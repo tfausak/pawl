@@ -72,6 +72,7 @@ import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -2670,6 +2671,34 @@ sphinxBoard s registry energy = do
       g2 = S.addPlayerCounter PlayerCounterKind.Energy energy S.alice g1
   pure (sphinx, srcId, g2 {GameState.priority = Just S.alice})
 
+-- sphinxBoard with a Synthetic Dynamo Conduit in place of one of the Islands, so
+-- one {U} of the {W}{U}{U} costs an energy counter.
+sphinxConduitBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Natural ->
+  m (Printing.Printing, ObjectId.ObjectId, GameState.GameState)
+sphinxConduitBoard s registry energy = do
+  sphinx <- S.printingOf s registry "Sphinx of the Revelation"
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  conduit <- S.printingOf s registry "Synthetic Dynamo Conduit"
+  mountain <- S.printingOf s registry "Mountain"
+  let (srcId, g0) = S.addPermanent sphinx S.alice (S.landsFor island S.alice 1 (S.landsInPlay plains 1))
+      (_, g1) = S.addPermanent conduit S.alice g0
+      g2 = List.foldl' (\gs _ -> snd (S.addLibraryCard mountain S.alice gs)) g1 [1 .. 6 :: Int]
+      g3 = S.addPlayerCounter PlayerCounterKind.Energy energy S.alice g2
+  pure (sphinx, srcId, g3 {GameState.priority = Just S.alice})
+
+-- answerXAt, and a blue yield wherever a mana ability offers one: the
+-- Conduit's one mana has to be the second {U}, where the first yield offered is
+-- white.
+answerXMakingBlue :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+answerXMakingBlue x who p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (any ((== ManaType.Colored Color.Blue) . ManaUnit.manaType) . Mana.yieldUnits) (NonEmpty.toList candidates))
+  _ -> answerXAt x who p
+
 -- Announces X and aims every target slot at `who`.
 answerXAt :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
 answerXAt x who p = case p of
@@ -2910,6 +2939,19 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     two <- boundsOff 2
     Spec.assertEqWith s "five counters bound X at 5" five [5]
     Spec.assertEqWith s "two counters bound X at 2" two [2]
+
+  -- CR 118.3 across the cost's two halves: the X energy the component pays and
+  -- the energy a Synthetic Dynamo Conduit spends making the second {U} are one
+  -- count. The board is the one above at two energy with the Conduit in place of
+  -- one Island, so what moves the bound from 2 to 1 is the Conduit's energy alone.
+  Spec.it s "CR 118.3 the Sphinx's X and a Conduit's mana share one count of energy" $ do
+    (sphinx, srcId, g1) <- sphinxConduitBoard s registry 2
+    let act = Activate.activateAbility S.alice srcId (theAbility sphinx)
+        bounds = State.execState (Engine.runGame (answerAtBound S.bob) g1 act) []
+        after = snd (Engine.runGamePure (answerXMakingBlue 1 S.bob) g1 (act >> Stack.resolveTop))
+    Spec.assertEqWith s "one energy for the {U} leaves one for X, so the bound is 1" bounds [1]
+    Spec.assertEqWith s "and X = 1 is payable: both counters spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 0
+    Spec.assertEqWith s "and alice drew the one card" (S.handSize S.alice after) 1
 
   -- CR 602.2: an X the counters cannot cover reverses the whole activation. The
   -- ENERGY is what refuses it here -- the mana half is payable at every X -- so

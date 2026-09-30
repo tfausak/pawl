@@ -1700,7 +1700,7 @@ announce subject spending pid oid total_ printed = do
     Just manaCost -> do
       -- The claims are read here rather than inside Mana.announce, which cannot
       -- reach claimOf -- this module imports that one, not the other way about.
-      (announced, life, paidWithLife) <- Mana.announce subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid oid total_ (lifeOwedBy pid gs (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost
+      (announced, life, paidWithLife) <- Mana.announce subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid oid total_ (lifeOwedBy pid gs (Cost.components cost)) (energyOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost
       pure
         ( cost
             { Cost.mana = Just announced,
@@ -2809,7 +2809,10 @@ canPayReading slots subject pid oid cost gs = case Cost.mana cost of
               -- 118.12's resolution-time payment -- so the mana is spent as it
               -- is. Which CR 106.6-restricted mana is a supply is the subject's
               -- question.
-              Mana.canPayCommitting subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) ManaSpending.AsProduced pid (lifeOwedBy pid gs components) (claimsOf slots pid oid components gs) residual gs
+              --
+              -- The energy committed is a fence: no special action or CR 118.12
+              -- cost in data/cards/ pays energy.
+              Mana.canPayCommitting subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) ManaSpending.AsProduced pid (lifeOwedBy pid gs components) (energyOwedBy components) (claimsOf slots pid oid components gs) residual gs
                 && all (\component -> canPayComponent slots pid oid component gs) components
                 && jointlyPayable slots pid oid components gs
      in any payableWith (waterbendSubstitutions (Cost.components cost) slots pid oid gs manaCost)
@@ -2932,9 +2935,10 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
               -- hand this function the same cost, so both get the same count.
               Activations.times = repeatsOf pid oid cost gs,
               Activations.claims = claimsOf Map.empty pid oid (Cost.components cost) gs,
-              Activations.life = lifeOwedBy pid gs (Cost.components cost)
+              Activations.life = lifeOwedBy pid gs (Cost.components cost),
+              Activations.energy = energyOwedBy (Cost.components cost)
             }
-        else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
+        else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
 
 -- CR 601.2f's adjustments for a MANA ability's activation cost, gathered where
 -- CR 605.3b leaves no stack window for Pawl.Engine.Activate to gather them in.
@@ -2999,6 +3003,7 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
             ManaSpending.AsProduced
             pid
             (lifeOwedBy pid gs (Cost.components cost))
+            (energyOwedBy (Cost.components cost))
             (claimsOf Map.empty pid oid (Cost.components cost) gs)
             totalled
             gs
@@ -3009,15 +3014,17 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- -- what makes Ashnod's Altar beside two creatures two mana activations, and
 -- Treasonous Ogre ("Pay 3 life: Add {R}") at 20 life six.
 --
--- The SMALLEST ceiling the cost's resources impose (CR 118.3's "fully"). Three
+-- The SMALLEST ceiling the cost's resources impose (CR 118.3's "fully"). Four
 -- are counted, each totalled over the WHOLE cost: OBJECTS, through
 -- Pawl.Engine.Claim.repeats, so two components drawing on one pool do not each
 -- get it -- untapped-ness is one such pool (ClaimAxis.Tapping), which is what
 -- makes Heritage Druid beside nine untapped Elves three activations and nine
 -- mana; LIFE, through CR 119.4, so the ceiling is the life total divided by
--- `lifeOwedBy`; and the COUNTERS on the source, CR 122.1's marker, so each
--- kind's ceiling is what it carries divided by `countersOwedBy` -- Workhorse's
--- four +1\/+1 counters are four activations and four mana.
+-- `lifeOwedBy`; ENERGY, through CR 107.14, the same division by `energyOwedBy`
+-- -- Synthetic Dynamo Conduit at three energy is three activations; and the
+-- COUNTERS on the source, CR 122.1's marker, so each kind's ceiling is what it
+-- carries divided by `countersOwedBy` -- Workhorse's four +1\/+1 counters are
+-- four activations and four mana.
 --
 -- Each totalled and then DIVIDED for one reason: two components spending the same
 -- resource would each get the whole of it if they were asked separately, which
@@ -3045,21 +3052,24 @@ repeatsOf pid oid cost gs =
       lifeCeiling = case lifeOwedBy pid gs components of
         0 -> []
         owed -> [div (lifeTotalOf pid gs) owed]
+      energyCeiling = case energyOwedBy components of
+        0 -> []
+        owed -> [div (Game.energyOf pid gs) owed]
       counterCeiling = [div (countersOn kind oid gs) owed | (kind, owed) <- Map.toList (countersOwedBy components), owed > 0]
-      ceilings = objectCeiling <> lifeCeiling <> counterCeiling <> Maybe.mapMaybe uncountedCeiling components
+      ceilings = objectCeiling <> lifeCeiling <> energyCeiling <> counterCeiling <> Maybe.mapMaybe uncountedCeiling components
    in case Cost.mana cost of
         Just (ManaCost.MkManaCost []) -> case ceilings of
           [] -> 1
           limits -> minimum limits
         _ -> 1
 
--- The ceiling ONE component imposes that `repeatsOf`'s three totals do not
+-- The ceiling ONE component imposes that `repeatsOf`'s four totals do not
 -- already carry, or Nothing where one of them does. 1 for every resource this
 -- module cannot count, and for two it need not. EXACT
 -- for CR 107.5's {T}, CR 107.6's {Q} and CR 606.4's loyalty (CR 606.3 allows one
 -- loyalty ability per turn whatever the counters allow); an UNDERSTATEMENT for
--- CR 107.14's energy, for a counter put on the source, for CR 701.68's blight,
--- and for TapForTotalPower and CollectEvidence (#2173).
+-- a counter put on the source, for CR 701.68's blight, and for TapForTotalPower
+-- and CollectEvidence (#2173).
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
@@ -3074,7 +3084,7 @@ uncountedCeiling component = case component of
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
   CostComponent.ExileCardFromHand _ -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
-  -- 1, and counted by none of the three totals: `claimOf` states no claim for
+  -- 1, and counted by none of the four totals: `claimOf` states no claim for
   -- this component either, Forage's answer below and for its reason. An
   -- UNDERSTATEMENT and the header's safe direction.
   CostComponent.ExileMaterials {} -> Just 1
@@ -3110,9 +3120,8 @@ uncountedCeiling component = case component of
   -- component can be paid. Heritage Druid's nine Elves are three activations
   -- (Pawl.ManaSpec).
   CostComponent.TapPermanents {} -> Nothing
-  -- An UNDERSTATEMENT: CR 107.14's ceiling is the player's energy counters
-  -- divided by what this component owes, `lifeCeiling`'s shape (#2173).
-  CostComponent.PayEnergy _ -> Just 1
+  -- Counted by `energyCeiling`, CR 107.14.
+  CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
   -- Counted by `counterCeiling`, CR 122.1.
@@ -3130,7 +3139,7 @@ uncountedCeiling component = case component of
   -- repeating it is bounded by whatever else the cost spends, not by the
   -- counters -- and the header's safe direction.
   CostComponent.PutPlusOneCountersOnThis _ -> Just 1
-  -- 1, and counted by none of the three totals: CR 701.20b spends nothing, so
+  -- 1, and counted by none of the four totals: CR 701.20b spends nothing, so
   -- there is no pool for `objectCeiling` to divide. An understatement,
   -- PutPlusOneCountersOnThis' above and the header's safe direction.
   CostComponent.RevealCardFromHand _ -> Just 1
@@ -3144,11 +3153,11 @@ uncountedCeiling component = case component of
   -- Zero, PayLifeX's answer above and for its reason: an unannounced X cannot be
   -- paid even once.
   CostComponent.BlightX -> Just 0
-  -- 1, and counted by none of the three totals: `claimOf` states no claim for
+  -- 1, and counted by none of the four totals: `claimOf` states no claim for
   -- this component, so `objectCeiling` has no pool to divide. An UNDERSTATEMENT
   -- -- a graveyard of nine pays three forages -- and the header's safe direction.
   CostComponent.Forage -> Just 1
-  -- 1, and counted by none of the three totals -- Forage's answer just above.
+  -- 1, and counted by none of the four totals -- Forage's answer just above.
   -- An UNDERSTATEMENT and the header's safe direction: nothing in rule 705
   -- bounds how many coins a player may flip, so this part alone would allow any
   -- number of repeats.
@@ -3161,7 +3170,7 @@ uncountedCeiling component = case component of
   -- Zero, BlightX's answer above and for its reason: an unannounced X
   -- cannot be paid even once.
   CostComponent.WaterbendX -> Just 0
-  -- 1, and counted by none of the three totals: rule 701.67a's licence spends
+  -- 1, and counted by none of the four totals: rule 701.67a's licence spends
   -- nothing, so `objectCeiling` has no pool to divide. Unreachable -- a
   -- waterbend cost carries the mana it licenses, so `repeatsOf` answers 1
   -- before it reads this.
@@ -3286,6 +3295,7 @@ canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ subs
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy pid gs (Cost.components cost)
+        outsideEnergy = energyOwedBy (Cost.components cost)
         claimed = claimsOf slots pid oid (Cost.components cost) gs
         -- CR 702.51b's and CR 702.66b's substitutes come with components of
         -- their own (`manaSubstitutions`), and CR 118.3 weighs those against the
@@ -3328,7 +3338,7 @@ canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ subs
             ( any
                 ( \(residual, extra) ->
                     componentsOkWith extra
-                      && Mana.canPayCommittingGiven subject hoisted spending sources pcs pid (outside + life) (claimsWith extra) residual gs
+                      && Mana.canPayCommittingGiven subject hoisted spending sources pcs pid (outside + life) outsideEnergy (claimsWith extra) residual gs
                 )
                 . substitute
             )
@@ -3384,6 +3394,55 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.DiscardThis _ -> 0
   CostComponent.PutCardFromHandOntoBattlefield _ -> 0
   CostComponent.PayEnergy _ -> 0
+  CostComponent.AddLoyaltyToThis _ -> 0
+  CostComponent.RemoveLoyaltyFromThis _ -> 0
+  CostComponent.RemoveCountersFromThis _ -> 0
+  CostComponent.RemoveCounters {} -> 0
+  CostComponent.RemovePlusOneCountersX _ -> 0
+  CostComponent.PutPlusOneCountersOnThis _ -> 0
+  CostComponent.Blight _ -> 0
+  CostComponent.BlightX -> 0
+  CostComponent.Forage -> 0
+  CostComponent.FlipCoin -> 0
+  CostComponent.ChooseOpponent -> 0
+  CostComponent.WaterbendX -> 0
+  CostComponent.Waterbend _ -> 0
+  CostComponent.ExileThisFromGraveyard -> 0
+  CostComponent.ExileThis -> 0
+  CostComponent.ExileCardsFromGraveyard {} -> 0
+  CostComponent.ExileMaterials {} -> 0
+  CostComponent.ExileTopFromGraveyard _ -> 0
+  CostComponent.CollectEvidence _ -> 0
+  CostComponent.ExileCardFromHand _ -> 0
+  CostComponent.RevealCardFromHand _ -> 0
+  CostComponent.Behold _ -> 0
+  CostComponent.MillCards _ -> 0
+
+-- CR 107.14's payments a cost owes outside its mana part, added up --
+-- `lifeOwedBy`'s energy sibling, and what `repeatsOf`'s energyCeiling divides
+-- by. Total for lifeOwedBy's reason.
+energyOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
+energyOwedBy = sum . fmap energyOwedByComponent
+
+energyOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
+energyOwedByComponent component = case component of
+  CostComponent.PayEnergy n -> n
+  -- 0, PayLifeX's answer in lifeOwedByComponent and for its reason.
+  CostComponent.PayEnergyX -> 0
+  CostComponent.PayLife _ -> 0
+  CostComponent.PayHalfLife _ -> 0
+  CostComponent.PayLifeX -> 0
+  CostComponent.TapThis -> 0
+  CostComponent.UntapThis -> 0
+  CostComponent.SacrificeThis -> 0
+  CostComponent.ReturnThis -> 0
+  CostComponent.Sacrifice {} -> 0
+  CostComponent.TapForTotalPower {} -> 0
+  CostComponent.TapPermanents {} -> 0
+  CostComponent.ReturnPermanents {} -> 0
+  CostComponent.DiscardCards {} -> 0
+  CostComponent.DiscardThis _ -> 0
+  CostComponent.PutCardFromHandOntoBattlefield _ -> 0
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.RemoveCountersFromThis _ -> 0
@@ -3642,7 +3701,7 @@ canPayComponent slots pid oid component gs = case component of
     Maybe.isJust (topExileCandidate slots pid criterion gs)
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters.
-  CostComponent.PayEnergy n -> energyOf pid gs >= n
+  CostComponent.PayEnergy n -> Game.energyOf pid gs >= n
   -- CR 606.4: always payable, CR 606.6 gating only the removing half -- but the
   -- permanent must still be one this player controls on the battlefield, rule
   -- 606.4 putting the counters on "that permanent".
@@ -4339,6 +4398,7 @@ announceToll pid charges = do
       -- CR 118.3 makes the whole toll one demand on one life total, so every
       -- charge's own CR 119.4 payments ride on every route offered for any of them.
       outside = sum (fmap (lifeOwedBy pid start . Cost.components . snd) charges)
+      outsideEnergy = sum (fmap (energyOwedBy . Cost.components . snd) charges)
       go done committed remaining = case remaining of
         [] -> pure (reverse done)
         (tag, cost) : rest -> case Cost.mana cost of
@@ -4369,6 +4429,7 @@ announceToll pid charges = do
                 tag
                 total_
                 (outside + committed)
+                outsideEnergy
                 claimed
                 manaCost
             let paid =
@@ -6416,21 +6477,9 @@ applyAdjustments adjustments cost =
           _ -> let (survivors, left) = cancel unspent rest in (symbol : survivors, left)
    in List.foldl' reduce (raise cost) reductions
 
--- CR 107.14: how many energy counters this player has, which is CR 118.3's
--- ceiling on what they can pay. Player.counters' absent-means-zero convention,
--- and a player who is not in the game has none.
---
--- SHARED rather than inlined at its readers: canPayComponent's PayEnergy gate,
--- spendEnergy below, and Pawl.Engine.Resolve's Effect.PayAnyEnergy bound must
--- agree about what "how much {E} do you have" means, and the last of those is a
--- number shown to the payer rather than a predicate.
-energyOf :: PlayerId -> GameState -> Natural
-energyOf pid gs =
-  maybe 0 (Map.findWithDefault 0 PlayerCounterKind.Energy . Player.counters) (Map.lookup pid (GameState.players gs))
-
 -- CR 107.14: pay this much {E} -- remove that many energy counters from the
 -- player. Natural subtraction is PARTIAL, so the floor is explicit; every caller
--- has already measured against energyOf, and the guard keeps this total anyway.
+-- has already measured against Game.energyOf, and the guard keeps this total anyway.
 --
 -- The one writer, so Pawl.Engine.Resolve's Effect.PayAnyEnergy spends through
 -- exactly the same edit CostComponent.PayEnergy does.

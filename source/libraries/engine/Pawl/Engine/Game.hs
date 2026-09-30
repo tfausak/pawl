@@ -63,6 +63,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -112,6 +113,18 @@ ask p = do
 -- see.
 poolOf :: PlayerId -> GameState -> Mana
 poolOf pid gs = Map.findWithDefault (Mana.MkMana []) pid (GameState.manaPool gs)
+
+-- CR 107.14: how many energy counters this player has, which is CR 118.3's
+-- ceiling on what they can pay. Player.counters' absent-means-zero convention,
+-- and a player who is not in the game has none.
+--
+-- SHARED rather than inlined at its readers: Pawl.Engine.Cost's PayEnergy gate
+-- and repeat ceiling, Pawl.Engine.Mana's joint payability, and Pawl.Engine.Resolve's
+-- Effect.PayAnyEnergy bound must agree about what "how much {E} do you have"
+-- means. Here rather than in Cost for poolOf's reason: Mana sits below Cost.
+energyOf :: PlayerId -> GameState -> Natural
+energyOf pid gs =
+  maybe 0 (Map.findWithDefault 0 PlayerCounterKind.Energy . Player.counters) (Map.lookup pid (GameState.players gs))
 
 lookupObject :: ObjectId -> GameState -> Maybe Object
 lookupObject oid gs = Map.lookup oid (GameState.objects gs)
