@@ -3503,12 +3503,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           runDamageRewriteEffects
           runPreventionRiders
       _ -> pure ()
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) -> do
+    -- The affected objects are enumerated once, by the same sweep every
+    -- ObjectRef-taking opcode uses. Nothing to affect (an illegal slot per CR
+    -- 608.2b, a set that matched nothing) arrives as the empty list.
+    --
+    -- The CHOSEN ref is asked through chosenPermanentOf instead, Effect.Pair's
+    -- reason: CR 608.2d's choice is an ask, which the pure sweep cannot make.
+    -- Mirkwood Trapper's "that player chooses an attacking creature. It gets
+    -- +2/+0" is the reader.
+    affected <- case ref of
+      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
+      _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
     State.modify' $ \gs ->
-      -- The affected objects are enumerated once, by the same sweep every
-      -- ObjectRef-taking opcode uses. Nothing to affect (an illegal slot per CR
-      -- 608.2b, a set that matched nothing) arrives as the empty list.
-      case objectRefObjects legal resolving controller source gs ref of
+      case affected of
         [] -> gs
         targets -> case Expiry.arm legal controller source duration gs of
           -- CR 611.2b: the duration never started, so nothing is stored.

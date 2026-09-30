@@ -21,6 +21,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -81,11 +82,15 @@ data TriggerCondition
     SelfIsDealtDamage
   | -- | CR 603.2 / 509-510 read by a bystander: a permanent the Filter admits
     -- dealt combat damage to a player (Tovolar, Dire Overlord).
+    --
+    -- Not implemented: narrowing the damaged player -- Teysa, Envoy of Ghosts'
+    -- "whenever a creature deals combat damage to you" (#4472).
     PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
-  | -- | CR 603.2c's batch reading of the arm above: "whenever one or more
-    -- artifact creatures you control deal combat damage to a player" (Pia
-    -- Nalaar, Chief Mechanic), once for the whole CR 510.2 step.
-    PermanentsDealCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.2c's batch reading of the arm above, with the damaged player
+    -- narrowed: "whenever one or more artifact creatures you control deal combat
+    -- damage to a player" (Pia Nalaar, Chief Mechanic), once per CR 510.2 step
+    -- and damagers' controller.
+    PermanentsDealCombatDamageToPlayer PermanentsDealCombatDamageToPlayer.PermanentsDealCombatDamageToPlayer
   | -- | CR 725.2: a creature dealt combat damage to the monarch. Borne by no
     -- card; matched only via Pawl.Engine.Monarch.inherentMatch.
     CreatureDealtCombatDamageToMonarch

@@ -619,8 +619,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.3c whole card: two attackers declared together draw ONE card | `check:helper-answering` `check:helper-handNames` `check:helper-libraryOf` `check:helper-sentAt`
 - CR 508.3d a declare attackers step with no attackers adds nothing | `check:helper-bobsTurn` `check:helper-sentAt`
 - CR 508.3d a declare attackers step with no attackers is not attacking | `check:helper-answering` `check:helper-sentAt`
-- CR 508.3d the declaring player is the one that pays | `check:helper-answering` `check:helper-fired` `check:helper-lives` `check:helper-sentAt`
-- CR 508.3d the payer does not follow who was attacked | `check:helper-answering` `check:helper-fired` `check:helper-lives` `check:helper-sentAt`
 - CR 508.3e a Seifer the defending player controls is silent | `check:helper-answering` `check:helper-fired` `check:helper-sentAt` `check:other-Goad.goadedBy`
 - CR 508.3e an opponent attacking somebody else leaves it silent | `check:helper-answering` `check:helper-fired` `check:helper-sentAt` `check:helper-stunOn`
 - CR 508.3e attacking a planeswalker that player controls leaves it silent | `check:helper-answering` `check:helper-fired` `check:helper-sentAt` `check:other-Goad.goadedBy`
