@@ -1,0 +1,24 @@
+{
+  "description": "CR 122.6 Battlegrowth puts a +1/+1 counter (gate)",
+  "note": "alice casts Battlegrowth on bob's Goblin Piker, which is 3/2 once it resolves.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Forest", "label": "forest", "ready": true }],
+        "hand": [{ "card": "Battlegrowth", "label": "battlegrowth" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "goblin-piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@battlegrowth", "targets": ["@goblin-piker"], "mana": ["@forest"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@goblin-piker", "power": 3, "toughness": 2 } } }
+  ]
+}

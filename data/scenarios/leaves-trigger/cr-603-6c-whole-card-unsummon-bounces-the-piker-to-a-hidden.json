@@ -1,0 +1,30 @@
+{
+  "description": "CR 603.6c whole card: Unsummon bounces the Piker to a hidden zone and the Shredder still grows",
+  "note": "Super Shredder's \"whenever another permanent leaves the battlefield\" read by a bystander: alice's Unsummon returns her Goblin Piker to her hand, a hidden zone, and bob's Shredder still grows to 2/2. The Shredder is bob's so that no reading of a \"you control\" the condition does not make can pass.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Goblin Piker", "label": "goblin-piker" }
+        ],
+        "hand": [{ "card": "Unsummon", "label": "unsummon" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Super Shredder", "label": "super-shredder" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@unsummon", "targets": ["@goblin-piker"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@super-shredder", "power": 2, "toughness": 2 } } }
+  ]
+}

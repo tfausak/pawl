@@ -80,6 +80,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt.Type
 import qualified Pawl.Types.Readiness as Readiness
@@ -654,6 +655,11 @@ observe gs check = case check of
   Check.Monarch (MonarchIs.MkMonarchIs expected) -> do
     actual <- traverse labelOf (GameState.monarch gs)
     pure (if actual == expected then Nothing else Just (maybe (Text.pack "nobody") Label.unwrap actual))
+  -- The projected values (CR 613.4), never the printed card's.
+  Check.PowerToughness (PowerToughnessIs.MkPowerToughnessIs ref power toughness) -> do
+    oid <- resolveObject ref gs
+    let actual = (,) <$> Projection.powerOf oid gs <*> Projection.toughnessOf oid gs
+    pure (if actual == Just (power, toughness) then Nothing else Just (maybe (Text.pack "no power and toughness") (\(p, t) -> Text.pack (show p <> "/" <> show t)) actual))
 
 -- Queues -----------------------------------------------------------------------
 

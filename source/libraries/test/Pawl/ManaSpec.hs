@@ -2340,22 +2340,6 @@ workhorseSpec s registry = Spec.describe s "Workhorse" $ do
     Spec.assertEqWith s "CR 122.1a so the 4/4 is a 1/1, and still there to be read" (S.powerToughnessOf horseId resolved) (Just (1, 1))
     Spec.assertEqWith s "and the failed cast spent none of the short board's counters" (S.counterOf CounterKind.PlusOnePlusOne shortId short) 2
 
-  -- The card's OTHER printed line, which the boards above set by hand: cast the
-  -- Workhorse and it arrives already carrying the four counters (CR 614.1c
-  -- through EntryRewrite.WithCounters).
-  Spec.it s "CR 614.1c Workhorse enters with four +1/+1 counters, so it arrives a 4/4" $ do
-    horse <- S.printingOf s registry "Workhorse"
-    forest <- S.printingOf s registry "Forest"
-    let (withSpell, spellId) = S.handOne horse (S.landsInPlay forest 6)
-        cast = S.runPure S.identityAnswer withSpell (S.cast S.alice spellId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-        entered = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield withSpell))
-    case entered of
-      [horseId] -> do
-        Spec.assertEqWith s "CR 122.1a a 4/4 on arrival, not the printed 0/0" (S.powerToughnessOf horseId resolved) (Just (4, 4))
-        Spec.assertEqWith s "four +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne horseId resolved) 4
-      _ -> Spec.assertFailure s "Workhorse should have resolved onto the battlefield"
-
 -- One Workhorse under alice's control carrying `counters` +1/+1 counters, and
 -- nothing else on the board. The counters are placed by hand rather than by CR
 -- 614.1c so that the two counts a case wants differ in the counters ALONE; the

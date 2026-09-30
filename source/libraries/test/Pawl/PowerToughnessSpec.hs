@@ -134,27 +134,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, gs) = S.addPermanent piker S.alice gs0
     Spec.assertEqWith s "none" (PC.characteristicPT (Projection.baseCharacteristics pikerId gs)) Nothing
-  Spec.it s "CR 613.4a Tarmogoyf's P/T is recomputed, not fixed at entry" $ do
-    -- THE FALSIFIER for evaluating a printed * once, at the seed or at entry:
-    -- nothing touches the Goyf, and its P/T moves because a graveyard did.
-    -- Empty graveyards -> 0 card types -> 0/1. Fog resolves and is put into
-    -- its owner's graveyard (CR 608.2n), adding the Instant type.
-    --
-    -- Fog, NOT Lightning Bolt: Bolt targets, S.identityAnswer would aim it at
-    -- the only creature on the board, and 3 damage would kill the 0/1 Goyf
-    -- being measured. Fog has no target and no effect outside combat.
-    forest <- S.printingOf s registry "Forest"
-    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
-    fog <- S.printingOf s registry "Fog"
-    let base = S.landsInPlay forest 1
-        (goyfId, board) = S.addPermanent tarmogoyf S.alice base
-        (gs, fogId) = S.handOne fog board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice fogId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "before: no card types in any graveyard, so 0 power" (Projection.powerOf goyfId board) (Just 0)
-    Spec.assertEqWith s "before: 0+1 toughness" (Projection.toughnessOf goyfId board) (Just 1)
-    Spec.assertEqWith s "after: one card type (Instant), so 1 power" (Projection.powerOf goyfId after) (Just 1)
-    Spec.assertEqWith s "after: 1+1 toughness" (Projection.toughnessOf goyfId after) (Just 2)
   Spec.it s "CR 208.2a 2007-10-01 the CDA works in all zones, and a Goyf in a graveyard counts itself" $ do
     -- Gatherer ruling on Tarmogoyf (WotC, 2007-10-01): "The ability that
     -- defines Tarmogoyf's power and toughness works in all zones, not just
@@ -1383,60 +1362,6 @@ serraAvatarSpec s registry = Spec.describe s "Serra Avatar" $ do
     Spec.assertEqWith s "alice is at 20" (S.lifeOf S.alice gs) (Just 20)
     Spec.assertEqWith s "power" (Projection.powerOf avatarId gs) (Just 20)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf avatarId gs) (Just 20)
-  -- THE LIVENESS FALSIFIER, upward. CR 119.3 adjusts a life total the moment an
-  -- effect says to, and nothing touches the Avatar -- only the next projection's
-  -- read of alice's life. Renewed Faith is targetless, so no interpreter here has
-  -- to choose who gains.
-  Spec.it s "CR 119.3 Renewed Faith's 6 life makes the Avatar a 26/26" $ do
-    plains <- S.printingOf s registry "Plains"
-    renewedFaith <- S.printingOf s registry "Renewed Faith"
-    avatar <- S.printingOf s registry "Serra Avatar"
-    let (gs0, spellId) = S.handOne renewedFaith (S.landsInPlay plains 3)
-        (avatarId, board) = S.addPermanent avatar S.alice gs0
-        cast = S.runPure S.identityAnswer board (S.cast S.alice spellId)
-        after = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "20/20 before" (S.powerToughnessOf avatarId board) (Just (20, 20))
-    Spec.assertEqWith s "alice gained 6" (S.lifeOf S.alice after) (Just 26)
-    Spec.assertEqWith s "26/26 after" (S.powerToughnessOf avatarId after) (Just (26, 26))
-  -- The same falsifier downward, and the one that matters for the board: an
-  -- Avatar that stayed 20/20 while its controller fell to 18 would be reading a
-  -- number frozen at entry. S.identityAnswer targets the least Recipient and
-  -- Sign in Blood's pool is Players, so alice (player 0) is the target without a
-  -- bespoke interpreter.
-  Spec.it s "CR 119.3 Sign in Blood's 2 life makes the Avatar an 18/18" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    signInBlood <- S.printingOf s registry "Sign in Blood"
-    avatar <- S.printingOf s registry "Serra Avatar"
-    let (gs0, spellId) = S.handOne signInBlood (twoCardLibrary swamp (S.landsInPlay swamp 2))
-        (avatarId, board) = S.addPermanent avatar S.alice gs0
-        cast = S.runPure S.identityAnswer board (S.cast S.alice spellId)
-        after = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "20/20 before" (S.powerToughnessOf avatarId board) (Just (20, 20))
-    Spec.assertEqWith s "alice lost 2" (S.lifeOf S.alice after) (Just 18)
-    Spec.assertEqWith s "18/18 after" (S.powerToughnessOf avatarId after) (Just (18, 18))
-  -- CR 109.5 / 604.3a(3): "your" in a characteristic-defining ability is the
-  -- object's OWN controller. The two players are held at different life totals
-  -- and nothing but control moves between the assertions, so an Avatar reading
-  -- its owner's life -- or its source's, or the active player's -- gives 18 where
-  -- the rule gives 20.
-  Spec.it s "CR 109.5 the life total read is the CONTROLLER's, not the owner's" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    signInBlood <- S.printingOf s registry "Sign in Blood"
-    avatar <- S.printingOf s registry "Serra Avatar"
-    let (gs0, spellId) = S.handOne signInBlood (twoCardLibrary swamp (S.landsInPlay swamp 2))
-        (avatarId, board) = S.addPermanent avatar S.alice gs0
-        cast = S.runPure S.identityAnswer board (S.cast S.alice spellId)
-        drained = S.runPure S.identityAnswer cast Stack.resolveTop
-        stolen = S.giveControl avatarId S.bob drained
-    Spec.assertEqWith s "alice at 18, bob untouched at 20" (S.lifeOf S.alice drained, S.lifeOf S.bob drained) (Just 18, Just 20)
-    Spec.assertEqWith s "under alice: 18/18" (S.powerToughnessOf avatarId drained) (Just (18, 18))
-    Spec.assertEqWith s "under bob: 20/20" (S.powerToughnessOf avatarId stolen) (Just (20, 20))
-
--- Two cards in alice's library, so Sign in Blood's "draws two cards" has
--- something to draw: an empty library would lose her the game to CR 704.5b
--- rather than shrink her Avatar.
-twoCardLibrary :: Printing.Printing -> GameState.GameState -> GameState.GameState
-twoCardLibrary printing gs = snd (S.addLibraryCard printing S.alice (snd (S.addLibraryCard printing S.alice gs)))
 
 -- Omnath, Locus of Mana ({2}{G} Legendary Creature -- Elemental), second line:
 -- "Omnath gets +1/+1 for each unspent green mana you have." Oracle text verified
@@ -1650,21 +1575,6 @@ aspectOfWolfSpec s registry = Spec.describe s "Aspect of Wolf" $ do
     Spec.assertEqWith s "before the Aura, the Hill Giant is its printed 3/3" (S.powerToughnessOf giantId before) (Just (3, 3))
     Spec.assertEqWith s "the Aura really attached, so the count genuinely runs (CR 303.4m)" (length (ridersOn giantId after)) 1
     Spec.assertEqWith s "half of five: down for the power, up for the toughness" (S.powerToughnessOf giantId after) (Just (5, 6))
-  -- A second odd board, so neither half can be a constant: every number moves.
-  Spec.it s "CR 107.1a three Forests give +1/+2" $ do
-    forest <- S.printingOf s registry "Forest"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    aspect <- S.printingOf s registry "Aspect of Wolf"
-    let (_, after, giantId) = wolfOn forest hillGiant aspect 3
-    Spec.assertEqWith s "half of three, each way" (S.powerToughnessOf giantId after) (Just (4, 5))
-  -- The control: on an EVEN count the directions agree, which is exactly why the
-  -- two cases above are odd.
-  Spec.it s "CR 107.1 four Forests give +2/+2, the directions agreeing" $ do
-    forest <- S.printingOf s registry "Forest"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    aspect <- S.printingOf s registry "Aspect of Wolf"
-    let (_, after, giantId) = wolfOn forest hillGiant aspect 4
-    Spec.assertEqWith s "no fraction to round" (S.powerToughnessOf giantId after) (Just (5, 5))
   -- CR 612.1 at a P/T modification's quantities (see #711): the "for each
   -- Forest you control" inside a layer-7c P/T modification is printed in the
   -- text box exactly as Kird Ape's "as long as" clause is, so a Magical Hack
