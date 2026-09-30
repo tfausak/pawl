@@ -81,11 +81,12 @@ playerOf controllerOf target gs = case target of
   -- (Pawl.Types.LastKnown's protector) and never the head of defendingPlayers,
   -- which CR 802.2a denies is an answer at all once several players defend.
   --
-  -- Both arms answer a DECLARED attack only where no seat was recorded, which in
-  -- a running game is never: defenderOfAttack below reads rule 508.5's second
-  -- sentence off Pawl.Types.Combat's attackedUnder, and reaches this function
-  -- only for a combat record built by hand. That leaves the filed designation
-  -- with no observer (#2985).
+  -- The filed designation is also what the declaration itself records:
+  -- Pawl.Engine.Combat writes attackedUnder and the AttackerDeclared event after
+  -- CR 508.1i's mana window, so a battle sacrificed to pay the attack cost has
+  -- already gone. Pawl.BattleSpec's "CR 508.1i / 508.5 a Siege sacrificed to pay
+  -- the attack tax leaves its protector defending" (Krark-Clan Ironworks) proves
+  -- it. Once that seat is recorded, defenderOfAttack below reads it instead.
   --
   -- Battlefield membership rather than a missing object, the question
   -- attackableBattles already asks: the two arms are "is it there" and "was it

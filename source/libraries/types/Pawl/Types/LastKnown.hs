@@ -173,8 +173,10 @@ data LastKnown = MkLastKnown
     -- combat while CR 506.4c keeps its attacker attacking it, and CR 508.5's
     -- second sentence then asks for "the protector of the battle that creature
     -- was attacking before it was removed from combat" -- a question with no live
-    -- object left to read. Pawl.Engine.Battle.lastKnownProtectorOf is the reader,
-    -- through Pawl.Engine.Defender.playerOf's battle arm.
+    -- object left to read, and one the declaration already asks of a battle
+    -- sacrificed during CR 508.1i's mana window.
+    -- Pawl.Engine.Battle.lastKnownProtectorOf is the reader, through
+    -- Pawl.Engine.Defender.playerOf's battle arm.
     protector :: !(Maybe PlayerId.PlayerId),
     -- | CR 400.7d: the optional additional costs paid for the spell that became
     -- it -- Object.paidCosts as it left. Not a characteristic, and gone with the
