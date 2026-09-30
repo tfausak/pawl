@@ -90,6 +90,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
 import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
@@ -5383,7 +5384,17 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- damage events this condition admits is the singular arm's answer, filter,
   -- kind and recipient alike, and firing once for the CR 510.2 step is
   -- `batchScoped` below plus eventTriggers' dedup, never this arm.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer f) event
+  --
+  -- Plus the damaged player, which the singular arm leaves unasked: Norn's
+  -- Decree's "deal combat damage to YOU", read like
+  -- SelfDealsCombatDamageToPlayer's relation.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer p -> case event of
+    GameEvent.DamageDealt ev ->
+      maybe False (PlayerRelation.holds (Game.teams gs) (PermanentsDealCombatDamageToPlayer.recipient p) you) (Recipient.playerOf (DamageEvent.target ev))
+        && matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.filter p)) event
+    -- A wildcard where the singular arm is exhaustive: that arm already answers
+    -- False for every other event, and this one only narrows it.
+    _ -> False
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
   -- ZoneChange.departed for that arm's reason (CR 603.10a).

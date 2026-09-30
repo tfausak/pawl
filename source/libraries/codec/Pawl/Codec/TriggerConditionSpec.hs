@@ -32,6 +32,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -140,12 +141,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- CR 603.2c's batch reading of that same form, carrying the same Filter -- so a
   -- separate tag is the only thing that keeps Pia Nalaar's once-per-step card and
   -- Tovolar's once-per-damager card apart on the wire.
-  Spec.it s "PermanentsDealCombatDamageToPlayer round-trips with its Filter" $
+  Spec.it s "PermanentsDealCombatDamageToPlayer round-trips with its Filter and recipient" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.And [Filter.HasCardType CardType.Artifact, Filter.ControlledBy PlayerRelation.You]))
-      " {\"type\":\"PermanentsDealCombatDamageToPlayer\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
+      (TriggerCondition.PermanentsDealCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer (Filter.And [Filter.HasCardType CardType.Artifact, Filter.ControlledBy PlayerRelation.You]) PlayerRelation.AnyPlayer))
+      " {\"type\":\"PermanentsDealCombatDamageToPlayer\",\"value\":{\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"recipient\":{\"type\":\"AnyPlayer\"}}} "
   -- CR 725.2: a creature dealt combat damage to the monarch.
   Spec.it s "CreatureDealtCombatDamageToMonarch" $
     Common.assertCodec
