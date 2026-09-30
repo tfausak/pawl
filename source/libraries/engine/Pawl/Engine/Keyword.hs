@@ -4000,17 +4000,15 @@ castFromGraveyardExile =
 handReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts keywords))]
 
--- | The replacement effects rule 702 mints for a card in a GRAVEYARD, off its
--- printed keywords -- `handReplacementsOf`'s sibling one zone over, and rule
+-- | The replacement effects rule 702 mints for a card in a GRAVEYARD, off the
+-- keyword set it is handed -- `handReplacementsOf`'s sibling one zone over, and rule
 -- 702.52a's dredge is the only one that reaches it.
 --
 -- Its own mint point for `handReplacementsOf`'s reason: rule 702.52a functions
 -- "only while the card with dredge is in a player's graveyard", which is a zone
 -- `mintedReplacementsFor`'s projection walk does not reach.
 -- Pawl.Engine.Projection.replacementsAffecting's graveyard walk hands it the
--- PROJECTION's keywords, but only for a card whose printed face has dredge,
--- so a dredge an effect granted to a card in a graveyard mints nothing (gap
--- #1859).
+-- PROJECTION's keywords, so a dredge an effect grants or removes there is seen.
 --
 -- ONE ROW PER DISTINCT dredge ability, which is what a keyword SET gives and
 -- what rule 702.52 asks for: each ability states its own N, so two unlike ones

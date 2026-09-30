@@ -928,6 +928,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   ashlingSpec s registry
   rumorGathererSpec s registry
   omnathSpec s registry
+  necrobloomSpec s registry
   guidingSpiritSpec s registry
 
 -- CR 608.2n / 608.2i: how many times an ACTIVATED ability has resolved this
@@ -1078,6 +1079,32 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Creation (CR 608.2n)"
         Spec.assertEqWith s "the first resolution gained 4 and added nothing" (poolSize S.alice once, S.lifeOf S.alice once) (0, Just 24)
         Spec.assertEqWith s "the fourth resolution did nothing at all" (S.lifeOf S.alice fourth, S.lifeOf S.bob fourth, poolSize S.alice fourth) (Just 24, Just 16, 4)
       _ -> Spec.assertFailure s "four Forests should have entered"
+
+-- CR 201.2b through a condition: The Necrobloom ({1}{W}{B}{G} Legendary
+-- Creature -- Plant 2/7, "Landfall -- Whenever a land you control enters,
+-- create a 0/1 green Plant creature token. If you control seven or more lands
+-- with different names, create a 2/2 black Zombie creature token instead.",
+-- Oracle text verified Scryfall 2026-09-30). alice controls six lands with six
+-- names; a pair of boards differing only in the seventh land to enter -- a
+-- Snow-Covered Forest, a seventh name, or a second Forest, seven lands with six
+-- names.
+necrobloomSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+necrobloomSpec s registry = Spec.describe s "The Necrobloom (CR 201.2b)"
+  . Spec.it s "CR 201.2b seven lands make a Zombie only when they have seven names"
+  $ do
+    bloom <- S.printingOf s registry "The Necrobloom"
+    lands <- mapM (S.printingOf s registry) ["Plains", "Island", "Swamp", "Mountain", "Forest", "Evolving Wilds"]
+    forest <- S.printingOf s registry "Forest"
+    snowy <- S.printingOf s registry "Snow-Covered Forest"
+    let (_, withBloom) = S.addPermanent bloom S.alice (Setup.emptyGame S.bothPlayers)
+        board = List.foldl' (\g land -> snd (S.addPermanent land S.alice g)) withBloom lands
+        tokens land =
+          let (oid, g) = S.addHandCard land S.alice board
+              after = enterFromHand oid g
+              count name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice after
+           in (count "Zombie Token", count "Plant Token")
+    Spec.assertEqWith s "CR 201.2b a seventh name makes a Zombie and no Plant" (tokens snowy) (1, 0)
+    Spec.assertEqWith s "CR 201.2b a second Forest leaves six names, so a Plant" (tokens forest) (0, 1)
 
 -- CR 603.2 / 603.3: one card alice holds is put onto the battlefield, the
 -- abilities it triggers are placed at the next settle, and the top one resolves.

@@ -3926,6 +3926,8 @@ aggregationReads a = case a of
   Aggregation.DistinctColors -> Set.singleton Colors
   Aggregation.MostSharingACreatureType -> Set.singleton Subtypes
   Aggregation.MostSharingACardType -> Set.singleton Types
+  -- No Modification writes CR 201.1's names, HasName's reason in filterReads.
+  Aggregation.DistinctNames -> Set.empty
   Aggregation.Greatest q -> quantityReads q
   Aggregation.Total q -> quantityReads q
 
@@ -5270,13 +5272,16 @@ replacementsAffecting gs =
       -- Pawl.Engine.Keyword.graveyardReplacementsOf is what decides which
       -- keywords reach it, and dredge is the only one.
       --
-      -- Gated on the PRINTED face, which keeps the walk from projecting every
-      -- card in every graveyard, and minted off the PROJECTION's keywords (CR
-      -- 613.1 names no zone) once it passes: Yixlid Jailer's "cards in graveyards
-      -- lose all abilities" takes the dredge away, and Pawl.ZoneReplacementSpec's
-      -- "CR 613.1f Yixlid Jailer leaves Darkblast no dredge" proves it. A card
-      -- printing no dredge fails the gate, so a dredge an effect GRANTS in a
-      -- graveyard mints nothing (gap #1859).
+      -- Minted off the PROJECTION's keywords (CR 613.1 names no zone): Yixlid
+      -- Jailer's "cards in graveyards lose all abilities" takes the dredge away,
+      -- and The Necrobloom's "land cards in your graveyard have dredge 2" gives
+      -- one. Pawl.ZoneReplacementSpec's "CR 613.1f Yixlid Jailer leaves
+      -- Darkblast no dredge" and "CR 613.1f The Necrobloom gives a land card in
+      -- a graveyard dredge" prove the two directions.
+      --
+      -- Gated so the walk does not project every card in every graveyard: a
+      -- card is projected only when its printed face has such a keyword or when
+      -- some grantor writes one (`graveyardGrantInForce`).
       --
       -- No mayStateZoneOfRow prefilter beside it, `mintedInHand`'s posture: a
       -- MINTED row is not printed in a face's list, so there is no
@@ -5285,8 +5290,17 @@ replacementsAffecting gs =
       mintedInGraveyard oid = case Game.faceOf oid gs of
         Nothing -> []
         Just face
-          | null (Keyword.graveyardReplacementsOf (Face.keywordSet face)) -> []
+          | null (Keyword.graveyardReplacementsOf (Face.keywordSet face)) && not graveyardGrantInForce -> []
           | otherwise -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.graveyardReplacementsOf (Map.keysSet (keywordsOf oid gs)))
+      -- Does anything grant a keyword that mints a graveyard row? baseHas's
+      -- grantor disjunct and `elsewhereHas`'s two, asked with the narrower
+      -- predicate. A thunk: only a graveyard card printing no such keyword
+      -- forces it.
+      mintsInGraveyard = grantsKeywordWhere (not . null . Keyword.graveyardReplacementsOf . Set.singleton)
+      graveyardGrantInForce =
+        any (any (any mintsInGraveyard . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) onBattlefield
+          || storedWrites mintsInGraveyard gs
+          || elsewhereGrants mintsInGraveyard gs
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
