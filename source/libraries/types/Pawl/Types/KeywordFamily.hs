@@ -290,7 +290,7 @@ data KeywordFamily
   | -- | CR 702.153a: casualty N. No card in the pool asks yet, and it is owed at
     -- the keyword rather than at the first asker.
     Casualty
-  | -- | CR 702.187b: mayhem [cost]. No card in the pool asks yet, and it is owed
+  | -- | CR 702.187b / 702.187c: mayhem, with a cost or without. No card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Mayhem
   | -- | CR 702.35a: madness [cost]. No card in the pool asks yet, and it is owed

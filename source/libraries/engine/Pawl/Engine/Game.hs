@@ -2899,7 +2899,8 @@ damagedObject event = damageRecipient event >>= Recipient.objectOf
 
 -- CR 702.187b / 608.2i: did this player discard THIS card this turn?
 -- wasDealtDamageThisTurn's shape below over the discard log, and the reader is
--- Pawl.Engine.Cost.candidateCostsGiven's mayhem offer. The turn scope is
+-- Pawl.Engine.Cost.candidateCostsGiven's mayhem offer, and
+-- Pawl.Engine.PlayerEffect.mayPlayByMayhem's CR 702.187c play. The turn scope is
 -- GameState.events itself, that function's reason.
 --
 -- The id compared is the one the CR 400.7 funnel minted, which is what

@@ -2448,15 +2448,36 @@ playPermissionPiles pid gs =
 
 -- CR 305.1 / 400.7i: the ways a play of the land `oid` can be made, asked of
 -- the PRE-MOVE state for castPermissionOptions' reason. Open without any
--- Play-verb permission where the land is in its owner's hand or a PlayLandsFrom
--- grant (Crucible of Worlds) opens its pile at no cost.
+-- Play-verb permission where the land is in its owner's hand, a PlayLandsFrom
+-- grant (Crucible of Worlds) opens its pile at no cost, or the land's own
+-- costless mayhem admits it (mayPlayByMayhem) -- so a once-each-turn permission
+-- (Serra Paragon) standing beside mayhem is a choice, not a spend.
 landPermissionOptions :: (ObjectId -> Bool) -> PlayerId -> ObjectId -> GameState -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
 landPermissionOptions rides pid oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj ->
     let zone = Object.zone obj
-        free = (zone == Zone.Hand && Object.owner obj == pid) || elem (zone, Object.owner obj) (playLandPiles pid gs)
+        free = (zone == Zone.Hand && Object.owner obj == pid) || elem (zone, Object.owner obj) (playLandPiles pid gs) || mayPlayByMayhem pid oid gs
      in permissionOptions rides free (landPermissionsFrom pid zone oid gs)
+
+-- CR 702.187c: may `pid` play `oid` out of their graveyard under the card's own
+-- costless mayhem? It is in `pid`'s graveyard (rule 702.187c's "your
+-- graveyard"), has the keyword there (CR 702.187a, read off the projection, so
+-- a granted instance counts), and `pid` discarded THIS object this turn -- CR
+-- 400.7 makes a card that left the graveyard and came back a new object with no
+-- discard behind it. Read live at the moment of the play, as the mayhem cast's
+-- own clause is (Pawl.Engine.Cost.candidateCostsGiven).
+--
+-- A per-CARD permission read off the card, so Pawl.Engine.Action.playableLands
+-- asks it of each graveyard member rather than opening the pile.
+mayPlayByMayhem :: PlayerId -> ObjectId -> GameState -> Bool
+mayPlayByMayhem pid oid gs = case Game.lookupObject oid gs of
+  Nothing -> False
+  Just obj ->
+    Object.zone obj == Zone.Graveyard
+      && Object.owner obj == pid
+      && Keyword.hasCostlessMayhem (Map.keysSet (Projection.keywordsOf oid gs))
+      && Game.discardedThisTurnBy pid oid gs
 
 -- CR 702.170f: the (zone, owner) piles some PlotFrom grant opens to `pid`, for
 -- Pawl.Engine.Plot to draw candidates from, playPermissionPiles' shape; which of

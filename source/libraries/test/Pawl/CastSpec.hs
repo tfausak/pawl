@@ -5852,6 +5852,51 @@ mayhemSpec s registry = Spec.describe s "Mayhem" $ do
       (costsOf discarded)
       [(Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, theRed]), [])]
     Spec.assertEqWith s "the undiscarded one is offered no cost at all" (costsOf notDiscarded) []
+  -- CR 702.187c on Oscorp Industries, a land printing "Mayhem" with no cost:
+  -- the permission is to PLAY it, which for a land is CR 305.1's special action
+  -- out of the graveyard. mayhemBoards' pair again, the Reunion discarding the
+  -- land on the left only; the Mountain it discards beside it is a land
+  -- discarded this turn WITHOUT mayhem, which is never offered.
+  Spec.it s "CR 702.187c a land discarded this turn is played from the graveyard, as the turn's land play" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    oscorp <- S.printingOf s registry "Oscorp Industries"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    let (discarded, notDiscarded) = mayhemBoards mountain piker oscorp reunion
+        oscorpIn gs = case Scenario.namedObjects (S.printingName oscorp) gs of
+          oid : _ -> Just oid
+          [] -> Nothing
+        plays gs = [oid | A.Play oid _ <- Action.legalActions S.alice gs, Game.zoneOf oid gs == Just Zone.Graveyard]
+        played = case oscorpIn discarded of
+          Just oid ->
+            let entered = S.runPure S.identityAnswer discarded (Cast.playLand False S.alice oid Nothing)
+             in S.runPure S.identityAnswer (S.runPure S.identityAnswer entered Engine.placePendingTriggers) Stack.resolveTop
+          Nothing -> discarded
+    Spec.assertEqWith s "the discarded Oscorp is the one land play offered from the graveyard" (plays discarded) (Maybe.maybeToList (oscorpIn discarded))
+    Spec.assertEqWith s "and none where it lay in the graveyard undiscarded" (plays notDiscarded) []
+    Spec.assertEqWith s "nor once the turn's land play is spent" (plays discarded {GameState.landsPlayed = Map.singleton S.alice 1}) []
+    Spec.assertEqWith
+      s
+      "played, it is on the battlefield and its enters-from-a-graveyard trigger cost alice 2 life"
+      (S.countOnBattlefieldByName (S.printingName oscorp) S.alice played, S.lifeOf S.alice played)
+      (1, fmap (subtract 2) (S.lifeOf S.alice discarded))
+  -- CR 702.187c beside CR 601.3's once-each-turn permission: Serra Paragon also
+  -- lets alice play a land from her graveyard, but mayhem needs no permission of
+  -- its own, so playing Oscorp Industries under mayhem (the engine's default
+  -- answer, the head) leaves the Paragon's use unspent.
+  Spec.it s "CR 702.187c a mayhem land play does not spend Serra Paragon's use" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    oscorp <- S.printingOf s registry "Oscorp Industries"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    paragon <- S.printingOf s registry "Serra Paragon"
+    let (discarded, _) = mayhemBoards mountain piker oscorp reunion
+        withParagon = snd (S.addPermanent paragon S.alice discarded)
+        played = case Scenario.namedObjects (S.printingName oscorp) withParagon of
+          oid : _ -> S.runPure S.identityAnswer withParagon (Cast.playLand False S.alice oid Nothing)
+          [] -> withParagon
+    Spec.assertEqWith s "Oscorp arrived" (S.countOnBattlefieldByName (S.printingName oscorp) S.alice played) 1
+    Spec.assertEqWith s "and the Paragon's use is unspent" (GameState.castPermissionsUsedThisTurn played) Map.empty
 
 -- The mayhem pair: the same four Mountains, the same Goblin Piker under bob, the
 -- same Cathartic Reunion cast and resolved, and Electro's Bolt in alice's
