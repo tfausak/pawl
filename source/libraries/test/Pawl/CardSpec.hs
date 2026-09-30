@@ -254,6 +254,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
@@ -4228,7 +4229,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- swept the same way for PermanentsDie's reason: answering [] here would exempt
   -- Pia Nalaar's "artifact creatures you control" from every corpus filter lint.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> unframed [f]
+  TriggerCondition.PermanentsDealCombatDamageToPlayer p -> unframed [PermanentsDealCombatDamageToPlayer.filter p]
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.CreaturesDealtCombatDamageToInitiative -> []
   TriggerCondition.PlayerTookInitiative -> []

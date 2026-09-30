@@ -199,6 +199,17 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- unreachable for an event this condition admitted.
   (TriggerCondition.PermanentDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     maybe id Binding.setTriggerPlayer (Recipient.playerOf (DamageEvent.target ev)) (Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty))
+  -- CR 603.2c's batch reading: the damagers' CONTROLLER, Norn's Decree's "that
+  -- opponent", off the same CR 608.2h-aware view the matcher read the Filter
+  -- through, so "whose was it" and "did it qualify" come from one sample. One
+  -- seat per member, and one per trigger: `batchPartition` below is what splits
+  -- the batch by it.
+  --
+  -- Unconditional given a match: that matcher answers False for a damager with
+  -- no view, and a permanent's view always carries its controller.
+  (TriggerCondition.PermanentsDealCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
+    let damager = DamageEvent.source ev
+     in maybe id Binding.setDamagersController (Filter.controller =<< Projection.viewWithLastKnown damager gs damager) Map.empty
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -1019,12 +1030,37 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- 603.7c's captured environment instead.
   _ -> Map.empty
 
+-- CR 603.2c's second sentence inside one batch: the seat that splits a
+-- batch-scoped condition's group into several occurrences, read off the
+-- bindings eventBindings stamped for one member. Norn's Decree's "one or more
+-- creatures AN OPPONENT controls" is one occurrence per opponent whose creatures
+-- connected, CR 726.2's "a player controls" grouped the same way by
+-- Pawl.Engine.Initiative.inherentPending. Nothing for every other batch-scoped
+-- condition, whose group is one occurrence whole.
+--
+-- The controller for EVERY PermanentsDealCombatDamageToPlayer, since each
+-- printing in data/cards/ names it -- "you control", "an opponent controls" --
+-- and a "you" is one seat.
+--
+-- Not implemented: a batch naming no controller, one occurrence whoever's
+-- creatures connected -- Starscream, Power Hungry's "one or more creatures deal
+-- combat damage to you" (#4473).
+batchPartition :: TriggerCondition -> Map.Map SlotName.SlotName Binding -> Maybe PlayerId
+batchPartition cond bindings = case cond of
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Map.lookup Binding.damagersController (Binding.playerSlots bindings)
+  -- The branch that matched is the one that stamped, eventBindings' AnyOf arm's
+  -- reading.
+  TriggerCondition.AnyOf conditions -> Maybe.listToMaybe (Maybe.mapMaybe (`batchPartition` bindings) conditions)
+  -- A wildcard where batchScoped is exhaustive: a batch condition splits only
+  -- where an arm above says by what.
+  _ -> Nothing
+
 -- CR 603.2c's FIRST sentence, read back: a batch-scoped condition's trigger event
--- is the whole Pawl.Types.EventGroup, so its bindings are the JOIN of what each
--- member it matched contributes, in log order. Binding.amount ADDS across
--- members -- "that many" counts the batch, not its first event -- and
--- Binding.objects appends; every other field keeps Binding.mergeBinding's left
--- bias. Called by both gatherers, eventTriggers and delayedPending, with the
+-- is the whole Pawl.Types.EventGroup (one `batchPartition` seat's share of it),
+-- so its bindings are the JOIN of what each member it matched contributes, in
+-- log order. Binding.amount ADDS across members -- "that many" counts the batch,
+-- not its first event -- and Binding.objects appends; every other field keeps
+-- Binding.mergeBinding's left bias. Called by both gatherers, eventTriggers and delayedPending, with the
 -- per-member eventBindings of every matching member.
 --
 -- Pawl.LeavesTriggerSpec's Rakshasa Vizier group proves the sum: two cards
@@ -1269,13 +1305,11 @@ eventBindingSlots cond = case cond of
   -- card" reads -- the same slot the self-scoped arm above stamps. Guaranteed
   -- given a match: matchesTrigger admits only a player recipient here.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.fromList [Binding.combatDamager, Binding.eventAmount, Binding.triggerPlayer]
-  -- Empty where the arm above binds three, by decision, PermanentsDie's reason
-  -- one event family over: the trigger event is a whole CR 510.2 step, and Pia
-  -- Nalaar, Chief Mechanic's payload names none of it. Not implemented: a slot for the damagers' CONTROLLER, which Norn's
-  -- Decree's "that opponent" reads and which is one seat per step but under the
-  -- shared team turns option, where each active player may have attacked (CR
-  -- 805.10a) (#2930).
-  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.empty
+  -- The damagers' CONTROLLER alone where the arm above binds three: the trigger
+  -- event is a whole CR 510.2 step split by that controller (CR 603.2c), so it is
+  -- the one seat every member of an occurrence shares. Norn's Decree's "that
+  -- opponent" is the reader.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.singleton Binding.damagersController
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.

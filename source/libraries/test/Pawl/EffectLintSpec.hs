@@ -1198,10 +1198,12 @@ data Asks
     -- it" -- through the same chooseCardsInHand the move gather uses, and falls
     -- through to the pure sweep for every other arm.
     AsksLookAtArm
-  | -- | Pawl.Engine.Resolve's Effect.Pair arm. It asks the chosen-permanent arm
-    -- through chosenPermanentOf -- CR 702.95a's "another unpaired creature you
-    -- control" -- and falls through to the pure sweep for everything else.
-    AsksPairPartner
+  | -- | Pawl.Engine.Resolve's Effect.Pair and Effect.ModifyTarget arms. Each
+    -- asks the chosen-permanent arm through chosenPermanentOf -- CR 702.95a's
+    -- "another unpaired creature you control", Mirkwood Trapper's "that player
+    -- chooses an attacking creature" -- and falls through to the pure sweep for
+    -- everything else.
+    AsksChosenPermanent
   | -- | Pawl.Engine.Resolve's Effect.ExchangeWithCardInHand arm, which asks
     -- its one hand chooser through chooseCardsInHand.
     AsksExchangeArm
@@ -1292,9 +1294,9 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInHand {} -> True
     _ -> False
   -- One arm and one only, for AsksTransformGather's reason: Resolve's
-  -- Effect.Pair arm routes ObjectRef.ChosenPermanent through chosenPermanentOf
-  -- and reads every other arm off the pure sweep.
-  AsksPairPartner -> case ref of
+  -- Effect.Pair and Effect.ModifyTarget arms route ObjectRef.ChosenPermanent
+  -- through chosenPermanentOf and read every other arm off the pure sweep.
+  AsksChosenPermanent -> case ref of
     ObjectRef.ChosenPermanent {} -> True
     _ -> False
   AsksExchangeArm -> case ref of
@@ -1328,7 +1330,7 @@ effectObjectRefs effect =
         -- Resolve.permanentsGathered.
         Effect.AttachAll (AttachAll.MkAttachAll ref _) -> [(AsksTransformGather, ref)]
         Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
-        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
+        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> [(AsksChosenPermanent, ref)]
         Effect.ChangeText {} -> []
         Effect.AddMana {} -> []
         Effect.Firebend {} -> []
@@ -1455,7 +1457,7 @@ effectObjectRefs effect =
         Effect.Untap ref -> [(AsksTransformGather, ref)]
         Effect.Detain ref -> read_ [ref]
         Effect.Goad ref -> read_ [ref]
-        Effect.Pair ref -> [(AsksPairPartner, ref)]
+        Effect.Pair ref -> [(AsksChosenPermanent, ref)]
         Effect.GrantLookAtExiled grant -> read_ [GrantLookAtExiled.cards grant]
         Effect.MakePlotted ref -> read_ [ref]
         Effect.MakeForetold x -> read_ [MakeForetold.cards x]

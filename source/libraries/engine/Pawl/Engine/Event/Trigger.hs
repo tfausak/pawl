@@ -21,7 +21,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
-import Pawl.Engine.Event.Binding (batchBindings, eventBindings)
+import Pawl.Engine.Event.Binding (batchBindings, batchPartition, eventBindings)
 import Pawl.Engine.Event.Match (matchesTriggerGiven, stepPlayers)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -882,8 +882,9 @@ batchScoped condition = case condition of
   -- simultaneously, Pawl.Engine.Damage.dealWave brackets the step as one
   -- Pawl.Types.EventGroup, and "one or more artifact creatures ... deal combat
   -- damage" (Pia Nalaar, Chief Mechanic) names that whole group as its trigger
-  -- event, which occurs once -- where the arm above is CR 603.2c's second
-  -- sentence and fires once per damager.
+  -- event, which occurs once per damagers' controller (Event.Binding's
+  -- batchPartition) -- where the arm above is CR 603.2c's second sentence and
+  -- fires once per damager.
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> True
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   -- CR 726.2's own "one or more creatures a player controls deal combat
@@ -2177,11 +2178,15 @@ eventTriggers events gs =
             -- than by the ability itself, so a permanent printing the same batch
             -- condition twice keeps both -- no equality on TriggeredAbility is
             -- needed and none is assumed.
-            key (index, (cond, _)) =
+            --
+            -- And by the seat `batchPartition` names, CR 603.2c's second sentence
+            -- inside the batch: Norn's Decree's damagers two opponents control are
+            -- two occurrences of one CR 510.2 step.
+            key (index, (cond, _)) trigger =
               if batchScoped cond
-                then Just (oid, index :: Natural)
+                then Just (oid, index :: Natural, batchPartition cond (PendingTrigger.bindings trigger))
                 else Nothing
-            keyed indexed = fmap ((,) (key indexed)) (pends (snd indexed))
+            keyed indexed = fmap (\trigger -> (key indexed trigger, trigger)) (pends (snd indexed))
          in concatMap keyed (filter (fires . snd) (zip [0 ..] abilities))
       -- Map.unions is left-biased, so the battlefield reading wins over a
       -- last-known one, a cycled card and a graveyard reading. That rules out a
@@ -3402,9 +3407,17 @@ delayedPending grouped gs =
       -- so answers alike for both readings (`batchScoped` above states that
       -- contract), which is why every gatherer owes the predicate a consultation;
       -- see #2384.
+      --
+      -- One per `batchPartition` seat within the group, eventTriggers' key's
+      -- reason: CR 603.2c's second sentence inside the batch. A regression
+      -- fence on this road: every delayed batch entry in data/cards/ (Forth
+      -- Eorlingas!, The Raven's Warning) watches creatures "you control", one
+      -- seat, and Pawl.TeamSpec's Norn's Decree case proves eventTriggers' key.
       occurrences entry
-        | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = fmap NonEmpty.head (eventGroups (matching entry))
+        | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = concatMap (ListUtils.nubOrdOn (partitionOf entry) . NonEmpty.toList) (eventGroups (matching entry))
         | otherwise = matching entry
+      memberSlots entry = eventBindings gs Nothing Map.empty (DelayedTrigger.source entry) (DelayedTrigger.controller entry) (TriggeredAbility.condition (DelayedTrigger.ability entry)) . LoggedEvent.event
+      partitionOf entry = batchPartition (TriggeredAbility.condition (DelayedTrigger.ability entry)) . memberSlots entry
       -- Which entries CR 603.7b's second sentence actually ASKS, answered without
       -- asking: the CR 101.4c ordering below has to know before the first
       -- question is raised. The three gates are firedBy's own, read through this
@@ -3438,9 +3451,10 @@ delayedPending grouped gs =
       -- Singular Cure reads in Pawl.EventTriggerSpec.
       --
       -- That second sentence turns on "its trigger event occurs MORE THAN ONCE",
-      -- so a batch-scoped condition never reaches it: `occurrences` has already
-      -- left one event per group, the block below is a singleton, and the prompt
-      -- is not raised. Asking would be a question the rule does not authorise.
+      -- so a batch-scoped condition reaches it only when one group holds two of
+      -- `batchPartition`'s seats: `occurrences` has already left one event per
+      -- seat, so the block below is otherwise a singleton and the prompt is not
+      -- raised. Asking would be a question the rule does not authorise.
       --
       -- Adjacency AND tag equality, which coincide by construction: `eventGroups`
       -- above is where that argument lives, and both scans read that one function
@@ -3469,8 +3483,9 @@ delayedPending grouped gs =
       -- group that fired it, a per-occurrence one's are its own event's.
       eventSlots entry logged =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
-            one = eventBindings gs Nothing Map.empty (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond . LoggedEvent.event
-         in case filter ((== LoggedEvent.group logged) . LoggedEvent.group) (matching entry) of
+            one = memberSlots entry
+            sameOccurrence other = LoggedEvent.group other == LoggedEvent.group logged && partitionOf entry other == partitionOf entry logged
+         in case filter sameOccurrence (matching entry) of
               first : rest | batchScoped cond -> batchBindings (fmap one (first NonEmpty.:| rest))
               _ -> one logged
       pend entry logged =
