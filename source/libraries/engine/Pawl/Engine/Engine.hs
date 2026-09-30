@@ -835,7 +835,7 @@ placeBorne srcId pending = do
       -- casting a spell or activating an ability, and a triggered ability is
       -- neither.
       --
-      -- CR 107.3m is the exception, and the only one: an object's
+      -- CR 107.3m is one exception: an object's
       -- enters-the-battlefield triggered ability reads the X announced for the
       -- spell that became that object, "although the value of X for that
       -- permanent is 0" -- so the same permanent's other abilities keep reading
@@ -854,8 +854,16 @@ placeBorne srcId pending = do
       -- read off the board against `srcId`, CR 113.7's source of this ability,
       -- which is what lets Mogis's Marauder's devotion count a trigger's
       -- targets.
+      --
+      -- CR 702.37f and CR 702.168e are the other: a permanent's turned-face-up
+      -- ability reads the X chosen as the morph or disguise special action was
+      -- taken, which Pawl.Engine.Event.Binding.eventBindings binds off the event
+      -- itself. The same binding reaches the ability object below, so its
+      -- effects read the number too. Pawl.FaceDownSpec's Aurelia's Vindicator
+      -- case is the proof.
       inheritedX = case TriggeredAbility.condition ability of
         TriggerCondition.SelfEnters -> Projection.announcedXOf srcId gs
+        TriggerCondition.SelfTurnedFaceUp -> Maybe.fromMaybe 0 (Binding.amountOf Binding.variableX bound)
         _ -> 0
       legal = Target.fillableModes (Just controller) bound srcId Map.empty modal gs
       selection = Modal.Type.selection modal
