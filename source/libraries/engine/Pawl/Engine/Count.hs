@@ -520,6 +520,23 @@ aggregate quantityOf aggregation members = case aggregation of
   Aggregation.MostSharingACardType ->
     let tally = Map.fromListWith (+) [(cardType, 1 :: Integer) | (_, view) <- members, cardType <- Set.toList (Filter.cardTypes view)]
      in Just (Foldable.foldl' max 0 tally)
+  -- CR 201.2b: the largest group in which every member has a name and no two
+  -- share one. Single-named members contribute one per distinct name; a
+  -- member with several names is tried in and out of the group, since taking
+  -- it spends all of them. Pawl.ConditionSpec's The Necrobloom case proves the
+  -- single-named count; the several-names branch is a regression fence, since
+  -- no card in data/cards counts names over objects that can have two.
+  Aggregation.DistinctNames ->
+    let named = filter (not . Set.null) (fmap (Filter.names . snd) members)
+        (single, multiple) = List.partition ((== 1) . Set.size) named
+        best used rest = case rest of
+          [] -> Set.size (Set.difference (Set.unions single) used)
+          these : others ->
+            let without = best used others
+             in if Set.null (Set.intersection these used)
+                  then max without (1 + best (Set.union these used) others)
+                  else without
+     in Just (toInteger (best Set.empty multiple))
   -- Undeterminable in both directions. A member whose quantity cannot be
   -- determined makes the whole maximum undeterminable rather than being dropped, which
   -- would report the maximum of a set the card never named; and an EMPTY
