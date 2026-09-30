@@ -25,6 +25,9 @@ data Aggregation quantity
   | -- | The most members that share one card type (CR 205.2a) -- Rowdy Crew's
     -- "if two cards that share a card type are discarded this way".
     MostSharingACardType
+  | -- | The most members with different names (CR 201.2b) -- The Necrobloom's
+    -- "seven or more lands with different names".
+    DistinctNames
   | -- | The largest value of a per-member quantity -- "the greatest mana value
     -- among artifacts you control" (Karn, Legacy Reforged). Unlike those above
     -- it must know WHICH per-object quantity to read, and the payload is the

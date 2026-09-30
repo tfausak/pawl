@@ -209,7 +209,8 @@ playerSetup pid =
       Seat.battlefield = Seq.empty,
       Seat.hand = Seq.empty,
       Seat.graveyard = Seq.empty,
-      Seat.library = Seq.empty
+      Seat.library = Seq.empty,
+      Seat.exile = Seq.empty
     }
 
 battlefield :: PlayerId.PlayerId -> [Placement.Placement] -> Seat.Seat

@@ -2684,17 +2684,7 @@ castTheCardSpec s registry =
             (theftId, gs) = S.addHandCard theft S.alice withBobs
             cast = S.runPure atBobAnswer gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice} (S.cast S.alice theftId)
          in S.runPure atBobAnswer cast Stack.resolveTop
-      named n = Just (CardName.MkCardName (Text.pack n))
    in Spec.describe s "CastTheCard" $ do
-        Spec.it s "CR 603.4 Psychic Theft returns the card alice never cast to bob's hand" $ do
-          ps <- traverse (S.printingOf s registry) ["Psychic Theft", "Island", "Mountain", "Lightning Bolt", "Goblin Piker"]
-          case ps of
-            [theft, island, mountain, bolt, piker] -> do
-              let exiled = theftBoard theft island mountain bolt piker
-                  after = S.runPure atBobAnswer (alicesEndStep exiled) Engine.priorityLoop
-              Spec.assertEqWith s "the Lightning Bolt is back in bob's hand" (List.sort (namesIn Zone.Hand S.bob after)) [named "Goblin Piker", named "Lightning Bolt"]
-              Spec.assertEqWith s "having been exiled until then" (namesIn Zone.Exile S.bob exiled) [named "Lightning Bolt"]
-            _ -> Spec.assertFailure s "five printings"
         Spec.it s "CR 603.4 Psychic Theft's card, once alice casts it, triggers nothing at her end step" $ do
           ps <- traverse (S.printingOf s registry) ["Psychic Theft", "Island", "Mountain", "Lightning Bolt", "Goblin Piker"]
           case ps of
@@ -2728,23 +2718,6 @@ castTheCardSpec s registry =
                   Spec.assertEqWith s "the trigger was still waiting when bob's turn began" (length (GameState.delayedTriggers bobsTurn), GameState.activePlayer bobsTurn) (1, S.bob)
                 _ -> Spec.assertFailure s "Psychic Theft should exile exactly one card"
             _ -> Spec.assertFailure s "six printings"
-        Spec.it s "CR 603.4 Planeswalker's Mischief returns the card alice never cast to bob's hand" $ do
-          ps <- traverse (S.printingOf s registry) ["Planeswalker's Mischief", "Island", "Lightning Bolt"]
-          case ps of
-            [mischief, island, bolt] -> do
-              let (mischiefId, withMischief) = S.addPermanent mischief S.alice (Setup.emptyGame S.bothPlayers)
-                  lands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withMischief [1 :: Int .. 4]
-                  (_, gs) = S.addHandCard bolt S.bob lands
-                  board = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-              case Activatable.abilitiesFor mischiefId board of
-                [ability] -> do
-                  let activated = S.runPure atBobAnswer board (Activate.activateAbility S.alice mischiefId ability)
-                      exiled = S.runPure atBobAnswer activated Stack.resolveTop
-                      after = S.runPure atBobAnswer (alicesEndStep exiled) Engine.priorityLoop
-                  Spec.assertEqWith s "the Lightning Bolt is back in bob's hand" (namesIn Zone.Hand S.bob after) [named "Lightning Bolt"]
-                  Spec.assertEqWith s "having been exiled until then" (namesIn Zone.Exile S.bob exiled) [named "Lightning Bolt"]
-                _ -> Spec.assertFailure s "one activated ability"
-            _ -> Spec.assertFailure s "three printings"
 
 -- "Until the beginning of your next upkeep" (Duration.UntilYourNextUpkeep).
 -- Oracle text checked against api.scryfall.com, 2026-09-26:

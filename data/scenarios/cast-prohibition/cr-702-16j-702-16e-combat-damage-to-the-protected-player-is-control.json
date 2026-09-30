@@ -1,0 +1,37 @@
+{
+  "description": "CR 702.16j / 702.16e combat damage to the protected player is prevented, and the same attacker otherwise connects",
+  "note": "The twin with the Coffin never activated: the same Piker attacking alice connects for 2, so alice's untouched life in the experiment is the protection's doing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "The Stasis Coffin", "label": "coffin" },
+          { "card": "Plains", "label": "plains", "ready": true },
+          { "card": "Plains", "label": "plains-2", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "hand": [{ "card": "Curse of Vitality" }],
+        "library": [{ "card": "Plains" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "@piker", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 18 } } }
+  ]
+}

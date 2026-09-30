@@ -1,0 +1,43 @@
+{
+  "description": "CR 702.62b a card with no time counters left is not suspended, and no upkeep reaches it",
+  "note": "CR 702.62b: suspended is exiled, with suspend, with a time counter. This is the state Rift Bolt's suspend leaves (the Mountain tapped for {R}) with the time counter taken off and nothing else moved, so at alice's next upkeep there is no counter to remove and no free cast: bob stays at 20 and the Bolt stays in exile. Libraries are stocked so nobody decks on the way.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Mountain", "label": "mountain", "tapped": true }],
+        "hand": [{ "card": "Doomed Traveler" }],
+        "library": [
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" }
+        ],
+        "exile": [{ "card": "Rift Bolt", "label": "rift-bolt" }]
+      },
+      {
+        "name": "bob",
+        "library": [
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 3, "step": "DrawStep", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 3, "step": "DrawStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Rift Bolt", "count": 1 } } }
+  ]
+}

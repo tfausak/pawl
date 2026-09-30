@@ -1,0 +1,25 @@
+{
+  "description": "CR 603.3b the inherent draw alone is one trigger, so nothing is asked",
+  "note": "alice is the monarch (Palace Jailer crowned her; its exiled Goblin Piker sits in bob's exile) and nothing else triggers at her end step, so CR 725.2's inherent draw is one trigger and CR 603.3b has nothing to order: an OrderTriggers prompt would fail the run. She still draws her library's one card.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Palace Jailer", "label": "palace-jailer" }],
+        "library": [{ "card": "Goblin Piker" }]
+      },
+      {
+        "name": "bob",
+        "exile": [{ "card": "Goblin Piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PostcombatMain",
+    "monarch": "alice"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Monarch": { "player": "alice" } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

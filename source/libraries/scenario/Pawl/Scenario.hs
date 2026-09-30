@@ -226,7 +226,8 @@ zonesOf seat =
   [ (Zone.Battlefield, Seat.battlefield seat),
     (Zone.Hand, Seat.hand seat),
     (Zone.Graveyard, Seat.graveyard seat),
-    (Zone.Library, Seat.library seat)
+    (Zone.Library, Seat.library seat),
+    (Zone.Exile, Seat.exile seat)
   ]
 
 boardFailure :: Map.Map Label.Label PlayerId.PlayerId -> Board.Board -> Maybe Failure.ScenarioFailure

@@ -2183,20 +2183,9 @@ monarchOrderingSpec s registry =
               gs = crownAndEndStep palaceJailer piker base
               after = snd (Engine.runGamePure sourcelessFirst gs Engine.priorityLoop)
           Spec.assertEqWith s "alice drew the one card in her library" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
-        -- The companion elision: with only the inherent trigger in the batch
-        -- there is nothing to order, and where the rules leave nothing to ask,
-        -- don't prompt.
-        Spec.it s "CR 603.3b the inherent draw alone is one trigger, so nothing is asked" $ do
-          palaceJailer <- S.printingOf s registry "Palace Jailer"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let gs = crownAndEndStep palaceJailer piker (Setup.emptyGame S.bothPlayers)
-              (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
-              after = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-          Spec.assertEqWith s "alice really holds the crown" (GameState.monarch gs) (Just S.alice)
-          Spec.assertEqWith s "no ordering choice was offered" asked []
-          Spec.assertEqWith s "and she still drew" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
-        -- And the mirror: the Ghoul's trigger alone, with no monarch at all, is
-        -- also one trigger and also asks nothing.
+        -- The Ghoul's trigger alone, with no monarch at all, is one trigger and
+        -- asks nothing, the mirror of the monarch's lone draw in
+        -- data/scenarios/trigger/cr-603-3b-the-inherent-draw-alone-is-one-trigger-so-nothing.json.
         Spec.it s "CR 603.3b the Ghoul's trigger alone, with no monarch, asks nothing" $ do
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           let (_, base) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
