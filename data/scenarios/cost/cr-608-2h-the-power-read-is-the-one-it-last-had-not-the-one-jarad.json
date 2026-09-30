@@ -1,0 +1,31 @@
+{
+  "description": "CR 608.2h the power read is the one it last had, not the one it printed",
+  "note": "Jarad, Golgari Lich Lord sacrifices a creature as its activation cost, so the drain reads the Ogre Sentry's last known power. Night of Souls' Betrayal makes that 2 where the printed power is 3: bob ends at 18, 17 for the printed reading, 20 for an unbound slot. alice, no opponent of herself, loses nothing. The Sentry is the only other creature, so the sacrifice asks nothing; the Piker would die to the Betrayal first.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Forest", "label": "forest", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Jarad, Golgari Lich Lord", "label": "jarad" },
+          { "card": "Ogre Sentry", "label": "ogre-sentry" },
+          { "card": "Night of Souls' Betrayal", "label": "night-of-souls-betrayal" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@ogre-sentry", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@jarad", "mana": ["@forest", "@swamp", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

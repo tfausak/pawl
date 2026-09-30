@@ -2,9 +2,10 @@
 
 Each `.json` file here, in any subdirectory, is one gameplay test: a board, a
 timeline of decisions and checks, and optional final checks. The test suite
-runs every one, and `pawl scenario FILE...` runs any. `pawl schema scenario`
-prints the schema. A test moved from a Haskell spec goes in a subdirectory
-named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
+runs every one, and `pawl scenario FILE...` runs any (a binary from `cabal
+list-bin pawl` needs `pawl_datadir=data` from the repository root). `pawl
+schema scenario` prints the schema. A test moved from a Haskell spec goes in a
+subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
 
 - **Board.** `seats` in turn order, each with a `name`, `life` (default 20)
   and `battlefield`, `hand`, `graveyard`, `library` and `exile` placements (a
@@ -35,7 +36,8 @@ named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
   one kind on an object), `Types` (an object's card types, all of them),
   `Attackers` (every attacker and what it attacks), `Blockers` (an attacker's
   blockers, `null` when unblocked), `Defenders` (the defending players, in
-  order) and `Monarch` (`null` for nobody). Assert combat at `EndOfCombat` or
+  order), `Monarch` (`null` for nobody) and `PowerToughness` (an object's
+  projected `power` and `toughness`). Assert combat at `EndOfCombat` or
   earlier: it is cleared as that step ends.
 - **Final.** The run plays whole steps until the timeline is spent, the game
   ends, or the turn passes the last one named; `final` checks that state.

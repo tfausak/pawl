@@ -8,6 +8,7 @@ import qualified Pawl.Codec.DamageIs as DamageIs
 import qualified Pawl.Codec.DefendersAre as DefendersAre
 import qualified Pawl.Codec.LifeIs as LifeIs
 import qualified Pawl.Codec.MonarchIs as MonarchIs
+import qualified Pawl.Codec.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Codec.TappedIs as TappedIs
 import qualified Pawl.Codec.TypesAre as TypesAre
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -28,7 +29,8 @@ codec =
       Arm.payload "Attackers" AttackersAre.codec Check.Attackers (\x -> case x of Check.Attackers y -> Just y; _ -> Nothing),
       Arm.payload "Blockers" BlockersAre.codec Check.Blockers (\x -> case x of Check.Blockers y -> Just y; _ -> Nothing),
       Arm.payload "Defenders" DefendersAre.codec Check.Defenders (\x -> case x of Check.Defenders y -> Just y; _ -> Nothing),
-      Arm.payload "Monarch" MonarchIs.codec Check.Monarch (\x -> case x of Check.Monarch y -> Just y; _ -> Nothing)
+      Arm.payload "Monarch" MonarchIs.codec Check.Monarch (\x -> case x of Check.Monarch y -> Just y; _ -> Nothing),
+      Arm.payload "PowerToughness" PowerToughnessIs.codec Check.PowerToughness (\x -> case x of Check.PowerToughness y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: Check.Check -> String
@@ -43,3 +45,4 @@ tagOf x = case x of
   Check.Blockers {} -> "Blockers"
   Check.Defenders {} -> "Defenders"
   Check.Monarch {} -> "Monarch"
+  Check.PowerToughness {} -> "PowerToughness"
