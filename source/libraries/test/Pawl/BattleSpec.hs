@@ -79,6 +79,7 @@
 -- all in defeatSpec below.
 module Pawl.BattleSpec where
 
+import qualified Control.Applicative as Applicative
 import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -105,8 +106,10 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterChange as CounterChange
@@ -541,6 +544,39 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "bob's Swamp is not the protector's, so the block is legal"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
       _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
+
+  -- The same question one step EARLIER: the Siege leaves during CR 508.1i's mana
+  -- window, before CR 508.1k makes the Wraith an attacking creature, so no live
+  -- battle is left when the declaration records the seat and raises its CR
+  -- 508.2b event. Oppressive Rays taxes the Wraith {3} whatever it attacks;
+  -- Liquimetal Coating has made the Siege an artifact, and alice pays with
+  -- Krark-Clan Ironworks sacrificing it plus her Mountain. CR 608.2h's last known
+  -- protector is the defending player (Defender.playerOf's battle arm), as it is
+  -- for a battle removed later.
+  --
+  -- This case is the proof: carol may block only as the Wraith's defending player
+  -- (CR 509.1a), and bob, who heads the defending players, holds the Swamp. An
+  -- engine answering nobody forbids carol's block, and one answering bob lets his
+  -- Swamp forbid it.
+  Spec.it s "CR 508.1i / 508.5 a Siege sacrificed to pay the attack tax leaves its protector defending" $ do
+    (after, battle, wraith, blocker) <- sacrificedMidToll s registry ["Swamp"] ["Goblin Piker", "Island"]
+    Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "carol defends against the Wraith, and bob's Swamp is not hers"
+    -- The premises, after the gameplay assertion so neither can absorb a
+    -- mutation of it.
+    Spec.assertEqWith s "CR 508.2b: the declaration names carol as the defending player" (declaredDefender wraith after) [S.carol]
+    Spec.assertBool s (not (Set.member battle (GameState.battlefield after))) "CR 701.21a: the Ironworks ate the Siege"
+    Spec.assertEqWith
+      s
+      "CR 508.1k: attacking the battle it was declared against"
+      (Map.lookup wraith (Combat.Type.attackers (GameState.combat after)))
+      (Just (AttackTarget.OfBattle battle))
+  Spec.it s "CR 702.14c and the same toll board with the Swamp moved to carol forbids the block" $ do
+    -- The other half, differing in which of bob and carol holds the Swamp:
+    -- swampwalk reads carol's lands, so a legal block above was not an engine that
+    -- had merely lost swampwalk.
+    (after, battle, wraith, blocker) <- sacrificedMidToll s registry ["Island"] ["Goblin Piker", "Swamp"]
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after)) "carol protected the Siege, so her Swamp stops the block"
+    Spec.assertBool s (not (Set.member battle (GameState.battlefield after))) "the Siege is gone here too"
 
   Spec.it s "CR 310.9c a creature the protector does not control can't block the battle's attacker" $ do
     -- CR 310.9c: "creatures controlled by other players can't block those
@@ -1499,6 +1535,56 @@ attackTheBattle battle p = case p of
       (NonEmpty.head options)
       (List.find (== AttackTarget.OfBattle battle) (NonEmpty.toList options))
   _ -> S.aggressiveAnswer p
+
+-- The three-seat Siege board (carol protects, bob and carol both defend) with
+-- alice's Bog Wraith under an Oppressive Rays, a Krark-Clan Ironworks, a Liquimetal
+-- Coating and one untapped Mountain; bob and carol hold `theirs` and `hers`. The
+-- Coating makes the Siege an artifact at beginning of combat, then alice attacks
+-- the Siege and pays the Rays' {3} from the Mountain first and the Ironworks
+-- second, feeding it the Siege. Gives back the board after the declaration, the
+-- departed Siege's id, the Wraith, and carol's first permanent.
+sacrificedMidToll ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [String] ->
+  [String] ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+sacrificedMidToll s registry theirs hers = do
+  rays <- S.printingOf s registry "Oppressive Rays"
+  coating <- S.printingOf s registry "Liquimetal Coating"
+  (gs, battle, mine, _, carols) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith", "Krark-Clan Ironworks", "Liquimetal Coating", "Mountain"] theirs hers
+  case (mine, carols, Face.activatedAbilities (S.combinedFace coating)) of
+    ([wraith, ironworks, coatingId, mountain], blocker : _, coat : _) -> do
+      let (aura, withAura) = S.addPermanent rays S.alice gs
+          board = S.attach aura wraith (bothDefending withAura)
+          atBeginning = board {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat, GameState.priority = Just S.alice}
+          coatTheSiege :: Prompt.Prompt r -> r
+          coatTheSiege p = case p of
+            Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter ((== Just battle) . Recipient.objectOf) legal) asked
+            _ -> S.identityAnswer p
+          coated = S.runPure coatTheSiege atBeginning (Activate.activateAbility S.alice coatingId coat >> Stack.resolveTop)
+          declaring = coated {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
+          -- CR 605.3a's window pinned by identity: the Mountain while it is
+          -- offered, then the Ironworks, whose sacrifice takes the Siege.
+          pay :: Prompt.Prompt r -> r
+          pay p = case p of
+            Prompt.ChooseManaSource _ _ candidates ->
+              List.find (== mountain) (NonEmpty.toList candidates) Applicative.<|> List.find (== ironworks) (NonEmpty.toList candidates)
+            Prompt.ChooseSacrifices _ _ _ candidates _ _ -> Set.filter (== battle) (Set.fromList candidates)
+            _ -> attackTheBattle battle p
+          after = S.runPure pay declaring (Combat.declareAttackers S.manaPerformer S.alice)
+      Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf battle declaring)) "CR 205.1b: the Coating made the Siege an artifact"
+      pure (after, battle, wraith, blocker)
+    _ -> Spec.assertFailure s "fixture should have a Wraith, an Ironworks, a Coating, a Mountain and a blocker"
+
+-- The defending player each CR 508.2b event names for `attacker`.
+declaredDefender :: ObjectId.ObjectId -> GameState.GameState -> [PlayerId.PlayerId]
+declaredDefender attacker gs =
+  let defenderIn event = case event of
+        GameEvent.AttackerDeclared declared | AttackerDeclared.attacker declared == attacker -> Just (AttackerDeclared.defender declared)
+        _ -> Nothing
+   in Maybe.mapMaybe defenderIn (S.eventsOf gs)
 
 -- CR 802.2: both of alice's opponents defending, bob ahead of carol in CR 101.4's
 -- APNAP order, on a board battleCombat left with one designated seat.
