@@ -512,7 +512,9 @@ applyEpic oid controller = do
     -- object is filed in GameState.stackArchive for Effect.CopyStackObject to
     -- find once CR 400.7 has deleted this id -- carrying rule 702.50a's "except
     -- for its epic ability" in its copiable snapshot, so the copy is a spell
-    -- without epic and arms no second copier.
+    -- without epic and arms no second copier. The object's own bindings ride
+    -- along, and with them CR 707.10's decisions: Pawl.CastSpec's Eternal
+    -- Dominion cases prove the copy keeps the spell's target.
     --
     -- Expiry.Never is what makes the delayed entry repeat: one carrying an expiry
     -- is never spent (Pawl.Engine.Event.Trigger), which is "each of your upkeeps

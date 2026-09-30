@@ -2902,9 +2902,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- is written in Pawl.Engine.Cost rather than on the card -- so CR 612.2 has no
   -- printed word here to swap.
   Keyword.Type.Retrace -> keyword
-  -- CR 702.187b's cost is printed, so its components take the same descent
+  -- CR 702.187b's cost, where there is one, is printed, so its components take the same descent
   -- flashback's do.
-  Keyword.Type.Mayhem cost -> Keyword.Type.Mayhem (rewriteCost pairs cost)
+  Keyword.Type.Mayhem cost -> Keyword.Type.Mayhem (fmap (rewriteCost pairs) cost)
   -- CR 702.35a's cost is printed, so its components take the same descent
   -- mayhem's do.
   Keyword.Type.Madness cost -> Keyword.Type.Madness (rewriteCost pairs cost)
