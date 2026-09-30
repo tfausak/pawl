@@ -704,7 +704,8 @@ finishSpell oid face controller = do
           -- CR 118.14's rider nor CR 118.9a's alternative cost, so the Adventure
           -- half is cast for its printed cost.
           ExilePlayPermission.spending = ManaSpending.AsProduced,
-          ExilePlayPermission.alternativeManaCost = Nothing,
+          ExilePlayPermission.alternativeCost = Nothing,
+          ExilePlayPermission.condition = Nothing,
           -- This IS rule 715.3d's permission, and so the one its next sentence
           -- excludes the Adventure half from.
           ExilePlayPermission.origin = PlayPermissionOrigin.Adventure,

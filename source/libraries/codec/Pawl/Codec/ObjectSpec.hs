@@ -34,6 +34,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -186,7 +187,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                   ExilePlayPermission.source = ObjectId.MkObjectId 14,
                   ExilePlayPermission.expiry = Expiry.AtCleanup,
                   ExilePlayPermission.spending = ManaSpending.AnyType,
-                  ExilePlayPermission.alternativeManaCost = Just (ManaCost.MkManaCost []),
+                  ExilePlayPermission.alternativeCost = Just (PermissionCost.InsteadOfManaCost (ManaCost.MkManaCost [])),
+                  ExilePlayPermission.condition = Nothing,
                   ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
                   ExilePlayPermission.verb = PermissionVerb.Cast
                 },
@@ -253,7 +255,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"timestamp\":10,\"face\":\"Delver of Secrets\",\"turnedOverAt\":11"
           <> ",\"worldSince\":12"
           <> ",\"playableFromExile\":{\"player\":13,\"source\":14,\"expiry\":{\"type\":\"AtCleanup\"}"
-          <> ",\"spending\":{\"type\":\"AnyType\"},\"alternativeManaCost\":[],\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Cast\"}}"
+          <> ",\"spending\":{\"type\":\"AnyType\"},\"alternativeCost\":{\"type\":\"InsteadOfManaCost\",\"value\":[]},\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Cast\"}}"
           <> ",\"plotted\":0,\"foretold\":15"
           <> ",\"foretellCostReduction\":[{\"type\":\"Generic\",\"value\":29}]"
           <> ",\"warped\":28,\"preparedCopyOf\":26"

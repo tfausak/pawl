@@ -987,7 +987,8 @@ rewriteEffect pairs effect = case effect of
     Effect.GrantPlayFromExile
       grant
         { GrantPlayFromExile.duration = rewriteDuration pairs (GrantPlayFromExile.duration grant),
-          GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant)
+          GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant),
+          GrantPlayFromExile.condition = fmap (rewriteCondition pairs) (GrantPlayFromExile.condition grant)
         }
   Effect.ForEach (ForEach.MkForEach ref membership slot body individually gate) ->
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually (fmap (rewritePayGate pairs) gate))
