@@ -3815,13 +3815,24 @@ splices keywords =
 -- the same breath.
 --
 -- A wildcard, and ONE ability per card (the ascending-least), disguiseCost's
--- shape. No printing has two.
+-- shape. No printing has two. A granted suspend prints neither half, so it is
+-- skipped: it has no special action to offer.
 suspend :: Set Keyword -> Maybe (Suspend.Suspend Keyword)
 suspend keywords =
   let abilityOf keyword = case keyword of
-        Keyword.Suspend ability -> Just ability
+        Keyword.Suspend ability -> ability
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe abilityOf (Set.toAscList keywords))
+
+-- CR 702.62b's "has suspend": any suspend at all, printed or granted, which is
+-- what the two triggered abilities and "suspended" ask. The keyword itself is
+-- the answer, for the tag the free cast leaves on the spell.
+suspendKeyword :: Set Keyword -> Maybe Keyword
+suspendKeyword keywords =
+  let isSuspend keyword = case keyword of
+        Keyword.Suspend _ -> True
+        _ -> False
+   in List.find isSuspend (Set.toAscList keywords)
 
 -- CR 702.170a: what CR 116.2k's special action costs, or Nothing when the card has
 -- no plot.
@@ -6794,7 +6805,7 @@ ward w =
             PayGate.perEach = fmap Quantity.PlayerCounters (Ward.perEach w),
             PayGate.offeredAt = Nothing
           }
-      effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing Nothing)
+      effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing Nothing Nothing)
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent,
           TriggeredAbility.modal =
@@ -8268,10 +8279,13 @@ handTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 -- data/cards/ prints suspend twice, so the caller hands over the distinct
 -- keywords as a set. Rule 702.85c and its siblings do state one, which
 -- is why `stackTriggeredAbilitiesOf` next door counts.
+--
+-- Not implemented: a pair per instance for a card holding two suspends, which
+-- two unconditional grants give it (#4460).
 exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-exileTriggeredAbilitiesOf keywords = case suspend keywords of
+exileTriggeredAbilitiesOf keywords = case suspendKeyword keywords of
   Nothing -> []
-  Just ability -> [suspendUpkeep, suspendLastCounter ability]
+  Just keyword -> [suspendUpkeep, suspendLastCounter keyword]
 
 -- CR 702.35a's SECOND ability for a card its first ability exiled, off the
 -- madness abilities the discard recorded (Discarded.madness) and the exiled
@@ -8912,9 +8926,10 @@ suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters 
 -- 702.62d routes through rules 601.2b and 601.2f-h -- the same field the plotted
 -- card's cast is priced with in Pawl.Engine.Cost.
 --
--- CAST and not rule 702.62a's wider "PLAY it", which for a land with suspend
--- would be a land play: Scryfall `keyword:suspend t:land`, 2026-09-07, no hit --
--- a land with suspend is the card that would tell the two apart.
+-- PLAY, rule 702.62a's own verb: a land face is played as CR 305.2a's land play
+-- during a resolution. A granted suspend reaches a modal double-faced card
+-- whose back is a land (CR 712.12) -- Pawl.SpecialActionSpec's "Delay on Sea
+-- Gate Restoration" case proves it.
 --
 -- THE INTERVENING "IF" is rule 702.62a's "if it's exiled", which immediately
 -- follows the trigger condition and so is CR 603.4's, gated at the gather and
@@ -8926,10 +8941,10 @@ suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters 
 -- CastOffer.offeredBy is rule 702.62a's LAST sentence, half of it: the offer
 -- states which keyword ability is behind the free cost, so the spell carries
 -- Object.castUsing = suspend and Pawl.Engine.Stack.armBecame can grant the
--- haste to the permanent it becomes. The tag is the whole ability, payload and
+-- haste to the permanent it becomes. The tag is the whole keyword, payload and
 -- all, `plainAlternativeCosts`' spelling; nothing reads the payload.
-suspendLastCounter :: Suspend.Suspend Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-suspendLastCounter ability =
+suspendLastCounter :: Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+suspendLastCounter keyword =
   let effect =
         Effect.OfferCast
           OfferCast.MkOfferCast
@@ -8938,11 +8953,11 @@ suspendLastCounter ability =
               -- trigger's controller, and a "may".
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just (Keyword.Suspend ability)},
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just keyword},
               -- rule 702.62a's "cast it": one card, the one the slot names.
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
-              OfferCast.verb = PermissionVerb.Cast,
+              OfferCast.verb = PermissionVerb.Play,
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }

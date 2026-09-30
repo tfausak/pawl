@@ -634,7 +634,7 @@ objectRefPositions =
         ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
         ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
         ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
-        ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing), [plantedRef "co"]),
+        ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing Nothing), [plantedRef "co"]),
         ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
         ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
         ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
@@ -3217,8 +3217,10 @@ keywordPayloadFilters keyword = case keyword of
   -- card's own mana cost names no Filter.
   Keyword.Foretell (ForetellCost.Stated cost) -> costFilters cost
   Keyword.Foretell (ForetellCost.ManaCostReducedBy _) -> []
-  -- CR 702.62a: the suspend cost, reached the same way; its N is a number.
-  Keyword.Suspend (Suspend.MkSuspend _ cost) -> costFilters cost
+  -- CR 702.62a: the suspend cost, reached the same way; its N is a number. A
+  -- granted suspend has no cost.
+  Keyword.Suspend (Just (Suspend.MkSuspend _ cost)) -> costFilters cost
+  Keyword.Suspend Nothing -> []
   -- CR 702.139a's condition, which is a Filter rather than a Cost. KeywordFramed
   -- like the rest: Pawl.Engine.Companion.fulfilled matches it against a printed
   -- face through a bare Context, so no slot is in scope.
@@ -5849,7 +5851,7 @@ effectFilters effect = case effect of
   Effect.ExchangeBlocks _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
-  Effect.Counter (Counter.MkCounter ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Counter (Counter.MkCounter ref _ _ _) -> frame SourceHostFramed (objectRefFilters ref)
   -- All THREE positions: the ObjectRef carries Renegade Krasis' "each other
   -- creature you control with a +1/+1 counter on it", and a Filter there would
   -- otherwise escape the lint; the count is a Quantity like any other; and CR

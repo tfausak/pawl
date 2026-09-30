@@ -108,7 +108,9 @@ codec =
       Arm.optionalPayload "Bloodthirst" Common.natural Keyword.Bloodthirst (\x -> case x of Keyword.Bloodthirst y -> Just y; _ -> Nothing),
       Arm.nullary "Haunt" Keyword.Haunt,
       Arm.nullary "SplitSecond" Keyword.SplitSecond,
-      Arm.payload "Suspend" (Suspend.codec codec) Keyword.Suspend (\x -> case x of Keyword.Suspend y -> Just y; _ -> Nothing),
+      -- A granted suspend (Delay's "it gains suspend") is the ABSENT "value"
+      -- key, vanishing's spelling below: it prints no N and no cost.
+      Arm.optionalPayload "Suspend" (Suspend.codec codec) Keyword.Suspend (\x -> case x of Keyword.Suspend y -> Just y; _ -> Nothing),
       -- CR 702.63b's numberless vanishing is the ABSENT "value" key, hexproof's
       -- spelling and for its reason: the two forms are one constructor, and the
       -- N-carrying form (Waning Wurm's @{"type":"Vanishing","value":2}@) is

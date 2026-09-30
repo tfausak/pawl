@@ -18,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
     Common.assertCodec
       s
       Counter.codec
-      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing)
+      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing Nothing)
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}} "
   -- Swift Silence's "counter all other spells. Draw a card for each spell
   -- countered this way".
@@ -26,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
     Common.assertCodec
       s
       Counter.codec
-      (Counter.MkCounter (ObjectRef.EachSpell (Filter.Not Filter.IsSource)) (Just (SlotName.MkSlotName (Text.pack "countered"))) Nothing)
+      (Counter.MkCounter (ObjectRef.EachSpell (Filter.Not Filter.IsSource)) (Just (SlotName.MkSlotName (Text.pack "countered"))) Nothing Nothing)
       " {\"ref\":{\"type\":\"EachSpell\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}},\"slot\":\"countered\"} "
   -- Green Slime's "if a permanent's ability is countered this way, destroy that
   -- permanent": the countered abilities' sources, bound for the Destroy to name.
@@ -34,6 +34,14 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
     Common.assertCodec
       s
       Counter.codec
-      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ability"))) Nothing (Just (SlotName.MkSlotName (Text.pack "permanent"))))
+      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ability"))) Nothing (Just (SlotName.MkSlotName (Text.pack "permanent"))) Nothing)
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"ability\"},\"sources\":\"permanent\"} "
+  -- Delay's "exile it ... instead of putting it into its owner's graveyard":
+  -- the exiled cards bound for the time counters and the suspend grant.
+  Spec.it s "MkCounter, countered into exile with the exiled cards bound" $
+    Common.assertCodec
+      s
+      Counter.codec
+      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing (Just (SlotName.MkSlotName (Text.pack "delayed"))))
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"exileInstead\":\"delayed\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Counter.codec
