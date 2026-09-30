@@ -45,6 +45,11 @@ data ChosenCardFromAmong = MkChosenCardFromAmong
   { slot :: SlotName.SlotName,
     filter :: Filter.Filter Keyword.Keyword,
     count :: Quantity.Quantity,
-    chooser :: PlayerRef.PlayerRef
+    chooser :: PlayerRef.PlayerRef,
+    -- | Whether the printed count says "up to", making it a ceiling the chooser
+    -- picks within, zero included, rather than one to fill (CR 608.2d) --
+    -- Uncovered Clues' "up to two". A Bool beside the count for
+    -- Pawl.Types.Search's upTo's reason.
+    upTo :: Bool
   }
   deriving (Eq, Ord, Show)
