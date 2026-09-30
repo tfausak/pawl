@@ -35,7 +35,8 @@ named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
   one kind on an object), `Types` (an object's card types, all of them),
   `Attackers` (every attacker and what it attacks), `Blockers` (an attacker's
   blockers, `null` when unblocked), `Defenders` (the defending players, in
-  order) and `Monarch` (`null` for nobody). Assert combat at `EndOfCombat` or
+  order), `Monarch` (`null` for nobody) and `PowerToughness` (an object's
+  projected `power` and `toughness`). Assert combat at `EndOfCombat` or
   earlier: it is cleared as that step ends.
 - **Final.** The run plays whole steps until the timeline is spent, the game
   ends, or the turn passes the last one named; `final` checks that state.

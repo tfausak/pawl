@@ -19,6 +19,7 @@ import qualified Pawl.Types.DefendersAre as DefendersAre.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.LifeIs as LifeIs.Type
 import qualified Pawl.Types.MonarchIs as MonarchIs.Type
+import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs.Type
 import qualified Pawl.Types.Reference as Reference.Type
 import qualified Pawl.Types.TapState as TapState.Type
 import qualified Pawl.Types.TappedIs as TappedIs.Type
@@ -47,6 +48,8 @@ spec s = Spec.describe s "Pawl.Codec.Check" $ do
     Common.assertCodec s Check.codec (Check.Type.Defenders (DefendersAre.Type.MkDefendersAre [Label.Type.MkLabel (Text.pack "bob")])) " {\"Defenders\":{\"players\":[\"bob\"]}} "
   Spec.it s "Monarch" $
     Common.assertCodec s Check.codec (Check.Type.Monarch (MonarchIs.Type.MkMonarchIs (Just (Label.Type.MkLabel (Text.pack "alice"))))) " {\"Monarch\":{\"player\":\"alice\"}} "
+  Spec.it s "PowerToughness" $
+    Common.assertCodec s Check.codec (Check.Type.PowerToughness (PowerToughnessIs.Type.MkPowerToughnessIs (labelled "bear") 3 3)) " {\"PowerToughness\":{\"object\":\"@bear\",\"power\":3,\"toughness\":3}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Check.codec
 
