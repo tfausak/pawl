@@ -1901,6 +1901,36 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
     Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
     Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Berserker's {G}" (S.tappedCount S.alice after) 4
 
+  -- CR 613.1f reaching a spell on the stack: Imoti, Celebrant of Bounty
+  -- {3}{G}{U} Legendary Creature -- Snake Druid 3/1 -- "Cascade / Spells you
+  -- cast with mana value 6 or greater have cascade." (Oracle text checked
+  -- 2026-09-30). Durkwood Baloth {4}{G}{G} prints no cascade and has mana value
+  -- 6 exactly, so the grant's "6 or greater" is met at its edge. The two boards
+  -- differ in Imoti alone; the cast trigger is read off the spell's projection
+  -- rather than its printed face.
+  Spec.it s "CR 613.1f Imoti grants a six-drop spell cascade" $ do
+    imoti <- S.printingOf s registry "Imoti, Celebrant of Bounty"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    think <- S.printingOf s registry "Think Twice"
+    forest <- S.printingOf s registry "Forest"
+    let board withImoti =
+          let base = Setup.emptyGame S.bothPlayers
+              (_, g1) = S.addLibraryCard think S.alice base
+              (_, g2) = S.addLibraryCard piker S.alice g1
+              g3 = foldr (\_ g -> snd (S.addPermanent forest S.alice g)) g2 [1 :: Int .. 6]
+              g4 = if withImoti then snd (S.addPermanent imoti S.alice g3) else g3
+              (_, g5) = S.addHandCard baloth S.alice g4
+           in g5
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.alice
+                }
+        isIn zone name gs = elem (CardName.MkCardName (Text.pack name)) (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone S.alice gs))
+        without = S.runPure cascading (board False) Engine.priorityLoop
+    Spec.assertBool s (isIn Zone.Battlefield "Goblin Piker" (S.runPure cascading (board True) Engine.priorityLoop)) "with Imoti, the Baloth's granted cascade cast the Goblin Piker free"
+    Spec.assertEqWith s "without Imoti, the Baloth resolved with no cascade and the Piker stayed in the library" (isIn Zone.Battlefield "Durkwood Baloth" without, isIn Zone.Library "Goblin Piker" without) (True, True)
+
   -- THE PROVING TEST for CR 702.85c. The library's top four cards are each a
   -- nonland of mana value under the Devastator's ten, so every walk stops at the
   -- first card it exiles and casts it; which cascade takes which is immaterial,

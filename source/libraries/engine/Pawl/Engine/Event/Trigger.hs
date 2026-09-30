@@ -1850,14 +1850,19 @@ eventTriggers events gs =
       -- Pawl.Engine.Keyword.stackTriggeredAbilitiesOf is what decides which
       -- keywords reach this: cascade and storm.
       --
-      -- Abilities come from the PRINTED card, so an effect changing the
-      -- triggered abilities of a spell on the stack is not seen (#1859).
+      -- The abilities and keywords are the PROJECTION's (CR 613.1 names no
+      -- zone), so Imoti, Celebrant of Bounty's granted cascade triggers --
+      -- Pawl.KeywordTriggerSpec's "CR 613.1f Imoti grants a six-drop spell
+      -- cascade" proves it. The face is read only for its delayed-ability
+      -- declarations, which are card data rather than a characteristic.
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
-          Just face -> case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) <> fmap whole (Keyword.stackTriggeredAbilitiesOf (Face.keywords face)) of
-            [] -> Map.empty
-            abilities -> Map.singleton spell (caster, abilities)
+          Just face ->
+            let pc = Projection.project spell gs
+             in case Maybe.mapMaybe (functionsIn (PC.subtypes pc) (Face.delayedAbilities face) Zone.Stack) (PC.triggeredAbilities pc) <> fmap whole (Keyword.stackTriggeredAbilitiesOf (PC.keywords pc)) of
+                  [] -> Map.empty
+                  abilities -> Map.singleton spell (caster, abilities)
         GameEvent.Discarded {} -> Map.empty
         GameEvent.Drew {} -> Map.empty
         GameEvent.Moved {} -> Map.empty
