@@ -3275,6 +3275,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   unagiSpec s registry
   waterbendingLessonSpec s registry
   benevolentRiverSpiritSpec s registry
+  waterbendersRestorationSpec s registry
+  spiritWaterRevivalSpec s registry
+  kataraSeekingRevengeSpec s registry
   mindGrindSpec s registry
   flashSpec s registry
 
@@ -7143,6 +7146,105 @@ benevolentRiverSpiritSpec s registry = Spec.describe s "Benevolent River Spirit"
     -- The taps, which the assertion above does not see: a Spirit whose {5} went
     -- unpaid would also have entered with mana value 2.
     Spec.assertEqWith s "CR 701.67a and seven permanents are tapped -- five for the waterbend cost and both Islands" (S.tappedCount S.alice resolved) 7
+
+-- Waterbender's Restoration {U}{U} Instant -- Lesson
+-- (data/cards/waterbenders-restoration.json): "As an additional cost to cast
+-- this spell, waterbend {X}. / Exile X target creatures you control. Return
+-- those cards to the battlefield under their owner's control at the beginning
+-- of the next end step."
+--
+-- CR 701.67a's {X} form as a spell's additional cost: the X is announced off
+-- the additional cost alone (CR 601.2b), since the mana cost states none, and
+-- the same announcement fixes the target count (CR 601.2c) and CR 701.67b's
+-- ceiling. Two Islands for the {U}{U}, so the {X} can only have been paid by
+-- tapping; the taps are Crawlspaces, the targets two of three Goblin Pikers.
+waterbendersRestorationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+waterbendersRestorationSpec s registry = Spec.describe s "Waterbender's Restoration" $ do
+  Spec.it s "CR 601.2b an X announced for a spell's additional waterbend {X} is paid by tapping and counts its targets" $ do
+    (spell, tappable, gs) <- waterbendSpellBoard s registry "Waterbender's Restoration" 2 False
+    let blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        (pikers, crawlspaces) = List.splitAt 3 tappable
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (`elem` fmap Recipient.ToCreature (take 2 pikers)) candidates) sets
+          _ -> waterbendingX 2 (ManaCost.MkManaCost [blue, blue]) (take 2 crawlspaces) p
+        resolved = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop
+    Spec.assertEqWith s "CR 601.2c X = 2: two of alice's three Pikers were exiled" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice resolved, length (Game.zoneMembers Zone.Exile S.alice resolved)) (1, 2)
+    -- The taps, which the assertion above does not see: an X paid out of
+    -- nowhere would also have exiled two Pikers.
+    Spec.assertEqWith s "CR 701.67a and four permanents are tapped -- two Crawlspaces for the waterbend cost and both Islands" (S.tappedCount S.alice resolved) 4
+
+-- Spirit Water Revival {1}{U}{U} Sorcery (data/cards/spirit-water-revival.json):
+-- "As an additional cost to cast this spell, you may waterbend {6}. / Draw two
+-- cards. If this spell's additional cost was paid, instead shuffle your
+-- graveyard into your library, draw seven cards, and you have no maximum hand
+-- size for the rest of the game. / Exile Spirit Water Revival."
+--
+-- CR 118.8b's OPTIONAL additional cost as a two-option choice, the empty option
+-- beside the waterbend, and the payment's own record (Binding.waterbendCost) as
+-- what "was paid" reads. A pair differing only in which option alice takes.
+spiritWaterRevivalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+spiritWaterRevivalSpec s registry = Spec.describe s "Spirit Water Revival" $ do
+  Spec.it s "CR 118.8b the spell reads whether its optional waterbend {6} was paid" $ do
+    (spell, _, gs) <- optionalWaterbendBoard s registry "Spirit Water Revival" 3
+    let resolved paid = S.runPure (optionalWaterbending paid) (S.runPure (optionalWaterbending paid) gs (S.cast S.alice spell)) Stack.resolveTop
+        outcome after = (S.handSize S.alice after, length (Game.zoneMembers Zone.Graveyard S.alice after), length (Game.zoneMembers Zone.Exile S.alice after))
+    Spec.assertEqWith s "CR 118.8b paid: her graveyard was shuffled away, she drew seven, and the spell is in exile" (outcome (resolved True)) (7, 0, 1)
+    Spec.assertEqWith s "unpaid: she drew two, and her graveyard's Water Whip stayed" (outcome (resolved False)) (2, 1, 1)
+    -- The taps, which the assertions above do not see: a {6} paid out of
+    -- nowhere would also have drawn seven.
+    Spec.assertEqWith s "CR 701.67a paid, nine permanents are tapped -- six for the waterbend cost and all three Islands; unpaid, the Islands alone" (S.tappedCount S.alice (resolved True), S.tappedCount S.alice (resolved False)) (9, 3)
+
+-- Katara, Seeking Revenge {3}{U/B} Legendary Creature -- Human Warrior Ally 3/3
+-- (data/cards/katara-seeking-revenge.json): "As an additional cost to cast this
+-- spell, you may waterbend {2}. / When Katara enters, draw a card, then discard
+-- a card unless her additional cost was paid. / Katara gets +1/+1 for each
+-- Lesson card in your graveyard."
+--
+-- Spirit Water Revival's read on a PERMANENT: CR 400.7d carries the spell's
+-- payment record onto Katara (Binding.paidCostRecord), and her enters trigger
+-- reads it there. Four Islands pay the {3}{U/B}; the {2} is paid by tapping.
+kataraSeekingRevengeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+kataraSeekingRevengeSpec s registry = Spec.describe s "Katara, Seeking Revenge" $ do
+  Spec.it s "CR 400.7d her enters trigger reads whether her optional waterbend {2} was paid" $ do
+    (spell, _, gs) <- optionalWaterbendBoard s registry "Katara, Seeking Revenge" 4
+    let resolved paid =
+          let answer :: Prompt.Prompt r -> r
+              answer = optionalWaterbending paid
+              entered = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) (Stack.resolveTop >> Engine.settleForPriority)
+           in S.runPure answer entered Stack.resolveTop
+        katara after = filter (\oid -> Game.zoneOf oid after == Just Zone.Battlefield) (Scenario.namedObjects (CardName.MkCardName (Text.pack "Katara, Seeking Revenge")) after)
+    Spec.assertEqWith s "CR 400.7d paid: she drew and kept the card" (S.handSize S.alice (resolved True)) 1
+    Spec.assertEqWith s "unpaid: she drew and discarded it" (S.handSize S.alice (resolved False)) 0
+    Spec.assertEqWith s "CR 701.67a paid, six permanents are tapped -- two for the waterbend cost and all four Islands" (S.tappedCount S.alice (resolved True)) 6
+    -- The graveyard's Water Whip is a Lesson; unpaid, the discarded Island is not.
+    Spec.assertEqWith s "and she is 4/4 off the Water Whip in alice's graveyard" (fmap (`S.powerToughnessOf` resolved True) (katara (resolved True))) [Just (4, 4)]
+
+-- The payer who waterbends where `paid`: the candidate stating the waterbend
+-- licence that leaves the least mana to find, its taps the first ones offered.
+-- Where not, the candidate stating no waterbend at all -- CR 118.8b's other
+-- option. Picked by the licence rather than by mana, since both options can
+-- leave the same mana part.
+optionalWaterbending :: Bool -> Prompt.Prompt r -> r
+optionalWaterbending paid p = case p of
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (List.sortOn (maybe 0 manaOwed . Cost.Type.mana) (filter ((== paid) . any isWaterbend . Cost.Type.components) candidates))
+  Prompt.ChooseTaps _ _ _ candidates wanted -> Set.fromList (take (Natural.Extra.toIntSaturating wanted) candidates)
+  _ -> S.identityAnswer p
+  where
+    isWaterbend component = case component of
+      CostComponent.Waterbend _ -> True
+      _ -> False
+
+-- waterbendSpellBoard's board with eight Islands in alice's library, for a draw
+-- of seven (CR 104.3c), and a Water Whip in her graveyard: a card for a shuffle
+-- to move, and a Lesson.
+optionalWaterbendBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Int -> m (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+optionalWaterbendBoard s registry name islands = do
+  (spell, tappable, gs) <- waterbendSpellBoard s registry name islands False
+  island <- S.printingOf s registry "Island"
+  whip <- S.printingOf s registry "Water Whip"
+  let stocked = List.foldl' (\acc _ -> snd (S.addLibraryCard island S.alice acc)) gs [1 .. 6 :: Int]
+  pure (spell, tappable, snd (S.addGraveyardCard whip S.alice stocked))
 
 -- Every waterbending answer above with CR 601.2c's announcement pinned at zero
 -- targets: alice's own creatures are candidates for "up to two target

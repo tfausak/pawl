@@ -46,8 +46,10 @@ data Quantity
     -- Pawl.Engine.Binding.variableX.
     InSlot SlotName.SlotName
   | -- | CR 701.4b: 1 if that slot of the surrounding announcement names at least
-    -- one object, else 0 -- Osseous Exhale's "if a Dragon was beheld", and CR
-    -- 701.59c's "if evidence was collected" (Vitu-Ghazi Inspector).
+    -- one object or holds an amount, else 0 -- Osseous Exhale's "if a Dragon
+    -- was beheld", CR 701.59c's "if evidence was collected" (Vitu-Ghazi
+    -- Inspector), and a waterbend cost's "if this spell's additional cost was
+    -- paid" (Spirit Water Revival).
     --
     -- Reads the BINDING and never the board, which is rule 701.4b's whole point:
     -- a Count over Scope.OverBound asks the same question through CR 400.7j and
