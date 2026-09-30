@@ -1,0 +1,255 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Kicker",
+          "value": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Blue"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Kicker",
+          "value": {
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Black"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Anavolver",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "replacementEffects": [
+        {
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "TimesPaid",
+                "value": {
+                  "type": "Kicker",
+                  "value": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 1
+                      },
+                      {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Blue"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            }
+          },
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "EntersWith",
+                "value": {
+                  "counters": [
+                    {
+                      "count": {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "kind": {
+                        "type": "PlusOnePlusOne"
+                      }
+                    }
+                  ],
+                  "keywords": [
+                    {
+                      "type": "Flying"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "TimesPaid",
+                "value": {
+                  "type": "Kicker",
+                  "value": {
+                    "mana": [
+                      {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Black"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            }
+          },
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "EntersWith",
+                "value": {
+                  "abilities": [
+                    {
+                      "type": "Activated",
+                      "value": {
+                        "cost": {
+                          "components": [
+                            {
+                              "type": "PayLife",
+                              "value": 3
+                            }
+                          ],
+                          "mana": []
+                        },
+                        "modal": {
+                          "modes": [
+                            {
+                              "clauses": [
+                                {
+                                  "effects": [
+                                    {
+                                      "type": "Replace",
+                                      "value": {
+                                        "duration": {
+                                          "type": "UntilEndOfTurn"
+                                        },
+                                        "effect": {
+                                          "type": "DestructionR",
+                                          "value": {
+                                            "rewrite": {
+                                              "type": "Regenerate"
+                                            }
+                                          }
+                                        },
+                                        "origin": {
+                                          "type": "Other"
+                                        },
+                                        "uses": {
+                                          "type": "Once"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "counters": [
+                    {
+                      "count": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "kind": {
+                        "type": "PlusOnePlusOne"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Volver"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

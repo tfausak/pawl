@@ -148,7 +148,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
-      (EntryRewrite.EntersWith (EntersWith.MkEntersWith (Just (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 2))) (Set.singleton Keyword.Flying)))
+      (EntryRewrite.EntersWith (EntersWith.MkEntersWith (Just (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 2))) (Set.singleton Keyword.Flying) Seq.empty))
       " {\"type\":\"EntersWith\",\"value\":{\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":2}}],\"keywords\":[{\"type\":\"Flying\"}]}} "
   -- CR 702.136a: riot's rewrite, payload-free because rule 702.136a fixes both
   -- halves. Minted from a keyword rather than written by a card, and round-tripped
