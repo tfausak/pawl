@@ -10729,12 +10729,11 @@ differentlyNamed gs = go Set.empty
 
 putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game [ObjectId]
 putFound searcher subject destination cardId = case destination of
-  -- Nature's Lore's "put that card onto the battlefield": the plain move, with
-  -- no rider naming how it enters, so CR 110.5b's defaults stand and the card
-  -- arrives untapped. That is why this is the plain move rather than putTapped
-  -- below -- the difference between the two arms is the card's own sentence.
-  SearchDestination.Battlefield -> Foldable.toList <$> Event.changeZoneReturning cardId Zone.Battlefield
-  SearchDestination.BattlefieldTapped -> Maybe.maybeToList <$> putTapped cardId
+  -- Nature's Lore's "put that card onto the battlefield", and Evolving Wilds'
+  -- "put it onto the battlefield tapped": CR 110.5b's default, or the card's
+  -- own rider, is the one difference between the two arms.
+  SearchDestination.Battlefield -> putOntoBattlefield searcher TapState.Untapped cardId
+  SearchDestination.BattlefieldTapped -> putOntoBattlefield searcher TapState.Tapped cardId
   -- The reveal comes FIRST, in the card's own order, and CR 701.20b makes that an
   -- order rather than decoration: revealing does not move the card. The two lines
   -- do not commute -- swapped, CR 400.7 has already ceased `cardId` and the
@@ -10807,9 +10806,7 @@ putFound searcher subject destination cardId = case destination of
 -- nothing.
 --
 -- CR 110.2a: it enters under the SEARCHER, the player whose effect is putting it
--- there -- not under its owner, which is what putFound's other arms'
--- Event.changeZone leaves it to, since none of them puts anything onto the
--- battlefield for someone other than its owner.
+-- there, as putOntoBattlefield's entries do.
 --
 -- Nothing from attachmentFor is CR 303.4i's "the Aura remains in its current
 -- zone" -- unreachable from a filter naming Filter.CanAttachToSubject, since that
@@ -10824,30 +10821,20 @@ attachFound searcher host cardId = do
       Foldable.toList
         <$> Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
 
--- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
--- shape). changeZone mints a new object; tap it by id after the move.
+-- Put a found card onto the battlefield, untapped or tapped as the card says.
 --
--- A direct write and NOT Pawl.Engine.Event.tap, for CR 603.2e's reason: this is
--- the permanent ENTERING the battlefield tapped, and an ability that triggers when
--- a permanent "becomes tapped" doesn't trigger if the permanent enters in that
--- state. Routing it through the funnel would fire such an ability.
-putTapped :: ObjectId -> Game (Maybe ObjectId)
-putTapped cardId = do
-  before <- State.get
-  Event.changeZone cardId Zone.Battlefield
-  moved <- State.get
-  let arrived = newestBattlefieldOf cardId before moved
-  Monad.forM_ arrived $ \newId ->
-    State.put moved {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) newId (GameState.objects moved)}
-  pure arrived
-
--- The single battlefield id present after a one-object move that was absent
--- before (changeZone mints a fresh id, CR 400.7).
-newestBattlefieldOf :: ObjectId -> GameState -> GameState -> Maybe ObjectId
-newestBattlefieldOf _ before after =
-  case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before)) of
-    newId : _ -> Just newId
-    [] -> Nothing
+-- CR 110.2a: it enters under the SEARCHER, attachFound's reading -- Eternal
+-- Dominion's "search target opponent's library ... put that card onto the
+-- battlefield under your control". Pawl.CastSpec's Eternal Dominion cases
+-- prove it.
+--
+-- The tap state rides the move rather than a write after it, for CR 603.2e's
+-- reason: this is the permanent ENTERING tapped, and an ability that triggers
+-- when a permanent "becomes tapped" doesn't trigger if it enters in that state.
+putOntoBattlefield :: PlayerId -> TapState.TapState -> ObjectId -> Game [ObjectId]
+putOntoBattlefield searcher tapped cardId =
+  Foldable.toList
+    <$> Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue Nothing tapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
 
 -- Write a whole new order back to a player's library: the shuffle after a CR
 -- 701.23 search, and CR 701.22a's scry, CR 701.25a's surveil and CR 701.29a's
