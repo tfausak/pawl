@@ -269,6 +269,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.Behold (Filter.HasCardType CardType.Creature))
       " {\"type\":\"Behold\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 701.4a then CR 406.2: Behold's payload under its own tag.
+  Spec.it s "BeholdAndExile" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.BeholdAndExile (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"BeholdAndExile\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 118.12's hand-to-battlefield cost: a bare criterion, one card.
   Spec.it s "PutCardFromHandOntoBattlefield" $
     Common.assertCodec

@@ -198,10 +198,13 @@ data CostComponent keyword
     -- Quantity.WasBound; CR 118.8b's optional "you may behold" is an option of a
     -- Pawl.Types.CostChoice whose other option is empty.
     --
-    -- Not implemented: beholding more than one object, and the Champion cycle's
-    -- "behold a [quality] and exile it" -- the payload is one Filter and states
-    -- neither (#3889).
+    -- Not implemented: beholding more than one object -- the payload is one
+    -- Filter and states no count (#3889).
     Behold (Filter.Filter keyword)
+  | -- | CR 701.4a then CR 406.2 / Champion of the Weird: the paying player
+    -- beholds one object matching the Filter and exiles it, linking the card to
+    -- the spell for CR 607.2q's "the exiled card".
+    BeholdAndExile (Filter.Filter keyword)
   | -- | CR 701.17a as a cost / Millikin: the paying player mills this many cards.
     -- The only component that moves a card out of a library, which CR 605.1a reads
     -- to bar a mana ability and CR 601.2h reads to put the payment in its second

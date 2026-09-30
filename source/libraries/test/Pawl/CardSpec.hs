@@ -3601,6 +3601,8 @@ costComponentFilters component = case component of
   -- CR 701.4a over the hand and the battlefield at once: Caustic Exhale's "a
   -- Dragon".
   CostComponent.Behold f -> [f]
+  -- The same, then exiled: Champion of the Weird's "a Goblin".
+  CostComponent.BeholdAndExile f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
