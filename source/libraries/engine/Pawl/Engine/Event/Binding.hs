@@ -1040,9 +1040,11 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
 --
 -- The controller for EVERY PermanentsDealCombatDamageToPlayer, since each
 -- printing in data/cards/ names it -- "you control", "an opponent controls" --
--- and a "you" is one seat. Witch-king of Angmar's "one or more creatures deal
--- combat damage to you" names none, so it would be one occurrence whoever's
--- creatures connected (MTGJSON dump of 2026-08-23, grepped 2026-09-30).
+-- and a "you" is one seat.
+--
+-- Not implemented: a batch naming no controller, one occurrence whoever's
+-- creatures connected -- Starscream, Power Hungry's "one or more creatures deal
+-- combat damage to you" (#4473).
 batchPartition :: TriggerCondition -> Map.Map SlotName.SlotName Binding -> Maybe PlayerId
 batchPartition cond bindings = case cond of
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Map.lookup Binding.damagersController (Binding.playerSlots bindings)

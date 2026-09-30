@@ -82,6 +82,9 @@ data TriggerCondition
     SelfIsDealtDamage
   | -- | CR 603.2 / 509-510 read by a bystander: a permanent the Filter admits
     -- dealt combat damage to a player (Tovolar, Dire Overlord).
+    --
+    -- Not implemented: narrowing the damaged player -- Teysa, Envoy of Ghosts'
+    -- "whenever a creature deals combat damage to you" (#4472).
     PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
   | -- | CR 603.2c's batch reading of the arm above, with the damaged player
     -- narrowed: "whenever one or more artifact creatures you control deal combat
