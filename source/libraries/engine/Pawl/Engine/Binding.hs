@@ -962,9 +962,9 @@ attackingCreatures = SlotName.MkSlotName (Text.pack "thoseAttackingCreatures")
 -- gathered.
 --
 -- "The attacking player" (Norn's Decree) and "that player" (Archnemesis) are the
--- printed phrases; neither printing is writable yet (#2930, #2931), so what
--- exercises the slot is data/cards/synthetic-marauders-toll.json and
--- data/cards/synthetic-reprisal-ledger.json.
+-- printed phrases. Norn's Decree reads it under CR 508.3d; Archnemesis is not
+-- writable yet (#2931), so data/cards/synthetic-reprisal-ledger.json exercises
+-- the CR 508.3e half.
 --
 -- Distinct from `triggerPlayer`, and that is why it exists: under CR 508.3e both
 -- players are subjects at once, and that slot already carries the ATTACKED one
@@ -984,6 +984,20 @@ attackingCreatures = SlotName.MkSlotName (Text.pack "thoseAttackingCreatures")
 -- "no card's targetSlots may name it" sweep as `attackingCreature`.
 attackingPlayer :: SlotName
 attackingPlayer = SlotName.MkSlotName (Text.pack "thatAttackingPlayer")
+
+-- CR 603.2c / 510.2: the reserved slot under which the CONTROLLER of the
+-- permanents a batch combat-damage trigger admitted is bound, as the damage was
+-- dealt -- Norn's Decree's "THAT OPPONENT gets a poison counter". Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings off each GameEvent.DamageDealt the
+-- condition matched, and one seat per trigger: Pawl.Engine.Event.Trigger splits
+-- the batch by it, so damagers two players control are two occurrences.
+--
+-- Not `attackingPlayer`: a creature can deal combat damage to a player without
+-- attacking (CR 510.1d's blocker, its damage redirected by CR 614.9), and CR
+-- 805.10c's "attacking player" names one of several seats where this names the
+-- one whose creatures connected.
+damagersController :: SlotName
+damagersController = SlotName.MkSlotName (Text.pack "thatDamagersController")
 
 -- CR 120.1: the reserved slot under which the OBJECT THAT DEALT the damage --
 -- its source -- is bound: Aragorn, Hornburg Hero's "double the number of +1/+1
@@ -1209,6 +1223,10 @@ setAttackingCreatures oids = Map.insert attackingCreatures (toObjects oids)
 -- Bind a player under the reserved attackingPlayer slot (CR 508.3d / 508.3e).
 setAttackingPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
 setAttackingPlayer pid = Map.insert attackingPlayer (toPlayer pid)
+
+-- Bind a player under the reserved damagersController slot (CR 603.2c).
+setDamagersController :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
+setDamagersController pid = Map.insert damagersController (toPlayer pid)
 
 -- Bind an object under the reserved combatDamager slot (CR 510.2).
 setCombatDamager :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

@@ -636,6 +636,26 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
     Spec.assertEqWith s "bob's Piker dealt carol 2" (run sharedTurns) (Just 18)
     Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
+  -- CR 603.2c / 805.10a: alice's and bob's Pikers connect with carol in one CR
+  -- 510.2 step, and Norn's Decree's "one or more creatures AN OPPONENT controls"
+  -- is one occurrence per opponent -- so each attacking player gets a poison
+  -- counter, where one trigger for the step would name only one of them.
+  --
+  -- Norn's Decree, {2}{W} Enchantment: "Whenever one or more creatures an
+  -- opponent controls deal combat damage to you, that opponent gets a poison
+  -- counter. ..."
+  Spec.it s "CR 603.2c two opponents' creatures dealing combat damage together are two occurrences" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    decree <- S.printingOf s registry "Norn's Decree"
+    let run option =
+          let (_, withDecree) = S.addPermanent decree S.carol (atCombat (option (twoTeams S.fourPlayerGame)))
+              (_, withAlice) = S.addPermanent piker S.alice withDecree
+              (_, board) = S.addPermanent piker S.bob withAlice
+              after = S.runCombat (S.attackTo S.carol) board
+              poisonOf pid = S.playerCounterOf PlayerCounterKind.Poison pid after
+           in (poisonOf S.alice, poisonOf S.bob, S.lifeOf S.carol after)
+    Spec.assertEqWith s "alice and bob each got a poison counter" (run sharedTurns) (1, 1, Just 16)
+    Spec.assertEqWith s "without the option only alice attacked" (run id) (1, 0, Just 18)
   -- CR 805.10d: the defending team has one combined block, so dave's creature
   -- may block a creature attacking his teammate carol, which CR 802.4a forbids
   -- without the option.
