@@ -73,5 +73,6 @@ seat name =
       Seat.Type.battlefield = Seq.empty,
       Seat.Type.hand = Seq.empty,
       Seat.Type.graveyard = Seq.empty,
-      Seat.Type.library = Seq.empty
+      Seat.Type.library = Seq.empty,
+      Seat.Type.exile = Seq.empty
     }

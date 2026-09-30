@@ -1,0 +1,58 @@
+{
+  "description": "CR 107.3 / 202.3 the -7's X is the total mana value of the cards you own in exile",
+  "note": "Alice owns two exiled cards of unequal mana value, Bad Moon's 2 and Bird Maiden's 3, so counting them reads 2, the greatest reads 3 and the total 5; carol's six-card library leaves a different remainder under each. Bob's exiled Goblin Piker is excluded only by CR 108.3's ownership conjunct: a count over the shared exile reads 7 and takes carol's library whole. Carol is the target on a third seat so the target player and you are told apart. Ashiok is at nine loyalty so the -7 leaves a survivor.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Ashiok, Wicked Manipulator", "label": "ashiok", "counters": [{ "key": { "type": "Loyalty" }, "value": 9 }] }],
+        "exile": [
+          { "card": "Bad Moon" },
+          { "card": "Bird Maiden" }
+        ]
+      },
+      {
+        "name": "bob",
+        "exile": [{ "card": "Goblin Piker" }]
+      },
+      {
+        "name": "carol",
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Mountain" },
+          { "card": "Forest" },
+          { "card": "Island" },
+          { "card": "Plains" },
+          { "card": "Ornithopter" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Swamp", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Mountain", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Forest", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Island", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Plains", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Ornithopter", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@ashiok", "ability": 2, "targets": ["@carol"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Library", "card": "Ornithopter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Library", "card": "Swamp", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Library", "card": "Mountain", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Library", "card": "Forest", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Library", "card": "Island", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Library", "card": "Plains", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Swamp", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Mountain", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Forest", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Island", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Plains", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Bad Moon", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Bird Maiden", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@ashiok", "kind": { "type": "Loyalty" }, "count": 2 } } }
+  ]
+}

@@ -19,6 +19,7 @@ codec = Fields.object $ do
   hand <- Fields.defaulted "hand" Seq.empty (Common.seq Placement.codec) Seat.hand
   graveyard <- Fields.defaulted "graveyard" Seq.empty (Common.seq Placement.codec) Seat.graveyard
   library <- Fields.defaulted "library" Seq.empty (Common.seq Placement.codec) Seat.library
+  exile <- Fields.defaulted "exile" Seq.empty (Common.seq Placement.codec) Seat.exile
   pure
     Seat.MkSeat
       { Seat.name = name,
@@ -26,5 +27,6 @@ codec = Fields.object $ do
         Seat.battlefield = battlefield,
         Seat.hand = hand,
         Seat.graveyard = graveyard,
-        Seat.library = library
+        Seat.library = library,
+        Seat.exile = exile
       }

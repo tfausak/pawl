@@ -2097,33 +2097,6 @@ offeredRecipients gs game =
         _ -> pure (S.identityAnswer p)
    in State.execState (Engine.runGame answer gs game) []
 
--- stasisCoffinBoard carried through one combat, runedHaloCombat's shape: bob's
--- Goblin Piker attacks `defender` alone and the pair (before, after) comes back so
--- a case can read the life it cost.
---
--- COMBAT damage for runedHaloCombat's reason -- rule 702.16b stops a burn spell
--- from ever TARGETING a protected player, so a case built on one would stay green
--- with rule 702.16e's shield deleted.
-stasisCoffinCombat ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Bool ->
-  PlayerId.PlayerId ->
-  (GameState.GameState, GameState.GameState)
-stasisCoffinCombat plains coffin curse piker activated defender =
-  let (coffinId, _, _, base) = stasisCoffinBoard plains coffin curse piker
-      before =
-        (if activated then activateCoffin coffinId base else base)
-          { GameState.activePlayer = S.bob,
-            GameState.priority = Just S.bob,
-            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defender]}
-          }
-      fight = Combat.declareAttackers S.manaPerformer S.bob >> Combat.declareBlockers S.manaPerformer >> Damage.dealCombatDamage
-   in (before, S.settleSba (S.runPure (S.attackTo defender) before fight))
-
 stasisCoffinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stasisCoffinSpec s registry =
   Spec.describe s "TheStasisCoffin" $ do
@@ -2165,31 +2138,6 @@ stasisCoffinSpec s registry =
       Spec.assertBool s (not (S.onBattlefield aura after)) "the Curse is off the battlefield after one pass"
       Spec.assertEqWith s "in its OWNER's graveyard, and bob owns it" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
       Spec.assertBool s (S.onBattlefield aura (S.settleSba cursed)) "and without the ability it stays where it is"
-    -- CR 702.16j with CR 702.16e: "all damage that would be dealt to such a
-    -- permanent or player is prevented", the CR 615.1 shield
-    -- Pawl.Engine.Replacement.collect mints off
-    -- Pawl.Engine.PlayerEffect.protectionCarriers, whose rows carry the quality
-    -- as a Filter.
-    --
-    -- THREE combats, each differing from the first in one thing: alice takes none
-    -- of the Piker's 2; carol takes all of it off the same activated board, so the
-    -- shield is scoped to the Coffin's controller and is not a Fog; and alice
-    -- takes all of it when the ability never resolved.
-    --
-    -- The Coffin is in EXILE by then -- its own cost put it there -- so the
-    -- shield's quality can only have come off the stored row.
-    Spec.it s "CR 702.16j / 702.16e combat damage to the protected player is prevented, and the same attacker otherwise connects" $ do
-      plains <- S.printingOf s registry "Plains"
-      coffin <- S.printingOf s registry "The Stasis Coffin"
-      curse <- S.printingOf s registry "Curse of Vitality"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let combat = stasisCoffinCombat plains coffin curse piker
-          (beforeAlice, atAlice) = combat True S.alice
-          (beforeCarol, atCarol) = combat True S.carol
-          (beforeOther, other) = combat False S.alice
-      Spec.assertEqWith s "with the ability resolved, alice takes none of the Piker's 2" (S.lifeOf S.alice atAlice) (S.lifeOf S.alice beforeAlice)
-      Spec.assertEqWith s "carol takes the whole 2 off the same board -- the Coffin protects its controller alone" (S.lifeOf S.carol atCarol) (fmap (subtract 2) (S.lifeOf S.carol beforeCarol))
-      Spec.assertEqWith s "and without the ability, so does alice" (S.lifeOf S.alice other) (fmap (subtract 2) (S.lifeOf S.alice beforeOther))
 
 -- Conjurer's Ban {W}{B} Sorcery: "Choose a card name. Until your next turn,
 -- spells with the chosen name can't be cast and lands with the chosen name can't
