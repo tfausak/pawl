@@ -5258,15 +5258,17 @@ replacementsAffecting gs =
       -- Pawl.Engine.Keyword.handReplacementsOf is what decides which keywords
       -- reach it, and madness is the only one.
       --
-      -- Minted off the PROJECTION's keywords (CR 613.1 names no zone), and read
-      -- off the printed face alone while no grantor writes a hand-minting
-      -- keyword (`handMintingKeywordsOf`), which keeps the walk from projecting
-      -- every card in every hand. Pawl.CastSpec's "CR 702.35a Falkenrath Gorger
-      -- gives a Vampire card in hand madness" proves the granted direction.
+      -- Minted off the PROJECTION's keywords (CR 613.1 names no zone), projected
+      -- only for a card printing madness or while a grantor writes it
+      -- (`handMintingKeywordsGiven`), which keeps the walk from projecting every
+      -- card in every hand. Pawl.CastSpec's "CR 702.35a Falkenrath Gorger gives
+      -- a Vampire card in hand madness" proves the granted direction.
       --
       -- ReplacementProvenance.Minted, replacementsOfGiven's mark for every row a
       -- rule writes onto an object rather than a face printing it.
-      mintedInHand oid = fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (handMintingKeywordsOf oid gs))
+      mintedInHand oid = fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (handMintingKeywordsGiven handGrantInForce oid gs))
+      -- A thunk, so the grantor walk runs once per gather rather than per card.
+      handGrantInForce = madnessGrantInForce gs
       -- CR 702.52a's replacement, minted for a card in a GRAVEYARD --
       -- `mintedInHand`'s sibling one zone over.
       -- Pawl.Engine.Keyword.graveyardReplacementsOf is what decides which
@@ -5292,15 +5294,9 @@ replacementsAffecting gs =
         Just face
           | null (Keyword.graveyardReplacementsOf (Face.keywordSet face)) && not graveyardGrantInForce -> []
           | otherwise -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.graveyardReplacementsOf (Map.keysSet (keywordsOf oid gs)))
-      -- Does anything grant a keyword that mints a graveyard row? baseHas's
-      -- grantor disjunct and `elsewhereHas`'s two, asked with the narrower
-      -- predicate. A thunk: only a graveyard card printing no such keyword
-      -- forces it.
-      mintsInGraveyard = grantsKeywordWhere (not . null . Keyword.graveyardReplacementsOf . Set.singleton)
-      graveyardGrantInForce =
-        any (any (any mintsInGraveyard . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) onBattlefield
-          || storedWrites mintsInGraveyard gs
-          || elsewhereGrants mintsInGraveyard gs
+      -- Does anything grant a keyword that mints a graveyard row? A thunk: only
+      -- a graveyard card printing no such keyword forces it.
+      graveyardGrantInForce = keywordGrantInForce (not . null . Keyword.graveyardReplacementsOf . Set.singleton) gs
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
@@ -5330,13 +5326,20 @@ replacementsAffecting gs =
 -- projection and answers empty, the projection's set differing there only in
 -- keywords that mint nothing in a hand.
 handMintingKeywordsOf :: ObjectId -> GameState -> Set Keyword
-handMintingKeywordsOf oid gs = case Game.faceOf oid gs of
+handMintingKeywordsOf oid gs = handMintingKeywordsGiven (madnessGrantInForce gs) oid gs
+
+-- `handMintingKeywordsOf` with `madnessGrantInForce`'s answer handed in, for a
+-- walk over every hand that asks it once.
+handMintingKeywordsGiven :: Bool -> ObjectId -> GameState -> Set Keyword
+handMintingKeywordsGiven granted oid gs = case Game.faceOf oid gs of
   Nothing -> Set.empty
   Just face
-    | null (Keyword.handReplacementsOf (Face.keywordSet face)) && not (keywordGrantInForce isMadness gs) -> Set.empty
+    | null (Keyword.handReplacementsOf (Face.keywordSet face)) && not granted -> Set.empty
     | otherwise -> Map.keysSet (keywordsOf oid gs)
-  where
-    isMadness k = not (null (Keyword.madnessCosts (Set.singleton k)))
+
+-- Does anything grant madness (`keywordGrantInForce`)?
+madnessGrantInForce :: GameState -> Bool
+madnessGrantInForce = keywordGrantInForce (not . null . Keyword.handReplacementsOf . Set.singleton)
 
 -- Does anything write a modification handing out a keyword satisfying `p`? A
 -- battlefield permanent's static ability, a stored effect (`storedWrites`) or
