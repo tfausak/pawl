@@ -6,6 +6,7 @@ import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | CR 608.2g: offer a player the cast of the objects a reference names, under
 -- CR 310.12b's riders.
@@ -69,6 +70,11 @@ data OfferCast = MkOfferCast
     copied :: Bool,
     -- | CR 723.2: the resolving controller controls the caster while the spell
     -- this offer casts resolves (Word of Command).
-    controlWhileResolving :: Bool
+    controlWhileResolving :: Bool,
+    -- | CR 400.7h: the slot the SPELL this offer's cast puts on the stack is
+    -- bound under, for a later sentence of the same effect to name (Storm of
+    -- Memories' "if that spell would be put into a graveyard"). Left unbound by
+    -- a declined offer and by CR 601.2e's reversal.
+    slot :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)
