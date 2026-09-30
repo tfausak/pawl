@@ -2562,7 +2562,7 @@ championOfTheWeirdSpec s registry =
       let resolved = S.runPure (beholdingOne brawler) (S.runPure (beholdingOne brawler) gs (S.cast S.alice champion)) Stack.resolveTop
       Spec.assertEqWith s "CR 406.2 the Brawler she beheld is in exile, and nothing else is" (namesIn Zone.Exile resolved) [cardNamed "Goblin Brawler"]
       Spec.assertBool s (List.elem piker (Game.zoneMembers Zone.Hand S.alice resolved)) "and the Piker she did not choose is still in her hand"
-      Spec.assertEqWith s "CR 601.2f and the Champion resolved onto the battlefield" (S.countOnBattlefieldByName (cardNamed "Champion of the Weird") S.alice resolved) 1
+      Spec.assertEqWith s "CR 608.3a and the Champion resolved onto the battlefield" (S.countOnBattlefieldByName (cardNamed "Champion of the Weird") S.alice resolved) 1
     Spec.it s "CR 607.2q the Champion leaving returns the exiled card to its owner's hand" $ do
       (champion, _, brawler, _, gs) <- championBoard s registry True
       let resolved = S.runPure (beholdingOne brawler) (S.runPure (beholdingOne brawler) gs (S.cast S.alice champion)) Stack.resolveTop
