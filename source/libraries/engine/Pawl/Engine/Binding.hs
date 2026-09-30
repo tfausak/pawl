@@ -598,6 +598,17 @@ beheldObject = SlotName.MkSlotName (Text.pack "thatBeheldObject")
 collectedEvidence :: SlotName
 collectedEvidence = SlotName.MkSlotName (Text.pack "thatCollectedEvidence")
 
+-- CR 701.67a: the reserved slot under which a CostComponent.Waterbend payment
+-- binds the waterbend cost's amount -- what "if this spell's additional cost
+-- was paid" asks after through Quantity.WasBound (Spirit Water Revival), and
+-- carried onto the permanent by paidCostRecord below (Katara, Seeking
+-- Revenge). An AMOUNT, since rule 701.67a's payment may tap nothing.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as the slots above.
+waterbendCost :: SlotName
+waterbendCost = SlotName.MkSlotName (Text.pack "thatWaterbendCost")
+
 -- CR 118.1 / 601.2h: the reserved slot under which a
 -- CostComponent.RemoveCounters payment binds HOW MANY counters it took
 -- off -- Ooze Flux's "the number of +1\/+1 counters removed this way", which
@@ -616,12 +627,12 @@ removedCounters = SlotName.MkSlotName (Text.pack "thatManyCountersRemoved")
 -- onto the permanent, and Pawl.Engine.Event.Trigger stamps it onto every
 -- ability that permanent triggers. Vitu-Ghazi Inspector is the reader.
 --
--- Only collectedEvidence: beheldObject is the other slot a cost binds for a
--- later "if" to read, and Scryfall `o:beheld -t:instant -t:sorcery`,
--- 2026-09-25, returns no permanent that reads it. A permanent printing "if a
--- [quality] was beheld" would want it here.
+-- collectedEvidence and waterbendCost (Katara, Seeking Revenge): beheldObject
+-- is the other slot a cost binds for a later "if" to read, and Scryfall
+-- `o:beheld -t:instant -t:sorcery`, 2026-09-25, returns no permanent that reads
+-- it. A permanent printing "if a [quality] was beheld" would want it here.
 paidCostRecord :: Map SlotName Binding -> Map SlotName Binding
-paidCostRecord bindings = Map.restrictKeys bindings (Set.singleton collectedEvidence)
+paidCostRecord bindings = Map.restrictKeys bindings (Set.fromList [collectedEvidence, waterbendCost])
 
 -- CR 702.122b: the reserved slot under which the VEHICLE a creature just crewed
 -- is bound -- the "that Vehicle" in Gearshift Ace's "whenever this creature crews

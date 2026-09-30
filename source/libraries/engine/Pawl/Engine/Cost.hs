@@ -6337,9 +6337,12 @@ payComponent moment slots pid oid component = case component of
   -- whether the generic mana went out as mana or as rule 701.67a's taps, since
   -- the substitution `announceSubstitutions` cashed is a TapPermanents component
   -- that says nothing about which licence bought it.
-  CostComponent.Waterbend _ -> do
+  --
+  -- Binds the amount under Binding.waterbendCost for the same reason: it is
+  -- what "if this spell's additional cost was paid" reads (Quantity.WasBound).
+  CostComponent.Waterbend n -> do
     State.modify' (Event.recordEvent (GameEvent.Waterbent pid))
-    pure bindsNothing
+    pure (Payment.Paid (Map.singleton Binding.waterbendCost (Binding.toAmount n)))
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.
