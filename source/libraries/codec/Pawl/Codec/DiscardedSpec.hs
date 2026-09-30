@@ -1,10 +1,12 @@
 module Pawl.Codec.DiscardedSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Codec.Discarded as Discarded
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
@@ -20,10 +22,10 @@ spec s = Spec.describe s "Pawl.Codec.Discarded" $ do
           { Discarded.player = PlayerId.MkPlayerId 0,
             Discarded.card = ObjectId.MkObjectId 7,
             Discarded.cause = DiscardCause.ToPayCyclingCost,
-            Discarded.exiledForMadness = False
+            Discarded.madness = Set.empty
           }
       )
-      " {\"player\":0,\"card\":7,\"cause\":{\"type\":\"ToPayCyclingCost\"},\"exiledForMadness\":false} "
+      " {\"player\":0,\"card\":7,\"cause\":{\"type\":\"ToPayCyclingCost\"},\"madness\":[]} "
   -- CR 702.35a's "exiled this way", the field's other value: an ordinary discard
   -- that rule 702.35a's own replacement redirected into exile.
   Spec.it s "MkDiscarded, a madness exile" $
@@ -34,8 +36,8 @@ spec s = Spec.describe s "Pawl.Codec.Discarded" $ do
           { Discarded.player = PlayerId.MkPlayerId 1,
             Discarded.card = ObjectId.MkObjectId 5,
             Discarded.cause = DiscardCause.Ordinary,
-            Discarded.exiledForMadness = True
+            Discarded.madness = Set.singleton MadnessCost.OwnManaCost
           }
       )
-      " {\"player\":1,\"card\":5,\"cause\":{\"type\":\"Ordinary\"},\"exiledForMadness\":true} "
+      " {\"player\":1,\"card\":5,\"cause\":{\"type\":\"Ordinary\"},\"madness\":[{\"type\":\"OwnManaCost\"}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Discarded.codec

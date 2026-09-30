@@ -117,6 +117,7 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.LoopMembers as LoopMembers
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
@@ -581,7 +582,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Mayhem _ -> []
   -- CR 702.35a's two abilities are minted elsewhere, suspend's shape: the
   -- static half by `handReplacementsOf` and the triggered half by
-  -- `exileTriggeredAbilitiesOf`, so this roster stays empty.
+  -- `madnessTriggersOf`, so this roster stays empty.
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
   Keyword.Scavenge _ -> []
@@ -2997,22 +2998,30 @@ warpCosts keywords =
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
 -- CR 702.35a: every cost this card may be cast for under its madness ability, in
--- ascending Set order. mayhemCosts' shape above, read by two callers a zone
--- apart -- `handReplacementsOf`, which mints rule 702.35a's discard replacement
--- while the card is in a hand, and `exileTriggeredAbilitiesOf`, which mints the
--- triggered half once the replacement has put the card in exile.
+-- ascending Set order. mayhemCosts' shape above, read by
+-- `handReplacementsOf`, which mints rule 702.35a's discard replacement while
+-- the card is in a hand, and by Pawl.Engine.Event.discardReturning, which
+-- records them for the triggered half (`madnessTriggersOf`).
 --
 -- A LIST for flashbackCosts' reason: rule 702.35 states no limit on how many
--- madness abilities an object has, and rule 702.35a's second ability names its
--- own cost, so two of them are two triggers.
+-- madness abilities an object has.
 --
 -- A wildcard rather than an exhaustive case, flashbackCosts' reason.
-madnessCosts :: Set Keyword -> [Cost Keyword]
+madnessCosts :: Set Keyword -> [MadnessCost.MadnessCost Keyword]
 madnessCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Madness cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.35a: a madness payload settled against the exiled card's mana cost --
+-- the stated cost as printed, or that mana cost itself (Falkenrath Gorger).
+-- A card with no mana cost leaves the cost unpayable (CR 202.1b, 118.6), which
+-- Cost.mana's Nothing already means.
+madnessCostFor :: Maybe ManaCost.ManaCost -> MadnessCost.MadnessCost Keyword -> Cost Keyword
+madnessCostFor manaCost payload = case payload of
+  MadnessCost.Stated cost -> cost
+  MadnessCost.OwnManaCost -> Cost.MkCost {Cost.mana = manaCost, Cost.components = []}
 
 -- CR 702.102a: does this card's keyword set let both halves be cast as one fused
 -- split spell? Its one reader is Pawl.Engine.Card.fusedFace, which builds the
@@ -3989,26 +3998,23 @@ castFromGraveyardExile =
         False
     )
 
--- | The replacement effects rule 702 mints for a card in a HAND, off its printed
--- keywords -- `mintedReplacementsOf`'s sibling one zone over, and rule 702.35a's
--- madness is the only one that reaches it.
+-- | The replacement effects rule 702 mints for a card in a HAND, off the keyword
+-- set it is handed -- `mintedReplacementsOf`'s sibling one zone over, and rule
+-- 702.35a's madness is the only one that reaches it.
 --
 -- Its own mint point rather than an arm of `mintedReplacementsFor`, because the
 -- two are gathered by different walks: that roster is read off the PROJECTION of
 -- a battlefield or command-zone object (Pawl.Engine.Projection.replacementsOf),
--- and CR 122.2 keeps every row it holds off a card in a hand. This one is read
--- off the printed face by Pawl.Engine.Projection.replacementsAffecting's hand
--- walk, where a granted madness would not be seen (gap #1859) -- the reading
--- `suspendOf` takes one clause of CR 113.6 apart.
+-- and CR 122.2 keeps every row it holds off a card in a hand. This one is
+-- handed Pawl.Engine.Projection.handMintingKeywordsOf by
+-- Pawl.Engine.Projection.replacementsAffecting's hand walk.
 --
--- ONE ROW however many madness abilities, unlike riot's per-instance rows: rule
--- 702.35a's replacement says only where the card goes, so two of them would be
--- indistinguishable CR 616.1 candidates and cost the discarding player a choice
--- between two identical answers. The COSTS are what differ, and they are the
--- triggered half's (`madnessCast`). Scryfall `keyword:madness`, 2026-09-12,
--- answers 62 cards and every one of them prints a single madness ability, so
--- the card that would tell the two readings apart does not exist; a printing
--- with two would refute this.
+-- ONE ROW however many madness abilities, unlike riot's per-instance rows.
+-- Scryfall `keyword:madness`, 2026-09-12, answers 62 cards and every one of
+-- them prints a single madness ability; a second reaches a card only by a
+-- grant, Falkenrath Gorger's. Not implemented: the CR 616.1 choice of WHICH
+-- madness ability exiles the card, which decides the trigger's cost when the
+-- two costs differ (#4443).
 handReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts keywords))]
 
@@ -8243,18 +8249,14 @@ handTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbilit
 handTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 
 -- CR 702.62a's SECOND and THIRD abilities, "the second and third are triggered
--- abilities that function in the exile zone", and CR 702.35a's second -- the
--- roster the exile scan in Pawl.Engine.Event.Trigger mints,
--- `handTriggeredAbilitiesOf`'s sibling one zone over.
+-- abilities that function in the exile zone" -- the roster the exile scan in
+-- Pawl.Engine.Event.Trigger mints, `handTriggeredAbilitiesOf`'s sibling one
+-- zone over.
 --
 -- UNGATED BY CR 113.6, which is the whole reason it is its own function: rule
 -- 702.62a states the zone itself, so the exile scan takes this list without
 -- asking `functionsIn` -- where the same scan does ask it of the card's PRINTED
--- abilities, which state no zone. Rule 702.35a states no zone in those words,
--- and reaches the same place by its own route: its first ability is what puts
--- the card in exile, so the second cannot fire anywhere else. `functionsIn`
--- would answer the GRAVEYARD for its condition (Pawl.Engine.Event.Trigger's
--- zonesTriggeredFrom, CR 701.9a's ordinary destination) and drop it.
+-- abilities, which state no zone.
 --
 -- Suspend's pair is ordered as rule 702.62a prints them, which is also the
 -- order they fire in: the upkeep removal takes the last counter off, and the
@@ -8262,21 +8264,32 @@ handTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 -- two shapes.
 --
 -- A SET rather than a count-carrying Map, `handTriggeredAbilitiesOf`'s
--- reading: rules 702.62 and 702.35 state no per-instance clause, and no card in
--- data/cards/ prints either keyword twice, so the caller hands over the distinct
--- keywords (Face.keywordSet). Rule 702.85c and its siblings do state one, which
+-- reading: rule 702.62 states no per-instance clause, and no card in
+-- data/cards/ prints suspend twice, so the caller hands over the distinct
+-- keywords as a set. Rule 702.85c and its siblings do state one, which
 -- is why `stackTriggeredAbilitiesOf` next door counts.
 exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-exileTriggeredAbilitiesOf keywords =
-  ( case suspend keywords of
-      Nothing -> []
-      Just ability -> [suspendUpkeep, suspendLastCounter ability]
-  )
-    -- CR 702.35a's SECOND ability, ungated for rule 702.62a's reason: the
-    -- discard has already put the card in exile by the time this fires, so the
-    -- ability that watches it functions there. One per madness cost, rule
-    -- 702.35a's "[cost]" being what one instance differs from another by.
-    <> fmap madnessCast (madnessCosts keywords)
+exileTriggeredAbilitiesOf keywords = case suspend keywords of
+  Nothing -> []
+  Just ability -> [suspendUpkeep, suspendLastCounter ability]
+
+-- CR 702.35a's SECOND ability for a card its first ability exiled, off the
+-- madness abilities the discard recorded (Discarded.madness) and the exiled
+-- card's mana cost, which a payload naming it settles against
+-- (`madnessCostFor`). Pawl.Engine.Event.Trigger mints it off that event
+-- rather than off the exiled card, so a grant that has since ended still
+-- triggers -- Pawl.CastSpec's "CR 702.35a the Gorger dying before the trigger
+-- is gathered still casts the Vampire" proves it.
+--
+-- ONE per distinct SETTLED cost: Falkenrath Gorger's grant beside Asylum
+-- Visitor's printed madness {1}{B} settles to the same {1}{B}, so choosing
+-- which madness ability applied is a choice between indistinguishable answers.
+-- Not implemented: that choice when the costs differ -- Bloodmad Vampire's
+-- madness {1}{R} beside the Gorger's {2}{R} -- which mints both triggers
+-- (#4443).
+madnessTriggersOf :: Maybe ManaCost.ManaCost -> Set (MadnessCost.MadnessCost Keyword) -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+madnessTriggersOf manaCost payloads =
+  fmap (madnessCast manaCost) (Map.elems (Map.fromListWith (\_ kept -> kept) [(madnessCostFor manaCost p, p) | p <- Set.toAscList payloads]))
 
 -- CR 702.59a's ability, "a triggered ability that functions only while the card
 -- with recover is in a player's graveyard" -- the roster the graveyard scan in
@@ -9232,9 +9245,10 @@ paradigmCopy =
 -- applying, and rule 702.35a's trigger must not fire then. Pawl.CastSpec's "CR
 -- 702.35a Rest in Peace's row chosen over madness's offers no cast" is what
 -- proves it.
-madnessCast :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-madnessCast cost =
-  let offer =
+madnessCast :: Maybe ManaCost.ManaCost -> MadnessCost.MadnessCost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+madnessCast manaCost payload =
+  let cost = madnessCostFor manaCost payload
+      offer =
         Effect.OfferCast
           OfferCast.MkOfferCast
             { OfferCast.ref = ObjectRef.InSlot Binding.triggerSource,
@@ -9243,7 +9257,7 @@ madnessCast cost =
               -- trigger's controller and the two seats coincide.
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just (Keyword.Madness cost)},
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just (Keyword.Madness payload)},
               -- rule 702.35a's "cast it": one card, the one the slot names.
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
