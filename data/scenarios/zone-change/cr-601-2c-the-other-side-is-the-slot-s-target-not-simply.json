@@ -1,5 +1,6 @@
 {
   "description": "CR 601.2c the other side is the slot's target, not simply the opponent",
+  "note": "Same board as the other exchange cases, aimed at carol: the slot is READ rather than the exchange running against a fixed second seat.",
   "board": {
     "seats": [
       {

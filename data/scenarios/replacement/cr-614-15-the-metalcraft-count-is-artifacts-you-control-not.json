@@ -1,5 +1,6 @@
 {
   "description": "CR 614.15 the metalcraft count is artifacts YOU control, not everyone's",
+  "note": "alice has two artifacts and bob has three. CR 109.5's \"you\" is the spell's controller, so hers is the count that matters and metalcraft is off.",
   "board": {
     "seats": [
       {

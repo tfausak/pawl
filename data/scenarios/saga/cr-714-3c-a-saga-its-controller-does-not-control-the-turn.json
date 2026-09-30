@@ -1,5 +1,6 @@
 {
   "description": "CR 714.3c a Saga its controller does not control the turn of stays put",
+  "note": "This is alice's precombat main phase: CR 505.4 names the active player, and bob's Saga is not theirs to advance.",
   "board": {
     "seats": [
       {

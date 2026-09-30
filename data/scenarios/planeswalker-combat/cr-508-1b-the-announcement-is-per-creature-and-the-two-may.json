@@ -1,5 +1,6 @@
 {
   "description": "CR 508.1b the announcement is per creature, and the two may differ",
+  "note": "CR 508.1b's announcement is asked PER CREATURE, and the answers are independent: two Pikers, one at Jace and one at bob.",
   "board": {
     "seats": [
       {

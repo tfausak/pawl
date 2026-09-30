@@ -1,5 +1,6 @@
 {
   "description": "CR 119.3 life loss from an effect bypasses the clause",
+  "note": "Worship's own ruling: \"Worship does not prevent loss of life, so loss of life bypasses Worship.\" Zof Consumption (\"Each opponent loses 4 life and you gain 4 life\") is the road CR 119.3 owns, against the same board and life total that survives 3 damage in the Worship damage cases.",
   "board": {
     "seats": [
       {

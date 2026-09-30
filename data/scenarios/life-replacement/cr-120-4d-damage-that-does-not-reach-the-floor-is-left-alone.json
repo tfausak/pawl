@@ -1,5 +1,6 @@
 {
   "description": "CR 120.4d damage that does not reach the floor is left alone",
+  "note": "CR 120.4d's own Worship example, second reading: the damage would not take the player below 1, so Worship's effect is not applied.",
   "board": {
     "seats": [
       {

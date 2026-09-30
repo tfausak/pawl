@@ -1,5 +1,6 @@
 {
   "description": "CR 702.4b a double striker deals twice to an unblocked player",
+  "note": "The 2/1 double striker deals 2 in each combat damage step, so bob loses 4. The first-strike and vanilla scenarios beside it are the controls: each deals once.",
   "board": {
     "seats": [
       {

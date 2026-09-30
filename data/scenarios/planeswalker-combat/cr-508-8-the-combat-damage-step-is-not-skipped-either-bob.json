@@ -1,5 +1,6 @@
 {
   "description": "CR 508.8 the combat damage step is not skipped either: bob takes 5",
+  "note": "Meandering Towershell returns attacking on a turn nothing is declared. The declare blockers step being reached says the schedule kept it; this says the combat damage step ran and the creature that was never declared dealt its damage anyway (CR 508.4: such creatures ARE attacking).",
   "board": {
     "seats": [
       {

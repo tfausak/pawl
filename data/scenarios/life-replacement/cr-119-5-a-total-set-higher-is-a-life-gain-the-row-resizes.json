@@ -1,5 +1,6 @@
 {
   "description": "CR 119.5 a total set HIGHER is a life gain the row resizes",
+  "note": "CR 119.5's upward direction: setting a life total gains or loses the necessary amount, so a replacement on the gain can OVERSHOOT the number the effect named (the card's ruling: \"your life total will actually become 17\" from 3 on a set to 10). Biorhythm sets three seats off one pre-effect board (CR 608.2f); carol holds the doubling row and is the only seat that goes up. Every number is distinct (alice to 1, bob to 2, carol from 2 by a gain of 1 doubled to 2), so the unreplaced reading of carol (3) collides with nothing.",
   "board": {
     "seats": [
       {

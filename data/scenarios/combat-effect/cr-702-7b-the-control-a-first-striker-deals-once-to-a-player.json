@@ -1,5 +1,6 @@
 {
   "description": "CR 702.7b the control: a first striker deals once to a player",
+  "note": "The control for double strike: first strike alone deals once, in the first-strike step only.",
   "board": {
     "seats": [
       {

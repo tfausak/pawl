@@ -1,5 +1,6 @@
 {
   "description": "CR 510.1b the control: a vanilla creature deals once to a player",
+  "note": "The control for the first-strike and double-strike scenarios: with neither keyword the creature deals its damage once.",
   "board": {
     "seats": [
       {

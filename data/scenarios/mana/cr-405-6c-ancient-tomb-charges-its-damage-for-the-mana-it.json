@@ -1,5 +1,6 @@
 {
   "description": "CR 405.6c Ancient Tomb charges its damage for the mana it makes",
+  "note": "CR 405.6c: a mana ability's other effect happens immediately. Ancient Tomb (\"{T}: Add {C}{C}. This land deals 2 damage to you\") has a clause beyond its mana, and CR 605.3b keeps the ability off the stack, so the payment itself has to deal the damage.",
   "board": {
     "seats": [
       {

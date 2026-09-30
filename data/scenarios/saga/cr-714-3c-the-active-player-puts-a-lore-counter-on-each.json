@@ -1,5 +1,6 @@
 {
   "description": "CR 714.3c the active player puts a lore counter on each Saga they control",
+  "note": "CR 714.3c: as the active player's precombat main phase begins, they put a lore counter on each Saga they control.",
   "board": {
     "seats": [
       {

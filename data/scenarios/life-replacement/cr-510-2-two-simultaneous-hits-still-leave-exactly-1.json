@@ -1,5 +1,6 @@
 {
   "description": "CR 510.2 two simultaneous hits still leave exactly 1",
+  "note": "CR 510.2's simultaneity, and CR 120.4d's first Worship example scaled down: two attackers, each of which alone would carry alice past the floor. Reading each against the PRE-BATCH life would cut both to a loss of 1 and leave her at 0, dead to CR 704.5a. The second attacker is a Child of Night rather than a second Celestine: CR 704.5j would bury one of two legends, and the two amounts differ, which no single number could tell apart.",
   "board": {
     "seats": [
       {

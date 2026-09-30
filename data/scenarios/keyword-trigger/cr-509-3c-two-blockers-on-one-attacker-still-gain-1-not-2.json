@@ -1,5 +1,6 @@
 {
   "description": "CR 509.3c two blockers on one attacker still gain 1, not 2",
+  "note": "CR 509.3c's \"only once each combat for that creature, even if it's blocked by multiple creatures\". Two Pikers block the one Prey: two blocking events, one became-blocked event. The falsifier is a condition matched against the declaration's pairs instead, which fires twice, for 22.",
   "board": {
     "seats": [
       {

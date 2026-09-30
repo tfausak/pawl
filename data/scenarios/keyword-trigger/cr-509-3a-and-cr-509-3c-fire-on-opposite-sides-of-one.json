@@ -1,5 +1,6 @@
 {
   "description": "CR 509.3a and CR 509.3c fire on opposite sides of one declaration",
+  "note": "CR 509.3a and CR 509.3c on one board, which is what tells the two arms apart: alice's Prey becomes blocked by bob's Guardian, so alice gains 1 and bob gains 3 off a single declaration. Either arm reading the other's event moves one of those two numbers.",
   "board": {
     "seats": [
       {

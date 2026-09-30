@@ -1,5 +1,6 @@
 {
   "description": "CR 120.3 the same five dealt to a PLAYER does not",
+  "note": "CR 120.3's other recipient on the same board as the Glory of Battle scenario: the block is the only difference, and a condition written over the bare damage event would fire here too.",
   "board": {
     "seats": [
       {

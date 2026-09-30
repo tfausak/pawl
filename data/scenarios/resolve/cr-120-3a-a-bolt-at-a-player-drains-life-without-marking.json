@@ -1,5 +1,6 @@
 {
   "description": "CR 120.3a a Bolt at a player drains life without marking",
+  "note": "With no creature on the battlefield the Bolt targets alice: a self-Bolt, which is legal Magic. Damage to a player is life loss and marks nothing.",
   "board": {
     "seats": [
       {

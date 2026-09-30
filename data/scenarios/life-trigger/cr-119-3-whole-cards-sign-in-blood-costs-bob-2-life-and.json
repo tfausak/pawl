@@ -1,5 +1,6 @@
 {
   "description": "CR 119.3 whole cards: Sign in Blood costs bob 2 life and Exquisite Blood gains alice that much",
+  "note": "The gameplay-level proof, cast to resolution: bob loses 2 (CR 119.3), and Exquisite Blood matches that event and gains alice the 2 it carried. Both players have library cards, so neither the target nor the control's target loses to CR 104.3c before a trigger could resolve.",
   "board": {
     "seats": [
       {

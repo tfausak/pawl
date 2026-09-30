@@ -1,5 +1,6 @@
 {
   "description": "CR 119.4 bob pays 2 life for Greed and Exquisite Blood gains alice that much",
+  "note": "CR 119.4's \"in other words, the player loses that much life\". The only life-loss producer that happens while paying a COST rather than while an effect resolves, so the loss is recorded outside resolution and the CR 117.5 trigger scan still has to find it.",
   "board": {
     "seats": [
       {

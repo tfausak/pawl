@@ -1,5 +1,6 @@
 {
   "description": "CR 614.1a a Clue is not a creature token, so nothing is appended",
+  "note": "The negative, one thing different: the token is a Clue, and \"creature tokens\" does not say Clue.",
   "board": {
     "seats": [
       {

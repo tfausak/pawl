@@ -1,5 +1,6 @@
 {
   "description": "CR 119.5 a total set LOWER is a life loss the row resizes, and one set higher is not",
+  "note": "CR 119.5: setting a life total is a gain or loss of the difference. Biorhythm sets three seats off one pre-effect board (CR 608.2f), so one case reads three answers: an opponent's LOSS is resized, the controller's own loss is not, and a GAIN is not a loss and proposes nothing. Every number is distinct (alice 20 to 1, bob 20 to -20 rather than 0, carol 2 to 3 rather than 4), so no two readings land on the same total.",
   "board": {
     "seats": [
       {

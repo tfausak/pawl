@@ -1,5 +1,6 @@
 {
   "description": "CR 509.3a an attacker's own declaration is not a block",
+  "note": "CR 509.1a gives each blocker one creature to block by default, so a second ATTACKER adds a declaration the Guardian is not in. alice attacks with two Pikers and bob blocks the first; the second's 2 gets through: 20 + 3 - 2 = 21. The falsifier is a condition that matches an attacker's declaration too: three events rather than one, for 25.",
   "board": {
     "seats": [
       {

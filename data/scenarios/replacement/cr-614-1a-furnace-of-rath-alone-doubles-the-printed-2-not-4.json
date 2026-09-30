@@ -1,5 +1,6 @@
 {
   "description": "CR 614.1a Furnace of Rath alone doubles the printed 2, not 4",
+  "note": "The control leg for Furnace of Rath: with metalcraft OFF there is no self-replacement, so the Furnace doubles the printed 2. Without it, an engine that ignored the metalcraft clause and simply doubled twice would also reach 8. Two Myr, so the Furnace (an enchantment, which cannot make up the count itself) leaves alice short of metalcraft's three.",
   "board": {
     "seats": [
       {

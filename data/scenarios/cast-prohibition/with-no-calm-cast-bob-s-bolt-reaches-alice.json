@@ -1,5 +1,6 @@
 {
   "description": "with no Calm cast, bob's Bolt reaches alice",
+  "note": "The control twin for Blossoming Calm: same seats, Mountain, Bolt and target, but alice never casts her instant. Without it, \"alice took no damage\" in the Calm case could mean the Bolt was never cast at all.",
   "board": {
     "seats": [
       {

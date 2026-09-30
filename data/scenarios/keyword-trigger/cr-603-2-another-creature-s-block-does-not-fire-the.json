@@ -1,5 +1,6 @@
 {
   "description": "CR 603.2 another creature's block does not fire the Guardian's ability",
+  "note": "CR 603.2: the condition is the BEARER's own declaration. bob blocks one attacker with two creatures, so two declarations are recorded and only one is the Guardian's. The falsifier is a match that ignores the blocker on the event: it fires twice, for 26.",
   "board": {
     "seats": [
       {

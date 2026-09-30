@@ -1,5 +1,6 @@
 {
   "description": "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing",
+  "note": "The converse, in CR 509.3c's own words: a creature that BLOCKS does not become blocked. Here the Prey is bob's and blocks a Piker; the falsifier is an arm matching the blocker's own event, which would put bob at 21.",
   "board": {
     "seats": [
       {

@@ -1,5 +1,6 @@
 {
   "description": "CR 509.3a blocking TWO creatures still gains 3 once",
+  "note": "Rule 509.3a's \"even if it blocks multiple creatures\". High Ground gives bob's team the extra block, the Guardian blocks both Pikers, and the gain is 3 once rather than 3 twice. The falsifier is a match on the per-attacker blocking event, which fires once per attacker blocked: 26.",
   "board": {
     "seats": [
       {

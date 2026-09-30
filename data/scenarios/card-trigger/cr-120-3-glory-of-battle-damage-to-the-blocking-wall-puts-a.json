@@ -1,5 +1,6 @@
 {
   "description": "CR 120.3 Glory of Battle: damage to the blocking Wall puts a +1/+1 counter on Strax",
+  "note": "Strax, Sontaran Nurse's Glory of Battle (\"Whenever Strax deals damage to a creature, put a +1/+1 counter on Strax\") with a CREATURE recipient. Wall of Stone 0/8 survives all five, so the counter is the trigger and not a death trigger, and trample assigns nothing past it: the whole event has one recipient. The paired scenario sends the same five to bob instead.",
   "board": {
     "seats": [
       {

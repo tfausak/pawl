@@ -1,5 +1,6 @@
 {
   "description": "CR 601.2c both sides are read from the slot, the controller included when named",
+  "note": "Same board as the other exchange cases, differing only in which two players the answer names: the controller is a side when she is TARGETED, and the slot is what decides.",
   "board": {
     "seats": [
       {

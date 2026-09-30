@@ -1,5 +1,6 @@
 {
   "description": "CR 701.12c without the Cindermaw the same exchange happens",
+  "note": "The paired control on the same board: the Cindermaw is the only difference, so the Cindermaw case is not passing for want of mana or a target.",
   "board": {
     "seats": [
       {

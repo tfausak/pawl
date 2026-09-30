@@ -1,5 +1,6 @@
 {
   "description": "CR 601.2f Murderous Betrayal's half is fixed before Mana Confluence's life is paid",
+  "note": "Murderous Betrayal's {B}{B} from a Swamp and a Mana Confluence, at 11 life. CR 601.2f fixes the half at 6 before CR 601.2g's Confluence pays 1, so alice ends at 4; a half measured when the component is paid reads 10 and leaves her at 5.",
   "board": {
     "seats": [
       {

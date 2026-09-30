@@ -15,6 +15,9 @@ named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent. Setup is a
   state, not a history: nothing placed triggers anything.
+- **Note.** An optional `note` says in prose what the scenario rules out and
+  why its board is built the way it is. It is free text: nothing reads it, and
+  the decoder ignores it like any other unknown key.
 - **References.** `"@name"` is a seat or a labelled card. `"Goblin Piker"` is
   the first live object with that name, `"Goblin Piker#2"` the second, in
   creation order across every zone.
