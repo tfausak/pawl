@@ -2547,7 +2547,7 @@ apply batch candidate event =
       -- the evaluable branch loops.
       --
       -- placeEntryCounters is the funnel, shared with the EntersWith arm below,
-      -- whose sentence prints a counter half beside its keywords.
+      -- whose sentence prints a counter half beside its grants.
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         placeEntryCounters candidate oid counters
@@ -2577,6 +2577,9 @@ apply batch candidate event =
       -- "CR 707.2 a token copy of the kicked Squadron has neither the flying nor
       -- the counters" is the half that proves it.
       --
+      -- A quoted ability (Degavolver's "Pay 3 life: Regenerate this creature.")
+      -- lands the same way, as a GainAbility beside the GainKeywords.
+      --
       -- ONE timestamp for the whole set, taken once: CR 613.7a gives a static
       -- ability's continuous effect the timestamp of the object it is on, and
       -- Cetavolver's "with first strike and trample" is one clause, so its two
@@ -2604,17 +2607,20 @@ apply batch candidate event =
                 Nothing -> gs2
                 Just expiry ->
                   let (ts, gs3) = Game.freshTimestamp gs2
-                      effectFor keyword =
+                      effectFor modification =
                         ContinuousEffect.MkContinuousEffect
                           { ContinuousEffect.source = oid,
                             ContinuousEffect.timestamp = ts,
                             ContinuousEffect.expiry = expiry,
-                            ContinuousEffect.modification = Modification.GainKeyword keyword,
+                            ContinuousEffect.modification = modification,
                             -- CR 611.2c: a fixed set of one, settled here -- the
                             -- permanent that entered.
                             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
                           }
-                   in gs3 {GameState.continuousEffects = fmap effectFor (Set.toList (EntersWith.keywords entersWith)) <> GameState.continuousEffects gs3}
+                      grants =
+                        fmap Modification.GainKeyword (Set.toList (EntersWith.keywords entersWith))
+                          <> fmap Modification.GainAbility (Foldable.toList (EntersWith.abilities entersWith))
+                   in gs3 {GameState.continuousEffects = fmap effectFor grants <> GameState.continuousEffects gs3}
             pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -4799,7 +4805,7 @@ putOwnCounters oid kind n = do
 
 -- | CR 614.1c's counter half, placed for both rows that carry one:
 -- EntryRewrite.WithCounters' whole payload, and the counters
--- EntryRewrite.EntersWith prints beside its keywords. Into the pending map
+-- EntryRewrite.EntersWith prints beside its grants. Into the pending map
 -- through addEnteringCounters, and NOT a direct write to Object.counters,
 -- because CR 614.16 makes a counter-scaling replacement apply even when the
 -- original event was not itself an effect -- so Doubling Season has to see

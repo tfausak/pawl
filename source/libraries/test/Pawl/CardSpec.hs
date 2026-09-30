@@ -5008,9 +5008,11 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- every KIND, the map's keys being CR 122.1b's, any of which may be a whole
   -- Keyword carrying a Filter; see #2728.
   EntryRewrite.WithCounters w -> withCountersFilters w
-  -- BOTH halves of CR 614.1c's keyword-bearing sentence: the counters take the
+  -- BOTH halves of CR 614.1c's grant-bearing sentence: the counters take the
   -- arm above's sweep, and the granted keywords are the option arms' payload
   -- without the choice around it, reached the same way.
+  -- The quoted abilities are swept by grantedModifications instead
+  -- (entryQuotedAbilities), for copyExceptionFilters' GainAbility reason.
   EntryRewrite.EntersWith e -> foldMap withCountersFilters (EntersWith.counters e) <> concatMap keywordFilters (Set.toList (EntersWith.keywords e))
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
@@ -6144,7 +6146,8 @@ grantedStaticAbilities card =
 --
 -- A THIRD source rides beside them as a GainAbility: CR 707.9a's quoted ability
 -- in a copy exception (copyQuotedAbilities), text printed on this card that ends
--- up on the copy.
+-- up on the copy; and CR 614.1c's quoted ability in an entry clause
+-- (entryQuotedAbilities).
 --
 -- Iterated, because a granted ability's own effects may store a grant in turn:
 -- each round feeds the abilities just found back through the ModifyTarget walk,
@@ -6171,7 +6174,7 @@ grantedModifications card =
                   Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create) <> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (CreateCopy.riders create))
                   Effect.BecomeCopy become -> copyQuotedAbilities (BecomeCopy.exceptions become)
                   Effect.CopyStackObject copy -> copyQuotedAbilities (CopyStackObject.exceptions copy)
-                  Effect.Replace replace -> copyQuotedAbilities (replacementCopyExceptions (Replace.effect replace))
+                  Effect.Replace replace -> copyQuotedAbilities (replacementCopyExceptions (Replace.effect replace)) <> entryQuotedAbilities (Replace.effect replace)
                   _ -> []
               )
               . effectWithNested
@@ -6191,7 +6194,7 @@ grantedModifications card =
           else
             let expanded = withFullText modifications
              in expanded <> deeper (storedIn (effectsOf expanded) <> staticsIn expanded)
-   in deeper (printed <> concatMap (copyQuotedAbilities . replacementCopyExceptions . PrintedReplacement.effect) (Face.replacementEffects card) <> storedIn (printedCarrierEffects card))
+   in deeper (printed <> concatMap ((\r -> copyQuotedAbilities (replacementCopyExceptions r) <> entryQuotedAbilities r) . PrintedReplacement.effect) (Face.replacementEffects card) <> storedIn (printedCarrierEffects card))
 
 -- CR 707.9a: the abilities a copy exception QUOTES, as the grant they amount to.
 copyQuotedAbilities :: [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Projection.Modification]
@@ -6201,6 +6204,13 @@ copyQuotedAbilities =
         CopyException.GainAbility granted -> Just (Modification.GainAbility granted)
         _ -> Nothing
     )
+
+-- CR 614.1c: the abilities an entry clause QUOTES (Degavolver's "with 'Pay 3
+-- life: Regenerate this creature.'"), as the grant they amount to.
+entryQuotedAbilities :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Projection.Modification]
+entryQuotedAbilities replacement = case replacement of
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.EntersWith e)) -> fmap Modification.GainAbility (Foldable.toList (EntersWith.abilities e))
+  _ -> []
 
 -- The copy exceptions a replacement carries: CR 707.5's AsCopy is the one arm.
 replacementCopyExceptions :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)]
@@ -6984,7 +6994,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             -- counters on it" announces X on the spell and reads it at the entry.
             wc <- case rewrite of
               EntryRewrite.WithCounters w -> [w]
-              -- The counter half of a keyword-bearing sentence takes the same
+              -- The counter half of a grant-bearing sentence takes the same
               -- funnel (Pawl.Engine.Event's placeEntryCounters), so an X in it is
               -- read at the entry too.
               EntryRewrite.EntersWith e -> Maybe.maybeToList (EntersWith.counters e)

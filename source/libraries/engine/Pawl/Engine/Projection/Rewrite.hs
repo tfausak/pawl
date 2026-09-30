@@ -1584,11 +1584,13 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.ChooseCardNames f -> EntryRewrite.ChooseCardNames (Filter.rewrite pairs f)
   EntryRewrite.ChooseCardName f -> EntryRewrite.ChooseCardName (Filter.rewrite pairs f)
   EntryRewrite.WithCounters w -> EntryRewrite.WithCounters (rewriteWithCounters pairs w)
-  -- BOTH halves of the sentence: the counters take the arm above's descent and
+  -- EVERY part of the sentence: the counters take the arm above's descent and
   -- the keywords take CR 702.14a's word once more, this time in a keyword the
   -- entry clause grants outright. The keyword half is latent for
   -- ChoiceByCoinFlip's reason: Faerie Squadron grants flying, which carries no
-  -- word, and an entry clause granting islandwalk would be what proves it.
+  -- word, and an entry clause granting islandwalk would be what proves it. A
+  -- quoted ability takes CopyException.GainAbility's descent, latent the same
+  -- way: Degavolver's quoted ability prints no subtype.
   --
   -- Written out rather than as a record update, so a field added to the payload
   -- is a missing-field error here rather than a value the text change silently
@@ -1597,7 +1599,8 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
     EntryRewrite.EntersWith
       EntersWith.MkEntersWith
         { EntersWith.counters = fmap (rewriteWithCounters pairs) (EntersWith.counters e),
-          EntersWith.keywords = Set.map (Filter.rewriteKeyword pairs) (EntersWith.keywords e)
+          EntersWith.keywords = Set.map (Filter.rewriteKeyword pairs) (EntersWith.keywords e),
+          EntersWith.abilities = fmap (rewriteGrantedAbility pairs) (EntersWith.abilities e)
         }
   EntryRewrite.UnderSourceControl -> rewrite
   EntryRewrite.SacrificeAnyNumber s ->

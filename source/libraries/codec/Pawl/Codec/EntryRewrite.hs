@@ -40,7 +40,7 @@ codec abilityCodec effectCodec =
       Arm.nullary "ChoosePlayer" EntryRewrite.ChoosePlayer,
       Arm.payload "ChooseCardNames" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardNames (\x -> case x of EntryRewrite.ChooseCardNames y -> Just y; _ -> Nothing),
       Arm.payload "ChooseCardName" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardName (\x -> case x of EntryRewrite.ChooseCardName y -> Just y; _ -> Nothing),
-      Arm.payload "EntersWith" EntersWith.codec EntryRewrite.EntersWith (\x -> case x of EntryRewrite.EntersWith y -> Just y; _ -> Nothing),
+      Arm.payload "EntersWith" (EntersWith.codec abilityCodec) EntryRewrite.EntersWith (\x -> case x of EntryRewrite.EntersWith y -> Just y; _ -> Nothing),
       Arm.nullary "UnderSourceControl" EntryRewrite.UnderSourceControl,
       Arm.nullary "ReadAhead" EntryRewrite.ReadAhead,
       Arm.nullary "Riot" EntryRewrite.Riot,
