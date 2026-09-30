@@ -1,0 +1,37 @@
+{
+  "description": "CR 119.3 life loss from an effect bypasses the clause",
+  "note": "Worship's own ruling: \"Worship does not prevent loss of life, so loss of life bypasses Worship.\" Zof Consumption (\"Each opponent loses 4 life and you gain 4 life\") is the road CR 119.3 owns, against the same board and life total that survives 3 damage in the Worship damage cases.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 2,
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true },
+          { "card": "Swamp", "label": "swamp-4", "ready": true },
+          { "card": "Worship", "ready": true },
+          { "card": "Goblin Piker", "ready": true },
+          { "card": "Goblin Piker", "ready": true },
+          { "card": "Goblin Piker", "ready": true }
+        ],
+        "hand": [
+          { "card": "Stronghold Discipline", "label": "stronghold-discipline", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@stronghold-discipline", "mana": ["@swamp", "@swamp-2", "@swamp-3", "@swamp-4"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": -1 } },
+    { "Life": { "player": "bob", "life": 20 } }
+  ]
+}

@@ -1563,16 +1563,6 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
           _ -> []
     Spec.assertEqWith s "both opponents are candidates, alice is not" candidates [Set.fromList [Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol]]
 
-  -- The same board and the same interpreter, aimed at carol: the slot is READ
-  -- rather than the exchange running against a fixed second seat.
-  Spec.it s "CR 601.2c the other side is the slot's target, not simply the opponent" $ do
-    mirror <- S.printingOf s registry "Mirror Universe"
-    let (_, board) = mirrorBoard mirror 4 27 13
-        after = S.runPure (exchangeAnswer S.carol) board Engine.runStep
-    Spec.assertEqWith s "alice took carol's 13" (S.lifeOf S.alice after) (Just 13)
-    Spec.assertEqWith s "carol took alice's 4" (S.lifeOf S.carol after) (Just 4)
-    Spec.assertEqWith s "bob, untargeted, is untouched" (S.lifeOf S.bob after) (Just 27)
-
   -- CR 119.9: equal totals are an exchange that moves nobody, and a gain of 0 is
   -- no life gain event at all -- so "whenever you gain life" must not fire on it.
   Spec.it s "CR 119.9 an exchange between equal totals logs no life event" $ do
@@ -1604,18 +1594,6 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     -- The ability was really activated, so an exchange that did nothing cannot
     -- pass the assertions above by leaving the board alone.
     Spec.assertEqWith s "and the Conduit paid its own {T}" (fmap Object.tapped (Game.lookupObject conduitId after)) (Just TapState.Tapped)
-
-  -- The same board and the same interpreter, differing only in which two players
-  -- the answer names: the controller is a side when she is TARGETED, and the slot
-  -- is what decides.
-  Spec.it s "CR 601.2c both sides are read from the slot, the controller included when named" $ do
-    conduit <- S.printingOf s registry "Soul Conduit"
-    island <- S.printingOf s registry "Island"
-    let (_, board) = soulConduitBoard conduit island 4 27 13
-        after = S.runPure (conduitAnswer [S.alice, S.bob]) board Engine.runStep
-    Spec.assertEqWith s "alice took bob's 27" (S.lifeOf S.alice after) (Just 27)
-    Spec.assertEqWith s "bob took alice's 4" (S.lifeOf S.bob after) (Just 4)
-    Spec.assertEqWith s "carol, whom nobody named, is untouched" (S.lifeOf S.carol after) (Just 13)
 
   -- CR 701.12a: "if the entire exchange can't be completed, no part of the
   -- exchange occurs." One of the two targets leaves the game after the ability is
@@ -1658,15 +1636,6 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     -- The ability was really activated, so the assertions above cannot pass
     -- because nothing happened at all.
     Spec.assertEqWith s "and the Conduit paid its own {T}" (fmap Object.tapped (Game.lookupObject conduitId after)) (Just TapState.Tapped)
-
-  -- The paired control on the same board: the Cindermaw is the only difference,
-  -- so the case above is not passing for want of mana or a target.
-  Spec.it s "CR 701.12c without the Cindermaw the same exchange happens" $ do
-    conduit <- S.printingOf s registry "Soul Conduit"
-    island <- S.printingOf s registry "Island"
-    let (_, board) = soulConduitBoard conduit island 4 27 13
-        after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
-    Spec.assertEqWith s "carol took bob's 27" (S.lifeOf S.carol after) (Just 27)
 
 -- CR 701.12g on alice's upkeep, three seats, the exchanger carrying a +1/+1
 -- counter so that CR 613.4b's layer 7b and CR 613.4c's layer 7c tell apart:

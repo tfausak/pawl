@@ -1,8 +1,10 @@
 # Scenarios
 
-Each `.json` file here is one gameplay test: a board, a timeline of decisions
-and checks, and optional final checks. The test suite runs every one, and
-`pawl scenario FILE...` runs any. `pawl schema scenario` prints the schema.
+Each `.json` file here, in any subdirectory, is one gameplay test: a board, a
+timeline of decisions and checks, and optional final checks. The test suite
+runs every one, and `pawl scenario FILE...` runs any. `pawl schema scenario`
+prints the schema. A test moved from a Haskell spec goes in a subdirectory
+named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
 
 - **Board.** `seats` in turn order, each with a `name`, `life` (default 20)
   and `battlefield`, `hand`, `graveyard` and `library` placements (a library
@@ -13,6 +15,9 @@ and checks, and optional final checks. The test suite runs every one, and
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent. Setup is a
   state, not a history: nothing placed triggers anything.
+- **Note.** An optional `note` says in prose what the scenario rules out and
+  why its board is built the way it is. It is free text: nothing reads it, and
+  the decoder ignores it like any other unknown key.
 - **References.** `"@name"` is a seat or a labelled card. `"Goblin Piker"` is
   the first live object with that name, `"Goblin Piker#2"` the second, in
   creation order across every zone.

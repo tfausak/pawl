@@ -21,6 +21,7 @@ import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Validate as Validate
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
+import qualified Pawl.Scenario.Load as Load
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
@@ -47,6 +48,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.When as When
+import qualified System.Directory as Directory
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Scenario" $ do
@@ -467,6 +469,18 @@ spec s registry = Spec.describe s "Scenario" $ do
 
 -- Every scenario under data/scenarios: each file matches the schema pawl
 -- emits for it, and runs clean.
+-- The corpus is one directory per source spec, so a root's scenarios are every
+-- .json file beneath it, ascending by path.
+loadSpec :: Spec.Spec IO n -> n ()
+loadSpec s = Spec.describe s "Pawl.Scenario.Load" $ do
+  Spec.it s "loadRoot finds scenarios in subdirectories, ascending by path" $ do
+    found <- S.withCorpusDir "scenario-load-nested" [("b.json", Text.pack "{}"), ("notes.txt", Text.empty)] $ \dir -> do
+      Directory.createDirectoryIfMissing True (dir <> "/sub")
+      ByteString.writeFile (dir <> "/sub/a.json") (Encoding.encodeUtf8 (Text.pack "{}"))
+      loaded <- Load.loadRoot dir
+      pure (fmap (drop (length dir) . fst) loaded)
+    Spec.assertEqWith s "both .json files, the nested one included" found ["/b.json", "/sub/a.json"]
+
 corpusSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> [(FilePath, Either Text.Text Scenario.Type.Scenario)] -> n ()
 corpusSpec s registry = Spec.describe s "Scenarios" . mapM_ (uncurry (scenarioCase s registry))
 

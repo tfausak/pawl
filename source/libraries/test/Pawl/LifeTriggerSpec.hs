@@ -16,7 +16,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
@@ -37,7 +36,6 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -1647,59 +1645,7 @@ belltowerSphinxSpec s registry =
 lifeLossTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lifeLossTriggerSpec s registry =
   let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-      -- Sign in Blood's one target slot, answered with `who` rather than left to
-      -- identityAnswer's lowest-sorting candidate -- which is alice, and so is
-      -- the control case rather than the positive one.
-      aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-      aimAt who p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
-        _ -> S.identityAnswer p
-      -- alice: two Swamps for the {B}{B}, an Exquisite Blood, and Sign in Blood
-      -- in hand.
-      --
-      -- BOTH players get two library cards, not only the one the positive case
-      -- aims at, and this is load-bearing rather than tidy: Sign in Blood draws
-      -- its target two cards as well as costing them the life, so a target with
-      -- an empty library loses the game to CR 104.3c the next time a player would
-      -- get priority -- before any trigger could resolve. The CR 109.5 control
-      -- below would then be silent for THAT reason instead of the relation's, and
-      -- would pass however the matcher read the relation. With a library on each
-      -- side the two cases differ in the target and in nothing else.
-      signInBloodBoard swamp blood signInBlood =
-        let (_, withBlood) = S.addPermanent blood S.alice (S.landsInPlay swamp 2)
-            stock pid gs =
-              let (_, one) = S.addLibraryCard swamp pid gs
-                  (_, two) = S.addLibraryCard swamp pid one
-               in two
-         in S.handOne signInBlood (stock S.bob (stock S.alice withBlood))
    in Spec.describe s "PlayerLosesLife" $ do
-        -- The gameplay-level proof, cast to resolution. bob loses 2 (CR 119.3),
-        -- Exquisite Blood matches THAT event and gains alice the 2 it carried.
-        Spec.it s "CR 119.3 whole cards: Sign in Blood costs bob 2 life and Exquisite Blood gains alice that much" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          blood <- S.printingOf s registry "Exquisite Blood"
-          signInBlood <- S.printingOf s registry "Sign in Blood"
-          let (gs, spellId) = signInBloodBoard swamp blood signInBlood
-              cast = snd (Engine.runGamePure (aimAt S.bob) gs (S.cast S.alice spellId))
-              settled = resolveAll cast
-          Spec.assertEqWith s "bob lost exactly 2" (S.lifeOf S.bob settled) (Just 18)
-          Spec.assertEqWith s "and alice gained exactly that much" (S.lifeOf S.alice settled) (Just 22)
-        -- The control twin, differing in ONE thing: the spell targets ALICE, so
-        -- alice is the one who loses. The same card, the same 2 life, the same
-        -- GameEvent.LifeLost written -- and "an opponent" is bob, so Exquisite
-        -- Blood stays silent.
-        --
-        -- alice's loss is asserted too, or the case would pass for the wrong
-        -- reason: an engine that recorded no loss at all would also show no gain.
-        Spec.it s "CR 109.5/603.3a the control: ALICE loses the life, and her own Exquisite Blood stays silent" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          blood <- S.printingOf s registry "Exquisite Blood"
-          signInBlood <- S.printingOf s registry "Sign in Blood"
-          let (gs, spellId) = signInBloodBoard swamp blood signInBlood
-              cast = snd (Engine.runGamePure (aimAt S.alice) gs (S.cast S.alice spellId))
-              settled = resolveAll cast
-          Spec.assertEqWith s "alice really lost the 2" (S.lifeOf S.alice settled) (Just 18)
-          Spec.assertEqWith s "bob lost nothing" (S.lifeOf S.bob settled) (Just 20)
         -- CR 119.2 / 120.3a: "damage dealt to a player by a source without infect
         -- causes that player to lose that much life". The second producer, and
         -- the one no effect says the words for -- combat did.
@@ -1718,31 +1664,6 @@ lifeLossTriggerSpec s registry =
           Spec.assertEqWith s "bob lost the Giant's 3 and none of the Elf's 1" (S.lifeOf S.bob settled) (Just 17)
           Spec.assertEqWith s "the Elf really connected" (S.playerCounterOf PlayerCounterKind.Poison S.bob settled) 1
           Spec.assertEqWith s "so alice gained 3, not 4" (S.lifeOf S.alice settled) (Just 23)
-        -- CR 119.4's "in other words, the player loses that much life". The third
-        -- producer, and the only one that happens while paying a COST rather than
-        -- while an effect resolves -- so the record is written outside resolution
-        -- and the CR 117.5 trigger scan still has to find it.
-        Spec.it s "CR 119.4 bob pays 2 life for Greed and Exquisite Blood gains alice that much" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          blood <- S.printingOf s registry "Exquisite Blood"
-          greed <- S.printingOf s registry "Greed"
-          case Face.activatedAbilities (S.combinedFace greed) of
-            [] -> Spec.assertFailure s "Greed should carry an activated ability"
-            ability : _ -> do
-              let (_, withBlood) = S.addPermanent blood S.alice (Setup.emptyGame S.bothPlayers)
-                  (_, withSwamp) = S.addPermanent swamp S.bob withBlood
-                  (greedId, withGreed) = S.addPermanent greed S.bob withSwamp
-                  (_, gs1) = S.addLibraryCard swamp S.bob withGreed
-                  gs =
-                    gs1
-                      { GameState.phase = Phase.PrecombatMain,
-                        GameState.activePlayer = S.alice,
-                        GameState.priority = Just S.alice
-                      }
-                  activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.bob greedId ability)
-                  settled = resolveAll activated
-              Spec.assertEqWith s "bob paid exactly 2" (S.lifeOf S.bob settled) (Just 18)
-              Spec.assertEqWith s "and alice gained exactly that much" (S.lifeOf S.alice settled) (Just 22)
         -- eventBindings in isolation, so the binding is pinned to the RULE rather
         -- than to one card's payload -- the gain group's last case, mirrored. The
         -- 7 is no life total and no other number in reach, so an arm binding

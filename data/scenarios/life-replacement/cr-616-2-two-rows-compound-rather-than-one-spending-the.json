@@ -1,0 +1,31 @@
+{
+  "description": "CR 616.2 two rows compound rather than one spending the event",
+  "note": "CR 616.2 rather than CR 614.5: the rewritten event is re-collected, so the SECOND Boon Reflection applies to the doubled gain. The card's ruling states the answer (\"you'll gain four times the original amount\"), and the board is the single-Boon case plus one row, so the two differ in exactly one thing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Boon Reflection", "ready": true },
+          { "card": "Boon Reflection", "ready": true },
+          { "card": "Plains", "label": "plains", "ready": true }
+        ],
+        "hand": [{ "card": "Blossoming Calm", "label": "blossoming-calm", "ready": true }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@blossoming-calm", "mana": ["@plains"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 28 } }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "description": "CR 714.3c the active player puts a lore counter on each Saga they control",
+  "note": "CR 714.3c: as the active player's precombat main phase begins, they put a lore counter on each Saga they control.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "History of Benalia",
+            "label": "history-of-benalia",
+            "ready": true,
+            "counters": [{ "key": { "type": "Lore" }, "value": 1 }]
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@history-of-benalia", "kind": { "type": "Lore" }, "count": 2 } } }
+  ]
+}

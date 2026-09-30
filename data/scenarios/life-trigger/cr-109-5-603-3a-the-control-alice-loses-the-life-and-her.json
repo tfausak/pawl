@@ -1,0 +1,37 @@
+{
+  "description": "CR 109.5/603.3a the control: ALICE loses the life, and her own Exquisite Blood stays silent",
+  "note": "The control twin for Sign in Blood, differing in ONE thing: the spell targets alice, so she is the one who loses. Same card, same 2 life, same life-loss event, and \"an opponent\" is bob, so Exquisite Blood stays silent. alice's loss is checked too, or the case would pass for the wrong reason: an engine that recorded no loss would also show no gain. Both players have library cards so Sign in Blood's draw cannot end the game before the trigger could resolve.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Exquisite Blood", "ready": true }
+        ],
+        "hand": [{ "card": "Sign in Blood", "label": "sign-in-blood", "ready": true }],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@sign-in-blood", "targets": ["@alice"], "mana": ["@swamp", "@swamp-2"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 18 } },
+    { "Life": { "player": "bob", "life": 20 } }
+  ]
+}

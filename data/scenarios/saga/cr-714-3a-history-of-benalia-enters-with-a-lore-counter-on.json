@@ -1,0 +1,28 @@
+{
+  "description": "CR 714.3a History of Benalia enters with a lore counter on it",
+  "note": "One lore counter goes on as the Saga enters (CR 714.3a), which fires chapter I (CR 714.2b). Both halves are visible from a cast, which makes this the gameplay-level test rather than a projection one.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains", "ready": true },
+          { "card": "Plains", "label": "plains-2", "ready": true },
+          { "card": "Plains", "label": "plains-3", "ready": true }
+        ],
+        "hand": [{ "card": "History of Benalia", "label": "history-of-benalia", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@history-of-benalia", "mana": ["@plains", "@plains-2", "@plains-3"] } } }
+  ],
+  "final": [
+    { "Counters": { "object": "History of Benalia", "kind": { "type": "Lore" }, "count": 1 } }
+  ]
+}

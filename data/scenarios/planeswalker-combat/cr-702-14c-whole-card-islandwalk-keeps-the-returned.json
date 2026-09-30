@@ -1,0 +1,45 @@
+{
+  "description": "CR 702.14c whole card: islandwalk keeps the returned Towershell unblockable",
+  "note": "The only window in which Meandering Towershell's islandwalk can be read: on the turn it is declared it exiles itself before blockers, so the return turn is where the keyword works. bob controls an Island and blocks with everything he can, so a Towershell without islandwalk would be blocked and deal nothing. A Wall and not a Piker because bob's turn falls between the two combats: defender keeps the Wall untapped, where a Piker would have attacked and be tapped, unable to block for a reason unrelated to evasion. The two Wall blocks on turn 3 are rejected (islandwalk makes them illegal) and asked again.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Meandering Towershell", "label": "meandering-towershell", "ready": true }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Wall of Stone", "label": "wall-of-stone", "ready": true }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@meandering-towershell"] } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@wall-of-stone": ["Meandering Towershell"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@wall-of-stone": ["Meandering Towershell"] } } },
+    { "turn": 3, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "description": "CR 601.2g Typhoid Rats is cast off a lone Mana Confluence, for 1 life",
+  "note": "The gameplay-level proof (design.md section 4): a real spell cast end to end off Mana Confluence, with the life leaving the caster as part of paying for it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Mana Confluence", "label": "mana-confluence", "ready": true }],
+        "hand": [{ "card": "Typhoid Rats", "label": "typhoid-rats", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@typhoid-rats", "mana": ["@mana-confluence"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Typhoid Rats", "count": 1 } },
+    { "Life": { "player": "alice", "life": 19 } }
+  ]
+}

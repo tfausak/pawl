@@ -1,0 +1,27 @@
+{
+  "description": "CR 509.3c two blockers on one attacker still gain 1, not 2",
+  "note": "CR 509.3c's \"only once each combat for that creature, even if it's blocked by multiple creatures\". Two Pikers block the one Prey: two blocking events, one became-blocked event. The falsifier is a condition matched against the declaration's pairs instead, which fires twice, for 22.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Sacred Prey", "label": "sacred-prey", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "goblin-piker", "ready": true },
+          { "card": "Goblin Piker", "label": "goblin-piker-2", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@sacred-prey"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@goblin-piker": ["@sacred-prey"], "@goblin-piker-2": ["@sacred-prey"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@sacred-prey", "do": { "AssignDamage": { "@goblin-piker": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 21 } } }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "description": "CR 700.2a casting a non-modal spell (Lightning Bolt) never issues ChooseModes",
+  "note": "The point is that choosing modes is never asked for a non-modal spell: the scenario fails on any cast prompt it has no answer for. With no creature on the battlefield the Bolt targets alice herself, the same shape as the resolve scenario's self-Bolt.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Mountain", "label": "mountain", "ready": true }],
+        "hand": [{ "card": "Lightning Bolt", "label": "lightning-bolt", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lightning-bolt", "targets": ["@alice"], "mana": ["@mountain"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 17 } }
+  ]
+}
