@@ -1,0 +1,28 @@
+{
+  "description": "CR 614.1a Furnace of Rath alone doubles the printed 2, not 4",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain", "ready": true },
+          { "card": "Darksteel Myr", "ready": true },
+          { "card": "Darksteel Myr", "ready": true },
+          { "card": "Furnace of Rath", "ready": true }
+        ],
+        "hand": [{ "card": "Galvanic Blast", "label": "galvanic-blast", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@galvanic-blast", "targets": ["@bob"], "mana": ["@mountain"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "bob", "life": 16 } }
+  ]
+}

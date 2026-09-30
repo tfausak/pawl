@@ -1,0 +1,25 @@
+{
+  "description": "CR 509.3a an attacker's own declaration is not a block",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "goblin-piker", "ready": true },
+          { "card": "Goblin Piker", "label": "goblin-piker-2", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Pride Guardian", "label": "pride-guardian", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker", "@goblin-piker-2"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@pride-guardian": ["@goblin-piker"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 21 } } }
+  ]
+}

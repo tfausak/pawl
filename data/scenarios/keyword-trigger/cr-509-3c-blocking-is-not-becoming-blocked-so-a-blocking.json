@@ -1,0 +1,22 @@
+{
+  "description": "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "goblin-piker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Sacred Prey", "label": "sacred-prey", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@sacred-prey": ["@goblin-piker"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

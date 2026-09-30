@@ -1,0 +1,38 @@
+{
+  "description": "CR 508.8 the combat damage step is not skipped either: bob takes 5",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Meandering Towershell", "label": "meandering-towershell", "ready": true }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@meandering-towershell"] } },
+    { "turn": 3, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } }
+  ]
+}

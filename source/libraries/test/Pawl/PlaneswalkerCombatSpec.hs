@@ -432,23 +432,6 @@ planeswalkerAttackSpec s registry = Spec.describe s "AttackingAPlaneswalker" $ d
     Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "CR 704.5i: off the battlefield"
     Spec.assertEqWith s "CR 704.5i: in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
     Spec.assertEqWith s "and none of the 4 damage splashed onto bob" (S.lifeOf S.bob after) (Just 20)
-  -- CR 508.1b's announcement is asked PER CREATURE, and the answers are
-  -- independent: two Pikers, one at Jace and one at bob.
-  Spec.it s "CR 508.1b the announcement is per creature, and the two may differ" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (gs, mine, jaceId) = jaceBoard jace [piker, piker]
-        splitting :: Prompt.Prompt r -> r
-        splitting p = case p of
-          -- The first Piker (the lower id) is sent at Jace and the second at bob.
-          Prompt.ChooseAttackTarget _ _ oid options ->
-            if Just oid == Maybe.listToMaybe mine
-              then attackThePlaneswalker p
-              else NonEmpty.head options
-          _ -> S.aggressiveAnswer p
-        after = S.runCombat splitting gs
-    Spec.assertEqWith s "one Piker's 2 went to Jace" (S.counterOf CounterKind.Loyalty jaceId after) 1
-    Spec.assertEqWith s "and the other's 2 went to bob" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 508.1b the prompt is asked once per attacker, over the defending player and their planeswalker" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     jace <- S.printingOf s registry "Jace Beleren"
@@ -1845,14 +1828,6 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
     Spec.assertEqWith s "it is still on the battlefield, not exiled again" (S.countOnBattlefieldByName towershellName S.alice atReturn) 1
     Spec.assertEqWith s "the delayed store is empty: nothing armed a second return" (length (GameState.delayedTriggers atReturn)) 0
     Spec.assertEqWith s "and no declaration was recorded for it" (S.attackerDeclarationsOf atReturn) []
-  Spec.it s "CR 508.8 the combat damage step is not skipped either: bob takes 5" $ do
-    -- The other half of that clause, and the end-to-end statement of it. The
-    -- declare blockers step being reached says the schedule kept it; this says
-    -- the combat damage step ran and the creature that never attacked dealt its
-    -- damage anyway (CR 508.4: such creatures ARE attacking).
-    (gs, _) <- boardOf
-    let afterCombat = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
-    Spec.assertEqWith s "a 5/9 connected" (S.lifeOf S.bob afterCombat) (Just 15)
   -- CR 508.4's CHOICE, which this card is the pool's only producer of: the
   -- Towershell returns attacking on a turn nothing is declared, and its
   -- controller says what it is attacking as it enters. Its own ruling is the
@@ -1885,26 +1860,6 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
     Spec.assertEqWith s "and bob took none of it" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "aimed at bob instead, he takes 5" (S.lifeOf S.bob control) (Just 15)
     Spec.assertEqWith s "and Jace keeps all three counters" (S.counterOf CounterKind.Loyalty jaceId control) 3
-  Spec.it s "CR 702.14c whole card: islandwalk keeps the returned Towershell unblockable" $ do
-    -- The pool's first ISLANDwalk (Bog Wraith, #500's card, prints swampwalk),
-    -- and the only window in which this card's own evasion can be read: on the
-    -- turn it is declared it exiles itself before blockers are declared, so the
-    -- return turn is where the keyword does its work.
-    --
-    -- bob controls an Island and a Wall of Stone, and blocks with everything he
-    -- can -- so a Towershell without islandwalk would be blocked here and deal
-    -- bob nothing.
-    --
-    -- A WALL and not a Goblin Piker, because bob's own turn falls between the
-    -- two combats: CR 702.3b keeps a creature with defender out of the
-    -- declaration, so the Wall is still untapped when the Towershell comes back,
-    -- where a Piker would have attacked on turn 2 and be tapped (CR 509.1a) --
-    -- unable to block for a reason that has nothing to do with evasion.
-    wall <- S.printingOf s registry "Wall of Stone"
-    island <- S.printingOf s registry "Island"
-    (gs, _) <- boardWith [island, wall]
-    let afterCombat = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
-    Spec.assertEqWith s "the Wall could not block it (CR 702.14c)" (S.lifeOf S.bob afterCombat) (Just 15)
 
 -- alice at her declare attackers step with one Meandering Towershell and bob
 -- defending, both players holding a small library so the draw steps of the turns

@@ -1,0 +1,30 @@
+{
+  "description": "CR 601.2c the other side is the slot's target, not simply the opponent",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 4,
+        "battlefield": [{ "card": "Mirror Universe", "label": "mirror-universe", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "life": 27
+      },
+      {
+        "name": "carol",
+        "life": 13
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@mirror-universe", "targets": ["@carol"], "costOrder": [0, 1] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 13 } },
+    { "Life": { "player": "carol", "life": 4 } },
+    { "Life": { "player": "bob", "life": 27 } }
+  ]
+}

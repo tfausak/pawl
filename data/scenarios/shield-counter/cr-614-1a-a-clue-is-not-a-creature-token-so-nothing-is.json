@@ -1,0 +1,36 @@
+{
+  "description": "CR 614.1a a Clue is not a creature token, so nothing is appended",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Queen Allenal of Ruadach", "ready": true }
+        ],
+        "hand": [
+          {
+            "card": "Eliminate the Impossible",
+            "label": "eliminate-the-impossible",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@eliminate-the-impossible", "mana": ["@mountain", "@mountain-2", "@island", null] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Soldier Token", "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Clue Token", "count": 1 } }
+  ]
+}

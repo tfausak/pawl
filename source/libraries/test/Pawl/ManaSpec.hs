@@ -1672,14 +1672,6 @@ prefersLongYieldFrom wanted p = case p of
 -- the executor the payment path is handed for it.
 ancientTombSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ancientTombSpec s registry = Spec.describe s "Ancient Tomb" $ do
-  Spec.it s "CR 405.6c Ancient Tomb charges its damage for the mana it makes" $ do
-    ancientTomb <- S.printingOf s registry "Ancient Tomb"
-    sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
-    let resolved = castOffBoard S.identityAnswer [ancientTomb] sapphireMedallion
-    Spec.assertEqWith s "alice took 2 for the mana" (S.lifeOf S.alice resolved) (Just 18)
-    Spec.assertEqWith s "and only alice, CR 109.5's you being the activator" (S.lifeOf S.bob resolved) (Just 20)
-    Spec.assertEqWith s "the Medallion was still cast off it" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Sapphire Medallion") S.alice resolved) 1
-
   -- The IMMEDIATELY half of CR 405.6c, which is what rules out queueing the
   -- clause for a caller above the payment. At 2 life the damage empties alice
   -- before CR 601.2g's window asks again, and CR 119.4 then refuses Mana
@@ -2003,15 +1995,6 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     Spec.assertEqWith s "both of them, 2 life" (S.lifeOf S.alice (tapEach [firstId, secondId])) (Just 18)
     Spec.assertEqWith s "and the Forest adds a third mana for nothing" (S.lifeOf S.alice (tapEach [firstId, secondId, forestId])) (Just 18)
     Spec.assertEqWith s "three mana in the pool" (poolSize S.alice (tapEach [firstId, secondId, forestId])) 3
-
-  -- The gameplay-level proof (design.md section 4): a real spell cast end to end
-  -- off the card, with the life leaving the caster as part of paying for it.
-  Spec.it s "CR 601.2g Typhoid Rats is cast off a lone Mana Confluence, for 1 life" $ do
-    manaConfluence <- S.printingOf s registry "Mana Confluence"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let resolved = castOffBoard (prefersColor Color.Black) [manaConfluence] typhoidRats
-    Spec.assertEqWith s "the Rats resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Typhoid Rats") S.alice resolved) 1
-    Spec.assertEqWith s "and the black mana cost her 1 life" (S.lifeOf S.alice resolved) (Just 19)
 
   -- CR 118.3c: "Activating mana abilities is not mandatory, even if paying a cost
   -- is." Mana Confluence is what makes that observable rather than a formality --

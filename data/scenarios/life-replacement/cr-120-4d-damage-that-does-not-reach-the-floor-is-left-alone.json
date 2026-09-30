@@ -1,0 +1,34 @@
+{
+  "description": "CR 120.4d damage that does not reach the floor is left alone",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 5,
+        "battlefield": [
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Worship", "ready": true },
+          { "card": "Goblin Piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Celestine, the Living Saint",
+            "label": "celestine-the-living-saint",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@celestine-the-living-saint"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Block": {} } },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Life": { "player": "alice", "life": 2 } } }
+  ]
+}

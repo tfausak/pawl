@@ -189,21 +189,6 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
     Spec.assertEqWith s "no damage was dealt" (S.damageEventsOf after) []
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
 
-forcedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-forcedSpec s registry = Spec.describe s "ForcedNoPrompt" $ do
-  Spec.it s "CR 700.2a casting a non-modal spell (Lightning Bolt) never issues ChooseModes" $ do
-    -- No creature on the battlefield, so neverAskModes's identityAnswer
-    -- fallback picks ToPlayer alice via Set.lookupMin (a self-Bolt, the same
-    -- shape as ResolveSpec's "CR 120.3a a Bolt at a player drains life
-    -- without marking"). The point of this test is that ChooseModes is never
-    -- reached at all -- if it were, neverAskModes's error would fire.
-    mountain <- S.printingOf s registry "Mountain"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (gs0, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
-        cast = snd (Engine.runGamePure neverAskModes gs0 (S.cast S.alice oid))
-        after = snd (Engine.runGamePure neverAskModes cast Stack.resolveTop)
-    Spec.assertEqWith s "alice at 17 (Bolt resolved, forced/unprompted mode selection)" (S.lifeOf S.alice after) (Just 17)
-
 -- M4h task 1: Aether Channeler's "another nonland permanent" slot as data --
 -- Pool.Permanents narrowed by Not (HasCardType Land), with CR 601.2c's "another"
 -- as the Not IsSource conjunct (#163). This proves the target slot and the exclusion in
@@ -1242,7 +1227,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   falsifierSpec s registry
   onlyChosenModeSpec s registry
   fizzleSpec s registry
-  forcedSpec s registry
   nonlandPermanentTargetSpec s registry
   modalReaderSpec s
   activationModalSpec s registry

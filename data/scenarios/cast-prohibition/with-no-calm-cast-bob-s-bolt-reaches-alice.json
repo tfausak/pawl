@@ -1,0 +1,30 @@
+{
+  "description": "with no Calm cast, bob's Bolt reaches alice",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Plains", "ready": true }],
+        "hand": [{ "card": "Blossoming Calm", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Mountain", "label": "mountain", "ready": true }],
+        "hand": [{ "card": "Lightning Bolt", "label": "lightning-bolt", "ready": true }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@lightning-bolt", "targets": ["@alice"], "mana": ["@mountain"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 17 } },
+    { "Life": { "player": "bob", "life": 20 } },
+    { "Life": { "player": "carol", "life": 20 } }
+  ]
+}

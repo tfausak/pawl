@@ -2992,17 +2992,6 @@ emperionSpec s registry =
         (fmap (\ev -> (DamageEvent.target ev, DamageEvent.amount ev)) (S.damageEventsOf after))
         [(Recipient.ToPlayer S.alice, 3)]
 
-    -- CR 109.5: "YOUR life total", so bob's Emperion protects bob and not alice.
-    -- The same board one seat over, which an unscoped reading would answer the
-    -- same way as the case above.
-    Spec.it s "CR 109.5 bob's Emperion does not stop alice losing life" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      bolt <- S.printingOf s registry "Lightning Bolt"
-      emperion <- S.printingOf s registry "Platinum Emperion"
-      let (oid, board) = emperionBoard mountain bolt emperion [S.bob]
-          after = S.runPure (boltingAnswer S.alice) board (do S.cast S.alice oid; Stack.resolveTop)
-      Spec.assertEqWith s "alice fell to 17" (S.lifeOf S.alice after) (Just 17)
-
 -- Greed ({3}{B} Enchantment, "{B}, Pay 2 life: Draw a card") and one Swamp under
 -- alice, with a card in her library to draw and `emperionSeats` naming who
 -- controls a Platinum Emperion.

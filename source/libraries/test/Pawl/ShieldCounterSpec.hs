@@ -891,7 +891,6 @@ queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.
          in S.addPermanent queen S.alice lands
       soldierName = CardName.MkCardName (Text.pack "Soldier Token")
       goblinName = CardName.MkCardName (Text.pack "Goblin Token")
-      clueName = CardName.MkCardName (Text.pack "Clue Token")
       namedTokens name gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just name) (S.tokensOf gs)
   Spec.it s "CR 614.1a two Goblins would be created, so two Goblins plus a Soldier are" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -912,18 +911,6 @@ queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.
       other -> Spec.assertFailure s ("expected exactly one Soldier, got " <> show (length other))
     -- The Queen's own CR 604.3 box, read live: herself and three tokens.
     Spec.assertEqWith s "the Queen counts the creatures she controls" (S.powerToughnessOf queenId after) (Just (4, 4))
-  -- The negative, one thing different: the token is a Clue, and "creature
-  -- tokens" does not say Clue.
-  Spec.it s "CR 614.1a a Clue is not a creature token, so nothing is appended" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
-    eliminate <- S.printingOf s registry "Eliminate the Impossible"
-    let (_, g1) = board mountain island queen
-        (g2, spellId) = S.handOne eliminate g1
-        after = castAndResolve S.identityAnswer g2 spellId
-    Spec.assertEqWith s "no Soldier" (S.countOnBattlefieldByName soldierName S.alice after) 0
-    Spec.assertEqWith s "the Clue was created, so the spell did resolve" (S.countOnBattlefieldByName clueName S.alice after) 1
   -- CR 616.1: the append is INSIDE the one creation event, which is what the
   -- order against Doubling Season observes. Queen first: two Goblins plus a
   -- Soldier, then doubled -- two Soldiers. Season first: four Goblins, then

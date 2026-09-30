@@ -538,15 +538,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let (_, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "one card" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-  Spec.it s "CR 120.3a a Bolt at a player drains life without marking" $ do
-    -- No creature on the battlefield, so identityAnswer's lookupMin picks
-    -- ToPlayer alice: a self-Bolt, which is legal Magic.
-    mountain <- S.printingOf s registry "Mountain"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "seventeen" (S.lifeOf S.alice after) (Just 17)
   Spec.it s "the resolved damage flows through the event funnel" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"

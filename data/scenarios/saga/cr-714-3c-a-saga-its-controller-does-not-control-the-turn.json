@@ -1,0 +1,26 @@
+{
+  "description": "CR 714.3c a Saga its controller does not control the turn of stays put",
+  "board": {
+    "seats": [
+      {
+        "name": "alice"
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "History of Benalia",
+            "label": "history-of-benalia",
+            "ready": true,
+            "counters": [{ "key": { "type": "Lore" }, "value": 1 }]
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@history-of-benalia", "kind": { "type": "Lore" }, "count": 1 } } }
+  ]
+}

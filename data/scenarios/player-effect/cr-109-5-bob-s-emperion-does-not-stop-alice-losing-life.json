@@ -1,0 +1,24 @@
+{
+  "description": "CR 109.5 bob's Emperion does not stop alice losing life",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Mountain", "label": "mountain", "ready": true }],
+        "hand": [{ "card": "Lightning Bolt", "label": "lightning-bolt", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Platinum Emperion", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lightning-bolt", "targets": ["@alice"], "mana": ["@mountain"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 17 } }
+  ]
+}

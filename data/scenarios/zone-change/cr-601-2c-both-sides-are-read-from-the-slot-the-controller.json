@@ -1,0 +1,38 @@
+{
+  "description": "CR 601.2c both sides are read from the slot, the controller included when named",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 4,
+        "battlefield": [
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true },
+          { "card": "Island", "label": "island-3", "ready": true },
+          { "card": "Island", "label": "island-4", "ready": true },
+          { "card": "Island", "label": "island-5", "ready": true },
+          { "card": "Island", "label": "island-6", "ready": true },
+          { "card": "Soul Conduit", "label": "soul-conduit", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 27
+      },
+      {
+        "name": "carol",
+        "life": 13
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@soul-conduit", "targets": ["@alice", "@bob"], "mana": ["@island", "@island-2", "@island-3", "@island-4", "@island-5", "@island-6"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 27 } },
+    { "Life": { "player": "bob", "life": 4 } },
+    { "Life": { "player": "carol", "life": 13 } }
+  ]
+}

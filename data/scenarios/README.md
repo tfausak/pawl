@@ -1,8 +1,10 @@
 # Scenarios
 
-Each `.json` file here is one gameplay test: a board, a timeline of decisions
-and checks, and optional final checks. The test suite runs every one, and
-`pawl scenario FILE...` runs any. `pawl schema scenario` prints the schema.
+Each `.json` file here, in any subdirectory, is one gameplay test: a board, a
+timeline of decisions and checks, and optional final checks. The test suite
+runs every one, and `pawl scenario FILE...` runs any. `pawl schema scenario`
+prints the schema. A test moved from a Haskell spec goes in a subdirectory
+named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
 
 - **Board.** `seats` in turn order, each with a `name`, `life` (default 20)
   and `battlefield`, `hand`, `graveyard` and `library` placements (a library

@@ -930,22 +930,6 @@ firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
         after = S.runCombat S.aggressiveAnswer gs
     Spec.assertEqWith s "alice's is dead" (S.creaturesInPlay S.alice after) 0
     Spec.assertEqWith s "bob's is dead" (S.creaturesInPlay S.bob after) 0
-  Spec.it s "CR 702.4b a double striker deals twice to an unblocked player" $ do
-    -- The raptor (2/1 double strike) deals 2 in each step: bob loses 4.
-    ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
-    let (gs, _, _) = S.combatBoardOf [ridgetopRaptor] []
-        after = S.runCombat S.aggressiveAnswer gs
-    Spec.assertEqWith s "bob took 4" (S.lifeOf S.bob after) (Just 16)
-  Spec.it s "CR 702.7b the control: a first striker deals once to a player" $ do
-    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
-    let (gs, _, _) = S.combatBoardOf [sabretoothTiger] []
-        after = S.runCombat S.aggressiveAnswer gs
-    Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
-  Spec.it s "CR 510.1b the control: a vanilla creature deals once to a player" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [piker] []
-        after = S.runCombat S.aggressiveAnswer gs
-    Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 510.4 double strike kills a 3/3 across two steps; first strike does not" $ do
     -- The raptor deals 2 + 2 = 4 to the Ogre (3/3), killing it. A first
     -- striker deals 2 once, and the Ogre lives.

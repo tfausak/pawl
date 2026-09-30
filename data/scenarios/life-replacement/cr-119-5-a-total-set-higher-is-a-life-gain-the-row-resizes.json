@@ -1,0 +1,49 @@
+{
+  "description": "CR 119.5 a total set HIGHER is a life gain the row resizes",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "ready": true },
+          { "card": "Forest", "label": "forest", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Forest", "label": "forest-5", "ready": true },
+          { "card": "Forest", "label": "forest-6", "ready": true },
+          { "card": "Forest", "label": "forest-7", "ready": true },
+          { "card": "Forest", "label": "forest-8", "ready": true }
+        ],
+        "hand": [{ "card": "Biorhythm", "label": "biorhythm", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "ready": true },
+          { "card": "Goblin Piker", "ready": true }
+        ]
+      },
+      {
+        "name": "carol",
+        "life": 2,
+        "battlefield": [
+          { "card": "Boon Reflection", "ready": true },
+          { "card": "Goblin Piker", "ready": true },
+          { "card": "Goblin Piker", "ready": true },
+          { "card": "Goblin Piker", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@biorhythm", "mana": ["@forest", "@forest-2", "@forest-3", "@forest-4", "@forest-5", "@forest-6", "@forest-7", "@forest-8"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "carol", "life": 4 } },
+    { "Life": { "player": "alice", "life": 1 } },
+    { "Life": { "player": "bob", "life": 2 } }
+  ]
+}

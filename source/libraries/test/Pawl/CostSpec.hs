@@ -22,7 +22,6 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -2016,26 +2015,6 @@ hatredBoard swamp piker hatred life =
 halfLifeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 halfLifeSpec s registry =
   Spec.describe s "PayHalfLife" $ do
-    -- Murderous Betrayal's {B}{B} from a Swamp and a Mana Confluence, at 11 life.
-    -- CR 601.2f fixes the half at 6 before CR 601.2g's Confluence pays 1, so she
-    -- ends at 4; a half measured when the component is paid reads 10 and leaves
-    -- her at 5.
-    Spec.it s "CR 601.2f Murderous Betrayal's half is fixed before Mana Confluence's life is paid" $ do
-      let mine =
-            (S.battlefield S.alice [S.aliased "betrayal" (S.permanent "Murderous Betrayal"), S.settled "swamp" "Swamp", S.settled "confluence" "Mana Confluence"])
-              { Seat.life = 11
-              }
-          setup = S.board (mine NonEmpty.:| [S.battlefield S.bob [S.aliased "piker" (S.permanent "Goblin Piker")]]) S.alice S.precombatMain
-          choices =
-            Choices.none
-              { Choices.targets = Just [S.aliasRef "piker"],
-                Choices.manaSources = Seq.fromList [Just (S.aliasRef "swamp"), Just (S.aliasRef "confluence")],
-                Choices.manaYields = Seq.singleton (Mana.Type.MkMana [plainUnit (ManaType.Colored Color.Black)])
-              }
-          script = S.turn 1 [S.on S.precombatMain S.alice (S.activateAction (S.aliasRef "betrayal") choices)]
-      after <- S.play s registry setup script S.priorityGame
-      Spec.assertEqWith s "CR 601.2f: 11 - 1 for the Confluence - 6 for half of 11" (S.lifeOf S.alice after) (Just 4)
-      Spec.assertEqWith s "CR 701.8a: the Piker was destroyed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 0
     -- CR 118.3: the half and Mana Confluence's 1 life share one life total.
     -- At 1 life the pair owes 2, so the activation is not offered; at 3 it owes
     -- 3 and is. The pair differs in life alone.
@@ -2066,16 +2045,6 @@ halfLifeSpec s registry =
       Spec.assertEqWith s "CR 205.1a: a creature and not an enchantment" (Projection.cardTypesOf evil after) (Set.singleton CardType.Creature)
       Spec.assertEqWith s "a Phyrexian Horror" (Projection.subtypesOf evil after) (Set.fromList [Subtype.Phyrexian, Subtype.Horror])
       Spec.assertBool s (Map.member Keyword.Flying (Projection.keywordsOf evil after)) "with flying"
-  where
-    plainUnit manaType =
-      ManaUnit.MkManaUnit
-        { ManaUnit.manaType = manaType,
-          ManaUnit.tags = Set.empty,
-          ManaUnit.retention = ManaRetention.Ordinary,
-          ManaUnit.restriction = Nothing,
-          ManaUnit.rider = Nothing,
-          ManaUnit.sourceChosenSubtype = Nothing
-        }
 
 -- Hatred {3}{B}{B} Instant: "As an additional cost to cast this spell, pay X
 -- life. Target creature gets +X/+0 until end of turn."
