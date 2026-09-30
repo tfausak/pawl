@@ -1,0 +1,38 @@
+{
+  "description": "Kenessos whole card: an Octopus on top enters, a Piker goes under",
+  "note": "Kenessos's activated ability looks at the top card: an Octopus creature card may go onto the battlefield, and a card that did not may go to the bottom. The Mountain under the top card is what the bottomed card must end up below. This leg has a Goblin Piker on top, which the first may cannot move; taking the second puts it under the Mountain. Library order has no check, so alice's turn-3 draw reads it: she draws the Mountain, not the Piker. Bob's library card keeps his turn-2 draw off an empty library.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kenessos, Priest of Thassa", "label": "kenessos" },
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Forest", "label": "forest-4" }
+        ],
+        "library": [
+          { "card": "Goblin Piker" },
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [{ "card": "Island" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@kenessos", "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Mountain", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 3, "step": "DrawStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Mountain", "count": 1 } } },
+    { "turn": 3, "step": "DrawStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 3, "step": "DrawStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

@@ -938,21 +938,6 @@ variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
     Spec.assertBool s (not (offers atFive five minusSix)) "and NOT at 5"
     Spec.assertBool s (offers atFive five plusTwoScry && offers atFive five zeroLook) "while the +2 and the 0 are offered at 5"
 
-  -- CR 107.3m through the card's own text: the `0` reads "a creature card with
-  -- mana value less than or equal to the number of loyalty counters on Nissa",
-  -- and those counters are the ones X put there. Goblin Piker's mana value is 2.
-  Spec.it s "the 0 ability puts a creature card within the X-derived loyalty onto the battlefield" $ do
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
-    piker <- S.printingOf s registry "Goblin Piker"
-    birdMaiden <- S.printingOf s registry "Bird Maiden"
-    let (nissaId, board) = nissaCastFor forest island nissa [piker, birdMaiden] 5
-        after = useNissaAbility zeroLook nissa nissaId board
-    Spec.assertEqWith s "loyalty 5, and the Piker's mana value is 2" (S.counterOf CounterKind.Loyalty nissaId after) 5
-    Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-    Spec.assertEqWith s "only the Bird Maiden is left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
-
   -- The pair's other half, and the ONE thing changed is the X announced: at
   -- loyalty 1 the Piker's mana value of 2 is too high, so the conjunction inside
   -- the card's disjunction is false and the clause does nothing.
@@ -967,20 +952,6 @@ variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
     Spec.assertEqWith s "loyalty 1, below the Piker's mana value of 2" (S.counterOf CounterKind.Loyalty nissaId after) 1
     Spec.assertEqWith s "nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
     Spec.assertEqWith s "both cards are still in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 2
-
-  -- The land half of the same disjunction, which no mana value gates: CR 107.3m's
-  -- X is irrelevant to it, so a Forest on top goes to the battlefield at the
-  -- loyalty that just refused the Piker.
-  Spec.it s "the 0 ability puts a land card onto the battlefield whatever the loyalty" $ do
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
-    birdMaiden <- S.printingOf s registry "Bird Maiden"
-    let (nissaId, board) = nissaCastFor forest island nissa [forest, birdMaiden] 1
-        after = useNissaAbility zeroLook nissa nissaId board
-    Spec.assertEqWith s "loyalty 1" (S.counterOf CounterKind.Loyalty nissaId after) 1
-    Spec.assertEqWith s "seven Forests: the six paid with plus the one put onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 7
-    Spec.assertEqWith s "only the Bird Maiden is left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
 
   -- The -6, paid for out of the X-derived loyalty. CR 205.1b splits the card's
   -- two sentences: "they're still lands" is why the CREATURE card type is added

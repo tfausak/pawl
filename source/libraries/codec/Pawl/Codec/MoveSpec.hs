@@ -12,6 +12,7 @@ import qualified Pawl.Types.Casting as Casting.Type
 import qualified Pawl.Types.Choices as Choices.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.Move as Move.Type
+import qualified Pawl.Types.OptionalDecision as OptionalDecision.Type
 import qualified Pawl.Types.Reference as Reference.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -34,6 +35,8 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.ChooseAttackTarget (ref "bob")) " {\"ChooseAttackTarget\":\"@bob\"} "
   Spec.it s "OrderTimestamps" $
     Common.assertCodec s Move.codec (Move.Type.OrderTimestamps (Seq.fromList [ref "first", ref "second"])) " {\"OrderTimestamps\":[\"@first\",\"@second\"]} "
+  Spec.it s "ChooseOptional" $
+    Common.assertCodec s Move.codec (Move.Type.ChooseOptional OptionalDecision.Type.Exercises) " {\"ChooseOptional\":{\"type\":\"Exercises\"}} "
   Spec.it s "Concede" $
     Common.assertCodec s Move.codec Move.Type.Concede " \"Concede\" "
   Spec.it s "Pass" $

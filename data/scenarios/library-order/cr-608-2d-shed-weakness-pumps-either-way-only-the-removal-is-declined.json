@@ -1,0 +1,26 @@
+{
+  "description": "CR 608.2d Shed Weakness pumps either way; only the removal is optional",
+  "note": "Shed Weakness is two clauses over one target, and only the second (\"you may remove a -1/-1 counter from it\") is gated, so the +2/+2 lands whichever way the may is answered; under a mode-wide gate the declined leg would read 1. The Haskell board used a Goblin Piker, which a -1/-1 counter leaves 1/0 and CR 704.5f would bury here; a vanilla 2/2 Cabal Evangel keeps the test's own 2/2-to-1/1 arithmetic. This leg declines: pumped to 3/3 and the counter stays.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Forest", "label": "forest" }],
+        "hand": [{ "card": "Shed Weakness", "label": "shed-weakness" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Cabal Evangel", "label": "evangel", "counters": [{ "key": { "type": "MinusOneMinusOne" }, "value": 1 }] }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@evangel", "power": 1, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@shed-weakness", "targets": ["@evangel"], "mana": ["@forest"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Declines" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@evangel", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@evangel", "kind": { "type": "MinusOneMinusOne" }, "count": 1 } } }
+  ]
+}

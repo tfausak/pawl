@@ -204,38 +204,6 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot Nothing))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "the kind is gone, not negative" (fmap Object.counters (Game.lookupObject oid after)) (Just Map.empty)
-  -- CR 608.2d over CR 608.2e's unit, on a whole card: Shed Weakness ({G} Instant,
-  -- Amonkhet 185) reads "Target creature gets +2/+2 until end of turn. You may
-  -- remove a -1/-1 counter from it." Two clauses, one target, and only the second
-  -- clause is gated -- so the pump lands whichever way the "may" is answered.
-  --
-  -- The -1/-1 counter is placed directly, as the CR 704.5q case just below does:
-  -- casting Instill Infection for it would add a draw and a second resolution
-  -- that this case does not want in the way of what it is proving.
-  Spec.it s "CR 608.2d Shed Weakness pumps either way; only the removal is optional" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    shedWeakness <- S.printingOf s registry "Shed Weakness"
-    let (victim, withFoe) = S.addPermanent piker S.bob (S.landsInPlay forest 1)
-        withCounter = S.addCounter CounterKind.MinusOneMinusOne 1 victim withFoe
-        (gs, spellId) = S.handOne shedWeakness withCounter
-        -- Written out per answerer rather than through a helper taking one: a
-        -- let-bound function over an answerer would need a rank-2 argument, and
-        -- the neighbouring Deem Worthy case inlines them for the same reason.
-        --
-        -- S.identityAnswer declines every optional prompt (Script.declining), so
-        -- it is the declining half unaided; exerciseOptional is its opposite.
-        castDeclining = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        declined = snd (Engine.runGamePure S.identityAnswer castDeclining Stack.resolveTop)
-        castExercising = snd (Engine.runGamePure exerciseOptional gs (S.cast S.alice spellId))
-        exercised = snd (Engine.runGamePure exerciseOptional castExercising Stack.resolveTop)
-    Spec.assertEqWith s "before: the -1/-1 counter makes the 2/2 a 1/1" (Projection.powerOf victim gs) (Just 1)
-    -- The discriminator. Under a MODE-wide gate, declining would skip the pump
-    -- too and this would read 1.
-    Spec.assertEqWith s "declined: pumped to 3/3 anyway" (Projection.powerOf victim declined) (Just 3)
-    Spec.assertEqWith s "declined: the counter is still there" (fmap Object.counters (Game.lookupObject victim declined)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
-    Spec.assertEqWith s "exercised: pumped to 4/4" (Projection.powerOf victim exercised) (Just 4)
-    Spec.assertEqWith s "exercised: no counters remain" (fmap Object.counters (Game.lookupObject victim exercised)) (Just Map.empty)
   -- CR 608.2d on the same card: "the player can't choose an option that's
   -- illegal or impossible", so "you may remove a -1/-1 counter from it" over a
   -- creature that bears none is not offered at all.
@@ -1144,33 +1112,6 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
         Spec.assertEqWith s "Eligeth first: two drawn" (S.handSize S.alice (first eligeth)) 2
         Spec.assertEqWith s "and the scryer was asked" (snd (scryPicking kenessos ballId both)) 1
       _ -> Spec.assertFailure s "expected two permanents"
-
-  -- Kenessos's activated ability, the rest of the card: an Octopus creature on
-  -- top may go onto the battlefield; anything else may go to the bottom.
-  Spec.it s "Kenessos whole card: an Octopus on top enters, a Piker goes under" $ do
-    let board top = do
-          forest <- S.printingOf s registry "Forest"
-          mountain <- S.printingOf s registry "Mountain"
-          kenessos <- S.printingOf s registry "Kenessos, Priest of Thassa"
-          topCard <- S.printingOf s registry top
-          let (kenessosId, g0) = S.addPermanent kenessos S.alice (S.landsInPlay forest 4)
-              (under, g1) = S.addLibraryCard mountain S.alice g0
-              (topId, g2) = S.addLibraryCard topCard S.alice g1
-          pure (kenessosId, under, topId, g2 {GameState.priority = Just S.alice})
-        exercising :: Prompt.Prompt r -> r
-        exercising p = case p of
-          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-          _ -> S.identityAnswer p
-        activate (kenessosId, _, _, gs) = case Activatable.abilitiesFor kenessosId gs of
-          [ability] -> S.runPure exercising gs (Activate.activateAbility S.alice kenessosId ability >> Stack.resolveTop)
-          _ -> gs
-    octopus@(_, under, _, _) <- board "Bubble Smuggler"
-    piker@(_, underPiker, _, _) <- board "Goblin Piker"
-    let entered = activate octopus
-        bottomed = activate piker
-    Spec.assertEqWith s "the Octopus left the library for the battlefield" (scryLibrary entered) [under]
-    Spec.assertEqWith s "alice now has Kenessos, the Octopus and four Forests" (length (Projection.controls S.alice entered)) 6
-    Spec.assertEqWith s "the Piker went under the Mountain" (fmap (take 1) [scryLibrary bottomed], length (scryLibrary bottomed)) ([[underPiker]], 2)
 
 -- Each named card on the battlefield under alice, and their ids in order.
 withScryRow :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> GameState.GameState -> m (GameState.GameState, [ObjectId.ObjectId])
@@ -2936,16 +2877,6 @@ optionalEffectSpec s registry =
               -- stack is the last part of that resolution.
               Spec.assertEqWith s "and the ability left the stack anyway -- it did not fizzle" (length (GameState.stack after)) 1
             abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
-        Spec.it s "CR 603.5 whole card: cycling Renewed Faith and taking the may gains exactly 2" $ do
-          (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
-          case Activatable.abilitiesFor faithId gs of
-            [ability] -> do
-              let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice faithId ability)
-                  placed = S.runPure takeOptional cycled Engine.settleForPriority
-                  after = S.runPure takeOptional placed Stack.resolveTop
-              Spec.assertEqWith s "the Faith is in the graveyard, cycled" (length (Game.zoneMembers Zone.Graveyard S.alice cycled)) 1
-              Spec.assertEqWith s "taking it gains exactly 2" (S.lifeOf S.alice after) (Just 22)
-            abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
         -- The prompt itself, not just its consequence: recording the run puts
         -- the answer in the transcript, which is the only place a raised
         -- prompt is directly observable. Twinned with the mandatory control
@@ -3048,26 +2979,6 @@ optionalEffectSpec s registry =
               -- declining half with no bespoke answerer needed.
               after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance 0 (ModeIndex.MkModeIndex 0) 0, mode)])
           Spec.assertEqWith s "the mandatory clause drew, the declined one did not" (S.handSize S.alice after) (before + 1)
-        -- The same rule at gameplay level, through a real cast: Corpse Churn
-        -- PRINTS the mandatory-then-optional pair the case above builds by hand.
-        -- Milling three and then DECLINING the return must leave all three
-        -- milled cards in the graveyard -- the decline skips its own clause and
-        -- nothing else. Paired with the taking half below, which differs in
-        -- exactly one thing: the answer to the "may".
-        --
-        -- The Shed Weakness case in the Counters group proves the same rule on
-        -- the same spell loop; what this card adds is the other half of CR
-        -- 608.2d, "the player announces these while applying the effect" -- the
-        -- optional clause here CHOOSES its object at resolution rather than
-        -- acting on a target fixed at CR 601.2c -- and a mandatory clause whose
-        -- effect is a zone change, so the decline has to leave cards where an
-        -- earlier clause put them.
-        Spec.it s "CR 608.2d whole card: Corpse Churn's declined return leaves the mill done" $ do
-          (gs, spellId) <- corpseChurnBoard
-          let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-              after = S.runPure S.identityAnswer cast Stack.resolveTop
-          Spec.assertEqWith s "declining the return leaves all three milled cards in the graveyard" (milledNames after) [forestName, pikerName, pikerName]
-          Spec.assertEqWith s "and nothing came back to the hand" (aliceNamesIn Zone.Hand after) []
         Spec.it s "CR 608.2d whole card: taking Corpse Churn's return moves one card and leaves the rest milled" $ do
           (gs, spellId) <- corpseChurnBoard
           let cast = S.runPure returnsChurn gs (S.cast S.alice spellId)

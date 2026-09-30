@@ -3,6 +3,7 @@ module Pawl.Codec.Move where
 import qualified Pawl.Codec.Activation as Activation
 import qualified Pawl.Codec.Casting as Casting
 import qualified Pawl.Codec.Label as Label
+import qualified Pawl.Codec.OptionalDecision as OptionalDecision
 import qualified Pawl.Codec.Reference as Reference
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -24,6 +25,7 @@ codec =
       Arm.payload "ChooseDefender" Label.codec Move.ChooseDefender (\x -> case x of Move.ChooseDefender y -> Just y; _ -> Nothing),
       Arm.payload "ChooseAttackTarget" Reference.codec Move.ChooseAttackTarget (\x -> case x of Move.ChooseAttackTarget y -> Just y; _ -> Nothing),
       Arm.payload "OrderTimestamps" (Common.seq Reference.codec) Move.OrderTimestamps (\x -> case x of Move.OrderTimestamps y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseOptional" OptionalDecision.codec Move.ChooseOptional (\x -> case x of Move.ChooseOptional y -> Just y; _ -> Nothing),
       Arm.nullary "Concede" Move.Concede,
       Arm.nullary "Pass" Move.Pass
     ]
@@ -39,5 +41,6 @@ tagOf x = case x of
   Move.ChooseDefender {} -> "ChooseDefender"
   Move.ChooseAttackTarget {} -> "ChooseAttackTarget"
   Move.OrderTimestamps {} -> "OrderTimestamps"
+  Move.ChooseOptional {} -> "ChooseOptional"
   Move.Concede {} -> "Concede"
   Move.Pass {} -> "Pass"
