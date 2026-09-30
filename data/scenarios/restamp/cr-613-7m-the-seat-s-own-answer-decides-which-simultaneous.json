@@ -1,0 +1,31 @@
+{
+  "description": "CR 613.7m the seat's own answer decides which simultaneous stamp is later",
+  "note": "alice reverses the offered order, so the Sculptor's 5/5 is stamped last. Moonmist transforms both synthetic Humans at once, and each back face sets every Wall's base P/T in layer 7b: the Warden's Sculptor 5/5, the Keeper's Shaper 3/3, over a Wall of Stone that prints 0/8. The Warden is placed first, so the offered order stamps the Keeper later. The Wall reads whichever back face alice stamps later; each Human reads 2/2, its back face, where its front is 1/1. The one OrderTimestamps entry names both, so a second prompt or a group of one fails the run.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Synthetic Rampart Warden", "label": "warden", "ready": true },
+          { "card": "Synthetic Rampart Keeper", "label": "keeper", "ready": true },
+          { "card": "Wall of Stone", "label": "wall", "ready": true }
+        ],
+        "hand": [{ "card": "Moonmist", "label": "moonmist" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@moonmist", "mana": ["@forest", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["@keeper", "@warden"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@wall", "power": 5, "toughness": 5 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@warden", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@keeper", "power": 2, "toughness": 2 } } }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "description": "CR 614.1a any token at all: a Clue plus a Frog",
+  "note": "Quina, Qu Gourmet appends a Frog to any token creation, with no kind: the same Clue that slips past Queen Allenal brings a Frog here. Eliminate the Impossible's investigate is the creation.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Quina, Qu Gourmet", "ready": true }
+        ],
+        "hand": [{ "card": "Eliminate the Impossible", "label": "eliminate-the-impossible" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@eliminate-the-impossible", "mana": ["@island", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Clue Token", "Frog Token"] } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Frog Token", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Clue Token", "count": 1 } }
+  ]
+}

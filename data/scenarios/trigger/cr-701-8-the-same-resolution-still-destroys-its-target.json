@@ -1,0 +1,31 @@
+{
+  "description": "CR 701.8 the same resolution still destroys its target",
+  "note": "Salt Road Skirmish destroys target creature, then creates two Warriors that gain haste and are sacrificed at the next end step. Checked in the main phase, before that end step: bob's Typhoid Rats is gone and both Warriors stand.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Swamp", "label": "swamp-4" }
+        ],
+        "hand": [{ "card": "Salt Road Skirmish", "label": "salt-road-skirmish" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Typhoid Rats", "label": "rats" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@salt-road-skirmish", "targets": ["@rats"], "mana": ["@swamp", "@swamp-2", "@swamp-3", "@swamp-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Typhoid Rats", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Typhoid Rats", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 2 } } }
+  ]
+}

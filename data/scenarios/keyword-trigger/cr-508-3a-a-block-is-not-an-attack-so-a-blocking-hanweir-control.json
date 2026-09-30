@@ -1,0 +1,25 @@
+{
+  "description": "CR 508.3a a block is not an attack, so a blocking Hanweir Garrison makes no tokens",
+  "note": "The positive control: the same Hanweir Garrison attacking really does make two tapped and attacking Human tokens. bob's Goblin Piker blocks the Garrison, so both tokens connect and survive combat.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Hanweir Garrison", "label": "hanweir-garrison", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "goblin-piker", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hanweir-garrison"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Human Token", "Human Token#2"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@goblin-piker": ["@hanweir-garrison"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Human Token", "count": 2 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Human Token", "count": 0 } } }
+  ]
+}

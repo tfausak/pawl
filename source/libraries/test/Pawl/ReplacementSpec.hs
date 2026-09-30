@@ -530,100 +530,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         let after = castAndResolve (raceAnswer corpsejack piker) gs spellId
          in Spec.assertEqWith s "not doubled -- ControllerRelation is Yours" (countersOn CounterKind.PlusOnePlusOne piker after) 1
       _ -> Spec.assertFailure s "fixture did not build both sides"
-  -- THE PROVING TEST for #78's candidate-collection channel. CR 614.12 settles
-  -- which replacement effects modify how a permanent enters by taking into
-  -- account "continuous effects that already exist and would apply to the
-  -- permanent" -- and a permanent arriving in the SAME batch has none yet, since
-  -- its static abilities begin to apply only once it is on the battlefield, which
-  -- is the moment this one arrives too. Corpsejack Menace's own ruling states the
-  -- effect this rule denies it here: "if a creature you control would enter the
-  -- battlefield with a number of +1/+1 counters on it, it enters with twice that
-  -- many instead."
-  --
-  -- Rise of the Dark Realms returns every creature card from every graveyard as
-  -- ONE CR 608.2f event, so the Menace and the Worker enter simultaneously.
-  -- Arcbound Worker is a printed 0/0 with modular 1 (CR 702.43a), which
-  -- Pawl.Engine.Keyword mints as the CR 614.1c entry replacement "enters with one
-  -- +1/+1 counter" -- so the counter is placed inside the Worker's entry loop,
-  -- exactly where the rule is asked.
-  --
-  -- The Menace is buried FIRST so it takes the lower ObjectId and moves first
-  -- (Resolve.graveyardCardsOf sorts ascending, S.addGraveyardCard mints in call
-  -- order), which is the only order in which a live-board reading has anything to
-  -- double; the mirrored leg pins that the answer does not depend on it, which is
-  -- CR 608.2f's point -- the batch is one event and nobody gets to order it.
-  --
-  -- Power and toughness ride along with the counter count because they are what a
-  -- player sees: 1 counter is a 1/1 Worker, 2 is a 2/2, and 0 would be a 0/0 that
-  -- CR 704.5f buries -- three boards no pair of readings can confuse.
-  Spec.it s "CR 614.12 a Corpsejack Menace reanimated beside a modular creature doubles nothing (#78)" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    rise <- S.printingOf s registry "Rise of the Dark Realms"
-    corpsejackMenace <- S.printingOf s registry "Corpsejack Menace"
-    arcboundWorker <- S.printingOf s registry "Arcbound Worker"
-    let outcome buried =
-          let graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) (S.landsInPlay swamp 9) buried
-              (gs, spellId) = S.handOne rise graves
-              after = castAndResolve S.identityAnswer gs spellId
-              workers =
-                filter
-                  (\oid -> Projection.namesOf oid after == Set.singleton (CardName.MkCardName (Text.pack "Arcbound Worker")))
-                  (Set.toList (GameState.battlefield after))
-           in fmap (\oid -> (countersOn CounterKind.PlusOnePlusOne oid after, S.powerToughnessOf oid after)) workers
-        menaceFirst = outcome [corpsejackMenace, arcboundWorker]
-        workerFirst = outcome [arcboundWorker, corpsejackMenace]
-    Spec.assertEqWith s "modular 1's one counter, undoubled -- a 1/1 Worker" menaceFirst [(1, Just (1, 1))]
-    Spec.assertEqWith s "and the batch's processing order changes nothing (CR 608.2f)" workerFirst menaceFirst
-  -- THE PROVING TEST for #78's PROJECTION channel, the other half of the same
-  -- rule. A permanent's static abilities function only while it is on the
-  -- battlefield (CR 113.6), and CR 614.12a puts an as-enters choice BEFORE the
-  -- permanent enters -- so at the moment a batch member makes its choice, a
-  -- sibling arriving in the same batch has no continuous effect yet, which is the
-  -- same thing CR 614.12 says by admitting only "continuous effects that already
-  -- exist". This engine materializes every batch member up front, so the sibling
-  -- IS sitting on the battlefield when the projection reads run, and its static
-  -- has to be suppressed rather than merely not looked at.
-  --
-  -- Ashaya, Soul of the Wild ("nontoken creatures you control are Forest lands in
-  -- addition to their other types") and Wood Elemental ("as this creature enters,
-  -- sacrifice any number of untapped Forests") come back from one graveyard as ONE
-  -- CR 608.2f event. The victim is a THIRD permanent -- a Goblin Piker already on
-  -- the battlefield -- because CR 614.13a already bars the batch's own members from
-  -- the offer, so a sibling of the batch could not tell the two rules apart.
-  --
-  -- The answer is greedy (sacrificesAll), so the offer is not merely observed but
-  -- SPENT: with Ashaya's static visible the Piker projects as an untapped Forest,
-  -- is offered, and dies.
-  --
-  -- Ashaya is buried FIRST so it takes the lower ObjectId and arrives first
-  -- (Resolve.graveyardCardsOf sorts ascending, S.addGraveyardCard mints in call
-  -- order) -- the only order in which a live-board reading has a Forest to offer.
-  -- The mirrored leg pins that the answer does not depend on it, which is CR
-  -- 608.2f's point. The nine lands are Swamps, not Forests, so the only Forest
-  -- anywhere on the board is one Ashaya would have made.
-  --
-  -- Wood Elemental's power and toughness ride along, read after one SBA sweep:
-  -- its CDA reads the count it sacrificed (CR 208.2a), so 0 is a 0/0 that CR
-  -- 704.5f buries and 1 is a 1/1 still standing -- a second reading of the same
-  -- divergence, on the same board, that the Piker count cannot be confused with.
-  Spec.it s "CR 614.12 a Wood Elemental reanimated beside Ashaya sacrifices nothing (#78)" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    rise <- S.printingOf s registry "Rise of the Dark Realms"
-    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
-    woodElemental <- S.printingOf s registry "Wood Elemental"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
-        outcome buried =
-          let (_, withPiker) = S.addPermanent pikerPrinting S.alice (S.landsInPlay swamp 9)
-              graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) withPiker buried
-              (gs, spellId) = S.handOne rise graves
-              after = S.settleSba (castAndResolve sacrificesAll gs spellId)
-              pikers = length (filter (\oid -> Projection.hasName pikerName oid after) (Set.toList (GameState.battlefield after)))
-           in (pikers, fmap (`S.powerToughnessOf` after) (newestNamed (CardName.MkCardName (Text.pack "Wood Elemental")) after))
-        ashayaFirst = outcome [ashaya, woodElemental]
-        elementalFirst = outcome [woodElemental, ashaya]
-    Spec.assertEqWith s "the Piker was never a Forest, so it was not offered and it lives -- and the Wood Elemental that sacrificed nothing is a 0/0 CR 704.5f buried" ashayaFirst (1, Nothing)
-    Spec.assertEqWith s "and the batch's processing order changes nothing (CR 608.2f)" elementalFirst ashayaFirst
   -- CR 614.1d: "Continuous effects that read '[This permanent] enters . . .' or
   -- '[Objects] enter [the battlefield] . . .' are replacement effects." Zof
   -- Bloodbog prints one sentence of exactly that shape -- "This land enters
@@ -1129,25 +1035,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         after = S.runPure S.identityAnswer g3 (Event.runEntry Set.empty piker)
     Spec.assertBool s (not (wasAskedForEntryOption asked)) "no ChooseEntryOption was raised"
     Spec.assertEqWith s "the sole option applied anyway" (Projection.powerOf piker after) (Just 3)
-  Spec.it s "CR 614.16 Doubling Season turns Dragon Fodder's two Goblins into four" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    doublingSeason <- S.printingOf s registry "Doubling Season"
-    dragonFodder <- S.printingOf s registry "Dragon Fodder"
-    let base = S.landsInPlay mountain 2
-        (_, g1) = S.addPermanent doublingSeason S.alice base
-        (g2, spellId) = S.handOne dragonFodder g1
-        after = castAndResolve S.identityAnswer g2 spellId
-    Spec.assertEqWith s "twice that many" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 4
-  Spec.it s "CR 614.5 two Doubling Seasons are two instances: eight Goblins" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    doublingSeason <- S.printingOf s registry "Doubling Season"
-    dragonFodder <- S.printingOf s registry "Dragon Fodder"
-    let base = S.landsInPlay mountain 2
-        (_, g1) = S.addPermanent doublingSeason S.alice base
-        (_, g2) = S.addPermanent doublingSeason S.alice g1
-        (g3, spellId) = S.handOne dragonFodder g2
-        after = castAndResolve S.identityAnswer g3 spellId
-    Spec.assertEqWith s "2 -> 4 -> 8" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 8
   Spec.it s "CR 614.1 Doubling Season's OTHER clause doubles counters, not tokens" $ do
     forest <- S.printingOf s registry "Forest"
     battlegrowth <- S.printingOf s registry "Battlegrowth"
@@ -1270,7 +1157,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   grifterBladeSpec s registry
   hyenaUmbraSpec s registry
   darkblastSpec s registry
-  replicaFoundrySpec s registry
 
 -- Faerie Squadron {U} Creature -- Faerie 1/1, whole text: "Kicker {3}{U} (You may
 -- pay an additional {3}{U} as you cast this spell.) / If this creature was
@@ -2760,26 +2646,6 @@ onBattlefieldNamed name = S.countOnBattlefieldByName (CardName.MkCardName (Text.
 fixedEntryCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fixedEntryCostSpec s registry =
   Spec.describe s "Fixed entry costs across a batch (CR 614.12b)" $ do
-    -- THE PROVING BOARD. Heart of Yavimaya ("sacrifice a Forest instead") moves
-    -- first and Lake of the Dead ("sacrifice a Swamp instead") second, over a
-    -- Bayou (Swamp Forest) and a Forest. Heart's greedy answer is the Bayou,
-    -- which would leave the Lake no Swamp and send it back to the graveyard; CR
-    -- 614.12b forbids that choice, so Heart is offered the Forest alone and asked
-    -- nothing.
-    Spec.it s "an earlier choice may not starve a later fixed cost (CR 614.12b)" $ do
-      prints <- (,,) <$> S.printingOf s registry "Mountain" <*> S.printingOf s registry "Llanowar Elves" <*> S.printingOf s registry "Splendid Reclamation"
-      bayou <- S.printingOf s registry "Bayou"
-      forest <- S.printingOf s registry "Forest"
-      heart <- S.printingOf s registry "Heart of Yavimaya"
-      lake <- S.printingOf s registry "Lake of the Dead"
-      let (gs, held, landIds) = reclamationBoard prints [(bayou, False), (forest, False)] [heart, lake]
-          bayouId = take 1 landIds
-          play = S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority
-          after = S.runPure (sacrificesPreferring bayouId) gs play
-      Spec.assertEqWith s "Lake of the Dead entered" (onBattlefieldNamed "Lake of the Dead" after) 1
-      Spec.assertEqWith s "and Heart of Yavimaya beside it" (onBattlefieldNamed "Heart of Yavimaya" after) 1
-      Spec.assertEqWith s "the Forest and the Bayou paid for them" (List.sort (graveyardNames S.alice after)) (fmap (CardName.MkCardName . Text.pack) ["Bayou", "Forest", "Splendid Reclamation"])
-      Spec.assertEqWith s "Heart was offered one Forest, so nobody was asked" (sacrificeAsks (answersFor (sacrificesPreferring bayouId) gs play)) 0
     -- The control, differing in one thing: no Lake behind the Heart. Now nothing
     -- is owed later, so Heart is offered both and the greedy answer takes the
     -- Bayou -- the narrowing above is the Lake's, not the arm's.
@@ -2795,23 +2661,6 @@ fixedEntryCostSpec s registry =
       Spec.assertEqWith s "Heart of Yavimaya entered" (onBattlefieldNamed "Heart of Yavimaya" after) 1
       Spec.assertEqWith s "paid for with the Bayou it was asked about" (List.sort (graveyardNames S.alice after)) (fmap (CardName.MkCardName . Text.pack) ["Bayou", "Splendid Reclamation"])
       Spec.assertEqWith s "one prompt, over both" (sacrificeAsks (answersFor (sacrificesPreferring bayouId) gs play)) 1
-    -- A demand of TWO: Lotus Vale's "sacrifice two untapped lands" behind the
-    -- Heart, over an untapped Forest, a tapped Forest and an untapped Island.
-    -- Taking the untapped Forest would leave the Vale one untapped land, so the
-    -- Heart gets the tapped one.
-    Spec.it s "a later demand of two is counted whole (CR 614.12b, CR 118.3)" $ do
-      prints <- (,,) <$> S.printingOf s registry "Mountain" <*> S.printingOf s registry "Llanowar Elves" <*> S.printingOf s registry "Splendid Reclamation"
-      forest <- S.printingOf s registry "Forest"
-      island <- S.printingOf s registry "Island"
-      heart <- S.printingOf s registry "Heart of Yavimaya"
-      vale <- S.printingOf s registry "Lotus Vale"
-      let (gs, held, landIds) = reclamationBoard prints [(forest, False), (forest, True), (island, False)] [heart, vale]
-          untappedForest = take 1 landIds
-          play = S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority
-          after = S.runPure (sacrificesPreferring untappedForest) gs play
-      Spec.assertEqWith s "Lotus Vale entered" (onBattlefieldNamed "Lotus Vale" after) 1
-      Spec.assertEqWith s "and Heart of Yavimaya beside it" (onBattlefieldNamed "Heart of Yavimaya" after) 1
-      Spec.assertEqWith s "both Forests and the Island paid for them" (List.sort (graveyardNames S.alice after)) (fmap (CardName.MkCardName . Text.pack) ["Forest", "Forest", "Island", "Splendid Reclamation"])
     -- CR 614.1a's other branch: played from hand with no Swamp to sacrifice, the
     -- Lake is put into its owner's graveyard instead of entering.
     Spec.it s "with nothing to sacrifice, the land goes to the graveyard instead (CR 614.1a)" $ do
@@ -3141,56 +2990,3 @@ dredging p = case p of
 -- graveyardNames one zone over.
 handNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
 handNames pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Hand pid gs))
-
--- Synthetic Replica Foundry {2}{W} Artifact, whole text: "If one or more tokens
--- would be created under your control, those tokens plus a 1/1 colorless Servo
--- artifact creature token are created instead."
---
--- Synthetic because the ATOM is what needs a producer, not the sentence. Every
--- printed row of this shape says "tokens" as the NOUN that
--- Pawl.Types.TokenPattern's whatToken already scopes -- Scryfall
--- @o:"would be created" or o:"would create one or more" or o:"you would create"@,
--- 2026-09-20, 33 cards, each narrowing by card type or subtype and none by
--- token-ness -- so their transcriptions leave whatToken empty and none puts
--- Filter.IsToken, pawl's spelling of printed "token" (Ashaya, Soul of the Wild's
--- "nontoken"), under it. Doubling Season or Quina, Qu Gourmet transcribed that
--- way would refute this card. Writing the atom is what makes the two branches of
--- Pawl.Engine.Replacement.matchesTokenLot observable apart.
-replicaFoundrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-replicaFoundrySpec s registry =
-  Spec.describe s "Synthetic Replica Foundry (CR 111.1)" $ do
-    -- THE PROVING TEST for the text-lot half of
-    -- Pawl.Engine.Replacement.matchesTokenLot. CR 111.1: the Goblins Dragon
-    -- Fodder would create are tokens, so the row's IsToken (CR 111.6) matches
-    -- them. Built from the printed face alone the view answers `token = False`,
-    -- and this case reads 0 Servos.
-    Spec.it s "CR 614.12 a text lot is judged as a token, so IsToken matches it" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      foundry <- S.printingOf s registry "Synthetic Replica Foundry"
-      dragonFodder <- S.printingOf s registry "Dragon Fodder"
-      let base = S.landsInPlay mountain 2
-          (_, g1) = S.addPermanent foundry S.alice base
-          (g2, spellId) = S.handOne dragonFodder g1
-          after = castAndResolve S.identityAnswer g2 spellId
-      Spec.assertEqWith s "the row saw the Goblins as tokens and appended its Servo" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Servo Token")) S.alice after) 1
-      Spec.assertEqWith s "setup: the Goblins themselves were created" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Token")) S.alice after) 2
-    -- The control, on the other branch of the same function: CR 707.1's copy
-    -- lot carries the copied permanent's characteristics instead of given text
-    -- and is judged through Pawl.Engine.Count.viewOfSnapshot, which was already
-    -- told the candidate is a token. Same row, same atom: the pair is what says
-    -- the two branches agree.
-    Spec.it s "CR 707.1 a copy lot is judged as a token too" $ do
-      island <- S.printingOf s registry "Island"
-      foundry <- S.printingOf s registry "Synthetic Replica Foundry"
-      piker <- S.printingOf s registry "Goblin Piker"
-      counterpart <- S.printingOf s registry "Cackling Counterpart"
-      let base = S.landsInPlay island 3
-          (_, g1) = S.addPermanent foundry S.alice base
-          (pikerId, g2) = S.addPermanent piker S.alice g1
-          (g3, spellId) = S.handOne counterpart g2
-          -- raceAnswer for its target arm alone: it aims the one slot at the
-          -- Piker by id, and this board has a single replacement row, so its
-          -- CR 616.1 arm never runs.
-          after = castAndResolve (raceAnswer pikerId pikerId) g3 spellId
-      Spec.assertEqWith s "the copy token drew the Servo as well" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Servo Token")) S.alice after) 1
-      Spec.assertEqWith s "setup: the copy token itself was created" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 2

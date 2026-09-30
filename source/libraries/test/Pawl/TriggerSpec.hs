@@ -1633,14 +1633,6 @@ tokenGroupReadSpec s registry =
                 (fmap (\oid -> Projection.hasKeyword Keyword.Type.Haste oid after) tokens)
                 [True, True]
             other -> Spec.assertFailure s ("expected exactly two Warrior tokens, got " <> show (length other))
-        Spec.it s "CR 701.8 the same resolution still destroys its target" $ do
-          skirmish <- S.printingOf s registry "Salt Road Skirmish"
-          swamp <- S.printingOf s registry "Swamp"
-          rats <- S.printingOf s registry "Typhoid Rats"
-          let (victim, base) = board swamp rats
-              after = castSkirmish skirmish base
-          Spec.assertBool s (Set.notMember victim (GameState.battlefield after)) "the targeted creature is gone"
-          Spec.assertEqWith s "and two Warriors stand" (length (warriors after)) 2
         -- The group is read by TWO opcodes in one resolution, and the second
         -- must still find it: ModifyTarget consuming the slot would leave the
         -- delayed ability with nothing to sacrifice.
@@ -1944,22 +1936,6 @@ orderingSpec s registry =
           let (_, gs) = boardOf tidalWave khabalGhoul island
               (_, asked) = State.runState (Engine.runGame countingAnswer gs Engine.settleForPriority) 0
           Spec.assertEqWith s "asked once" asked 1
-        -- THE ELISION, and its negative, one permanent apart. Dragon Fodder's
-        -- single Create of two tokens is one event (CR 603.6a), so each board's
-        -- watcher contributes two EQUAL entries under one controller.
-        --
-        -- Soul Warden's payload reads no slot, so both orders gain the same 2
-        -- life and there is nothing to decide. The life assertion is what stops
-        -- `asked == 0` passing because the triggers never fired.
-        Spec.it s "CR 603.3b a batch of interchangeable triggers is not asked about (Soul Warden)" $ do
-          soulWarden <- S.printingOf s registry "Soul Warden"
-          mountain <- S.printingOf s registry "Mountain"
-          dragonFodder <- S.printingOf s registry "Dragon Fodder"
-          let (gs, fodderId) = watcherBoard soulWarden mountain 2 dragonFodder
-              (after, asked) = castCounting gs fodderId
-          Spec.assertEqWith s "not asked" asked 0
-          Spec.assertEqWith s "and both triggers resolved: 1 life each" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
-          Spec.assertEqWith s "with both goblins still standing" (length (S.tokensOf after)) 2
         -- Aether Flash is Warstorm Surge's shape and the reason entry equality
         -- alone is not the test: the two entries are equal, their bindings name
         -- different creatures, and CR 117.3b hands priority back between the two

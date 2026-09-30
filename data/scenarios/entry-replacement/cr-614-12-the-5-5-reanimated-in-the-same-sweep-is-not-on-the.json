@@ -1,0 +1,43 @@
+{
+  "description": "CR 614.12 the 5/5 reanimated in the same sweep is not on the battlefield yet, so the row does not apply",
+  "note": "Rise of the Dark Realms reanimates Jedit Ojanen (5/5) and Frontier Mastodon from one graveyard as one CR 608.2f sweep. The Ojanen is buried first, so the sweep has already put it onto the battlefield when the Mastodon's entry loop runs; CR 614.12 still leaves it off the board the ferocious row reads, so the Mastodon gets no counter and stays the printed 3/2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true }
+        ],
+        "hand": [{ "card": "Rise of the Dark Realms", "label": "rise" }],
+        "graveyard": [
+          { "card": "Jedit Ojanen" },
+          { "card": "Frontier Mastodon" }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@rise", "mana": ["Swamp", "Swamp#2", "Swamp#3", "Swamp#4", "Swamp#5", "Swamp#6", "Swamp#7", "Swamp#8", "Swamp#9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Jedit Ojanen", "Frontier Mastodon"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Frontier Mastodon", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Frontier Mastodon", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Jedit Ojanen", "count": 1 } } }
+  ]
+}
