@@ -58,6 +58,7 @@ codec keywordCodec =
       Arm.nullary "PayEnergyX" CostComponent.PayEnergyX,
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
+      Arm.nullary "RemoveLoyaltyFromThisX" CostComponent.RemoveLoyaltyFromThisX,
       Arm.payload "RemoveCountersFromThis" (CountersFromThis.codec keywordCodec) CostComponent.RemoveCountersFromThis (\x -> case x of CostComponent.RemoveCountersFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveCounters" (CountersFromPermanents.codec keywordCodec) CostComponent.RemoveCounters (\x -> case x of CostComponent.RemoveCounters y -> Just y; _ -> Nothing),
       Arm.payload "RemovePlusOneCountersX" (Filter.codec keywordCodec) CostComponent.RemovePlusOneCountersX (\x -> case x of CostComponent.RemovePlusOneCountersX y -> Just y; _ -> Nothing),
@@ -102,6 +103,7 @@ tagOf x = case x of
   CostComponent.PayEnergyX {} -> "PayEnergyX"
   CostComponent.AddLoyaltyToThis {} -> "AddLoyaltyToThis"
   CostComponent.RemoveLoyaltyFromThis {} -> "RemoveLoyaltyFromThis"
+  CostComponent.RemoveLoyaltyFromThisX {} -> "RemoveLoyaltyFromThisX"
   CostComponent.RemoveCountersFromThis {} -> "RemoveCountersFromThis"
   CostComponent.RemoveCounters {} -> "RemoveCounters"
   CostComponent.RemovePlusOneCountersX {} -> "RemovePlusOneCountersX"

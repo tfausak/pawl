@@ -86,6 +86,10 @@ data CostComponent keyword
   | -- | CR 606.4's other half / Jace Beleren: remove this many loyalty counters
     -- from the permanent the cost is on, which CR 606.6 gates on it having them.
     RemoveLoyaltyFromThis Natural.Natural
+  | -- | CR 606.4 / 107.3a / Tamiyo, Compleated Sage: [-X], announced by the
+    -- activator and rewritten to a RemoveLoyaltyFromThis by
+    -- Pawl.Engine.Cost.substituteX.
+    RemoveLoyaltyFromThisX
   | -- | CR 118.1 as a cost / Barkhide Troll, Hickory Woodlot: remove this many
     -- counters of one kind from the permanent the cost is on.
     RemoveCountersFromThis (CountersFromThis.CountersFromThis keyword)

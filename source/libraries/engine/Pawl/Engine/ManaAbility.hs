@@ -252,6 +252,7 @@ costMovesLibraryCard component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemoveLoyaltyFromThisX -> False
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> False

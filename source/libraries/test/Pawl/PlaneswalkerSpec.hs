@@ -1564,6 +1564,66 @@ tamiyoNotebookSpec s registry = Spec.describe s "TamiyoNotebook" $ do
     Spec.assertBool s (S.castable S.alice divinationId created) "CR 601.2f: {2}{U} Divination costs {U}, so the one Island casts it"
     Spec.assertEqWith s "{T}: Draw a card -- Divination plus the drawn card" (S.handSize S.alice drawn) 2
 
+-- Tamiyo, Compleated Sage's -X: "Exile target nonland permanent card with mana
+-- value X from your graveyard. Create a token that's a copy of that card."
+-- Oracle text checked against Scryfall 2026-09-30. Alice holds her at FIVE
+-- loyalty with Kalakscion, Hunger Tyrant (mana value 3) and Hill Giant (4) in
+-- her graveyard, in her precombat main phase with priority.
+tamiyoMinusXBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Printing.Printing, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+tamiyoMinusXBoard s registry = do
+  tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+  tyrant <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (tamiyoId, placed) = S.addPermanent tamiyo S.alice (Setup.emptyGame S.bothPlayers)
+      (tyrantId, g1) = S.addGraveyardCard tyrant S.alice placed
+      (_, g2) = S.addGraveyardCard giant S.alice g1
+      board =
+        (S.addCounter CounterKind.Loyalty 5 tamiyoId g2)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+  pure (tamiyo, tamiyoId, tyrantId, board)
+
+-- Announces X and narrows the target slot to one card by FILTERING the offered
+-- set, so CR 608.2b's re-read keeps the recipient.
+answerXAt :: Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+answerXAt x wanted p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just wanted) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Records the bound Prompt.ChooseX carries and announces it.
+answerAtBoundX :: Prompt.Prompt r -> State.State [Natural] r
+answerAtBoundX p = case p of
+  Prompt.ChooseX _ _ _ _ bound -> do
+    State.modify' (<> [bound])
+    pure bound
+  _ -> pure (S.identityAnswer p)
+
+tamiyoMinusXSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tamiyoMinusXSpec s registry = Spec.describe s "TamiyoMinusX" $ do
+  Spec.it s "CR 606.4 / 107.3a her -X at X=3 removes three loyalty and copies the mana value 3 card" $ do
+    (tamiyo, tamiyoId, tyrantId, board) <- tamiyoMinusXBoard s registry
+    let after = useLoyaltyAbility (answerXAt 3 tyrantId) 1 tamiyo tamiyoId board
+        minted = Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield board))
+    Spec.assertEqWith
+      s
+      "CR 707.2: one token copy of the exiled card"
+      (fmap (\oid -> (Game.isToken oid after, Projection.namesOf oid after)) minted)
+      [(True, Set.singleton (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")))]
+    Spec.assertEqWith s "CR 606.4: the announced 3 loyalty counters came off her 5" (S.counterOf CounterKind.Loyalty tamiyoId after) 2
+    let plusOneOffered gs = any (\a -> Activatable.activatable S.alice tamiyoId a gs) (abilityAt 0 tamiyo)
+    Spec.assertEqWith s "CR 606.3: the -X was her one loyalty activation this turn, so the +1 offered before it is not offered after" (plusOneOffered board, plusOneOffered after) (True, False)
+    Spec.assertEqWith s "the card itself was exiled" (namesIn Zone.Exile S.alice after) [Just (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant"))]
+
+  -- CR 606.6 is what bounds the announcement: the X the prompt offers is her
+  -- loyalty, since a greater one is a cost she cannot pay.
+  Spec.it s "CR 606.6 the ChooseX bound is the loyalty on her" $ do
+    (tamiyo, tamiyoId, _, board) <- tamiyoMinusXBoard s registry
+    let bounds = State.execState (Engine.runGame answerAtBoundX board (mapM_ (Activate.activateAbility S.alice tamiyoId) (abilityAt 1 tamiyo))) []
+    Spec.assertEqWith s "five loyalty bounds X at 5" bounds [5]
+
 -- The Wandering Emperor {2}{W}{W}, loyalty 3: "Flash. As long as The Wandering
 -- Emperor entered this turn, you may activate her loyalty abilities any time
 -- you could cast an instant. ... -2: Exile target tapped creature. You gain 2
