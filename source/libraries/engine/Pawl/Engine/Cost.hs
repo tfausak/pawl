@@ -2643,16 +2643,16 @@ claimOf slots pid oid component gs =
           claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
         CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
           claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
-        -- The same graveyard pool and the same axis, with a count of ONE rather
-        -- than the component's number: rule 701.59a's number is a THRESHOLD on total
-        -- mana value, so how many cards a payment exiles is not settled until the
-        -- payer picks them. TapForTotalPower's arm below and for its reason -- one is
-        -- a LOWER BOUND, since a threshold above 0 needs some card with a positive
-        -- mana value, and `uncountedCeiling` caps this component at 1 so the wrong
-        -- direction never reaches `repeatsOf`. A threshold of 0 is paid by the empty
-        -- set and claims nothing.
+        -- The same graveyard pool and the same axis, counting the FEWEST cards whose
+        -- mana values reach the threshold rather than the component's number: rule
+        -- 701.59a's number is a THRESHOLD on total mana value, so how many cards a
+        -- payment exiles is not settled until the payer picks them. TapForTotalPower's
+        -- arm below and for its reason, the fewest being a LOWER BOUND. A threshold of
+        -- 0 is paid by the empty set and claims nothing.
         CostComponent.CollectEvidence n
-          | n > 0 -> claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (evidenceCandidates slots pid gs)) 1
+          | n > 0 ->
+              let candidates = evidenceCandidates slots pid gs
+               in claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList candidates) (max 1 (fewestReaching (toInteger n) (fmap (`evidenceValue` gs) candidates)))
           | otherwise -> Nothing
         -- A pool of at most ONE, CR 404.2's order having picked it.
         CostComponent.ExileTopFromGraveyard criterion ->
@@ -2682,22 +2682,25 @@ claimOf slots pid oid component gs =
         -- a third axis, and names the object the cost is on, so two such claims could
         -- only come from one cost carrying {Q} twice.
         CostComponent.UntapThis -> Nothing
-        -- ONE, and deliberately not the Natural: that number is a THRESHOLD on an
+        -- The FEWEST candidates whose powers reach the threshold (`fewestReaching`),
+        -- and deliberately not the Natural: that number is a THRESHOLD on an
         -- aggregate rather than a count of objects, so how many permanents a payment
-        -- taps is not settled until the payer picks them. A threshold above 0 needs
-        -- some permanent of positive power (canPayComponent below), so one is a LOWER
-        -- BOUND on what the payment taps and can never over-refuse; a threshold of 0 is
-        -- paid by the empty set, taps nothing and claims nothing. It is the wrong
-        -- direction for `repeatsOf`, which DIVIDES a pool by the count, and that is
-        -- why `uncountedCeiling` caps this component at 1 where it lets the sibling
-        -- arm below through.
+        -- taps is not settled until the payer picks them. No payment taps fewer, so
+        -- the count is a LOWER BOUND and can never over-refuse; a threshold of 0 is
+        -- paid by the empty set, taps nothing and claims nothing. Counting one
+        -- instead let a Springleaf Drum's creature also pay a total power of 3 that
+        -- needed all three (Pawl.ManaSpec's Synthetic Muster Dynamo). The same
+        -- division is still the wrong direction for `repeatsOf`, which is why
+        -- `uncountedCeiling` counts this component's repeats itself.
         --
         -- The pool is tapCandidates', TapPermanents' below: tapped candidates included,
         -- the same permissive reading and for its reason. CR 702.122a's own criterion
         -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
         -- untapped creatures exactly.
         CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
-          | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) 1
+          | threshold > 0 ->
+              let candidates = tapCandidates slots pid oid criterion gs
+               in claim ClaimAxis.Tapping (Set.fromList candidates) (max 1 (fewestReaching (toInteger threshold) (fmap (`tapPower` gs) candidates)))
           | otherwise -> Nothing
         -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
         -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
@@ -2974,11 +2977,12 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
               -- every activation still has to find that mana again. Both readers
               -- hand this function the same cost, so both get the same count.
               Activations.times = repeatsOf pid oid cost gs,
+              Activations.contendedTimes = contendedRepeatsOf pid oid cost gs,
               Activations.claims = claimsOf Map.empty pid oid (Cost.components cost) gs,
               Activations.life = lifeOwedBy pid gs (Cost.components cost),
               Activations.energy = energyOwedBy (Cost.components cost)
             }
-        else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
+        else Activations.MkActivations {Activations.times = 0, Activations.contendedTimes = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
 
 -- CR 601.2f's adjustments for a MANA ability's activation cost, gathered where
 -- CR 605.3b leaves no stack window for Pawl.Engine.Activate to gather them in.
@@ -3070,7 +3074,12 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- resource would each get the whole of it if they were asked separately, which
 -- would OVERSTATE, and this function's whole direction is the other way.
 --
--- Anything else caps the answer at 1 (`uncountedCeiling`), and so does a MANA
+-- Anything else is `uncountedCeiling`'s, one component at a time: a THRESHOLD
+-- on an aggregate there counts the disjoint selections reaching it, and most
+-- of the rest cap the answer at 1. A cost imposing no ceiling at all -- a CR
+-- 701.68a blight alone, which a player controlling a creature can pay any
+-- number of times -- answers 1 too, an understatement and the safe direction
+-- below. So does a MANA
 -- part, repeating which would spend mana this function has not measured. The
 -- offer paths (Mana.manaSourcesGiven, tapForMana) read only whether the count
 -- exceeds 0, so that arm decides nothing for them; the SUPPLY walk reads the
@@ -3096,24 +3105,38 @@ repeatsOf pid oid cost gs =
         0 -> []
         owed -> [div (Game.energyOf pid gs) owed]
       counterCeiling = [div (countersOn kind oid gs) owed | (kind, owed) <- Map.toList (countersOwedBy components), owed > 0]
-      ceilings = objectCeiling <> lifeCeiling <> energyCeiling <> counterCeiling <> Maybe.mapMaybe uncountedCeiling components
+      ceilings = objectCeiling <> lifeCeiling <> energyCeiling <> counterCeiling <> Maybe.mapMaybe (uncountedCeiling pid oid claims gs) components
    in case Cost.mana cost of
         Just (ManaCost.MkManaCost []) -> case ceilings of
           [] -> 1
           limits -> minimum limits
         _ -> 1
 
+-- `repeatsOf` where another source or the paid cost contends for this cost's
+-- claims (Activations.contendedTimes): at most 1 once the cost states a
+-- threshold claim, which the counting check does not hold to the objects that
+-- reach the threshold. Not implemented: an exact joint check for a contended
+-- threshold claim, which would let it repeat there too (#4433).
+contendedRepeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
+contendedRepeatsOf pid oid cost gs =
+  let components = Cost.components cost
+      thresholds =
+        [() | CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n _) <- components, n > 0]
+          <> [() | CostComponent.CollectEvidence n <- components, n > 0]
+   in (if null thresholds then id else min 1) (repeatsOf pid oid cost gs)
+
 -- The ceiling ONE component imposes that `repeatsOf`'s four totals do not
--- already carry, or Nothing where one of them does. 1 for every resource this
--- module cannot count, and for two it need not. EXACT
--- for CR 107.5's {T}, CR 107.6's {Q} and CR 606.4's loyalty (CR 606.3 allows one
--- loyalty ability per turn whatever the counters allow); an UNDERSTATEMENT for
--- a counter put on the source, for CR 701.68's blight, and for TapForTotalPower
--- and CollectEvidence (#2173).
+-- already carry, or Nothing where one of them does or where it spends nothing
+-- that runs out. 1 for every resource this module cannot count, and for two it
+-- need not. EXACT for CR 107.5's {T}, CR 107.6's {Q} and CR 606.4's loyalty (CR
+-- 606.3 allows one loyalty ability per turn whatever the counters allow).
+--
+-- `claims` are the whole cost's, which a threshold arm reads to learn whether
+-- it is the only component drawing on its pool.
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
-uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
-uncountedCeiling component = case component of
+uncountedCeiling :: PlayerId -> ObjectId -> [Claim] -> GameState -> CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
+uncountedCeiling pid oid claims gs component = case component of
   -- Counted by `objectCeiling`.
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
@@ -3144,17 +3167,33 @@ uncountedCeiling component = case component of
   CostComponent.PayEnergyX -> Just 0
   CostComponent.TapThis -> Just 1
   CostComponent.UntapThis -> Just 1
-  -- 1 even though `claimOf` states a claim, and NOT folded into `objectCeiling`:
-  -- that claim's count is ONE where the component's number is a THRESHOLD on an
-  -- aggregate, so dividing the pool by it would OVERSTATE -- four 1/1s pay a
-  -- threshold of 3 once, not four times -- and the header's direction is the
-  -- other way (#2173).
-  CostComponent.TapForTotalPower {} -> Just 1
-  -- 1, TapForTotalPower's arm above and for its reason one zone over: CR
-  -- 701.59a's number is a THRESHOLD on total mana value, so `claimOf` counts one
-  -- card and dividing the graveyard by that would OVERSTATE -- three one-drops
-  -- collect evidence 3 once, not three times.
-  CostComponent.CollectEvidence _ -> Just 1
+  -- A THRESHOLD on an aggregate, so NOT `objectCeiling`'s division: four 1/1s
+  -- pay a total power of 3 once, not four times. `thresholdRepeats` over the
+  -- candidates' powers, `canPayComponent`'s pool and reading -- six 1/1s are two
+  -- activations of Synthetic Muster Dynamo (Pawl.ManaSpec). A threshold of 0
+  -- taps nothing and imposes nothing.
+  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
+    | threshold > 0 ->
+        Just
+          ( alone
+              ClaimAxis.Tapping
+              threshold
+              (fmap (max 0 . (`tapPower` gs)) (tapCandidates Map.empty pid oid criterion gs))
+          )
+    | otherwise -> Nothing
+  -- TapForTotalPower's arm above one zone over: CR 701.59a's number is a
+  -- threshold on total mana value, so three one-drops collect evidence 3 once,
+  -- not three times. A FENCE: Cryptex, the one printed mana ability collecting
+  -- evidence, also charges {T}.
+  CostComponent.CollectEvidence threshold
+    | threshold > 0 ->
+        Just
+          ( alone
+              (ClaimAxis.Removal Zone.Graveyard)
+              threshold
+              (fmap (`evidenceValue` gs) (evidenceCandidates Map.empty pid gs))
+          )
+    | otherwise -> Nothing
   -- Counted by `objectCeiling`, on ClaimAxis.Tapping: the count is exact, so the
   -- pool of untapped candidates divided by it is how many times in a row the
   -- component can be paid. Heritage Druid's nine Elves are three activations
@@ -3170,29 +3209,30 @@ uncountedCeiling component = case component of
   -- on `oid`, and this component takes them off ANOTHER permanent, so the
   -- division would measure the wrong pile. An UNDERSTATEMENT -- a creature with
   -- nine counters pays Zameck Guildmage's cost nine times -- and the header's
-  -- safe direction (#2173).
+  -- safe direction. MTGJSON 2026-08-23, a cost removing counters from anything
+  -- but "this" followed by ": Add": no printing.
   CostComponent.RemoveCounters {} -> Just 1
   -- Zero, PayLifeX's answer above and for its reason.
   CostComponent.RemovePlusOneCountersX _ -> Just 0
-  -- 1, and NOT folded into `counterCeiling`: this component PUTS counters on, so
-  -- it spends none of the resource that ceiling divides. An understatement --
-  -- repeating it is bounded by whatever else the cost spends, not by the
-  -- counters -- and the header's safe direction.
-  CostComponent.PutPlusOneCountersOnThis _ -> Just 1
-  -- 1, and counted by none of the four totals: CR 701.20b spends nothing, so
-  -- there is no pool for `objectCeiling` to divide. An understatement,
-  -- PutPlusOneCountersOnThis' above and the header's safe direction.
-  CostComponent.RevealCardFromHand _ -> Just 1
-  -- 1, RevealCardFromHand's answer above and for its reason: CR 701.4a spends
-  -- nothing, so no total divides. An understatement, and the header's safe
-  -- direction.
-  CostComponent.Behold _ -> Just 1
+  -- Nothing: this component PUTS counters on, so it spends nothing that runs
+  -- out, and repeating it is bounded by whatever else the cost spends. Blight's
+  -- arm below and for its reason; a FENCE, no mana ability in `data/cards/`
+  -- pairing it with a counted resource.
+  CostComponent.PutPlusOneCountersOnThis _ -> Nothing
+  -- Nothing, the arm above's answer: CR 701.20c lets a revealed card be
+  -- revealed again, so CR 701.20b spends nothing. A FENCE, the arm above's.
+  CostComponent.RevealCardFromHand _ -> Nothing
+  -- Nothing, the arm above's answer: neither of CR 701.4a's halves spends
+  -- anything. A FENCE, the arm above's.
+  CostComponent.Behold _ -> Nothing
   -- 1, ExileMaterials' answer above and for its reason: `claimOf` states no
   -- claim for this component. An understatement, the header's safe direction.
   CostComponent.BeholdAndExile _ -> Just 1
-  -- An UNDERSTATEMENT: a player controlling a creature can blight as often as
-  -- they can pay the rest of the cost (#2173).
-  CostComponent.Blight _ -> Just 1
+  -- Nothing: CR 701.68a puts counters on a creature and takes nothing out of
+  -- any pool, and CR 704.3 checks no state-based action inside CR 601.2g's
+  -- mana window, so the creature blighted stays to be blighted again. The rest
+  -- of the cost is the bound -- Synthetic Withering Font's life (Pawl.ManaSpec).
+  CostComponent.Blight _ -> Nothing
   -- Zero, PayLifeX's answer above and for its reason: an unannounced X cannot be
   -- paid even once.
   CostComponent.BlightX -> Just 0
@@ -3202,15 +3242,13 @@ uncountedCeiling component = case component of
   -- this component, so `objectCeiling` has no pool to divide. An UNDERSTATEMENT
   -- -- a graveyard of nine pays three forages -- and the header's safe direction.
   CostComponent.Forage -> Just 1
-  -- 1, and counted by none of the four totals -- Forage's answer just above.
-  -- An UNDERSTATEMENT and the header's safe direction: nothing in rule 705
-  -- bounds how many coins a player may flip, so this part alone would allow any
-  -- number of repeats.
-  CostComponent.FlipCoin -> Just 1
-  -- 1, FlipCoin's answer just above and for its reason: `claimOf` states no
-  -- claim, so there is no pool to divide. Not an understatement here -- rule
+  -- Nothing, Blight's answer above: nothing in rule 705 bounds how many coins a
+  -- player may flip, so the rest of the cost is the bound. A FENCE,
+  -- PutPlusOneCountersOnThis' above.
+  CostComponent.FlipCoin -> Nothing
+  -- 1: `claimOf` states no claim, so there is no pool to divide, and rule
   -- 702.174a's cost is offered once per gift ability
-  -- (Pawl.Engine.Keyword.optionalCost) -- but the safe direction either way.
+  -- (Pawl.Engine.Keyword.optionalCost).
   CostComponent.ChooseOpponent -> Just 1
   -- Zero, BlightX's answer above and for its reason: an unannounced X
   -- cannot be paid even once.
@@ -3220,6 +3258,77 @@ uncountedCeiling component = case component of
   -- waterbend cost carries the mana it licenses, so `repeatsOf` answers 1
   -- before it reads this.
   CostComponent.Waterbend _ -> Just 1
+  where
+    -- `thresholdRepeats` where this is the ONLY claim on its axis, and 1 where
+    -- another component of the cost draws on it too: the selections would then
+    -- have to leave that component its share, which this count cannot see.
+    alone axis threshold amounts =
+      if Natural.length (filter ((== axis) . Claim.Type.axis) claims) == 1
+        then thresholdRepeats (toInteger threshold) amounts
+        else 1
+
+-- How many DISJOINT selections of these amounts each reach `threshold`, every
+-- one holding the fewest amounts any selection can (`fewestReaching`) -- the
+-- repeats of a threshold cost whose claim `claimOf` states at that fewest.
+-- Holding them to the fewest is what keeps Mana.payableResolutionsGiven's count
+-- of objects exact: it scales that claim by the activations taken, and k of
+-- these selections hold exactly k times it. An UNDERSTATEMENT where uneven amounts would allow
+-- more selections of mixed sizes -- {3, 1, 1, 1} reach 3 twice, and this counts
+-- once -- which is the header's safe direction.
+--
+-- EXACT otherwise, by search rather than greedily. Some best answer puts the
+-- largest amount in a selection, since it can replace any member of one, so
+-- the search takes it and tries every minimal completion.
+thresholdRepeats :: Integer -> [Integer] -> Natural
+thresholdRepeats threshold amounts =
+  let size = fewestReaching threshold amounts
+      grouped = Map.toDescList (Map.fromListWith (+) [(amount, 1 :: Natural) | amount <- amounts, amount > 0])
+   in if threshold <= 0 then 0 else selectionsOf threshold size grouped
+
+-- The fewest of these amounts reaching `threshold` together: the largest first,
+-- until they do. Every amount, where they never do.
+fewestReaching :: Integer -> [Integer] -> Natural
+fewestReaching threshold amounts =
+  let go reached picked = case picked of
+        [] -> 0
+        amount : rest
+          | reached >= threshold -> 0
+          | otherwise -> 1 + go (reached + amount) rest
+   in go 0 (List.sortBy (flip compare) (filter (> 0) amounts))
+
+-- `thresholdRepeats`' search over amounts grouped by value, largest first.
+selectionsOf :: Integer -> Natural -> [(Integer, Natural)] -> Natural
+selectionsOf threshold size groups = case groups of
+  [] -> 0
+  (largest, count) : rest ->
+    let remaining = if count > 1 then (largest, count - 1) : rest else rest
+        bound = min (div (sum (fmap (\(amount, n) -> amount * toInteger n) groups)) threshold) (toInteger (div (sum (fmap snd groups)) (max 1 size)))
+        tries = [1 + selectionsOf threshold size (without chosen remaining) | chosen <- reachingCompletions (size - 1) (threshold - largest) remaining]
+     in if bound <= 0 then 0 else upTo (Integer.toNaturalSaturating bound) tries
+  where
+    -- The best of these, stopping at the first to reach the bound.
+    upTo bound = List.foldl' (\best try -> if best >= bound then best else max best try) 0
+    without chosen = Maybe.mapMaybe (\(amount, n) -> let taken = Maybe.fromMaybe 0 (lookup amount chosen) in if n > taken then Just (amount, n - taken) else Nothing)
+
+-- Every way to take at most `budget` more of these grouped amounts so that
+-- together they reach `need`, each MINIMAL -- the last amount taken is the one
+-- that reaches it -- as a count per value.
+reachingCompletions :: Natural -> Integer -> [(Integer, Natural)] -> [[(Integer, Natural)]]
+reachingCompletions budget need groups
+  | need <= 0 = [[]]
+  | otherwise = case groups of
+      [] -> []
+      (amount, count) : rest
+        | toInteger budget * amount < need -> []
+        | otherwise ->
+            let enough = Integer.toNaturalSaturating (div (need + amount - 1) amount)
+                finishing = [[(amount, enough)] | enough <= min count budget]
+                partial =
+                  [ [(amount, taken) | taken > 0] <> more
+                  | taken <- [0 .. minimum [count, budget, enough - 1]],
+                    more <- reachingCompletions (budget - taken) (need - toInteger taken * amount) rest
+                  ]
+             in finishing <> partial
 
 -- This player's life total as an amount that could be PAID (CR 119.4), floored
 -- at zero: a player at or below 0 life can pay nothing but CR 119.4b's zero.
