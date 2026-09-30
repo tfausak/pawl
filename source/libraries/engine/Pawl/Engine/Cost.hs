@@ -90,6 +90,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Face as Face
@@ -1456,6 +1457,7 @@ substituteXInComponent x component = case component of
   CostComponent.ExileCardFromHand _ -> component
   CostComponent.RevealCardFromHand _ -> component
   CostComponent.Behold _ -> component
+  CostComponent.BeholdAndExile _ -> component
   CostComponent.MillCards _ -> component
 
 -- Does this cost contain an X (CR 107.3)? What decides whether the caster is
@@ -1524,6 +1526,7 @@ componentHasVariable component = case component of
   CostComponent.ExileCardFromHand _ -> False
   CostComponent.RevealCardFromHand _ -> False
   CostComponent.Behold _ -> False
+  CostComponent.BeholdAndExile _ -> False
   CostComponent.MillCards _ -> False
 
 -- CR 601.2b: the greatest value of X this player could legally announce -- what
@@ -1625,6 +1628,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.ExileCardFromHand _ -> False
   CostComponent.RevealCardFromHand _ -> False
   CostComponent.Behold _ -> False
+  CostComponent.BeholdAndExile _ -> False
   CostComponent.MillCards _ -> False
 
 -- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X --
@@ -1925,6 +1929,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ExileCardFromHand _ -> Nothing
   CostComponent.RevealCardFromHand _ -> Nothing
   CostComponent.Behold _ -> Nothing
+  CostComponent.BeholdAndExile _ -> Nothing
   CostComponent.MillCards _ -> Nothing
 
 -- CR 606.5: multiple costs to add or remove loyalty counters are combined into a
@@ -2014,6 +2019,9 @@ zoneOfComponent component = case component of
   -- of its two halves the payer takes, so there is no zone for CR 113.6m to be
   -- told about.
   CostComponent.Behold _ -> Nothing
+  -- Nothing, and NOT Just Zone.Hand or Zone.Battlefield: CR 113.6m asks about an
+  -- ability that moves THE OBJECT IT'S ON, and this exiles another object.
+  CostComponent.BeholdAndExile _ -> Nothing
   -- Nothing, and NOT Just Zone.Library, for the arms above's reason: CR 701.17a
   -- mills the cards on top of the paying player's library, which are OTHER cards
   -- than the object the cost is on -- a Millikin on the battlefield is not in the
@@ -2061,7 +2069,7 @@ statesHiddenQuality cost = any componentStatesHiddenQuality (Cost.components cos
 
 componentStatesHiddenQuality :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 componentStatesHiddenQuality component = case component of
-  -- One of the five True-capable arms: CR 701.9a discards from the HAND, CR
+  -- One of the six True-capable arms: CR 701.9a discards from the HAND, CR
   -- 400.2's hidden zone, and the criterion is the rule's stated quality --
   -- Magmatic Insight's "discard a land card" states one, Cathartic Reunion's
   -- "discard two cards" does not.
@@ -2080,11 +2088,15 @@ componentStatesHiddenQuality component = case component of
   -- land card". The DESTINATION is not what rule 118.8c asks about; the zone the
   -- cards are described IN is, and that is the hand.
   CostComponent.PutCardFromHandOntoBattlefield criterion -> Filter.statesAQuality criterion
-  -- The fifth, and the only one whose action reaches a PUBLIC zone as well: CR
-  -- 701.4a's hand half is RevealCardFromHand's action exactly, and rule 118.8c
-  -- asks whether the cost INCLUDES such an action rather than whether it forces
-  -- one, so the battlefield half it offers instead does not take this arm out.
+  -- The fifth, and with the sixth below the only ones whose action reaches a
+  -- PUBLIC zone as well: CR 701.4a's hand half is RevealCardFromHand's action
+  -- exactly, and rule 118.8c asks whether the cost INCLUDES such an action rather
+  -- than whether it forces one, so the battlefield half it offers instead does
+  -- not take this arm out.
   CostComponent.Behold criterion -> Filter.statesAQuality criterion
+  -- The sixth, Behold's arm above: the exile after the behold changes nothing
+  -- about which cards the cost is described by.
+  CostComponent.BeholdAndExile criterion -> Filter.statesAQuality criterion
   -- The hidden zone WITHOUT a quality: CR 702.29a names the object the cost is
   -- on, so no card is described and the player has none to fail to find.
   CostComponent.DiscardThis _ -> False
@@ -2741,6 +2753,11 @@ claimOf slots pid oid component gs =
         -- both of CR 701.4a's halves: neither revealing a card nor choosing a permanent
         -- takes anything out of any pool.
         CostComponent.Behold _ -> Nothing
+        -- Nothing, ExileMaterials' arm below and for its reason: CR 701.4a's pool
+        -- spans the hand and the battlefield, two DIFFERENT axes, and a Claim names
+        -- one. A FENCE: Champion of the Weird's cost states no second component
+        -- that draws on either zone.
+        CostComponent.BeholdAndExile _ -> Nothing
         -- Nothing, Forage's arm above and for its reason: CR 702.167a's pool spans the
         -- battlefield and the payer's graveyard, two DIFFERENT axes, and a Claim names
         -- one. A FENCE, no cost in `data/cards/` printing this component beside a
@@ -3147,6 +3164,9 @@ uncountedCeiling component = case component of
   -- nothing, so no total divides. An understatement, and the header's safe
   -- direction.
   CostComponent.Behold _ -> Just 1
+  -- 1, ExileMaterials' answer above and for its reason: `claimOf` states no
+  -- claim for this component. An understatement, the header's safe direction.
+  CostComponent.BeholdAndExile _ -> Just 1
   -- An UNDERSTATEMENT: a player controlling a creature can blight as often as
   -- they can pay the rest of the cost (#2173).
   CostComponent.Blight _ -> Just 1
@@ -3416,6 +3436,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.ExileCardFromHand _ -> 0
   CostComponent.RevealCardFromHand _ -> 0
   CostComponent.Behold _ -> 0
+  CostComponent.BeholdAndExile _ -> 0
   CostComponent.MillCards _ -> 0
 
 -- CR 107.14's payments a cost owes outside its mana part, added up --
@@ -3465,6 +3486,7 @@ energyOwedByComponent component = case component of
   CostComponent.ExileCardFromHand _ -> 0
   CostComponent.RevealCardFromHand _ -> 0
   CostComponent.Behold _ -> 0
+  CostComponent.BeholdAndExile _ -> 0
   CostComponent.MillCards _ -> 0
 
 -- The counters a cost takes OFF the object it is on, added up per kind --
@@ -3522,6 +3544,7 @@ countersOwedByComponent component = case component of
   CostComponent.ExileCardFromHand _ -> []
   CostComponent.RevealCardFromHand _ -> []
   CostComponent.Behold _ -> []
+  CostComponent.BeholdAndExile _ -> []
   CostComponent.MillCards _ -> []
 
 -- CR 118.3 for ONE component. `slots` is what CR 601.2c has bound, or would bind
@@ -3660,6 +3683,9 @@ canPayComponent slots pid oid component gs = case component of
   -- once. What it decides is the OFFER; `payComponent` answers Unpaid on an empty
   -- pool either way.
   CostComponent.Behold criterion ->
+    not (null (beholdCandidates slots pid oid criterion gs))
+  -- The arm above: CR 118.3 asks the same pool, the exile spending what it beheld.
+  CostComponent.BeholdAndExile criterion ->
     not (null (beholdCandidates slots pid oid criterion gs))
   -- CR 702.29a: payable only while the card is in the paying player's hand.
   -- Asked of the zone and the owner rather than of control, CR 108.4 giving a
@@ -3841,6 +3867,7 @@ criteriaOf component = case component of
   CostComponent.ExileCardFromHand criterion -> [criterion]
   CostComponent.RevealCardFromHand criterion -> [criterion]
   CostComponent.Behold criterion -> [criterion]
+  CostComponent.BeholdAndExile criterion -> [criterion]
   CostComponent.ExileCardsFromGraveyard exile -> [ExileCardsFromGraveyard.whichCards exile]
   CostComponent.ExileMaterials materials -> [ExileMaterials.whichObjects materials]
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
@@ -4595,6 +4622,9 @@ paidInSecondPass component = case component of
   CostComponent.RevealCardFromHand _ -> False
   -- CR 701.4a moves nothing out of any zone, RevealCardFromHand's arm above.
   CostComponent.Behold _ -> False
+  -- The exile moves a card out of a hand or off the battlefield, neither a
+  -- library, so the header's first pass holds it.
+  CostComponent.BeholdAndExile _ -> False
 
 payInOrder :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payInOrder moment slots pid oid components = case components of
@@ -4683,6 +4713,9 @@ orderSensitive component = case component of
   -- card in the hand and the permanent on the battlefield, so paying this changes
   -- no other part's pool.
   CostComponent.Behold _ -> False
+  -- TRUE, unlike Behold above: the exile takes the object out of a pool another
+  -- part could draw on.
+  CostComponent.BeholdAndExile _ -> True
   CostComponent.ExileThisFromGraveyard -> True
   CostComponent.ExileThis -> True
   CostComponent.TapThis -> True
@@ -5882,6 +5915,30 @@ payComponent moment slots pid oid component = case component of
             pure (if List.elem answer candidates then answer else first)
         Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
         pure (Payment.Paid (Binding.paidObjects Binding.beheldObject (Set.singleton (Recipient.ToObject chosen))))
+  -- CR 701.4a's behold, the arm above's pool, prompt and reveal, then CR 406.2's
+  -- exile of what was beheld through Event.changeZoneReturning.
+  --
+  -- LINKS the card CR 400.7 put into exile to `oid`, the spell, which is CR
+  -- 607.2q's "cards exiled to pay the cost of the spell"; Event.carryOver hands
+  -- the link to the permanent the spell becomes. Pawl.CostSpec's Champion of the
+  -- Weird group is the proof.
+  CostComponent.BeholdAndExile criterion -> do
+    gs <- State.get
+    let candidates = beholdCandidates slots pid oid criterion gs
+        decider = Decide.deciderFor pid gs
+    case candidates of
+      [] -> pure Payment.Unpaid
+      first : rest -> do
+        chosen <- case rest of
+          [] -> pure first
+          second : more -> do
+            answer <- Game.choose (Prompt.ChooseBehold decider pid oid (first NonEmpty.:| (second : more)))
+            pure (if List.elem answer candidates then answer else first)
+        Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
+        arrived <- Event.changeZoneReturning chosen Zone.Exile
+        let link = ExileLink.MkExileLink {ExileLink.source = oid, ExileLink.ability = Nothing}
+        State.modify' (\g -> g {GameState.exiledWith = foldr (`Map.insert` link) (GameState.exiledWith g) arrived})
+        pure bindsNothing
   -- CR 107.14: paying energy removes that many energy counters from the player.
   -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.

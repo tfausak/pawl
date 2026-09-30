@@ -6707,6 +6707,8 @@ arrangeComponents pid dest components =
 -- the permanent a graveyard cast became keeps the rider past the Paragon"
 -- proves it.
 --
+-- CR 607.2q rides it as well: `relink` below.
+--
 -- Not implemented: CR 400.7b for a static grant to spells that is no
 -- permission's rider (Zinnia, Valley's Voice's offspring): nothing stores one,
 -- so there is no row here to re-key (gap #3635). CR 400.7i for an exile
@@ -6720,8 +6722,17 @@ carryOver carrying oldId newId = case carrying of
     State.modify' $ \gs ->
       gs
         { GameState.continuousEffects = fmap (reanchor oldId (Set.singleton newId)) (GameState.continuousEffects gs),
-          GameState.replacements = fmap (rewatch oldId newId) (GameState.replacements gs)
+          GameState.replacements = fmap (rewatch oldId newId) (GameState.replacements gs),
+          GameState.exiledWith = fmap (relink oldId newId) (GameState.exiledWith gs)
         }
+
+-- carryOver's CR 607.2q half: a card exiled to pay the cost of a permanent spell
+-- is linked to the permanent that spell becomes, so a link naming the spell
+-- names the permanent instead. Pawl.Engine.Cost.payComponent's BeholdAndExile
+-- arm is the writer; Pawl.CostSpec's Champion of the Weird group is the proof.
+relink :: ObjectId -> ObjectId -> ExileLink.ExileLink -> ExileLink.ExileLink
+relink oldId newId link =
+  if ExileLink.source link == oldId then link {ExileLink.source = newId} else link
 
 -- carryOver's per-ROW half, and CR 400.7c's whole of it: a floating damage row
 -- watching the spell watches the permanent instead. DamagePattern.whichSource is

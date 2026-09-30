@@ -2979,7 +2979,7 @@ rewriteWhichCounters pairs which = case which of
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
 -- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
--- ExileCardFromHand, RevealCardFromHand, Behold, ExileMaterials,
+-- ExileCardFromHand, RevealCardFromHand, Behold, BeholdAndExile, ExileMaterials,
 -- RemoveCounters and
 -- PutCardFromHandOntoBattlefield arms
 -- are a regression
@@ -3005,6 +3005,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileCardFromHand criterion -> CostComponent.ExileCardFromHand (rewrite pairs criterion)
   CostComponent.RevealCardFromHand criterion -> CostComponent.RevealCardFromHand (rewrite pairs criterion)
   CostComponent.Behold criterion -> CostComponent.Behold (rewrite pairs criterion)
+  CostComponent.BeholdAndExile criterion -> CostComponent.BeholdAndExile (rewrite pairs criterion)
   CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n which criterion spread) -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n (rewriteWhichCounters pairs which) (rewrite pairs criterion) spread)
   CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemovePlusOneCountersX (rewrite pairs criterion)
   CostComponent.TapThis -> component
