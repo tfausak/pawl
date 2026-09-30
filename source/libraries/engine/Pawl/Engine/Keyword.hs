@@ -3073,13 +3073,12 @@ escapeCosts keywords =
 -- limit on how many disturb abilities a card has, and CR 601.2b makes two of
 -- them a choice.
 --
--- Read off the card's FRONT face by both its callers
--- (Pawl.Engine.Cast.permitsCastFromGraveyard, Pawl.Engine.Cost.candidateCostsGiven)
--- rather than off the projection of the half being cast, which is CR 712.11d's
--- own scope: the ability is "an ability of a double-faced card's front face" and
--- the spell it permits is the back face. A disturb ability GRANTED to a card in
--- a graveyard is therefore not expanded (gap #1859), which is the reading
--- Pawl.Engine.Card.convertedFace already takes for rule 702.162a.
+-- Handed the FRONT face's keywords by both its callers rather than the half
+-- being cast, which is CR 712.11d's own scope: the ability is "an ability of a
+-- double-faced card's front face" and the spell it permits is the back face.
+-- Pawl.Engine.Cast.permitsDisturb projects that face where the card lies;
+-- Pawl.Engine.Cost.candidateCostsGiven reads it printed, so a disturb ability
+-- GRANTED to a card in a graveyard is not priced (gap #1859).
 disturbCosts :: Set Keyword -> [Cost Keyword]
 disturbCosts keywords =
   let costOf keyword = case keyword of
