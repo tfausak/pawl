@@ -1797,8 +1797,13 @@ eventTriggers events gs =
       -- `inGraveyards`' reason: a haunting card sits in exile indefinitely and no
       -- event names it, so nothing narrower could find it.
       --
-      -- Abilities come from the PRINTED card, so an effect changing the abilities
-      -- of a card in exile is not seen (#1859). The controller is the OWNER (CR
+      -- Abilities come from the PROJECTION (CR 613.1 names no zone), asked only
+      -- of a card whose printed face yields one or while some grantor writes a
+      -- keyword minting one here (`exileGrantInForce`), `graveyardCandidate`'s
+      -- gate widened by that grantor disjunct: Pawl.CastSpec's "CR 702.35a
+      -- Falkenrath Gorger gives a Vampire card in hand madness" proves a
+      -- granted madness is seen. A triggered ability GRANTED to a card in exile
+      -- fails the gate and is not seen (#1859). The controller is the OWNER (CR
       -- 108.4a), for `inGraveyards`' reason: CR 108.4 gives a card in exile no
       -- controller at all, so Blind Hunter's "you gain 2 life" pays the player
       -- who owns the haunting card.
@@ -1821,11 +1826,20 @@ eventTriggers events gs =
       -- is what decides which keywords reach this: suspend and CR 702.35a's
       -- madness, whose own first ability is what put its card here.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-        (Just obj, Just face) | not (Object.exiledFaceDown obj) ->
-          case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> fmap whole (Keyword.exileTriggeredAbilitiesOf (Face.keywordSet face)) of
-            [] -> Nothing
-            abilities -> Just (oid, (Object.owner obj, abilities))
+        (Just obj, Just face)
+          | not (Object.exiledFaceDown obj) ->
+              let exiled subtypes manaCost triggered keywords = Maybe.mapMaybe (functionsIn subtypes (Face.delayedAbilities face) Zone.Exile) triggered <> fmap whole (Keyword.exileTriggeredAbilitiesOf manaCost keywords)
+               in case exiled (TypeLine.subtypes (Face.typeLine face)) (Face.manaCost face) (Face.triggeredAbilities face) (Face.keywordSet face) of
+                    [] | not exileGrantInForce -> Nothing
+                    _ ->
+                      let pc = Projection.project oid gs
+                       in case exiled (PC.subtypes pc) (PC.manaCost pc) (PC.triggeredAbilities pc) (Map.keysSet (PC.keywords pc)) of
+                            [] -> Nothing
+                            abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
+      -- Does anything grant a keyword that mints an exile trigger? A thunk: only
+      -- an exiled card whose printed face yields none forces it.
+      exileGrantInForce = Projection.keywordGrantInForce (not . null . Keyword.exileTriggeredAbilitiesOf Nothing . Set.singleton) gs
       inExile = Map.fromList (Maybe.mapMaybe exileCandidate (Set.toAscList (GameState.exile gs)))
       -- CR 113.6k's other zone: the spell that just became cast, offered from the
       -- STACK, where CR 601.2a leaves it. Desolation Twin's "when you cast this

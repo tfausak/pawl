@@ -337,6 +337,7 @@ import qualified Pawl.Codec.LookAtSpec
 import qualified Pawl.Codec.LoopMembersSpec
 import qualified Pawl.Codec.LoyaltyKindSpec
 import qualified Pawl.Codec.LoyaltySpec
+import qualified Pawl.Codec.MadnessCostSpec
 import qualified Pawl.Codec.MakeForetoldSpec
 import qualified Pawl.Codec.ManaAbilityResolvedSpec
 import qualified Pawl.Codec.ManaAddedCauseSpec
@@ -1076,6 +1077,7 @@ spec s registry = do
   Pawl.Codec.RepeatSpec.spec s
   Pawl.Codec.RepeatIfSpec.spec s
   Pawl.Codec.ForetellCostSpec.spec s
+  Pawl.Codec.MadnessCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidActivationSpec.spec s
   Pawl.Codec.ForbidBlockSpec.spec s

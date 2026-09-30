@@ -5984,6 +5984,40 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
     Spec.assertEqWith s "CR 702.35a Rest in Peace exiled the discarded Wurm, so no madness trigger and no cast" (S.countOnBattlefieldByName (S.printingName wurm) S.alice byRest) 0
     Spec.assertEqWith s "CR 702.35a madness's own row exiled it on the SAME board, and the cast is offered" (S.countOnBattlefieldByName (S.printingName wurm) S.alice byMadness) 1
     Spec.assertBool s (elem (S.printingName wurm) (namesIn Zone.Exile byRest)) "and the Wurm Rest in Peace exiled is still in exile, where nothing watches it"
+  -- CR 613.1f / 702.35a: Falkenrath Gorger GRANTS madness to a Vampire card in
+  -- hand, "the madness cost is equal to its mana cost". Two boards differing only
+  -- in whether the Gorger is on the battlefield; the same script runs both.
+  Spec.it s "CR 702.35a Falkenrath Gorger gives a Vampire card in hand madness" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    vampire <- S.printingOf s registry "Bloodrage Vampire"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    gorger <- S.printingOf s registry "Falkenrath Gorger"
+    let run withGorger = gorgerRun (gorgerBoard withGorger mountain swamp vampire reunion gorger)
+    Spec.assertEqWith s "CR 702.35a with the Gorger the discarded Vampire is cast for its mana cost" (S.countOnBattlefieldByName (S.printingName vampire) S.alice (run True)) 1
+    Spec.assertEqWith s "CR 701.9a without it the same discard casts nothing" (S.countOnBattlefieldByName (S.printingName vampire) S.alice (run False)) 0
+    Spec.assertBool s (elem (S.printingName vampire) (namesIn Zone.Graveyard (run False))) "and the Vampire is in its owner's graveyard"
+
+-- alice on her turn with two Mountains and three Swamps untapped, Bloodrage
+-- Vampire {2}{B} and a Mountain in hand beside Cathartic Reunion, and Falkenrath
+-- Gorger on the battlefield when `withGorger`. The Reunion takes the two hand
+-- cards; whichever two lands pay its {1}{R}, the three left pay {2}{B}.
+gorgerBoard :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+gorgerBoard withGorger mountain swamp vampire reunion gorger =
+  let base = aliceOnTurn (S.landsFor swamp S.alice 3 (S.landsInPlay mountain 2))
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) base [1 :: Int .. 4]
+      handed = snd (S.addHandCard mountain S.alice (snd (S.addHandCard vampire S.alice stocked)))
+      withIt = if withGorger then snd (S.addPermanent gorger S.alice handed) else handed
+   in S.addHandCard reunion S.alice withIt
+
+-- Cast the Reunion, place whatever triggered, and resolve twice: rule 702.35a's
+-- trigger and the Vampire it cast, or else the Reunion and then nothing.
+gorgerRun :: (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+gorgerRun (reunionId, ready) =
+  let discarded = S.runPure madnessAnswer ready (S.cast S.alice reunionId)
+      placed = S.runPure madnessAnswer discarded Engine.placePendingTriggers
+      first = S.runPure madnessAnswer placed Stack.resolveTop
+   in S.runPure madnessAnswer first Stack.resolveTop
 
 -- Takes rule 702.35a's offered cast and answers everything else as S.identityAnswer
 -- does, which is what the declining case reuses unchanged.

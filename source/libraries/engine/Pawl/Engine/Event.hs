@@ -8413,7 +8413,7 @@ discardReturning cause pid oid = do
   before <- State.get
   -- READ BEFORE THE MOVE: CR 400.7 deletes this incarnation, so the hand card's
   -- own keywords are unreadable by the time the funnel returns.
-  let hasMadness = maybe False (not . null . Keyword.madnessCosts . Face.keywordSet) (Game.faceOf oid before)
+  let hasMadness = not (null (Keyword.madnessCosts (Projection.handMintingKeywordsOf oid before)))
   moved <- changeZoneWithCause (Just cause) Nothing Set.empty oid Zone.Graveyard LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
   after <- State.get
   -- CR 702.35a's "exiled THIS WAY": which redirect the CR 616.1 loop applied,
@@ -8432,9 +8432,9 @@ discardReturning cause pid oid = do
   -- that would tell the two readings apart prints madness AND a row of its own
   -- that redirects it into exile; none does.
   --
-  -- The PRINTED face, Projection.replacementsAffecting's read at the matching
-  -- mint point and for its reason: a madness ability granted to a card in a hand
-  -- mints no row there either (gap #1859), so the two questions agree on it.
+  -- The keywords Projection.replacementsAffecting mints the row from
+  -- (Projection.handMintingKeywordsOf), so the two questions agree on a
+  -- madness an effect granted.
   --
   -- A REGRESSION FENCE rather than a proof: neutralizing the conjunct leaves the
   -- suite green, since the card that would tell it from the exiledWith test alone

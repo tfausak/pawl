@@ -5256,15 +5256,15 @@ replacementsAffecting gs =
       -- Pawl.Engine.Keyword.handReplacementsOf is what decides which keywords
       -- reach it, and madness is the only one.
       --
-      -- The PRINTED face, `statedFrom`'s read and for its reason: `project` is
-      -- what the short-circuit exists to skip, so a madness ability an effect
-      -- granted to a card in a hand mints nothing (gap #1859).
+      -- Minted off the PROJECTION's keywords (CR 613.1 names no zone), and read
+      -- off the printed face alone while no grantor writes a hand-minting
+      -- keyword (`handMintingKeywordsOf`), which keeps the walk from projecting
+      -- every card in every hand. Pawl.CastSpec's "CR 702.35a Falkenrath Gorger
+      -- gives a Vampire card in hand madness" proves the granted direction.
       --
       -- ReplacementProvenance.Minted, replacementsOfGiven's mark for every row a
       -- rule writes onto an object rather than a face printing it.
-      mintedInHand oid = case Game.faceOf oid gs of
-        Nothing -> []
-        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywordSet face))
+      mintedInHand oid = fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (handMintingKeywordsOf oid gs))
       -- CR 702.52a's replacement, minted for a card in a GRAVEYARD --
       -- `mintedInHand`'s sibling one zone over.
       -- Pawl.Engine.Keyword.graveyardReplacementsOf is what decides which
@@ -5305,6 +5305,36 @@ replacementsAffecting gs =
           then []
           else concatMap (forOne Zone.Battlefield) onBattlefield <> concatMap (forOne Zone.Command) inCommand
    in onBoard <> stated
+
+-- The keywords of a card in a hand that CR 702.35a's discard replacement is
+-- minted from (Keyword.handReplacementsOf) -- the projection's, since CR 613.1
+-- names no zone, so an effect granting or removing madness there is seen.
+--
+-- Projected when the printed face has madness, so an effect removing it is
+-- seen, or when some grantor writes madness (`keywordGrantInForce`), so one
+-- granting it is. A card printing none on a board granting none skips the
+-- projection and answers empty, the projection's set differing there only in
+-- keywords that mint nothing in a hand.
+handMintingKeywordsOf :: ObjectId -> GameState -> Set Keyword
+handMintingKeywordsOf oid gs = case Game.faceOf oid gs of
+  Nothing -> Set.empty
+  Just face
+    | null (Keyword.handReplacementsOf (Face.keywordSet face)) && not (keywordGrantInForce isMadness gs) -> Set.empty
+    | otherwise -> Map.keysSet (keywordsOf oid gs)
+  where
+    isMadness k = not (null (Keyword.madnessCosts (Set.singleton k)))
+
+-- Does anything write a modification handing out a keyword satisfying `p`? A
+-- battlefield permanent's static ability, a stored effect (`storedWrites`) or
+-- an off-battlefield static ability (`elsewhereGrants`) -- the three grantor
+-- disjuncts replacementsAffecting's gate asks, for a gate that must decide
+-- whether to project a card off the battlefield without projecting it.
+keywordGrantInForce :: (Keyword -> Bool) -> GameState -> Bool
+keywordGrantInForce p gs =
+  let writes = grantsKeywordWhere p
+   in any (any (any writes . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
+        || storedWrites writes gs
+        || elsewhereGrants writes gs
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
 -- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two
