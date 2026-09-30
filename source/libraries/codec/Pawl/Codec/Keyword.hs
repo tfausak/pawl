@@ -92,7 +92,9 @@ codec =
       Arm.payload "Morph" (Morph.codec codec) Keyword.Morph (\x -> case x of Keyword.Morph y -> Just y; _ -> Nothing),
       Arm.payload "Amplify" Common.natural Keyword.Amplify (\x -> case x of Keyword.Amplify y -> Just y; _ -> Nothing),
       Arm.payload "Entwine" (Cost.codec codec) Keyword.Entwine (\x -> case x of Keyword.Entwine y -> Just y; _ -> Nothing),
-      Arm.payload "Modular" Common.natural Keyword.Modular (\x -> case x of Keyword.Modular y -> Just y; _ -> Nothing),
+      -- CR 702.44c's Modular--Sunburst is the ABSENT "value" key, bloodthirst X's
+      -- spelling below.
+      Arm.optionalPayload "Modular" Common.natural Keyword.Modular (\x -> case x of Keyword.Modular y -> Just y; _ -> Nothing),
       Arm.nullary "Sunburst" Keyword.Sunburst,
       Arm.payload "Dredge" Common.natural Keyword.Dredge (\x -> case x of Keyword.Dredge y -> Just y; _ -> Nothing),
       Arm.payload "Bushido" Common.natural Keyword.Bushido (\x -> case x of Keyword.Bushido y -> Just y; _ -> Nothing),

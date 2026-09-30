@@ -1634,6 +1634,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- object's CR 400.7d mana record rather than card text, so there is no word
   -- here for CR 612.1 to reach either.
   EntryRewrite.Sunburst -> rewrite
+  EntryRewrite.ModularSunburst -> rewrite
   -- CR 702.150a states compleated whole, the symbol count being CR 118.13a's
   -- announced payment rather than card text, so there is no word here for CR
   -- 612.1 either.

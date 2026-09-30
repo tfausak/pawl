@@ -725,12 +725,23 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Modular 2)
+      (Keyword.Modular (Just 2))
       " {\"type\":\"Modular\",\"value\":2} "
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Modular 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
+      (Codec.encode Keyword.codec (Keyword.Modular (Just 3)) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "modular 3 is not bushido 3"
+  -- CR 702.44c's Modular--Sunburst (Arcbound Wanderer) is the absent number.
+  Spec.it s "Modular--Sunburst without a printed N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Modular Nothing)
+      " {\"type\":\"Modular\"} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Modular Nothing) /= Codec.encode Keyword.codec (Keyword.Modular (Just 0)))
+      "modular--sunburst is not modular 0"
   -- CR 702.44a's sunburst is nullary: rule 702.44a fixes both counter kinds, and
   -- CR 702.44b's count is the entering object's mana record rather than a printed
   -- number.
@@ -944,7 +955,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       " {\"type\":\"Bloodthirst\",\"value\":1} "
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Bloodthirst (Just 1)) /= Codec.encode Keyword.codec (Keyword.Modular 1))
+      (Codec.encode Keyword.codec (Keyword.Bloodthirst (Just 1)) /= Codec.encode Keyword.codec (Keyword.Modular (Just 1)))
       "bloodthirst 1 is not modular 1"
   -- CR 702.54b's X names no number, so it is the absent "value" key -- and it must
   -- not collide with a printed zero, which rule 702.54a would gate on damage.
