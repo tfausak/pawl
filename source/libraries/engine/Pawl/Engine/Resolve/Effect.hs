@@ -8297,9 +8297,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- controller can no longer be asked for exactly (see Pawl.Types.Countering).
     --
     -- Delay's "exile it ... instead" sends a countered spell to exile rather
-    -- than to CR 701.6a's graveyard. The card's own instruction and not a
-    -- competing CR 614 replacement: Delay's ruling (2021-03-19) has it exile a
-    -- spell cast with flashback, "not the flashback effect".
+    -- than to CR 701.6a's graveyard. A self-replacement effect (CR 614.15),
+    -- which CR 616.1a applies before any other, so it is folded into the
+    -- destination and the funnel offers the rest the exile move -- Delay's
+    -- ruling (2021-03-19) has it exile a spell cast with flashback, "not the
+    -- flashback effect".
     moved <- Event.counterReturning (maybe Zone.Graveyard (const Zone.Exile) mExiled) source controller named
     let countered = fmap fst moved
     -- CR 701.6a's "countered this way" is what the funnel COUNTERED, never what

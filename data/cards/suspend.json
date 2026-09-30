@@ -1,0 +1,102 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Suspend",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": {
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "creature"
+                      },
+                      "slot": "suspended",
+                      "zone": {
+                        "type": "Exile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "PutCounters",
+                    "value": {
+                      "kind": {
+                        "type": "Time"
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "suspended"
+                      }
+                    }
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": {
+                      "duration": {
+                        "type": "Indefinite"
+                      },
+                      "modification": {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Suspend"
+                        }
+                      },
+                      "ref": {
+                        "type": "EachCardFromAmong",
+                        "value": {
+                          "filter": {
+                            "type": "Not",
+                            "value": {
+                              "type": "HasKeywordFamily",
+                              "value": {
+                                "type": "Suspend"
+                              }
+                            }
+                          },
+                          "slot": "suspended"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "creature": {
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

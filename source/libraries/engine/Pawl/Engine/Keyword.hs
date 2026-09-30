@@ -8279,6 +8279,9 @@ handTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 -- data/cards/ prints suspend twice, so the caller hands over the distinct
 -- keywords as a set. Rule 702.85c and its siblings do state one, which
 -- is why `stackTriggeredAbilitiesOf` next door counts.
+--
+-- Not implemented: a pair per instance for a card holding two suspends, which
+-- two unconditional grants give it (#4460).
 exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 exileTriggeredAbilitiesOf keywords = case suspendKeyword keywords of
   Nothing -> []
@@ -8923,9 +8926,10 @@ suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters 
 -- 702.62d routes through rules 601.2b and 601.2f-h -- the same field the plotted
 -- card's cast is priced with in Pawl.Engine.Cost.
 --
--- CAST and not rule 702.62a's wider "PLAY it", which for a land with suspend
--- would be a land play: Scryfall `keyword:suspend t:land`, 2026-09-07, no hit --
--- a land with suspend is the card that would tell the two apart.
+-- PLAY, rule 702.62a's own verb: a land face is played as CR 305.2a's land play
+-- during a resolution. A granted suspend reaches a modal double-faced card
+-- whose back is a land (CR 712.12) -- Pawl.SpecialActionSpec's "Delay on Sea
+-- Gate Restoration" case proves it.
 --
 -- THE INTERVENING "IF" is rule 702.62a's "if it's exiled", which immediately
 -- follows the trigger condition and so is CR 603.4's, gated at the gather and
@@ -8953,7 +8957,7 @@ suspendLastCounter keyword =
               -- rule 702.62a's "cast it": one card, the one the slot names.
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
-              OfferCast.verb = PermissionVerb.Cast,
+              OfferCast.verb = PermissionVerb.Play,
               OfferCast.controlWhileResolving = False,
               OfferCast.slot = Nothing
             }
