@@ -6147,9 +6147,8 @@ reboundRaceTo answer gs spellId =
 -- 1/1 green Snake creature token for each card in your hand. / Epic" (Oracle text
 -- fetched from Scryfall 2026-09-13, SOK). The payoff is an Effect.Create pawl
 -- already builds, counted off the caster's hand, so rule 702.50a's two spell
--- abilities are the only things under test. It is the ONE epic printing that
--- announces no target and no X, which is what pawl's archived spell can carry --
--- Eternal Dominion is the card that needs the rest (#3708).
+-- abilities are the only things under test. The copied target is Eternal
+-- Dominion's case below.
 --
 -- THE SNAKE COUNT is the observer, and it moves by a different amount at each
 -- upkeep, so no two readings can be confused: three as the spell resolves (three
@@ -6176,6 +6175,42 @@ epicBoard forest fog swarm =
    in -- reboundBoard's schedule, for its reason: the beginning phase this turn
       -- still has queued would otherwise arrive after the main phase.
       ((aliceOnTurn ready) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}, swarmId, fogId)
+
+-- Eternal Dominion {7}{U}{U}{U} Sorcery -- "Search target opponent's library for
+-- an artifact, creature, enchantment, or land card. Put that card onto the
+-- battlefield under your control. Then that player shuffles. / Epic" (Oracle
+-- text fetched from Scryfall 2026-09-30) -- on a three-seat board, so bob and
+-- carol are two opponents the copy's target can tell apart. Ten Islands pay for
+-- it; every library holds twelve Forests, the search's find and every draw.
+eternalDominionBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+eternalDominionBoard island forest dominion =
+  let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard forest pid h)) g [1 :: Int .. 12]
+      stocked = List.foldl' stock (S.landsFor island S.alice 10 S.threePlayerGame) [S.alice, S.bob, S.carol]
+      (dominionId, ready) = S.addHandCard dominion S.alice stocked
+   in ((aliceOnTurn ready) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}, dominionId)
+
+-- Aims every target at `whom` and takes the search's find.
+dominating :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+dominating whom p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer whom) sets
+  Prompt.Search _ _ candidates n -> List.genericTake n candidates
+  _ -> S.identityAnswer p
+
+-- alice casts the Dominion at bob, and it resolves.
+dominionCast :: GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+dominionCast gs dominionId = S.runPure (dominating S.bob) gs (S.cast S.alice dominionId >> Stack.resolveTop)
+
+-- Runs to alice's next draw step, past the upkeep the copy is made at.
+dominionUpkeep :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+dominionUpkeep answer resolved =
+  let startTurn = GameState.turnNumber resolved
+   in reboundRunUntil answer (\g -> GameState.turnNumber g > startTurn + 2 && GameState.phase g == Phase.Beginning BeginningStep.DrawStep) resolved
+
+-- How many permanents alice controls that bob owns, and that carol owns.
+dominionHaul :: GameState.GameState -> (Int, Int)
+dominionHaul gs =
+  let taken owner = length [oid | oid <- Projection.controls S.alice gs, fmap Object.owner (Game.lookupObject oid gs) == Just owner]
+   in (taken S.bob, taken S.carol)
 
 epicSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 epicSpec s registry = Spec.describe s "Epic" $ do
@@ -6207,6 +6242,36 @@ epicSpec s registry = Spec.describe s "Epic" $ do
         resolved = S.runPure S.identityAnswer gs (S.cast S.alice swarmId >> Stack.resolveTop)
     Spec.assertBool s (not (S.castable S.alice fogId resolved)) "alice can't cast the Fog once the Endless Swarm has resolved"
     Spec.assertBool s (S.castable S.alice fogId gs) "though the ninth Forest pays for it on the same board before it did"
+  -- Rule 702.50a's last sentence over CR 707.10's copied target, on Eternal
+  -- Dominion: the upkeep copy searches the library of the opponent the spell
+  -- targeted unless alice re-chooses. The pair differs only in the upkeep's
+  -- answer; a copy carrying no target searches nobody's library.
+  Spec.it s "CR 702.50a / 707.10 the epic copy keeps the spell's target" $ do
+    (gs, dominionId) <- dominionBoard
+    let upkept = dominionUpkeep (dominating S.bob) (dominionCast gs dominionId)
+    Spec.assertEqWith s "alice took a second card of bob's and none of carol's" (dominionHaul upkept) (2, 0)
+  Spec.it s "CR 702.50a / 707.10c the epic copy may choose a new target" $ do
+    (gs, dominionId) <- dominionBoard
+    let upkept = dominionUpkeep (dominating S.carol) (dominionCast gs dominionId)
+    Spec.assertEqWith s "alice took carol's card at the upkeep" (dominionHaul upkept) (1, 1)
+  -- Undying Flames' own sentence, a second targeted epic printing: two Forests
+  -- over a Hill Giant, so the exile runs three deep and only the Giant's mana
+  -- value of 4 is dealt.
+  Spec.it s "Undying Flames deals damage equal to the mana value of the nonland card it exiled" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    giant <- S.printingOf s registry "Hill Giant"
+    flames <- S.printingOf s registry "Undying Flames"
+    let stacked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) (S.landsInPlay mountain 6) [giant, forest, forest]
+        (flamesId, ready) = S.addHandCard flames S.alice stacked
+        resolved = S.runPure (dominating S.bob) (aliceOnTurn ready) (S.cast S.alice flamesId >> Stack.resolveTop)
+    Spec.assertEqWith s "bob took the Giant's 4" (S.lifeOf S.bob resolved) (Just 16)
+  where
+    dominionBoard = do
+      island <- S.printingOf s registry "Island"
+      forest <- S.printingOf s registry "Forest"
+      dominion <- S.printingOf s registry "Eternal Dominion"
+      pure (eternalDominionBoard island forest dominion)
 
 -- CR 702.192's whole keyword, on Decorum Dissertation {3}{B}{B} Sorcery -- Lesson,
 -- "Target player draws two cards and loses 2 life. / Paradigm" (Oracle text

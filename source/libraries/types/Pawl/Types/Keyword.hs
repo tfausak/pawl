@@ -252,11 +252,8 @@ data Keyword
     -- except for its epic ability at the beginning of each of your upkeeps for
     -- the rest of the game (CR 707.10). Pawl.Engine.Resolve.applyEpic performs
     -- both as the spell finishes resolving, rule 702.50a calling them SPELL
-    -- abilities.
-    --
-    -- Not implemented: CR 707.10's copied decisions -- the targets, the modes and
-    -- the value of X -- which the archived spell carries none of, so an epic card
-    -- that announces one cannot be transcribed (Eternal Dominion, #3708).
+    -- abilities. Pawl.CastSpec's Eternal Dominion cases prove the copy keeps,
+    -- or re-chooses, the spell's target (CR 707.10, 707.10c).
     Epic
   | -- | 702.192a: a free cast of a copy each precombat main phase after the
     -- first resolution of this name, and "exile this spell"

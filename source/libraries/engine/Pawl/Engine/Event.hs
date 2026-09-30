@@ -597,8 +597,8 @@ enterTapped oid =
 -- exactly what a second record would break.
 --
 -- What does NOT come through here is a permanent entering the battlefield tapped
--- (`enterTapped` above, and Pawl.Engine.Resolve.Effect.putTapped) -- CR 603.2e's other
--- sentence, and the reason those two stay direct writes.
+-- (`enterTapped` above, and Pawl.Engine.Resolve.Effect.putOntoBattlefield) -- CR 603.2e's other
+-- sentence, and the reason neither comes through here.
 --
 -- CR 110.5 makes tapped a PERMANENT's status, which every caller above already
 -- has: a cost's tap candidates, an attacker, a regenerating permanent and the
