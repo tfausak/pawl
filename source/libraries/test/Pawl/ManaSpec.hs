@@ -2373,7 +2373,7 @@ workhorseBoard horse counters =
 -- {T} on the Druid for CR 107.5 to bar a second activation, so nine untapped
 -- Elves are three activations and nine mana. `uncountedCeiling` capped the
 -- component at 1, so nine Elves supplied three mana and a cast two further
--- activations could have paid for was never offered (#2173).
+-- activations could have paid for was never offered; see #2173.
 --
 -- Glistener Elf is the fuel throughout and makes no mana, so every mana on these
 -- boards comes through the Druid and no count below can be met any other way.
@@ -2475,6 +2475,99 @@ dynamoConduitBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -
 dynamoConduitBoard s registry conduits energy = do
   conduit <- S.printingOf s registry "Synthetic Dynamo Conduit"
   pure (S.addPlayerCounter PlayerCounterKind.Energy energy S.alice (alicePermanents (replicate conduits conduit)))
+
+-- CR 118.3's "fully" over CR 701.68a's blight, which spends nothing that runs
+-- out: the creature blighted stays on the battlefield through CR 601.2g's mana
+-- window, since CR 704.3 checks no state-based action there, and is blighted
+-- again. Synthetic Withering Font ({2} Artifact, "Blight 1, Pay 1 life: Add
+-- {C}.") is the pool's first mana ability whose cost blights and that nothing
+-- caps at one activation: MTGJSON 2026-08-23 and Scryfall
+-- `o:/blight [0-9X][^.]*: add/ include:extras`, 2026-09-30, no printing. The
+-- life is the bound, so the boards differ in life alone.
+--
+-- The gameplay-level proof (design.md section 4). Crucible of Worlds is {3},
+-- all generic, and targets nothing, so the cast turns on the Font being
+-- activated three times, blighting the one Goblin Piker (2/1) each time.
+witheringFontSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+witheringFontSpec s registry =
+  Spec.describe s "Synthetic Withering Font"
+    . Spec.it s "CR 605.3a Crucible of Worlds is cast off three blights of one creature"
+    $ do
+      crucible <- S.printingOf s registry "Crucible of Worlds"
+      (pikerId, board) <- witheringFontBoard s registry
+      let resolved = castFrom S.identityAnswer (atLife 4 board) crucible
+          short = castFrom S.identityAnswer (atLife 2 board) crucible
+          countOf = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Crucible of Worlds")) S.alice
+      Spec.assertEqWith s "the Crucible resolved" (countOf resolved) 1
+      Spec.assertEqWith s "with two life there is no {3} and the cast fails" (countOf short) 0
+      Spec.assertEqWith s "CR 701.68a the one Piker was blighted three times" (S.counterOf CounterKind.MinusOneMinusOne pikerId resolved) 3
+      Spec.assertEqWith s "and CR 119.4 three life paid for it" (S.lifeOf S.alice resolved) (Just 1)
+
+-- Alice's Synthetic Withering Font and one Goblin Piker, whose id is answered.
+witheringFontBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+witheringFontBoard s registry = do
+  font <- S.printingOf s registry "Synthetic Withering Font"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (pikerId, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+  pure (pikerId, snd (S.addPermanent font S.alice withPiker))
+
+-- A cost tapping creatures for a TOTAL POWER, a threshold on an aggregate rather
+-- than a count. Synthetic Muster Dynamo ({2} Artifact, "Tap any number of
+-- untapped creatures you control with total power 3 or greater: Add {C}.") is
+-- the pool's first such mana ability that nothing caps at one activation:
+-- MTGJSON 2026-08-23 and Scryfall `o:/total power [0-9] or (greater|more): add/
+-- include:extras`, 2026-09-30, no printing. Glistener Elf (1/1) and Goblin
+-- Piker (2/1) are the fuel and make no mana.
+musterDynamoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+musterDynamoSpec s registry = Spec.describe s "Synthetic Muster Dynamo" $ do
+  -- Two Pikers and four Elves total 8, and 2 + 1 is the fewest reaching 3. So
+  -- two activations, not the three a division of the six by that fewest counts:
+  -- the third would need two Elves, and 1 + 1 is short.
+  Spec.it s "CR 118.3 two Pikers and four Elves are two activations" $ do
+    board <- musterDynamoBoard s registry [("Goblin Piker", 2), ("Glistener Elf", 4)]
+    let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 2) "two activations pay {2}"
+    Spec.assertBool s (not (pays 3)) "and the Elves left over total 2, so not {3}"
+
+  -- The JOINT count (Mana.payableResolutionsGiven): one activation taps all
+  -- three Elves, so the Drum's own Elf is one too many.
+  Spec.it s "CR 118.3 a Springleaf Drum cannot tap an Elf the Dynamo needs" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    board <- musterDynamoBoard s registry [("Glistener Elf", 3)]
+    let withDrum = snd (S.addPermanent drum S.alice board)
+        pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) withDrum
+    Spec.assertBool s (pays 1) "either source pays {1}"
+    Spec.assertBool s (not (pays 2)) "and three Elves are not four, so not {2}"
+
+  -- The gameplay-level proof (design.md section 4). Sapphire Medallion is {2},
+  -- all generic, and targets nothing, so the cast turns on the Dynamo being
+  -- activated twice. The boards differ in one Elf.
+  Spec.it s "CR 605.3a Sapphire Medallion is cast off two activations of one Dynamo" $ do
+    medallion <- S.printingOf s registry "Sapphire Medallion"
+    six <- musterDynamoBoard s registry [("Glistener Elf", 6)]
+    five <- musterDynamoBoard s registry [("Glistener Elf", 5)]
+    let resolved = castFrom tapFirstElves six medallion
+        short = castFrom tapFirstElves five medallion
+        countOf = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Sapphire Medallion")) S.alice
+    Spec.assertEqWith s "the Medallion resolved" (countOf resolved) 1
+    Spec.assertEqWith s "with five Elves there is no second activation and the cast fails" (countOf short) 0
+    Spec.assertEqWith s "CR 601.2h all six Elves paid for it" (S.tappedCount S.alice resolved) 6
+    Spec.assertEqWith s "and CR 601.2h left the short board's Elves untapped" (S.tappedCount S.alice short) 0
+
+-- The first `threshold` Elves offered, each of power 1, where the default answer
+-- taps every candidate and would spend all six on one activation. Test-local:
+-- the harness has no vocabulary for ChooseTapsForTotalPower.
+tapFirstElves :: Prompt.Prompt r -> r
+tapFirstElves p = case p of
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates threshold -> Set.fromList (List.genericTake threshold candidates)
+  _ -> S.identityAnswer p
+
+-- Alice's Synthetic Muster Dynamo and, for each name, that many of the card.
+musterDynamoBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [(String, Int)] -> m GameState.GameState
+musterDynamoBoard s registry fuel = do
+  dynamo <- S.printingOf s registry "Synthetic Muster Dynamo"
+  creatures <- traverse (\(name, n) -> fmap (replicate n) (S.printingOf s registry name)) fuel
+  pure (alicePermanents (dynamo : concat creatures))
 
 -- The half #1128 gave up: WHICH mana each of a repeatable source's activations
 -- makes. Phyrexian Altar ({3} Artifact, "Sacrifice a creature: Add one mana of
@@ -4034,6 +4127,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   workhorseSpec s registry
   heritageDruidSpec s registry
   dynamoConduitSpec s registry
+  witheringFontSpec s registry
+  musterDynamoSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
   pluralBoardSpec s registry
