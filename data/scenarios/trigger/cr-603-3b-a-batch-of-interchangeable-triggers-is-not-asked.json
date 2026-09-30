@@ -1,0 +1,30 @@
+{
+  "description": "CR 603.3b a batch of interchangeable triggers is not asked about (Soul Warden)",
+  "note": "Dragon Fodder's one Create of two tokens is one event (CR 603.6a), so Soul Warden contributes two equal entries under one controller. Its payload reads no slot, so both orders gain the same 2 life and there is nothing to decide: an OrderTriggers prompt would fail the run. The life total is what stops the silence passing because the triggers never fired.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Soul Warden", "ready": true }
+        ],
+        "hand": [{ "card": "Dragon Fodder", "label": "dragon-fodder" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@dragon-fodder", "mana": ["@mountain", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2"] } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 22 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 2 } }
+  ]
+}

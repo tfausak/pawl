@@ -1,0 +1,28 @@
+{
+  "description": "CR 614.12 a text lot is judged as a token, so IsToken matches it",
+  "note": "The proving test for the text-lot half of the token-lot match. CR 111.1: the Goblins Dragon Fodder would create are tokens, so Synthetic Replica Foundry's IsToken (CR 111.6) matches them and appends its Servo. A view built from the printed face alone answers token = False and reads no Servo.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Synthetic Replica Foundry", "ready": true }
+        ],
+        "hand": [{ "card": "Dragon Fodder", "label": "fodder" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fodder", "mana": ["@mountain-1", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2", "Servo Token"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Servo Token", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 2 } } }
+  ]
+}

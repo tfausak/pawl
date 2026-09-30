@@ -1,0 +1,33 @@
+{
+  "description": "CR 712.13a/702.145b and the transformed permanent's own trigger is the one that resolves",
+  "note": "Night is reached by play rather than placed: Tovolar makes it day (CR 702.145d) on bob's turn, bob casts nothing, and alice's untap step turns it to night (CR 502.2). Infestation Expert then enters transformed, and the trigger that resolves is the one it entered with: the back face's two Insects, not the front face's one, which the later CR 702.145c sweep would give if the scan read the board at settle.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Tovolar, Dire Overlord", "label": "tovolar", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true }
+        ],
+        "hand": [{ "card": "Infestation Expert", "label": "expert" }],
+        "library": [{ "card": "Forest" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@expert", "mana": ["Forest", "Forest#2", "Forest#3", "Forest#4", "Forest#5"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Insect Token", "Insect Token#2"] } },
+    { "turn": 2, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Insect Token", "count": 2 } } }
+  ]
+}

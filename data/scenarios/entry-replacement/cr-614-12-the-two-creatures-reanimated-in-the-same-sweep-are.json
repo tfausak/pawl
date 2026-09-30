@@ -1,0 +1,45 @@
+{
+  "description": "CR 614.12 the two creatures reanimated in the same sweep are not on the battlefield yet, so its own count is zero",
+  "note": "Rise of the Dark Realms reanimates Squad Captain beside Jedit Ojanen and a Goblin Piker, both buried before it, as one CR 608.2f sweep. Its \"for each other creature you control\" rewrite runs while none of the three has entered, so the count is zero and the printed 2/2 stays a 2/2. The nine Swamps are not creatures.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true }
+        ],
+        "hand": [{ "card": "Rise of the Dark Realms", "label": "rise" }],
+        "graveyard": [
+          { "card": "Jedit Ojanen" },
+          { "card": "Goblin Piker" },
+          { "card": "Squad Captain" }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@rise", "mana": ["Swamp", "Swamp#2", "Swamp#3", "Swamp#4", "Swamp#5", "Swamp#6", "Swamp#7", "Swamp#8", "Swamp#9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Jedit Ojanen", "Goblin Piker", "Squad Captain"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Squad Captain", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Squad Captain", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Jedit Ojanen", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

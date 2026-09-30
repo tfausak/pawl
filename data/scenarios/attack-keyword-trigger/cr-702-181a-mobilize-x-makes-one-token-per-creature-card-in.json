@@ -1,0 +1,33 @@
+{
+  "description": "CR 702.181a mobilize X makes one token per creature card in its controller's graveyard",
+  "note": "Avenger of the Fallen's mobilize X counts the creature cards in alice's graveyard: three of them, beside a Lightning Bolt (every card would be four) and bob's Goblin Piker (every graveyard's creature cards would be four too), while the Avenger's own power is two. So three tokens, each entering tapped and attacking bob, the player the Avenger attacks.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Avenger of the Fallen", "label": "avenger", "ready": true }],
+        "graveyard": [
+          { "card": "Goblin Piker" },
+          { "card": "Doomed Traveler" },
+          { "card": "Doomed Traveler" },
+          { "card": "Lightning Bolt" }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Goblin Piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@avenger"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2", "Warrior Token#3"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 3 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@avenger": "@bob", "Warrior Token": "@bob", "Warrior Token#2": "@bob", "Warrior Token#3": "@bob" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Warrior Token", "tapped": true } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Warrior Token#2", "tapped": true } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Warrior Token#3", "tapped": true } } }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "description": "CR 508.3a a block is not an attack, so a blocking Hanweir Garrison makes no tokens",
+  "note": "A creature that blocks did not attack: bob's Hanweir Garrison blocks alice's Goblin Piker and makes no Human tokens. A SelfAttacks trigger that matched the blocking declaration would make two. The -control file is the same card attacking, so the zero is a fact about blocking rather than the fixture.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "goblin-piker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hanweir Garrison", "label": "hanweir-garrison", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@hanweir-garrison": ["@goblin-piker"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Human Token", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Human Token", "count": 0 } } }
+  ]
+}

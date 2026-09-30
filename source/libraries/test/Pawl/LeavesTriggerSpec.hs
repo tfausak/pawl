@@ -2608,7 +2608,6 @@ amuletSpec s registry =
       aimedPaying r who p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== r) candidates) sets
         _ -> paysFor who p
-      goblinTokens gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Goblin Token"))) (Set.toList (GameState.battlefield gs))
       board = do
         mountain <- S.printingOf s registry "Mountain"
         swamp <- S.printingOf s registry "Swamp"
@@ -2718,15 +2717,6 @@ amuletSpec s registry =
           Spec.assertEqWith s "and alice is untouched" (S.lifeOf S.alice after) (Just 20)
           Spec.assertEqWith s "and nobody was offered the {1}" (payResponses transcript) []
           Spec.assertEqWith s "only the Bolt was on the stack" (length (GameState.stack onStack)) 1
-        -- The card's second line, CR 111.6 read through CR 613.1g's layer 7:
-        -- Dragon Fodder's two 1/1 Goblin TOKENS against a nontoken Goblin Piker
-        -- standing on the same board. CR 704.5f does not reach the tokens -- a
-        -- 0/1 is alive -- so this stays a power/toughness reading.
-        Spec.it s "CR 111.6 creature TOKENS get -1/-0 and nontoken creatures do not" $ do
-          (_, pikerId, _, _, fodderId, _, gs) <- board
-          let resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.bob fodderId)) Stack.resolveTop
-          Spec.assertEqWith s "CR 613.1g the two Goblin tokens are 0/1" (fmap (\oid -> S.powerToughnessOf oid resolved) (goblinTokens resolved)) [Just (0, 1), Just (0, 1)]
-          Spec.assertEqWith s "and the nontoken Piker is untouched" (S.powerToughnessOf pikerId resolved) (Just (2, 1))
 
 -- The CR 603.5 "may" answers in a transcript, in order -- paysFor's
 -- payResponses one Response constructor over. A transcript with no

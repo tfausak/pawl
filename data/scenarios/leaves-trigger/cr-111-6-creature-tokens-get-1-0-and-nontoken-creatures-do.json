@@ -1,0 +1,57 @@
+{
+  "description": "CR 111.6 creature TOKENS get -1/-0 and nontoken creatures do not",
+  "note": "Amulet of Safekeeping's second line, read through CR 613.1g's layer 7: Dragon Fodder's two 1/1 Goblin tokens against a nontoken Goblin Piker on the same board, which is what makes the token filter load-bearing. CR 704.5f does not reach the tokens, since a 0/1 is alive, so this stays a power/toughness reading. Three seats and the unused hand cards are the Amulet group's shared board.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "ready": true },
+          { "card": "Amulet of Safekeeping", "ready": true }
+        ],
+        "hand": [{ "card": "Lightning Bolt" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Mountain", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt" },
+          { "card": "Ravenous Rats" },
+          { "card": "Dragon Fodder", "label": "fodder" }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@fodder", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Token", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "PowerToughness": { "object": "Goblin Token", "power": 0, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "PowerToughness": { "object": "Goblin Token#2", "power": 0, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } }
+  ]
+}
