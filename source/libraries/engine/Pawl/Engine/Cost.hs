@@ -2069,7 +2069,7 @@ statesHiddenQuality cost = any componentStatesHiddenQuality (Cost.components cos
 
 componentStatesHiddenQuality :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 componentStatesHiddenQuality component = case component of
-  -- One of the five True-capable arms: CR 701.9a discards from the HAND, CR
+  -- One of the six True-capable arms: CR 701.9a discards from the HAND, CR
   -- 400.2's hidden zone, and the criterion is the rule's stated quality --
   -- Magmatic Insight's "discard a land card" states one, Cathartic Reunion's
   -- "discard two cards" does not.
@@ -2088,10 +2088,11 @@ componentStatesHiddenQuality component = case component of
   -- land card". The DESTINATION is not what rule 118.8c asks about; the zone the
   -- cards are described IN is, and that is the hand.
   CostComponent.PutCardFromHandOntoBattlefield criterion -> Filter.statesAQuality criterion
-  -- The fifth, and the only one whose action reaches a PUBLIC zone as well: CR
-  -- 701.4a's hand half is RevealCardFromHand's action exactly, and rule 118.8c
-  -- asks whether the cost INCLUDES such an action rather than whether it forces
-  -- one, so the battlefield half it offers instead does not take this arm out.
+  -- The fifth, and with the sixth below the only ones whose action reaches a
+  -- PUBLIC zone as well: CR 701.4a's hand half is RevealCardFromHand's action
+  -- exactly, and rule 118.8c asks whether the cost INCLUDES such an action rather
+  -- than whether it forces one, so the battlefield half it offers instead does
+  -- not take this arm out.
   CostComponent.Behold criterion -> Filter.statesAQuality criterion
   -- The sixth, Behold's arm above: the exile after the behold changes nothing
   -- about which cards the cost is described by.

@@ -258,8 +258,8 @@ data Prompt r where
   ChooseBlight :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 701.4a: which object CostComponent.Behold or BeholdAndExile beholds --
   -- a card in the payer's hand or a permanent they control, in one pool, the
-  -- ObjectId being the object the cost is on. Not raised for one candidate, where the two zones
-  -- between them offer a single answer.
+  -- ObjectId being the object the cost is on. Not raised for one candidate,
+  -- where the two zones between them offer a single answer.
   ChooseBehold :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 701.38a: which of the listed choices this player votes for; the seats
   -- are asked one at a time, starting with the one the effect specifies and
