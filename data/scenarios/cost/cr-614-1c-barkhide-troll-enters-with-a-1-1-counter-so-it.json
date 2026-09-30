@@ -1,0 +1,28 @@
+{
+  "description": "CR 614.1c Barkhide Troll enters with a +1/+1 counter, so it arrives a 3/3",
+  "note": "The card's other printed line, which the activation cases set by hand: cast, Barkhide Troll arrives already carrying its +1/+1 counter, a 3/3 rather than the printed 2/2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true }
+        ],
+        "hand": [{ "card": "Barkhide Troll", "label": "barkhide-troll" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@barkhide-troll", "mana": ["@forest", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Barkhide Troll", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Barkhide Troll", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Barkhide Troll", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}

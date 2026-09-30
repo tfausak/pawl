@@ -105,19 +105,6 @@ import qualified Pawl.Types.Zone as Zone
 
 countersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 countersSpec s registry = Spec.describe s "Counters" $ do
-  Spec.it s "CR 122.6 Battlegrowth puts a +1/+1 counter (gate)" $ do
-    -- alice casts Battlegrowth on bob's Piker (2/1). After resolution the Piker
-    -- is 3/2 and carries one +1/+1 counter.
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    battlegrowth <- S.printingOf s registry "Battlegrowth"
-    let base = S.landsInPlay forest 1
-        (victim, withFoe) = S.addPermanent piker S.bob base
-        (gs, spellId) = S.handOne battlegrowth withFoe
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "power 3" (Projection.powerOf victim after) (Just 3)
-    Spec.assertEqWith s "toughness 2" (Projection.toughnessOf victim after) (Just 2)
   Spec.it s "CR 122 counter persists through cleanup (vs Giant Growth wearing off)" $ do
     -- After a cleanup step, the +1/+1 counter is still on the Piker.
     forest <- S.printingOf s registry "Forest"

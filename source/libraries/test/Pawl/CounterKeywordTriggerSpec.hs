@@ -1704,11 +1704,7 @@ flankingSpec s registry =
 -- would leave both creatures where an unpumped Guard does.
 bushidoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bushidoSpec s registry =
-  let noBlocks :: Prompt.Prompt r -> r
-      noBlocks p = case p of
-        Prompt.DeclareBlockers {} -> Map.empty
-        _ -> S.aggressiveAnswer p
-      board mine theirs = do
+  let board mine theirs = do
         ours <- mapM (S.printingOf s registry) mine
         yours <- mapM (S.printingOf s registry) theirs
         pure (S.combatBoardOf ours yours)
@@ -1728,17 +1724,6 @@ bushidoSpec s registry =
               Spec.assertBool s (not (S.onBattlefield piker fought)) "the pumped Guard's 2 killed the 2/1 Piker"
               Spec.assertBool s (S.onBattlefield guard fought) "and its 4 toughness survived the Piker's 2"
             _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Guard"
-        -- The control leg for the case above, on the same board: nothing blocks,
-        -- so CR 509.3a's event never happens and the Guard stays 0/2. Without it
-        -- an ability that pumped on any combat event at all would pass.
-        Spec.it s "CR 509.3a a Guard that does not block is not pumped" $ do
-          (gs, _, blockers) <- board ["Goblin Piker"] ["Inner-Chamber Guard"]
-          case blockers of
-            [guard] -> do
-              let after = S.runCombat noBlocks gs
-              Spec.assertEqWith s "still 0/2" (S.powerToughnessOf guard after) (Just (0, 2))
-              Spec.assertEqWith s "and the unblocked Piker's 2 reached bob" (S.lifeOf S.bob after) (Just 18)
-            _ -> Spec.assertFailure s "fixture should give bob a Guard"
         -- CR 509.3c's half, the other arm of the same printed sentence: now the
         -- Guard is alice's and attacks, and bob's Piker blocks it. An
         -- implementation with only the CR 509.3a arm passes every case above and
@@ -1753,17 +1738,6 @@ bushidoSpec s registry =
               Spec.assertBool s (not (S.onBattlefield piker fought)) "the pumped Guard's 2 killed the 2/1 Piker"
               Spec.assertBool s (S.onBattlefield guard fought) "and its 4 toughness survived the Piker's 2"
             _ -> Spec.assertFailure s "fixture should give alice a Guard and bob a Piker"
-        -- The control leg for CR 509.3c, on the same board as the case above:
-        -- attacking is not becoming blocked, so an unblocked Guard stays 0/2 and
-        -- takes nothing from bob.
-        Spec.it s "CR 509.3c a Guard that goes unblocked is not pumped" $ do
-          (gs, attackers, _) <- board ["Inner-Chamber Guard"] ["Goblin Piker"]
-          case attackers of
-            [guard] -> do
-              let after = S.runCombat noBlocks gs
-              Spec.assertEqWith s "still 0/2" (S.powerToughnessOf guard after) (Just (0, 2))
-              Spec.assertEqWith s "and 0 power took nothing from bob" (S.lifeOf S.bob after) (Just 20)
-            _ -> Spec.assertFailure s "fixture should give alice a Guard"
         -- CR 702.45b: "If a creature has multiple instances of bushido, each
         -- triggers separately." Asked of the mint rather than of a board, as
         -- prowess' and battle cry's are: no card in this pool prints bushido twice

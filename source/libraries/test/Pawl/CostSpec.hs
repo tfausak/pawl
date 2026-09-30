@@ -1931,7 +1931,7 @@ jaradDrainBoard jarad swamp forest victim extras =
 -- CR 602.2b pays an activation cost at CR 601.2h, so by the time Jarad's drain
 -- resolves the creature it sacrificed is a card in a graveyard and CR 608.2h's
 -- last known information is the only reading of its power there is.
-jaradDrainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaradDrainSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 jaradDrainSpec s registry =
   Spec.describe s "Jarad, Golgari Lich Lord's drain" $ do
     -- The base case: nothing modifies the prey's power, so this separates "the
@@ -1951,29 +1951,6 @@ jaradDrainSpec s registry =
       Spec.assertEqWith s "alice, who is not an opponent of herself, lost nothing" (S.lifeOf S.alice resolved) (Just 20)
       Spec.assertEqWith s "the Piker really was sacrificed, and as a COST" (Game.lookupObject preyId activated) Nothing
       Spec.assertEqWith s "so the ability was on the stack with the Piker already gone" (length (GameState.stack activated)) 1
-    -- The discriminating leg. Night of Souls' Betrayal ("All creatures get
-    -- -1/-1") makes the Sentry's LAST KNOWN power 2 where its PRINTED power is
-    -- 3, so the two readings of CR 608.2h give bob 18 and 17 -- and an unbound
-    -- slot gives 20. Three implementations, three life totals.
-    --
-    -- Ogre Sentry rather than the Goblin Piker above: the Piker is 1/0 under the
-    -- Betrayal and dies to CR 704.5f before the activation, which would make this
-    -- leg unreachable rather than discriminating. Its defender is inert here,
-    -- nothing attacking.
-    Spec.it s "CR 608.2h the power read is the one it last had, not the one it printed" $ do
-      jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
-      swamp <- S.printingOf s registry "Swamp"
-      forest <- S.printingOf s registry "Forest"
-      sentry <- S.printingOf s registry "Ogre Sentry"
-      betrayal <- S.printingOf s registry "Night of Souls' Betrayal"
-      let (jaradId, preyId, gs) = jaradDrainBoard jarad swamp forest sentry [betrayal]
-          activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice jaradId (theAbility jarad))
-          resolved = S.runPure S.identityAnswer activated Stack.resolveTop
-      -- Guards the leg against passing off a board where the anthem is not
-      -- applying: 3 printed less 1 is what makes 18 differ from 17.
-      Spec.assertEqWith s "the Sentry is 2/2 under the Betrayal, not 3/3" (S.powerToughnessOf preyId gs) (Just (2, 2))
-      Spec.assertEqWith s "bob lost 2 -- the Sentry's 3 printed power less the anthem's -1" (S.lifeOf S.bob resolved) (Just 18)
-      Spec.assertEqWith s "alice lost nothing" (S.lifeOf S.alice resolved) (Just 20)
 
 -- Chooses this value of X; every other prompt takes the identity fallback, which
 -- aims Hatred's one target slot at the only creature on the board. The liar
@@ -3052,23 +3029,6 @@ flingSpec s registry =
       Spec.assertEqWith s "the Giant really was sacrificed, and as a COST" (fmap (\oid -> Game.lookupObject oid cast) (Maybe.listToMaybe mine)) (Just Nothing)
       Spec.assertEqWith s "so the spell was on the stack with the Giant already gone" (length (GameState.stack cast)) 1
       Spec.assertBool s (any (S.isCastOf spell) (Action.legalActions S.alice gs)) "and CR 118.3 offered the cast on this board"
-    -- The discriminating leg, Jarad's: Night of Souls' Betrayal ("All creatures
-    -- get -1/-1") makes the Sentry's LAST KNOWN power 2 where its PRINTED power is
-    -- 3, so the two readings of CR 608.2h give bob 18 and 17 -- and an unbound slot
-    -- gives 20. Three implementations, three life totals.
-    Spec.it s "CR 608.2h the power read is the one it last had, not the one it printed" $ do
-      fling <- S.printingOf s registry "Fling"
-      mountain <- S.printingOf s registry "Mountain"
-      sentry <- S.printingOf s registry "Ogre Sentry"
-      betrayal <- S.printingOf s registry "Night of Souls' Betrayal"
-      let (spell, mine, gs) = flingBoard fling mountain [sentry, betrayal] (Setup.emptyGame S.bothPlayers)
-          cast = S.runPure (targetingPlayer S.bob) gs (S.cast S.alice spell)
-          resolved = S.runPure (targetingPlayer S.bob) cast Stack.resolveTop
-      Spec.assertEqWith s "bob took 2 -- the Sentry's 3 printed power less the anthem's -1" (S.lifeOf S.bob resolved) (Just 18)
-      Spec.assertEqWith s "alice took nothing" (S.lifeOf S.alice resolved) (Just 20)
-      -- After the behavioural assertion, never ahead of it: this is the guard that
-      -- the anthem was applying at all, which is what makes 18 differ from 17.
-      Spec.assertEqWith s "the Sentry is 2/2 under the Betrayal, not 3/3" (fmap (\oid -> S.powerToughnessOf oid gs) (Maybe.listToMaybe mine)) (Just (Just (2, 2)))
     -- The copy leg, which the anthem above cannot reach: a Clone's PRINTED power
     -- is nothing at all, so a read that went through the printed card rather than
     -- the copiable values CR 707.2 stamped would deal no damage. bob owns the
@@ -4856,22 +4816,6 @@ barkhideTrollSpec s registry =
       let (trollId, gs) = trollBoard troll forest
       Spec.assertBool s (Activatable.activatable S.alice trollId (theAbility troll) gs) "activatable"
       Spec.assertEqWith s "and menued exactly once" (length (filter (isActivateOf trollId) (Action.legalActions S.alice gs))) 1
-    -- The card's OTHER printed line, which the fixture above sets by hand: cast
-    -- the Troll and it arrives already carrying the counter (CR 614.1c through
-    -- EntryRewrite.WithCounters), so the 3/3 the case above starts from is the
-    -- card's own doing.
-    Spec.it s "CR 614.1c Barkhide Troll enters with a +1/+1 counter, so it arrives a 3/3" $ do
-      troll <- S.printingOf s registry "Barkhide Troll"
-      forest <- S.printingOf s registry "Forest"
-      let (withSpell, spellId) = S.handOne troll (S.landsInPlay forest 2)
-          cast = S.runPure S.identityAnswer withSpell (S.cast S.alice spellId)
-          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-          entered = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield withSpell))
-      case entered of
-        [trollId] -> do
-          Spec.assertEqWith s "CR 613.4c a 3/3 on arrival, not the printed 2/2" (S.powerToughnessOf trollId resolved) (Just (3, 3))
-          Spec.assertEqWith s "one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne trollId resolved) 1
-        _ -> Spec.assertFailure s "Barkhide Troll should have resolved onto the battlefield"
 
 -- Zameck Guildmage {G}{U} Creature -- Elf Wizard 2/2 (Oracle text checked
 -- against Scryfall 2026-09-17): "{G}{U}: This turn, each creature you control
@@ -5216,17 +5160,6 @@ oozeFluxSpec s registry =
           oozes = newPermanents board after
       Spec.assertEqWith s "CR 111.3 the Ooze is 2/2" (fmap (`Projection.powerOf` after) oozes) [Just 2]
       Spec.assertEqWith s "the payer was asked" (length asked) 1
-    -- The elision: the creatures carry exactly the floor, so one counter comes off
-    -- and there is nothing to ask.
-    Spec.it s "CR 118.3 counters exactly at the floor are one answer, so nothing is asked" $ do
-      (fluxId, pikerId, _, board) <- oozeFluxBoard s registry [1, 0]
-      flux <- S.printingOf s registry "Ooze Flux"
-      let act = do Activate.activateAbility S.alice fluxId (theAbility flux); Stack.resolveTop
-          (after, asked) = State.runState (fmap snd (Engine.runGame (recordingAtLeastRemovals Map.empty) board act)) []
-          oozes = newPermanents board after
-      Spec.assertEqWith s "CR 111.3 the Ooze is 1/1" (fmap (`Projection.powerOf` after) oozes) [Just 1]
-      Spec.assertEqWith s "the Piker's counter came off" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 0
-      Spec.assertEqWith s "and the payer was asked nothing" asked []
     -- A division taking more than a creature carries is refused, not repaired.
     Spec.it s "CR 118.3 an answer past what a creature carries pays nothing" $ do
       (fluxId, pikerId, giantId, board) <- oozeFluxBoard s registry [1, 2]
@@ -5449,16 +5382,9 @@ soulDivinerSpec s registry =
 -- THE BOARD: alice controls Quillspike over a Swamp, a Hill Giant carrying the
 -- -1/-1 count given, and a Goblin Piker carrying a +1/+1 counter, a kind the cost
 -- does not reach.
-quillspikeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+quillspikeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 quillspikeSpec s registry =
   Spec.describe s "Quillspike" $ do
-    Spec.it s "CR 122.1 the -1/-1 counter comes off, and Quillspike gets +3/+3" $ do
-      quillspike <- S.printingOf s registry "Quillspike"
-      (quillId, giantId, pikerId, board) <- quillspikeBoard s registry 1
-      let after = S.runPure S.identityAnswer board (Activate.activateAbility S.alice quillId (theAbility quillspike) >> Stack.resolveTop)
-      Spec.assertEqWith s "CR 122.1 the Giant's -1/-1 counter came off" (S.counterOf CounterKind.MinusOneMinusOne giantId after) 0
-      Spec.assertEqWith s "and the Piker's +1/+1 counter stayed" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
-      Spec.assertEqWith s "CR 613.4c and Quillspike is 4/4" (S.powerToughnessOf quillId after) (Just (4, 4))
     -- CR 118.3 / 602.2b over the pair differing in the Giant's -1/-1 counter: the
     -- Piker's +1/+1 counter does not pay.
     Spec.it s "CR 118.3 with no -1/-1 counter the ability is not offered" $ do

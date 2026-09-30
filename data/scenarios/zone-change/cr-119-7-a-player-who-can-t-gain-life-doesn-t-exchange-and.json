@@ -1,0 +1,29 @@
+{
+  "description": "CR 119.7 a player who can't gain life doesn't exchange, and neither does the toughness",
+  "note": "The Tree of Redemption board with bob's Giant Cindermaw. alice can't gain life, so CR 701.12a leaves the whole exchange undone: she keeps 7 and the Tree stays 1/14, though it paid its {T}.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 7,
+        "battlefield": [{ "card": "Tree of Redemption", "label": "exchanger", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 1 }] }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Giant Cindermaw" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@exchanger" } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Life": { "player": "alice", "life": 7 } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@exchanger", "power": 1, "toughness": 14 } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@exchanger", "tapped": true } } }
+  ]
+}

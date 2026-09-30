@@ -1,0 +1,29 @@
+{
+  "description": "CR 701.12g Tree of Redemption exchanges its controller's life with its toughness",
+  "note": "A 0/13 Tree with a +1/+1 counter, alice at 7, on three seats. The life side reads the projected 14; the Tree's base toughness becomes 7 and the counter still applies in layer 7c, so it is 1/8 (the 2018-03-16 ruling).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 7,
+        "battlefield": [{ "card": "Tree of Redemption", "label": "exchanger", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 1 }] }]
+      },
+      {
+        "name": "bob",
+        "battlefield": []
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@exchanger" } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Life": { "player": "alice", "life": 14 } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@exchanger", "power": 1, "toughness": 8 } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@exchanger", "tapped": true } } }
+  ]
+}

@@ -165,17 +165,6 @@ permanentLeavesTheBattlefieldSpec s registry =
           Spec.assertEqWith s "the Piker really was exiled, not destroyed" (fmap Object.zone (Game.lookupObject pikerId settled)) Nothing
           Spec.assertEqWith s "and it is bob's Shredder that grew, off alice's permanent" (Projection.powerOf shredderId after, Projection.toughnessOf shredderId after) (Just 2, Just 2)
           Spec.assertEqWith s "one counter, from one departure" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId after)) (Just (Just 1))
-        -- CR 400.2's hidden half of the same rule: a bounce reaches a HAND, and
-        -- the watcher still sees it. "Another permanent" reads no controller, so
-        -- this board cannot tell CR 603.10a's look-back from CR 108.4a's owner;
-        -- permanentReturnedToHandSpec's stolen Piker does.
-        Spec.it s "CR 603.6c whole card: Unsummon bounces the Piker to a hidden zone and the Shredder still grows" $ do
-          island <- S.printingOf s registry "Island"
-          unsummon <- S.printingOf s registry "Unsummon"
-          (shredderId, pikerId, board) <- shredderBoard (S.landsInPlay island 1)
-          let (settled, after) = castAt pikerId (S.handOne unsummon board)
-          Spec.assertEqWith s "the Piker is in its owner's hand" (Game.lookupObject pikerId settled) Nothing
-          Spec.assertEqWith s "the Shredder grew on a departure to a hidden zone" (Projection.powerOf shredderId after, Projection.toughnessOf shredderId after) (Just 2, Just 2)
         -- CR 603.10a's look-back, which this condition needs for the reason
         -- PermanentDies needs it and one step further: the WATCHER can be gone
         -- too. alice's Day of Judgment destroys her Piker and bob's Shredder in

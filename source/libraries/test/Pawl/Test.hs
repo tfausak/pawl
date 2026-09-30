@@ -447,6 +447,7 @@ import qualified Pawl.Codec.PlotFromZoneSpec
 import qualified Pawl.Codec.PlusSpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
+import qualified Pawl.Codec.PowerToughnessIsSpec
 import qualified Pawl.Codec.PreventAllDamageSpec
 import qualified Pawl.Codec.PreventNextDamageSpec
 import qualified Pawl.Codec.PreventionRiderSpec
@@ -1217,6 +1218,7 @@ spec s registry = do
   Pawl.Codec.CountIsSpec.spec s
   Pawl.Codec.TypesAreSpec.spec s
   Pawl.Codec.MonarchIsSpec.spec s
+  Pawl.Codec.PowerToughnessIsSpec.spec s
   Pawl.Codec.DefendersAreSpec.spec s
   Pawl.Codec.CountersAreSpec.spec s
   Pawl.Codec.BlockersAreSpec.spec s

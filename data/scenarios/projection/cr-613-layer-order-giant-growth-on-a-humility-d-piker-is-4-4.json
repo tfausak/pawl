@@ -1,0 +1,27 @@
+{
+  "description": "CR 613 layer order: Giant Growth on a Humility'd Piker is 4/4",
+  "note": "Layer 7b's set to 1/1 from bob's Humility applies before 7c's +3/+3, so the Piker is 4/4.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest", "ready": true },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Giant Growth", "label": "giant-growth" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Humility" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@giant-growth", "targets": ["@piker"], "mana": ["@forest"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 4 } } }
+  ]
+}

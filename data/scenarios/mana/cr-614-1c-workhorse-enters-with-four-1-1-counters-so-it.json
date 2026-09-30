@@ -1,0 +1,32 @@
+{
+  "description": "CR 614.1c Workhorse enters with four +1/+1 counters, so it arrives a 4/4",
+  "note": "The card's other printed line, which the mana cases set by hand: cast, Workhorse arrives already carrying its four +1/+1 counters, a 4/4 rather than the printed 0/0.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Forest", "label": "forest-5", "ready": true },
+          { "card": "Forest", "label": "forest-6", "ready": true }
+        ],
+        "hand": [{ "card": "Workhorse", "label": "workhorse" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@workhorse", "mana": ["@forest", "@forest-2", "@forest-3", "@forest-4", "@forest-5", "@forest-6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Workhorse", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Workhorse", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Workhorse", "kind": { "type": "PlusOnePlusOne" }, "count": 4 } } }
+  ]
+}
