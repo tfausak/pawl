@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -269,15 +270,15 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.RevealCardFromHand (Filter.HasCardType CardType.Creature))
       " {\"type\":\"RevealCardFromHand\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
-  -- CR 701.4a over the hand and the battlefield at once: a bare criterion, one
-  -- object.
+  -- CR 701.4a over the hand and the battlefield at once: a count and a
+  -- criterion.
   Spec.it s "Behold" $
     Common.assertCodec
       s
       codec
-      (CostComponent.Behold (Filter.HasCardType CardType.Creature))
-      " {\"type\":\"Behold\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
-  -- CR 701.4a then CR 406.2: Behold's payload under its own tag.
+      (CostComponent.Behold (Behold.MkBehold {Behold.count = 1, Behold.whichObjects = Filter.HasCardType CardType.Creature}))
+      " {\"type\":\"Behold\",\"value\":{\"count\":1,\"whichObjects\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- CR 701.4a then CR 406.2: a bare criterion, one object.
   Spec.it s "BeholdAndExile" $
     Common.assertCodec
       s
