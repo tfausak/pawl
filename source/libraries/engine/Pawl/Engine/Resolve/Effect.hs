@@ -8282,7 +8282,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Monad.forM_ mNew $ \newId ->
                 State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
       _ -> pure ()
-  Effect.Counter (Counter.MkCounter ref mSlot mSources) -> do
+  Effect.Counter (Counter.MkCounter ref mSlot mSources mExiled) -> do
     gs <- State.get
     let named = objectRefObjects legal resolving controller source gs ref
         -- CR 113.7: each named ability's source, read BEFORE the funnel runs --
@@ -8297,11 +8297,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- The funnel is handed THIS effect's source and controller, which Baral,
     -- Chief of Compliance reads off the event: by the CR 117.5 trigger scan the
     -- controller can no longer be asked for exactly (see Pawl.Types.Countering).
-    countered <- Event.counterReturning source controller named
+    --
+    -- Delay's "exile it ... instead" sends a countered spell to exile rather
+    -- than to CR 701.6a's graveyard. A self-replacement effect (CR 614.15),
+    -- which CR 616.1a applies before any other, so it is folded into the
+    -- destination and the funnel offers the rest the exile move -- Delay's
+    -- ruling (2021-03-19) has it exile a spell cast with flashback, "not the
+    -- flashback effect".
+    moved <- Event.counterReturning (maybe Zone.Graveyard (const Zone.Exile) mExiled) source controller named
+    let countered = fmap fst moved
     -- CR 701.6a's "countered this way" is what the funnel COUNTERED, never what
     -- the sweep named. Bound onto this effect's SOURCE, and bound even at zero.
     Monad.forM_ mSlot $ \slot ->
       State.modify' (bindAmountSlot resolving source slot (Natural.length countered))
+    -- Delay's "exile it with three time counters on it": the cards the
+    -- countering put into exile, bound onto `resolving` as a GROUP, Destroy's
+    -- `buried` shape and for its reason. Read off the board after the funnel, so
+    -- a move a replacement sent elsewhere binds nothing; nothing is bound when
+    -- nothing qualifies.
+    Monad.forM_ mExiled $ \slot -> do
+      after <- State.get
+      let exiled = concatMap (filter (`Set.member` GameState.exile after) . Foldable.toList . snd) moved
+      Monad.unless (null exiled) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList exiled)))
     -- CR 113.7: the PERMANENTS whose abilities the funnel countered, for Green
     -- Slime's "if a permanent's ability is countered this way, destroy that
     -- permanent". The funnel's answer walked to its sources, never the sweep's;

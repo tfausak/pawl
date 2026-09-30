@@ -17,9 +17,11 @@ codec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec Counter.ref
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Counter.slot
   sources <- Fields.defaulted "sources" Nothing (Common.maybe SlotName.codec) Counter.sources
+  exileInstead <- Fields.defaulted "exileInstead" Nothing (Common.maybe SlotName.codec) Counter.exileInstead
   pure
     Counter.MkCounter
       { Counter.ref = ref,
         Counter.slot = slot,
-        Counter.sources = sources
+        Counter.sources = sources,
+        Counter.exileInstead = exileInstead
       }
