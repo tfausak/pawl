@@ -115,8 +115,9 @@ protectorOf oid gs = Object.protector =<< Game.lookupObject oid gs
 
 -- CR 608.2h for the same designation: who protected a battle that no longer
 -- exists. CR 508.5's second sentence is the one caller -- a creature goes on
--- attacking a battle CR 506.4 removed from combat, and "the protector of the
--- battle that creature was attacking" then has no live object to read
+-- attacking a battle CR 506.4 removed from combat, or one sacrificed while CR
+-- 508.1i's attack cost was paid, and "the protector of the battle that creature
+-- was attacking" then has no live object to read
 -- (Pawl.Engine.Defender.playerOf's battle arm).
 --
 -- Reads GameState.lastKnown alone, so it answers only where protectorOf cannot:

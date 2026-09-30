@@ -67,6 +67,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
@@ -125,6 +126,29 @@ lengBoard s registry decision = do
       cast = snd (Engine.runGamePure (lengAnswer decision) gs (S.cast S.alice spellId))
       after = snd (Engine.runGamePure (lengAnswer decision) cast Stack.resolveTop)
   pure (after, swamp, piker, miasma)
+
+-- Three seats: alice controls Pulmonic Sliver; carol owns a Lymph Sliver bob
+-- controls, over a library of one Goblin Piker each for bob and carol. The
+-- Lymph Sliver is destroyed; bob answers the redirect as given and any other
+-- seat asked answers the opposite. Returns the state and the two printings the
+-- assertions name.
+pulmonicBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> OptionalDecision.OptionalDecision -> m (GameState.GameState, Printing.Printing, Printing.Printing)
+pulmonicBoard s registry decision = do
+  pulmonic <- S.printingOf s registry "Pulmonic Sliver"
+  lymph <- S.printingOf s registry "Lymph Sliver"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (_, withPulmonic) = S.addPermanent pulmonic S.alice S.threePlayerGame
+      (lymphId, withLymph) = S.addPermanent lymph S.carol withPulmonic
+      stolen = S.giveControl lymphId S.bob withLymph
+      (_, g1) = S.addLibraryCard piker S.bob stolen
+      (_, g2) = S.addLibraryCard piker S.carol g1
+      opposite = if decision == OptionalDecision.Exercises then OptionalDecision.Declines else OptionalDecision.Exercises
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseRedirect _ pid _ _ -> if pid == S.bob then decision else opposite
+        _ -> S.identityAnswer p
+      after = S.runPure answer g2 (Event.destroy Regenerability.Regenerable [lymphId])
+  pure (after, lymph, piker)
 
 -- atBobAnswer with CR 701.9a's choice pinned by INDEX rather than left to the
 -- identity answerer, so a discard of two takes two distinct cards.
@@ -825,6 +849,20 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         after = S.runPure (lengAnswer OptionalDecision.Exercises) gs (Event.discard DiscardCause.Ordinary S.bob swampId)
     Spec.assertEqWith s "bob's swamp is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName swamp)]
     Spec.assertEqWith s "and not in his library" (namesIn Zone.Library S.bob after) []
+  -- Pulmonic Sliver's GRANTED "may" row (CR 614.1a), on a stolen Sliver: alice
+  -- controls Pulmonic, carol owns Lymph Sliver, bob controls it. CR 109.5 makes
+  -- bob, the controller of the Sliver the ability is on, the one asked; CR 400.3
+  -- sends the card to carol's library. The pair differs in the answerer's flip
+  -- alone: bob's answer is as given and every other seat answers the opposite,
+  -- so asking alice or carol lands the card in the wrong zone in both cases.
+  Spec.it s "CR 109.5 / 400.3 Pulmonic Sliver's granted redirect asks the Sliver's controller and tops its owner's library" $ do
+    (after, lymph, piker) <- pulmonicBoard s registry OptionalDecision.Exercises
+    Spec.assertEqWith s "lymph sliver is on top of carol's library" (namesIn Zone.Library S.carol after) [Just (S.printingName lymph), Just (S.printingName piker)]
+    Spec.assertEqWith s "and bob's library is untouched" (namesIn Zone.Library S.bob after) [Just (S.printingName piker)]
+  Spec.it s "CR 614.1a Pulmonic Sliver's granted redirect declined leaves the Sliver in its owner's graveyard" $ do
+    (after, lymph, piker) <- pulmonicBoard s registry OptionalDecision.Declines
+    Spec.assertEqWith s "lymph sliver is in carol's graveyard" (namesIn Zone.Graveyard S.carol after) [Just (S.printingName lymph)]
+    Spec.assertEqWith s "and carol's library is untouched" (namesIn Zone.Library S.carol after) [Just (S.printingName piker)]
   -- The Wheel's own relation, CR 303.4b's enchanted player
   -- (ControllerRelation.EnchantedPlayers, judged by Replacement.relationHolds),
   -- as the whole card: cast at bob, then one card of each seat's headed for its

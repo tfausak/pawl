@@ -1,0 +1,75 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "Sacrifice",
+                "value": {
+                  "count": 1,
+                  "whichPermanents": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Artifact"
+                    }
+                  }
+                }
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "production": {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colorless"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "production": {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colorless"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Krark-Clan Ironworks",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
