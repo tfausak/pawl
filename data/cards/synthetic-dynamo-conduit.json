@@ -1,0 +1,53 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "PayEnergy",
+                "value": 1
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "production": {
+                            "type": "AnyColor"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Dynamo Conduit",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

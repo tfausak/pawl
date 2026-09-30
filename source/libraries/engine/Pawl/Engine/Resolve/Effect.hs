@@ -9303,7 +9303,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- to pay", whose twin one {E} higher is asked.
   Effect.PayAnyEnergy slot -> do
     gs <- State.get
-    let have = Cost.energyOf controller gs
+    let have = Game.energyOf controller gs
     paid <-
       if have == 0
         then pure 0

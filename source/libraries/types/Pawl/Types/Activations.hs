@@ -13,9 +13,9 @@ import Pawl.Types.Claim (Claim)
 -- has to add several of them up: two sources whose costs each sacrifice a
 -- creature both answer 1 beside one creature, and two whose costs each pay 3 life
 -- both answer 2 at 6 life. What stops either pair being counted twice over is
--- the claims and the life.
+-- the claims, the life and the energy.
 --
--- The claims and the life are ONE activation's, unscaled, whatever the count --
+-- The claims, the life and the energy are ONE activation's, unscaled, whatever the count --
 -- the reader multiplies by however many it takes.
 data Activations = MkActivations
   { -- | CR 118.3: how many times in a row this player could pay the cost.
@@ -25,6 +25,8 @@ data Activations = MkActivations
     -- exile from a graveyard, or the untapped-ness a tapping cost takes.
     claims :: [Claim],
     -- | CR 119.4: the life one activation pays.
-    life :: Natural
+    life :: Natural,
+    -- | CR 107.14: the energy one activation pays.
+    energy :: Natural
   }
   deriving (Eq, Ord, Show)

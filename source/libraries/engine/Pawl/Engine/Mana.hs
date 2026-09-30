@@ -111,8 +111,8 @@ import qualified Pawl.Types.Supertype as Supertype
 -- And WHAT ONE ACTIVATION SPENDS besides, because the count is a fact about one
 -- source asked alone and the supply model has to add several of them up: two
 -- sources that each sacrifice a creature both answer 1 beside one creature, and
--- two that each pay 3 life both answer 2 at 6 life. The claims and the life are
--- what stop either pair being counted twice over (payableResolutionsGiven, #1126).
+-- two that each pay 3 life both answer 2 at 6 life. The claims, the life and the
+-- energy are what stop either pair being counted twice over (payableResolutionsGiven, #1126).
 -- Unscaled -- one activation's, whatever the count.
 --
 -- A CALLBACK rather than a call, for Pawl.Engine.Count.ViewOf's reason: those
@@ -202,7 +202,7 @@ supplyCapacity capacity _measure pcs pid oid cost restrictions ability gs = case
 -- No activation at all: the answer a Capacity gives for a route this player
 -- cannot take.
 noActivations :: Activations.Activations
-noActivations = Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
+noActivations = Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
 
 -- CR 105.4: a player asked to choose a color must choose one of the five;
 -- multicolored and colorless are not colors. So an any-colour producer offers
@@ -1597,6 +1597,10 @@ monocoloredHybridGeneric = 2
 -- whose components spend no life, which is every cost that reached here before
 -- one did.
 --
+-- `outsideEnergy` is the same thing for CR 107.14's energy (Cost.energyOwedBy).
+-- A fence rather than a proof here: no cost in data/cards/ pairs an energy
+-- payment with a symbol this function offers two routes for.
+--
 -- `claimed` is the same thing for objects: the components' own claims on a zone's
 -- contents or on the untapped permanents (Pawl.Types.ClaimAxis), which every route
 -- offered here has to be payable alongside (#1134). Empty for a cost whose
@@ -1608,8 +1612,8 @@ monocoloredHybridGeneric = 2
 -- permission to spend mana of any type the off-colour route is a real one.
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural, Natural)
-announce subject capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) =
+announce :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural, Natural)
+announce subject capacity spending pid oid total outside outsideEnergy claimed (ManaCost.MkManaCost symbols) =
   let -- "Payable" here means SOME completion of the remaining announcements pays
       -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
       -- here rather than left to canPay's own `resolutions` so that each completion
@@ -1622,7 +1626,7 @@ announce subject capacity spending pid oid total outside claimed (ManaCost.MkMan
       stillPayable done rest gs extra ways =
         let candidate (tail_, life) =
               any
-                (\totalled -> canPayCommitting subject capacity spending pid (outside + extra + life) claimed totalled gs)
+                (\totalled -> canPayCommitting subject capacity spending pid (outside + extra + life) outsideEnergy claimed totalled gs)
                 (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
          in any candidate (completions rest)
       -- One symbol's announcement. Asked only where two routes are payable, and
@@ -1822,19 +1826,20 @@ hybridHalves a b = if a == b then [a] else [a, b]
 -- caller with a subject wants canPayCommitting below, which is what
 -- Pawl.Engine.Cost.canPay takes.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
-canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSpending.AsProduced pid 0 []
+canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSpending.AsProduced pid 0 0 []
 
 -- The same question with the payer's CR 118.14 permission and with resources
 -- already spoken for: `spending`, which `relax` applies to the demands;
 -- `committed` life, which CR 119.4's floor must still admit alongside whatever
--- the rest of this cost costs; and `claimed`, the objects the rest of this cost
+-- the rest of this cost costs; `committedEnergy`, the same for CR 107.14's
+-- energy counters; and `claimed`, the objects the rest of this cost
 -- will spend, whether by taking them out of a zone or by tapping them
 -- (Pawl.Types.ClaimAxis).
 --
 -- `subject` is spendableFor's, and it is what makes this the function a CAST or
 -- an ACTIVATION asks: the wrapper above hard-codes ForNeither.
 --
--- Two callers commit life: `announce`, for CR 118.13a's choices -- both those
+-- Two callers commit life, and energy the same way: `announce`, for CR 118.13a's choices -- both those
 -- already made and those a `completions` entry is standing in for -- and
 -- Pawl.Engine.Cost's canPay and canPaySomeCompletion(Given), for the CR 119.4
 -- payments the cost's COMPONENTS owe.
@@ -1843,21 +1848,21 @@ canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSp
 -- Village Rites' "sacrifice a creature" and Phyrexian Tower's are one demand on
 -- one creature under CR 118.3, exactly as two sources' are (#1134). Zero and
 -- empty everywhere else, which is what `canPay` is.
-canPayCommitting :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommitting subject capacity spending pid committed claimed cost gs =
+canPayCommitting :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommitting subject capacity spending pid committed committedEnergy claimed cost gs =
   let pcs = Projection.projectAll gs
-   in canPayCommittingGiven subject capacity spending (manaSourcesGiven Set.empty (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in canPayCommittingGiven subject capacity spending (manaSourcesGiven Set.empty (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed committedEnergy claimed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
 -- for what `sources` and `pcs` are and why handing them in changes no answer.
-canPayCommittingGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommittingGiven subject capacity spending sources pcs pid committed claimed cost gs = not (null (payableResolutionsGiven subject capacity spending sources pcs pid committed claimed cost gs))
+canPayCommittingGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommittingGiven subject capacity spending sources pcs pid committed committedEnergy claimed cost gs = not (null (payableResolutionsGiven subject capacity spending sources pcs pid committed committedEnergy claimed cost gs))
 
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
 -- option per group of yields (see the collapse below), and each option is that
 -- group -- read as one supply per mana it adds -- repeated as many times as it is
 -- taken, paired with what those activations SPEND: the claims they make on objects
--- (Pawl.Types.ClaimAxis), and the life they pay (manaSuppliesGiven).
+-- (Pawl.Types.ClaimAxis), and the life and energy they pay (manaSuppliesGiven).
 -- payableResolutions picks exactly ONE option per source.
 --
 -- How many times is enumerated, 0 up to the ceiling, for an option that SPENDS
@@ -1899,15 +1904,15 @@ canPayCommittingGiven subject capacity spending sources pcs pid committed claime
 -- adding SEVERAL mana cannot join a union -- "one mana of any of these types"
 -- cannot speak for Sol Ring's {C}{C} -- so it stays its own option.
 --
--- Collapsed PER whole answer (Pawl.Types.Activations: the count, the claims and
--- the life), which is what lets a repeatable source MIX its yields across
+-- Collapsed PER whole answer (Pawl.Types.Activations: the count, the claims, the
+-- life and the energy), which is what lets a repeatable source MIX its yields across
 -- activations: each activation of Phyrexian Altar ("Sacrifice a creature: Add one
 -- mana of any color") chooses a colour on its own, so two creatures buy one red
 -- and one green, and the union repeated twice says exactly that where one option
 -- per yield said "two of one colour" (#1131). Exact because the KEY is what an
 -- activation costs: every yield in a group is reachable by the same number of
--- activations spending the same objects and the same life, so k of them are k
--- supplies of the union, claim Claim.scale k, and pay k times the life.
+-- activations spending the same objects, life and energy, so k of them are k
+-- supplies of the union, claim Claim.scale k, and pay k times the life and energy.
 --
 -- A multi-mana yield mixes the same way, one activation at a time: a GROUP's
 -- alternatives are its one-mana union (per CR 106.6 key, below) and each
@@ -1937,7 +1942,8 @@ data SourceOption = MkSourceOption
   { optionSupplies :: [Supply],
     optionDemands :: [Demand],
     optionClaims :: [Claim],
-    optionLife :: Natural
+    optionLife :: Natural,
+    optionEnergy :: Natural
   }
   deriving (Eq, Ord, Show)
 
@@ -1971,6 +1977,7 @@ sourceOptions clauses admitting contended supplies =
       optionsFor ((activations, manaCost), yields) =
         let claims = Activations.claims activations
             life = Activations.life activations
+            energy = Activations.energy activations
             alternatives = alternativesOf yields
             eats = not (null (ManaCost.unwrap manaCost))
             -- A mana-EATING option is always worth taking fewer times, for the same
@@ -1980,7 +1987,7 @@ sourceOptions clauses admitting contended supplies =
             -- supplies are added, which stops being true the moment an option adds
             -- a demand as well.
             counts =
-              if not eats && (null claims || not contended) && life == 0
+              if not eats && (null claims || not contended) && life == 0 && energy == 0
                 then [Activations.times activations]
                 else [0 .. Activations.times activations]
             -- CR 107.4e's hybrid and CR 107.4f's Phyrexian inside a mana ability's
@@ -1997,7 +2004,8 @@ sourceOptions clauses admitting contended supplies =
                   { optionSupplies = concat taken,
                     optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
                     optionClaims = Claim.scale k claims,
-                    optionLife = k * (life + owed)
+                    optionLife = k * (life + owed),
+                    optionEnergy = k * energy
                   }
       collapsed admits units =
         if null units
@@ -2105,10 +2113,10 @@ multisets k xs = case (k, xs) of
 -- into charging {2/B} a single mana. CR 107.4f's {G/P} rides on the same
 -- enumeration: its life way is a resolution with one fewer demand, so neither
 -- has to learn about a symbol that consumes no supply at all.
-payableResolutions :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutions subject capacity spending pid committed claimed cost gs =
+payableResolutions :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutions subject capacity spending pid committed committedEnergy claimed cost gs =
   let pcs = Projection.projectAll gs
-   in payableResolutionsGiven subject capacity spending (manaSourcesGiven Set.empty (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in payableResolutionsGiven subject capacity spending (manaSourcesGiven Set.empty (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed committedEnergy claimed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
@@ -2158,8 +2166,8 @@ payableResolutions subject capacity spending pid committed claimed cost gs =
 -- additional cost, not both
 -- (#1134). It is the whole cost's claims and not the remainder's, which is
 -- exact: `Cost.canPay` asks this before any part of the cost is paid.
-payableResolutionsGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutionsGiven subject capacity spending sources pcs pid committed claimed cost gs =
+payableResolutionsGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutionsGiven subject capacity spending sources pcs pid committed committedEnergy claimed cost gs =
   let -- EVERY payment a board can hold, and not just the one this walk is for:
       -- the outer cost's, plus each source's own activation cost, which CR
       -- 605.3a lets the player pay inside the outer one's mana window and CR
@@ -2194,6 +2202,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- not contention -- Cost.repeatsOf has already measured that, and it is
       -- what `times` is.
       contested = Claim.contested (claimed : fmap (concatMap activationsOf) suppliesPer)
+      energyHeld = Game.energyOf pid gs
       -- Each option paired with the SOURCE it came from, which is what says
       -- whose activation cost its demands are: CR 602.2b's subject for the
       -- position that option occupies below.
@@ -2234,6 +2243,11 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       boards = do
         taken <- sequenceA options
         Monad.guard (Claim.satisfiable (claimed <> concatMap (optionClaims . snd) taken))
+        -- CR 107.14's one count of energy counters, held across the board's
+        -- activations and the cost's own components exactly as the claims are:
+        -- two Synthetic Dynamo Conduits at three energy are three activations
+        -- between them, not six.
+        Monad.guard (committedEnergy + sum (fmap (optionEnergy . snd) taken) <= energyHeld)
         let (eating, free) = List.partition (not . null . optionDemands . snd) taken
         order <- orderings eating
         let ranked = zip [1 :: Natural ..] order
@@ -2347,6 +2361,6 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
 -- gates' job (Pawl.Engine.Cost.canPay); all this picks is which resolution the
 -- mana is spent under.
 lifeNeeded :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> ManaCost -> GameState -> Maybe Natural
-lifeNeeded subject capacity spending pid cost gs = case payableResolutions subject capacity spending pid 0 [] cost gs of
+lifeNeeded subject capacity spending pid cost gs = case payableResolutions subject capacity spending pid 0 0 [] cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing

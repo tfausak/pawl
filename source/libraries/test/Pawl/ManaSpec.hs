@@ -91,6 +91,7 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -2427,6 +2428,54 @@ heritageDruidBoard s registry elves = do
   elf <- S.printingOf s registry "Glistener Elf"
   pure (alicePermanents (druid : replicate (elves - 1) elf))
 
+-- CR 118.3's "fully" over CR 107.14's energy, the resource a player holds rather
+-- than a permanent. Synthetic Dynamo Conduit ({2} Artifact, "Pay {E}: Add one
+-- mana of any color.") is the pool's first mana ability whose cost spends energy
+-- and nothing CR 107.5 bars repeating: Scryfall `o:"{E}" o:/: add/`, 2026-09-30,
+-- every "Pay {E}: Add" printing also charges {T}. Three energy is three
+-- activations and three mana, and two Conduits share the three rather than each
+-- taking them.
+--
+-- Nothing else on these boards makes mana, so every count below comes through
+-- a Conduit.
+dynamoConduitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dynamoConduitSpec s registry = Spec.describe s "Synthetic Dynamo Conduit" $ do
+  Spec.it s "CR 107.14 three energy supply three mana" $ do
+    board <- dynamoConduitBoard s registry 1 3
+    let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 3) "three activations pay {3}"
+    Spec.assertBool s (not (pays 4)) "and three energy buy no fourth, so not {4}"
+
+  -- The JOINT count (Mana.payableResolutionsGiven): each Conduit asked alone
+  -- answers three, and the board has three energy between them.
+  Spec.it s "CR 107.14 two Conduits share one count of energy" $ do
+    board <- dynamoConduitBoard s registry 2 3
+    let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 3) "the three energy pay {3} across the pair"
+    Spec.assertBool s (not (pays 4)) "and not {4}: the second Conduit spends the same counters"
+
+  -- The gameplay-level proof (design.md section 4). Crucible of Worlds is {3},
+  -- all generic, and targets nothing, so the cast turns on the one Conduit being
+  -- activated three times. The boards differ in the energy alone.
+  Spec.it s "CR 605.3a Crucible of Worlds is cast off three activations of one Conduit" $ do
+    crucible <- S.printingOf s registry "Crucible of Worlds"
+    three <- dynamoConduitBoard s registry 1 3
+    two <- dynamoConduitBoard s registry 1 2
+    let resolved = castFrom S.identityAnswer three crucible
+        short = castFrom S.identityAnswer two crucible
+        countOf = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Crucible of Worlds")) S.alice
+    Spec.assertEqWith s "the Crucible resolved" (countOf resolved) 1
+    Spec.assertEqWith s "with two energy there is no {3} and the cast fails" (countOf short) 0
+    Spec.assertEqWith s "CR 107.14 all three energy paid for it" (S.playerCounterOf PlayerCounterKind.Energy S.alice resolved) 0
+    Spec.assertEqWith s "and the failed cast spent none of the short board's" (S.playerCounterOf PlayerCounterKind.Energy S.alice short) 2
+
+-- Alice with `conduits` Synthetic Dynamo Conduits, `energy` energy counters and
+-- nothing else.
+dynamoConduitBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> Natural -> m GameState.GameState
+dynamoConduitBoard s registry conduits energy = do
+  conduit <- S.printingOf s registry "Synthetic Dynamo Conduit"
+  pure (S.addPlayerCounter PlayerCounterKind.Energy energy S.alice (alicePermanents (replicate conduits conduit)))
+
 -- The half #1128 gave up: WHICH mana each of a repeatable source's activations
 -- makes. Phyrexian Altar ({3} Artifact, "Sacrifice a creature: Add one mana of
 -- any color") is the pool's first mana ability that is both repeatable and offers
@@ -3984,6 +4033,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   ashnodsAltarSpec s registry
   workhorseSpec s registry
   heritageDruidSpec s registry
+  dynamoConduitSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
   pluralBoardSpec s registry
