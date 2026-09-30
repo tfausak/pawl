@@ -132,6 +132,9 @@ data KeywordFamily
   | -- | CR 702.64a: absorb N. No card in the pool asks yet, and it is owed at
     -- the keyword rather than at the first asker.
     Absorb
+  | -- | CR 702.65a: aura swap [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    AuraSwap
   | -- | CR 702.67a: fortify [cost]. Equip's family one rule over; no card in the
     -- pool asks yet, and it is owed at the keyword rather than at the first
     -- asker.

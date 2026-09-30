@@ -38,6 +38,7 @@ import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Clause as Clause
@@ -398,6 +399,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.AuraSwap _ -> []
   Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
@@ -630,6 +632,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.AuraSwap _ -> []
   Keyword.EquipPlaneswalker _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
@@ -1215,6 +1218,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.AuraSwap _ -> []
   Keyword.EquipPlaneswalker _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
@@ -1861,6 +1865,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- CR 702.67c, in CR 702.6d's words: any of a Fortification's fortify
   -- abilities may be used, so one ability per instance as equip is.
   Keyword.Fortify cost -> List.genericReplicate count (fortify cost)
+  -- CR 702.65a, one ability per instance as fortify is.
+  Keyword.AuraSwap cost -> List.genericReplicate count (auraSwap cost)
   -- CR 702.49a's ability functions from a HAND, so it is minted by
   -- handAbilitiesFor above and never from the battlefield.
   Keyword.Ninjutsu _ -> []
@@ -2538,6 +2544,31 @@ reconfigure cost =
 reconfigureTarget :: SlotName.SlotName
 reconfigureTarget = SlotName.MkSlotName (Text.pack "reconfigured")
 
+-- CR 702.65a: "[Cost]: You may exchange this permanent with an Aura card in
+-- your hand." No timing restriction, the rule stating none, and no target: the
+-- card and the "may" are both announced as the ability resolves (CR 608.2d),
+-- by its controller (CR 109.5).
+auraSwap :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+auraSwap cost =
+  let chosen = ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasSubtype Subtype.Aura)
+      effect = Effect.ExchangeWithCardInHand chosen
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost,
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
+          ActivatedAbility.restrictions = [],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          ActivatedAbility.name = Nothing,
+          -- Nothing here and written by `mintedBy` at the roster, the one place that
+          -- knows the keyword by identity rather than by reconstructing it.
+          ActivatedAbility.keyword = Nothing
+        }
+
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions are a separate, additive list.
 --
@@ -2583,6 +2614,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.AuraSwap _ -> []
   Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
@@ -4339,6 +4371,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.AuraSwap _ -> []
   Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
@@ -4755,6 +4788,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.AuraSwap _ -> []
   Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
@@ -5043,6 +5077,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.AuraSwap _ -> []
   Keyword.EquipPlaneswalker _ -> []
   Keyword.Ninjutsu _ -> []
   Keyword.Splice _ -> []
@@ -5387,6 +5422,7 @@ familyOf keyword = case keyword of
   -- group is what proves it.
   Keyword.Equip _ -> Just KeywordFamily.Equip
   Keyword.Fortify _ -> Just KeywordFamily.Fortify
+  Keyword.AuraSwap _ -> Just KeywordFamily.AuraSwap
   -- CR 702.6e calls it "a variant of the equip ability", so Bureau Headmaster's
   -- "equip abilities" reach it.
   Keyword.EquipPlaneswalker _ -> Just KeywordFamily.Equip

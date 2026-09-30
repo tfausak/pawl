@@ -1324,6 +1324,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   animateDeadSpec s registry
   groupAttachSpec s registry
   groupAttachCardsSpec s registry
+  auraSwapSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -5021,3 +5022,77 @@ groupAttachCardsSpec s registry =
             (_, _, _, strength, split, resolved, settled) -> do
               Spec.assertEqWith s "with no creature able to take both, alice still gains control of both" (Projection.controllerOf strength resolved, Projection.controllerOf split resolved) (Just S.alice, Just S.alice)
               Spec.assertEqWith s "and after CR 704.5m/n the Bonesplitter stands unattached, the Aura gone" (hostOf split settled, Set.member split (GameState.battlefield settled), Set.member strength (GameState.battlefield settled)) (Nothing, True, False)
+
+-- CR 702.65 / 701.12d: aura swap. Arcanum Wings {1}{U} Enchantment -- Aura,
+-- "Enchant creature" / "Enchanted creature has flying." / "Aura swap {2}{U}"
+-- (Oracle checked against api.scryfall.com, 2026-09-30).
+--
+-- alice's Wings enchants the Goblin Piker, and Russet Wolves is a second
+-- creature, so CR 303.4f's host question would be a real prompt were the
+-- exchange to ask it; the answerer then names the Wolves. Her hand holds
+-- Pacifism and Wild Growth (enchant land), so the hand choice is a real prompt
+-- too. A test-local answerer, since no scenario move answers ChooseOptional or
+-- ChooseCardInHand.
+auraSwapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+auraSwapSpec s registry =
+  let answer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      answer wanted wrongHost p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseCardInHand {} -> wanted
+        Prompt.ChooseAttachment _ _ _ offered | List.elem wrongHost (NonEmpty.toList offered) -> wrongHost
+        _ -> S.identityAnswer p
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Maybe (GameState.GameState, [Response.Response])
+      run answerer wingsId gs = case Projection.abilitiesOf wingsId gs of
+        [ability] ->
+          let ((_, after), responses) = Replay.record answerer gs (Activate.activateAbility S.alice wingsId ability >> Stack.resolveTop)
+           in Just (after, responses)
+        _ -> Nothing
+      hostPrompts = length . filter (\r -> case r of Response.ChoseAttachment _ -> True; _ -> False)
+      hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
+      namedOnBattlefield name gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack name))) (Set.toList (GameState.battlefield gs))
+      sorted = List.sort . fmap (CardName.MkCardName . Text.pack)
+   in Spec.describe s "AuraSwap" $ do
+        Spec.it s "CR 701.12e the chosen Aura enters attached to the Wings' host, and the Wings go to hand" $ do
+          (pikerId, wolvesId, wingsId, pacifismId, _, gs) <- auraSwapBoard s registry S.alice
+          case run (answer pacifismId wolvesId) wingsId gs of
+            Just (after, responses) -> do
+              Spec.assertEqWith s "Pacifism enchants the Piker, the creature the Wings enchanted" (fmap (`hostOf` after) (namedOnBattlefield "Pacifism" after)) [Just pikerId]
+              Spec.assertEqWith s "the Wings are in alice's hand beside Wild Growth" (List.sort (handNames S.alice after)) (sorted ["Arcanum Wings", "Wild Growth"])
+              Spec.assertEqWith s "CR 303.4f asked nobody for a host" (hostPrompts responses) 0
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId after)) "and the Piker has lost flying"
+            Nothing -> Spec.assertFailure s "Arcanum Wings has not exactly one ability"
+        Spec.it s "CR 702.65b an Aura that cannot enchant the host leaves both where they were" $ do
+          (pikerId, wolvesId, wingsId, _, growthId, gs) <- auraSwapBoard s registry S.alice
+          case run (answer growthId wolvesId) wingsId gs of
+            Just (after, _) -> do
+              Spec.assertEqWith s "Wild Growth and Pacifism are both still in alice's hand" (List.sort (handNames S.alice after)) (sorted ["Pacifism", "Wild Growth"])
+              Spec.assertEqWith s "and the Wings still enchant the Piker" (hostOf wingsId after) (Just pikerId)
+            Nothing -> Spec.assertFailure s "Arcanum Wings has not exactly one ability"
+        Spec.it s "CR 701.12d a Wings bob owns is not exchanged with a card alice owns" $ do
+          (pikerId, wolvesId, wingsId, pacifismId, _, gs) <- auraSwapBoard s registry S.bob
+          case run (answer pacifismId wolvesId) wingsId gs of
+            Just (after, _) -> do
+              Spec.assertEqWith s "Pacifism and Wild Growth are both still in alice's hand" (List.sort (handNames S.alice after)) (sorted ["Pacifism", "Wild Growth"])
+              Spec.assertEqWith s "and the Wings still enchant the Piker" (hostOf wingsId after) (Just pikerId)
+            Nothing -> Spec.assertFailure s "Arcanum Wings has not exactly one ability"
+
+-- auraSwapSpec's board: three Islands, the Piker wearing Arcanum Wings (owned by
+-- `owner`, controlled by alice), the Wolves, and Pacifism and Wild Growth in
+-- alice's hand. Returns the Piker, the Wolves, the Wings, Pacifism, Wild Growth
+-- and the board.
+auraSwapBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> PlayerId.PlayerId -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+auraSwapBoard s registry owner = do
+  wings <- S.printingOf s registry "Arcanum Wings"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  wolves <- S.printingOf s registry "Russet Wolves"
+  pacifism <- S.printingOf s registry "Pacifism"
+  growth <- S.printingOf s registry "Wild Growth"
+  let mana = S.landsFor island S.alice 3 S.threePlayerGame
+      (pikerId, g1) = S.addPermanent piker S.alice mana
+      (wolvesId, g2) = S.addPermanent wolves S.alice g1
+      (wingsId, g3) = S.addPermanent wings owner g2
+      controlled = if owner == S.alice then g3 else S.giveControl wingsId S.alice g3
+      (pacifismId, g4) = S.addHandCard pacifism S.alice (S.attach wingsId pikerId controlled)
+      (growthId, g5) = S.addHandCard growth S.alice g4
+  pure (pikerId, wolvesId, wingsId, pacifismId, growthId, g5 {GameState.priority = Just S.alice})

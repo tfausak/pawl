@@ -2751,6 +2751,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- half alone.
   Keyword.Type.Equip (Equip.MkEquip cost criterion) -> Keyword.Type.Equip (Equip.MkEquip (rewriteCost pairs cost) (fmap (rewrite pairs) criterion))
   Keyword.Type.Fortify cost -> Keyword.Type.Fortify (rewriteCost pairs cost)
+  Keyword.Type.AuraSwap cost -> Keyword.Type.AuraSwap (rewriteCost pairs cost)
   Keyword.Type.EquipPlaneswalker cost -> Keyword.Type.EquipPlaneswalker (rewriteCost pairs cost)
   -- CR 702.49a's ninjutsu cost, fortify's shape: a Cost whose components can
   -- carry a Filter, and rule 702.49a's own return-an-unblocked-attacker component

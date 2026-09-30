@@ -191,6 +191,9 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ExchangeLifeTotals _ -> Nothing
   Effect.ExchangeValues _ -> Nothing
   Effect.ExchangeZones _ -> Nothing
+  -- CR 113.6m's zone is the battlefield, which CR 113.6 already makes a
+  -- permanent's abilities' zone.
+  Effect.ExchangeWithCardInHand _ -> Nothing
   Effect.SetLifeTotal {} -> Nothing
   Effect.LoseGame {} -> Nothing
   Effect.WinGame {} -> Nothing

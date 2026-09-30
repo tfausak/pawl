@@ -608,6 +608,7 @@ refCounts = concatMap quantityCounts . Resolve.objectRefQuantities
 objectRefPositions :: [(String, Effect.Effect () (), [ObjectRef.ObjectRef])]
 objectRefPositions =
   let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
+      handChoice = ChosenCardInHand.MkChosenCardInHand (plantedPlayer "xh") (Filter.Type.And [])
    in [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
         ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt")), [plantedRef "mt"]),
         ("restart-game", Effect.RestartGame (Just (plantedRef "rg")), [plantedRef "rg"]),
@@ -616,6 +617,7 @@ objectRefPositions =
         ("move-to-zone", Effect.MoveToZone (MoveToZone.MkMoveToZone (plantedRef "mz") Zone.Exile plainRiders Nothing Nothing LibraryPlacement.OwnerChooses Nothing), [plantedRef "mz"]),
         ("reveal", Effect.Reveal (Reveal.MkReveal (plantedRef "rv") Nothing), [plantedRef "rv"]),
         ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
+        ("exchange-with-card-in-hand", Effect.ExchangeWithCardInHand handChoice, [ObjectRef.ChosenCardInHand handChoice]),
         ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
         ("arrange-in-library", Effect.ArrangeInLibrary (plantedRef "al"), [plantedRef "al"]),
         ("connive", Effect.Connive (Connive.MkConnive (Quantity.Type.Literal 1) (plantedRef "cn")), [plantedRef "cn"]),
@@ -1271,6 +1273,7 @@ ownCounts effect = case effect of
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues x -> durationCounts (ExchangeValues.duration x)
   Effect.ExchangeZones _ -> []
+  Effect.ExchangeWithCardInHand _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -1747,6 +1750,7 @@ effectNestedEffects effect = case effect of
   Effect.ExchangeLifeTotals {} -> []
   Effect.ExchangeValues {} -> []
   Effect.ExchangeZones {} -> []
+  Effect.ExchangeWithCardInHand {} -> []
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -2255,6 +2259,7 @@ effectReplacements effect = case effect of
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues _ -> []
   Effect.ExchangeZones _ -> []
+  Effect.ExchangeWithCardInHand _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -2737,6 +2742,7 @@ effectMintedFaces effect = case effect of
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues _ -> []
   Effect.ExchangeZones _ -> []
+  Effect.ExchangeWithCardInHand _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -3254,6 +3260,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.67a's payload is equip's, and so is this: the "target land you
   -- control" filter its minted ability carries is the ENGINE's, never a card's.
   Keyword.Fortify cost -> costFilters cost
+  Keyword.AuraSwap cost -> costFilters cost
   -- CR 702.6e's cost, fortify's shape for the same reason.
   Keyword.EquipPlaneswalker cost -> costFilters cost
   -- CR 702.49a carries a whole Cost, so a Filter inside it is the card's. The
@@ -5739,6 +5746,7 @@ effectFilters effect = case effect of
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (foldMap objectRefFilters (foldMap Resolve.exchangedObjectRefs [one, other]))
   Effect.ExchangeZones _ -> []
+  Effect.ExchangeWithCardInHand chosen -> frame SourceHostFramed (objectRefFilters (ObjectRef.ChosenCardInHand chosen))
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []

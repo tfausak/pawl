@@ -144,6 +144,7 @@ codec =
       Arm.payload "Replicate" (Cost.codec codec) Keyword.Replicate (\x -> case x of Keyword.Replicate y -> Just y; _ -> Nothing),
       Arm.payload "Graft" Common.natural Keyword.Graft (\x -> case x of Keyword.Graft y -> Just y; _ -> Nothing),
       Arm.payload "Absorb" Common.natural Keyword.Absorb (\x -> case x of Keyword.Absorb y -> Just y; _ -> Nothing),
+      Arm.payload "AuraSwap" (Cost.codec codec) Keyword.AuraSwap (\x -> case x of Keyword.AuraSwap y -> Just y; _ -> Nothing),
       Arm.payload "Recover" (Cost.codec codec) Keyword.Recover (\x -> case x of Keyword.Recover y -> Just y; _ -> Nothing),
       Arm.payload "Ripple" Common.natural Keyword.Ripple (\x -> case x of Keyword.Ripple y -> Just y; _ -> Nothing),
       Arm.payload "Casualty" Common.natural Keyword.Casualty (\x -> case x of Keyword.Casualty y -> Just y; _ -> Nothing),
@@ -344,6 +345,7 @@ tagOf x = case x of
   Keyword.Replicate {} -> "Replicate"
   Keyword.Graft {} -> "Graft"
   Keyword.Absorb {} -> "Absorb"
+  Keyword.AuraSwap {} -> "AuraSwap"
   Keyword.Recover {} -> "Recover"
   Keyword.Ripple {} -> "Ripple"
   Keyword.Casualty {} -> "Casualty"

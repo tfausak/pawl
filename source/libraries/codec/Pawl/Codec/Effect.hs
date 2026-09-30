@@ -30,6 +30,7 @@ import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChooseNumber as ChooseNumber
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.ChoosePlayerAtRandom as ChoosePlayerAtRandom
+import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.Codec.Connive as Connive
 import qualified Pawl.Codec.ControlPlayer as ControlPlayer
@@ -191,6 +192,7 @@ codec cardCodec abilityCodec =
           Arm.payload "ExchangeLifeTotals" ExchangeSides.codec Effect.ExchangeLifeTotals (\x -> case x of Effect.ExchangeLifeTotals y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeValues" ExchangeValues.codec Effect.ExchangeValues (\x -> case x of Effect.ExchangeValues y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeZones" ExchangeZones.codec Effect.ExchangeZones (\x -> case x of Effect.ExchangeZones y -> Just y; _ -> Nothing),
+          Arm.payload "ExchangeWithCardInHand" ChosenCardInHand.codec Effect.ExchangeWithCardInHand (\x -> case x of Effect.ExchangeWithCardInHand y -> Just y; _ -> Nothing),
           Arm.payload "SetLifeTotal" PlayerQuantity.codec Effect.SetLifeTotal (\x -> case x of Effect.SetLifeTotal y -> Just y; _ -> Nothing),
           Arm.payload "LoseGame" PlayerRef.codec Effect.LoseGame (\x -> case x of Effect.LoseGame y -> Just y; _ -> Nothing),
           Arm.payload "WinGame" PlayerRef.codec Effect.WinGame (\x -> case x of Effect.WinGame y -> Just y; _ -> Nothing),
@@ -355,6 +357,7 @@ tagOf x = case x of
   Effect.ExchangeLifeTotals {} -> "ExchangeLifeTotals"
   Effect.ExchangeValues {} -> "ExchangeValues"
   Effect.ExchangeZones {} -> "ExchangeZones"
+  Effect.ExchangeWithCardInHand {} -> "ExchangeWithCardInHand"
   Effect.SetLifeTotal {} -> "SetLifeTotal"
   Effect.LoseGame {} -> "LoseGame"
   Effect.WinGame {} -> "WinGame"

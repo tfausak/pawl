@@ -363,6 +363,7 @@ manaProduced effect = case effect of
   Effect.ExchangeLifeTotals _ -> Nothing
   Effect.ExchangeValues _ -> Nothing
   Effect.ExchangeZones _ -> Nothing
+  Effect.ExchangeWithCardInHand _ -> Nothing
   Effect.SetLifeTotal {} -> Nothing
   Effect.LoseGame {} -> Nothing
   Effect.WinGame {} -> Nothing
@@ -602,6 +603,8 @@ movesLibraryCard effect = case effect of
   Effect.ExchangeZones x ->
     let (one, other) = ZonePair.zones (ExchangeZones.zones x)
      in one == Zone.Library || other == Zone.Library
+  -- A hand and the battlefield.
+  Effect.ExchangeWithCardInHand _ -> False
   Effect.SetLifeTotal {} -> False
   Effect.LoseGame {} -> False
   Effect.WinGame {} -> False
