@@ -117,7 +117,10 @@ playableLands pid gs =
       -- Per card instead, because CR 715.3d's permission is state on ONE exiled
       -- incarnation naming ONE player.
       fromExile = filter (\oid -> Cast.permitsLandPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)
-   in concatMap playable (ListUtils.nubOrd (fromHand <> fromGranted <> fromPermitted <> fromExile))
+      -- CR 702.187c: per card as well, the permission being the card's own
+      -- costless mayhem and the discard that arms it this player's.
+      fromMayhem = filter (\oid -> PlayerEffect.mayPlayByMayhem pid oid gs) (Game.zoneMembers Zone.Graveyard pid gs)
+   in concatMap playable (ListUtils.nubOrd (fromHand <> fromGranted <> fromPermitted <> fromExile <> fromMayhem))
 
 -- The cards in this player's hand whose own text grants CR 116.2e's special
 -- action: Circling Vultures' "you may discard this card any time you could cast

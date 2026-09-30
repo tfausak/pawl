@@ -1655,7 +1655,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- not share Flashback's tag: rule 702.187b gates its permission on the discard
   -- this turn and rule 702.34a on the card type, so the two answer differently.
   Spec.it s "Mayhem carries its cost, and is not Flashback" $ do
-    let mayhem n = Keyword.Mayhem (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    let mayhem n = Keyword.Mayhem (Just (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []))
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
     Common.assertCodec
       s
@@ -1663,12 +1663,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (mayhem 2)
       " {\"type\":\"Mayhem\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (mayhem 2) /= Codec.encode Keyword.codec (flashbackOf 2)) "the same cost under two keywords encodes differently"
+  -- CR 702.187c: mayhem with no cost at all, Oscorp Industries', is the absent
+  -- "value" key -- and not a free cost, which would be rule 702.187b's cast.
+  Spec.it s "costless Mayhem omits its value" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Mayhem Nothing)
+      " {\"type\":\"Mayhem\"} "
   -- CR 702.35a's payload is a whole Cost, Arrogant Wurm's {2}{G}, and it must not
   -- share Mayhem's tag: rule 702.35a casts from exile off a trigger and rule
   -- 702.187b from a graveyard off a permission.
   Spec.it s "Madness carries its cost, and is not Mayhem" $ do
     let madness n = Keyword.Madness (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
-        mayhemOf n = Keyword.Mayhem (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        mayhemOf n = Keyword.Mayhem (Just (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []))
     Common.assertCodec
       s
       Keyword.codec

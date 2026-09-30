@@ -775,6 +775,7 @@ countQuantities count = case Count.Type.aggregation count of
   Aggregation.DistinctColors -> []
   Aggregation.MostSharingACreatureType -> []
   Aggregation.MostSharingACardType -> []
+  Aggregation.DistinctNames -> []
   Aggregation.Greatest quantity -> [quantity]
   Aggregation.Total quantity -> [quantity]
 
@@ -3531,8 +3532,8 @@ keywordPayloadFilters keyword = case keyword of
   -- the rule's own word, written into the criterion
   -- Pawl.Engine.Cost.candidateCostsGiven mints.
   Keyword.Retrace -> []
-  -- CR 702.187b's payload is a whole Cost, flashback's shape.
-  Keyword.Mayhem cost -> costFilters cost
+  -- CR 702.187b's payload is a whole Cost, flashback's shape, and CR 702.187c's is none.
+  Keyword.Mayhem cost -> foldMap costFilters cost
   -- CR 702.35a's payload is a whole Cost, mayhem's shape.
   Keyword.Madness cost -> costFilters cost
   -- CR 702.88a carries no payload, retrace's position.

@@ -2889,7 +2889,11 @@ permissionsFor cardTypes keyword = case keyword of
   -- (Pawl.Engine.Cost.candidateCostsGiven), where the state is in hand. The two
   -- readings cannot be told apart -- rule 702.187b's permission and its cost are
   -- one sentence, so a card whose mayhem cost is withheld has nothing to be cast
-  -- for, and a permission from somewhere else brings its own cost.
+  -- for, and a permission from somewhere else brings its own cost. CR
+  -- 702.187c's costless mayhem is the same permission, priced at the card's
+  -- ordinary costs where the same discard gates them (candidateCostsGiven's
+  -- graveyard arm); its land half is a play, not a cast
+  -- (Pawl.Engine.PlayerEffect.mayPlayByMayhem).
   Keyword.Mayhem _ -> [CastingPermission.CastFromGraveyard]
   -- CR 702.35a states no standing permission: the cast is offered by rule
   -- 702.35a's own triggered ability, which carries its cost as CR 608.2g's
@@ -2952,13 +2956,22 @@ hasRetrace = Set.member Keyword.Retrace
 -- A LIST for flashbackCosts' reason: rule 702.187b states no limit on how many
 -- mayhem abilities an object has, and CR 601.2b makes two of them a CHOICE.
 --
--- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason. A costless
+-- mayhem (CR 702.187c) states no cost and contributes none; hasCostlessMayhem
+-- below is its reader.
 mayhemCosts :: Set Keyword -> [Cost Keyword]
 mayhemCosts keywords =
   let costOf keyword = case keyword of
-        Keyword.Mayhem cost -> Just cost
+        Keyword.Mayhem cost -> cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- | CR 702.187c: does this card have mayhem WITHOUT a cost, "you may play this
+-- card from your graveyard if you discarded it this turn"? Membership rather
+-- than a count, the rule taking no parameter. Read by
+-- Pawl.Engine.PlayerEffect.mayPlayByMayhem, which asks the zone and the discard.
+hasCostlessMayhem :: Set Keyword -> Bool
+hasCostlessMayhem = Set.member (Keyword.Mayhem Nothing)
 
 -- CR 702.185a: every cost this card may be cast from its owner's HAND for under
 -- its warp ability, in ascending Set order. mayhemCosts' shape above, read by
@@ -4000,17 +4013,15 @@ castFromGraveyardExile =
 handReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts keywords))]
 
--- | The replacement effects rule 702 mints for a card in a GRAVEYARD, off its
--- printed keywords -- `handReplacementsOf`'s sibling one zone over, and rule
+-- | The replacement effects rule 702 mints for a card in a GRAVEYARD, off the
+-- keyword set it is handed -- `handReplacementsOf`'s sibling one zone over, and rule
 -- 702.52a's dredge is the only one that reaches it.
 --
 -- Its own mint point for `handReplacementsOf`'s reason: rule 702.52a functions
 -- "only while the card with dredge is in a player's graveyard", which is a zone
 -- `mintedReplacementsFor`'s projection walk does not reach.
 -- Pawl.Engine.Projection.replacementsAffecting's graveyard walk hands it the
--- PROJECTION's keywords, but only for a card whose printed face has dredge,
--- so a dredge an effect granted to a card in a graveyard mints nothing (gap
--- #1859).
+-- PROJECTION's keywords, so a dredge an effect grants or removes there is seen.
 --
 -- ONE ROW PER DISTINCT dredge ability, which is what a keyword SET gives and
 -- what rule 702.52 asks for: each ability states its own N, so two unlike ones
