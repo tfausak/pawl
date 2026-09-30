@@ -1797,13 +1797,8 @@ eventTriggers events gs =
       -- `inGraveyards`' reason: a haunting card sits in exile indefinitely and no
       -- event names it, so nothing narrower could find it.
       --
-      -- Abilities come from the PROJECTION (CR 613.1 names no zone), asked only
-      -- of a card whose printed face yields one or while some grantor writes a
-      -- keyword minting one here (`exileGrantInForce`), `graveyardCandidate`'s
-      -- gate widened by that grantor disjunct: Pawl.CastSpec's "CR 702.35a
-      -- Falkenrath Gorger gives a Vampire card in hand madness" proves a
-      -- granted madness is seen. A triggered ability GRANTED to a card in exile
-      -- fails the gate and is not seen (#1859). The controller is the OWNER (CR
+      -- Abilities come from the PRINTED card, so an effect changing the abilities
+      -- of a card in exile is not seen (#1859). The controller is the OWNER (CR
       -- 108.4a), for `inGraveyards`' reason: CR 108.4 gives a card in exile no
       -- controller at all, so Blind Hunter's "you gain 2 life" pays the player
       -- who owns the haunting card.
@@ -1823,24 +1818,29 @@ eventTriggers events gs =
       -- 113.6's default has already been overridden by the rule that mints them,
       -- and asking again would only re-derive it from a condition (an upkeep)
       -- that says nothing about exile. Pawl.Engine.Keyword.exileTriggeredAbilitiesOf
-      -- is what decides which keywords reach this: suspend and CR 702.35a's
-      -- madness, whose own first ability is what put its card here.
+      -- is what decides which keywords reach this: suspend. CR 702.35a's
+      -- madness trigger is `exiledForMadness`'s, off the discard event.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-        (Just obj, Just face)
-          | not (Object.exiledFaceDown obj) ->
-              let exiled subtypes manaCost triggered keywords = Maybe.mapMaybe (functionsIn subtypes (Face.delayedAbilities face) Zone.Exile) triggered <> fmap whole (Keyword.exileTriggeredAbilitiesOf manaCost keywords)
-               in case exiled (TypeLine.subtypes (Face.typeLine face)) (Face.manaCost face) (Face.triggeredAbilities face) (Face.keywordSet face) of
-                    [] | not exileGrantInForce -> Nothing
-                    _ ->
-                      let pc = Projection.project oid gs
-                       in case exiled (PC.subtypes pc) (PC.manaCost pc) (PC.triggeredAbilities pc) (Map.keysSet (PC.keywords pc)) of
-                            [] -> Nothing
-                            abilities -> Just (oid, (Object.owner obj, abilities))
+        (Just obj, Just face) | not (Object.exiledFaceDown obj) ->
+          case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> fmap whole (Keyword.exileTriggeredAbilitiesOf (Face.keywordSet face)) of
+            [] -> Nothing
+            abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
-      -- Does anything grant a keyword that mints an exile trigger? A thunk: only
-      -- an exiled card whose printed face yields none forces it.
-      exileGrantInForce = Projection.keywordGrantInForce (not . null . Keyword.exileTriggeredAbilitiesOf Nothing . Set.singleton) gs
       inExile = Map.fromList (Maybe.mapMaybe exileCandidate (Set.toAscList (GameState.exile gs)))
+      -- CR 702.35a's SECOND ability, for the card its first ability exiled:
+      -- minted off the madness abilities the discard RECORDED
+      -- (Discarded.madness), `spellCast`'s event scope, and not off the exiled
+      -- card's keywords now. The trigger fires on the discard (CR 603.2), so a
+      -- madness Falkenrath Gorger granted still triggers after the Gorger has
+      -- left -- state-based actions run before triggers are gathered (CR
+      -- 117.5). The controller is the OWNER, `inExile`'s reason; the mana cost
+      -- is the exiled card's projected one.
+      exiledForMadness event = case event of
+        GameEvent.Discarded (Discarded.MkDiscarded _ oid _ madness)
+          | not (Set.null madness),
+            Just obj <- Game.lookupObject oid gs ->
+              Map.singleton oid (Object.owner obj, fmap whole (Keyword.madnessTriggersOf (PC.manaCost (Projection.project oid gs)) madness))
+        _ -> Map.empty
       -- CR 113.6k's other zone: the spell that just became cast, offered from the
       -- STACK, where CR 601.2a leaves it. Desolation Twin's "when you cast this
       -- spell" is borne by an object that is on nobody's battlefield and in
@@ -2187,7 +2187,7 @@ eventTriggers events gs =
       -- `inExile`: CR 400.1 makes exile a zone of its own, and an id in it is in
       -- no other. Nor does `revealedInHand`: CR 701.20b leaves the revealed card
       -- in the hand, which no other source reads.
-      candidates onBattlefield event later same graveyard = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, graveyard, inCommand, inExile])
+      candidates onBattlefield event later same graveyard = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, graveyard, inCommand, Map.unionWith (\(c, a) (_, b) -> (c, a <> b)) inExile (exiledForMadness event)])
       scanOne board later same graveyard event = concatMap (forOne board event) (candidates (onBattlefieldOf board) event later same graveyard)
       -- CR 603.2c's FIRST sentence, applied to ONE event group: a batch-scoped
       -- condition's trigger event is the whole group, which occurs once however

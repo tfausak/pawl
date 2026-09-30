@@ -34,6 +34,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
 import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -5997,6 +5998,41 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
     Spec.assertEqWith s "CR 702.35a with the Gorger the discarded Vampire is cast for its mana cost" (S.countOnBattlefieldByName (S.printingName vampire) S.alice (run True)) 1
     Spec.assertEqWith s "CR 701.9a without it the same discard casts nothing" (S.countOnBattlefieldByName (S.printingName vampire) S.alice (run False)) 0
     Spec.assertBool s (elem (S.printingName vampire) (namesIn Zone.Graveyard (run False))) "and the Vampire is in its owner's graveyard"
+  -- CR 603.2 / 702.35a: the trigger fires on the DISCARD, so a grantor gone by
+  -- the time triggers are gathered still leaves it (the Gorger's own ruling).
+  -- alice's Tweeze kills her Gorger and she discards the Vampire to it; CR
+  -- 117.5's state-based actions put the Gorger in the graveyard before the
+  -- trigger is placed.
+  Spec.it s "CR 702.35a the Gorger dying before the trigger is gathered still casts the Vampire" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    vampire <- S.printingOf s registry "Bloodrage Vampire"
+    tweeze <- S.printingOf s registry "Tweeze"
+    gorger <- S.printingOf s registry "Falkenrath Gorger"
+    let base = aliceOnTurn (S.landsFor swamp S.alice 3 (S.landsInPlay mountain 3))
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) base [1 :: Int .. 4]
+        (gorgerId, withGorger) = S.addPermanent gorger S.alice stocked
+        (vampireId, handed) = S.addHandCard vampire S.alice withGorger
+        (tweezeId, ready) = S.addHandCard tweeze S.alice handed
+        resolved = S.runPure (gorgerTweezeAnswer gorgerId vampireId) ready (S.cast S.alice tweezeId >> Stack.resolveTop >> Monad.void Sba.performStateBasedActions)
+        placed = S.runPure (gorgerTweezeAnswer gorgerId vampireId) resolved Engine.placePendingTriggers
+        entered = S.runPure (gorgerTweezeAnswer gorgerId vampireId) (S.runPure (gorgerTweezeAnswer gorgerId vampireId) placed Stack.resolveTop) Stack.resolveTop
+    Spec.assertEqWith s "CR 702.35a the Vampire is cast for {2}{B} though the Gorger has died" (S.countOnBattlefieldByName (S.printingName vampire) S.alice entered) 1
+    Spec.assertBool s (elem (S.printingName gorger) (namesIn Zone.Graveyard resolved)) "setup: the Gorger was in the graveyard before triggers were placed"
+  -- Asylum Visitor prints madness {1}{B} and the Gorger grants one at its mana
+  -- cost {1}{B}: which of the two exiles it is a choice between indistinguishable
+  -- answers, so ONE trigger goes on the stack above the Reunion (#4443 is the
+  -- case where the costs differ).
+  Spec.it s "CR 702.35a Asylum Visitor under the Gorger has one madness trigger" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    visitor <- S.printingOf s registry "Asylum Visitor"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    gorger <- S.printingOf s registry "Falkenrath Gorger"
+    let (reunionId, ready) = gorgerBoard True mountain swamp visitor reunion gorger
+        discarded = S.runPure madnessAnswer ready (S.cast S.alice reunionId)
+        placed = S.runPure madnessAnswer discarded Engine.placePendingTriggers
+    Spec.assertEqWith s "CR 702.35a the Reunion and one madness trigger are on the stack" (length (GameState.stack placed)) 2
 
 -- alice on her turn with two Mountains and three Swamps untapped, Bloodrage
 -- Vampire {2}{B} and a Mountain in hand beside Cathartic Reunion, and Falkenrath
@@ -6009,6 +6045,15 @@ gorgerBoard withGorger mountain swamp vampire reunion gorger =
       handed = snd (S.addHandCard mountain S.alice (snd (S.addHandCard vampire S.alice stocked)))
       withIt = if withGorger then snd (S.addPermanent gorger S.alice handed) else handed
    in S.addHandCard reunion S.alice withIt
+
+-- Tweeze aimed at alice's own Gorger by FILTERING the offer, its "may" taken,
+-- and the Vampire pinned as the discard; rule 702.35a's cast taken too.
+gorgerTweezeAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+gorgerTweezeAnswer gorgerId vampireId p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToCreature gorgerId) sets
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n (filter (== vampireId) ids)
+  _ -> madnessAnswer p
 
 -- Cast the Reunion, place whatever triggered, and resolve twice: rule 702.35a's
 -- trigger and the Vampire it cast, or else the Reunion and then nothing.
