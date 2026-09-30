@@ -1797,11 +1797,19 @@ eventTriggers events gs =
       -- `inGraveyards`' reason: a haunting card sits in exile indefinitely and no
       -- event names it, so nothing narrower could find it.
       --
-      -- Abilities come from the PRINTED card, so an effect changing the abilities
-      -- of a card in exile is not seen (#1859). The controller is the OWNER (CR
-      -- 108.4a), for `inGraveyards`' reason: CR 108.4 gives a card in exile no
-      -- controller at all, so Blind Hunter's "you gain 2 life" pays the player
-      -- who owns the haunting card.
+      -- Abilities come from the PROJECTION (CR 613.1 names no zone), so Delay's
+      -- "it gains suspend" mints suspend's two triggered abilities on the card it
+      -- exiled -- Pawl.SpecialActionSpec's "CR 702.62a Delay" group proves it.
+      -- Gated so the scan does not project every exiled card: a card is
+      -- projected only when its printed face yields such an ability or some
+      -- grantor writes a keyword that mints one (`exileGrantInForce`).
+      --
+      -- Not implemented: a triggered ability granted to a card in exile with no
+      -- keyword behind it, which that gate does not consult (#1859).
+      --
+      -- The controller is the OWNER (CR 108.4a), for `inGraveyards`' reason: CR
+      -- 108.4 gives a card in exile no controller at all, so Blind Hunter's "you
+      -- gain 2 life" pays the player who owns the haunting card.
       -- A card exiled FACE DOWN is skipped: CR 406.3a leaves it no
       -- characteristics, so it bears no ability to function from anywhere. The
       -- sibling gates are Pawl.Engine.Projection's, which drop the same card's
@@ -1821,11 +1829,21 @@ eventTriggers events gs =
       -- is what decides which keywords reach this: suspend and CR 702.35a's
       -- madness, whose own first ability is what put its card here.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-        (Just obj, Just face) | not (Object.exiledFaceDown obj) ->
-          case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> fmap whole (Keyword.exileTriggeredAbilitiesOf (Face.keywordSet face)) of
-            [] -> Nothing
-            abilities -> Just (oid, (Object.owner obj, abilities))
+        (Just obj, Just face)
+          | not (Object.exiledFaceDown obj) ->
+              let inExileZone subtypes triggered keywords = Maybe.mapMaybe (functionsIn subtypes (Face.delayedAbilities face) Zone.Exile) triggered <> fmap whole (Keyword.exileTriggeredAbilitiesOf keywords)
+                  printed = inExileZone (TypeLine.subtypes (Face.typeLine face)) (Face.triggeredAbilities face) (Face.keywordSet face)
+               in if null printed && not exileGrantInForce
+                    then Nothing
+                    else
+                      let pc = Projection.project oid gs
+                       in case inExileZone (PC.subtypes pc) (PC.triggeredAbilities pc) (Map.keysSet (PC.keywords pc)) of
+                            [] -> Nothing
+                            abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
+      -- Does anything grant a keyword that mints an exile trigger? A thunk:
+      -- only an exiled card whose printed face yields none forces it.
+      exileGrantInForce = Projection.keywordGrantInForce (not . null . Keyword.exileTriggeredAbilitiesOf . Set.singleton) gs
       inExile = Map.fromList (Maybe.mapMaybe exileCandidate (Set.toAscList (GameState.exile gs)))
       -- CR 113.6k's other zone: the spell that just became cast, offered from the
       -- STACK, where CR 601.2a leaves it. Desolation Twin's "when you cast this

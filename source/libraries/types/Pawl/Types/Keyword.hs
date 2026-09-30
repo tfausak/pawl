@@ -325,8 +325,10 @@ data Keyword
     -- (Pawl.Engine.Suspend); the two triggered abilities function in exile and
     -- are minted by Pawl.Engine.Keyword.exileTriggeredAbilitiesOf. The last
     -- sentence's haste is Pawl.Engine.Stack.armBecame's, off the tag the third
-    -- ability's offer leaves on Pawl.Types.Object's castUsing.
-    Suspend (Suspend.Suspend Keyword)
+    -- ability's offer leaves on Pawl.Types.Object's castUsing. Nothing is the
+    -- suspend an effect gives an exiled card (Delay's "it gains suspend"), which
+    -- prints no N and no cost, so only the two triggered abilities remain.
+    Suspend (Maybe (Suspend.Suspend Keyword))
   | -- | 702.63a: vanishing N -- enter with N time counters, remove one at each
     -- upkeep, and sacrifice the permanent when the last one goes. Nothing is CR
     -- 702.63b's numberless printing, which states only the last two abilities.

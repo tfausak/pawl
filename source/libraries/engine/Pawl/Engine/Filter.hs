@@ -2636,7 +2636,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.SplitSecond -> keyword
   -- CR 702.62a states a cost, so rewriteCost reaches it as flashback's does. The
   -- N is a number and not a word, and "time counter" is the rule's own noun.
-  Keyword.Type.Suspend (Suspend.MkSuspend n cost) -> Keyword.Type.Suspend (Suspend.MkSuspend n (rewriteCost pairs cost))
+  Keyword.Type.Suspend payload -> Keyword.Type.Suspend (fmap (\(Suspend.MkSuspend n cost) -> Suspend.MkSuspend n (rewriteCost pairs cost)) payload)
   -- CR 702.77a states a cost, so rewriteCost reaches it as flashback's does. The
   -- N is a number and not a word, and "+1/+1 counter" is in the ability
   -- Pawl.Engine.Keyword.reinforce mints rather than in this value.

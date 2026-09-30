@@ -5292,15 +5292,9 @@ replacementsAffecting gs =
         Just face
           | null (Keyword.graveyardReplacementsOf (Face.keywordSet face)) && not graveyardGrantInForce -> []
           | otherwise -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.graveyardReplacementsOf (Map.keysSet (keywordsOf oid gs)))
-      -- Does anything grant a keyword that mints a graveyard row? baseHas's
-      -- grantor disjunct and `elsewhereHas`'s two, asked with the narrower
-      -- predicate. A thunk: only a graveyard card printing no such keyword
-      -- forces it.
-      mintsInGraveyard = grantsKeywordWhere (not . null . Keyword.graveyardReplacementsOf . Set.singleton)
-      graveyardGrantInForce =
-        any (any (any mintsInGraveyard . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) onBattlefield
-          || storedWrites mintsInGraveyard gs
-          || elsewhereGrants mintsInGraveyard gs
+      -- Does anything grant a keyword that mints a graveyard row? A thunk: only
+      -- a graveyard card printing no such keyword forces it.
+      graveyardGrantInForce = keywordGrantInForce (not . null . Keyword.graveyardReplacementsOf . Set.singleton) gs
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
@@ -5319,6 +5313,19 @@ replacementsAffecting gs =
           then []
           else concatMap (forOne Zone.Battlefield) onBattlefield <> concatMap (forOne Zone.Command) inCommand
    in onBoard <> stated
+
+-- Does anything grant a keyword satisfying `p`, to anything? A static ability
+-- of a permanent, a stored continuous effect (storedWrites), or a static
+-- ability functioning from another zone (elsewhereGrants). What a zone walk
+-- asks before it projects a card whose printed face carries no such keyword:
+-- replacementsAffecting's dredge mint and Pawl.Engine.Event.Trigger's exile
+-- scan.
+keywordGrantInForce :: (Keyword -> Bool) -> GameState -> Bool
+keywordGrantInForce p gs =
+  let writes = grantsKeywordWhere p
+   in any (any (any writes . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
+        || storedWrites writes gs
+        || elsewhereGrants writes gs
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
 -- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two

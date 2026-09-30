@@ -1436,7 +1436,7 @@ effectObjectRefs effect =
         -- The pair comes out of a target slot, not an ObjectRef.
         Effect.SwitchBlockers {} -> []
         Effect.ExchangeBlocks {} -> []
-        Effect.Counter (Counter.MkCounter ref _ _) -> read_ [ref]
+        Effect.Counter (Counter.MkCounter ref _ _ _) -> read_ [ref]
         Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
         Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
         -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the

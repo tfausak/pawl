@@ -501,13 +501,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- ENCODE direction, since Arm.tagged forces a constructor's TAG and not its
   -- arm, so a missing arm compiles.
   Spec.it s "Suspend carries its counters and its cost" $ do
-    let suspend n cost = Keyword.Suspend (Suspend.MkSuspend (SuspendCounters.Literal n) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic cost])) []))
+    let suspend n cost = Keyword.Suspend (Just (Suspend.MkSuspend (SuspendCounters.Literal n) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic cost])) [])))
     Common.assertCodec
       s
       Keyword.codec
       (suspend 1 3)
       " {\"type\":\"Suspend\",\"value\":{\"counters\":{\"type\":\"Literal\",\"value\":1},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}} "
     Spec.assertBool s (Codec.encode Keyword.codec (suspend 1 3) /= Codec.encode Keyword.codec (suspend 2 3)) "the counters are carried, not defaulted"
+    Common.assertCodec s Keyword.codec (Keyword.Suspend Nothing) " {\"type\":\"Suspend\"} "
   -- CR 702.94a's payload is a Cost too, and must not share Plot's or Flashback's
   -- tag: all three name a cost on a card, and miracle's is the one CR 118.9
   -- alternative the reveal window offers.

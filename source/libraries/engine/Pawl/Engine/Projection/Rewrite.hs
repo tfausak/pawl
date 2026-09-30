@@ -778,7 +778,7 @@ rewriteEffect pairs effect = case effect of
   -- holds no word.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount from whatRecipient whoRecipient to chosenSource) ->
     Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (fmap (rewriteQuantity pairs) amount) (fmap (rewriteObjectRef pairs) from) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
-  Effect.Counter (Counter.MkCounter ref mSlot mSources) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources)
+  Effect.Counter (Counter.MkCounter ref mSlot mSources mExiled) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources mExiled)
   -- CR 612.1 through the KIND as well, where Filter's HasCounters arm rewrites
   -- the same one: CR 122.1b's keyword counter carries a keyword, and a word
   -- inside it is swapped like any other. Pawl.CounterspellSpec's Synthetic

@@ -7117,36 +7117,41 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- 117.5 scan reads this event the controller can no longer be asked for exactly
 -- (see Pawl.Types.Countering).
 counter :: ObjectId -> PlayerId -> ObjectId -> Game ()
-counter source controller oid = Monad.void (counterOne source controller oid)
+counter source controller oid = Monad.void (counterOne Zone.Graveyard source controller oid)
 
 -- counter over a whole batch, answering with the objects it ACTUALLY countered
 -- (CR 701.6a) -- which is emphatically not the batch it was handed: an id naming
 -- no object, any can't-be-countered gate, and a move the CR 616.1 loop
 -- cancelled each leave their victim out of the answer.
 --
--- The VICTIMS as the caller named them, not the graveyard incarnations CR 400.7
--- mints: Swift Silence's "draw a card for each spell countered this way" and
--- Glen Elendra's Answer's "for each spell and ability countered this way" want
--- how many, which Pawl.Engine.Resolve binds as an amount, and Green Slime's "if
--- a permanent's ability is countered this way" wants WHICH, walked to its CR
--- 113.7 source under the id the caller named. An ability leaves no new object
--- at all (CR 608.2n), so there is no second id to report for it -- which is why
--- the answer is the victims and not the incarnations.
+-- Each VICTIM as the caller named it, beside the incarnations its move minted
+-- (CR 400.7). Swift Silence's "draw a card for each spell countered this way"
+-- and Glen Elendra's Answer's "for each spell and ability countered this way"
+-- want how many, which Pawl.Engine.Resolve binds as an amount, and Green
+-- Slime's "if a permanent's ability is countered this way" wants WHICH, walked
+-- to its CR 113.7 source under the id the caller named. Delay's "exile it with
+-- three time counters on it" wants the incarnation. An ability leaves no new
+-- object at all (CR 608.2n), so it has none.
+--
+-- `zone` is where a countered SPELL goes: CR 701.6a's graveyard, or exile for
+-- Delay's "exile it ... instead of putting it into its owner's graveyard".
 --
 -- A second door rather than a return type on `counter`, the destroyReturning
--- posture: only the Counter opcode's two bound slots use the answer.
-counterReturning :: ObjectId -> PlayerId -> [ObjectId] -> Game [ObjectId]
-counterReturning source controller = Monad.filterM (counterOne source controller)
+-- posture: only the Counter opcode's bound slots use the answer.
+counterReturning :: Zone.Zone -> ObjectId -> PlayerId -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
+counterReturning zone source controller =
+  fmap Maybe.catMaybes . traverse (\oid -> fmap (fmap ((,) oid)) (counterOne zone source controller oid))
 
--- The shared body of both doors: counter ONE object, answering whether it was.
-counterOne :: ObjectId -> PlayerId -> ObjectId -> Game Bool
-counterOne source controller oid = do
+-- The shared body of both doors: counter ONE object, answering Nothing when it
+-- was not countered and the incarnations its move minted when it was.
+counterOne :: Zone.Zone -> ObjectId -> PlayerId -> ObjectId -> Game (Maybe (Seq.Seq ObjectId))
+counterOne zone source controller oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
-    Nothing -> pure False
+    Nothing -> pure Nothing
     -- CR 613.11's gate first, ahead of the branch split, because it is the one
     -- that reaches both of CR 701.6a's subjects.
-    Just _ | protectedFromCountering oid gs -> pure False
+    Just _ | protectedFromCountering oid gs -> pure Nothing
     -- CR 106.6 through CR 101.2, and ahead of the branch split for CR 613.11's
     -- reason: rule 106.6 says an additional effect "affects the spell or
     -- ability that mana is spent on", so both of CR 701.6a's subjects are in
@@ -7155,7 +7160,7 @@ counterOne source controller oid = do
     --
     -- The typed question again, so this module never sees a ManaRiderEffect
     -- constructor; Pawl.Engine.ManaRider is where the casing lives.
-    Just _ | ManaRider.uncounterable oid gs -> pure False
+    Just _ | ManaRider.uncounterable oid gs -> pure Nothing
     -- CR 608.2n, reached before the CR 113.6g gate because that gate asks about a
     -- spell's own card and an ability has none -- Game.faceOf answers Nothing for
     -- one, so asking first would fall through to the graveyard move by accident.
@@ -7169,13 +7174,13 @@ counterOne source controller oid = do
               Countering.source = source,
               Countering.controller = controller
             }
-      pure True
+      pure (Just Seq.empty)
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
-      Just Counterability.CantBeCountered -> pure False
+      Just Counterability.CantBeCountered -> pure Nothing
       _ -> do
-        moved <- changeZoneReturning oid Zone.Graveyard
+        moved <- changeZoneReturning oid zone
         if Seq.null moved
-          then pure False
+          then pure Nothing
           else do
             State.modify'
               . recordEvent
@@ -7185,7 +7190,7 @@ counterOne source controller oid = do
                     Countering.source = source,
                     Countering.controller = controller
                   }
-            pure True
+            pure (Just moved)
 
 -- CR 601.2c: record that everything just announced as a target BECAME one --
 -- "the chosen objects and/or players each become a target of that spell. (Any
