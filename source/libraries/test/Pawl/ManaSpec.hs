@@ -2539,6 +2539,26 @@ musterDynamoSpec s registry = Spec.describe s "Synthetic Muster Dynamo" $ do
     Spec.assertBool s (pays 1) "either source pays {1}"
     Spec.assertBool s (not (pays 2)) "and three Elves are not four, so not {2}"
 
+  -- Two Bloodbraid Elves (3/2) would be two activations alone, but Heritage
+  -- Druid must tap three of its four Elves, a Bloodbraid among them, so the
+  -- Dynamo is one activation beside it: {G}{G}{G} and {C}. The counting check
+  -- cannot see WHICH creatures reach 3, so a contended Dynamo is held to one
+  -- activation (Activations.contendedTimes); at one it still overstates on
+  -- some boards (#4433). Eon Hub is {5} and Jade Statue {4}, both all generic
+  -- and neither targeting as it is cast.
+  Spec.it s "CR 601.2g the Dynamo beside a Heritage Druid is one activation" $ do
+    druid <- S.printingOf s registry "Heritage Druid"
+    bloodbraid <- S.printingOf s registry "Bloodbraid Elf"
+    hub <- S.printingOf s registry "Eon Hub"
+    statue <- S.printingOf s registry "Jade Statue"
+    board <- musterDynamoBoard s registry [("Glistener Elf", 1), ("Goblin Piker", 1)]
+    let withElves = foldr (\p gs -> snd (S.addPermanent p S.alice gs)) board [druid, bloodbraid, bloodbraid]
+        offered spell =
+          let (withSpell, oid) = S.handOne spell withElves
+           in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+    Spec.assertBool s (not (offered hub)) "no {5}: the Druid leaves one Bloodbraid, and the Dynamo one activation"
+    Spec.assertBool s (offered statue) "and {4} is the Druid's {G}{G}{G} and one {C}"
+
   -- The gameplay-level proof (design.md section 4). Sapphire Medallion is {2},
   -- all generic, and targets nothing, so the cast turns on the Dynamo being
   -- activated twice. The boards differ in one Elf.

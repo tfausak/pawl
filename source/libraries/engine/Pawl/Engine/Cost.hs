@@ -2973,11 +2973,12 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
               -- every activation still has to find that mana again. Both readers
               -- hand this function the same cost, so both get the same count.
               Activations.times = repeatsOf pid oid cost gs,
+              Activations.contendedTimes = contendedRepeatsOf pid oid cost gs,
               Activations.claims = claimsOf Map.empty pid oid (Cost.components cost) gs,
               Activations.life = lifeOwedBy pid gs (Cost.components cost),
               Activations.energy = energyOwedBy (Cost.components cost)
             }
-        else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
+        else Activations.MkActivations {Activations.times = 0, Activations.contendedTimes = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
 
 -- CR 601.2f's adjustments for a MANA ability's activation cost, gathered where
 -- CR 605.3b leaves no stack window for Pawl.Engine.Activate to gather them in.
@@ -3106,6 +3107,19 @@ repeatsOf pid oid cost gs =
           [] -> 1
           limits -> minimum limits
         _ -> 1
+
+-- `repeatsOf` where another source or the paid cost contends for this cost's
+-- claims (Activations.contendedTimes): at most 1 once the cost states a
+-- threshold claim, which the counting check does not hold to the objects that
+-- reach the threshold. Not implemented: an exact joint check for a contended
+-- threshold claim, which would let it repeat there too (#4433).
+contendedRepeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
+contendedRepeatsOf pid oid cost gs =
+  let components = Cost.components cost
+      thresholds =
+        [() | CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n _) <- components, n > 0]
+          <> [() | CostComponent.CollectEvidence n <- components, n > 0]
+   in (if null thresholds then id else min 1) (repeatsOf pid oid cost gs)
 
 -- The ceiling ONE component imposes that `repeatsOf`'s four totals do not
 -- already carry, or Nothing where one of them does or where it spends nothing
