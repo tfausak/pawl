@@ -23,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.Scenario" $ do
         { Scenario.Type.description = Text.pack "nothing happens",
           Scenario.Type.board =
             Board.Type.MkBoard
-              { Board.Type.seats = Seat.Type.MkSeat (Label.Type.MkLabel (Text.pack "alice")) 20 Seq.empty Seq.empty Seq.empty Seq.empty NonEmpty.:| [],
+              { Board.Type.seats = Seat.Type.MkSeat (Label.Type.MkLabel (Text.pack "alice")) 20 Seq.empty Seq.empty Seq.empty Seq.empty Seq.empty NonEmpty.:| [],
                 Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
                 Board.Type.phase = Phase.Type.PrecombatMain,
                 Board.Type.monarch = Nothing,
