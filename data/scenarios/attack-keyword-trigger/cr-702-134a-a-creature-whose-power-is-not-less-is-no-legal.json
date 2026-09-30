@@ -1,0 +1,25 @@
+{
+  "description": "CR 702.134a a creature whose power is not less is no legal target",
+  "note": "Mentor's \"power less than this creature's power\" is strict, so a Hill Giant attacking beside the 3-power Blade Instructor is no legal target, and neither is the Instructor itself: nothing is mentored. Same declaration as the proving test; only the fellow attacker's power differs. A filter that admitted the Giant would ask for the trigger's target, which fails the run, or put a counter on it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Blade Instructor", "label": "blade-instructor", "ready": true },
+          { "card": "Hill Giant", "label": "hill-giant", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@blade-instructor", "@hill-giant"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@hill-giant", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@blade-instructor", "power": 3, "toughness": 1 } } }
+  ]
+}

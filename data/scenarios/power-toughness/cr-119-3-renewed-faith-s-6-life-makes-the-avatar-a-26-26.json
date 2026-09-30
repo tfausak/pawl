@@ -1,0 +1,30 @@
+{
+  "description": "CR 119.3 Renewed Faith's 6 life makes the Avatar a 26/26",
+  "note": "The liveness falsifier, upward: nothing touches the Avatar, so only the next projection's read of alice's life can move it from 20/20 to 26/26. Renewed Faith is targetless.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains-1", "ready": true },
+          { "card": "Plains", "label": "plains-2", "ready": true },
+          { "card": "Plains", "label": "plains-3", "ready": true },
+          { "card": "Serra Avatar", "label": "avatar" }
+        ],
+        "hand": [{ "card": "Renewed Faith", "label": "renewed-faith" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@avatar", "power": 20, "toughness": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@renewed-faith", "mana": ["@plains-1", "@plains-2", "@plains-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 26 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@avatar", "power": 26, "toughness": 26 } } }
+  ]
+}

@@ -367,23 +367,6 @@ mentorSpec s registry =
                 (Just (3, 2), Just (3, 1))
               Spec.assertEqWith s "and it is a counter" (countersOn piker after) (Map.singleton CounterKind.PlusOnePlusOne 1)
             _ -> Spec.assertFailure s "fixture should give alice an Instructor and a Piker"
-        -- "POWER LESS THAN this creature's power" is strict, so a 3/3 attacking
-        -- beside a 3-power Instructor is no legal target -- and neither is the
-        -- Instructor itself, which is why nothing at all is mentored here. Same
-        -- declaration as the proving test; only the fellow attacker's power
-        -- differs. S.aggressiveAnswer rather than `plan`, so that a filter that
-        -- admitted the Giant would take the default target and go red.
-        Spec.it s "CR 702.134a a creature whose power is not less is no legal target" $ do
-          (gs, mine, _) <- board ["Blade Instructor", "Hill Giant"] []
-          case mine of
-            [instructor, giant] -> do
-              let after = atDamage S.aggressiveAnswer gs
-              Spec.assertEqWith
-                s
-                "both are at their printed sizes"
-                (S.powerToughnessOf giant after, S.powerToughnessOf instructor after)
-                (Just (3, 3), Just (3, 1))
-            _ -> Spec.assertFailure s "fixture should give alice an Instructor and a Giant"
         -- CR 508.1k's "attacking": the same Piker, small enough and on the same
         -- side, is no target while it stays home. The answerer aims at it anyway,
         -- so an ability that dropped the IsAttacking conjunct would mentor it.

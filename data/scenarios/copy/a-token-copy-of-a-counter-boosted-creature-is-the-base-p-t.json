@@ -1,0 +1,30 @@
+{
+  "description": "a token copy of a counter-boosted creature is the base P/T (CR 707.2)",
+  "note": "CR 707.2 excludes counters from the copiable values. Cackling Counterpart copies a Goblin Piker carrying a +1/+1 counter: the source is 3/2, the token the base 2/1. Stamping the projection rather than the copiable values would make the token 3/2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "goblin-piker", "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 1 }] },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true },
+          { "card": "Island", "label": "island-3", "ready": true }
+        ],
+        "hand": [{ "card": "Cackling Counterpart", "label": "cackling-counterpart" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@cackling-counterpart", "targets": ["@goblin-piker"], "mana": ["@island", "@island-2", "@island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@goblin-piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Goblin Piker#2", "power": 2, "toughness": 1 } } }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "description": "CR 509.3a a Guard that does not block is not pumped",
+  "note": "The control leg for bushido's blocking half, on the same board: bob's Inner-Chamber Guard does not block alice's Goblin Piker, so CR 509.3a's event never happens and the Guard stays 0/2 while the Piker's 2 reaches bob. An ability that pumped on any combat event would pass the blocking case and fail this one.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "goblin-piker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Inner-Chamber Guard", "label": "inner-chamber-guard", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@inner-chamber-guard", "power": 0, "toughness": 2 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } }
+  ]
+}

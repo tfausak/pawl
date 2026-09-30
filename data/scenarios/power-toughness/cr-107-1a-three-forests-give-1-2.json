@@ -1,0 +1,32 @@
+{
+  "description": "CR 107.1a three Forests give +1/+2",
+  "note": "Aspect of Wolf on bob's 3/3 Hill Giant, three Forests under alice: half of three rounds down for the power and up for the toughness, so 4/5. The Aura's controller counts, not the Giant's: bob's two Forests would change the answer. A second odd board beside the five-Forest one, so neither half can be a constant.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true }
+        ],
+        "hand": [{ "card": "Aspect of Wolf", "label": "aspect" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Forest", "label": "bob-forest-1", "ready": true },
+          { "card": "Forest", "label": "bob-forest-2", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@aspect", "targets": ["@giant"], "mana": ["@forest-1", "@forest-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 4, "toughness": 5 } } }
+  ]
+}
