@@ -127,6 +127,65 @@ lengBoard s registry decision = do
       after = snd (Engine.runGamePure (lengAnswer decision) cast Stack.resolveTop)
   pure (after, swamp, piker, miasma)
 
+-- CR 401.4's owner, answering Prompt.ArrangeLibraryArrivals: bob reverses the
+-- order he is offered when `reversing`, and keeps it otherwise; any other seat
+-- asked keeps it, so asking the wrong player leaves the move order.
+arrangedBy :: Bool -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [Natural]
+arrangedBy reversing pid oids
+  | reversing && pid == S.bob = reverse (zipWith const [0 ..] oids)
+  | otherwise = zipWith const [0 ..] oids
+
+-- Library of Leng under bob, who holds a Forest and an Island over a library
+-- of one Goblin Piker; alice casts Mind Rot at him and he puts both discards on
+-- top. Two cards are his whole hand, so CR 609.3 takes both unasked, in hand
+-- order: handCards adds at the front, so the Island goes first and the Forest
+-- lands on it. Returns the resolved state.
+lengMindRotBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m GameState.GameState
+lengMindRotBoard s registry reversing = do
+  swamp <- S.printingOf s registry "Swamp"
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  mindRot <- S.printingOf s registry "Mind Rot"
+  leng <- S.printingOf s registry "Library of Leng"
+  let base = S.landsInPlay swamp 3
+      (_, withLeng) = S.addPermanent leng S.bob base
+      (_, stocked) = S.addLibraryCard piker S.bob withLeng
+      withHand = handCards island S.bob 1 (handCards forest S.bob 1 stocked)
+      (gs, spellId) = S.handOne mindRot withHand
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ArrangeLibraryArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        _ -> lengAnswer OptionalDecision.Exercises p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
+-- Wheel of Sun and Moon, alice's, enchanting bob, who controls a Goblin Piker
+-- and an Ogre Sentry over a library of one Typhoid Rats; alice casts Day of
+-- Judgment, and both creatures go to the bottom of bob's library. Returns the
+-- resolved state.
+wheelJudgmentBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m GameState.GameState
+wheelJudgmentBoard s registry reversing = do
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wheel <- S.printingOf s registry "Wheel of Sun and Moon"
+  judgment <- S.printingOf s registry "Day of Judgment"
+  let base = S.landsInPlay plains 4
+      (wheelId, withWheel) = S.addPermanent wheel S.alice base
+      enchanting = S.attachTo wheelId (Recipient.ToPlayer S.bob) withWheel
+      (_, withPiker) = S.addPermanent piker S.bob enchanting
+      (_, withSentry) = S.addPermanent sentry S.bob withPiker
+      (_, stocked) = S.addLibraryCard rats S.bob withSentry
+      (gs, spellId) = S.handOne judgment stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ArrangeLibraryArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
 -- Three seats: alice controls Pulmonic Sliver; carol owns a Lymph Sliver bob
 -- controls, over a library of one Goblin Piker each for bob and carol. The
 -- Lymph Sliver is destroyed; bob answers the redirect as given and any other
@@ -815,6 +874,55 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "psychic miasma returned to alice's hand" (namesIn Zone.Hand S.alice after) [Just (S.printingName miasma)]
     Spec.assertEqWith s "bob's discarded swamp is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName swamp)]
     Spec.assertEqWith s "and his library is untouched" (namesIn Zone.Library S.bob after) [Just (S.printingName piker)]
+  -- CR 401.4: "if an effect puts two or more cards in a specific position in a
+  -- library at the same time, the owner of those cards may arrange them in any
+  -- order" -- Library of Leng's own ruling says the same. Mind Rot's two
+  -- discards are one event (CR 608.2f), each redirected onto the top of bob's
+  -- library, so bob is asked their order. The pair differs in bob's answer
+  -- alone: kept, the Forest moved last is on top; reversed, the Island is, and
+  -- it is what bob draws next.
+  Spec.it s "CR 401.4 bob orders the two Mind Rot discards Library of Leng puts on top of his library" $ do
+    reversed <- lengMindRotBoard s registry True
+    kept <- lengMindRotBoard s registry False
+    let name = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "reversed: the Island is on top, over the Forest" (namesIn Zone.Library S.bob reversed) [name "Island", name "Forest", name "Goblin Piker"]
+    Spec.assertEqWith s "kept: the Forest is on top, over the Island" (namesIn Zone.Library S.bob kept) [name "Forest", name "Island", name "Goblin Piker"]
+    Spec.assertEqWith s "and his graveyard is empty" (namesIn Zone.Graveyard S.bob reversed) []
+  -- The same rule through the destroy funnel: Wheel of Sun and Moon sends Day of
+  -- Judgment's two victims to the bottom of bob's library together, and bob
+  -- orders them from the bottom up.
+  Spec.it s "CR 401.4 bob orders the two creatures Wheel of Sun and Moon puts under his library" $ do
+    reversed <- wheelJudgmentBoard s registry True
+    kept <- wheelJudgmentBoard s registry False
+    let name = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "reversed: the Goblin Piker is on the bottom" (namesIn Zone.Library S.bob reversed) [name "Typhoid Rats", name "Ogre Sentry", name "Goblin Piker"]
+    Spec.assertEqWith s "kept: the Ogre Sentry is on the bottom" (namesIn Zone.Library S.bob kept) [name "Typhoid Rats", name "Goblin Piker", name "Ogre Sentry"]
+  -- CR 118.12: Tweeze's "You may discard a card. If you do, draw a card" makes
+  -- the discard a cost paid on resolution, and Library of Leng's ruling: "you
+  -- can't use the Library of Leng ability ... when you discard a card as a cost,
+  -- because costs aren't effects". Alice controls the Library and takes every
+  -- "may" and every redirect she is offered; were the redirect offered, the
+  -- Forest would go on top of her library and be the card she draws.
+  Spec.it s "CR 118.12 Library of Leng does not reach Tweeze's discard, a cost" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    tweeze <- S.printingOf s registry "Tweeze"
+    leng <- S.printingOf s registry "Library of Leng"
+    let (_, withLeng) = S.addPermanent leng S.alice (S.landsInPlay mountain 3)
+        (_, stocked) = S.addLibraryCard piker S.alice withLeng
+        (withSpell, spellId) = S.handOne tweeze stocked
+        (_, gs) = S.addHandCard forest S.alice withSpell
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          _ -> lengAnswer OptionalDecision.Exercises p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+        name = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "the Forest is in alice's graveyard beside Tweeze" (List.sort (namesIn Zone.Graveyard S.alice after)) (List.sort [name "Forest", name "Tweeze"])
+    Spec.assertEqWith s "and she drew the Goblin Piker, not the Forest" (namesIn Zone.Hand S.alice after) [name "Goblin Piker"]
+    Spec.assertEqWith s "bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
   -- The row's other gate, its ruling's "you can't use the Library of Leng
   -- ability ... when you discard a card as a cost, because costs aren't
   -- effects": a DiscardCause.Ordinary discard is never offered the row, so an

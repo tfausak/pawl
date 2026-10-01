@@ -324,6 +324,7 @@ import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LabelSpec
 import qualified Pawl.Codec.LastKnownSpec
 import qualified Pawl.Codec.LayoutSpec
+import qualified Pawl.Codec.LibraryArrivalSpec
 import qualified Pawl.Codec.LibraryDepthSpec
 import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
@@ -1121,6 +1122,7 @@ spec s registry = do
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LastKnownSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
+  Pawl.Codec.LibraryArrivalSpec.spec s
   Pawl.Codec.LibraryDepthSpec.spec s
   Pawl.Codec.LibraryPlacementSpec.spec s
   Pawl.Codec.LibraryPositionSpec.spec s

@@ -1818,6 +1818,8 @@ withEvents events gs =
       GameState.nextEventGroup = EventGroup.MkEventGroup (Natural.length events),
       GameState.eventGroupDepth = 0,
       GameState.enteringTogether = Nothing,
+      GameState.libraryArrivals = Seq.empty,
+      GameState.payingOnResolution = False,
       GameState.scannedThrough = 0,
       GameState.damageScannedThrough = 0,
       -- Rewriting the log rewrites the groups, so any sample Event.recordEvent
@@ -2090,6 +2092,8 @@ oneMountainState mountain ph =
           GameState.nextEventGroup = EventGroup.first,
           GameState.eventGroupDepth = 0,
           GameState.enteringTogether = Nothing,
+          GameState.libraryArrivals = Seq.empty,
+          GameState.payingOnResolution = False,
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.battlefieldWhenTriggered = Map.empty,

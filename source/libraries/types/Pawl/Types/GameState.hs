@@ -38,6 +38,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LibraryArrival as LibraryArrival
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
@@ -120,6 +121,14 @@ data GameState = MkGameState
     -- | CR 613.7m: the arrivals of the CR 608.2f action under way, ordered when
     -- it ends (Event.together). Nothing outside one.
     enteringTogether :: Maybe EnteringTogether.EnteringTogether,
+    -- | CR 401.4: the redirected library arrivals of the Event.simultaneously
+    -- bracket under way, arranged by their owners when it ends. Empty outside
+    -- one.
+    libraryArrivals :: Seq.Seq LibraryArrival.LibraryArrival,
+    -- | CR 118.12: the instructions running are the "[do something]" a later
+    -- clause's "If [a player] does" reads, so a cost paid on resolution rather
+    -- than an effect (Event.payingOnResolution). False outside one.
+    payingOnResolution :: Bool,
     -- | CR 608.2h / 113.7a: last known information, keyed by the id an object
     -- had before it left a zone (CR 400.7). Grows for the whole game.
     lastKnown :: Map.Map ObjectId.ObjectId LastKnown.LastKnown,

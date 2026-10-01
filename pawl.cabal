@@ -697,6 +697,8 @@ library codec
     Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
     Pawl.Codec.LayoutSpec
+    Pawl.Codec.LibraryArrival
+    Pawl.Codec.LibraryArrivalSpec
     Pawl.Codec.LibraryDepth
     Pawl.Codec.LibraryDepthSpec
     Pawl.Codec.LibraryPlacement
@@ -2204,6 +2206,7 @@ library types
     Pawl.Types.Layer
     Pawl.Types.Layout
     Pawl.Types.LearnMode
+    Pawl.Types.LibraryArrival
     Pawl.Types.LibraryDepth
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition

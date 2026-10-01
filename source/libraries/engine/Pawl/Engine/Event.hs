@@ -144,6 +144,7 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.LibraryArrival as LibraryArrival
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LifeGainR as LifeGainR
@@ -358,12 +359,65 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
 -- each source's gain an event of its own.
+--
+-- The outermost bracket also settles CR 401.4 for the moves a replacement
+-- redirected into a library inside it (arrangeLibraryArrivals), before the group
+-- closes.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
   result <- body
+  outermost <- State.gets ((== 1) . GameState.eventGroupDepth)
+  Monad.when outermost arrangeLibraryArrivals
   State.modify' closeEventGroup
   pure result
+
+-- CR 401.4: "if an effect puts two or more cards in a specific position in a
+-- library at the same time, the owner of those cards may arrange them in any
+-- order". The redirected arrivals the bracket recorded (noteLibraryArrival),
+-- grouped by owner and end; a group of two or more MOVES is asked of its owner
+-- with Prompt.ArrangeLibraryArrivals, and the cards are rewritten into the slots
+-- they already hold. A lone move is one order -- a melded permanent's two cards
+-- were arranged by CR 712.21a as they moved.
+--
+-- After the fact rather than before each move, which observes nothing new:
+-- nothing inside the bracket reads a library's order, and the owner learns no
+-- more by waiting than the replacement choices already told them.
+--
+-- Pawl.ZoneChangeSpec's Library of Leng and Wheel of Sun and Moon CR 401.4 cases
+-- prove it.
+arrangeLibraryArrivals :: Game ()
+arrangeLibraryArrivals = do
+  pending <- State.gets GameState.libraryArrivals
+  Monad.unless (Seq.null pending) $ do
+    State.modify' (\g -> g {GameState.libraryArrivals = Seq.empty})
+    gs0 <- State.get
+    let movesAt owner position = filter (\arrival -> LibraryArrival.owner arrival == owner && LibraryArrival.position arrival == position) (Foldable.toList pending)
+    Monad.forM_ (Game.apnapOrder gs0) $ \owner -> Monad.forM_ [minBound .. maxBound] $ \position -> do
+      let moves = movesAt owner position
+      Monad.when (length moves >= 2) $ do
+        gs <- State.get
+        let library = Map.findWithDefault Seq.empty owner (GameState.library gs)
+            members = Set.fromList (concatMap (Foldable.toList . LibraryArrival.cards) moves)
+            held = [i | (i, oid) <- zip [0 :: Int ..] (Foldable.toList library), Set.member oid members]
+            -- From the arrival end inward, the prompt's reading.
+            slots = case position of
+              LibraryPosition.Top -> held
+              LibraryPosition.Bottom -> reverse held
+            batch = fmap (Seq.index library) slots
+        Monad.when (length batch >= 2) $ do
+          answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+          let arranged = Game.permute batch answer
+              rewrite lib = List.foldl' (\acc (slot, oid) -> Seq.update slot oid acc) lib (zip slots arranged)
+          State.modify' (\g -> g {GameState.library = Map.adjust rewrite owner (GameState.library g)})
+
+-- CR 401.4's record: inside an Event.simultaneously bracket, note a move a
+-- replacement redirected to an end of `owner`'s library. Outside one the move is
+-- alone, and one move is one order.
+noteLibraryArrival :: PlayerId -> LibraryPosition.LibraryPosition -> Seq.Seq ObjectId -> GameState -> GameState
+noteLibraryArrival owner position cards gs
+  | GameState.eventGroupDepth gs == 0 = gs
+  | otherwise = gs {GameState.libraryArrivals = GameState.libraryArrivals gs Seq.|> LibraryArrival.MkLibraryArrival owner position cards}
 
 -- CR 613.7m over CR 608.2f's action: run `body` so that everything it puts onto
 -- the battlefield is one batch, settled by Restamp.settle once it ends rather
@@ -6430,6 +6484,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- The OWNER's library, CR 400.3: every zone this funnel places into
               -- is keyed by owner, and `pid` is the id placeObject was handed.
               Monad.when shuffling (shuffleLibrary pid)
+              -- CR 401.4: a redirect INTO a library at a stated end, for the
+              -- bracket's owner to arrange (arrangeLibraryArrivals). A move
+              -- headed for a library already had its order settled by its
+              -- instruction (Pawl.Engine.Resolve.Effect.settleArrivals), and a
+              -- shuffle leaves no position to arrange.
+              Monad.when (dest == Zone.Library && requestedDest /= Zone.Library && not shuffling) $
+                State.modify' (noteLibraryArrival pid position (newId Seq.<| trailingIds0))
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
@@ -8416,6 +8477,25 @@ offerMiracleReveal pid drawn = do
 -- MINTED, since CR 702.29c's abilities trigger from wherever the card winds up.
 discard :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game ()
 discard cause pid oid = Monad.void (discardReturning cause pid oid)
+
+-- CR 118.12: run `body` as the "[do something]" of a resolving "If [a player]
+-- does": "the action [do something] is a cost, paid when the spell or ability
+-- resolves". Saved and restored, so nothing outside the body is a cost.
+payingOnResolution :: Game a -> Game a
+payingOnResolution body = do
+  saved <- State.gets GameState.payingOnResolution
+  State.modify' (\g -> g {GameState.payingOnResolution = True})
+  result <- body
+  State.modify' (\g -> g {GameState.payingOnResolution = saved})
+  pure result
+
+-- Why a resolving instruction's discard happens: ByEffect (CR 609.1), unless
+-- it is CR 118.12's cost (payingOnResolution) -- Library of Leng's ruling,
+-- "costs aren't effects". Pawl.ZoneChangeSpec's Tweeze case proves it.
+resolvingDiscardCause :: GameState -> DiscardCause.DiscardCause
+resolvingDiscardCause gs
+  | GameState.payingOnResolution gs = DiscardCause.Ordinary
+  | otherwise = DiscardCause.ByEffect
 
 -- A second door rather than a return type on `discard`, the changeZoneReturning
 -- and destroyReturning shape: the ~dozen callers that only perform the discard
