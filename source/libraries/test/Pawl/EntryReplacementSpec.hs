@@ -679,9 +679,9 @@ ravenousBoard plains rabbit =
       (held, gs) = S.addHandCard rabbit S.alice stocked
    in (readyForAlice gs, held)
 
--- CR 601.2b's announcement pinned to one value rather than followed to the mana,
--- Pawl.CopySpec's copyNamedAnnouncing's reason: an answerer taking the prompt's
--- affordability bound would announce 5 on both boards.
+-- CR 601.2b's announcement pinned to one value rather than followed to the mana:
+-- an answerer taking the prompt's affordability bound would announce 5 on both
+-- boards.
 announcing :: Natural.Natural -> Prompt.Prompt r -> r
 announcing x p = case p of
   Prompt.ChooseX {} -> x

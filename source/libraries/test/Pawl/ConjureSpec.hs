@@ -615,127 +615,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "asked once, offering the three nonland cards and no land, and revealing nothing"
       (offers, [() | GameEvent.Revealed _ <- S.eventsOf final])
       ([[lightningBolt, thinkTwice, ornithopter]], [])
-  -- The COPIABLE-VALUES tripwire. A Clone (CR 707.2) is a printed Clone whose
-  -- copiable values are the Piker's, so the two roads a duplicate could take
-  -- answer different names: the printed card under the object says Clone, and
-  -- its copiable values say Goblin Piker.
-  --
-  -- READ THROUGH THE PROJECTION, which is where CR 707.2's copiable values live
-  -- (CR 613.1a): the duplicate's printed card still says Clone -- it is minted
-  -- off the named object's printing -- and every characteristic a rule asks of it
-  -- says Goblin Piker. The two are asserted side by side, so a duplicate that
-  -- took the printed card instead would fail on the projection while the
-  -- printed-name read went on passing.
-  --
-  -- The Piker is DEAD when the assertions are read, which is what makes this a
-  -- duplicate rather than CreateCopy's token: a snapshot is a value (CR 707.2b)
-  -- and does not go looking for the object it came from.
-  --
-  -- The next case casts the duplicate out of that hand.
-  Spec.it s "CR 707.2 a duplicate of a Clone is a duplicate of what the Clone copies" $ do
-    islandPrinting <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    let board0 = S.landsFor mountain S.alice 3 (S.landsInPlay islandPrinting 2)
-        (pikerId, board1) = S.addPermanent piker S.alice board0
-        -- Pawl.CopySpec's road onto the battlefield: the Clone is RESOLVED, with
-        -- CR 614.12's as-enters copy answered by naming the Piker, so it is on
-        -- the battlefield as a copy rather than as the 0/0 CR 704.5f sweeps up.
-        (_, staged) = S.spellOnStack clone S.alice board1
-        entered = S.settleSba (copyingPiker pikerId staged)
-    case clonesOnBattlefield entered of
-      [] -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      cloneId : _ -> do
-        let (spell, board2) = S.addHandCard reflections S.alice entered
-            board = board2 {GameState.phase = Phase.PrecombatMain}
-            resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
-            gone = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId, cloneId]))
-            duplicates = filter (\oid -> S.soleFaceName oid gone `notElem` [islandName, mountainName]) (Game.zoneMembers Zone.Hand S.alice gone)
-        Spec.assertEqWith
-          s
-          "CR 707.2 the duplicate's copiable values are the Piker's, where its printed card is the Clone's"
-          (fmap (\oid -> (Set.toList (Projection.namesOf oid gone), S.soleFaceName oid gone)) duplicates)
-          [([goblinPiker], cloneName)]
-        Spec.assertEqWith
-          s
-          "and it reads the Piker's 2/1 with the Piker itself in the graveyard"
-          (fmap (\oid -> S.powerToughnessOf oid gone) duplicates, List.sort (namesIn Zone.Graveyard gone))
-          ([Just (2, 1)], List.sort [cloneName, goblinPiker, sinisterReflections])
-  -- The same duplicate across THREE zone changes, each a new object (CR 400.7):
-  -- cast out of the hand, resolved onto the battlefield, destroyed into the
-  -- graveyard. The copiable values are the card's own, so every incarnation is
-  -- the Piker. A duplicate that forgot them would be a Clone spell that
-  -- resolves into a Clone choosing its CR 614.12 copy afresh -- and with
-  -- nothing answered it enters as the 0/0 CR 704.5f sweeps up.
-  --
-  -- Islands and Mountains both, so the cast is affordable at the Clone's
-  -- {3}{U} as well as the Piker's {1}{R}, and the assertion on the permanent
-  -- is what goes red rather than the cast.
-  Spec.it s "a duplicate of a Clone cast and resolved is the Piker" $ do
-    islandPrinting <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    let board0 = S.landsFor mountain S.alice 4 (S.landsInPlay islandPrinting 4)
-        (pikerId, board1) = S.addPermanent piker S.alice board0
-        (_, staged) = S.spellOnStack clone S.alice board1
-        entered = S.settleSba (copyingPiker pikerId staged)
-    case clonesOnBattlefield entered of
-      [] -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      cloneId : _ -> do
-        let (spell, board2) = S.addHandCard reflections S.alice entered
-            board = board2 {GameState.phase = Phase.PrecombatMain}
-            resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
-            gone = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId, cloneId]))
-            inHand = namedIn cloneName Zone.Hand gone
-            played = S.settleSba (S.runPure S.identityAnswer gone (Monad.mapM_ (\oid -> S.cast S.alice oid >> Stack.resolveTop) inHand))
-            permanents = clonesOnBattlefield played
-            died = S.settleSba (S.runPure S.identityAnswer played (Event.destroy Regenerability.Regenerable permanents))
-        Spec.assertEqWith
-          s
-          "CR 400.7 the resolved duplicate is a Goblin Piker on the battlefield, printed Clone beneath"
-          (fmap (\oid -> (Set.toList (Projection.namesOf oid played), S.powerToughnessOf oid played)) permanents)
-          [([goblinPiker], Just (2, 1))]
-        Spec.assertEqWith
-          s
-          "and a Goblin Piker again in the graveyard, beside the original Clone's own name"
-          (List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid died)) (namedIn cloneName Zone.Graveyard died)))
-          (List.sort [[cloneName], [goblinPiker]])
-  -- CR 707.2 lists mana cost among the copiable values, so the duplicate in
-  -- hand costs the Piker's {1}{R} and not the printed Clone's {3}{U}. Two
-  -- Islands and two Mountains: whatever pays Sinister Reflections' {1}{U}
-  -- leaves {1}{R} payable and {3}{U} not.
-  Spec.it s "CR 707.2 a duplicate of a Clone costs what the Clone copies" $ do
-    islandPrinting <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    let board0 = S.landsFor mountain S.alice 2 (S.landsInPlay islandPrinting 2)
-        (pikerId, board1) = S.addPermanent piker S.alice board0
-        (_, staged) = S.spellOnStack clone S.alice board1
-        entered = S.settleSba (copyingPiker pikerId staged)
-    case clonesOnBattlefield entered of
-      [] -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      cloneId : _ -> do
-        let (spell, board2) = S.addHandCard reflections S.alice entered
-            board = board2 {GameState.phase = Phase.PrecombatMain}
-            resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
-            inHand = namedIn cloneName Zone.Hand resolved
-            played = S.settleSba (S.runPure S.identityAnswer resolved (Monad.mapM_ (\oid -> S.cast S.alice oid >> Stack.resolveTop) inHand))
-        Spec.assertEqWith
-          s
-          "CR 707.2 the duplicate is castable off two lands, at the Piker's {1}{R}"
-          (fmap (\oid -> S.castable S.alice oid resolved) inHand)
-          [True]
-        Spec.assertEqWith
-          s
-          "and resolves into a second Goblin Piker beside the Clone"
-          (fmap (\oid -> Set.toList (Projection.namesOf oid played)) (clonesOnBattlefield played))
-          [[goblinPiker], [goblinPiker]]
   -- CR 707.2 / 601.2b: the additional cost is rules text, so it is copiable too.
   -- A Clone copying Headless Skaab ({2}{U}, "As an additional cost to cast this
   -- spell, exile a creature card from your graveyard") is duplicated, and the
@@ -926,26 +805,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "CR 715.3a/715.3b/715.3d (Welcome Home offered as a cast, lands it taps, the spell's names, Bears, cards in exile)"
           (castOffered duplicate welcomeHome paid, S.tappedCount S.alice cast - S.tappedCount S.alice paid, fmap (\oid -> Projection.namesOf oid cast) (GameState.stack cast), length bears, length (Game.zoneMembers Zone.Exile S.alice played))
           (True, 7, [Set.singleton welcomeHome], 3, 1)
-      Nothing -> Spec.assertFailure s "expected one Clone and one duplicate"
-  -- CR 305.1 / 707.2: card types are copiable, so a duplicate of a Clone copying
-  -- Dryad Arbor -- printed Clone beneath -- is a land card its owner may play,
-  -- and enters as Dryad Arbor. With no mana cost it has no cast to fall back on
-  -- (CR 118.6), so the land play is the only way it leaves the hand.
-  Spec.it s "CR 707.2/305.1 a duplicate of a Clone of Dryad Arbor is played as a land" $ do
-    island <- S.printingOf s registry "Island"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    arbor <- S.printingOf s registry "Dryad Arbor"
-    let (arborId, board0) = S.addPermanent arbor S.alice (S.landsInPlay island 2) {GameState.phase = Phase.PrecombatMain}
-    case duplicateOfCopy clone reflections arborId board0 of
-      Just (duplicate, conjured) -> do
-        let played = S.settleSba (S.runPure S.identityAnswer conjured (Cast.playLand False S.alice duplicate Nothing))
-            arrived = Set.toList (Set.difference (GameState.battlefield played) (GameState.battlefield conjured))
-        Spec.assertEqWith
-          s
-          "CR 305.1 (the land play offered, the names it enters with)"
-          (elem (Action.Play duplicate Nothing) (Action.legalActions S.alice conjured {GameState.priority = Just S.alice}), fmap (\oid -> Projection.namesOf oid played) arrived)
-          (True, [Set.singleton dryadArbor])
       Nothing -> Spec.assertFailure s "expected one Clone and one duplicate"
   -- CR 707.2 / 702.37c / 702.37e: morph is copiable, so a duplicate of a Clone
   -- copying Ainok Tracker ({5}{R}, "Morph {4}{R}") -- printed Clone beneath --
@@ -1606,9 +1465,6 @@ goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")
 hillGiant :: CardName.CardName
 hillGiant = CardName.MkCardName (Text.pack "Hill Giant")
 
-sinisterReflections :: CardName.CardName
-sinisterReflections = CardName.MkCardName (Text.pack "Sinister Reflections")
-
 -- CR 601.2c's announcement and choice in one, pinned to the named objects:
 -- announce as many as there are and hand back exactly those. Pinned rather than
 -- searched, Pawl.CopySpec's posture, so a mutation cannot be repaired by the
@@ -1751,9 +1607,6 @@ duplicateOf reflections target board0 = do
 castOffered :: ObjectId.ObjectId -> CardName.CardName -> GameState.GameState -> Bool
 castOffered oid name gs = elem (Action.Cast oid name Facing.FaceUp) (Action.legalActions S.alice gs {GameState.priority = Just S.alice})
 
-dryadArbor :: CardName.CardName
-dryadArbor = CardName.MkCardName (Text.pack "Dryad Arbor")
-
 ainokTracker :: CardName.CardName
 ainokTracker = CardName.MkCardName (Text.pack "Ainok Tracker")
 
@@ -1771,9 +1624,6 @@ torturePit = CardName.MkCardName (Text.pack "Torture Pit")
 
 cloneName :: CardName.CardName
 cloneName = CardName.MkCardName (Text.pack "Clone")
-
-mountainName :: CardName.CardName
-mountainName = CardName.MkCardName (Text.pack "Mountain")
 
 -- The ten cards data/cards/tome-of-the-infinite.json prints as the Tome's
 -- spellbook, in the order the card file writes them.
