@@ -3238,6 +3238,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   brittleEffigySpec s registry
   exiledReliquarySpec s registry
   hanweirBattlementsSpec s registry
+  trumpetingCarnosaurSpec s registry
   ashnodsAltarSpec s registry
   reversalSpec s registry
   shufflingReversalSpec s registry
@@ -5860,6 +5861,71 @@ hanweirBattlementsSpec s registry = Spec.describe s "Hanweir Battlements" $ do
         Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId after) "CR 702.10 the targeted Piker gained haste"
         Spec.assertEqWith s "and the Battlements paid its own {T}" (fmap Object.tapped (Game.lookupObject battlementsId after)) (Just TapState.Tapped)
         Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
+
+-- Trumpeting Carnosaur "{2}{R}, Discard this card: It deals 3 damage to target
+-- creature or planeswalker", activated from alice's hand beside her Cadaverous
+-- Bloom ("Exile a card from your hand: Add {B}{B} or {G}{G}") and one Mountain.
+-- CR 605.3a's window offers the Bloom, and the Bloom's own cost offers every card
+-- in that hand -- the Carnosaur included, since it is still there (CR 602.2a
+-- moves no card). Exiling it for {B}{B} leaves CR 601.2h nothing to discard, so
+-- the order is unpayable and CR 733.1 reverses the activation.
+--
+-- A PAIR differing in one thing, the card the Bloom exiles: a Mountain card
+-- also in hand is the other answer, which pays in full. bob's Goblin Piker is
+-- the target, 3 damage being lethal to it.
+carnosaurBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+carnosaurBoard carnosaur bloom mountain piker =
+  let (bloomId, g1) = S.addPermanent bloom S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent mountain S.alice g1
+      (carnosaurId, g3) = S.addHandCard carnosaur S.alice g2
+      (fuelId, g4) = S.addHandCard mountain S.alice g3
+      (pikerId, g5) = S.addPermanent piker S.bob g4
+   in (carnosaurId, bloomId, fuelId, pikerId, g5 {GameState.priority = Just S.alice})
+
+-- The Bloom first, then anything else; the Bloom exiles `fuel`; every target
+-- slot narrowed to `victim` by filtering the offer. The State is whether the
+-- Bloom has been named yet, so the second source is the Mountain.
+bloomExiling :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Bool r
+bloomExiling bloomId fuel victim p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> do
+    used <- State.get
+    let offered = NonEmpty.toList candidates
+    if not used && elem bloomId offered
+      then do
+        State.put True
+        pure (Just bloomId)
+      else pure (Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (/= bloomId) offered)))
+  Prompt.ChooseCardInHand _ _ _ candidates -> pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== fuel) (NonEmpty.toList candidates)))
+  _ -> pure (targeting victim p)
+
+trumpetingCarnosaurSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+trumpetingCarnosaurSpec s registry = Spec.describe s "Trumpeting Carnosaur" $ do
+  Spec.it s "CR 601.2h exiling the Carnosaur for mana leaves nothing to discard, and the activation reverses" $ do
+    (carnosaurId, _, pikerId, after) <- run True
+    Spec.assertEqWith s "the Piker took no damage" (fmap Object.damage (Game.lookupObject pikerId after)) (Just 0)
+    Spec.assertEqWith s "CR 733.1 and the Carnosaur is back in alice's hand" (fmap Object.zone (Game.lookupObject carnosaurId after)) (Just Zone.Hand)
+    Spec.assertEqWith s "with nothing on the stack" (length (GameState.stack after)) 0
+  Spec.it s "CR 605.3a exiling another card pays the same cost and resolves" $ do
+    (carnosaurId, fuelId, pikerId, after) <- run False
+    Spec.assertEqWith s "CR 120.3e the Piker took the 3 damage" (fmap Object.damage (Game.lookupObject pikerId after)) (Just 3)
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject carnosaurId after)) "and the Carnosaur left the hand as a discard (CR 400.7)"
+    Spec.assertEqWith s "landing in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject fuelId after)) "while the Mountain card paid the Bloom"
+  where
+    run exileItself = do
+      carnosaur <- S.printingOf s registry "Trumpeting Carnosaur"
+      bloom <- S.printingOf s registry "Cadaverous Bloom"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (carnosaurId, bloomId, fuelId, pikerId, gs) = carnosaurBoard carnosaur bloom mountain piker
+          fuel = if exileItself then carnosaurId else fuelId
+          (_, after) = State.evalState (Engine.runGame (bloomExiling bloomId fuel pikerId) gs (Activate.activateAbility S.alice carnosaurId (theAbility carnosaur) >> Stack.resolveTop)) False
+      pure (carnosaurId, fuelId, pikerId, after)
 
 -- Ashnod's Altar "Sacrifice a creature: Add {C}{C}": a mana ability with no {T}
 -- in its cost, so CR 605.3a's window offers it while ANOTHER permanent's cost is
