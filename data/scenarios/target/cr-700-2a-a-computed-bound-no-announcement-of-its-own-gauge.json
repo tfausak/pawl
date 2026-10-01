@@ -1,0 +1,37 @@
+{
+  "description": "CR 700.2a a computed bound no announcement of its own gauge slot could reach makes the mode unchoosable",
+  "note": "Synthetic Measured Refrain's destroy mode bounds its victim's mana value by how many creatures its \"up to two\" gauge slot names. Against bob's Wall of Stone (mana value 3) no announcement of the gauge affords the victim, so CR 700.2a leaves the draw mode the only legal one and \"choose two\" forces it twice: two Swamps drawn, no mode prompt, the Wall standing. A reversed cast would draw none and leave the spell in hand. The -control file is the same board with a mana value 2 victim.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" },
+          { "card": "Swamp", "label": "swamp3" },
+          { "card": "Wall of Stone", "label": "wall-a" },
+          { "card": "Wall of Stone", "label": "wall-b" },
+          { "card": "Wall of Stone", "label": "wall-c" }
+        ],
+        "hand": [{ "card": "Synthetic Measured Refrain", "label": "refrain" }],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Wall of Stone", "label": "victim" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@refrain", "mana": ["@swamp1", "@swamp2", "@swamp3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Swamp", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Synthetic Measured Refrain", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Wall of Stone", "count": 1 } } }
+  ]
+}

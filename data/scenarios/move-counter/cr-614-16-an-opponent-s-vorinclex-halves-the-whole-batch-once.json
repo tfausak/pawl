@@ -1,0 +1,45 @@
+{
+  "description": "CR 614.16 an opponent's Vorinclex halves the whole batch once, not each counter",
+  "note": "CR 614.16 replaces a placement of one or more counters once, so bob's Vorinclex halves one placement of three to one; three placements of one would each halve to nothing. The removal is not replaced, so the land still loses all three, and the rider counts what completed the move: one life.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Mountain", "label": "land", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 3 }, { "key": { "type": "Shield" }, "value": 1 }] },
+          { "card": "Black Panther, Wakandan King", "label": "panther", "ready": true },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Vorinclex, Monstrous Raider", "label": "vorinclex" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@land", "kind": { "type": "PlusOnePlusOne" }, "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@land", "kind": { "type": "Shield" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "Shield" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@panther", "targetsBySlot": { "land": ["@land"], "creature": ["@piker"] }, "mana": ["@forest-1", "@forest-2", "@forest-3", null] } } }
+  ],
+  "final": [
+    { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } },
+    { "Counters": { "object": "@piker", "kind": { "type": "Shield" }, "count": 0 } },
+    { "Counters": { "object": "@land", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
+    { "Counters": { "object": "@land", "kind": { "type": "Shield" }, "count": 1 } },
+    { "Life": { "player": "alice", "life": 21 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 1 } }
+  ]
+}

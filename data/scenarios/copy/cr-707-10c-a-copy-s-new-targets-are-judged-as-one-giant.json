@@ -1,0 +1,42 @@
+{
+  "description": "CR 707.10c a copy's new targets are judged as one announcement",
+  "note": "The same board as the joint-announcement case, with the Spider dealing and the Giant as the copy's victim: the Giant is a legal victim and takes 2, so the rejection in the main case is the joint check rather than a slot the offer had emptied.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Giant Spider", "label": "spider" }
+        ],
+        "hand": [
+          { "card": "Fall of the Hammer", "label": "hammer" },
+          { "card": "Twincast", "label": "twincast" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Wall of Stone", "label": "wall" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hammer", "targetsBySlot": { "dealer": ["@giant"], "victim": ["@wall"] }, "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@twincast", "targets": ["Fall of the Hammer"], "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "dealer": ["@spider"], "victim": ["@giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@giant", "damage": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@wall", "damage": 3 } } }
+  ]
+}

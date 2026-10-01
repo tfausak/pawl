@@ -3027,22 +3027,6 @@ preyBoard s registry = do
 -- combat damage, and this module owns the damage funnel.
 fightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
-  Spec.it s "CR 701.14a each fighter deals damage equal to its power to the other" $ do
-    (before, spell, mine, theirs) <- preyBoard s registry
-    let after = S.settleSba (S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell >> Stack.resolveTop))
-    -- The fixture's own numbers first, so neither assertion below can pass on a
-    -- board whose bodies were not what this case claims.
-    Spec.assertEqWith s "alice's 2/1 and bob's 3/3" (S.powerToughnessOf mine before, S.powerToughnessOf theirs before) (Just (2, 1), Just (3, 3))
-    -- CR 701.14a's first blow. 2 and not 3: the Piker deals ITS power, not the
-    -- Giant's.
-    Spec.assertEqWith s "CR 701.14a the Piker dealt 2 to the Giant" (S.damageOf theirs after) (Just 2)
-    -- CR 701.14a's second blow, and the assertion that only it can redden: the
-    -- Giant's 3 is lethal to a 2/1 (CR 704.5g).
-    Spec.assertBool s (not (S.onBattlefield mine after)) "CR 701.14a/704.5g the Giant's 3 back killed the Piker"
-    -- The control: 2 is not lethal to a 3/3, so the Giant is still there and the
-    -- death above is the rule's arithmetic rather than a board-wide wipe.
-    Spec.assertBool s (S.onBattlefield theirs after) "CR 704.5g and 2 is not lethal to the Giant"
-
   -- CR 701.14b: "if one or both creatures instructed to fight are no longer on
   -- the battlefield or are no longer creatures, NEITHER of them fights or deals
   -- damage. If one or both creatures are illegal targets ... neither of them

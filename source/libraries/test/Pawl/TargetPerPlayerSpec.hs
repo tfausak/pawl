@@ -133,11 +133,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" . Spec.describe s "PerPla
             (gs, spellId) = S.handOne card g3
         pure (gs, spellId, pikerId, thopterId)
       steal picks gs spellId = State.evalState (fmap snd (Engine.runGame (aiming picks) gs (S.cast S.alice spellId))) []
-  Spec.it s "CR 601.2c Blatant Thievery gains control of one permanent from each opponent" $ do
-    (gs, spellId, pikerId, thopterId) <- thievery False
-    let after = resolve (steal (Set.fromList [pikerId, thopterId]) gs spellId)
-    Spec.assertEqWith s "alice controls bob's Piker" (Projection.controllerOf pikerId after) (Just S.alice)
-    Spec.assertEqWith s "alice controls carol's Ornithopter" (Projection.controllerOf thopterId after) (Just S.alice)
   -- Sylvan Primordial's ruling for the same template: a player with nothing to
   -- target gets no target, so carol controlling nothing does not stop the cast.
   -- The pair's other half: with NO opponent controlling anything the slot

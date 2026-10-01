@@ -1,0 +1,36 @@
+{
+  "description": "CR 509.1a a pair the Path's hypothetical refuses on arity moves nobody",
+  "note": "Sorrow's Path's hypothetical on CR 509.1a's arity: a Hill Giant can block one creature, so it could not block the two the Lairwatch Giant is blocking, and the exchange moves nobody.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Sorrow's Path", "label": "path" },
+          { "card": "Hill Giant", "label": "one", "ready": true },
+          { "card": "Hill Giant", "label": "two", "ready": true },
+          { "card": "Hill Giant", "label": "three", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "single" },
+          { "card": "Lairwatch Giant", "label": "pair" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@one", "@two", "@three"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@single": ["@one"], "@pair": ["@two", "@three"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@path", "targetsBySlot": { "first": ["@single"], "second": ["@pair"] } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@one", "blockers": ["@single"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@two", "blockers": ["@pair"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@three", "blockers": ["@pair"] } } }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "description": "CR 601.2c a twice-chosen targeting mode is prompted for two slots",
+  "note": "Mystic Confluence with the bounce mode chosen twice: the cast is offered two slots, creature and creature#1, and must name both, so a repeated mode whose slots collapsed would offer one. CR 700.2d lets the same object be chosen for each, so aiming both at one Piker is a legal cast: it resolves, the Piker goes home once, and alice draws once.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true },
+          { "card": "Island", "label": "island-3", "ready": true },
+          { "card": "Island", "label": "island-4", "ready": true },
+          { "card": "Island", "label": "island-5", "ready": true }
+        ],
+        "hand": [{ "card": "Mystic Confluence", "label": "confluence" }],
+        "library": [
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Wall of Stone", "label": "wall" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@confluence", "modes": [1, 1, 2], "targetsBySlot": { "creature": ["@piker"], "creature#1": ["@piker"] }, "mana": ["@island-1", "@island-2", "@island-3", "@island-4", "@island-5"] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Mystic Confluence", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Wall of Stone", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1 } }
+  ]
+}

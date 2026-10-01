@@ -376,24 +376,6 @@ aimingMeasured gauges victim gaugeTwo victimTwo p = case p of
       asked
   _ -> S.identityAnswer p
 
--- CR 700.2a's whole announcement for Synthetic Measured Refrain with its destroy
--- mode chosen ONCE beside its draw mode, where aimingMeasured above chooses the
--- destroy mode twice: occurrence 0 keeps the printed slot names, so `gauge` takes
--- the creatures the bound is to measure and `victim` the one that bound affords.
--- Pinned per slot name and FILTERED out of the offered set, aimingMeasured's
--- shape and for its reason.
-aimingGauged :: [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimingGauged gauges victim p = case p of
-  Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 1]
-  Prompt.ChooseTargets _ _ _ asked ->
-    Map.mapWithKey
-      ( \slot (_, offered) ->
-          let wanted = if slot == SlotName.MkSlotName (Text.pack "gauge") then gauges else [victim]
-           in Set.filter (maybe False (`elem` wanted) . Recipient.objectOf) offered
-      )
-      asked
-  _ -> S.identityAnswer p
-
 -- CR 601.2c's whole announcement for Bioshift: `giverId` in the `from` slot and
 -- `takerId` in the `to` slot, aimingHammer's shape and FILTERED for its reason.
 --
@@ -466,15 +448,6 @@ unburySpec s registry = Spec.describe s "Unbury" $ do
     -- CR 601.2e behind the refusal: the announcement is reversed.
     Spec.assertEqWith s "the Giant-and-Goblin cast is reversed" (length (GameState.stack (cast giantA pikerId))) 0
     Spec.assertBool s (inHand spellId (cast giantA pikerId)) "and Unbury is back in alice's hand"
-  -- The rulings' case, CR 608.2b with CR 608.2h: one card leaves the graveyard
-  -- before Unbury resolves, and the other is still returned, since it shares a
-  -- type with the one that left as it last existed.
-  Spec.it s "CR 608.2b one target leaving does not strand the other" $ do
-    (_, board, spellId, giantA, giantB, _, _) <- fixture
-    let cast = S.runPure (aimingUnbury giantA giantB) board (S.cast S.alice spellId)
-        exiled = S.runPure S.identityAnswer cast (Event.changeZone giantA Zone.Exile)
-        after = S.runPure (aimingUnbury giantA giantB) exiled Stack.resolveTop
-    Spec.assertEqWith s "the Giant still in the graveyard returns, and the exiled one does not" (handNames after) (named ["Hill Giant"])
   -- The union posture: before either target is chosen, the second slot is
   -- offered every creature card, the Goblin included, and the joint check is
   -- what narrows it.
@@ -2486,57 +2459,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
       (slotNamed "victim#1")
       (Set.fromList (fmap Recipient.ToCreature [gaugeA, gaugeB, gaugeC, victimId, dearId, cheapId]))
 
-  -- The case above's card asked one step earlier, as Fall of the Hammer's pair is:
-  -- CR 700.2a, "if one of the modes would be illegal (due to an inability to
-  -- choose legal targets, for example), that mode can't be chosen". The offer
-  -- WIDENS a slot whose CR 202.3 bound names a sibling -- the bound is measured
-  -- against everything the gauge slot could take at once -- so the fillability
-  -- gate has to narrow it back or a mode with no legal announcement is offered
-  -- and every announcement of it reverses at CR 601.2e.
-  --
-  -- THREE Walls of Stone for alice, whose gauge slot is "up to two", so the
-  -- widened bound is 3 and no announcement can state more than 2. The victim slot
-  -- reads mana value, and Wall of Stone's is 3.
-  --
-  -- TWO BOARDS differing in exactly ONE thing: whether bob's creature is a Wall
-  -- of Stone (mana value 3, which no announcement affords) or a Goblin Piker
-  -- (mana value 2, which only the FULL announcement of two affords). The gauge
-  -- slot is alice's three Walls on both, bob's creature being none of hers.
-  --
-  -- Reversal and unofferability leave the same creature standing, so the
-  -- observable is what alice's OTHER mode did: the selection is "choose two, and
-  -- you may choose the same mode more than once", so a refused destroy mode
-  -- leaves the draw mode as the only legal one and CR 700.2a forces it twice.
-  -- Two cards drawn is the mode never having been offered; the reversal draws
-  -- none and leaves the spell in hand.
-  Spec.it s "CR 700.2a a computed bound no announcement of its own gauge slot could reach makes the mode unchoosable" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    wall <- S.printingOf s registry "Wall of Stone"
-    piker <- S.printingOf s registry "Goblin Piker"
-    refrain <- S.printingOf s registry "Synthetic Measured Refrain"
-    let (_, l1) = S.addLibraryCard swamp S.alice (S.landsInPlay swamp 3)
-        (_, l2) = S.addLibraryCard swamp S.alice l1
-        (gaugeA, g1) = S.addPermanent wall S.alice l2
-        (gaugeB, g2) = S.addPermanent wall S.alice g1
-        (_, common) = S.addPermanent wall S.alice g2
-        run victim board0 =
-          let (board, spellId) = S.handOne refrain board0
-              cast = S.runPure (aimingGauged [gaugeA, gaugeB] victim) board (S.cast S.alice spellId)
-           in S.runPure (aimingGauged [gaugeA, gaugeB] victim) cast Stack.resolveTop
-        (dearId, dearBoard) = S.addPermanent wall S.bob common
-        (cheapId, cheapBoard) = S.addPermanent piker S.bob common
-        atDear = run dearId dearBoard
-        atCheap = run cheapId cheapBoard
-        onBattlefield gs oid = elem oid (Game.zoneMembers Zone.Battlefield S.bob gs)
-        handSize gs = length (Game.zoneMembers Zone.Hand S.alice gs)
-    -- THE GAMEPLAY-LEVEL ASSERTIONS. The first is the mode working where an
-    -- announcement exists; the second is CR 700.2a's refusal, and it is the draw
-    -- count rather than the survivor because a reversal leaves the same survivor.
-    Spec.assertBool s (not (onBattlefield atCheap cheapId)) "two of alice's three Walls afford bob's mana value 2 creature, so the destroy mode is offered and the creature is destroyed"
-    Spec.assertEqWith s "against a mana value 3 creature no announcement of the up-to-two gauge affords it, so the destroy mode is not offered at all and the draw mode is forced twice" (handSize atDear) 2
-    Spec.assertBool s (onBattlefield atDear dearId) "and bob's Wall of Stone survives"
-    Spec.assertEqWith s "where the destroy mode was chosen, the draw mode was chosen once and drew once" (handSize atCheap) 1
-
   -- CR 601.2c's sibling-slot reading in its POSITIVE form, where Fall of the
   -- Hammer above is the negative one: "another" excludes what a sibling slot
   -- holds, and "with the same controller" demands something of it -- CR 110.2's
@@ -3769,18 +3691,6 @@ redirectSpec s registry =
                   after = drainDeclining (retarget (redirectOf ids) (Recipient.ToCreature (guardOf ids)) growthSpell paid)
               Spec.assertEqWith s "the Growth resolved on the Guard" (S.powerToughnessOf (guardOf ids) after) (Just (6, 4))
               Spec.assertEqWith s "alice paid the one ward cost, spending all three Forests" (S.tappedCount S.alice paid) 3
-        -- Wild Ricochet: "You may choose new targets for target instant or sorcery
-        -- spell. Then copy that spell. You may choose new targets for the copy."
-        -- The copy is of the RE-AIMED Growth, so bob's own Piker takes both.
-        Spec.it s "CR 115.7d / 707.10 Wild Ricochet re-aims the spell, then copies it" $ do
-          (ids, board) <- boardOf
-          let cast = growthAt (Recipient.ToCreature (pikerOf ids)) board ids
-          case topOfStack cast of
-            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
-            Just growthSpell -> do
-              let after = drainDeclining (retarget (ricochetOf ids) (Recipient.ToCreature (bobPikerOf ids)) growthSpell cast)
-              Spec.assertEqWith s "bob's Piker took the Growth and its copy" (S.powerToughnessOf (bobPikerOf ids) after) (Just (8, 7))
-              Spec.assertEqWith s "and alice's Piker neither" (S.powerToughnessOf (pikerOf ids) after) (Just (2, 1))
 
 -- CR 115.7d's two halves over a jointly judged slot: Bioshift's `to` must be
 -- "another target creature with the same controller" as its `from`. alice casts

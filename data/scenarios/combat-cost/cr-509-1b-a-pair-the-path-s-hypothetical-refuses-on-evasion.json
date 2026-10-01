@@ -1,0 +1,35 @@
+{
+  "description": "CR 509.1b a pair the Path's hypothetical refuses on evasion moves nobody",
+  "note": "Sorrow's Path exchanges two blockers only \"if each of those creatures could block all creatures that the other is blocking\", judged pairwise: the Serra Inquisitors could not block the flying Pixie Guide (CR 702.9b), so nothing moves, though the Giant Spider's reach could block the Hill Giant. The Path tapping shows the ability was activated and resolved.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Sorrow's Path", "label": "path" },
+          { "card": "Hill Giant", "label": "ground", "ready": true },
+          { "card": "Pixie Guide", "label": "flier", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Serra Inquisitors", "label": "inq" },
+          { "card": "Giant Spider", "label": "spider" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@ground", "@flier"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@inq": ["@ground"], "@spider": ["@flier"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@path", "targetsBySlot": { "first": ["@inq"], "second": ["@spider"] } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@flier", "blockers": ["@spider"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@ground", "blockers": ["@inq"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "@path", "tapped": true } } }
+  ]
+}

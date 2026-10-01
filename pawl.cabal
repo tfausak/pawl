@@ -190,6 +190,8 @@ library codec
     Pawl.Codec.AttackTarget
     Pawl.Codec.AttackTargetKind
     Pawl.Codec.AttackTargetKindSpec
+    Pawl.Codec.AttackTargetRef
+    Pawl.Codec.AttackTargetRefSpec
     Pawl.Codec.AttackTargetSpec
     Pawl.Codec.Backup
     Pawl.Codec.BackupSpec
@@ -1915,6 +1917,7 @@ library types
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.AttackTargetKind
+    Pawl.Types.AttackTargetRef
     Pawl.Types.Backup
     Pawl.Types.BattlefieldCandidate
     Pawl.Types.BecameAttached
