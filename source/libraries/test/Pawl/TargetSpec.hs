@@ -3619,7 +3619,7 @@ mainPhase gs =
 -- his own), and carol is neither. alice's Goblin Piker is what the Growth names
 -- first. alice's three Forests are the Growth and a {2} ward payment she CAN make,
 -- so a countered Growth is her declining rather than being unable.
-redirectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+redirectSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 redirectSpec s registry =
   let boardOf = do
         forest <- S.printingOf s registry "Forest"
@@ -3649,21 +3649,6 @@ redirectSpec s registry =
         let cast = S.runPure (aimingAs S.bob (Recipient.ToObject growthSpell)) gs (S.cast S.bob card)
          in S.runPure (aimingAs S.bob aim) cast (Stack.resolveTop >> Engine.settleForPriority)
    in Spec.describe s "Redirect (CR 115.7d)" $ do
-        -- CR 115.7 makes the new target a target of the Growth, so bob's ward
-        -- fires against alice's spell. The Growth first named alice's Piker, so
-        -- nothing but the re-target ever names the Guard: 3/1 is the Growth
-        -- countered, 6/4 is a re-target nothing observed.
-        Spec.it s "CR 115.7d / 702.21a Redirect's NEW target becomes a target, and ward fires" $ do
-          (ids, board) <- boardOf
-          let cast = growthAt (Recipient.ToCreature (pikerOf ids)) board ids
-          case topOfStack cast of
-            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
-            Just growthSpell -> do
-              let redirected = retarget (redirectOf ids) (Recipient.ToCreature (guardOf ids)) growthSpell cast
-                  after = drainDeclining redirected
-              Spec.assertEqWith s "CR 702.21a alice declined the ward cost, so the Growth was countered and the Guard is still a 3/1" (S.powerToughnessOf (guardOf ids) after) (Just (3, 1))
-              Spec.assertEqWith s "and it never reached alice's Piker" (S.powerToughnessOf (pikerOf ids) after) (Just (2, 1))
-              Spec.assertEqWith s "the ward trigger went on the stack over the Growth" (length (GameState.stack redirected)) 2
         -- The same board, bob naming his Slippery Bogle instead. CR 115.7d's new
         -- target "must be legal", judged for the GROWTH, whose controller is
         -- alice -- so CR 702.11b's hexproof refuses it though bob is the one
@@ -3677,20 +3662,6 @@ redirectSpec s registry =
               let after = drainDeclining (retarget (redirectOf ids) (Recipient.ToCreature (bogleOf ids)) growthSpell cast)
               Spec.assertEqWith s "the Growth resolved on alice's Piker, its old target" (S.powerToughnessOf (pikerOf ids) after) (Just (5, 4))
               Spec.assertEqWith s "and the Bogle is untouched" (S.powerToughnessOf (bogleOf ids) after) (Just (1, 1))
-        -- A target LEFT unchanged did not become one: it already was. The Growth
-        -- names the Guard as it is cast, alice pays that ward, and Redirect keeps
-        -- the Guard -- so no second ward fires and the Growth resolves, where a
-        -- second trigger alice declines leaves a 3/1.
-        Spec.it s "CR 115.7d a target Redirect leaves unchanged does not become a target again" $ do
-          (ids, board) <- boardOf
-          let cast = growthAt (Recipient.ToCreature (guardOf ids)) board ids
-          case topOfStack cast of
-            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
-            Just growthSpell -> do
-              let paid = S.runPure alicePaysWard cast (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-                  after = drainDeclining (retarget (redirectOf ids) (Recipient.ToCreature (guardOf ids)) growthSpell paid)
-              Spec.assertEqWith s "the Growth resolved on the Guard" (S.powerToughnessOf (guardOf ids) after) (Just (6, 4))
-              Spec.assertEqWith s "alice paid the one ward cost, spending all three Forests" (S.tappedCount S.alice paid) 3
 
 -- CR 115.7d's two halves over a jointly judged slot: Bioshift's `to` must be
 -- "another target creature with the same controller" as its `from`. alice casts
@@ -3761,12 +3732,6 @@ data RedirectBoard = MkRedirectBoard
 aimingAs :: PlayerId.PlayerId -> Recipient.Recipient -> Prompt.Prompt r -> r
 aimingAs who recipient p = case p of
   Prompt.ChooseTargets _ player _ asked | player == who -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
-  _ -> S.identityAnswer p
-
--- alice pays every cost she is offered; everything else is the identity answer.
-alicePaysWard :: Prompt.Prompt r -> r
-alicePaysWard p = case p of
-  Prompt.ChooseToPay _ player _ _ _ _ | player == S.alice -> PaymentDecision.Pays
   _ -> S.identityAnswer p
 
 topOfStack :: GameState.GameState -> Maybe ObjectId.ObjectId

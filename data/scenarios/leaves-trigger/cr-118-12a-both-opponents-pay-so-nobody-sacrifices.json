@@ -1,0 +1,52 @@
+{
+  "description": "CR 118.12a both opponents pay, so nobody sacrifices",
+  "note": "Rishadan Cutpurse's enters trigger makes each opponent sacrifice a permanent unless they pay {1}, offered once per opponent in APNAP order. This is the limb where both bob and carol pay, so the IfNotPaid branch selects nobody and the clause does nothing. The three seats start with four, three and five permanents, read here card by card, so no two readings of the rule leave the same boards.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [{ "card": "Rishadan Cutpurse", "label": "cutpurse" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@cutpurse", "mana": ["@island-1", "@island-2", "@island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@forest-1", null] } }, "source": "Rishadan Cutpurse" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@swamp-1", null] } }, "source": "Rishadan Cutpurse" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@forest-1", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@swamp-1", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Island", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Rishadan Cutpurse", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Forest", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Swamp", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Goblin Piker", "count": 2 } } }
+  ]
+}

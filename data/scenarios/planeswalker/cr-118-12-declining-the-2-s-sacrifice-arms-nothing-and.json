@@ -1,0 +1,35 @@
+{
+  "description": "CR 118.12 declining the -2's sacrifice arms nothing and destroys nothing",
+  "note": "Grist's -2 reads \"You may sacrifice a creature. When you do, destroy target creature or planeswalker.\" The paying case's board, differing only in alice declining CR 118.12's optional cost: no reflexive trigger, so bob's Jace, Ogre and Mountain all stay, alice keeps her one Goblin Piker, and the loyalty cost is paid either way.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Grist, the Hunger Tide", "label": "grist", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Jace Beleren", "label": "jace", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] },
+          { "card": "Villainous Ogre", "label": "ogre" },
+          { "card": "Mountain", "label": "mountain" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@grist", "ability": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "@grist" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Jace Beleren", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Jace Beleren", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Villainous Ogre", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Mountain", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@grist", "kind": { "type": "Loyalty" }, "count": 1 } } }
+  ]
+}

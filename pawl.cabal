@@ -871,6 +871,10 @@ library codec
     Pawl.Codec.PayBranchSpec
     Pawl.Codec.PayGate
     Pawl.Codec.PayGateSpec
+    Pawl.Codec.Paying
+    Pawl.Codec.PayingSpec
+    Pawl.Codec.PaymentDecision
+    Pawl.Codec.PaymentDecisionSpec
     Pawl.Codec.PayObligation
     Pawl.Codec.PayObligationSpec
     Pawl.Codec.PendingDamageEffect
@@ -2301,6 +2305,7 @@ library types
     Pawl.Types.PastActivation
     Pawl.Types.PayBranch
     Pawl.Types.PayGate
+    Pawl.Types.Paying
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
     Pawl.Types.PaymentMoment

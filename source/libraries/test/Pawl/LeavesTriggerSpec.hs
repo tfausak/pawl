@@ -2084,50 +2084,6 @@ fabricateSpec s registry =
                     )
                 other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
             other -> Spec.assertFailure s ("expected one Glint-Sleeve Artisan, got " <> show (length other))
-        -- CR 614.1 over a cost paid DURING a resolution: the board differs from
-        -- the first case in nothing but the Hardened Scales, and what it proves
-        -- is that fabricate's payment places its counter through CR 122.6's
-        -- funnel rather than writing it onto the object directly.
-        --
-        -- NOT the payment moment. Hardened Scales is CR 614.1's passive subject,
-        -- which reaches a placement at either moment; the moment's own split is
-        -- pinned by Pawl.ReplacementSpec's blight pair and by
-        -- Pawl.PlaneswalkerSpec's loyalty case, all three of them CR 614.16
-        -- subjects (Doubling Season).
-        Spec.it s "CR 614.1 Hardened Scales sees fabricate's counter, so the Artisan reads 4/4" $ do
-          onStack <- board ["Hardened Scales"]
-          let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
-          case artisansOn onStack of
-            [artisanId] -> do
-              Spec.assertEqWith s "it still entered as a 2/2" (S.powerToughnessOf artisanId onStack) (Just (2, 2))
-              Spec.assertEqWith s "one counter became two" (S.counterOf CounterKind.PlusOnePlusOne artisanId after) 2
-              Spec.assertEqWith s "so it reads 4/4" (S.powerToughnessOf artisanId after) (Just (4, 4))
-              Spec.assertEqWith s "and still no Servo" (S.tokensOf after) []
-            other -> Spec.assertFailure s ("expected one Glint-Sleeve Artisan, got " <> show (length other))
-        -- The keyword's N, at gameplay level and on BOTH halves. Weaponcraft
-        -- Enthusiast, {2}{B} Creature -- Aetherborn Artificer 0/1, whose entire
-        -- text box is "Fabricate 2": a mint that dropped the payload would put
-        -- one counter on (1/2, not 2/3) and make one Servo, and 0/1 keeps every
-        -- reading a different number from the Artisan's.
-        Spec.it s "CR 702.123a fabricate 2 puts two counters on the Enthusiast" $ do
-          onStack <- boardOf "Swamp" "Weaponcraft Enthusiast" []
-          let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
-          case named "Weaponcraft Enthusiast" onStack of
-            [enthusiastId] -> do
-              Spec.assertEqWith s "it entered as a 0/1" (S.powerToughnessOf enthusiastId onStack) (Just (0, 1))
-              Spec.assertEqWith s "two +1/+1 counters went on" (S.counterOf CounterKind.PlusOnePlusOne enthusiastId after) 2
-              Spec.assertEqWith s "so it reads 2/3" (S.powerToughnessOf enthusiastId after) (Just (2, 3))
-              Spec.assertEqWith s "and no Servo" (S.tokensOf after) []
-            other -> Spec.assertFailure s ("expected one Weaponcraft Enthusiast, got " <> show (length other))
-        Spec.it s "CR 702.123a declining fabricate 2 creates two Servos" $ do
-          onStack <- boardOf "Swamp" "Weaponcraft Enthusiast" []
-          let after = S.runPure S.identityAnswer onStack Stack.resolveTop
-          case named "Weaponcraft Enthusiast" onStack of
-            [enthusiastId] -> do
-              Spec.assertEqWith s "no counter went on" (S.counterOf CounterKind.PlusOnePlusOne enthusiastId after) 0
-              Spec.assertEqWith s "so it is still a 0/1" (S.powerToughnessOf enthusiastId after) (Just (0, 1))
-              Spec.assertEqWith s "and there are two Servos" (length (S.tokensOf after)) 2
-            other -> Spec.assertFailure s ("expected one Weaponcraft Enthusiast, got " <> show (length other))
         -- CR 702.123b: "if a permanent has multiple instances of fabricate, each
         -- triggers separately". Asserted of the MINT, as afterlife's multiplicity
         -- is, no card in the pool printing fabricate twice.
@@ -2280,15 +2236,17 @@ wardSpec s registry =
 -- counts from a ward that does not.
 --
 -- THE PAIR differs in bob's FOREST COUNT and nothing else -- two, of which the
--- Growth spends one, against three. Together the cases pin X at exactly two: the
--- first says X > 1, the second X <= 2. Both boards hold the same cards, alice
--- makes the same plays, and bob answers `paysFor S.bob` in both, so a spell that
--- survived did so because he could pay rather than because nobody asked.
+-- Growth spends one, against three. The case below and
+-- data/scenarios/leaves-trigger/cr-702-21b-one-more-forest-pays-the-same-ward-2-and-the-growth.json
+-- pin X at exactly two: the first says X > 1, the second X <= 2. Both boards
+-- hold the same cards, alice makes the same plays, and bob pays in both, so a
+-- spell that survived did so because he could pay rather than because nobody
+-- asked.
 --
 -- A test-local answerer rather than Pawl.Support's script: the harness has no
 -- vocabulary for Prompt.ChooseToPay, and the ward group above already answers it
 -- with `paysFor`.
-mintharaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mintharaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 mintharaSpec s registry =
   let board plains forest minthara ezuri squire growth forests =
         let withLands = S.landsFor forest S.bob forests (S.landsFor plains S.alice 4 S.threePlayerGame)
@@ -2337,19 +2295,6 @@ mintharaSpec s registry =
           Spec.assertEqWith s "CR 702.21b: ward {2} was owed, bob could not pay it, and the Growth was countered -- Minthara is her 2/2 self plus the anthem's two" (S.powerToughnessOf mintharaId after) (Just (4, 2))
           Spec.assertEqWith s "CR 118.3: an unpayable cost is never offered" (payResponses transcript) []
           Spec.assertEqWith s "and the countered Growth is in bob's graveyard" (Seq.length (Map.findWithDefault Seq.empty S.bob (GameState.graveyard after))) 1
-        -- The same board and the same plays, differing in NOTHING but bob's
-        -- third Forest.
-        Spec.it s "CR 702.21b one more Forest pays the same ward {2} and the Growth resolves" $ do
-          (mintharaId, squireId, growthId, gs) <- boardOf 3
-          let answer :: Prompt.Prompt r -> r
-              answer = aimedAt mintharaId
-              onStack = S.runPure answer (S.runPure answer gs (S.cast S.bob growthId)) Engine.settleForPriority
-              flashed = S.runPure answer (S.runPure answer onStack (S.cast S.alice squireId)) Engine.settleForPriority
-              gained = S.runPure answer flashed (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-              ((_, after), transcript) = Replay.record answer gained (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
-          Spec.assertEqWith s "CR 702.21b: bob paid ward {2}, so the Growth resolved onto a Minthara the anthem already made a 4/2" (S.powerToughnessOf mintharaId after) (Just (7, 5))
-          Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
-          Spec.assertEqWith s "setup: alice still holds the two experience counters" (S.playerCounterOf PlayerCounterKind.Experience S.alice after) 2
 
 -- CR 118.12a over MORE THAN ONE PAYER: "[Do something] unless [a player does
 -- something else]" means "[A player may do something else]. If [that player
@@ -2417,15 +2362,6 @@ cutpurseSpec s registry =
           let ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
           Spec.assertEqWith s "CR 118.12a: both opponents sacrificed and alice did not" (controls S.alice after, controls S.bob after, controls S.carol after) (4, 2, 4)
           Spec.assertEqWith s "both were asked, and both declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines, Response.ChoseToPay PaymentDecision.Declines]
-        -- The other limb, moved on its own: both opponents pay, so the IfNotPaid
-        -- branch selects nobody and the clause does nothing at all.
-        Spec.it s "CR 118.12a both opponents pay, so nobody sacrifices" $ do
-          onStack <- boardOf
-          let paysForEither p = case p of
-                Prompt.ChooseToPay {} -> PaymentDecision.Pays
-                _ -> S.identityAnswer p
-              after = S.runPure paysForEither onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 118.12a: the paid branch sacrificed nothing" (controls S.alice after, controls S.bob after, controls S.carol after) (4, 3, 5)
 
 -- CR 601.2c read from the TARGETED PLAYER's side: "the chosen objects and/or
 -- players each become a target of that spell". Dormant Gomazoa, {1}{U}{U}

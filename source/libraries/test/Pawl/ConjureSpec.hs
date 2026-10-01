@@ -1344,16 +1344,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       (length (namedIn calimName Zone.Graveyard final), namedIn calimName Zone.Battlefield final)
       (2, [])
     Spec.assertEqWith s "and alice was never offered the exile" offered 0
-  -- The first case's board with bob's Leyline of the Void, which exiles the
-  -- discarded Calim instead. CR 400.7j still finds it in exile, but "return Calim
-  -- from your graveyard" names a graveyard, so it stays there.
-  Spec.it s "CR 400.7j Calim's Breath does not return a Calim its discard put into exile" $ do
-    (final, _) <- calimsBreath s registry True 2
-    Spec.assertEqWith
-      s
-      "no Calim is on alice's battlefield, and all three are in exile"
-      (namedIn calimName Zone.Battlefield final, length (namedIn calimName Zone.Exile final))
-      ([], 3)
 
   -- Mine Security ({1}{R} Creature -- Kavu Soldier 3/1, trample, "When this
   -- creature enters, conjure a card named Flametongue Kavu into the top eight

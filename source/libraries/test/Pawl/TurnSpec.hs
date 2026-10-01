@@ -1432,7 +1432,7 @@ aimCreature oid p = case p of
 -- "Create a 4/4 red Giant creature token." plus that clause). Onset.Immediately
 -- is the whole of "next": the ability watches from its creation, fires once,
 -- and only on its controller's upkeep.
-nextUpkeepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nextUpkeepSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 nextUpkeepSpec s registry = Spec.describe s "PactNextUpkeep" $ do
   let boardOf = do
         mountain <- S.printingOf s registry "Mountain"
@@ -1465,18 +1465,6 @@ nextUpkeepSpec s registry = Spec.describe s "PactNextUpkeep" $ do
     Spec.assertEqWith s "bob's upkeep is not alice's" (GameState.activePlayer atAlicesTurn, Game.stillPlaying atAlicesTurn) (S.alice, [S.alice, S.bob])
     Spec.assertEqWith s "alice lost on her next turn" (Game.stillPlaying after) [S.bob]
     Spec.assertEqWith s "in its upkeep" (GameState.phase after) (Phase.Beginning BeginningStep.Upkeep)
-  Spec.it s "CR 603.7b paying at alice's next upkeep spends the ability" $ do
-    (gs, pact) <- boardOf
-    let resolved = castAndResolve pact gs
-        atAlicesTurn = turnsWith PaymentDecision.Pays 2 resolved
-        paid = turnsWith PaymentDecision.Pays 1 atAlicesTurn
-        -- Declining from here on: an ability still armed would lose her the game
-        -- at her following upkeep.
-        later = turnsWith PaymentDecision.Declines 2 paid
-    Spec.assertEqWith s "alice paid and plays on" (Game.stillPlaying paid) [S.alice, S.bob]
-    Spec.assertEqWith s "her following turn, turn 5, has run" (GameState.turnNumber later) 6
-    Spec.assertEqWith s "and it never asked again" (Game.stillPlaying later) [S.alice, S.bob]
-    Spec.assertEqWith s "nothing is left armed" (length (GameState.delayedTriggers later)) 0
 
 -- Casts the first castable spell offered and passes otherwise, deferring every
 -- other prompt to S.identityAnswer. This is the CR 724.1f discriminator: under a

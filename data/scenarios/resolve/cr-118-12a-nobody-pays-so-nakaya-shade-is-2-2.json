@@ -1,0 +1,38 @@
+{
+  "description": "CR 118.12a nobody pays, so Nakaya Shade is 2/2",
+  "note": "Wild Might's \"unless any player pays\" gate, on an activated ability's resolution: Nakaya Shade's +1/+1 happens unless any player pays {2}, and with every seat declining it applies. Alice tapped her one Swamp to activate, so only bob and carol are offered, in APNAP order.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Nakaya Shade", "label": "shade" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "bob-island" },
+          { "card": "Island", "label": "bob-island-2" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Island", "label": "carol-island" },
+          { "card": "Island", "label": "carol-island-2" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@shade", "mana": ["@swamp"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "@shade" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "@shade" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@shade", "power": 2, "toughness": 2 } } }
+  ]
+}

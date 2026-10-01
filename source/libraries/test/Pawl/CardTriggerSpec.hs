@@ -3397,7 +3397,9 @@ enormousEnergyBladeSpec s registry =
 -- detach fold in Pawl.Engine.Sba), and the Equipment LEAVING THE BATTLEFIELD (the
 -- zone-change funnel), which is also the leg CR 603.10c's look-back is for --
 -- there the bearer is in a graveyard by the time its own trigger is gathered.
--- Deleting any one emit leaves the other two green.
+-- Deleting any one emit leaves the other two green. The fourth road, an unattach
+-- instruction (Pawl.Engine.Event.detach), is data/scenarios/unattach's Disarm
+-- scenario.
 graftedWargearSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graftedWargearSpec s registry =
   Spec.describe s "CR 701.3d a trigger on becoming unattached" $ do

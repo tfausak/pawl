@@ -402,6 +402,7 @@ manaProduced effect = case effect of
   Effect.ChooseNumber _ -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
+  Effect.Unattach _ -> Nothing
   Effect.Detain _ -> Nothing
   Effect.Goad _ -> Nothing
   Effect.Pair _ -> Nothing
@@ -667,6 +668,7 @@ movesLibraryCard effect = case effect of
   Effect.ChooseNumber _ -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
+  Effect.Unattach _ -> False
   Effect.Detain _ -> False
   Effect.Goad _ -> False
   Effect.Pair _ -> False
