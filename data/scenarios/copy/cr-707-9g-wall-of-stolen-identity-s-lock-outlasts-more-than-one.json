@@ -34,7 +34,7 @@
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$giant" } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
     { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
     { "turn": 4, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$giant", "tapped": true } } }
   ]

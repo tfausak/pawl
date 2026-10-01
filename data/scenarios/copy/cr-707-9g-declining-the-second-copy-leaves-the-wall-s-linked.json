@@ -28,8 +28,8 @@
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$gargantuan" } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": null } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$gargantuan", "tapped": true } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": false } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Wall of Stolen Identity", "subtypes": ["Shapeshifter", "Wall"] } } }
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Tapped": { "object": "$gargantuan", "tapped": true } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": false } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Subtypes": { "object": "Wall of Stolen Identity", "subtypes": ["Shapeshifter", "Wall"] } } }
   ]
 }
