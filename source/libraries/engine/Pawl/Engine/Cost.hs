@@ -1210,9 +1210,8 @@ totalManas adjustments =
 -- offers three entries rather than nine.
 --
 -- The keywords are read off the object's own face rather than through the
--- projection, selfReductions' posture and for its reason (#1859): this is the
--- half Cast.asProposed stamped, under any copy stamp's keywords
--- (Game.castingKeywordsOf, CR 707.2).
+-- projection (#1859, #4522): this is the half Cast.asProposed stamped, under
+-- any copy stamp's keywords (Game.castingKeywordsOf, CR 707.2).
 --
 -- The OFFERS come in two provenances and this function holds only the keywords'.
 -- CR 701.67a's waterbend is the other, and it rides the COST (CostComponent.Waterbend)
