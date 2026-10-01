@@ -8,6 +8,7 @@ import qualified Pawl.Types.Activation as Activation
 import qualified Pawl.Types.Casting as Casting
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Paying as Paying
 import qualified Pawl.Types.Reference as Reference
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -34,6 +35,8 @@ data Move
     OrderTimestamps (Seq.Seq Reference.Reference)
   | -- | CR 603.5 / 608.2d: whether the deciding player takes a printed "may".
     ChooseOptional OptionalDecision.OptionalDecision
+  | -- | CR 118.12a: whether the deciding player pays a cost a resolving object offers.
+    ChooseToPay Paying.Paying
   | -- | CR 601.2c / 603.3d: the targets of each slot a prompt outside a cast
     -- or activation offers, which also answers its announcement of how many.
     ChooseTargets (Map.Map SlotName.SlotName (Seq.Seq Reference.Reference))

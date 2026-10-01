@@ -1,0 +1,33 @@
+{
+  "description": "CR 614.1 Hardened Scales sees fabricate's counter, so the Artisan reads 4/4",
+  "note": "Glint-Sleeve Artisan's whole text is Fabricate 1. The board differs from the plain paying case only in the Hardened Scales: fabricate's payment places its counter through CR 122.6's funnel rather than writing it onto the object directly, so CR 614.1's replacement sees it. Not the payment moment, which ReplacementSpec's and PlaneswalkerSpec's CR 614.16 subjects pin.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains-1" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Plains", "label": "plains-3" },
+          { "card": "Hardened Scales" }
+        ],
+        "hand": [{ "card": "Glint-Sleeve Artisan", "label": "artisan" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@artisan", "mana": ["@plains-1", "@plains-2", "@plains-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Glint-Sleeve Artisan", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Glint-Sleeve Artisan", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "Glint-Sleeve Artisan" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Glint-Sleeve Artisan", "kind": { "type": "PlusOnePlusOne" }, "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Glint-Sleeve Artisan", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Servo Token", "count": 0 } } }
+  ]
+}

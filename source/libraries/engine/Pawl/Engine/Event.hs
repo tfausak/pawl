@@ -381,9 +381,9 @@ simultaneously body = do
 -- minted as or after it entered.
 --
 -- Pawl.RestampSpec's Mirror Match and Ornate Imitations boards prove the order.
--- Holding back the entry events is a regression fence: a CR 603.6a match reads
--- the entrant live (Pawl.Engine.Event.Match), so recording them before the order
--- leaves the suite green.
+-- Holding back the entry events is a regression fence: Restamp.settle re-takes
+-- each entry's CR 603.10 sample under the chosen order, so recording them before
+-- the order leaves the suite green.
 -- CR 614.12b / 608.2f: run a one-member-at-a-time move of `members` onto the
 -- battlefield with every member not yet moved visible to the entry choices of
 -- the ones moved before it (GameState.enteringPending). `under` is the player
@@ -7408,6 +7408,9 @@ attachVia legality subject destination = do
 -- CR 400.7 take the whole object away.
 --
 -- Not called by Pawl.Engine.Phasing, which is CR 702.26j.
+--
+-- `detach` below, Effect.Unattach's funnel, is a fourth route, clearing the
+-- field as the Sba fold does.
 unattach :: ObjectId -> Recipient.Recipient -> Game ()
 unattach subject host =
   State.modify'
@@ -7417,6 +7420,15 @@ unattach subject host =
         { BecameUnattached.attachment = subject,
           BecameUnattached.host = host
         }
+
+-- CR 701.3d: move `subject` off whatever it is attached to, leaving it on the
+-- battlefield. Attached to nothing, nothing happens and no event is recorded.
+detach :: ObjectId -> Game ()
+detach subject = do
+  gs <- State.get
+  Monad.forM_ (Game.lookupObject subject gs >>= Object.attachedTo) $ \host -> do
+    State.put gs {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Nothing}) subject (GameState.objects gs)}
+    unattach subject host
 
 -- CR 611.1 / 613.11: does a rules-modifying continuous effect stop this spell or
 -- ability from being countered (Spider-Punk, Prowling Serpopard)? The victim's

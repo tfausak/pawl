@@ -75,7 +75,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -695,30 +694,6 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         (after, asked) = proliferateTwiceRun (board {GameState.priority = Just S.alice}, spell)
     Spec.assertEqWith s "bob lost 2 life" (S.lifeOf S.bob after) (Just 18)
     Spec.assertEqWith s "nobody was asked" asked 0
-  -- Ezuri, Stalker of Spheres: "When Ezuri enters, you may pay {3}. If you do,
-  -- proliferate twice. Whenever you proliferate, draw a card." Two proliferate
-  -- instructions, each doubled by Tekuthal, draw four.
-  Spec.it s "CR 614.1a Ezuri's two proliferates under Tekuthal are four, and draw four" $ do
-    let paying :: Prompt.Prompt r -> r
-        paying p = case p of
-          Prompt.ChooseToPay {} -> PaymentDecision.Pays
-          _ -> S.identityAnswer p
-        run withTekuthal = do
-          island <- S.printingOf s registry "Island"
-          forest <- S.printingOf s registry "Forest"
-          ezuri <- S.printingOf s registry "Ezuri, Stalker of Spheres"
-          tekuthal <- S.printingOf s registry "Tekuthal, Inquiry Dominus"
-          -- {2}{G}{U} to cast and {3} for the ability: one Forest, six Islands.
-          let g0 = S.landsFor forest S.alice 1 (S.landsInPlay island 6)
-              g1 = if withTekuthal then snd (S.addPermanent tekuthal S.alice g0) else g0
-              g2 = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) g1 [1 .. (5 :: Int)]
-              (board, spell) = S.handOne ezuri g2
-              cast = S.runPure paying (board {GameState.priority = Just S.alice}) (S.cast S.alice spell)
-          pure (S.runPure paying cast Engine.priorityLoop)
-    after <- run True
-    baseline <- run False
-    Spec.assertEqWith s "four proliferates drew four" (S.handSize S.alice after) 4
-    Spec.assertEqWith s "without Tekuthal, two" (S.handSize S.alice baseline) 2
 
 -- Steady Progress in alice's hand over three Islands and a card to draw, a
 -- Goblin Piker of hers with one +1/+1 counter, bob at two poison, and each named

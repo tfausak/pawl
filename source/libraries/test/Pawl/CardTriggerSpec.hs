@@ -1719,6 +1719,31 @@ ezuriExperienceSpec s registry =
               after = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Engine.priorityLoop)
           Spec.assertEqWith s "alice gets no experience counter" (experienceOf S.alice after) 0
           Spec.assertEqWith s "and neither does bob, who has no Ezuri" (experienceOf S.bob after) 0
+        -- CR 603.10's first sentence: the entrant's power is read immediately
+        -- after it entered, not after CR 704.5j's legend rule buries the
+        -- Kongming that pumped it. A second Kongming, "Sleeping Dragon" (2/2,
+        -- "Other creatures you control get +1/+1") enters as a 3/3; alice keeps
+        -- it, and it is a 2/2 by the trigger scan. The pair differs only in the
+        -- first Kongming.
+        Spec.it s "CR 603.10 a Kongming that entered as a 3/3 pays nothing, though the legend rule leaves it a 2/2" $ do
+          ezuri <- S.printingOf s registry "Ezuri, Claw of Progress"
+          kongming <- S.printingOf s registry "Kongming, \"Sleeping Dragon\""
+          plains <- S.printingOf s registry "Plains"
+          let (ezuriId, withEzuri) = S.addPermanent ezuri S.alice (S.landsInPlay plains 4)
+              (firstId, withFirst) = S.addPermanent kongming S.alice withEzuri
+              keepNewcomer :: Prompt.Prompt r -> r
+              keepNewcomer p = case p of
+                Prompt.ChooseLegend _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (/= firstId) (NonEmpty.toList candidates))
+                _ -> S.identityAnswer p
+              resolveWith gs0 =
+                let (gs, spell) = S.handOne kongming gs0
+                 in S.runPure keepNewcomer (S.runPure keepNewcomer gs (S.cast S.alice spell)) Engine.priorityLoop
+              pumped = resolveWith withFirst
+              alone = resolveWith withEzuri
+          Spec.assertEqWith s "the newcomer entered as a 3/3, so alice gets nothing" (experienceOf S.alice pumped) 0
+          Spec.assertBool s (not (Set.member firstId (GameState.battlefield pumped))) "the legend rule buried the first Kongming"
+          Spec.assertEqWith s "and the newcomer pumps Ezuri, so it survived" (S.powerToughnessOf ezuriId pumped) (Just (4, 4))
+          Spec.assertEqWith s "with no first Kongming it enters as a 2/2 and pays one" (experienceOf S.alice alone) 1
 
 -- CR 122.1's OBJECT counters read WITHOUT NAMING A KIND, with Savanti Romero,
 -- Time's Exile {3}{B}{B} Legendary Creature -- Demon Wizard 4/4: "Trample. At the
@@ -3372,7 +3397,9 @@ enormousEnergyBladeSpec s registry =
 -- detach fold in Pawl.Engine.Sba), and the Equipment LEAVING THE BATTLEFIELD (the
 -- zone-change funnel), which is also the leg CR 603.10c's look-back is for --
 -- there the bearer is in a graveyard by the time its own trigger is gathered.
--- Deleting any one emit leaves the other two green.
+-- Deleting any one emit leaves the other two green. The fourth road, an unattach
+-- instruction (Pawl.Engine.Event.detach), is data/scenarios/unattach's Disarm
+-- scenario.
 graftedWargearSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graftedWargearSpec s registry =
   Spec.describe s "CR 701.3d a trigger on becoming unattached" $ do

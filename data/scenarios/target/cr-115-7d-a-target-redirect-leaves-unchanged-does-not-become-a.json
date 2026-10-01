@@ -1,0 +1,57 @@
+{
+  "description": "CR 115.7d a target Redirect leaves unchanged does not become a target again",
+  "note": "A target left unchanged did not become one: it already was. The Growth names bob's Tomakul Honor Guard as it is cast, alice pays that ward with her other two Forests, and Redirect keeps the Guard, so no second ward fires and the Growth resolves (6/4), where a second trigger alice could not pay would leave a 3/1. Three seats, the board Redirect's cases share.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest1" },
+          { "card": "Forest", "label": "forest2" },
+          { "card": "Forest", "label": "forest3" },
+          { "card": "Goblin Piker", "label": "alice-piker" }
+        ],
+        "hand": [{ "card": "Giant Growth", "label": "growth" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain1" },
+          { "card": "Mountain", "label": "mountain2" },
+          { "card": "Mountain", "label": "mountain3" },
+          { "card": "Mountain", "label": "mountain4" },
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" },
+          { "card": "Tomakul Honor Guard", "label": "guard" },
+          { "card": "Slippery Bogle", "label": "bogle" },
+          { "card": "Goblin Piker", "label": "bob-piker" }
+        ],
+        "hand": [
+          { "card": "Redirect", "label": "redirect" },
+          { "card": "Wild Ricochet", "label": "ricochet" }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@growth", "targets": ["@guard"], "mana": ["@forest1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@forest2", "@forest3"] } }, "source": "@guard" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@forest1", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@forest2", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@forest3", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@alice-piker", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@redirect", "targets": ["Giant Growth"], "mana": ["@island1", "@island2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@guard"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@guard", "power": 6, "toughness": 4 } } }
+  ]
+}

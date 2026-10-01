@@ -20,4 +20,4 @@ module Pawl.Types.PaymentDecision where
 data PaymentDecision
   = Declines
   | Pays
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

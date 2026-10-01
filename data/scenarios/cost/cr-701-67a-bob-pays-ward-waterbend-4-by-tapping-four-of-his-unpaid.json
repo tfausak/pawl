@@ -1,0 +1,41 @@
+{
+  "description": "CR 701.67a bob pays ward--waterbend {4} by tapping four of his own permanents",
+  "note": "The pair: the same board with three Pikers of bob's, so he cannot pay {4} by tapping even with alice's four creatures untapped beside them, and the Growth is countered: the Unagi stays 5/5 and only his Forest is tapped. The engine never offers a cost bob cannot pay, so no ChooseToPay entry appears.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "The Unagi of Kyoshi Island", "label": "unagi" },
+          { "card": "Goblin Piker", "label": "alice-piker-1" },
+          { "card": "Goblin Piker", "label": "alice-piker-2" },
+          { "card": "Goblin Piker", "label": "alice-piker-3" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Goblin Piker", "label": "bob-piker-1" },
+          { "card": "Goblin Piker", "label": "bob-piker-2" },
+          { "card": "Goblin Piker", "label": "bob-piker-3" }
+        ],
+        "hand": [{ "card": "Giant Growth", "label": "growth" }]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@growth", "targets": ["@unagi"], "mana": ["@forest"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "PowerToughness": { "object": "@unagi", "power": 5, "toughness": 5 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@forest", "tapped": true } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@bob-piker-1", "tapped": false } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@bob-piker-2", "tapped": false } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@bob-piker-3", "tapped": false } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@unagi", "tapped": false } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@alice-piker-1", "tapped": false } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@alice-piker-2", "tapped": false } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Tapped": { "object": "@alice-piker-3", "tapped": false } } }
+  ]
+}

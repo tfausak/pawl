@@ -198,7 +198,6 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
-import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
@@ -741,8 +740,8 @@ attachTogether movers recipient = do
 -- The permanents an ObjectRef names, for an instruction that acts on them
 -- together: the one ref that is a CR 608.2d question rather than a read has to
 -- be answered in the Game monad, and every other is objectRefObjects' pure
--- sweep. Shared by turnPermanentsOver, Effect.AttachAll, Effect.Untap and
--- Effect.Sacrifice.
+-- sweep. Shared by turnPermanentsOver, Effect.AttachAll, Effect.Unattach,
+-- Effect.Untap and Effect.Sacrifice.
 permanentsGathered ::
   Map.Map SlotName (Set Recipient) ->
   ObjectId ->
@@ -3046,6 +3045,13 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.AttachTargetToEach {} -> False
   Effect.AttachBound {} -> False
   Effect.AttachAll {} -> False
+  -- CR 701.3d: the sweep names at least one permanent and none of them is
+  -- attached to anything, so there is nothing to move away (Akiri, Fearless
+  -- Voyager's "you may unattach"). A regression fence: no printed "may" in
+  -- data/cards reaches it.
+  Effect.Unattach ref ->
+    let named = objectRefObjects legal resolving controller source gs ref
+     in not (null named) && all ((== Just Nothing) . fmap Object.attachedTo . flip Game.lookupObject gs) named
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> choosesFromNothing ref
   Effect.Draw {} -> False
   -- CR 701.17b: "a player can't mill a number of cards greater than the number
@@ -8283,6 +8289,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Proposed as a bare ToObject; Event.attach re-tags it per mover, as
     -- AttachTarget's arm says.
     Foldable.for_ destination (attachTogether movers . Recipient.ToObject)
+  -- CR 701.3d: move each named permanent off its host, leaving it on the
+  -- battlefield, through Event.detach so each is a becomes-unattached event. The
+  -- movers are gathered ONCE (CR 608.2f), off the board before any moves, and in
+  -- one event group. CR 702.151b's creature-type removal on a reconfigure
+  -- Equipment ends with the attachment, Keyword.reconfigured's affected set
+  -- re-asking Object.attachedTo.
+  Effect.Unattach ref -> do
+    movers <- permanentsGathered legal resolving controller source ref
+    Event.simultaneously (Monad.forM_ movers Event.detach)
   Effect.ExileUntilMonarch slot ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
@@ -10053,19 +10068,7 @@ runEntryEffect pending = do
     (PendingEntryEffect.effects pending)
   State.modify' (\gs -> gs {GameState.enteringBeside = outer})
   Foldable.for_ announced $ \_ -> State.modify' (setX before)
-  State.modify' (resampleEntry oid)
-
--- CR 603.10: the board "immediately after" a permanent entered includes what its
--- as-enters effects did, since they are part of the entry (CR 614.1c). So the
--- CR 603.10 sample filed under the entry's event group is taken again now --
--- a watcher Ixidron turned face down sees nothing enter. Pawl.FaceDownSpec's "CR
--- 614.1c / 603.10 a watcher Ixidron turns face down does not see it enter" proves
--- it. Only an existing sample is replaced; a group without one reads the live
--- board anyway (Trigger.battlefieldAt).
-resampleEntry :: ObjectId -> GameState -> GameState
-resampleEntry oid gs = case entryGroup oid gs of
-  Nothing -> gs
-  Just group -> gs {GameState.battlefieldWhenTriggered = Map.adjust (const (Trigger.battlefieldCandidates gs)) group (GameState.battlefieldWhenTriggered gs)}
+  State.modify' (Trigger.resampleEntry oid)
 
 -- CR 614.12: the other permanents that entered in the same event as `oid` (CR
 -- 608.2f's group, which an Event.simultaneously bracket shares) -- not yet on the
@@ -10076,7 +10079,7 @@ resampleEntry oid gs = case entryGroup oid gs of
 -- "CR 614.12 a creature entering beside Ixidron enters face up" (one MoveToZone)
 -- and Pawl.TargetPerPlayerSpec's Sepulchral Primordial pair (a ForEach) prove it.
 enteredBeside :: ObjectId -> GameState -> Set ObjectId
-enteredBeside oid gs = case entryGroup oid gs of
+enteredBeside oid gs = case Trigger.entryGroup oid gs of
   Nothing -> Set.empty
   Just group ->
     Set.delete oid . Set.fromList $
@@ -10086,12 +10089,6 @@ enteredBeside oid gs = case entryGroup oid gs of
         Just zc <- [Trigger.movedOf (LoggedEvent.event logged)],
         ZoneChange.to zc == Zone.Battlefield
       ]
-
--- The event group of the log entry that put `oid` onto the battlefield.
-entryGroup :: ObjectId -> GameState -> Maybe EventGroup.EventGroup
-entryGroup oid gs =
-  let entered logged = maybe False (\zc -> ZoneChange.object zc == oid && ZoneChange.to zc == Zone.Battlefield) (Trigger.movedOf (LoggedEvent.event logged))
-   in fmap (LoggedEvent.group . Seq.index (GameState.events gs)) (Seq.findIndexR entered (GameState.events gs))
 
 -- CR 614.1a: run the effects a DamageRewrite.RunEffects rewrite put in a damage
 -- event's place -- Kill-Suit Cultist's destruction. Drains

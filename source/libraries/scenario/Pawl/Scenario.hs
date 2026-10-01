@@ -77,6 +77,8 @@ import qualified Pawl.Types.MonarchIs as MonarchIs
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Paying as Paying
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
@@ -460,6 +462,24 @@ answerTopPrompt decider asked =
           key <- whenOf gs (Decider.unwrap who)
           let named = Maybe.fromMaybe resolving (Game.abilitySourceOf resolving gs)
           onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
+            Move.ChooseOptional decision -> Just (pure decision)
+            _ -> Nothing
+        -- CR 118.12a: keyed like ChooseOptional, by the object offering the cost.
+        -- Paying leaves the move's choices pending for the payment's own prompts.
+        Prompt.Type.ChooseToPay who _ offering _ _ _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          let named = Maybe.fromMaybe offering (Game.abilitySourceOf offering gs)
+          onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
+            Move.ChooseToPay paying -> Just $ do
+              Monad.when (Paying.decision paying == PaymentDecision.Pays) $
+                State.modify' (\rehearsal -> rehearsal {pending = Just (key, verb, Paying.choices paying)})
+              pure (Paying.decision paying)
+            _ -> Nothing
+        -- CR 614.1a's optional redirect, a "may" keyed by the redirect's own
+        -- source like ChooseOptional above.
+        Prompt.Type.ChooseRedirect who _ source _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          onEntry unscheduled key kind [] (takeForSource gs key source) $ \verb -> case verb of
             Move.ChooseOptional decision -> Just (pure decision)
             _ -> Nothing
         -- The order named is the whole group, each object once; the engine

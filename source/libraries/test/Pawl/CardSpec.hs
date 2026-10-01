@@ -643,6 +643,7 @@ objectRefPositions =
         ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
         ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
         ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
+        ("unattach", Effect.Unattach (plantedRef "ua"), [plantedRef "ua"]),
         ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
         ("earthbend", Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Type.Literal 1) (plantedRef "eb")), [plantedRef "eb"]),
         ("airbend", Effect.Airbend (plantedRef "ab"), [plantedRef "ab"]),
@@ -1347,6 +1348,7 @@ ownCounts effect = case effect of
   Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Unattach _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
   Effect.Pair _ -> []
@@ -1816,6 +1818,7 @@ effectNestedEffects effect = case effect of
   Effect.ChooseNumber _ -> []
   Effect.Tap {} -> []
   Effect.Untap {} -> []
+  Effect.Unattach {} -> []
   Effect.Detain {} -> []
   Effect.Goad {} -> []
   Effect.Pair {} -> []
@@ -2338,6 +2341,7 @@ effectReplacements effect = case effect of
   Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Unattach _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
   Effect.Pair _ -> []
@@ -2825,6 +2829,7 @@ effectMintedFaces effect = case effect of
   Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Unattach _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
   Effect.Pair _ -> []
@@ -5900,6 +5905,7 @@ effectFilters effect = case effect of
   Effect.ChooseNumber _ -> []
   Effect.Tap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Untap ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Unattach ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Detain ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Goad ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Pair ref -> frame SourceHostFramed (objectRefFilters ref)
