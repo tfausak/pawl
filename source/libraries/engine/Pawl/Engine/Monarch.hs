@@ -277,8 +277,8 @@ crown pid gs =
           -- departed controller is never crowned, and CR 800.2's teams are
           -- settled before the game begins. Nothing needs to be stored.
           mark watch =
-            if Game.areOpponents gs (MonarchWatch.controller watch) pid
-              then watch {MonarchWatch.due = True}
+            if Game.areOpponents gs (MonarchWatch.controller watch) pid && Maybe.isNothing (MonarchWatch.due watch)
+              then watch {MonarchWatch.due = Just (GameState.nextEventGroup gs)}
               else watch
        in Event.recordEvent
             (GameEvent.BecameMonarch pid)
@@ -304,19 +304,26 @@ crown pid gs =
 -- to an opponent and back inside one resolution still frees the prisoner" is the
 -- proof (see #208).
 --
+-- CR 610.3d: the watches one crowning marked return as ONE event, so the
+-- creatures coming back see each other enter (CR 603.6a); two crownings
+-- since the last settle return theirs as two events, earlier first.
+-- data/scenarios/simultaneous-moves' Palace Jailer board proves the first; the
+-- split is a REGRESSION FENCE, no board in the suite crowning twice between
+-- settles.
+--
 -- Departure.objectsLeaveWith drops an entry whose KEY (the exiled object) belongs
 -- to a departing player, never one whose VALUE does, so the effect survives its
 -- controller's departure.
 returnExiledForMonarch :: Game Bool
 returnExiledForMonarch = do
   gs <- State.get
-  let due = Map.keys (Map.filter MonarchWatch.due (GameState.exiledUntilMonarch gs))
-  if null due
+  let batches = Map.fromListWith (flip (<>)) [(group, [oid]) | (oid, Just group) <- Map.toList (fmap MonarchWatch.due (GameState.exiledUntilMonarch gs))]
+  if Map.null batches
     then pure False
     else do
-      Monad.forM_ due $ \oid -> do
-        _ <- Event.changeZoneReturning oid Zone.Battlefield
-        State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g)})
+      Monad.forM_ (Map.elems batches) $ \due -> do
+        _ <- Event.changeZonesTogether (fmap (\oid -> (oid, Zone.Battlefield)) due)
+        State.modify' (\g -> g {GameState.exiledUntilMonarch = foldr Map.delete (GameState.exiledUntilMonarch g) due})
       pure True
 
 -- CR 725.4: reassign the crown when the monarch leaves the game. Who takes it is

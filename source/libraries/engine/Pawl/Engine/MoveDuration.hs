@@ -18,10 +18,12 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Restamp as Restamp
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
@@ -56,9 +58,14 @@ hasLeftTheBattlefield oid gs = case Game.lookupObject oid gs of
 -- 610.3 gives nobody a window to respond, and a return that used the stack could
 -- be countered or removed -- see #2626.
 --
--- ONE BATCH read off one board (CR 610.3d): every due watch is collected before
--- any object moves, and each move is judged against that board, so returns after
--- simultaneous events stay simultaneous.
+-- CR 610.3d: the returns created after one event are one event too, so the due
+-- watches are grouped by the event their source left in (the logged
+-- GameEvent.Moved's group) and each group moves as one
+-- (Event.changeZonesTogether), earlier departures first. Sources with no
+-- logged departure return theirs together, after the rest.
+-- data/scenarios/simultaneous-moves' Banisher Priest board proves one group's
+-- return; the split across two departures is a REGRESSION FENCE, no board in the
+-- suite removing two sources in separate events before one settle.
 --
 -- The entry goes whether or not the move happened. A cancelled move (CR 614.6) or
 -- an id that is no longer in the zone it was moved to has had its duration end all
@@ -77,14 +84,19 @@ returnMoved = do
         filter
           (\(_, watch) -> hasLeftTheBattlefield (ReturnWatch.source watch) gs)
           (Map.toList (GameState.movedUntilSourceLeaves gs))
+      departedIn src =
+        Foldable.foldl'
+          ( \found logged -> case (found, LoggedEvent.event logged) of
+              (Nothing, GameEvent.Moved m) | src `elem` Moved.departures m -> Just (LoggedEvent.group logged)
+              _ -> found
+          )
+          Nothing
+          (GameState.events gs)
+      batches = Map.fromListWith (flip (<>)) [(maybe (Right ()) Left (departedIn (ReturnWatch.source watch)), [(oid, ReturnWatch.zone watch)]) | (oid, watch) <- due]
   if null due
     then pure False
     else do
-      arrived <- Monad.forM due $ \(oid, watch) -> do
-        back <- Event.changeZoneInBatchReturning gs oid (ReturnWatch.zone watch)
-        State.modify' (\g -> g {GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g)})
-        pure back
-      -- CR 613.7m: what returned together is stamped in APNAP order, each seat
-      -- choosing its own.
-      Restamp.settle (GameState.nextTimestamp gs) (concatMap Foldable.toList arrived)
+      Monad.forM_ (Map.elems batches) $ \batch -> do
+        _ <- Event.changeZonesTogether batch
+        State.modify' (\g -> g {GameState.movedUntilSourceLeaves = foldr (Map.delete . fst) (GameState.movedUntilSourceLeaves g) batch})
       pure True
