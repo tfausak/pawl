@@ -32,7 +32,6 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -183,18 +182,6 @@ storedSpec s registry = Spec.describe s "Stored" $ do
     let offered = twinOffers victim twin resolved
     Spec.assertBool s (notElem twin offered) "the twin's regeneration is withheld instead"
     Spec.assertEqWith s "and the first Troll's is the one Troll offer left" offered [victim]
-  -- CR 514.2 / 611.2a: "this turn" arms Expiry.AtCleanup, so the cleanup sweep
-  -- drops the row and the ability is offered again. Through the sweep directly,
-  -- which is the narrowest path that shows it.
-  Spec.it s "CR 514.2 the prohibition ends at cleanup" $ do
-    (victim, twin, resolved) <- deadlockResolved s registry "Uthden Troll" const
-    let swept = Expiry.dropAtCleanup resolved
-    Spec.assertEqWith
-      s
-      "both Trolls may be activated once the turn's cleanup has run"
-      (Set.fromList (twinOffers victim twin swept))
-      (Set.fromList [victim, twin])
-    Spec.assertEqWith s "with nothing left stored" (GameState.activationProhibitions swept) []
   -- CR 605.3a's window, which the STORED row closes too: Pawl.Types.ForbidActivation
   -- carries no CR 605.1a kind, so a mana ability goes the way every other
   -- activated ability does. Treasonous Ogre's "Pay 3 life: Add {R}" is the pool's

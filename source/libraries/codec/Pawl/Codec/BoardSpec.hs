@@ -1,6 +1,7 @@
 module Pawl.Codec.BoardSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Board as Board
@@ -70,6 +71,7 @@ seat name =
   Seat.Type.MkSeat
     { Seat.Type.name = Label.Type.MkLabel (Text.pack name),
       Seat.Type.life = 20,
+      Seat.Type.counters = Map.empty,
       Seat.Type.battlefield = Seq.empty,
       Seat.Type.hand = Seq.empty,
       Seat.Type.graveyard = Seq.empty,

@@ -1,0 +1,36 @@
+{
+  "description": "Venerated Rotpriest triggers once per creature a spell targets",
+  "note": "CR 603.2c's second sentence: \"a creature\" is one trigger event per creature targeted. Lead by Example targets both of alice's Pikers, so Venerated Rotpriest triggers twice and bob, alice's only opponent and so the forced target, gets two poison counters from none.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Venerated Rotpriest", "label": "rotpriest" },
+          { "card": "Goblin Piker", "label": "piker-1" },
+          { "card": "Goblin Piker", "label": "piker-2" }
+        ],
+        "hand": [{ "card": "Lead by Example", "label": "lead" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lead", "targets": ["@piker-1", "@piker-2"], "mana": ["@forest-1", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["@rotpriest", "@rotpriest"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@bob"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@bob"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker-1", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker-2", "power": 3, "toughness": 2 } } }
+  ]
+}

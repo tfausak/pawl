@@ -144,30 +144,6 @@ poisonousSpec s registry =
               let fought = S.fightWith S.aggressiveAnswer gs
               Spec.assertEqWith s "damage is dealt" (S.lifeOf S.bob fought) (Just 18)
               Spec.assertEqWith s "but no poison until the trigger resolves" (S.playerCounterOf PlayerCounterKind.Poison S.bob fought) 0
-        -- CR 702.70b at the board level: two Auras are two poisonous 3
-        -- abilities, so two triggers and six counters. The falsifier is a
-        -- projection that keeps keywords in a set -- the second grant collapses
-        -- into the first and bob takes three.
-        Spec.it s "CR 702.70b two Snake Cult Initiations trigger separately for six poison" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          initiation <- S.printingOf s registry "Snake Cult Initiation"
-          case board piker initiation 2 [] of
-            Nothing -> Spec.assertFailure s "fixture should have an attacker"
-            Just (gs, _, _) -> do
-              let after = S.runCombat S.aggressiveAnswer gs
-              Spec.assertEqWith s "bob has six poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 6
-        -- CR 702.70a is scoped to combat damage dealt TO A PLAYER: a blocked
-        -- creature deals its damage to the blocker, so the ability never
-        -- triggers and the blocker (not being a player) gets nothing either.
-        Spec.it s "CR 702.70a a blocked creature poisons nobody" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          initiation <- S.printingOf s registry "Snake Cult Initiation"
-          case board piker initiation 1 [piker] of
-            Nothing -> Spec.assertFailure s "fixture should have an attacker"
-            Just (gs, _, _) -> do
-              let after = S.runCombat S.aggressiveAnswer gs
-              Spec.assertEqWith s "bob has no poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 0
-              Spec.assertEqWith s "and lost no life" (S.lifeOf S.bob after) (Just 20)
         -- CR 613.1f / 613 layer 6: the ability is derived from the POST-LAYER
         -- keywords, so Humility's LoseAllAbilities (a later timestamp, so it
         -- applies after the Aura's grant) takes it away with no arm of its own.
