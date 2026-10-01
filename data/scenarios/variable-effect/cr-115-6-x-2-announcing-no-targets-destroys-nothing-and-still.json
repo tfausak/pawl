@@ -1,0 +1,38 @@
+{
+  "description": "CR 115.6 X=2 announcing no targets destroys nothing and still makes the Pests",
+  "note": "Pest Infestation cast for X=2 with zero of its \"up to X target artifacts and/or enchantments\" announced: no targets chosen, so CR 608.2b has nothing to find illegal. All three of bob's candidates stand, and twice X Pests are made, which a fizzled spell would not do.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Forest", "label": "forest-4" },
+          { "card": "Forest", "label": "forest-5" }
+        ],
+        "hand": [{ "card": "Pest Infestation", "label": "infestation" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Sol Ring" },
+          { "card": "Ornithopter" },
+          { "card": "Glorious Anthem" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@infestation", "x": 2, "targets": [], "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4", "@forest-5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Pest Token", "Pest Token#2", "Pest Token#3", "Pest Token#4"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Sol Ring", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Ornithopter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Glorious Anthem", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Pest Token", "count": 4 } } }
+  ]
+}

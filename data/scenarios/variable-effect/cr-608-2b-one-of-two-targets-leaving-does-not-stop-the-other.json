@@ -1,0 +1,38 @@
+{
+  "description": "CR 608.2b one of two targets leaving does not stop the other being pumped",
+  "note": "Hearts on Fire names the Piker and the Wall; bob answers with Doom Blade on the Wall, so one target is gone when the spell resolves. Under CR 608.2b's per-object reading the surviving Piker is still pumped; a per-slot reading would take it down with the Wall.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain1", "ready": true },
+          { "card": "Mountain", "label": "mountain2", "ready": true }
+        ],
+        "hand": [{ "card": "Hearts on Fire", "label": "hearts" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp1", "ready": true },
+          { "card": "Swamp", "label": "swamp2", "ready": true },
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Typhoid Rats", "label": "rats" },
+          { "card": "Wall of Stone", "label": "wall" }
+        ],
+        "hand": [{ "card": "Doom Blade", "label": "doom-blade" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hearts", "targets": ["@piker", "@wall"], "mana": ["@mountain1", "@mountain2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@doom-blade", "targets": ["@wall"], "mana": ["@swamp1", "@swamp2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Wall of Stone", "count": 0 } } }
+  ]
+}

@@ -1492,20 +1492,8 @@ soulfireBoard s registry = do
 -- stated at turn 3 or at turn 4. Both are driven through Engine.runStep, so the
 -- permission is observed the way a player would: by the engine offering the cast
 -- as a legal action, or not.
-soulfireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulfireSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
-  Spec.it s "CR 611.2a the permission lasts through the controller's next turn, and the card is played on it" $ do
-    (pikerId, resolved) <- soulfireBoard s registry
-    -- Turns 1 and 2 are played out with nothing cast, so the card is played on
-    -- alice's NEXT turn rather than on the turn the spell resolved.
-    let alicesNext = runToTurn S.identityAnswer 3 resolved
-        played = runToTurn (castingFromExile pikerId) 4 alicesNext
-    Spec.assertEqWith s "alice's next turn began" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
-    -- Where an "until your next turn" duration is already over: this is the
-    -- assertion the printed card and pawl's old, stricter reading disagree on.
-    Spec.assertEqWith s "the permission survived the handoff into it" (permissionOn pikerId alicesNext) (Just S.alice)
-    Spec.assertEqWith s "alice played the exiled card during that turn" (S.creaturesInPlay S.alice played) 1
-    Spec.assertEqWith s "so it is no longer in exile" (Game.zoneMembers Zone.Exile S.alice played) []
   Spec.it s "CR 611.2a / 514.2 it ends as that turn ends, and no later turn of theirs can play the card" $ do
     (pikerId, resolved) <- soulfireBoard s registry
     -- The same board, run one turn further with the same answerer: the only

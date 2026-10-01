@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Move as Move
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | Keyed, so a move reads @{"Attack": ["\@bear"]}@ and a pass @"Pass"@. Blocks
 -- and assignments are objects keyed by reference: @{"\@wall": ["\@bear"]}@.
@@ -26,6 +27,7 @@ codec =
       Arm.payload "ChooseAttackTarget" Reference.codec Move.ChooseAttackTarget (\x -> case x of Move.ChooseAttackTarget y -> Just y; _ -> Nothing),
       Arm.payload "OrderTimestamps" (Common.seq Reference.codec) Move.OrderTimestamps (\x -> case x of Move.OrderTimestamps y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOptional" OptionalDecision.codec Move.ChooseOptional (\x -> case x of Move.ChooseOptional y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseTargets" (Common.textMap SlotName.unwrap (Right . SlotName.MkSlotName) (Common.seq Reference.codec)) Move.ChooseTargets (\x -> case x of Move.ChooseTargets y -> Just y; _ -> Nothing),
       Arm.nullary "Concede" Move.Concede,
       Arm.nullary "Pass" Move.Pass
     ]
@@ -42,5 +44,6 @@ tagOf x = case x of
   Move.ChooseAttackTarget {} -> "ChooseAttackTarget"
   Move.OrderTimestamps {} -> "OrderTimestamps"
   Move.ChooseOptional {} -> "ChooseOptional"
+  Move.ChooseTargets {} -> "ChooseTargets"
   Move.Concede {} -> "Concede"
   Move.Pass {} -> "Pass"

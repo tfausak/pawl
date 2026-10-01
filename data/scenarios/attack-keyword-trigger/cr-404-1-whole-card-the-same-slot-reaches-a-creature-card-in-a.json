@@ -1,0 +1,28 @@
+{
+  "description": "CR 404.1 whole card: the same slot reaches a creature card in a graveyard",
+  "note": "The other half of Savior of Ollenbock's pool: a creature card in a graveyard rather than a creature on the battlefield. It is bob's graveyard, so \"a graveyard\" is not read as the controller's own. The Goblin Piker's 2 power trains the 1-power Savior.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Savior of Ollenbock", "label": "savior", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Ogre Sentry", "label": "sentry" }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@savior", "@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@sentry"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@savior", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Ogre Sentry", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Ogre Sentry", "count": 0 } } }
+  ]
+}
