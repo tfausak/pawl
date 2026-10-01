@@ -1,0 +1,86 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 2
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PreventNextDamageInstance",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "you"
+                          },
+                          "riders": [
+                            {
+                              "type": "MoveToZone",
+                              "value": {
+                                "ref": {
+                                  "type": "TopOfLibrary",
+                                  "value": {
+                                    "count": {
+                                      "type": "InSlot",
+                                      "value": "thatMuch"
+                                    },
+                                    "player": {
+                                      "type": "Relative",
+                                      "value": {
+                                        "type": "You"
+                                      }
+                                    }
+                                  }
+                                },
+                                "zone": {
+                                  "type": "Exile"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Bone Mask",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

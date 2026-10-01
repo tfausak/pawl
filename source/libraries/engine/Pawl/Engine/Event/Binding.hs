@@ -609,7 +609,7 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- addressed to.
   --
   -- CR 120.1's SOURCE is, and it is the one thing this condition's payload can
-  -- name that the arm above's cannot: Deflecting Palm's "that source's
+  -- name that the arm above's cannot: New Way Forward's "that source's
   -- controller" points at the object that would have dealt the damage, which the
   -- record already carries. Not bound on the DamageToPlayerPrevented arm, whose
   -- printed sentences all speak about the recipient's side; a printing there that

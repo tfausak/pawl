@@ -364,12 +364,14 @@ handArrival = SlotName.MkSlotName (Text.pack "handArrival")
 eventAmount :: SlotName
 eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 
--- CR 615.13 / 120.1: the reserved slot under which a prevention trigger's
+-- CR 615.5 / 615.13 / 120.1: the reserved slot under which a prevention's
 -- SOURCE is bound -- the object that would have dealt the damage, which
--- Deflecting Palm's "that source's controller" reads through
--- PlayerRef.ControllerOfBound. Stamped by
--- Pawl.Engine.Event.Binding.eventBindings alongside `eventAmount`, off
--- Pawl.Types.DamagePrevented.source.
+-- Deflecting Palm's and New Way Forward's "that source's controller" reads
+-- through PlayerRef.ControllerOfBound. Two writers, one per carrier: a CR 615.13
+-- trigger's is Pawl.Engine.Event.Binding.eventBindings, alongside
+-- `eventAmount` and off Pawl.Types.DamagePrevented.source, and a CR 615.5
+-- rider's is Pawl.Engine.Resolve.Effect.runPreventionRider, off
+-- Pawl.Types.Prevention.source.
 --
 -- Distinct from `triggerSource` (CR 113.7a), which names the ability's own
 -- source: the bearer here is the card that shielded, and the object that would
@@ -378,18 +380,18 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 -- names a player through an OBJECT, and CR 108.4's controller is read as the
 -- payload runs rather than snapshotted as the damage was stopped.
 --
--- ROUTINELY DEAD by the time the payload runs -- the source may have been a
--- spell that has since resolved (CR 609.7a admits one) -- which is
+-- ROUTINELY DEAD by the time a trigger's payload runs -- the source may have
+-- been a spell that has since resolved (CR 609.7a admits one) -- which is
 -- `blockingCreature`'s posture and the payload's problem: every read of it goes
 -- through last known information, ControllerOfBound's own
 -- Projection.controllerWithLastKnown among them.
 --
 -- NOT named by Pawl.Engine.Resolve.Slots.effectViewOf, `unattachedHost`'s
--- posture: no printing reads a CHARACTERISTIC off the source whose damage was
--- stopped. Honorable Passage's "damage from a red source" looks like one and is
--- not -- that predicate sits on the trigger's CONDITION, which
--- Pawl.Engine.Event matches through Projection.viewWithLastKnown already. A
--- payload saying "equal to that source's power" would want the arm.
+-- posture: no card in data/cards/ reads a CHARACTERISTIC off the source whose
+-- damage was stopped. A trigger's condition asking one is matched through
+-- Projection.viewWithLastKnown already; a rider or payload asking one --
+-- Honorable Passage's "if damage from a red source is prevented this way" --
+-- would want the arm.
 --
 -- Not a target (CR 115.10a; nothing was chosen), so the same CR 608.2b posture
 -- and the same "no card's targetSlots may name it" sweep as `became`, and the
