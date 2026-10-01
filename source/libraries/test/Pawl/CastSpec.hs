@@ -42,6 +42,7 @@ import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
+import Pawl.SpecialActionSpec (humiliatedBoard)
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -6434,9 +6435,44 @@ sharedEnumerationSpec s registry = Spec.describe s "SharedEnumeration" $ do
     -- The boards discriminate: each offers some casts and refuses others.
     Spec.assertBool s (not (null (plain tight)) && length (plain tight) < length (plain roomy) && length (plain roomy) < length (Cast.castProposals S.alice roomy)) "some casts are offered and some refused on each board"
 
+-- CR 613.1f / 113.6e: Patriar's Humiliation's perpetual "loses all abilities"
+-- follows the card Unsummon returns to alice's hand
+-- (Pawl.SpecialActionSpec.humiliatedBoard), so the flash or morph printed on it
+-- is gone there. Each pair differs only in whether the Humiliation took the
+-- card's abilities or bob's Goblin Piker's; the Plains and Island paid for
+-- both spells.
+humiliationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+humiliationSpec s registry =
+  Spec.describe s "CR 613.1f Patriar's Humiliation" $ do
+    let build base victim = do
+          plains <- S.printingOf s registry "Plains"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          humiliation <- S.printingOf s registry "Patriar's Humiliation"
+          unsummon <- S.printingOf s registry "Unsummon"
+          pure (humiliatedBoard base victim plains island piker humiliation unsummon)
+    -- alice's end step, where only an instant-speed cast is open; three Forests
+    -- pay the Cheetah's {2}{G}.
+    Spec.it s "CR 702.8a a Pouncing Cheetah that perpetually lost all abilities has no flash" $ do
+      forest <- S.printingOf s registry "Forest"
+      cheetah <- S.printingOf s registry "Pouncing Cheetah"
+      board <- build (S.landsInPlay forest 3) cheetah
+      let castableIn (mId, gs) = maybe False (\oid -> S.castable S.alice oid gs {GameState.phase = Phase.Ending EndingStep.EndStep}) mId
+      Spec.assertBool s (not (castableIn (board True))) "CR 613.1f the humiliated Cheetah cannot be cast in the end step"
+      Spec.assertBool s (castableIn (board False)) "the control: with the Piker humiliated instead, it can"
+    -- Three Forests pay the face-down {3}, not the face-up {5}{R}.
+    Spec.it s "CR 702.37a an Ainok Tracker that perpetually lost all abilities cannot be cast face down" $ do
+      forest <- S.printingOf s registry "Forest"
+      tracker <- S.printingOf s registry "Ainok Tracker"
+      board <- build (S.landsInPlay forest 3) tracker
+      let faceDownIn (mId, gs) = any (\(oid, _, facing) -> Just oid == mId && facing /= Facing.FaceUp) (Cast.castableSpells S.alice gs)
+      Spec.assertBool s (not (faceDownIn (board True))) "CR 613.1f the humiliated Tracker is offered no face-down cast"
+      Spec.assertBool s (faceDownIn (board False)) "the control: with the Piker humiliated instead, it may be cast face down"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
+  humiliationSpec s registry
   sharedEnumerationSpec s registry
   castEngineSpec s registry
   stackSpec s registry
