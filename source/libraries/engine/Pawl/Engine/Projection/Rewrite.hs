@@ -1873,6 +1873,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfBecomesClassLevel _ -> condition
   TriggerCondition.SelfLastCounterRemoved _ -> condition
   TriggerCondition.SelfCountersRemoved _ -> condition
+  TriggerCondition.SelfCounterRemoved _ -> condition
   TriggerCondition.SelfHalfUnlocked _ -> condition
   TriggerCondition.RoomFullyUnlocked _ -> condition
   TriggerCondition.AnyOf conditions -> TriggerCondition.AnyOf (fmap (rewriteTriggerCondition pairs) conditions)

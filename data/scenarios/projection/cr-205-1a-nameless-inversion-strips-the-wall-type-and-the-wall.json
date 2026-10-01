@@ -1,0 +1,36 @@
+{
+  "description": "CR 205.1a Nameless Inversion strips the Wall type, and the Wall blocks what no Wall may block",
+  "note": "CR 205.1a: removing a subtype leaves card types alone. Nameless Inversion makes bob's Secret Door a 3/1 with no creature type, so Otarian Juggernaut's \"can't be blocked by Walls\" no longer stops it: it blocks, bob takes nothing, and it kills the 2/3. alice's own Wall of Stone is the untargeted control and keeps its type; it has defender, so it is never offered as an attacker.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Otarian Juggernaut", "label": "juggernaut", "ready": true },
+          { "card": "Wall of Stone", "label": "wall", "ready": true },
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" }
+        ],
+        "hand": [{ "card": "Nameless Inversion", "label": "inversion" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Secret Door", "label": "door", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Cast": { "object": "@inversion", "targets": ["@door"], "mana": ["@swamp1", "@swamp2"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@door", "subtypes": [] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "@door", "types": ["Artifact", "Creature"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@wall", "subtypes": ["Wall"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@juggernaut"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@door": ["@juggernaut"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@juggernaut", "blockers": ["@door"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Otarian Juggernaut", "count": 0 } } }
+  ]
+}

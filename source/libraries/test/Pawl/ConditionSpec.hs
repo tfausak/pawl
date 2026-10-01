@@ -578,7 +578,7 @@ lastKnownTokenSpec s registry =
 -- 1-toughness creature), declared blockers or not, so the draw cannot be the
 -- kill's doing. Combat damage is never dealt: the fixture stops at the top of the
 -- combat damage step.
-lastKnownBlockingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownBlockingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 lastKnownBlockingSpec s registry =
   let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
       run giant prowler swamp blocks k = case S.combatBoardOf [giant] [prowler] of
@@ -602,17 +602,6 @@ lastKnownBlockingSpec s registry =
             Spec.assertEqWith s "and it really was blocking before it died" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just True)
             Spec.assertEqWith s "and it really did die" (Set.member prowlerId (GameState.battlefield killed)) False
             Spec.assertEqWith s "so nothing was gathered onto the stack" (length (GameState.stack (settle killed))) 0
-
-        -- The negative's twin, and the control the case above is read against: bob
-        -- declines the block and the same kill draws him a card.
-        Spec.it s "CR 509.1g the same Prowler that never blocked draws one" $ do
-          giant <- S.printingOf s registry "Hill Giant"
-          prowler <- S.printingOf s registry "Guildsworn Prowler"
-          swamp <- S.printingOf s registry "Swamp"
-          run giant prowler swamp False $ \prowlerId declared killed after -> do
-            Spec.assertEqWith s "bob drew his one library card" (S.handSize S.bob after) 1
-            Spec.assertEqWith s "off a Prowler that was never blocking" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just False)
-            Spec.assertEqWith s "and died the same way" (Set.member prowlerId (GameState.battlefield killed)) False
 
 -- Declares exactly `victim` as an attacker, or nobody at all: the ONE thing the
 -- two legs of lastKnownAttackingSpec differ in. Filters the offered set rather
@@ -647,7 +636,7 @@ attackingOnly attacks victim p = case p of
 -- Combat damage is never dealt: the fixture stops at the top of the combat damage
 -- step, so the attacking leg's Giant does not hit bob and his life total answers
 -- for Garna's 1 damage alone.
-lastKnownAttackingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownAttackingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 lastKnownAttackingSpec s registry =
   let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
       run garna giant swamp attacks k = case S.combatBoardOf [garna, giant] [] of
@@ -659,17 +648,8 @@ lastKnownAttackingSpec s registry =
            in k giantId killed (S.runPure S.identityAnswer onStack Stack.resolveTop)
         _ -> Spec.assertFailure s "combatBoardOf should place Garna and one Hill Giant"
    in Spec.describe s "LastKnownAttacking" $ do
-        Spec.it s "CR 608.2h an attacking Hill Giant that dies draws Garna a card" $ do
-          garna <- S.printingOf s registry "Garna, Bloodfist of Keld"
-          giant <- S.printingOf s registry "Hill Giant"
-          swamp <- S.printingOf s registry "Swamp"
-          run garna giant swamp True $ \giantId killed after -> do
-            Spec.assertEqWith s "alice drew her one library card" (S.handSize S.alice after) 1
-            Spec.assertEqWith s "and bob is untouched, so the otherwise clause was skipped" (S.lifeOf S.bob after) (Just 20)
-            Spec.assertEqWith s "off a Giant CR 608.2h still says was attacking" (fmap Filter.attacking (Projection.viewWithLastKnownAnywhere killed giantId)) (Just True)
-            Spec.assertEqWith s "and it really did die" (Set.member giantId (GameState.battlefield killed)) False
-
-        -- The positive's twin, and the control it is read against: alice declines
+        -- The twin of cr-608-2h-an-attacking-hill-giant-that-dies-draws-garna-a.json,
+        -- and the control it is read against: alice declines
         -- the attack and the same kill takes bob's life instead of filling her hand.
         Spec.it s "CR 508.1k the same Giant that never attacked deals bob 1 instead" $ do
           garna <- S.printingOf s registry "Garna, Bloodfist of Keld"
@@ -812,18 +792,6 @@ wasBlockedThisTurnSpec s registry =
             Spec.assertEqWith s "off a Druid nothing had blocked" (unblockedIn declared druidId) True
             Spec.assertEqWith s "which died the same way" (Set.member druidId (GameState.battlefield killed)) False
             Spec.assertEqWith s "and nothing was gathered onto the stack" (length (GameState.stack onStack)) 0
-
-        -- The ordinary board: a Hill Giant blocks and the Druid dies in the combat
-        -- damage step, with CR 509.1h's status still live on the record.
-        Spec.it s "CR 509.1h a Druid that dies inside combat gains the 4 too" $ do
-          druid <- S.printingOf s registry "Fyndhorn Druid"
-          giant <- S.printingOf s registry "Hill Giant"
-          run druid giant True False $ \druidId giantId declared _ killed onStack after -> do
-            Spec.assertEqWith s "alice gained the 4 all the same" (S.lifeOf S.alice after) (Just 24)
-            Spec.assertEqWith s "off a Druid the Giant had blocked" (unblockedIn declared druidId) False
-            Spec.assertEqWith s "which died with the Giant still beside it" (Set.member giantId (GameState.battlefield killed)) True
-            Spec.assertEqWith s "and itself gone" (Set.member druidId (GameState.battlefield killed)) False
-            Spec.assertEqWith s "with its trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do

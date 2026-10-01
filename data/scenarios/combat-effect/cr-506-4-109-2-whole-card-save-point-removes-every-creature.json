@@ -1,0 +1,35 @@
+{
+  "description": "CR 506.4/109.2 whole card: Save Point removes EVERY creature from combat, so no combat damage is dealt",
+  "note": "alice attacks with two Pikers and bob blocks the first; after blocks alice sacrifices Save Point (\"Remove each creature from combat\"). Two attackers so a sweep is told from a reader that removed only the head: the UNBLOCKED Piker is the one such a reader would leave attacking, so bob's 20 against 18 is the falsifier. The control file never activates: bob takes the unblocked Piker's 2 and the blocked pair trades. Save Point's extra combat phase comes after these checks.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocked", "ready": true },
+          { "card": "Goblin Piker", "label": "unblocked", "ready": true },
+          { "card": "Save Point", "label": "point" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "blocker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@blocked", "@unblocked"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@blocked"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@blocked", "blockers": ["@blocker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@unblocked", "blockers": null } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@point" } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Save Point", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Blockers": { "attacker": "@blocked", "blockers": null } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 2 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

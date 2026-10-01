@@ -651,23 +651,24 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
 
   -- CR 704.3's simultaneity, which is the property the before/after diff in
   -- Pawl.Engine.Sba exists to keep: FOUR +1/+1 counters against two -1/-1
-  -- counters annihilate TWO pairs in one check, so two +1/+1 counters came off
-  -- ONCE and the Hydra's trigger fires once, for two counters back and not four.
+  -- counters annihilate TWO pairs in one check, so two +1/+1 counters came off in
+  -- ONE removal. "Whenever A +1/+1 counter is removed" is CR 603.2c's second
+  -- sentence -- that one event holds two occurrences -- so the Hydra triggers
+  -- twice (its ruling: "If multiple +1/+1 counters are removed from Protean
+  -- Hydra at once, its last ability will trigger that many times").
   --
-  -- A per-counter loop is the wrong reading this board exists to catch, and only
-  -- a board with more than one pair can tell the two apart: it would arm two
-  -- delayed abilities and end at six. Every number is distinct -- four given, two
-  -- annihilated, two left, four at the end step -- so neither wrong reading lands
-  -- on the right total by coincidence.
-  Spec.it s "CR 704.3 two pairs annihilating together are ONE removal, so Protean Hydra's trigger fires once" $ do
+  -- Every number is distinct -- four given, two annihilated, two left, six at
+  -- the end step -- so a once-per-removal reading, which ends at four, cannot
+  -- land on the right total by coincidence.
+  Spec.it s "CR 603.2c two counters annihilated in one removal trigger Protean Hydra twice" $ do
     forest <- S.printingOf s registry "Forest"
     hydra <- S.printingOf s registry "Protean Hydra"
     let (oid, gs0) = S.addPermanent hydra S.alice (S.landsInPlay forest 0)
         gs1 = S.addCounter CounterKind.MinusOneMinusOne 2 oid (S.addCounter CounterKind.PlusOnePlusOne 4 oid gs0)
         armed = settleAndResolve (settle gs1)
         after = settleAndResolve (settle (beginEndStep armed))
-    Spec.assertEqWith s "4 - 2 annihilated, then + 2 once: not + 2 twice" (S.counterOf CounterKind.PlusOnePlusOne oid after) 4
-    Spec.assertEqWith s "one delayed ability, not one per counter" (Seq.length (GameState.delayedTriggers armed)) 1
+    Spec.assertEqWith s "4 - 2 annihilated, then + 2 for each counter removed" (S.counterOf CounterKind.PlusOnePlusOne oid after) 6
+    Spec.assertEqWith s "one delayed ability per counter removed" (Seq.length (GameState.delayedTriggers armed)) 2
 
   Spec.it s "CR 603.2 SelfDealsCombatDamageToPlayer matches the bearer's combat damage to a player" $ do
     let bearer = ObjectId.MkObjectId 1

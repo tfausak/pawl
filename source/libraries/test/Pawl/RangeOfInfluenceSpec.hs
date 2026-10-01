@@ -372,35 +372,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (not (Game.inRangeOf S.alice S.carol shielded)) "carol is outside alice's range"
     Spec.assertEqWith s "CR 801.13b carol's Piker deals alice nothing" (S.lifeOf S.alice (strike S.carol [carols] S.alice shielded)) (Just 20)
 
-  -- CR 801.13a: alice's Turn the Tables ("All combat damage that would be dealt
-  -- to you this turn is dealt to target attacking creature instead.") targets
-  -- one of bob's two attacking Goblin Pikers, and carol then gains control of
-  -- it, taking it out of combat and out of alice's range. The other Piker's
-  -- damage has nowhere in range to go, so it stays on alice.
-  Spec.it s "CR 801.13a a redirection to a destination outside its controller's range does nothing" $ do
-    plains <- S.printingOf s registry "Plains"
-    tables <- S.printingOf s registry "Turn the Tables"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (spellId, g0) = S.addHandCard tables S.alice (S.landsFor plains S.alice 5 S.fourPlayerGame)
-        (aimed, g1) = S.addPermanent piker S.bob g0
-        (other, g2) = S.addPermanent piker S.bob g1
-        attacking =
-          (onMain g2)
-            { GameState.activePlayer = S.bob,
-              GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
-              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice], Combat.Type.attackers = Map.fromList [(aimed, AttackTarget.OfPlayer S.alice), (other, AttackTarget.OfPlayer S.alice)]}
-            }
-        aim :: Prompt.Prompt r -> r
-        aim p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature aimed))) sets
-          _ -> S.identityAnswer p
-        stolen ranged = S.giveControl aimed S.carol (castResolved aim S.alice spellId (ranged attacking))
-        after ranged = S.settleSba (strike S.bob [other] S.alice (stolen ranged))
-    Spec.assertEqWith s "CR 801.13a at range 1 alice takes the 2" (S.lifeOf S.alice (after (S.withRange 1))) (Just 18)
-    Spec.assertBool s (S.onBattlefield aimed (after (S.withRange 1))) "and carol's Piker is untouched"
-    Spec.assertEqWith s "at an unlimited range alice takes nothing" (S.lifeOf S.alice (after id)) (Just 20)
-    Spec.assertBool s (not (S.onBattlefield aimed (after id))) "and the 2 kills carol's Piker"
-
   -- CR 801.13a for a zone change: alice's Leyline of the Void ("If a card would
   -- be put into an opponent's graveyard from anywhere, exile it instead.") while
   -- a Goblin Piker dies under carol, two seats away, and one under bob, one seat

@@ -1,0 +1,34 @@
+{
+  "description": "CR 205.4a a NONlegendary spell of the same cost and colour is not historic",
+  "note": "The discriminating twin of the Kalakscion file: Legions of Lim-Dûl is {1}{B}{B} like it, no artifact and no Saga, and differs only in lacking the Legendary supertype. The block stands, the two 2/1s trade and bob takes nothing.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Relic Runner", "label": "runner", "ready": true },
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" },
+          { "card": "Swamp", "label": "swamp3" },
+          { "card": "Swamp", "label": "swamp4" }
+        ],
+        "hand": [{ "card": "Legions of Lim-Dûl", "label": "spell" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@spell", "mana": ["@swamp1", "@swamp2", "@swamp3", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@runner"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@runner"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Relic Runner", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Legions of Lim-Dûl", "count": 1 } } }
+  ]
+}

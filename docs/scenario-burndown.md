@@ -91,6 +91,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:player-startingdeck`
 - `board:object-bindings`
 - `move:ChooseManaSource`: the `ChooseManaSource` prompt
+- `move:ChoosePermanent`: the `ChoosePermanent` prompt
+- `move:ChooseEncode`: the `ChooseEncode` prompt
+- `check:mana-pool`: the mana a cost spent, or what floats after it
 - `move:out-of-range-answer`: an answer outside what the prompt offers, which the engine clamps or ignores and the runner refuses up front
 - `move:CallCoin`: the `CallCoin` prompt
 - `board:dungeons`: dungeons
@@ -260,7 +263,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 307.5/109.5 whole card: the Augur does nothing in the opponent's upkeep | `check:on-battlefield`
 - CR 400.3 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 400.7 / 602.5b the permanent that returns may activate it again | `check:helper-activationsOf` `check:helper-isOnlyOnce` `check:offered-actions`
-- CR 506.7b/g the rider opens at the declaration and runs to the end of the combat phase | `board:combat`
+- CR 506.7b/g the rider opens at the declaration and runs to the end of the combat phase | `check:offered-actions`
 - CR 513.2 the encore tokens are sacrificed at the beginning of the next end step | `check:delayed-triggers`
 - CR 601.2b the ChooseX bound is the energy the player can spend | `check:prompt-payload`
 - CR 601.2b/611.2d an activated {X} pump freezes the announced X into the stored effect | `board:face`
@@ -283,9 +286,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 602.2b an activation cost with no black symbol sacrifices nothing | `check:helper-theAbility` `check:stack`
 - CR 602.2b an activation cost with one black symbol costs a Swamp | `move:ChooseSacrifices`
 - CR 602.2b two black symbols in an activation cost cost two Swamps | `move:ChooseSacrifices`
-- CR 602.5 being attacked is not enough on its own: not offered in the end of combat step | `board:combat`
-- CR 602.5 the Contraptions' ping IS offered when bob is the player attacked | `board:combat`
-- CR 602.5 the Contraptions' ping is NOT offered when the attack was on somebody else | `board:combat`
+- CR 602.5 being attacked is not enough on its own: not offered in the end of combat step | `check:offered-actions`
+- CR 602.5 the Contraptions' ping IS offered when bob is the player attacked | `check:offered-actions`
+- CR 602.5 the Contraptions' ping is NOT offered when the attack was on somebody else | `check:offered-actions`
 - CR 602.5 the Ring's ping IS offered with seven cards in the graveyard | `check:helper-activationsOf` `check:offered-actions` `check:zone-contents`
 - CR 602.5 the Ring's ping is NOT offered with six cards in the graveyard | `check:helper-activationsOf` `check:offered-actions` `check:zone-contents`
 - CR 602.5 whole card: bob may not ping an attack aimed at carol | `check:on-battlefield`
@@ -421,7 +424,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing | `check:attached-to` `check:stack`
 - CR 603.7a: a returned creature the Aura cannot enchant is still sacrificed | `check:controller` `check:helper-named`
 - CR 608.2b whole cards: killing the targeted creature in response fizzles the trigger, and its may is never asked | `board:stack`
-- CR 608.2c Battlefield Improvisation attaches the chosen Equipment only to an attacking target | `board:combat`
+- CR 608.2c Battlefield Improvisation attaches the chosen Equipment only to an attacking target | `move:ChooseAnyNumberOfPermanents` `check:attached-to`
 - CR 608.2c the control change lands before the destination is chosen, so 'creature you control' means alice's | `check:attached-to` `check:controller` `check:helper-attachedTo`
 - CR 608.2d naming a permanent that was never offered does not move the Aura there | `move:ChooseAttachment`
 - CR 608.2h Fumble takes the Auras and Equipment that were attached to the bounced creature | `check:attached-to` `check:controller`
@@ -619,9 +622,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2i casting an infect creature spell poisons the TARGETED player | `check:helper-poisonOf`
 - CR 603.10c whole card: destroying the Wargear still sacrifices the creature it was on | `board:mana-pool`
 - CR 603.4 raid: an attack aimed at a planeswalker by a creature that then died still discards | `move:ChooseDiscard`
-- CR 603.4 the clause fails when the declaration went at a third player | `board:combat`
-- CR 603.4 the clause holds when a planeswalker you control was attacked | `board:combat`
-- CR 603.4 the clause holds when the declaring opponent attacked you | `board:combat`
+- CR 603.4 the clause fails when the declaration went at a third player | `check:events`
 - CR 603.4 the control leg: with no attack declared the Skullhunter enters and nothing is discarded | `check:hand-size`
 - CR 603.7 Ray of Command whole card: the borrowed creature is TAPPED when control reverts at cleanup, and Act of Treason's is not | `board:continuous-effect` `board:delayed-trigger` `board:hand-order` `board:mana-pool`
 - CR 608.2f a resolving Tap effect goes through the same funnel and draws | `move:ChooseEntwine`
@@ -636,7 +637,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 705.2 a lost flip creates none | `move:CallCoin` `move:FlipCoin`
 - CR 705.2 a winnerless flip fires neither trigger | `move:FlipCoin`
 - CR 705.2 a won flip creates two Treasures | `move:CallCoin` `move:FlipCoin`
-- CR 725.2 a trampler that trades with its blocker still steals the crown | `board:combat`
 - CR 725.2/109.5 a crown stolen by carol does not fire alice's trigger | `check:creature-count` `check:events` `check:helper-combatDamageTo` `check:helper-targetsPlayer` `check:on-battlefield` `check:other-S.soleFaceName` `check:stack` `check:zone-contents`
 - CR 725.3 a player who is ALREADY the monarch does not become the monarch, so the Lich's edict stays silent | `check:creature-count` `check:events` `check:helper-targetsPlayer` `check:on-battlefield` `check:stack`
 - a permanent entering from exile puts a counter on each creature you control | `check:helper-named`
@@ -859,9 +859,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.180b tapping the chosen creature for mana reverses the cast | `move:ChooseCost:unmatchable` `move:ReverseManaAbilities`
 - CR 702.185c a spell warped this turn makes Insatiable Skittermaw's end step trigger; the same Colossus cast for {9} does not | `move:OrderTriggers-departed-source`
 - CR 702.188a with a tapped Piker the Spider-Man is cast for {W} and the Piker goes home; untapped, no cast is offered | `check:helper-namedOnBattlefield` `check:helper-webSlingingCost` `check:offered-actions` `check:on-battlefield` `check:zone-contents`
-- CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer | `board:combat`
-- CR 702.190b a Splinter cast for its printed {1}{B} enters untapped and attacking nothing | `board:combat`
-- CR 702.190b the sneaked Splinter arrives tapped and attacking whatever the Piker it returned was attacking | `board:combat`
+- CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer | `check:offered-actions`
 - CR 702.192a the first resolution is exiled and each of its controller's precombat mains casts one free copy, which arms nothing more | `move:OfferedCast`
 - CR 702.194a Team Tactics cast using teamwork also grants trample; without it, double strike alone | `move:ChooseKicker` `move:ChooseTapsForTotalPower`
 - CR 702.34a a countered flashback spell is exiled too | `check:zone-contents`
@@ -965,7 +963,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 104.3a the offer is the opponents still in the game, and never the controller | `move:RandomPlayer`
 - CR 109.5 a Ghostly Prison its own controller is attacking WITH taxes nothing | `check:combat` `check:helper-allUntapped`
-- CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block | `board:combat`
+- CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block | `move:ChooseTaps`
 - CR 506.7b the window opens at the declaration and runs to the end of the combat phase | `check:offered-actions` `check:other-Turn.afterBlockersDeclared` `check:step`
 - CR 508.1 the rewound declaration is made again: two Pikers under a Ghostly Prison become one | `move:ReverseManaAbilities`
 - CR 508.1 the same board WITHOUT the Prison pays nothing | `check:combat` `check:helper-allUntapped`
@@ -979,27 +977,25 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.1j partial payments are not allowed: two Dragons and one land sacrifice nothing | `check:combat` `check:helper-allUntapped` `check:helper-stillThere`
 - CR 508.1j the payer orders the two taxing permanents: Hollow Warrior before Exalted Dragon | `move:OrderCombatTolls`
 - CR 508.1j the way the attacker's controller announced is the way the toll is paid | `move:AnnouncePhyrexianPayment`
-- CR 509.1 the rewound declaration is made again: the taxed blocker is dropped and the free one blocks | `board:combat`
-- CR 509.1 the same board WITHOUT the Aura pays nothing | `board:combat`
-- CR 509.1a / 802.4a whole card: Flash Foliage cannot name a creature attacking a planeswalker you control | `board:combat`
+- CR 509.1 the rewound declaration is made again: the taxed blocker is dropped and the free one blocks | `move:ChooseManaSource`
+- CR 509.1a / 802.4a whole card: Flash Foliage cannot name a creature attacking a planeswalker you control | `check:offered-actions`
 - CR 509.1b a pair the hypothetical refuses moves nobody | `check:helper-blockersOf` `check:helper-tapStateOf` `check:other-Combat.blockersOf`
 - CR 509.1c a Prized Unicorn does not force a block an Oppressive Rays taxes | `move:ChooseManaSource`
-- CR 509.1d a cost to block that is not mana sacrifices a land | `board:combat`
-- CR 509.1d the total is per CREATURE, not per pair: a Palace Guard blocking two owes {3} once | `board:combat`
-- CR 509.1d/509.1f blocking under an Oppressive Rays costs {3}, and the mana is paid | `board:combat`
-- CR 509.1f partial payments are not allowed: two Forests do not buy the block | `board:combat`
-- CR 509.1f partial payments are not allowed: two taxed blockers and one land sacrifice nothing | `board:combat`
+- CR 509.1d a cost to block that is not mana sacrifices a land | `move:ChooseSacrifices`
+- CR 509.1d the total is per CREATURE, not per pair: a Palace Guard blocking two owes {3} once | `move:ChooseManaSource`
+- CR 509.1d/509.1f blocking under an Oppressive Rays costs {3}, and the mana is paid | `move:ChooseManaSource`
+- CR 509.1f partial payments are not allowed: two Forests do not buy the block | `move:ChooseManaSource`
 - CR 509.1h a creature already blocked is not a legal target | `check:legal-targets` `check:other-Combat.isBlocked`
-- CR 509.1h an attacker whose only blocker returned to hand stays blocked and assigns nothing | `board:combat`
-- CR 509.1h whole card: Curtain of Light blocks an unblocked attacker, with nothing blocking it | `board:combat`
+- CR 509.1h an attacker whose only blocker returned to hand stays blocked and assigns nothing | `check:combat`
+- CR 509.1h whole card: Curtain of Light blocks an unblocked attacker, with nothing blocking it | `check:events`
 - CR 509.3b a creature put onto the battlefield blocking never blocked, so its own blocks trigger stays silent | `move:ChooseCardInHand`
-- CR 509.3c the attacker it is put onto the battlefield blocking becomes blocked | `board:combat`
+- CR 509.3c the attacker it is put onto the battlefield blocking becomes blocked | `check:events`
 - CR 509.3e a switch that leaves both attackers at two blockers does not fire Seifer again | `check:events`
 - CR 509.3e an Inquisitors already blocked by a black creature does not trigger again on the switch | `check:helper-blockersOf` `check:other-Combat.blockersOf`
-- CR 509.4 / 608.2f whole card: Mirror Match blocks every attacker with its own copy, and exiles them all | `board:combat`
-- CR 509.4 whole card: Aetherplasm swaps itself out for a creature card from hand, blocking | `board:combat`
-- CR 509.4 whole card: Flash Foliage's Saproling blocks the flier it could never have been declared against | `board:combat`
-- CR 509.4 whole card: Synthetic Sudden Interposition's Bear blocks the attacker its controller chooses | `board:combat`
+- CR 509.4 / 608.2f whole card: Mirror Match blocks every attacker with its own copy, and exiles them all | `check:events`
+- CR 509.4 whole card: Aetherplasm swaps itself out for a creature card from hand, blocking | `move:ChooseCardInHand` `check:combat`
+- CR 509.4 whole card: Flash Foliage's Saproling blocks the flier it could never have been declared against | `check:events` `check:combat`
+- CR 509.4 whole card: Synthetic Sudden Interposition's Bear blocks the attacker its controller chooses | `move:ChoosePermanent`
 - CR 603.6a / 608.2f: every Mirror Match token sees every other one enter | `move:OrderForEach`
 - CR 608.2d the opponent randomness named is the one the requirement makes Ruhan attack | `move:RandomPlayer`
 - CR 701.43a / 701.43b an exerted attacker misses one untap step, then untaps | `board:combat` `board:object-exertedby`
@@ -1007,28 +1003,25 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.154a a summoning-sick creature is not offered, and enlists nothing | `move:ChooseEnlist`
 - CR 702.154a a vigilant co-attacker is untapped and still cannot be enlisted | `move:ChooseEnlist`
 - CR 702.154a enlisting a 3-power creature gives the attacker +3/+0, and the tapped creature is not attacking | `move:ChooseEnlist`
-- CR 733.1 a blocker's toll: the Forests stay tapped and their mana floats | `board:combat`
+- CR 733.1 a blocker's toll: the Forests stay tapped and their mana floats | `move:ChooseManaSource` `move:ReverseManaAbilities` `check:helper-floating`
 - CR 733.1 the exert goes back with the declaration and the Drum's tap stands | `move:ChooseExert` `move:ReverseManaAbilities`
 - CR 733.2 the kept mana pays the smaller declaration | `move:ReverseManaAbilities`
 
 ### `CombatEffectSpec`
 
-- CR 506.4 a stolen BLOCKER is removed from combat, and CR 509.1h leaves the attacker blocked | `board:combat`
 - CR 506.4 the twin: the same Doom Blade on a creature that is not the animator leaves combat intact | `check:card-types` `check:on-battlefield`
 - CR 506.4 the twin: the same Ray of Command on a creature that is not in combat leaves combat intact | `check:controller`
 - CR 506.4 whole card: Ray of Command on an attacker removes THAT attacker from combat, and it deals no combat damage | `check:combat` `check:controller` `check:step`
 - CR 506.4 whole cards: an attacking Forest that stops being a creature is removed from combat | `check:card-types` `check:combat` `check:on-battlefield` `check:step`
 - CR 506.4 whole cards: an attacking creature that becomes a battle is removed from combat | `check:combat` `check:on-battlefield` `check:other-Projection.isBattleOf` `check:other-Scenario.namedObjects`
-- CR 506.4/109.2 whole card: Save Point removes EVERY creature from combat, so no combat damage is dealt | `board:combat`
 - CR 509.1h a BLOCKER that stops being a creature leaves the attacker blocked, so nothing is dealt combat damage | `board:combat` `board:object-worldsince`
-- CR 509.1h a removed BLOCKER leaves the attacker blocked, so nothing is dealt combat damage | `board:combat`
 - CR 510.2 the control: two vanilla 2/1s trade | `check:creature-count`
 - CR 510.4 a striker killed in the first step does not deal in the second | `check:creature-count`
 - CR 511.3 the removal still happens, one step later: combat is empty once the step ends | `check:combat` `check:other-Combat.Type.defenders` `check:step`
 - CR 511.3 the twin: the same Kill Shot has no target in the postcombat main phase | `check:creature-count` `check:step`
 - CR 511.3 whole card: Kill Shot destroys an attacker during the end of combat step | `check:combat` `check:creature-count` `check:step`
 - CR 601.2c the card's filter admits the attacker and the blocker and rejects the creature that stayed home | `check:helper-admits` `check:other-Combat.blockersOf` `check:step`
-- CR 701.26b/500.8 the same activation untaps both attackers and adds a combat phase after this one | `board:combat`
+- CR 701.26b/500.8 the same activation untaps both attackers and adds a combat phase after this one | `check:step`
 - CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor | `check:helper-attackersOf` `check:helper-tapStateOf`
 - CR 702.20b vigilance still attacks | `check:helper-attackersOf`
 - CR 702.7b a first striker kills a vanilla blocker and lives | `check:creature-count`
@@ -1041,11 +1034,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 302.6 a creature that just changed control is summoning sick (no haste) | `check:controller` `check:other-Combat.canAttack`
 - CR 305.7 setting a suspected land's subtype spares the ability rule 701.60c granted | `board:stack`
 - CR 507.1 with no opponents left the action does not happen at all | `check:combat` `check:other-Combat.Type.defenders`
-- CR 508.1 every attacker attacks the CHOSEN defending player | `board:combat`
 - CR 508.1a a creature that is also a battle is not offered as an attacker | `check:card-types` `check:other-Combat.legalAttackers` `check:other-Projection.isBattleOf`
 - CR 508.1c aimed elsewhere, both of alice's twins attack | `board:attackprohibitions` `board:hand-order` `board:mana-pool`
 - CR 508.1c the creature Netter en-Dal named cannot attack, and its twin still does | `board:attackprohibitions` `board:hand-order` `board:mana-pool`
-- CR 509.1 only the defending player is asked to declare blockers | `board:combat`
+- CR 509.1 only the defending player is asked to declare blockers | `check:offered-actions`
 - CR 509.1a a Mountain is not a legal blocker, flier or no flier | `check:other-Combat.legalBlockers`
 - CR 509.1a a creature that is also a battle is not offered as a blocker either | `check:card-types` `check:on-battlefield` `check:other-Combat.legalBlockers` `check:other-Projection.isBattleOf` `check:other-Scenario.namedObjects`
 - CR 509.1a a ground creature is still a legal blocker while a flier attacks | `check:other-Combat.legalBlockers`
@@ -1065,17 +1057,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 611.2a the restriction outlasts every other seat's turn and ends as alice's begins | `check:active-player` `check:other-GameState.attackProhibitions` `move:expect-rejected`
 - CR 611.2a the window names alice's next turn, so bob attacks with the creature on his | `board:attackprohibitions`
 - CR 613.11 Tapestry Warden compares power and toughness after characteristic effects | `board:continuous-effect`
-- CR 613.1f Hammerheim takes BOTH landwalks and the Hag can be blocked | `board:combat`
 - CR 613.7 a Humility older than the suspect leaves rule 701.60c's ability in place | `board:stack`
 - CR 613.7 a Humility younger than the suspect removes it | `board:stack`
 - CR 702.10b a hasty creature and a sick one, in the same declaration | `check:helper-declaredAttackers`
 - CR 702.13b a COLOURLESS creature with intimidate may be blocked only by artifact creatures | `check:colors` `move:expect-rejected`
-- CR 702.14c a nonbasic landwalker is blocked normally when every land is basic | `board:combat`
-- CR 702.14c a snow swampwalker does NOT walk on a Snow-Covered Mountain | `board:combat`
-- CR 702.14c a snow swampwalker does NOT walk on an ordinary Swamp | `board:combat`
-- CR 702.14c a swampwalker is blocked normally when the defending player's land is an Island | `board:combat`
-- CR 702.14c an artifact landwalker does NOT walk on a plain land | `board:combat`
-- CR 702.14d swampwalk on the BLOCKER cancels nothing | `board:combat`
 - CR 702.16k True-Name Nemesis can't be blocked by the chosen player's creature, and can by another's | `board:object-chosenplayer`
 - CR 702.19b a trampling Tapestry Warden spills the excess over its toughness | `board:continuous-effect`
 - CR 707.2 a Clone of Brassclaw Orcs can't block the Piker either | `board:stack`
@@ -1107,14 +1092,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ConditionSpec`
 
 - CR 400.3 only the Vessel raised from YOUR graveyard triggers | `check:colors`
-- CR 509.1g the same Prowler that never blocked draws one | `board:combat`
-- CR 509.1h a Druid that dies inside combat gains the 4 too | `board:combat`
 - CR 603.4 a creature entering from anywhere else does not | `board:controller` `board:hand-order` `board:mana-pool`
 - CR 603.4 a creature returning from your graveyard grows the Knight | `check:helper-resolveTop` `check:helper-sizeOf` `check:helper-skeletonsOn` `check:stack`
 - CR 603.4 the same Zubera dealt only 3 deals nothing | `check:on-battlefield` `check:stack`
 - CR 604.2 Thrasta has hexproof the turn it enters, and loses it at the handoff | `check:legal-targets` `check:on-battlefield` `check:other-S.soleFaceName` `check:other-S.spellOnStack` `check:other-S.spellTargetSlot`
-- CR 608.2h a blocking Guildsworn Prowler that dies draws nothing | `board:combat`
-- CR 608.2h an attacking Hill Giant that dies draws Garna a card | `board:combat`
+- CR 608.2h a blocking Guildsworn Prowler that dies draws nothing | `check:stack`
 - CR 608.2i the entrant killed between the two checks still grows the Knight | `board:stack`
 - CR 608.2i the turn handoff resets the tally | `board:mana-pool` `board:turn-number`
 
@@ -1167,8 +1149,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.103e a bestowed copy whose host died resolves as a token creature | `check:attached-to` `check:helper-rollickersOn` `check:other-Game.isToken`
 - CR 702.128a embalm exiles the card for a white Zombie token copy with no mana cost, and a Clone of it keeps all three | `check:colors` `check:mana-value` `check:offered-actions`
 - CR 702.129a eternalize makes a black 4/4 Zombie token copy, and neither it nor a Clone of it is a Doom Blade target | `check:mana-value` `check:offered-actions`
-- CR 702.99a Last Thoughts is encoded on the chosen Piker, which casts a copy when it connects | `board:combat`
-- CR 702.99c a flickered Piker is no longer encoded and offers nothing | `board:combat`
+- CR 702.99a Last Thoughts is encoded on the chosen Piker, which casts a copy when it connects | `move:ChooseEncode` `move:OfferedCast`
+- CR 702.99c a flickered Piker is no longer encoded and offers nothing | `move:ChooseEncode` `board:sickness`
 - CR 707.10 a copied activated ability was not activated, so no mana was spent to activate it | `ref:stack-ability`
 - CR 707.10 a target the copy KEPT becomes a target of the copy too | `check:stack` `move:ChooseCopyTarget`
 - CR 707.10 a triggered ability is copied, and its copy takes a new target | `move:ChooseDiscard`
@@ -1272,11 +1254,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2b the payer announces a convoked spell's hybrid halves, both blue | `move:AnnounceHybridHalf` `move:ChooseTaps`
 - CR 601.2b/107.3a whole card: X=3 pays 3 life and the Piker is 5/1 | `check:tapped-count` `check:zone-contents`
 - CR 601.2c / 601.2h the additional cost cannot take the target | `move:ChooseSacrifices`
-- CR 601.2f Bury in Books aimed at the attacking Giant is cast off three Islands | `board:combat`
+- CR 601.2f Bury in Books aimed at the attacking Giant is cast off three Islands | `check:mana-pool`
 - CR 601.2f a different tapped creature is a different amount of damage | `check:helper-isTapped` `check:on-battlefield`
 - CR 601.2f a reduction past the whole cost floors at {0} | `check:offered-actions` `check:tapped-count`
 - CR 601.2f aimed at the Dreadnought instead, the Sliver keeps its {5}, and the Vehicle gets +2/+2 | `check:offered-actions`
-- CR 601.2f on one board, aiming at the Giant at home costs all five Islands and the attacker three | `board:combat`
+- CR 601.2f on one board, aiming at the Giant at home costs all five Islands and the attacker three | `check:mana-pool`
 - CR 601.2f one opponent's two spells take {U} off; two opponents' one each do not | `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 601.2f one other spell takes only {3} off, and that does not pay | `check:offered-actions` `check:tapped-count`
 - CR 601.2f sacrificing the reducer to the additional cost does not raise the total | `check:hand-size` `check:helper-namesIn` `check:offered-actions` `check:tapped-count`
@@ -1374,7 +1356,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 111.3 the 3/3 is fixed at creation: it survives the turn handoff that clears the log | `board:mana-pool` `board:replacement`
 - CR 111.6 a creature token that dies is no card at all, so it makes no Devil | `move:ChooseTapsForTotalPower`
 - CR 202.3 X is the GREATEST mana value among the instants and sorceries ALICE cast | `board:mana-pool` `board:replacement`
-- CR 205.4a a NONlegendary spell of the same cost and colour is not historic | `board:combat`
 - CR 208.2a with no creatures X is 0, and the Anthem's +1/+1 is what the 0/0 Ooze survives on | `check:creature-count` `check:helper-oozes`
 - CR 303.4b draws once per enchanted player, the caster included, and skips the unenchanted one | `check:helper-board` `check:helper-inHand` `check:stack`
 - CR 303.4b two Auras on the same player still count as ONE enchanted player | `check:helper-board` `check:helper-inHand` `check:stack`
@@ -1384,7 +1365,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.6 attacking the OTHER player leaves the target's count at zero | `check:helper-sentAt`
 - CR 508.6 two creatures from one attacker count as ONE player attacking | `check:helper-sentAt`
 - CR 508.6 with nobody attacking the count is zero | `check:helper-sentAt`
-- CR 509.1b with no spell cast at all the Runner is blocked | `board:combat`
 - CR 601.2a a spell an OPPONENT cast neither triggers nor counts | `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 601.2a an OPPONENT's earlier Approach is not one you've cast | `board:turn-number`
 - CR 601.2a the second, cast from the LIBRARY, does not win | `board:hand-order` `board:mana-pool`
@@ -1400,8 +1380,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2i three of alice's own spells reach her graveyard from the stack, so she draws | `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 613.1b X counts the hand of the creature's CONTROLLER, not the caster's | `check:hand-size` `check:helper-handOf`
 - CR 613.1b a Wall STOLEN from bob counts carol's hand, who controls it | `board:sickness`
-- CR 700.6 a LEGENDARY spell cast this turn is historic, and the block is illegal | `board:combat`
-- CR 700.6 an ARTIFACT spell is historic too, through the other disjunct | `board:combat`
 - CR 704.5f with no creatures and nothing raising its toughness, the 0/0 Ooze dies | `check:creature-count` `check:helper-oozes`
 - CR 800.4a a player who has conceded is not one of alice's opponents | `board:player-status`
 - CR 800.4a neither EachPlayer nor Opponent names a player who has left the game | `check:other-Count.playersFor` `check:other-Filter.contextFor` `check:other-S.countOf` `check:other-S.stubView` `check:other-Teams.none`
@@ -1640,7 +1618,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 704.5k a lone world permanent survives | `check:helper-inPlay`
 - CR 704.5k the clock is when it became world, not when it entered | `check:helper-inPlay` `check:other-PC.supertypes` `check:other-Projection.project`
 - CR 704.5k whole cards: resolving Living Plane buries the Concordant Crossroads already out | `board:object-worldsince`
-- CR 800.4e a departed defender is not offered as a trample recipient either | `board:combat`
+- CR 800.4e a departed defender is not offered as a trample recipient either | `check:offered-actions`
 - life <= 0 loses | `check:game-result` `check:other-GameState.players` `check:other-Player.commander` `check:other-Player.commanderCasts` `check:other-Player.commanderDamage` `check:other-Player.companion` `check:other-Player.companionTaken` `check:other-Player.completedDungeonNames` `check:other-Player.completedDungeons` `check:other-Player.counters` `check:other-Player.designations` `check:other-Player.dungeons` `check:other-Player.outsideTheGame` `check:other-Player.ringTemptations` `check:other-Player.speed` `check:other-Player.startingDeck` `check:other-Player.status`
 
 ### `DaytimeSpec`
@@ -1682,7 +1660,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `DetainSpec`
 
 - CR 508.1c the detained creature does not end up among the attackers | `board:combat` `board:object-detaineduntil`
-- with nothing detained both twins attack | `board:combat`
 
 ### `DiceSpec`
 
@@ -2011,7 +1988,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 800.4a/117.4 priority after a concede goes to the next seat, and the pass cycle restarts | `check:game-result` `check:other-GameState.players` `check:other-Player.status`
 - CR 800.4j after a resolution, priority returns to the next seat, not the departed active player | `board:stack`
 - CR 800.4j the active player having left does not stop the turn: priority starts at the next seat | `check:active-player` `check:other-Engine.priorityHolder`
-- CR 800.4j/703.4i a departed active player is not asked to declare attackers | `board:combat`
 - CR 800.4j/703.4i the declare-attackers guard is load-bearing at two seats, where the game loop cannot reach this state | `check:combat` `check:other-Projection.controls`
 - CR 800.4k a departed player's turn does not begin | `check:active-player` `check:other-GameState.turnNumber` `check:other-GameState.turnOrder`
 - M5.6a gate: a three-player game survives a concede, and the departed seat still ends its durations | `board:player-effect`
@@ -2555,7 +2531,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `PhasingSpec`
 
-- CR 506.4 an attacking creature that phases out mid-combat deals no combat damage | `board:combat`
 - CR 702.103g a bestowed Aura that phases in unattached is a creature again | `board:zone-phasedout`
 - CR 702.26a a permanent without phasing does not phase out | `check:helper-onBattlefield` `check:other-Phasing.isPhasedOut`
 - CR 702.26a another player's untap step phases nothing out | `check:helper-onBattlefield`
@@ -2585,7 +2560,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 506.4 a planeswalker that stops being a planeswalker stops being attacked, so Soul Snare cannot name the attacker | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 506.4 a planeswalker whose CONTROLLER changes stops being attacked, so the new controller's Soul Snare cannot name the attacker | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 506.4 a planeswalker whose controller changes and changes BACK stays removed from combat, so Soul Snare still cannot name the attacker | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 506.4c a planeswalker that phases out stops being attacked, so Soul Snare cannot name the attacker | `board:combat`
+- CR 506.4c a planeswalker that phases out stops being attacked, so Soul Snare cannot name the attacker | `check:offered-actions` `check:controller`
 - CR 506.4d whole cards: a blocking Jace that stops being BOTH card types is removed from combat | `board:continuous-effect` `board:mana-pool`
 - CR 506.4d whole cards: a blocking Jace that stops being a planeswalker is still a blocking creature | `board:continuous-effect` `board:mana-pool`
 - CR 506.4e / 704.5x whole cards: becoming a battle mid-combat, he gets no protector, so bob's Snare cannot name the Elf | `board:continuous-effect` `board:mana-pool`
@@ -2598,13 +2573,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.3a on the return its OWN attack trigger does not fire | `check:combat` `check:other-GameState.delayedTriggers`
 - CR 508.3a the tokens are attacking, and the attack trigger fired only for the Garrison | `check:events`
 - CR 508.4 whole card: Hanweir Garrison's two Humans enter tapped and attacking | `check:sickness`
-- CR 508.5 nor is it the seat that is read while the planeswalker is still attacked | `board:combat`
-- CR 508.5 the gone planeswalker's OWNER is not the seat that is read | `board:combat`
-- CR 508.5 the same block stays illegal once the planeswalker has left combat | `board:combat`
 - CR 508.8 whole card: it returns attacking with NOTHING declared, and the two steps stay | `check:active-player` `check:combat` `check:helper-tapStateOf` `check:on-battlefield` `check:step`
-- CR 510.1b the stolen planeswalker takes no combat damage from the creature that was attacking it | `board:combat`
+- CR 510.1b the stolen planeswalker takes no combat damage from the creature that was attacking it | `move:ChooseAttachment`
 - CR 702.14c and the same theft with the lands swapped leaves that block legal | `move:ChooseAttachment`
-- CR 702.14c the premise: the stolen planeswalker's CONTROLLER is the defending player while it is attacked | `board:combat`
 - CR 702.19c an unblocked 7/7 pays Jace's 3 loyalty and sends the other 4 at bob | `check:helper-assignmentLog` `check:on-battlefield`
 - CR 702.19c the whole 7 may stay on Jace instead | `check:helper-assignmentLog` `check:on-battlefield`
 - CR 702.19f plain trample offers the defending player nothing | `check:on-battlefield`
@@ -2785,7 +2756,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 113.6c a Grist spell on the stack is a creature spell Essence Scatter counters | `move:ChooseManaToSpend`
 - CR 113.6p an emblem's own replacement row floors the life total from the command zone | `board:command`
 - CR 122.1j whole card: a hone counter moved onto an Aura gives the enchanted creature nothing | `move:ChooseMovedCounters`
-- CR 205.1a Nameless Inversion strips the Wall type, and the Wall blocks what no Wall may block | `board:combat`
 - CR 205.1a Turn to Frog replaces only the CREATURE types: Ashaya's Forest survives | `check:card-types`
 - CR 205.1b Wings of Velis Vel adds every creature type without replacing the Piker's own | `check:subtype-member`
 - CR 208.1/208.2b Imperial Recruiter's search offers the */* card and the 2-power creature, not the 3-power one | `move:Search` `move:Shuffle`
@@ -2818,7 +2788,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.8a casting the Nexus makes the Ogre an artifact when it resolves | `check:helper-ogreAcrossNexus`
 - CR 613.8b Armored Galleon's Hack and the exchange loop back to timestamp order | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 613.8b Kird Ape's Hack and the exchange loop back to timestamp order | `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 613.8b a Hack on the Piker waits for Armored Galleon's restriction | `board:combat`
 - CR 613.8b a Hack on the Piker waits for Kird Ape's text | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 613.8b a later Hack on one Kird Ape moves with the exchange | `board:continuous-effect`
 - CR 613.8b a swap waits for the later one that makes its word | `board:hand-order` `board:objects-ids`
@@ -2852,7 +2821,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `RangeOfInfluenceSpec`
 
 - CR 801.10 proliferate offers only players within its controller's range | `check:prompt-offers` `move:ChooseProliferate`
-- CR 801.13a a redirection to a destination outside its controller's range does nothing | `board:combat`
 - CR 801.15 a draw is a draw for its controller and the players within their range | `board:controller` `board:hand-order` `board:mana-pool`
 - CR 801.2c a seat emptied mid-turn closes up only when the next turn begins | `check:legal-targets`
 - CR 801.4 a target opponent slot does not offer an opponent outside the controller's range | `check:legal-targets`
@@ -3020,10 +2988,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `RestampSpec`
 
 - CR 613.7m / 608.2f the controller orders every card one conjure loop made | `move:LookUpCard` `move:ReferenceCards`
-- CR 613.7m / 608.2f the controller orders every token one loop made | `board:combat`
 - CR 613.7m the seat's own answer decides which simultaneous token is stamped later | `move:ChooseCopyTarget` `move:ChooseKicker`
 - CR 614.12 / 608.2f a card one conjure loop made later enters beside the earlier ones, not after them | `move:ChooseLegend` `move:LookUpCard` `move:ReferenceCards`
-- CR 614.12 / 608.2f a token one loop made later enters beside the earlier ones, not after them | `board:combat`
+- CR 614.12 / 608.2f a token one loop made later enters beside the earlier ones, not after them | `move:OrderForEach`
 
 ### `ReversalSpec`
 
@@ -3345,7 +3312,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.8 an attacker removed from combat still keeps the two steps | `check:combat` `check:step`
 - CR 508.8 an attacker-less combat changes no life total | `check:other-S.inCombatPhase` `check:step`
 - CR 508.8 no attacker declared skips to end of combat | `check:step`
-- CR 508.8 the skip stands even when an instant could have been cast | `board:combat`
+- CR 508.8 the skip stands even when an instant could have been cast | `check:step`
 - CR 511.3 Relentless Assault still finds an attacker after clearCombat | `check:combat`
 - CR 511.3 combat is emptied though the end of combat step never ran | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 511.3 the control end of combat step runs, and the phase's end sweeps anyway | `check:card-types` `check:combat` `check:helper-began` `check:other-Turn.afterBlockersDeclared` `check:step`
@@ -3374,7 +3341,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 502.3 a control change between the steps: the new controller's untap step is the second one skipped | `board:hand-order` `board:mana-pool` `board:object-doesnotuntapfor` `board:replacement`
 - CR 502.3/611.2a whole card: Telekinesis' target stays tapped through its controller's next two untap steps and untaps at the third | `board:hand-order` `board:mana-pool` `board:object-doesnotuntapfor` `board:replacement`
 - CR 611.2a Elvish Hunter's one step on top of Telekinesis' two still ends at the second step | `board:hand-order` `board:mana-pool` `board:object-doesnotuntapfor` `board:replacement`
-- CR 615.1a whole card: Telekinesis at an attacking Hill Giant prevents the combat damage it would deal | `board:combat`
 
 ### `VanguardSpec`
 

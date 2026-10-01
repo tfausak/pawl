@@ -1,0 +1,35 @@
+{
+  "description": "CR 509.1h a removed BLOCKER leaves the attacker blocked, so nothing is dealt combat damage",
+  "note": "After blocks, alice activates Labyrinth of Skophos's \"Remove target attacking or blocking creature from combat\" on bob's blocker, paying the {4} with the four Islands and declining the Labyrinth's own {C} (CR 605.3a's further-source offer). The blocker leaves the attacker's set while the attacker stays blocked (CR 509.1h), so CR 510.1c gives it no combat damage to assign: both Pikers live and bob takes nothing. The control file never activates, and the Pikers trade.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" },
+          { "card": "Labyrinth of Skophos", "label": "maze" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "blocker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@maze", "targets": ["@blocker"], "mana": ["@i1", "@i2", "@i3", "@i4", null] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Tapped": { "object": "@maze", "tapped": true } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": [] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

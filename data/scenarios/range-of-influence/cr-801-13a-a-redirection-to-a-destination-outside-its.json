@@ -1,0 +1,232 @@
+{
+  "description": "CR 801.13a a redirection to a destination outside its controller's range does nothing",
+  "note": "CR 801.13a: alice's Turn the Tables redirects her combat damage to bob's attacking Piker, and carol's Ray of Command then takes that Piker, out of combat and two seats from alice, outside her range of 1. The other Piker's 2 has nowhere in range to go, so it stays on alice and carol's Piker is untouched. The fixture's injected control change is played as Ray of Command, cast in the declare blockers step after Turn the Tables has resolved; the unlimited file is the pair.",
+  "board": {
+    "active": "bob",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains3"
+          },
+          {
+            "card": "Plains",
+            "label": "plains4"
+          },
+          {
+            "card": "Plains",
+            "label": "plains5"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Turn the Tables",
+            "label": "tables"
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "aimed",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "other",
+            "ready": true
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island1"
+          },
+          {
+            "card": "Island",
+            "label": "island2"
+          },
+          {
+            "card": "Island",
+            "label": "island3"
+          },
+          {
+            "card": "Island",
+            "label": "island4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ray of Command",
+            "label": "ray"
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "dave",
+        "range": 1
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "@aimed",
+          "@other"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "source": "@aimed",
+      "do": {
+        "ChooseAttackTarget": "@alice"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "source": "@other",
+      "do": {
+        "ChooseAttackTarget": "@alice"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@tables",
+          "targets": [
+            "@aimed"
+          ],
+          "mana": [
+            "@plains1",
+            "@plains2",
+            "@plains3",
+            "@plains4",
+            "@plains5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "@ray",
+          "targets": [
+            "@aimed"
+          ],
+          "mana": [
+            "@island1",
+            "@island2",
+            "@island3",
+            "@island4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "@other": "@alice"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 18
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Damage": {
+          "object": "@aimed",
+          "damage": 0
+        }
+      }
+    }
+  ]
+}

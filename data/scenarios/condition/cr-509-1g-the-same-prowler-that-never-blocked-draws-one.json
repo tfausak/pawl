@@ -1,0 +1,31 @@
+{
+  "description": "CR 509.1g the same Prowler that never blocked draws one",
+  "note": "Guildsworn Prowler: \"When this creature dies, if it wasn't blocking, draw a card.\" bob declines to block alice's Hill Giant, then alice Bolts the Prowler in the declare blockers step, so it dies to the same 3 damage as the blocking twin and the trigger draws bob's one library card. The Haskell fixture marked the damage directly; the Bolt replaces it.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Mountain", "label": "mountain" }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Guildsworn Prowler", "label": "prowler", "ready": true }],
+        "library": [{ "card": "Swamp" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@giant"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@giant", "blockers": null } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@prowler"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Guildsworn Prowler", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Swamp", "count": 1 } } }
+  ]
+}
