@@ -4134,7 +4134,7 @@ staticAbilityFilters :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbili
 staticAbilityFilters ability =
   frame
     Unframed
-    ( unframed (affectedFilters (StaticAbility.affected ability))
+    ( fmap ((,) AffectedSetFramed) (affectedFilters (StaticAbility.affected ability))
         <> frame Unframed (concatMap durationFilters (Maybe.maybeToList (StaticAbility.lingers ability)))
         <> concatMap modificationFilters (StaticAbility.modifications ability)
     )
@@ -5329,6 +5329,17 @@ blockPermissionFilters permission =
 --     Filter.Context.slotNames is filled and CR 709.4a's
 --     Filter.SameNameAsBound answers in its Count filter (Grim Reminder). It
 --     overlays no Filter.Context.sourceAttachedTo.
+--   * AffectedSetFramed -- a static ability's own affected set, matched by
+--     Pawl.Engine.Projection.affectsWith through affectedContext, which fills
+--     Filter.Context.sourceChosenColor and sourceChosenSubtype (CR 607.2d,
+--     Gauntlet of Power, Obelisk of Urd).
+--   * ActivationCostFramed -- an activated ability's own cost, whose pools in
+--     Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent fill the
+--     same two fields off the source (Projection.withChoicesOf, Doom Cannon).
+--   * ManaRestrictionFramed -- CR 106.6's restriction on the mana an ability
+--     adds, matched by Pawl.Engine.Mana.admitsUnder, which fills
+--     sourceChosenSubtype off the mana unit and not the colour (Pillar of
+--     Origins).
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -5483,6 +5494,12 @@ data Framing
   | -- | CR 119.3's per-recipient amount, evaluated in the resolution's own
     -- context. See the overview above.
     LifeLossAmountFramed
+  | -- | A static ability's own affected set. See the overview above.
+    AffectedSetFramed
+  | -- | An activated ability's own cost. See the overview above.
+    ActivationCostFramed
+  | -- | CR 106.6's restriction on added mana. See the overview above.
+    ManaRestrictionFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -5554,6 +5571,11 @@ sweptForSingularSlots framing = case framing of
   ClauseGateFramed -> True
   -- SWEPT for MillTallyFramed's reason: the LoseLife arm reads effectContext.
   LifeLossAmountFramed -> True
+  -- SWEPT, as all three were while they were Unframed: the split is about CR
+  -- 607.2d's chosen values, not about slots.
+  AffectedSetFramed -> True
+  ActivationCostFramed -> True
+  ManaRestrictionFramed -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -5658,10 +5680,8 @@ manaRiderFilters rider = [ManaRider.condition rider]
 -- AddMana's and Firebend's shared payload: CR 106.6's restriction and rider.
 manaAdditionFilters :: ManaAddition.ManaAddition -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 manaAdditionFilters addition =
-  unframed
-    ( concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition))
-        <> concatMap manaRiderFilters (Maybe.maybeToList (ManaAddition.rider addition))
-    )
+  fmap ((,) ManaRestrictionFramed) (concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition)))
+    <> unframed (concatMap manaRiderFilters (Maybe.maybeToList (ManaAddition.rider addition)))
 
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and
@@ -6289,8 +6309,10 @@ activatedAbilityFilters ability =
   -- Pawl.Engine.Activate stamps the chosen targets on the ability object before
   -- Pawl.Engine.Cost.pay reads them (Cost.announcedSlots) -- so a slot read in
   -- the cost is answered, and Unframed's promise holds (Synthetic Spiteful
-  -- Altar). See SlotlessCostFramed for the positions where it does not.
-  unframed (costFilters (ActivatedAbility.cost ability))
+  -- Altar). See SlotlessCostFramed for the positions where it does not. Its own
+  -- tag only for CR 607.2d's chosen values, which no other Unframed position
+  -- answers.
+  fmap ((,) ActivationCostFramed) (costFilters (ActivatedAbility.cost ability))
     -- CR 101.1's ceiling on this ability's own X, through a Count -- cardFilters'
     -- treatment of Face.maximumX one type over (Blighted Nightmare).
     <> frame Unframed (concatMap quantityFilters (ActivatedAbility.maximumX ability))
