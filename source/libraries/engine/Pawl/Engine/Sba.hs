@@ -645,7 +645,18 @@ checkStateBasedActions = Monad.void performStateBasedActions
 -- are one check, and splitting them would make CR 704.3's "simultaneously" a
 -- sequence again.
 performStateBasedActions :: Game Bool
-performStateBasedActions = Event.simultaneously $ do
+performStateBasedActions = do
+  -- CR 800.4a's fourth clause comes "Then", after the departures this pass
+  -- performs, so it runs once the pass's event has closed
+  -- (Departure.leaveTogether).
+  (acted, thenExile) <- Event.simultaneously checkOnce
+  thenExile
+  pure acted
+
+-- The pass itself, which is one event; `performStateBasedActions` above says why
+-- CR 800.4a's fourth clause is handed back rather than run here.
+checkOnce :: Game (Bool, Game ())
+checkOnce = do
   gs <- State.get
   let -- CR 704.5f/g are checked against the state BEFORE any of them apply: SBAs
       -- are simultaneous. Project the whole board once (one gather) and judge each
@@ -935,10 +946,10 @@ performStateBasedActions = Event.simultaneously $ do
   -- CR 104.2a/800.4a: the losers leave together (CR 704.3), in REVERSE of
   -- `leaving` -- the order the `foldr` this replaced applied them in, kept
   -- because CR 800.4a's fourth clause emits zone changes and CR 725.4 hands the
-  -- crown along, so who goes first is observable. Departure.departTogether is
+  -- crown along, so who goes first is observable. Departure.leaveTogether is
   -- monadic for that clause's sake, which is why this is a statement rather
   -- than another binding in the `let`.
-  Departure.departTogether Departure.Type.Lost (List.reverse leaving)
+  thenExile <- Departure.leaveTogether Departure.Type.Lost (List.reverse leaving)
   departed <- State.get
   let -- CR 704.5d and CR 704.5e: the objects the rules say cease to exist outside
       -- a zone of their own -- a token anywhere but the battlefield, a copy of a
@@ -1054,4 +1065,4 @@ performStateBasedActions = Event.simultaneously $ do
   -- an outcome when the game did not already have one. Same ordering as
   -- Departure.leaveGame -- the two doors that write GameState.result agree.
   State.put undungeoned {GameState.result = GameState.result undungeoned <|> outcome}
-  pure acted
+  pure (acted, thenExile)

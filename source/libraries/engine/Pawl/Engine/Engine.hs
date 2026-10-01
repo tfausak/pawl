@@ -1172,14 +1172,13 @@ performSettle = do
   -- Monstrous War-Leech's mill decides what CR 704.5f then reads.
   Resolve.runEntryEffects
   swept <- Expiry.sweepConditional
-  returned <- Monarch.returnExiledForMonarch
-  -- CR 610.3's second one-shot effect, beside CR 725's for the same reason: a
-  -- return zone change is not something an Expiry sweep can perform.
-  movedBack <- MoveDuration.returnMoved
+  -- CR 610.3's second one-shot effect, Palace Jailer's and Banisher Priest's
+  -- alike: a return zone change is not something an Expiry sweep can perform.
+  returned <- MoveDuration.returnDue
   -- CR 800.4c, checked here for CR 704.3's reason and not because it is a
-  -- state-based action -- that rule says it is not. AFTER the three above, each
+  -- state-based action -- that rule says it is not. AFTER the two above, each
   -- of which can be what ends a control-changing effect: the conditional sweep
-  -- drops a CR 611.2b duration outright, and either return moves a permanent a
+  -- drops a CR 611.2b duration outright, and a return moves a permanent a
   -- CR 613.1b grant is derived from. Before the SBA pass, so CR 704.5m reads the
   -- board the exile leaves rather than an Aura still attached to a permanent
   -- that has gone.
@@ -1230,7 +1229,7 @@ performSettle = do
   State.modify' Combat.removeChanged
   checkControlContinuity
   Ring.endOnControlChange
-  more <- if swept || returned || movedBack || orphaned || dayNight || designated || sampledControl || unpaired || acted || placed then performSettle else pure False
+  more <- if swept || returned || orphaned || dayNight || designated || sampledControl || unpaired || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
 -- CR 104.4b: how many events may happen with no player able to decide anything
@@ -1333,6 +1332,9 @@ priorityLoop = do
                             State.modify' $ \g ->
                               let reset = g {GameState.passed = Set.empty}
                                in reset {GameState.priority = Just (passPriorityFrom reset p)}
+                            -- CR 117.5: the departure changed the board, so the
+                            -- next player's priority waits on a settle.
+                            settleForPriority
                             loop
                           Concession.Continues -> do
                             let decider = Decide.deciderFor p gs

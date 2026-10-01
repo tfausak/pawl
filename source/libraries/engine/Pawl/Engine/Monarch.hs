@@ -261,6 +261,18 @@ placeInherent pending = do
 -- exile watch and TriggerCondition.PlayerBecomesMonarch -- therefore agree by
 -- construction, which is the reason this is one function rather than a write at
 -- each call site.
+--
+-- CR 725 (Palace Jailer): the return of an object whose watch this has
+-- marked is Pawl.Engine.MoveDuration.returnDue's, CR 610.3's second one-shot
+-- effect. The test is for an EVENT, not a state: a new monarch being CROWNED who
+-- is an opponent, not merely an opponent currently holding the crown. Palace
+-- Jailer's rulings draw that line explicitly. Which is why the decision is
+-- made here: a comparison against the monarch seen at the previous settle cannot
+-- tell a crown that never moved from one that moved away and came back, and no
+-- comparison against the CURRENT monarch can see a reign that began and ended
+-- between two settles at all. Pawl.LibraryOrderSpec's "a crown that goes to an
+-- opponent and back inside one resolution still frees the prisoner" is the
+-- proof (see #208).
 crown :: PlayerId -> GameState -> GameState
 crown pid gs =
   if GameState.monarch gs == Just pid
@@ -286,45 +298,6 @@ crown pid gs =
               { GameState.monarch = Just pid,
                 GameState.exiledUntilMonarch = fmap mark (GameState.exiledUntilMonarch gs)
               }
-
--- CR 725 (Palace Jailer): return every object whose watch `crown` has marked --
--- an opponent of the entry's controller HAS BECOME the monarch. Runs in the
--- settle loop; CR 704.3 fixes "whenever a player would get priority" as the
--- coarsest moment anything can observe a condition, so deciding at the crowning
--- and moving the card at the next settle is indistinguishable from moving it at
--- the crowning.
---
--- The test is for an EVENT, not a state: a new monarch being CROWNED who is an
--- opponent, not merely an opponent currently holding the crown. Palace Jailer's
--- rulings draw that line explicitly. Which is why the decision is `crown`'s and
--- not this function's: a comparison against the monarch seen at the previous
--- settle cannot tell a crown that never moved from one that moved away and came
--- back, and no comparison against the CURRENT monarch can see a reign that began
--- and ended between two settles at all. Pawl.LibraryOrderSpec's "a crown that goes
--- to an opponent and back inside one resolution still frees the prisoner" is the
--- proof (see #208).
---
--- CR 610.3d: the watches one crowning marked return as ONE event, so the
--- creatures coming back see each other enter (CR 603.6a); two crownings
--- since the last settle return theirs as two events, earlier first.
--- data/scenarios/simultaneous-moves' Palace Jailer board proves the first; the
--- split is a REGRESSION FENCE, no board in the suite crowning twice between
--- settles.
---
--- Departure.objectsLeaveWith drops an entry whose KEY (the exiled object) belongs
--- to a departing player, never one whose VALUE does, so the effect survives its
--- controller's departure.
-returnExiledForMonarch :: Game Bool
-returnExiledForMonarch = do
-  gs <- State.get
-  let batches = Map.fromListWith (flip (<>)) [(group, [oid]) | (oid, Just group) <- Map.toList (fmap MonarchWatch.due (GameState.exiledUntilMonarch gs))]
-  if Map.null batches
-    then pure False
-    else do
-      Monad.forM_ (Map.elems batches) $ \due -> do
-        _ <- Event.changeZonesTogether (fmap (\oid -> (oid, Zone.Battlefield)) due)
-        State.modify' (\g -> g {GameState.exiledUntilMonarch = foldr Map.delete (GameState.exiledUntilMonarch g) due})
-      pure True
 
 -- CR 725.4: reassign the crown when the monarch leaves the game. Who takes it is
 -- Game.heirOnDeparture's question, shared with CR 726.4.
