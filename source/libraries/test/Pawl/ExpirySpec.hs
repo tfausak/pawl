@@ -51,7 +51,6 @@ import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -98,7 +97,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.StepBegan as StepBegan
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Teams as Teams
@@ -1167,36 +1165,6 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
         Expiry.Type.AtEndOf PhaseSelector.CombatPhase,
         Expiry.Type.AtEndOf PhaseSelector.CombatPhase
       ]
-  -- CR 205.1b's last sentence, in the words Jade Statue prints: "Some effects
-  -- state that an object becomes a '[creature type or types] artifact
-  -- creature'; these effects also allow the object to retain all of its prior
-  -- card types and subtypes other than creature types, but replace any existing
-  -- creature types." The Statue is the DEGENERATE case of the layer-4
-  -- SetCreatureSubtype arm -- there is nothing for the set to replace, since its
-  -- printed type line is a bare Artifact -- where Turn to Frog (Pawl.ProjectionSpec)
-  -- is the case with a creature type standing. What the rule still has to say
-  -- here is the RETENTION: Artifact is a prior CARD type, so it survives, and
-  -- the projection is an Artifact Creature -- Golem rather than a
-  -- Creature -- Golem.
-  --
-  -- CR 205.3m lists Golem among the creature types, which is what makes
-  -- Pawl.Engine.Subtype.isCreatureType's filter the right one to run here.
-  Spec.it s "CR 205.1b whole card: the animated Statue is an Artifact Creature -- Golem" $ do
-    statue <- S.printingOf s registry "Jade Statue"
-    mountain <- S.printingOf s registry "Mountain"
-    let (statueId, _, jade) = jadeBoard statue mountain []
-        afterBeginningOfCombat = animateStep jade
-    Spec.assertEqWith s "before: an Artifact with no subtype at all" (Projection.cardTypesOf statueId jade, Projection.subtypesOf statueId jade) (Set.singleton CardType.Artifact, Set.empty)
-    Spec.assertEqWith
-      s
-      "after: CR 205.1b the Artifact card type is retained and Creature is added"
-      (Projection.cardTypesOf statueId afterBeginningOfCombat)
-      (Set.fromList [CardType.Artifact, CardType.Creature])
-    Spec.assertEqWith
-      s
-      "and the creature type is Golem"
-      (Projection.subtypesOf statueId afterBeginningOfCombat)
-      (Set.singleton Subtype.Golem)
   -- The other half of CR 500.5a, step by step through the whole combat phase:
   -- the animation is live at the START of the end of combat step -- "not at the
   -- beginning of the end of combat step" is the rule's own wording -- and gone

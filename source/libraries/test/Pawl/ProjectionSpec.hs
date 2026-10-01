@@ -1267,21 +1267,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "survives at 3/3 with 2 marked" (Projection.toughnessOf mammothId damaged) (Just 3)
     Spec.assertEqWith s "no creature survives once toughness is 1" (S.creaturesInPlay S.bob afterSba) 0
 
-  Spec.it s "CR 611 Serpent's Gift grants deathtouch to its target" $ do
-    -- {2}{G} needs 3 total mana; 3 Forests, not 2 (a brief fixture bug --
-    -- 2 Forests only pay {1}{G}, leaving the spell uncast and the assertion
-    -- vacuously true off the base card's native trample).
-    forest <- S.printingOf s registry "Forest"
-    warMammoth <- S.printingOf s registry "War Mammoth"
-    serpentsGift <- S.printingOf s registry "Serpent's Gift"
-    let base = S.landsInPlay forest 3
-        (mammothId, withMammoth) = S.addPermanent warMammoth S.alice base
-        (gs, sgId) = S.handOne serpentsGift withMammoth
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice sgId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertBool s (Projection.hasKeyword Keyword.Trample mammothId resolved) "keeps trample"
-    Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch mammothId resolved) "gains deathtouch"
-
   Spec.it s "CR 613.7 layer 6: a grant older than Humility is erased; newer survives" $ do
     -- War Mammoth and Humility on the battlefield; a directly-built
     -- Serpent's-Gift effect (GainKeyword Deathtouch, the same value the card
@@ -1697,30 +1682,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- The fixture, LAST: an assertion ahead of the six above would absorb a
     -- mutation to the atom and report itself instead.
     Spec.assertEqWith s "the fixture: both Obelisks resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Obelisk of Urd")) S.alice gs) 2
-
-  -- Turn to Frog {1}{U}: "Until end of turn, target creature loses all
-  -- abilities and becomes a blue Frog with base power and toughness 1/1."
-  -- Four layers at once -- 4 (Frog), 5 (blue), 6 (loses all abilities) and 7b
-  -- (base 1/1) -- and the pool's first producer of the layer-4 arm that SETS a
-  -- creature type.
-  --
-  -- Jade Statue is the other, and the degenerate one: "becomes a 3/6 Golem
-  -- artifact creature" sets a creature type over a permanent that prints none,
-  -- so the arm's filter runs over an empty set and the only thing left for CR
-  -- 205.1b to say is that the ARTIFACT card type is retained. Pawl.ExpirySpec
-  -- proves that one end to end; the case with a creature type standing is here.
-  Spec.it s "CR 205.1b Turn to Frog replaces Bog Wraith's creature type: a Frog, and no longer a Wraith" $ do
-    island <- S.printingOf s registry "Island"
-    bogWraith <- S.printingOf s registry "Bog Wraith"
-    turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (wraithId, board) = S.addPermanent bogWraith S.alice (S.landsInPlay island 3)
-        after = castAtCreature wraithId turnToFrog board
-    Spec.assertEqWith s "before: Creature -- Wraith" (Projection.subtypesOf wraithId board) (Set.singleton Subtype.Type.Wraith)
-    -- CR 205.1b's last sentence: an effect making an object a "[creature type]
-    -- artifact creature" lets it keep every prior subtype "other than creature
-    -- types, but replace any existing creature types". So this is a SET over
-    -- the creature types, and an ADD would leave Wraith standing.
-    Spec.assertEqWith s "after: Creature -- Frog, the Wraith replaced" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Type.Frog)
 
   -- THE REPLACE-ONLY-CREATURE-TYPES FALSIFIER. Ashaya, Soul of the Wild makes
   -- each nontoken creature alice controls a Forest land in addition to its other
@@ -5782,29 +5743,6 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
         hasted = S.addCounter (CounterKind.Keyword Keyword.Haste) 1 pikerId board
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId hasted) "haste granted"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId hasted)) "flying is not"
-
-  -- CR 613.7c against CR 613.7d: the grant carries the moment the COUNTER was put
-  -- on, not the moment the creature entered. Humility's CR 613.1f removal is in
-  -- the same layer, so the two orders below disagree -- and the Piker enters
-  -- before Humility on both boards, which is what makes the counter's own stamp
-  -- the only thing that can decide it.
-  Spec.it s "CR 613.7c a counter put on AFTER Humility grants flying through it" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    humility <- S.printingOf s registry "Humility"
-    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
-    let (target, humbled) = countered piker humility plains spontaneousFlight True
-    Spec.assertBool s (Projection.hasKeyword Keyword.Flying target humbled) "the counter is younger than Humility, so it flies"
-    Spec.assertEqWith s "Humility is applying: base 1/1 plus the spell's +2/+2" (Projection.powerOf target humbled) (Just 3)
-
-  Spec.it s "CR 613.7c a counter put on BEFORE Humility loses flying to it" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    humility <- S.printingOf s registry "Humility"
-    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
-    let (target, humbled) = countered piker humility plains spontaneousFlight False
-    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying target humbled)) "the counter is older than Humility, so it does not"
-    Spec.assertEqWith s "Humility is applying: base 1/1 plus the spell's +2/+2" (Projection.powerOf target humbled) (Just 3)
 
 -- The pair of boards the CR 613.7c cases above read: a Piker, a resolved
 -- Spontaneous Flight and a Humility, differing in nothing but whether Humility

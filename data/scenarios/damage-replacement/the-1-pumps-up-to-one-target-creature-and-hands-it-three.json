@@ -1,0 +1,38 @@
+{
+  "description": "the +1 pumps up to one target creature and hands it three keywords",
+  "note": "Ajani Steadfast's +1, whose four instructions all aim at one target slot: alice's targeted Goblin Piker becomes a 3/2 with first strike, vigilance and lifelink (CR 613.4c, 613.1f), the cost puts a loyalty counter on Ajani (CR 606.4), and bob's untargeted Piker is still a 2/1 with nothing gained. Loyalty counters are placed directly so each count is exactly the one named.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Ajani Steadfast", "label": "ajani", "counters": [{ "key": { "type": "Loyalty" }, "value": 7 }] },
+          { "card": "Jace Beleren", "label": "jace", "counters": [{ "key": { "type": "Loyalty" }, "value": 8 }] },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "life": 9
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Karn Liberated", "label": "karn", "counters": [{ "key": { "type": "Loyalty" }, "value": 6 }] },
+          { "card": "Goblin Piker", "label": "source" }
+        ],
+        "life": 7
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@ajani", "ability": 0, "targets": ["@piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "FirstStrike" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Vigilance" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Lifelink" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@ajani", "kind": { "type": "Loyalty" }, "count": 8 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@source", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@source", "keyword": { "type": "FirstStrike" }, "count": 0 } } }
+  ]
+}

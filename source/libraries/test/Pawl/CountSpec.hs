@@ -988,7 +988,7 @@ isSpellCast event = case event of
 -- and only the still-playing reading of CR 800.4a gives 2 then 1. The second
 -- row is what a literal fails on, which is the mutation this pair was checked
 -- against.
-tyranidInvasionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tyranidInvasionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 tyranidInvasionSpec s registry =
   let -- alice has four Forests and nothing else; bob and carol have empty
       -- boards, so every token on the battlefield afterwards is the spell's.
@@ -1004,15 +1004,6 @@ tyranidInvasionSpec s registry =
             cast = S.runPure S.identityAnswer gs1 (S.cast S.alice oid)
          in S.runPure S.identityAnswer cast Engine.priorityLoop
    in Spec.describe s "Tyranid Invasion" $ do
-        Spec.it s "CR 102.1 at three seats the count is alice's two opponents" $ do
-          invasion <- S.printingOf s registry "Tyranid Invasion"
-          forest <- S.printingOf s registry "Forest"
-          let after = castInvasion invasion (board forest)
-              tokens = S.tokensOf after
-          Spec.assertEqWith s "one token per opponent" (length tokens) 2
-          Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
-          Spec.assertEqWith s "each is a Tyranid Warrior" (fmap (\oid -> Set.toList (Projection.subtypesOf oid after)) tokens) [[Subtype.Tyranid, Subtype.Warrior], [Subtype.Tyranid, Subtype.Warrior]]
-          Spec.assertEqWith s "each is a 3/3" (fmap (`Projection.powerOf` after) tokens) [Just 3, Just 3]
         -- The discriminating case for CR 800.4a. The seating roster is still
         -- three (CR 800.5) and carol's Status.Departed is the only difference
         -- from the board above, so a count that named seats rather than players

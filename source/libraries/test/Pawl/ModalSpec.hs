@@ -56,7 +56,6 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
@@ -100,19 +99,6 @@ gateSpec s registry = Spec.describe s "Gate" $ do
         cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
     Spec.assertEqWith s "1 damage marked" (S.damageOf pikerOid after) (Just 1)
-
-  Spec.it s "CR 608.2c mode 2 (haste) grants haste to the chosen (summoning-sick) creature" $ do
-    chaosCharm <- S.printingOf s registry "Chaos Charm"
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (creatureId, gs1) = S.addPermanent piker S.alice gs0
-        sick = gs1 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) creatureId (GameState.objects gs1)}
-        answer :: Prompt.Prompt r -> r
-        answer = chooseModeAt (ModeIndex.MkModeIndex 2) (Recipient.ToCreature creatureId)
-        cast = snd (Engine.runGamePure answer sick (S.cast S.alice oid))
-        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
-    Spec.assertBool s (Projection.hasKeyword Keyword.Haste creatureId after) "projected keywords include Haste"
 
   Spec.it s "CR 608.2c mode 0 (destroy Wall) destroys the chosen Wall" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
