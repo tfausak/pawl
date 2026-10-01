@@ -807,6 +807,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfCountersRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Loyalty Zone.Battlefield))
       " {\"type\":\"SelfCountersRemoved\",\"value\":{\"kind\":{\"type\":\"Loyalty\"}}} "
+  -- Its per-counter reading (CR 603.2c), the same payload under its own tag,
+  -- on a fourth kind.
+  Spec.it s "SelfCounterRemoved round-trips its kind" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.PlusOnePlusOne Zone.Battlefield))
+      " {\"type\":\"SelfCounterRemoved\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"}}} "
   -- CR 603.2c's batch placement, whose payload is an OBJECT rather than a bare
   -- kind: a third counter kind and a Filter, so a codec that crossed this arm
   -- with either mirror above could not pass all three cases.

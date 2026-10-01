@@ -1175,6 +1175,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- And so does its any-amount mirror.
   TriggerCondition.SelfCountersRemoved _ -> []
+  TriggerCondition.SelfCounterRemoved _ -> []
   -- CR 603.2c's batch placement carries a kind and a Filter, and neither holds a
   -- Count. Its per-permanent scope carries the same payload.
   TriggerCondition.PermanentsGetCounters {} -> []
@@ -4401,6 +4402,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfLastCounterRemoved removal -> counterKindFilters (SelfCountersRemoved.kind removal)
   -- And so does its any-amount mirror.
   TriggerCondition.SelfCountersRemoved removal -> counterKindFilters (SelfCountersRemoved.kind removal)
+  TriggerCondition.SelfCounterRemoved removal -> counterKindFilters (SelfCountersRemoved.kind removal)
   -- CR 603.2c's batch placement carries one, over the permanents the counters
   -- landed on -- swept like PermanentsDie's, so a card's "one or more creatures"
   -- is not exempt from the corpus filter lints. And its KIND beside it, for the
@@ -4531,6 +4533,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesClassLevel _ -> []
   TriggerCondition.SelfLastCounterRemoved _ -> []
   TriggerCondition.SelfCountersRemoved _ -> []
+  TriggerCondition.SelfCounterRemoved _ -> []
   TriggerCondition.PermanentsGetCounters _ -> []
   TriggerCondition.PermanentGetsCounters _ -> []
   TriggerCondition.SpellCast _ -> []
