@@ -62,7 +62,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   blockers, `null` when unblocked), `Defenders` (the defending players, in
   order), `Monarch` (`null` for nobody), `PowerToughness` (an object's
   projected `power` and `toughness`) and `PlayerCounters` (how many of one
-  `kind` a `player` has). Assert combat at `EndOfCombat` or
+  `kind` a `player` has), `Subtypes` (an object's projected subtypes, all of
+  them, as bare names) and `Keywords` (how many instances of one `keyword` an
+  object has, 0 when it has none). Assert combat at `EndOfCombat` or
   earlier: it is cleared as that step ends.
 - **Final.** The run plays whole steps until the timeline is spent, the game
   ends, or the turn passes the last one named; `final` checks that state.

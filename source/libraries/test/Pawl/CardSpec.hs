@@ -316,6 +316,7 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
@@ -1315,8 +1316,7 @@ ownCounts effect = case effect of
   -- card's Counts -- the same recursion Create takes into a minted token.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
-  -- No quantity and no rider on CR 615.8's shield, so its duration is all of it.
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _) -> durationCounts duration
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> durationCounts duration <> foldMap quantityCounts amount
   -- CR 708.2's listed characteristics are card data, so the listed power and
   -- toughness are walked for the reason Create's minted face is. The listed type
@@ -1710,12 +1710,11 @@ effectNestedEffects effect = case effect of
   -- resolution INSTALLS; the PRINTED twin arrives through cardCarrierEffects'
   -- last limb instead.
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacementPrintedEffects replacement
-  -- CR 615.5's rider on the two prevention opcodes a SPELL authors: Test of
-  -- Faith's counters, Inkshield's Inklings.
+  -- CR 615.5's rider on the three prevention opcodes a SPELL authors: Test of
+  -- Faith's counters, Inkshield's Inklings, Reverse Damage's life.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ riders) -> Foldable.toList riders
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ riders) -> Foldable.toList riders
-  -- CR 615.8's shield carries no rider at all.
-  Effect.PreventNextDamageInstance {} -> []
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ _ _ riders) -> Foldable.toList riders
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Foldable.toList body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
@@ -2169,12 +2168,12 @@ replacementRewriteEffects replacement = case replacement of
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
 -- nothing else, since no other arm has a field to carry one. The card-authored
--- twin of the two prevention opcodes' `riders`.
+-- twin of the three prevention opcodes' `riders`.
 --
 -- Both halves reach cardResolutionEffects: this one as a carrier of its own, and
--- the rider a SPELL authors on Effect.PreventAllDamage or
--- Effect.PreventNextDamage through effectNestedEffects, which is what lets the CR
--- 111.4 naming case below see Inkshield's nested token face.
+-- the rider a SPELL authors on Effect.PreventAllDamage, Effect.PreventNextDamage
+-- or Effect.PreventNextDamageInstance through effectNestedEffects, which is what
+-- lets the CR 111.4 naming case below see Inkshield's nested token face.
 replacementEffectRiders :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ _ riders) -> Foldable.toList riders
@@ -2312,7 +2311,7 @@ effectReplacements effect = case effect of
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
-  Effect.PreventNextDamageInstance {} -> []
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ _ _ rider) -> concatMap effectReplacements rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectReplacements body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
@@ -2798,7 +2797,7 @@ effectMintedFaces effect = case effect of
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
-  Effect.PreventNextDamageInstance {} -> []
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ _ _ rider) -> concatMap effectMintedFaces rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectMintedFaces body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
@@ -4399,9 +4398,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind _) -> counterKindFilters kind
   TriggerCondition.SelfBecomesClassLevel _ -> []
   -- CR 310.12b names a counter kind alone, swept for the arm above's reason.
-  TriggerCondition.SelfLastCounterRemoved kind -> counterKindFilters kind
+  TriggerCondition.SelfLastCounterRemoved removal -> counterKindFilters (SelfCountersRemoved.kind removal)
   -- And so does its any-amount mirror.
-  TriggerCondition.SelfCountersRemoved kind -> counterKindFilters kind
+  TriggerCondition.SelfCountersRemoved removal -> counterKindFilters (SelfCountersRemoved.kind removal)
   -- CR 603.2c's batch placement carries one, over the permanents the counters
   -- landed on -- swept like PermanentsDie's, so a card's "one or more creatures"
   -- is not exempt from the corpus filter lints. And its KIND beside it, for the
@@ -5857,8 +5856,8 @@ effectFilters effect = case effect of
     frame Unframed (durationFilters duration) <> unframed (Maybe.maybeToList chosenSource <> Maybe.maybeToList whatRecipient <> [whatSource]) <> frame SourceHostFramed (foldMap objectRefFilters ref) <> concatMap effectFilters rider
   -- The two arms above's reads over the fields CR 615.8's shield carries, and
   -- CR 609.7a's chosen source is UNFRAMED there for their reason.
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration ref chosenSource) ->
-    frame Unframed (durationFilters duration) <> unframed [chosenSource] <> frame SourceHostFramed (objectRefFilters ref)
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration ref chosenSource rider) ->
+    frame Unframed (durationFilters duration) <> unframed [chosenSource] <> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters rider
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   -- CR 609.7a's chosen source and the recipient description are UNFRAMED, for
   -- the reason the two prevention arms above give.

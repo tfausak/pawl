@@ -1,0 +1,30 @@
+{
+  "description": "CR 611 Serpent's Gift grants deathtouch to its target",
+  "note": "Serpent's Gift costs {2}{G}, so three Forests pay for it; with two the spell would go uncast. War Mammoth keeps its printed trample and gains deathtouch.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "War Mammoth", "label": "mammoth" }
+        ],
+        "hand": [{ "card": "Serpent's Gift", "label": "gift" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@mammoth", "keyword": { "type": "Deathtouch" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@gift", "targets": ["@mammoth"], "mana": ["@forest-1", "@forest-2", "@forest-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@mammoth", "keyword": { "type": "Trample" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@mammoth", "keyword": { "type": "Deathtouch" }, "count": 1 } } }
+  ]
+}

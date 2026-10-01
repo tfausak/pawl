@@ -1,0 +1,30 @@
+{
+  "description": "CR 613.7c a counter put on AFTER Humility grants flying through it",
+  "note": "A keyword counter's layer-6 grant carries the timestamp of the moment the counter was put on (CR 613.7c), not the creature's entry (CR 613.7d). Humility's ability removal is in the same layer, and the Piker enters before Humility, so only the counter's own stamp can decide it. Here Spontaneous Flight puts the counter on after Humility, so the Piker flies; its paired file puts Humility after the counter.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains-1", "ready": true },
+          { "card": "Plains", "label": "plains-2", "ready": true },
+          { "card": "Plains", "label": "plains-3", "ready": true },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Spontaneous Flight", "label": "flight" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Humility" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@flight", "targets": ["@piker"], "mana": ["@plains-1", "@plains-2", "@plains-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Flying" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 3 } } }
+  ]
+}

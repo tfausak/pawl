@@ -94,7 +94,7 @@ data ActiveReplacement = MkActiveReplacement
     -- pattern out in full.
     condition :: Maybe Condition.Condition,
     -- | CR 615.5's additional effect for a FLOATING row: Nothing on every row
-    -- but a shield installed by one of the two prevention opcodes whose rider is
+    -- but a shield installed by one of the three prevention opcodes whose rider is
     -- non-empty. Copied forward to Pawl.Types.ReplacementCandidate and then to
     -- Pawl.Types.Prevention, since the row may be spent and dropped in the very
     -- application that fires it.

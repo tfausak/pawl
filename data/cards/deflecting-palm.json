@@ -1,49 +1,6 @@
 {
   "faces": [
     {
-      "delayedAbilities": {
-        "prevented this way": {
-          "condition": {
-            "type": "SelfPreventsDamage",
-            "value": {
-              "type": "And",
-              "value": []
-            }
-          },
-          "modal": {
-            "modes": [
-              {
-                "clauses": [
-                  {
-                    "effects": [
-                      {
-                        "type": "DealDamage",
-                        "value": {
-                          "parts": [
-                            {
-                              "quantity": {
-                                "type": "InSlot",
-                                "value": "thatMuch"
-                              },
-                              "ref": {
-                                "type": "Players",
-                                "value": {
-                                  "type": "ControllerOfBound",
-                                  "value": "thatDamageSource"
-                                }
-                              }
-                            }
-                          ]
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      },
       "manaCost": [
         {
           "type": "OfType",
@@ -80,16 +37,29 @@
                       "ref": {
                         "type": "InSlot",
                         "value": "you"
-                      }
-                    }
-                  },
-                  {
-                    "type": "ArmDelayedTrigger",
-                    "value": {
-                      "duration": {
-                        "type": "UntilEndOfTurn"
                       },
-                      "name": "prevented this way"
+                      "riders": [
+                        {
+                          "type": "DealDamage",
+                          "value": {
+                            "parts": [
+                              {
+                                "quantity": {
+                                  "type": "InSlot",
+                                  "value": "thatMuch"
+                                },
+                                "ref": {
+                                  "type": "Players",
+                                  "value": {
+                                    "type": "ControllerOfBound",
+                                    "value": "thatDamageSource"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
                     }
                   }
                 ]

@@ -1498,17 +1498,6 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton scout)) onMountain)) "a Mountain stops the block"
     (onSwamp, scout2, blocker2) <- scoutBoard False "Swamp"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton scout2)) onSwamp) "a Swamp does not"
-  Spec.it s "CR 612.1 a hacked Goblin Scouts mints SWAMPwalkers instead" $ do
-    (onMountain, scout, blocker) <- scoutBoard True "Mountain"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton scout)) onMountain) "a Mountain no longer stops the block"
-    let after = S.runPure S.aggressiveAnswer onMountain (Combat.declareBlockers S.manaPerformer)
-    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf scout after) (Set.singleton blocker)
-    -- CR 612.2 held to the one word: Magical Hack swaps land types, so the
-    -- token's creature types and its derived name are untouched.
-    Spec.assertEqWith s "still a Goblin Scout" (Projection.subtypesOf scout onMountain) (Set.fromList [Subtype.Goblin, Subtype.Scout])
-    Spec.assertEqWith s "still named Goblin Scout Token" (Projection.namesOf scout onMountain) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Scout Token")))
-    (onSwamp, scout2, blocker2) <- scoutBoard True "Swamp"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton scout2)) onSwamp)) "a Swamp stops it now"
 
 -- alice casts Goblin Scouts, optionally has a Magical Hack resolved at the
 -- SORCERY ON THE STACK (Mountain -> Swamp), and then the sorcery resolves; the

@@ -1,0 +1,47 @@
+{
+  "description": "CR 612.3 an evolved Goblin Piker's GRANTED afterlife still mints a Spirit Token",
+  "note": "CR 612.3: a text change can't modify an ability granted to the object. An Artificial Evolution swaps Spirit for Elf on alice's Goblin Piker, then Afterlife Insurance grants it afterlife 1 in layer 6, after the layer-3 swap, and Murder kills it: CR 702.135a's Spirit survives. The Piker prints neither afterlife nor Spirit, so its Goblin Warrior type line is untouched and every token comes from the grant. The Insurance draws, so alice has a library.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Swamp", "label": "swamp-4" },
+          { "card": "Swamp", "label": "swamp-5" },
+          { "card": "Swamp", "label": "swamp-6" },
+          { "card": "Island", "label": "island" },
+          { "card": "Goblin Piker", "label": "host" }
+        ],
+        "hand": [
+          { "card": "Artificial Evolution", "label": "evolution" },
+          { "card": "Afterlife Insurance", "label": "insurance" },
+          { "card": "Murder", "label": "murder" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["@host"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Spirit" }, "to": { "type": "Elf" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@insurance", "mana": ["@swamp-1", "@swamp-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@host", "keyword": { "type": "Afterlife", "value": 1 }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "@host", "subtypes": ["Goblin", "Warrior"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["@host"], "mana": ["@swamp-3", "@swamp-4", "@swamp-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Spirit Token", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elf Token", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Spirit Token", "subtypes": ["Spirit"] } } }
+  ]
+}

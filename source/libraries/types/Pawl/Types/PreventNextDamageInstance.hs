@@ -1,22 +1,17 @@
 module Pawl.Types.PreventNextDamageInstance where
 
+import qualified Data.Sequence as Seq
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
--- | CR 615.8's prevention shield: over whom, from which chosen source, and for
--- how long. One INSTANCE of damage goes, whatever its size, and the shield is
--- then used up.
+-- | CR 615.8's prevention shield: over whom, from which chosen source, for how
+-- long, and CR 615.5's additional effect riding it. One INSTANCE of damage goes,
+-- whatever its size, and the shield is then used up.
 
--- Not parametric in the effect, where Pawl.Types.PreventNextDamage and
--- Pawl.Types.PreventAllDamage both are: those two carry CR 615.5's rider and so
--- hold effects, and no printing of this rule's shape carries one -- Deflecting
--- Palm, Honorable Passage and New Way Forward all say "if damage is prevented
--- this way" instead, which is CR 615.13's triggered ability and lives in the
--- card's delayed abilities. A printing that wrote "for each 1 damage prevented
--- this way" would want the field, and would want the parameter with it.
-data PreventNextDamageInstance = MkPreventNextDamageInstance
+-- Parametric in the effect for Pawl.Types.PreventNextDamage's reason.
+data PreventNextDamageInstance effect = MkPreventNextDamageInstance
   { duration :: Duration.Duration,
     -- | The recipients this RESOLUTION names -- Deflecting Palm's "to you",
     -- Honorable Passage's "to any target" -- one CR 615.8 shield each.
@@ -38,6 +33,10 @@ data PreventNextDamageInstance = MkPreventNextDamageInstance
     -- narrows the candidates offered, and it is written into
     -- Pawl.Types.DamagePattern.whatSource so CR 609.7b's recheck happens at the
     -- damage event rather than at the choice.
-    chosenSource :: Filter.Filter Keyword.Keyword
+    chosenSource :: Filter.Filter Keyword.Keyword,
+    -- | CR 615.5's additional effect -- Reverse Damage's "you gain life equal to
+    -- the damage prevented this way". Empty for a shield with no such clause,
+    -- so the key is elided rather than written as an empty array.
+    riders :: Seq.Seq effect
   }
   deriving (Eq, Ord, Show)

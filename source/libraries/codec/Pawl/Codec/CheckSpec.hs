@@ -16,6 +16,8 @@ import qualified Pawl.Types.CounterKind as CounterKind.Type
 import qualified Pawl.Types.CountersAre as CountersAre.Type
 import qualified Pawl.Types.DamageIs as DamageIs.Type
 import qualified Pawl.Types.DefendersAre as DefendersAre.Type
+import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.KeywordsAre as KeywordsAre.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.LifeIs as LifeIs.Type
 import qualified Pawl.Types.MonarchIs as MonarchIs.Type
@@ -23,6 +25,8 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind.Type
 import qualified Pawl.Types.PlayerCountersAre as PlayerCountersAre.Type
 import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs.Type
 import qualified Pawl.Types.Reference as Reference.Type
+import qualified Pawl.Types.Subtype as Subtype.Type
+import qualified Pawl.Types.SubtypesAre as SubtypesAre.Type
 import qualified Pawl.Types.TapState as TapState.Type
 import qualified Pawl.Types.TappedIs as TappedIs.Type
 import qualified Pawl.Types.TypesAre as TypesAre.Type
@@ -54,6 +58,10 @@ spec s = Spec.describe s "Pawl.Codec.Check" $ do
     Common.assertCodec s Check.codec (Check.Type.PowerToughness (PowerToughnessIs.Type.MkPowerToughnessIs (labelled "bear") 3 3)) " {\"PowerToughness\":{\"object\":\"@bear\",\"power\":3,\"toughness\":3}} "
   Spec.it s "PlayerCounters" $
     Common.assertCodec s Check.codec (Check.Type.PlayerCounters (PlayerCountersAre.Type.MkPlayerCountersAre (Label.Type.MkLabel (Text.pack "bob")) PlayerCounterKind.Type.Energy 2)) " {\"PlayerCounters\":{\"player\":\"bob\",\"kind\":{\"type\":\"Energy\"},\"count\":2}} "
+  Spec.it s "Subtypes" $
+    Common.assertCodec s Check.codec (Check.Type.Subtypes (SubtypesAre.Type.MkSubtypesAre (labelled "piker") (Set.singleton Subtype.Type.Goblin))) " {\"Subtypes\":{\"object\":\"@piker\",\"subtypes\":[\"Goblin\"]}} "
+  Spec.it s "Keywords" $
+    Common.assertCodec s Check.codec (Check.Type.Keywords (KeywordsAre.Type.MkKeywordsAre (labelled "bird") Keyword.Type.Flying 1)) " {\"Keywords\":{\"object\":\"@bird\",\"keyword\":{\"type\":\"Flying\"},\"count\":1}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Check.codec
 

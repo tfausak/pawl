@@ -100,8 +100,10 @@
           "condition": {
             "type": "SelfLastCounterRemoved",
             "value": {
-              "type": "Named",
-              "value": "intervention"
+              "kind": {
+                "type": "Named",
+                "value": "intervention"
+              }
             }
           },
           "modal": {

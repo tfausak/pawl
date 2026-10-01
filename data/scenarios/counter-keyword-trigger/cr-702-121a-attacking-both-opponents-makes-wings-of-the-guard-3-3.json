@@ -1,0 +1,31 @@
+{
+  "description": "CR 702.121a attacking both opponents makes Wings of the Guard 3/3",
+  "note": "CR 802.2 / 702.121a: melee counts each opponent attacked by any of your creatures. alice's Wings of the Guard (1/1 flying, melee) attack bob and her Goblin Piker attacks carol, so the Bird gets +2/+2: bob takes 3, carol 2.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Wings of the Guard", "label": "wings", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@wings", "@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@bob" }, "source": "@wings" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@piker" },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@wings", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } }
+  ]
+}

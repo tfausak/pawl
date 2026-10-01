@@ -42,6 +42,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
@@ -788,13 +789,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesClassLevel (ClassLevel.MkClassLevel 2))
       " {\"type\":\"SelfBecomesClassLevel\",\"value\":2} "
-  -- CR 310.12b. The payload is the counter kind alone: "the last" needs no number.
-  Spec.it s "SelfLastCounterRemoved round-trips its kind" $
+  -- CR 310.12b. The payload is the counter kind and a zone: "the last" needs no
+  -- number. The stated zone is CR 113.6b's (Veiling Oddity's "while it's
+  -- exiled").
+  Spec.it s "SelfLastCounterRemoved round-trips its kind and zone" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.SelfLastCounterRemoved CounterKind.Defense)
-      " {\"type\":\"SelfLastCounterRemoved\",\"value\":{\"type\":\"Defense\"}} "
+      (TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Time Zone.Exile))
+      " {\"type\":\"SelfLastCounterRemoved\",\"value\":{\"kind\":{\"type\":\"Time\"},\"zone\":{\"type\":\"Exile\"}}} "
   -- Its any-amount mirror, sharing the payload and differing only in the tag --
   -- a DIFFERENT kind here, so a codec that crossed the two arms could not pass
   -- both cases.
@@ -802,8 +805,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.SelfCountersRemoved CounterKind.Loyalty)
-      " {\"type\":\"SelfCountersRemoved\",\"value\":{\"type\":\"Loyalty\"}} "
+      (TriggerCondition.SelfCountersRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Loyalty Zone.Battlefield))
+      " {\"type\":\"SelfCountersRemoved\",\"value\":{\"kind\":{\"type\":\"Loyalty\"}}} "
   -- CR 603.2c's batch placement, whose payload is an OBJECT rather than a bare
   -- kind: a third counter kind and a Filter, so a codec that crossed this arm
   -- with either mirror above could not pass all three cases.

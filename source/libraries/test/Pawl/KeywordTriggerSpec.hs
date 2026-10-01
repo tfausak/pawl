@@ -116,21 +116,6 @@ poisonousSpec s registry =
           let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
               bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.alice (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) ev
           Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.bob)))
-        -- The proving test. CR 702.70a: "Whenever this creature deals combat
-        -- damage to a player, that player gets N poison counters." bob is dealt
-        -- the Piker's two damage AND gets three poison -- poisonous is not
-        -- infect (CR 702.90b), so the life still goes.
-        Spec.it s "CR 702.70a Snake Cult Initiation gives the damaged player three poison" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          initiation <- S.printingOf s registry "Snake Cult Initiation"
-          case board piker initiation 1 [] of
-            Nothing -> Spec.assertFailure s "fixture should have an attacker"
-            Just (gs, attacker, _) -> do
-              Spec.assertBool s (Projection.hasKeyword (Keyword.Type.Poisonous 3) attacker gs) "the enchanted creature has poisonous 3"
-              let after = S.runCombat S.aggressiveAnswer gs
-              Spec.assertEqWith s "bob has three poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
-              Spec.assertEqWith s "and lost the two life as well" (S.lifeOf S.bob after) (Just 18)
-              Spec.assertEqWith s "alice, who controls the ability, gets none" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
         -- What separates poisonous from infect and toxic: it is a TRIGGERED
         -- ability, so the poison arrives when the ability resolves, not as the
         -- damage is dealt. `fightWith` deals combat damage without ever reaching
@@ -144,23 +129,6 @@ poisonousSpec s registry =
               let fought = S.fightWith S.aggressiveAnswer gs
               Spec.assertEqWith s "damage is dealt" (S.lifeOf S.bob fought) (Just 18)
               Spec.assertEqWith s "but no poison until the trigger resolves" (S.playerCounterOf PlayerCounterKind.Poison S.bob fought) 0
-        -- CR 613.1f / 613 layer 6: the ability is derived from the POST-LAYER
-        -- keywords, so Humility's LoseAllAbilities (a later timestamp, so it
-        -- applies after the Aura's grant) takes it away with no arm of its own.
-        -- The falsifier is a mint that reads the PRINTED keywords or the Aura's
-        -- own static ability instead of the projection.
-        Spec.it s "CR 613 Humility strips poisonous along with everything else" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          initiation <- S.printingOf s registry "Snake Cult Initiation"
-          humility <- S.printingOf s registry "Humility"
-          case board piker initiation 1 [] of
-            Nothing -> Spec.assertFailure s "fixture should have an attacker"
-            Just (gs0, attacker, _) -> do
-              let gs = S.withHumility humility gs0
-              Spec.assertBool s (not (Projection.hasKeyword (Keyword.Type.Poisonous 3) attacker gs)) "the keyword is gone"
-              let after = S.runCombat S.aggressiveAnswer gs
-              Spec.assertEqWith s "so bob takes no poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 0
-              Spec.assertEqWith s "only the 1/1's one damage" (S.lifeOf S.bob after) (Just 19)
         -- CR 702.70a's "that player" is whoever was DEALT the damage. In a
         -- multiplayer game (CR 800.1) that is not derivable from the ability's
         -- controller, since CR 506.2a has the attacking player choose which
