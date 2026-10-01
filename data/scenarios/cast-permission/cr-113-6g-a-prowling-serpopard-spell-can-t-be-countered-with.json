@@ -1,0 +1,183 @@
+{
+  "description": "CR 113.6g a Prowling Serpopard spell can't be countered with none on the battlefield",
+  "note": "The card's first sentence, CR 113.6g's self-referential ability: a Prowling Serpopard SPELL survives bob's Cancel with no Serpopard on the battlefield, so no CR 613.11 effect can explain it. The Haskell test's card-field assertion (Counterability CantBeCountered) is what this board leaves as the only explanation. Playing the casts for real taps alice's Forests and bob's Islands, which nothing here reads.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest-1"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3"
+          },
+          {
+            "card": "Prodigal Sorcerer",
+            "label": "sorcerer",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Prowling Serpopard",
+            "label": "victim"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island-1"
+          },
+          {
+            "card": "Island",
+            "label": "island-2"
+          },
+          {
+            "card": "Island",
+            "label": "island-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Cancel",
+            "label": "cancel"
+          },
+          {
+            "card": "Stifle",
+            "label": "stifle"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@victim",
+          "mana": [
+            "@forest-1",
+            "@forest-2",
+            "@forest-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Stack",
+          "card": "Prowling Serpopard",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Stack",
+          "card": "Cancel",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Prowling Serpopard",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Cancel",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Prowling Serpopard",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "@cancel",
+          "targets": [
+            "Prowling Serpopard"
+          ],
+          "mana": [
+            "@island-1",
+            "@island-2",
+            "@island-3"
+          ]
+        }
+      }
+    }
+  ]
+}

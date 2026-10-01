@@ -1,0 +1,43 @@
+{
+  "description": "CR 113.8 the ability's controller, not the stationing permanent's new one, is asked for the grant",
+  "note": "Tapestry Warden's ruling says \"a station ability you control\": alice stations Lumen-Class Frigate by tapping Wall of Stone, and bob takes the Frigate with Word of Seizing in response. CR 113.8 keeps the ability alice's, so it is her Warden that answers as it resolves, and it loads the Wall's toughness, 8, not its power. The Warden is placed tapped so the Wall is the only creature the station cost can tap and no tap choice is asked; tapped or not, its static ability applies. Played rather than placed: bob's steal is a real Word of Seizing where the Haskell fixture changed control by hand.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Lumen-Class Frigate", "label": "frigate" },
+          { "card": "Tapestry Warden", "label": "warden", "tapped": true, "ready": true },
+          { "card": "Wall of Stone", "label": "wall", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" },
+          { "card": "Mountain", "label": "mountain-4" },
+          { "card": "Mountain", "label": "mountain-5" }
+        ],
+        "hand": [{ "card": "Word of Seizing", "label": "word" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@frigate" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@wall", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@word", "targets": ["@frigate"], "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Lumen-Class Frigate", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Lumen-Class Frigate", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@frigate", "kind": { "type": "Named", "value": "charge" }, "count": 8 } } }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "description": "CR 608.2b a fizzled spell applies none of its effects",
+  "note": "alice's Lightning Bolt at bob's Goblin Piker, and bob kills the Piker in response with his own Bolt, so alice's Bolt finds its only target illegal and is removed from the stack unresolved: it deals no damage, and no life total moves on alice's side. Played rather than placed: the Piker dies to a real Bolt where the Haskell fixture marked lethal damage by hand.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Mountain", "label": "mountain-a" }],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt-a" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Mountain", "label": "mountain-b" }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt-b" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt-a", "targets": ["@piker"], "mana": ["@mountain-a"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bolt-b", "targets": ["@piker"], "mana": ["@mountain-b"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Lightning Bolt", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

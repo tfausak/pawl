@@ -1,0 +1,45 @@
+{
+  "description": "CR 702.29d cycling a card fires the discard trigger exactly once",
+  "note": "CR 702.29d: a cycled card triggers a discard trigger only once. Barkhide Mauler's whole text is Cycling {2}, so nothing else on it can add a trigger. The Haskell test counted the stack (the draw plus one Megrim trigger); here the first pass resolves the trigger above the draw (2 damage, library untouched), the second resolves the draw, and alice ends at 18, not 16.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "f1" },
+          { "card": "Forest", "label": "f2" }
+        ],
+        "hand": [
+          { "card": "Barkhide Mauler", "label": "mauler" }
+        ],
+        "library": [
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Megrim", "label": "megrim" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@mauler", "mana": ["@f1", "@f2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Barkhide Mauler", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 20}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 18}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 18}}}
+  ],
+  "final": [
+    {"Life": {"player": "alice", "life": 18}},
+    {"Life": {"player": "bob", "life": 20}}
+  ]
+}

@@ -1,5 +1,6 @@
 module Pawl.Types.CopyTargets where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- | Where a copy put onto the stack by Pawl.Types.Effect's CopyStackObject arm
@@ -16,33 +17,12 @@ data CopyTargets
     Copied
   | -- | CR 707.10c: "you may choose new targets for the copy" (Twincast).
     ChosenByController
-  | -- | CR 707.10d: one copy per object this ref names that the original could
-    -- target, every one of that copy's targets being that object (Zada, Hedron
-    -- Grinder's "copy that spell for each other creature you control that the
-    -- spell could target").
-    --
-    -- The ref names the card's own description of the candidates ("each other
-    -- creature you control"); rule 707.10d's "could target" narrowing is the
-    -- executor's and is not written here.
-    --
-    -- Not implemented: CR 707.10d's "each PLAYER ... it could target", which
-    -- Radiate needs and an ObjectRef cannot name (#3140).
-    ForEach ObjectRef.ObjectRef
-  | -- | CR 707.10e: ONE copy, whose every target is the object this ref names
-    -- (Ivy, Gleeful Spellthief's "you may copy that spell. The copy targets
-    -- Ivy").
-    --
-    -- The arm above's shape with the count fixed at one rather than at the
-    -- candidate set's size, and rule 707.10e states the same test rule 707.10d
-    -- does -- "if that player or object isn't a legal target for each instance of
-    -- the word 'target', the copy isn't created" -- so the two share an
-    -- executor.
-    --
-    -- A ref naming SEVERAL objects names none: the rule specifies "a new target",
-    -- singular, and no printing states a set here.
-    --
-    -- Not implemented: a PLAYER as the new target, which Zevlor, Elturel Exile
-    -- needs and an ObjectRef cannot name (#3140).
+  | -- | CR 707.10d: one copy per player or object these refs name that the
+    -- original could target, other than what it already targets (Zada, Hedron
+    -- Grinder; Radiate).
+    ForEach (NonEmpty.NonEmpty ObjectRef.ObjectRef)
+  | -- | CR 707.10e: ONE copy, whose every target is the one player or object
+    -- this ref names (Ivy, Gleeful Spellthief).
     Stated ObjectRef.ObjectRef
   deriving (Eq, Ord, Show)
 

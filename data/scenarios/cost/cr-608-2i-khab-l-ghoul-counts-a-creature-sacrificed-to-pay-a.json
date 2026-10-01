@@ -1,0 +1,30 @@
+{
+  "description": "CR 608.2i Khabál Ghoul counts a creature sacrificed to pay a cost",
+  "note": "Village Rites sacrifices a creature as an additional cost. The payment has to go through the sacrifice funnel for the turn history to see it, and a direct zone change would not be seen. Khabál Ghoul counts the creatures that died this turn at the end step, so its one +1/+1 counter is the Piker sacrificed to pay the cost. The Ghoul is bob's, not alice's as in the Haskell test, so the Piker is the only creature alice could sacrifice and nobody is asked to choose. Rites is cast and resolves in the main phase rather than sitting on the stack into the end step, and alice's library holds the two cards it draws.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Village Rites", "label": "rites" }],
+        "library": [{ "card": "Goblin Piker" }, { "card": "Goblin Piker" }, { "card": "Goblin Piker" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Khabál Ghoul", "label": "ghoul" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@rites", "mana": ["@swamp"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@ghoul", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Counters": { "object": "@ghoul", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}

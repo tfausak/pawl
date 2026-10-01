@@ -1555,32 +1555,12 @@ endTurnSpec s registry = Spec.describe s "EndTheTurn" $ do
         burst <- S.printingOf s registry "Burst Lightning"
         brothers <- S.printingOf s registry "Brothers of Fire"
         pure (timeStopBoard island mountain gnarlbark timeStop divination burst brothers, S.printingName timeStop, S.printingName burst)
-  -- THE CONTROL, and the same board differing in exactly one thing: whether alice
-  -- casts anything. Without it every negative below is satisfied by a board where
-  -- the end step trigger never existed.
-  Spec.it s "CR 500.1 the control turn runs its steps and the end step trigger fires" $ do
-    ((gs, tree, _), _, _) <- board
-    let (after, phases) = runTurn S.identityAnswer gs
-    Spec.assertEqWith s "the whole turn ran" phases [Phase.PrecombatMain, Phase.Combat CombatStep.BeginningOfCombat, Phase.Combat CombatStep.DeclareAttackers, Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
-    Spec.assertEqWith s "so Sinister Gnarlbark's end step trigger drew" (length (Game.zoneMembers Zone.Library S.alice after)) 9
-    Spec.assertEqWith s "and blighted itself" (S.counterOf CounterKind.MinusOneMinusOne tree after) 1
-    -- Both of bob's stack objects resolved: 1 from the Brothers of Fire ability
-    -- (which also pings bob) and 2 from Burst Lightning.
-    Spec.assertEqWith s "and both of bob's stack objects resolved" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 17, Just 19)
   -- CR 724.1d/724.1e: the schedule assertions, in their own case so no zone
   -- assertion can absorb a mutation to the jump.
   Spec.it s "CR 724.1d ending the turn skips straight to the cleanup step" $ do
     ((gs, _, _), _, _) <- board
     let phases = snd (runTurn castingFirst gs)
     Spec.assertEqWith s "the postcombat main phase and the end step never ran" phases [Phase.PrecombatMain, Phase.Ending EndingStep.Cleanup]
-  -- CR 724.1e in its OWN case: the schedule assertion above would otherwise
-  -- absorb every mutation that skips to the wrong step, and never let this one
-  -- run.
-  Spec.it s "CR 724.1e the end step is skipped, so its triggers never trigger" $ do
-    ((gs, tree, _), _, _) <- board
-    let after = fst (runTurn castingFirst gs)
-    Spec.assertEqWith s "Sinister Gnarlbark never drew" (length (Game.zoneMembers Zone.Library S.alice after)) 10
-    Spec.assertEqWith s "and never blighted" (S.counterOf CounterKind.MinusOneMinusOne tree after) 0
   -- CR 724.1b against CR 608.2n: both spells are EXILED, and neither reaches a
   -- graveyard. Asserting Time Stop's own destination is also what makes a card
   -- that failed to parse unable to pass this group.

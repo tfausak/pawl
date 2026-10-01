@@ -1,0 +1,202 @@
+{
+  "description": "CR 118.12a declining the multiplied cost counters the spell",
+  "note": "The {3} case's board with bob's answer the only difference. bob could have paid {3} out of four Islands, so the refusal is his rather than CR 118.3's, and a second offer would be an unscheduled prompt. The Piker is countered into bob's graveyard beside the card already there. bob casts the Piker for real off two Mountains, so his Islands are the ones the check reads.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "alice-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "alice-island-2"
+          },
+          {
+            "card": "Island",
+            "label": "alice-island-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rakshasa's Disdain",
+            "label": "disdain"
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-2"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-3"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "@piker",
+          "mana": [
+            "@mountain-1",
+            "@mountain-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@disdain",
+          "targets": [
+            "Goblin Piker#5"
+          ],
+          "mana": [
+            "@alice-island-1",
+            "@alice-island-2",
+            "@alice-island-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseToPay": {
+          "decision": {
+            "type": "Declines"
+          }
+        }
+      },
+      "source": "Rakshasa's Disdain"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Goblin Piker",
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "@bob-island-1",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "@bob-island-2",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "@bob-island-3",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "@bob-island-4",
+          "tapped": false
+        }
+      }
+    }
+  ]
+}

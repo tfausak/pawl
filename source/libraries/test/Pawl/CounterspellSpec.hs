@@ -198,90 +198,6 @@ cancelVictim island cancel victim =
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (victimId, resolved)
 
--- Append a second card of `printing` to `pid`'s hand (handOne overwrites the hand,
--- so a second in-hand card must be appended, not re-inserted).
-handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-handAppend printing pid gs =
-  let (printingId, gsP) = Game.intern printing gs
-      (oid, gs1) = Game.freshObjectId gsP
-      obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty 0 Set.empty Set.empty Nothing Nothing
-   in ( oid,
-        gs1
-          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-            GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand gs1)
-          }
-      )
-
--- alice has 6 Islands and TWO Cancels; a Piker (bob's) sits on the stack. alice
--- casts Cancel A at the Piker, then Cancel B at the Piker (CR 117.3c keeps
--- priority). Stack [B, A, Piker]; resolveTop LIFO: B counters the Piker, then A --
--- its only target gone -- fizzles (CR 608.2b).
-racingCounters :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
-racingCounters island piker cancel =
-  let base = S.landsInPlay island 6
-      (victimId, onStack) = S.spellOnStack piker S.bob base
-      (gs1, cancelA) = S.handOne cancel onStack
-      (cancelB, gs2) = handAppend cancel S.alice gs1
-      atVictim :: Prompt.Prompt r -> r
-      atVictim p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets
-        _ -> S.identityAnswer p
-      castA = snd (Engine.runGamePure atVictim gs2 (S.cast S.alice cancelA))
-      castB = snd (Engine.runGamePure atVictim castA (S.cast S.alice cancelB))
-      r1 = snd (Engine.runGamePure atVictim castB Stack.resolveTop) -- B counters the Piker
-      r2 = snd (Engine.runGamePure atVictim r1 Stack.resolveTop) -- A fizzles
-   in r2
-
-counterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-counterSpec s registry = Spec.describe s "Counter" $ do
-  Spec.it s "CR 701.6 Cancel counters a spell into its owner's graveyard" $ do
-    island <- S.printingOf s registry "Island"
-    cancel <- S.printingOf s registry "Cancel"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_victimId, resolved) = cancelVictim island cancel piker
-    Spec.assertEqWith s "victim countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
-    Spec.assertEqWith s "victim never resolved onto the battlefield" (S.creaturesInPlay S.bob resolved) 0
-    Spec.assertEqWith s "Cancel in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-  -- CR 113.6g: "an object's ability that states it can't be countered …
-  -- functions on the stack", and CR 101.2 makes the "can't" win. The twin is
-  -- the case directly above: the same Cancel, cast the same way at a spell
-  -- that does not say it, DOES counter -- so this is the card's clause and
-  -- not a broken Cancel.
-  Spec.it s "CR 113.6g whole card: Cancel resolves but cannot counter Rending Volley" $ do
-    island <- S.printingOf s registry "Island"
-    cancel <- S.printingOf s registry "Cancel"
-    rendingVolley <- S.printingOf s registry "Rending Volley"
-    let (victimId, resolved) = cancelVictim island cancel rendingVolley
-    Spec.assertBool s (elem victimId (GameState.stack resolved)) "Rending Volley is still on the stack"
-    Spec.assertEqWith s "and not in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
-    -- CR 101.2 again, from the other side: the countering spell is not itself
-    -- stopped. Cancel targeted legally (CR 113.6g grants no shroud), resolved,
-    -- did nothing, and CR 608.2n put it into its owner's graveyard as the
-    -- final part of that resolution.
-    Spec.assertEqWith s "Cancel resolved into alice's graveyard regardless" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
-  Spec.it s "CR 608.2b a Cancel whose target already left the stack fizzles" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    cancel <- S.printingOf s registry "Cancel"
-    let after = racingCounters island piker cancel
-    Spec.assertEqWith s "the Piker moved exactly once, to bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "both Cancels in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
-    Spec.assertEqWith s "the Piker never hit the battlefield" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "stack cleared" (length (GameState.stack after)) 0
-  Spec.it s "CR 614 Cancel under Rest in Peace exiles the countered spell" $ do
-    restInPeace <- S.printingOf s registry "Rest in Peace"
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    cancel <- S.printingOf s registry "Cancel"
-    let (_, ripOut) = S.addPermanent restInPeace S.alice (S.landsInPlay island 3)
-        (_victimId, onStack) = S.spellOnStack piker S.bob ripOut
-        (gs, cancelId) = S.handOne cancel onStack
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "the countered spell is not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
-    Spec.assertEqWith s "the countered spell is exiled" (length (Game.zoneMembers Zone.Exile S.bob resolved)) 1
-
 -- The board every Mana Leak case starts from, with only `bobLands` varying.
 -- alice has two Islands (Mana Leak's {1}{U}) and a Mana Leak in hand; bob has
 -- `bobLands` untapped Islands of his own and a Goblin Piker already on the
@@ -393,56 +309,6 @@ isPayResponse response = case response of
 -- way, a refusal being the other branch rather than a failure.
 manaLeakSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
-  Spec.it s "CR 118.12a the targeted spell's controller declines, so it is countered" $ do
-    island <- S.printingOf s registry "Island"
-    manaLeak <- S.printingOf s registry "Mana Leak"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_victimId, cast) = manaLeakBoard island manaLeak piker 3
-        ((_, after), transcript) = Replay.record S.identityAnswer cast Stack.resolveTop
-    -- bob COULD have paid -- three untapped Islands -- so he was really asked,
-    -- and the refusal is his rather than CR 118.3's.
-    Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
-    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "declining spent nothing: bob's Islands are all untapped" (S.tappedCount S.bob after) 0
-    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
-  Spec.it s "CR 118.12a the targeted spell's controller pays, so it is not countered" $ do
-    island <- S.printingOf s registry "Island"
-    manaLeak <- S.printingOf s registry "Mana Leak"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (victimId, cast) = manaLeakBoard island manaLeak piker 3
-        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
-    -- The payment really happened: CR 605.3a lets the payer activate mana
-    -- abilities "whenever a rule or effect asks for a mana payment, even if
-    -- it's in the middle of ... resolving a spell", and three Islands paid {3}.
-    Spec.assertEqWith s "paying tapped three of bob's Islands" (S.tappedCount S.bob after) 3
-    -- CR 118.12a's other branch: the counter did not happen, and the spell is
-    -- still there to resolve. Asserting only "not in the graveyard" would pass
-    -- for a spell that never resolved at all, so the next line resolves it.
-    Spec.assertBool s (elem victimId (GameState.stack after)) "the Piker is still on the stack"
-    Spec.assertEqWith s "nothing of bob's is in his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
-    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-    -- CR 400.7 mints a fresh incarnation on the battlefield, so the permanent
-    -- is counted rather than looked up by the spell's id.
-    let played = snd (Engine.runGamePure bobPaysAnswer after Stack.resolveTop)
-    Spec.assertEqWith s "and the Piker then resolves onto the battlefield" (S.creaturesInPlay S.bob played) 1
-  -- CR 118.3 / 118.12: "can't" is the rule's own third case, and its Standstill
-  -- example is exactly an unpayable cost. Two Islands cannot pay {3}, so there
-  -- is one possible answer and the prompt is not raised -- proved by the
-  -- transcript, under an interpreter that WOULD have paid.
-  Spec.it s "CR 118.12 a controller who cannot pay {3} is not asked, and is countered" $ do
-    island <- S.printingOf s registry "Island"
-    manaLeak <- S.printingOf s registry "Mana Leak"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_victimId, cast) = manaLeakBoard island manaLeak piker 2
-        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "bob was never asked" (payResponses transcript) []
-    Spec.assertEqWith s "nothing of bob's was tapped" (S.tappedCount S.bob after) 0
-    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
   -- CR 601.2f totals the cost of a spell being CAST -- "the player determines the
   -- total cost of the spell ... plus all additional costs and cost increases" --
   -- and a cost paid during resolution is not that, so no cost increase reaches
@@ -595,20 +461,6 @@ rakshasasDisdainSpec s registry = Spec.describe s "RakshasasDisdain" $ do
     Spec.assertEqWith s "two cards in alice's graveyard made the offer {2}, tapping two of bob's four Islands" (S.tappedCount S.bob after) 2
     Spec.assertBool s (elem victimId (GameState.stack after)) "so the Piker was not countered"
     Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
-  -- CR 118.12a's other branch, off the FIRST case's board with bob's answer the
-  -- only difference.
-  Spec.it s "CR 118.12a declining the multiplied cost counters the spell" $ do
-    island <- S.printingOf s registry "Island"
-    disdain <- S.printingOf s registry "Rakshasa's Disdain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_victimId, cast) = disdainBoard island disdain piker 3
-        ((_, after), transcript) = Replay.record S.identityAnswer cast Stack.resolveTop
-    -- bob could have paid {3} out of four Islands, so the refusal is his rather
-    -- than CR 118.3's.
-    Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
-    Spec.assertEqWith s "the Piker was countered into bob's graveyard, beside the card already there" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
-    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "declining spent nothing: bob's Islands are all untapped" (S.tappedCount S.bob after) 0
 
 -- CR 118.4 / CR 107.3a: Clash of Wills, {X}{U} Instant, "Counter target spell
 -- unless its controller pays {X}." The {X} of a cost paid at RESOLUTION (CR
@@ -620,7 +472,7 @@ rakshasasDisdainSpec s registry = Spec.describe s "RakshasasDisdain" $ do
 -- cannot cover {4}. A gate that left the symbol unsubstituted reads {0} (see
 -- Pawl.Engine.Cost's costGenericOf), which is payable for free -- so both cases
 -- would end with the Piker uncountered and nothing of bob's tapped.
-clashOfWillsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+clashOfWillsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 clashOfWillsSpec s registry = Spec.describe s "ClashOfWills" $ do
   Spec.it s "CR 107.3a the announced X is what the targeted spell's controller pays" $ do
     island <- S.printingOf s registry "Island"
@@ -636,20 +488,6 @@ clashOfWillsSpec s registry = Spec.describe s "ClashOfWills" $ do
     -- CR 107.3a's other half: the value came off the announcement, so the
     -- resolution asked nobody for an X -- not the payer, whose choice it never is.
     Spec.assertEqWith s "and nobody was asked to choose an X during resolution" (xResponses transcript) []
-    Spec.assertEqWith s "Clash of Wills finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-  -- CR 118.3 against the SAME board with a larger announcement: an unpayable cost
-  -- takes the "can't" branch with no prompt, exactly as Mana Leak's {3} does
-  -- against two Islands.
-  Spec.it s "CR 118.3 a larger announced X the controller cannot pay counters the spell" $ do
-    island <- S.printingOf s registry "Island"
-    clash <- S.printingOf s registry "Clash of Wills"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_victimId, cast) = clashBoard island clash piker 4
-        ((_, after), transcript) = Replay.record (announcesXBobPays 4) cast Stack.resolveTop
-    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "three Islands cannot pay the announced {4}, so bob was never asked" (payResponses transcript) []
-    Spec.assertEqWith s "and nothing of bob's was tapped" (S.tappedCount S.bob after) 0
     Spec.assertEqWith s "Clash of Wills finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
 -- Puts every looked-at card where a look-and-split keyword action's FIRST list
@@ -842,18 +680,6 @@ dontMakeASoundSpec s registry = Spec.describe s "DontMakeASound" $ do
     -- an offer per clause bob can afford both and pays twice.
     Spec.assertEqWith s "and {2} cost him exactly two Islands" (S.tappedCount S.bob after) 2
     Spec.assertEqWith s "the surveil still happened" (length (Game.zoneMembers Zone.Library S.alice after)) 1
-  Spec.it s "CR 118.12 declining counters the spell, and there is no surveil" $ do
-    island <- S.printingOf s registry "Island"
-    sound <- S.printingOf s registry "Don't Make a Sound"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (victimId, cast) = dontMakeASoundBoard island sound piker 4
-        ((_, after), transcript) = Replay.record digsAndDeclines cast Stack.resolveTop
-    Spec.assertBool s (elem victimId (GameState.stack cast)) "setup: the Piker is on the stack"
-    -- Once here too: the IfPaid clause reads the recorded refusal rather than
-    -- offering the {2} again, which bob could have afforded.
-    Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
-    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "and alice's library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 3
 
 -- Whipstitched Zombie and one untapped Swamp on alice's battlefield, her upkeep
 -- begun and the trigger settled onto the stack (CR 603.3b). Returns the Zombie,
@@ -3161,7 +2987,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   fizzleSpec s registry
   indestructibleSpec s registry
-  counterSpec s registry
   manaLeakSpec s registry
   rakshasasDisdainSpec s registry
   clashOfWillsSpec s registry

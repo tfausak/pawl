@@ -1,0 +1,50 @@
+{
+  "description": "CR 120.3c whole card: that much is the damage the event carried",
+  "note": "Questing Beast deals that much damage to target planeswalker that player controls. Three seats, bob and carol each with a Karn Liberated on 6 loyalty, so the target slot is narrowed to carol's. A -1/-1 counter makes the Beast a 3/3 when it connects, and four Battlegrowths cast in response leave it a 7/7 when the trigger resolves (CR 704.5q annihilates one pair), so the loyalty lost names the event's 3 rather than the printed 4 or the live 7. The Haskell test's four hand-added +1/+1 counters are played as four real Battlegrowths, which taps alice's Forests.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Questing Beast", "label": "beast", "ready": true, "counters": [{ "key": { "type": "MinusOneMinusOne" }, "value": 1 }] },
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Forest", "label": "forest-4" }
+        ],
+        "hand": [
+          { "card": "Battlegrowth", "label": "growth-1" },
+          { "card": "Battlegrowth", "label": "growth-2" },
+          { "card": "Battlegrowth", "label": "growth-3" },
+          { "card": "Battlegrowth", "label": "growth-4" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Karn Liberated", "label": "bob-karn", "counters": [{ "key": { "type": "Loyalty" }, "value": 6 }] }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Karn Liberated", "label": "carol-karn", "counters": [{ "key": { "type": "Loyalty" }, "value": 6 }] }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "@beast", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Counters": { "object": "@bob-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Counters": { "object": "@carol-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@beast"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@beast", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["@carol-karn"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-1", "targets": ["@beast"], "mana": ["@forest-1", null] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-2", "targets": ["@beast"], "mana": ["@forest-2", null] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-3", "targets": ["@beast"], "mana": ["@forest-3", null] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-4", "targets": ["@beast"], "mana": ["@forest-4"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "@carol-karn", "kind": { "type": "Loyalty" }, "count": 3 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "@bob-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 17 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "@beast", "power": 7, "toughness": 7 } } }
+  ]
+}

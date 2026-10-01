@@ -1,0 +1,43 @@
+{
+  "description": "CR 113.6 Cancel legally targets the Blurred Mongoose spell, and CR 113.6g stops it countering",
+  "note": "Shroud is printed on a creature card, so it functions only on the battlefield (CR 113.6) and the Blurred Mongoose spell has none: alice's Cancel targets it legally, which the cast standing and Cancel reaching her graveyard show. CR 113.6g makes \"can't be countered\" function on the stack, so the Mongoose is still unanswered once Cancel has resolved (not in bob's graveyard) and then resolves onto his battlefield. bob is active so his creature spell is castable.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Island", "label": "island1"},
+          {"card": "Island", "label": "island2"},
+          {"card": "Island", "label": "island3"}
+        ],
+        "hand": [
+          {"card": "Cancel", "label": "cancel"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Forest", "label": "forest1"},
+          {"card": "Forest", "label": "forest2"}
+        ],
+        "hand": [
+          {"card": "Blurred Mongoose", "label": "mongoose"}
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@mongoose", "mana": ["@forest1", "@forest2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@cancel", "targets": ["Blurred Mongoose"], "mana": ["@island1", "@island2", "@island3"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Cancel", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Blurred Mongoose", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "check": {"Count": {"player": "bob", "zone": "Battlefield", "card": "Blurred Mongoose", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "check": {"Count": {"player": "bob", "zone": "Battlefield", "card": "Blurred Mongoose", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Blurred Mongoose", "count": 0}}}
+  ]
+}

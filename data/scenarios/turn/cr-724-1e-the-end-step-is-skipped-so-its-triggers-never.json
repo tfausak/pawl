@@ -1,0 +1,74 @@
+{
+  "description": "CR 724.1e the end step is skipped, so its triggers never trigger",
+  "note": "alice casts Time Stop above bob's Burst Lightning and Brothers of Fire ability. Ending the turn skips straight to cleanup (CR 724.1d), so the end step never begins and Sinister Gnarlbark's \"at the beginning of your end step\" never triggers: by bob's upkeep alice has drawn nothing and the Gnarlbark carries no -1/-1 counter. The control is the CR 500.1 file. The Haskell original put bob's spell and ability on the stack by hand; here bob plays them.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Sinister Gnarlbark", "label": "gnarlbark"},
+          {"card": "Island", "label": "island1"},
+          {"card": "Island", "label": "island2"},
+          {"card": "Island", "label": "island3"},
+          {"card": "Island", "label": "island4"},
+          {"card": "Island", "label": "island5"},
+          {"card": "Island", "label": "island6"},
+          {"card": "Island", "label": "island7"},
+          {"card": "Island", "label": "island8"},
+          {"card": "Island", "label": "island9"}
+        ],
+        "hand": [
+          {"card": "Time Stop", "label": "time-stop"},
+          {"card": "Divination", "label": "divination"}
+        ],
+        "library": [
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Mountain", "label": "mountain1"},
+          {"card": "Mountain", "label": "mountain2"},
+          {"card": "Mountain", "label": "mountain3"},
+          {"card": "Mountain", "label": "mountain4"},
+          {"card": "Brothers of Fire", "label": "brothers"}
+        ],
+        "hand": [
+          {"card": "Burst Lightning", "label": "burst"}
+        ],
+        "library": [
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@burst", "targets": ["@alice"], "mana": ["@mountain1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Activate": {"object": "@brothers", "targets": ["@alice"], "mana": ["@mountain2", "@mountain3", "@mountain4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@time-stop", "mana": ["@island1", "@island2", "@island3", "@island4", "@island5", "@island6", null]}}},
+    {"turn": 2, "step": "Upkeep", "player": "bob", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 10}}},
+    {"turn": 2, "step": "Upkeep", "player": "bob", "check": {"Counters": {"object": "@gnarlbark", "kind": {"type": "MinusOneMinusOne"}, "count": 0}}}
+  ]
+}

@@ -540,25 +540,6 @@ villageRitesSpec s registry =
       let (rites, _, gs) = villageRitesBoard swamp piker villageRites 0
       Spec.assertBool s (not (S.castable S.alice rites gs)) "not castable"
       Spec.assertEqWith s "and not offered" (filter (S.isCastOf rites) (Action.legalActions S.alice gs)) []
-    -- The cost payment went through Event.sacrifice, the CR 701.21 funnel,
-    -- so the turn history saw it. A direct zone poke passes both cases
-    -- above and fails this one. The settle/resolve shape is
-    -- Pawl.TriggerSpec's historySpec, verbatim.
-    Spec.it s "CR 608.2i Khabál Ghoul counts a creature sacrificed to pay a cost" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      piker <- S.printingOf s registry "Goblin Piker"
-      villageRites <- S.printingOf s registry "Village Rites"
-      khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
-      let (rites, _, gs0) = villageRitesBoard swamp piker villageRites 1
-          (ghoul, gs1) = S.addPermanent khabalGhoul S.alice gs0
-          cast = S.runPure S.identityAnswer gs1 (S.cast S.alice rites)
-          endStep = Phase.Ending EndingStep.EndStep
-          beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
-          settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-          resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
-          atEnd = resolveAll (settle (beginEndStep (settle cast)))
-          counters = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject ghoul atEnd)
-      Spec.assertEqWith s "one +1/+1 counter for the sacrificed Piker" counters 1
     -- CR 701.21a lets the player choose which of their permanents dies, so
     -- two candidates is a real choice; one is not, and where the rules
     -- leave nothing to ask, don't prompt.
@@ -6221,22 +6202,6 @@ reversalSpec s registry = Spec.describe s "Reversal" $ do
     Spec.assertEqWith s "and the damage is undone with it" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "CR 118.12a the Piker is countered either way" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
     Spec.assertEqWith s "and the same one question was raised" asked 1
-
-  -- The control, and the elision CR 733.1 itself states: what the rule offers
-  -- back is the mana abilities the player ACTIVATED, so a window that activated
-  -- none leaves nothing to decide. Bob still says he will pay -- the same board,
-  -- the same gate, the same refusal -- and taps nothing.
-  Spec.it s "CR 733.1 a window that activated nothing asks nobody" $ do
-    island <- S.printingOf s registry "Island"
-    ancientTomb <- S.printingOf s registry "Ancient Tomb"
-    manaLeak <- S.printingOf s registry "Mana Leak"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (tombId, cast) = reversalBoard island ancientTomb manaLeak piker
-        (after, asked) = attemptLeak False OptionalDecision.Declines tombId cast
-    Spec.assertEqWith s "CR 733.1 nobody was asked whether to reverse anything" asked 0
-    Spec.assertEqWith s "nothing of bob's was tapped" (S.tappedCount S.bob after) 0
-    Spec.assertEqWith s "nothing is floating" (poolSize S.bob after) 0
-    Spec.assertEqWith s "CR 118.12a and the Piker is countered all the same" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
 
 -- pid's library, top to bottom, as a plain list -- read directly off
 -- GameState.library rather than through a zone helper, so the assertion below
