@@ -1,0 +1,149 @@
+{
+  "description": "CR 601.2i casting an infect creature spell poisons the TARGETED player",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Hand of the Praetors",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Glistener Elf",
+            "label": "glistener-elf",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$glistener-elf",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$forest",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Glistener Elf",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Glistener Elf",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Glistener Elf",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Glistener Elf",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Glistener Elf",
+        "power": 2,
+        "toughness": 2
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "bob",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 1
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "alice",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 0
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "carol",
+        "kind": {
+          "type": "Poison"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "description": "CR 302.6 a creature the declaring player has not controlled since the turn began survives",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Total War",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Augury Raven",
+            "label": "augury-raven",
+            "ready": true
+          },
+          {
+            "card": "Bird Maiden",
+            "ready": true
+          },
+          {
+            "card": "Bird Maiden",
+            "label": "unsettled-maiden"
+          },
+          {
+            "card": "Razorgrass Screen",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$augury-raven"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$augury-raven": "$alice"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Bird Maiden",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Bird Maiden",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$augury-raven",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Controller",
+        "object": "$unsettled-maiden",
+        "is": "bob"
+      }
+    }
+  ]
+}

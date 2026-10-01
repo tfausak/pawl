@@ -1,0 +1,146 @@
+{
+  "description": "CR 608.2c the control change lands before the destination is chosen, so 'creature you control' means alice's",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Aura Graft",
+            "label": "aura-graft",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-2",
+            "ready": true
+          },
+          {
+            "card": "War Mammoth",
+            "ready": true
+          },
+          {
+            "card": "Setessan Training",
+            "label": "setessan-training",
+            "ready": true,
+            "attached": "goblin-piker-2"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$aura-graft",
+          "targets": [
+            "$setessan-training"
+          ],
+          "mana": [
+            "$island",
+            "$island-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Setessan Training",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Aura Graft",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Aura Graft",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Setessan Training",
+        "count": 0
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker-2",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 3,
+        "toughness": 1
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "Setessan Training",
+        "is": "$goblin-piker"
+      }
+    },
+    {
+      "Keywords": {
+        "object": "$goblin-piker",
+        "keyword": {
+          "type": "Trample"
+        },
+        "count": 1
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "War Mammoth",
+        "power": 3,
+        "toughness": 3
+      }
+    }
+  ]
+}
