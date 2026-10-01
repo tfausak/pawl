@@ -77,6 +77,7 @@ import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.MonarchIs as MonarchIs
 import qualified Pawl.Types.Move as Move
+import qualified Pawl.Types.NamesAre as NamesAre
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Paying as Paying
@@ -520,6 +521,14 @@ answerTopPrompt decider asked =
           onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
             Move.ChooseTypeSwap swap -> Just (pure (TypeSwap.from swap, TypeSwap.to swap))
             _ -> Nothing
+        -- CR 707.5 / 614.12a: keyed by the object entering as the copy; an
+        -- unoffered permanent fails rather than reaching the engine.
+        Prompt.Type.ChooseCopyTarget who _ entering candidates -> do
+          key <- whenOf gs (Decider.unwrap who)
+          offers <- describeAll gs candidates
+          onEntry unscheduled key kind offers (takeForSource gs key entering) $ \verb -> case verb of
+            Move.ChooseCopyTarget chosen -> Just (traverse (resolveOffered gs key kind candidates) chosen)
+            _ -> Nothing
         -- CR 614.1a's optional redirect, a "may" keyed by the redirect's own
         -- source like ChooseOptional above.
         Prompt.Type.ChooseRedirect who _ source _ -> do
@@ -820,6 +829,11 @@ observe gs check = case check of
     oid <- resolveObject ref gs
     let actual = Projection.subtypesOf oid gs
     pure (if actual == subtypes then Nothing else Just (Text.pack (show (Set.toList actual))))
+  -- The projected names (CR 707.2's copiable values), never the printed card's.
+  Check.Names (NamesAre.MkNamesAre ref names) -> do
+    oid <- resolveObject ref gs
+    let actual = Projection.namesOf oid gs
+    pure (if actual == names then Nothing else Just (Text.pack (show (fmap CardName.unwrap (Set.toList actual)))))
   -- The projected keywords (CR 613.1f), counted by instance.
   Check.Keywords (KeywordsAre.MkKeywordsAre ref keyword count) -> do
     oid <- resolveObject ref gs

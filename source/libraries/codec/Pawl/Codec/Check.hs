@@ -9,6 +9,7 @@ import qualified Pawl.Codec.DefendersAre as DefendersAre
 import qualified Pawl.Codec.KeywordsAre as KeywordsAre
 import qualified Pawl.Codec.LifeIs as LifeIs
 import qualified Pawl.Codec.MonarchIs as MonarchIs
+import qualified Pawl.Codec.NamesAre as NamesAre
 import qualified Pawl.Codec.PlayerCountersAre as PlayerCountersAre
 import qualified Pawl.Codec.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Codec.SubtypesAre as SubtypesAre
@@ -36,6 +37,7 @@ codec =
       Arm.payload "PowerToughness" PowerToughnessIs.codec Check.PowerToughness (\x -> case x of Check.PowerToughness y -> Just y; _ -> Nothing),
       Arm.payload "PlayerCounters" PlayerCountersAre.codec Check.PlayerCounters (\x -> case x of Check.PlayerCounters y -> Just y; _ -> Nothing),
       Arm.payload "Subtypes" SubtypesAre.codec Check.Subtypes (\x -> case x of Check.Subtypes y -> Just y; _ -> Nothing),
+      Arm.payload "Names" NamesAre.codec Check.Names (\x -> case x of Check.Names y -> Just y; _ -> Nothing),
       Arm.payload "Keywords" KeywordsAre.codec Check.Keywords (\x -> case x of Check.Keywords y -> Just y; _ -> Nothing)
     ]
 
@@ -54,4 +56,5 @@ tagOf x = case x of
   Check.PowerToughness {} -> "PowerToughness"
   Check.PlayerCounters {} -> "PlayerCounters"
   Check.Subtypes {} -> "Subtypes"
+  Check.Names {} -> "Names"
   Check.Keywords {} -> "Keywords"
