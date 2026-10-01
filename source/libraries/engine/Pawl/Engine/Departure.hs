@@ -97,16 +97,23 @@ departTogether reason named = do
       leave why pid gs = gs {GameState.players = Map.adjust (lose why) pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)}
       -- CR 800.4a's first three clauses, in the rule's order.
       clauses pid = if continues then nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid else id
-  Monad.forM_ departing (\(why, pid) -> State.modify' (leave why pid . clauses pid))
+  -- ONE event: CR 800.4a's departure is a single instant for every player in
+  -- the set, and CR 725.4 crowns "at the same time as that player leaves", so the
+  -- crowning shares the departure's event group and CR 610.3d returns the
+  -- prisoners both free as one event. data/scenarios/simultaneous-moves'
+  -- concession board proves it.
+  Event.simultaneously $ do
+    Monad.forM_ departing (\(why, pid) -> State.modify' (leave why pid . clauses pid))
+    Monad.forM_ pids $ \pid -> do
+      Monarch.reassignOnDeparture pid
+      -- CR 726.4, the same clause one rule over and for the same reason: the
+      -- active player takes the initiative at the same time its holder leaves.
+      Initiative.reassignOnDeparture pid
+  -- CR 800.4a's fourth clause: "Then", so after the instant above.
   Monad.when continues $ do
     Monad.mapM_ remainingControlledExiled pids
     -- CR 901.10: the replacement plane, once CR 800.4a is done.
     Planechase.ownersLeft before pids
-  Monad.forM_ pids $ \pid -> do
-    Monarch.reassignOnDeparture pid
-    -- CR 726.4, the same clause one rule over and for the same reason: the
-    -- active player takes the initiative at the same time its holder leaves.
-    Initiative.reassignOnDeparture pid
 
 -- CR 800.4: a multiplayer game can continue after players leave, and CR 800.1
 -- makes "multiplayer" mean a game that BEGINS with more than two players.

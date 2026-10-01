@@ -428,12 +428,12 @@ data GameState = MkGameState
     resolvedNames :: Map.Map PlayerId.PlayerId (Set.Set CardName.CardName),
     -- | CR 725: objects exiled "until an opponent becomes the monarch", keyed
     -- by the exiled incarnation, swept by
-    -- Pawl.Engine.Monarch.returnExiledForMonarch. Not an Expiry, which cannot
+    -- Pawl.Engine.MoveDuration.returnDue. Not an Expiry, which cannot
     -- perform a zone change.
     exiledUntilMonarch :: Map.Map ObjectId.ObjectId MonarchWatch.MonarchWatch,
     -- | CR 610.3: objects moved "until this leaves the battlefield", keyed by
     -- the incarnation the move minted, swept by
-    -- Pawl.Engine.MoveDuration.returnMoved.
+    -- Pawl.Engine.MoveDuration.returnDue.
     movedUntilSourceLeaves :: Map.Map ObjectId.ObjectId ReturnWatch.ReturnWatch,
     -- | CR 702.55b: which object each haunting card haunts, keyed by the exiled
     -- incarnation; the value is never cleaned up, the haunted creature dying

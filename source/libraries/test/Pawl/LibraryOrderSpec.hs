@@ -8,6 +8,7 @@ module Pawl.LibraryOrderSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -24,6 +25,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Monarch as Monarch
+import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
@@ -92,6 +94,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotArity as SlotArity
@@ -2460,7 +2463,7 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.ExileUntilMonarch slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
-        settled = snd (Engine.runGamePure S.identityAnswer exiled Monarch.returnExiledForMonarch)
+        settled = snd (Engine.runGamePure S.identityAnswer exiled MoveDuration.returnDue)
     Spec.assertEqWith s "the watch was registered" (Map.size (GameState.exiledUntilMonarch exiled)) 1
     Spec.assertEqWith s "bob is still the monarch, unchanged" (GameState.monarch settled) (Just S.bob)
     Spec.assertEqWith s "nothing came back to the battlefield" (Set.size (GameState.battlefield settled)) 0
@@ -2487,9 +2490,9 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         -- Monarch.crown and not a write to GameState.monarch, because that is
         -- where a crowning marks the watches now -- a bare field write is not a
         -- crowning at all.
-        alicesCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.alice exiled) Monarch.returnExiledForMonarch)
+        alicesCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.alice exiled) MoveDuration.returnDue)
         -- bob deals combat damage to the monarch (CR 725.3) and takes it back.
-        bobsCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.bob alicesCrown) Monarch.returnExiledForMonarch)
+        bobsCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.bob alicesCrown) MoveDuration.returnDue)
     Spec.assertEqWith s "alice holding the crown does not discharge the watch" (Map.size (GameState.exiledUntilMonarch alicesCrown)) 1
     Spec.assertEqWith s "nor return the creature" (Set.size (GameState.battlefield alicesCrown)) 0
     Spec.assertEqWith s "bob retaking it does return the creature" (Set.size (GameState.battlefield bobsCrown)) 1
@@ -2514,9 +2517,45 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         -- CR 725.4's third sentence is the only way back to no monarch, and it
         -- crowns nobody, so this is a bare field write by construction.
-        noMonarch = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Nothing} Monarch.returnExiledForMonarch)
+        noMonarch = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Nothing} MoveDuration.returnDue)
     Spec.assertEqWith s "the watch is still armed" (Map.size (GameState.exiledUntilMonarch noMonarch)) 1
     Spec.assertEqWith s "and nothing returned" (Set.size (GameState.battlefield noMonarch)) 0
+  -- CR 610.3d across the two registers: a Banisher Priest-style source leaves,
+  -- THEN an opponent is crowned, both before one settle, so the Priest's
+  -- prisoner returns first. Driven at the sweep rather than through a game: the
+  -- one printing that does both in one resolution, Heart-Shaped Herb, is not in
+  -- the pool (gap #4583).
+  Spec.it s "CR 610.3d a prisoner whose source left before a crowning returns before the crowning's" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    warden <- S.printingOf s registry "Soul Warden"
+    let (jailed, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (held, g2) = S.addPermanent warden S.bob g1
+        (source, g3) = S.addPermanent piker S.alice g2
+        base = g3 {GameState.monarch = Just S.alice}
+        slot = SlotName.MkSlotName (Text.pack "target")
+        exile =
+          Resolve.applyEffect
+            S.noSource
+            S.noSource
+            S.alice
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature jailed)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature jailed)))
+            (Effect.ExileUntilMonarch slot)
+        banish = do
+          moved <- Event.changeZoneReturning held Zone.Exile
+          State.modify' (\g -> g {GameState.movedUntilSourceLeaves = Map.fromList [(m, ReturnWatch.MkReturnWatch source Zone.Battlefield) | m <- Foldable.toList moved]})
+        settled =
+          snd
+            ( Engine.runGamePure S.identityAnswer base $ do
+                exile
+                banish
+                Event.changeZone source Zone.Graveyard
+                State.modify' (Monarch.crown S.bob)
+                MoveDuration.returnDue
+            )
+        arrivals = fmap snd (List.sort [(Object.timestamp obj, fmap S.nameOf (Game.cardOf oid settled)) | oid <- Set.toList (GameState.battlefield settled), Just obj <- [Game.lookupObject oid settled]])
+    Spec.assertEqWith s "the Soul Warden came back before the Goblin Piker" arrivals [Just (S.printingName warden), Just (S.printingName piker)]
+    Spec.assertEqWith s "both watches are discharged" (Map.size (GameState.exiledUntilMonarch settled), Map.size (GameState.movedUntilSourceLeaves settled)) (0, 0)
 
   -- SYNTHETIC. "Synthetic Regency Swap" {1}{W} Sorcery: "Target player becomes
   -- the monarch. Then you become the monarch." Two crownings in ONE resolution,

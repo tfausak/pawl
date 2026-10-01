@@ -1,0 +1,65 @@
+{
+  "description": "CR 610.3d / 725.4 / 800.4a the monarch conceding crowns the active player as their Banisher Priest leaves, so its prisoner and their Palace Jailer's return as one event and each Soul Warden sees the other enter",
+  "note": "alice's Palace Jailer holds carol's Warden until an opponent becomes the monarch; her Banisher Priest holds bob's until it leaves. alice concedes on carol's turn: the Priest leaves the game with her and carol is crowned at the same moment. Returned apart, only the later Warden sees the earlier one, leaving bob or carol one life short. bob's Warden being back when carol next gets priority in the same step is CR 117.5's settle after a concession.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "p1" },
+          { "card": "Plains", "label": "p2" },
+          { "card": "Plains", "label": "p3" },
+          { "card": "Plains", "label": "p4" },
+          { "card": "Plains", "label": "p5" },
+          { "card": "Plains", "label": "p6" },
+          { "card": "Plains", "label": "p7" }
+        ],
+        "hand": [
+          { "card": "Palace Jailer", "label": "jailer" },
+          { "card": "Banisher Priest", "label": "priest" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Soul Warden", "label": "bob warden" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Soul Warden", "label": "carol warden" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$jailer", "mana": ["$p1", "$p2", "$p3", "$p4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["Palace Jailer", "Palace Jailer"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$carol warden"] } }, "source": "Palace Jailer" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$priest", "mana": ["$p5", "$p6", "$p7"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$bob warden"] } }, "source": "Banisher Priest" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 22 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 21 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": "alice" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Soul Warden", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Exile", "card": "Soul Warden", "count": 1 } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Concede" },
+    { "turn": 3, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 3, "step": "PrecombatMain", "player": "carol", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Soul Warden", "count": 1 } } },
+    { "turn": 3, "step": "BeginningOfCombat", "player": "carol", "check": { "Life": { "player": "bob", "life": 23 } } },
+    { "turn": 3, "step": "BeginningOfCombat", "player": "carol", "check": { "Life": { "player": "carol", "life": 22 } } },
+    { "turn": 3, "step": "BeginningOfCombat", "player": "carol", "check": { "Monarch": { "player": "carol" } } },
+    { "turn": 3, "step": "BeginningOfCombat", "player": "carol", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Soul Warden", "count": 1 } } },
+    { "turn": 3, "step": "BeginningOfCombat", "player": "carol", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Soul Warden", "count": 1 } } }
+  ]
+}
