@@ -20,7 +20,7 @@ import qualified Pawl.Types.Filter as Filter
 -- Pawl.Types.Sacrifice's fields, and deliberately -- this is that record's
 -- question asked about tapping rather than about sacrificing, which is why the
 -- field names agree. The two are still separate types because the ACTIONS
--- differ: Pawl.Engine.Cost's arms pay one through Pawl.Engine.Event.sacrifice
+-- differ: Pawl.Engine.Cost's arms pay one through Pawl.Engine.Event.sacrificeAll
 -- and the other with a tap, and no reader wants to be told they are the same.
 data TapPermanents keyword = MkTapPermanents
   { count :: Natural.Natural,
