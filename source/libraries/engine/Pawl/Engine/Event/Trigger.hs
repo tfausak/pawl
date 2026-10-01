@@ -3473,7 +3473,9 @@ delayedPending grouped gs =
       -- reason: CR 603.2c's second sentence inside the batch. The Raven's
       -- Warning's flyers hitting two players are two occurrences, which
       -- data/scenarios/event-trigger/cr-603-2c-the-ravens-warning-draws-once-per-player-its-flyers-hit.json
-      -- proves on this road.
+      -- proves on this road. Forth Eorlingas!'s "to one or more players" is
+      -- one occurrence however many players its Knights hit, which
+      -- Pawl.LifeTriggerSpec's three-seat Forth Eorlingas! case proves.
       occurrences entry
         | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = concatMap (ListUtils.nubOrdOn (partitionOf entry) . NonEmpty.toList) (eventGroups (matching entry))
         | otherwise = matching entry

@@ -30,6 +30,7 @@ import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1206,12 +1207,13 @@ forthEorlingasSpec s registry =
       -- alice, in her precombat main with the four lands {2}{R}{W} needs at X=2,
       -- casts the spell for `x` and resolves it. Both libraries are stocked
       -- because the negative below plays through two draw steps (CR 104.3c).
-      armed x = do
+      armed = armedAmong S.bothPlayers
+      armedAmong players x = do
         mountain <- S.printingOf s registry "Mountain"
         plains <- S.printingOf s registry "Plains"
         spell <- S.printingOf s registry "Forth Eorlingas!"
-        let lands = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
-            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard plains pid g)) lands (concat (replicate 4 [S.alice, S.bob]))
+        let lands = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame players))
+            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard plains pid g)) lands (concat (replicate 4 (NonEmpty.toList players)))
             (spellId, withSpell) = S.addHandCard spell S.alice stocked
             gs =
               withSpell
@@ -1225,9 +1227,11 @@ forthEorlingasSpec s registry =
       -- attack bob, the damage step's turn-based action deals their damage, and
       -- the settle that follows puts whatever triggered onto the stack. Read
       -- there for the count, then resolved for the crown -- one run, read twice.
-      connecting gs =
-        let atDamage = S.runToStep combatDamage S.aggressiveAnswer gs
-            placed = S.runPure S.aggressiveAnswer atDamage (Engine.runTurnBasedActions combatDamage >> Engine.settleForPriority)
+      connecting = connectingWith S.aggressiveAnswer
+      connectingWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> (GameState.GameState, GameState.GameState)
+      connectingWith answer gs =
+        let atDamage = S.runToStep combatDamage answer gs
+            placed = S.runPure answer atDamage (Engine.runTurnBasedActions combatDamage >> Engine.settleForPriority)
          in (placed, resolveAll placed)
    in Spec.describe s "CR 603.2c Forth Eorlingas!" $ do
         Spec.it s "CR 111.3 / 601.2b cast for X=2, it mints two 2/2 red Human Knights with trample and haste and arms one entry" $ do
@@ -1256,6 +1260,27 @@ forthEorlingasSpec s registry =
           Spec.assertEqWith s "both Knights connected, for four" (S.lifeOf S.bob after) (Just 16)
           Spec.assertEqWith s "CR 510.2: the two damage events were one event group" (length (combatDamageGroups placed)) 1
           Spec.assertEqWith s "and CR 603.7b's stated duration kept the entry armed" (Seq.length (GameState.delayedTriggers after)) 1
+        -- "To ONE OR MORE PLAYERS": three seats, and the Knights split between
+        -- bob and carol, so the step damages two players and is still one
+        -- trigger event -- where "to a player" (Feline Sovereign) is one per
+        -- damaged player. Each Knight's CR 508.1b announcement is pinned by its
+        -- position among the offered attackers.
+        Spec.it s "CR 603.2c two Knights connecting with two players in one step are still one trigger event" $ do
+          gs <- armedAmong S.threePlayers 2
+          let ready = runUntil (\g -> S.runPure S.identityAnswer g Engine.runStep) ((== declareAttackers) . GameState.phase) gs
+          case knights ready of
+            [first, _] -> do
+              let split :: Prompt.Prompt r -> r
+                  split p = case p of
+                    Prompt.ChooseAttackTarget _ _ attacker options ->
+                      let who = if attacker == first then S.bob else S.carol
+                       in Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer who) (NonEmpty.toList options))
+                    _ -> S.aggressiveAnswer p
+                  (placed, after) = connectingWith split ready
+              Spec.assertEqWith s "one trigger on the stack for the step, not one per damaged player" (length (GameState.stack placed)) 1
+              Spec.assertEqWith s "alice became the monarch" (GameState.monarch after) (Just S.alice)
+              Spec.assertEqWith s "CR 508.1b each Knight connected with its own player, for two each" (S.lifeOf S.bob after, S.lifeOf S.carol after) (Just 18, Just 18)
+            other -> Spec.assertFailure s ("expected exactly two Knight tokens, got " <> show (length other))
         -- The floor the two readings share: one Knight is one occurrence either
         -- way, so a fixed count of one passes here and fails above.
         Spec.it s "CR 603.2c a lone Knight connecting is one trigger event as well" $ do

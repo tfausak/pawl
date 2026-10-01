@@ -50,6 +50,7 @@ import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
+import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -219,7 +220,9 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- through, so "whose was it" and "did it qualify" come from one sample. And
   -- the DAMAGED PLAYER under `triggerPlayer`, Feline Sovereign's "that player
   -- controls". One seat each per member, and one each per trigger:
-  -- `batchPartition` below is what splits the batch by both.
+  -- `batchPartition` below is what splits the batch by both. No damaged player
+  -- for "to one or more players" (Forth Eorlingas!), whose occurrence spans
+  -- every player the step damaged, so `batchPartition` leaves it whole.
   --
   -- Unconditional given a match: that matcher answers False for a damager with
   -- no view or a recipient that is no player, and a permanent's view always
@@ -227,9 +230,10 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   --
   -- The sample is a regression fence here: no board in the suite changes a
   -- damager's controller between the damage and the scan.
-  (TriggerCondition.PermanentsDealCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
+  (TriggerCondition.PermanentsDealCombatDamageToPlayer p, GameEvent.DamageDealt ev) ->
     let damager = DamageEvent.source ev
-     in maybe id Binding.setTriggerPlayer (Recipient.playerOf (DamageEvent.target ev)) (maybe id Binding.setDamagersController (Filter.controller =<< postEventView board gs damager) Map.empty)
+        damaged = if PermanentsDealCombatDamageToPlayer.oneOrMorePlayers p then Nothing else Recipient.playerOf (DamageEvent.target ev)
+     in maybe id Binding.setTriggerPlayer damaged (maybe id Binding.setDamagersController (Filter.controller =<< postEventView board gs damager) Map.empty)
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -1064,6 +1068,8 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
 -- 506.2a and CR 508.1b let one CR 510.2 step damage several players, and "to
 -- a player" is one occurrence per player hit: Feline Sovereign's "that player
 -- controls" and The Raven's Warning's "that player's hand" name one seat.
+-- Not for "to one or more players" (Forth Eorlingas!), whose eventBindings arm
+-- stamps no damaged player.
 -- data/scenarios/card-trigger/cr-603-2c-feline-sovereign-triggers-once-per-player-its-cats-hit.json
 -- proves the split.
 --
@@ -1349,8 +1355,11 @@ eventBindingSlots cond = case cond of
   -- three: the trigger event is a whole CR 510.2 step split by both (CR
   -- 603.2c), so they are the seats every member of an occurrence shares. Norn's
   -- Decree's "that opponent" reads the first, Feline Sovereign's "that player"
-  -- the second.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.fromList [Binding.damagersController, Binding.triggerPlayer]
+  -- the second. The controller alone for "to one or more players", which names
+  -- no one damaged player.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer p
+    | PermanentsDealCombatDamageToPlayer.oneOrMorePlayers p -> Set.singleton Binding.damagersController
+    | otherwise -> Set.fromList [Binding.damagersController, Binding.triggerPlayer]
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.
