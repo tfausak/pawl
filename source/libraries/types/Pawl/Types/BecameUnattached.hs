@@ -5,10 +5,10 @@ import qualified Pawl.Types.Recipient as Recipient
 
 -- | CR 701.3d: one Aura, Equipment or Fortification CEASING to be attached to
 -- the object or player it was attached to -- rule 701.3d's "becoming unattached
--- [from that object or player]", which covers the attachment moving elsewhere,
--- the attachment leaving the battlefield, the host leaving its zone and the host
--- player leaving the game. Recorded by Pawl.Engine.Event.unattach, the funnel
--- every route goes through.
+-- [from that object or player]", which covers an unattach instruction
+-- (Effect.Unattach), the attachment moving elsewhere, the attachment leaving the
+-- battlefield, the host leaving its zone and the host player leaving the game.
+-- Recorded by Pawl.Engine.Event.unattach, the funnel every route goes through.
 --
 -- Not recorded by Pawl.Engine.Phasing, which is CR 702.26j: a permanent phasing
 -- out keeps its Object.attachedTo, and the rule states outright that becoming

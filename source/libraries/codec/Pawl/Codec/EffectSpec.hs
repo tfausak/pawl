@@ -476,6 +476,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Filter.IsSource))
       " {\"type\":\"AttachAll\",\"value\":{\"subjects\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"destination\":{\"type\":\"IsSource\"}}} "
+  -- CR 701.3d: the ObjectRef alone.
+  Spec.it s "Unattach" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Unattach (ObjectRef.EachMatching Filter.IsSource))
+      " {\"type\":\"Unattach\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
   -- MoveToZone's payload is the ObjectRef and the destination zone, then four
   -- independently elided extras -- the EntryRiders, the bound slot, CR 113.6m's
   -- origin zone and CR 401.2's library position -- so it is told apart by JSON

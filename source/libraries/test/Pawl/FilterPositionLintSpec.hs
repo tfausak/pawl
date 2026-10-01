@@ -1730,11 +1730,25 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Bewitching Leechcraft's tap is framed too"
       (hostOfSourceCounts (S.combinedFace leechcraft))
       (1, 0)
+    -- And the CR 603.4 Effect.Unattach of the Equipment an Aura enchants:
+    -- Carry Away's, and Tamiyo's Compleation's beside its tap.
+    carry <- S.printingOf s registry "Carry Away"
+    Spec.assertEqWith
+      s
+      "Carry Away's unattach is framed too"
+      (hostOfSourceCounts (S.combinedFace carry))
+      (1, 0)
+    compleation <- S.printingOf s registry "Tamiyo's Compleation"
+    Spec.assertEqWith
+      s
+      "Tamiyo's Compleation's tap and unattach are framed too"
+      (hostOfSourceCounts (S.combinedFace compleation))
+      (2, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
-      7
+      10
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the same atom planted in a target slot -- the position a card
     -- author would most plausibly reach for -- IS counted as elsewhere.

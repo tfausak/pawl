@@ -1,0 +1,28 @@
+{
+  "description": "CR 702.151a / 702.151b Rabbit Battery's second reconfigure ability unattaches it, and it is a creature again",
+  "note": "The Piker loses the Battery's +1/+1 and the Battery gets its creature type back, so both halves of the unattach are visible.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Rabbit Battery", "label": "battery", "attached": "piker", "ready": true },
+          { "card": "Mountain", "label": "mountain", "ready": true }
+        ]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@battery", "types": ["Artifact"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@battery", "ability": 1, "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@battery", "types": ["Artifact", "Creature"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@battery", "power": 1, "toughness": 1 } } }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "description": "CR 701.3d Carry Away takes control of bob's Bonesplitter and its enters trigger unattaches it from bob's Piker",
+  "note": "The Piker is read with the trigger still on the stack, so its 4/1 there is the control change alone (CR 301.5d keeps the Equipment on), and its 2/1 at the end is the unattach.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "i1", "ready": true },
+          { "card": "Island", "label": "i2", "ready": true }
+        ],
+        "hand": [{ "card": "Carry Away", "label": "aura" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Bonesplitter", "label": "split", "attached": "piker" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@aura", "targets": ["@split"], "mana": ["@i1", "@i2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bonesplitter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 1 } } }
+  ],
+  "final": [
+    { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bonesplitter", "count": 1 } }
+  ]
+}
