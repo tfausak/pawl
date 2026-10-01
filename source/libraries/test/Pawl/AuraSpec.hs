@@ -3937,14 +3937,15 @@ attachingTo oid p = case p of
 -- observable here and neither existing opcode has them -- Effect.Attach's mover
 -- is the ability's own source, which is the enchantment and not the Equipment,
 -- and Effect.AttachTarget's destination is picked as the effect resolves, which
--- CR 115.10a says is no target at all. The three cases below are the three
--- consequences of it BEING a target: CR 603.3d's choice refuses a creature with
--- shroud, CR 608.2b drops it if it goes illegal, and CR 603.5's "may" is a
--- separate question asked later.
+-- CR 115.10a says is no target at all. Three consequences follow from it BEING
+-- a target: CR 603.3d's choice refuses a creature with shroud and CR 608.2b
+-- drops it if it goes illegal (data/scenarios/aura/'s two Sigarda's Aid pairs),
+-- and CR 603.5's "may" is a separate question asked later (the case below).
 sigardasAidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
   -- CR 603.5's "may", asked as the ability resolves rather than when it was put
-  -- on the stack: the same board as the positive case above, answered by
+  -- on the stack: the board of
+  -- cr-603-3d-701-3a-whole-cards-sigarda-s-aid-equips-the-piker.json, answered by
   -- S.identityAnswer, which declines every optional clause. The target was still
   -- chosen -- declining is not the same as having no target.
   Spec.it s "CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing" $ do

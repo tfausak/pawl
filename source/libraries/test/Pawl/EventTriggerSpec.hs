@@ -80,7 +80,8 @@ import qualified Pawl.Types.Zone as Zone
 -- whenever a player 'cycles or discards' a card. These abilities trigger only
 -- once when a card is cycled." An engine that recorded the cycle and the discard
 -- as two log entries, both of them describing the one discard, would answer 4
--- damage to the second case below instead of 2.
+-- damage in cr-702-29d-cycling-a-card-fires-the-discard-trigger-exactly.json
+-- instead of 2.
 --
 -- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
 -- every "an opponent" below is alice.

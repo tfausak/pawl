@@ -3025,8 +3025,9 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
   -- Read through a Fog-shaped shield -- CR 615.1's prevention, scoped to
   -- DamageKind.Combat and to no recipient in particular -- so the rule is a
   -- board on which combat damage cannot land and the fight's damage does anyway.
-  -- THE PAIR with the first case, differing only in that shield: every number
-  -- below is the same one that case asserts.
+  -- THE PAIR with cr-701-14b-one-illegal-target-and-neither-creature-deals.json,
+  -- differing only in that shield: every number below is the same one it
+  -- asserts.
   Spec.it s "CR 701.14d fight damage is not combat damage, so a combat-only prevention misses it" $ do
     (base, spell, mine, theirs) <- preyBoard s registry
     let shield =
