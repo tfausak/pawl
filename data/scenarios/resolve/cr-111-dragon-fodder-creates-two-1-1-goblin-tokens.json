@@ -19,13 +19,13 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@dragon-fodder", "mana": ["@mountain", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$dragon-fodder", "mana": ["$mountain", "$mountain-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 2 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "Goblin Token", "types": ["Creature"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "Goblin Token#2", "types": ["Creature"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@mountain", "types": ["Land"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@mountain-2", "types": ["Land"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "$mountain", "types": ["Land"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "$mountain-2", "types": ["Land"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Dragon Fodder", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Mountain", "count": 0 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "Goblin Token", "tapped": false } } },

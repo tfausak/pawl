@@ -22,10 +22,10 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker", "@piker-2"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@piker", "do": { "ChooseAttackTarget": "@bob" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@piker-2", "do": { "ChooseAttackTarget": "@bob" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "OrderTriggers": ["@decree", "@decree"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$piker", "$piker-2"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$piker", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$piker-2", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "OrderTriggers": ["$decree", "$decree"] } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Life": { "player": "alice", "life": 18 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } }

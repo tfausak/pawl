@@ -26,11 +26,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@spell", "mana": ["@plains-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$spell", "mana": ["$plains-1", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "@ratchet", "do": { "ChooseOptional": { "type": "Exercises" } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@weathervane"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "$ratchet", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$weathervane"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
   ]
 }

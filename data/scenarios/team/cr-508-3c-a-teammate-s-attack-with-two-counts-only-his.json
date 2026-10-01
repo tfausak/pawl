@@ -54,9 +54,9 @@
     "sharedTeamTurns": true
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@alices-piker", "@bobs-piker-1"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@alices-piker", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@bobs-piker-1", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$alices-piker", "$bobs-piker-1"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$alices-piker", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$bobs-piker-1", "do": { "ChooseAttackTarget": "$carol" } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Island", "count": 0 } } }
   ]
 }

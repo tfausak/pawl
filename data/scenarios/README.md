@@ -25,8 +25,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
 - **Note.** An optional `note` says in prose what the scenario rules out and
   why its board is built the way it is. It is free text: nothing reads it, and
   the decoder ignores it like any other unknown key.
-- **References.** `"@name"` is a seat or a labelled card. `"Goblin Piker"` is
-  the first live object with that name, `"Goblin Piker#2"` the second, in
+- **References.** `"$name"` is a seat or a labelled card; the sigil is not `@`,
+  so a label quoted in a PR or issue mentions no GitHub user. `"Goblin Piker"`
+  is the first live object with that name, `"Goblin Piker#2"` the second, in
   creation order across every zone.
 - **Timeline.** Each entry is keyed by `turn`, `step` and the `player` who
   decides, and carries `do` (a move) or `check`. Entries sharing a key are

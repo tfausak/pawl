@@ -23,7 +23,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@workhorse", "mana": ["@forest", "@forest-2", "@forest-3", "@forest-4", "@forest-5", "@forest-6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$workhorse", "mana": ["$forest", "$forest-2", "$forest-3", "$forest-4", "$forest-5", "$forest-6"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Workhorse", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Workhorse", "power": 4, "toughness": 4 } } },

@@ -131,11 +131,11 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@divination",
+          "object": "$divination",
           "mana": [
-            "@alice-island-1",
-            "@alice-island-2",
-            "@alice-island-3"
+            "$alice-island-1",
+            "$alice-island-2",
+            "$alice-island-3"
           ]
         }
       }
@@ -203,12 +203,12 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@answer",
+          "object": "$answer",
           "mana": [
-            "@island-1",
-            "@island-2",
-            "@island-3",
-            "@island-4"
+            "$island-1",
+            "$island-2",
+            "$island-3",
+            "$island-4"
           ]
         }
       }

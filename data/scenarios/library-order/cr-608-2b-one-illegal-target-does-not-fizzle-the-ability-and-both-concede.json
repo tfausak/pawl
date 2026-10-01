@@ -28,7 +28,7 @@
     "monarch": "alice"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@denethor", "targetsBySlot": {"player": ["@bob"], "damage": ["@carol"]}, "mana": ["@m1", "@m2", "@m3", "@m4"], "costOrder": [0, 1]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "$denethor", "targetsBySlot": {"player": ["$bob"], "damage": ["$carol"]}, "mana": ["$m1", "$m2", "$m3", "$m4"], "costOrder": [0, 1]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Concede"},
     {"turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede"},

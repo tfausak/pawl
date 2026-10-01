@@ -27,10 +27,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@worthy", "mana": ["@m1", "@m2", "@m3", "@m4"]}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseTargets": {"target": ["@giant"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "$worthy", "mana": ["$m1", "$m2", "$m3", "$m4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseTargets": {"target": ["$giant"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseOptional": {"type": "Declines"}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Damage": {"object": "@giant", "damage": 0}}}
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Damage": {"object": "$giant", "damage": 0}}}
   ]
 }

@@ -19,13 +19,13 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@cavalry"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@cavalry"], "@giant": ["@cavalry"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "OrderTriggers": ["@cavalry", "@cavalry"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$cavalry"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$piker": ["$cavalry"], "$giant": ["$cavalry"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "OrderTriggers": ["$cavalry", "$cavalry"] } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 2, "toughness": 2 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@cavalry", "power": 2, "toughness": 2 } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "$cavalry", "power": 2, "toughness": 2 } } }
   ]
 }

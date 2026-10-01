@@ -25,12 +25,12 @@
     ]
   },
   "timeline": [
-    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@brute"]}},
-    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Cast": {"object": "@wisps", "targets": ["@brute"], "mana": ["@swamp"]}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$brute"]}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Cast": {"object": "$wisps", "targets": ["$brute"], "mana": ["$swamp"]}}},
     {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@rats": ["@brute"], "@plain": ["@brute"]}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@rats": ["@brute"]}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@rats": ["@brute"], "@myr": ["@brute"]}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@brute", "blockers": ["@rats", "@myr"]}}}
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"$rats": ["$brute"], "$plain": ["$brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"$rats": ["$brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"$rats": ["$brute"], "$myr": ["$brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$brute", "blockers": ["$rats", "$myr"]}}}
   ]
 }

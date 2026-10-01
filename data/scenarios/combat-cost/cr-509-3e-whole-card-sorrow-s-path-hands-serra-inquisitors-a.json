@@ -23,13 +23,13 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@red", "@black"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@inq": ["@red"], "@other": ["@black"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@path", "targetsBySlot": { "first": ["@inq"], "second": ["@other"] } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$red", "$black"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$inq": ["$red"], "$other": ["$black"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "$path", "targetsBySlot": { "first": ["$inq"], "second": ["$other"] } } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@inq", "power": 5, "toughness": 3 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@black", "blockers": ["@inq"] } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "$inq", "power": 5, "toughness": 3 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$black", "blockers": ["$inq"] } } }
   ]
 }

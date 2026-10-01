@@ -27,7 +27,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@splendid-reclamation", "mana": ["@mountain", "@mountain-2", "@mountain-3", "@elves", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$splendid-reclamation", "mana": ["$mountain", "$mountain-2", "$mountain-3", "$elves", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Heart of Yavimaya", "Lake of the Dead"] } }
   ],
   "final": [

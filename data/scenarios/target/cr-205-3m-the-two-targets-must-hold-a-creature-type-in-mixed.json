@@ -27,7 +27,7 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@unbury", "modes": [1], "targetsBySlot": {"first": ["@giant-a"], "second": ["@piker"]}}} },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$unbury", "modes": [1], "targetsBySlot": {"first": ["$giant-a"], "second": ["$piker"]}}} },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Unbury", "count": 1}} },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Hill Giant", "count": 0}} },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 0}} },

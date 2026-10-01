@@ -19,9 +19,9 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@savior", "@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@sentry"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@savior", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$savior", "$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["$sentry"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "$savior", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Ogre Sentry", "count": 1 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Ogre Sentry", "count": 0 } } }
   ]

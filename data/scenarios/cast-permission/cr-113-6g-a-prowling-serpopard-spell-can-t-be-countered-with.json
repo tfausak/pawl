@@ -69,11 +69,11 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@victim",
+          "object": "$victim",
           "mana": [
-            "@forest-1",
-            "@forest-2",
-            "@forest-3"
+            "$forest-1",
+            "$forest-2",
+            "$forest-3"
           ]
         }
       }
@@ -167,14 +167,14 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@cancel",
+          "object": "$cancel",
           "targets": [
             "Prowling Serpopard"
           ],
           "mana": [
-            "@island-1",
-            "@island-2",
-            "@island-3"
+            "$island-1",
+            "$island-2",
+            "$island-3"
           ]
         }
       }

@@ -16,7 +16,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lightning-bolt", "targets": ["@alice"], "mana": ["@mountain"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$lightning-bolt", "targets": ["$alice"], "mana": ["$mountain"] } } }
   ],
   "final": [
     { "Life": { "player": "alice", "life": 17 } }

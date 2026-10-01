@@ -21,10 +21,10 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@savior", "@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@sentry"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$savior", "$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["$sentry"] } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Ogre Sentry", "count": 1 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@savior"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "$bolt", "targets": ["$savior"], "mana": ["$mountain"] } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Savior of Ollenbock", "count": 1 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Ogre Sentry", "count": 1 } } },

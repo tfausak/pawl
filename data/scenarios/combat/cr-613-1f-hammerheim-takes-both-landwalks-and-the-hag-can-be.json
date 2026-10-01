@@ -24,13 +24,13 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hag"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Activate": { "object": "@hammerheim", "ability": 1, "targets": ["@hag"], "mana": [null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$hag"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Activate": { "object": "$hammerheim", "ability": 1, "targets": ["$hag"], "mana": [null] } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@hag"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@hag", "blockers": ["@blocker"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@hag", "keyword": { "type": "Haste" }, "count": 1 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@hag", "keyword": { "type": "Landwalk", "value": { "type": "HasSubtype", "value": { "type": "Swamp" } } }, "count": 0 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@hag", "keyword": { "type": "Landwalk", "value": { "type": "HasSubtype", "value": { "type": "Forest" } } }, "count": 0 } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$blocker": ["$hag"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$hag", "blockers": ["$blocker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "$hag", "keyword": { "type": "Haste" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "$hag", "keyword": { "type": "Landwalk", "value": { "type": "HasSubtype", "value": { "type": "Swamp" } } }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "$hag", "keyword": { "type": "Landwalk", "value": { "type": "HasSubtype", "value": { "type": "Forest" } } }, "count": 0 } } }
   ]
 }

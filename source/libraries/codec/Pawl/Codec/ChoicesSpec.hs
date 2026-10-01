@@ -27,12 +27,12 @@ spec s = Spec.describe s "Pawl.Codec.Choices" $ do
           Choices.Type.costOrder = Just [1, 0],
           Choices.Type.manaSources = Seq.fromList [Just (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "mountain"))), Nothing]
         }
-      " {\"targets\":[\"@bob\"],\"modes\":[1],\"x\":3,\"costOrder\":[1,0],\"mana\":[\"@mountain\",null]} "
+      " {\"targets\":[\"$bob\"],\"modes\":[1],\"x\":3,\"costOrder\":[1,0],\"mana\":[\"$mountain\",null]} "
   Spec.it s "targets by slot" $
     Common.assertCodec
       s
       Choices.codec
       Choices.Type.none {Choices.Type.targetsBySlot = Map.singleton (SlotName.Type.MkSlotName (Text.pack "victim")) (Seq.singleton (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))))}
-      " {\"targetsBySlot\":{\"victim\":[\"@bear\"]}} "
+      " {\"targetsBySlot\":{\"victim\":[\"$bear\"]}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Choices.codec

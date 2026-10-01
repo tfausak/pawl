@@ -24,8 +24,8 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@one", "@two", "@three"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@lone": ["@one"], "@pair": ["@two", "@three"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@lone", "keyword": { "type": "FirstStrike" }, "count": 0 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$one", "$two", "$three"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$lone": ["$one"], "$pair": ["$two", "$three"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "$lone", "keyword": { "type": "FirstStrike" }, "count": 0 } } }
   ]
 }

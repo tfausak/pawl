@@ -19,9 +19,9 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@attacker", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "carol", "do": { "Block": { "@carol guard": ["@attacker"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@carol guard"] } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$attacker", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "carol", "do": { "Block": { "$carol guard": ["$attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$attacker", "blockers": ["$carol guard"] } } }
   ]
 }

@@ -34,8 +34,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["@kami"], "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "soulshifted": ["@mine"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$murder", "targets": ["$kami"], "mana": ["$swamp-1", "$swamp-2", "$swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "soulshifted": ["$mine"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Declines" } } }
   ],
   "final": [

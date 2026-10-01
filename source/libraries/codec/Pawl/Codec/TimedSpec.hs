@@ -21,7 +21,7 @@ spec s = Spec.describe s "Pawl.Codec.Timed" $ do
       s
       Timed.codec
       (Timed.Type.MkTimed (When.Type.MkWhen 1 (Phase.Type.Combat CombatStep.Type.CombatDamage) (Label.Type.MkLabel (Text.pack "alice"))) (Just (ref "bear")) (Entry.Type.Do (Move.Type.AssignDamage (Map.singleton (ref "wall") 2))))
-      " {\"turn\":1,\"step\":\"CombatDamage\",\"player\":\"alice\",\"source\":\"@bear\",\"do\":{\"AssignDamage\":{\"@wall\":2}}} "
+      " {\"turn\":1,\"step\":\"CombatDamage\",\"player\":\"alice\",\"source\":\"$bear\",\"do\":{\"AssignDamage\":{\"$wall\":2}}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Timed.codec
 

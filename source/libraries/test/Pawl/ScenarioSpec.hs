@@ -452,7 +452,7 @@ spec s registry = Spec.describe s "Scenario" $ do
         s
         registry
         ( "{\"description\":\"x\",\"board\":{\"seats\":[{\"name\":\"alice\",\"battlefield\":[{\"card\":\"Goblin Piker\",\"label\":\"attacker\",\"ready\":true}]},{\"name\":\"bob\",\"battlefield\":[{\"card\":\"Goblin Piker\",\"ready\":true}]}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"},"
-            <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\"@attacker\"]}},"
+            <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\"$attacker\"]}},"
             <> "{\"turn\":1,\"step\":\"DeclareBlockers\",\"player\":\"bob\",\"refuse\":{\"Block\":{}}}]}"
         )
     case result of
@@ -493,7 +493,7 @@ spec s registry = Spec.describe s "Scenario" $ do
       Right _ -> Spec.assertFailure s "the final check read a state past the run's end"
 
   Spec.it s "a label naming a seat is not an object" $ do
-    result <- runJson s registry (attackThenAttacking "@bob")
+    result <- runJson s registry (attackThenAttacking "$bob")
     case result of
       Left (ScenarioFailure.MkNotAnObject _) -> pure ()
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
@@ -546,7 +546,7 @@ runJson s registry json = case Common.parse (Text.pack json) >>= Codec.decode Co
 attackThen :: String -> String -> String
 attackThen entry final =
   "{\"description\":\"x\",\"board\":{\"seats\":[{\"name\":\"alice\",\"battlefield\":[{\"card\":\"Goblin Piker\",\"label\":\"attacker\",\"ready\":true}]},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"},"
-    <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\"@attacker\"]}}"
+    <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\"$attacker\"]}}"
     <> (if null entry then "" else "," <> entry)
     <> "],\"final\":"
     <> final

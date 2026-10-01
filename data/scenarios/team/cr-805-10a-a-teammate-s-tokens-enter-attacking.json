@@ -26,11 +26,11 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@garrison"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@garrison" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$garrison"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "$carol" }, "source": "$garrison" },
     { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "OrderTimestamps": ["Human Token", "Human Token#2"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseAttackTarget": "@carol" }, "source": "Human Token" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseAttackTarget": "@carol" }, "source": "Human Token#2" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseAttackTarget": "$carol" }, "source": "Human Token" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseAttackTarget": "$carol" }, "source": "Human Token#2" },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 16 } } }
   ]
 }

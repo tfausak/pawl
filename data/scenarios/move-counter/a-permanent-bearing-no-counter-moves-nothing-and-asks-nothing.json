@@ -24,14 +24,14 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@defense", "targetsBySlot": { "from": ["@giver"], "to": ["@taker"] }, "mana": ["@plains-1", "@plains-2", "@plains-3", "@plains-4", "@plains-5"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$defense", "targetsBySlot": { "from": ["$giver"], "to": ["$taker"] }, "mana": ["$plains-1", "$plains-2", "$plains-3", "$plains-4", "$plains-5"] } } }
   ],
   "final": [
-    { "Counters": { "object": "@taker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
-    { "Counters": { "object": "@taker", "kind": { "type": "Shield" }, "count": 0 } },
-    { "Counters": { "object": "@taker", "kind": { "type": "MinusOneMinusOne" }, "count": 0 } },
-    { "Counters": { "object": "@giver", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
-    { "Counters": { "object": "@giver", "kind": { "type": "Shield" }, "count": 0 } },
-    { "Counters": { "object": "@giver", "kind": { "type": "MinusOneMinusOne" }, "count": 0 } }
+    { "Counters": { "object": "$taker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
+    { "Counters": { "object": "$taker", "kind": { "type": "Shield" }, "count": 0 } },
+    { "Counters": { "object": "$taker", "kind": { "type": "MinusOneMinusOne" }, "count": 0 } },
+    { "Counters": { "object": "$giver", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
+    { "Counters": { "object": "$giver", "kind": { "type": "Shield" }, "count": 0 } },
+    { "Counters": { "object": "$giver", "kind": { "type": "MinusOneMinusOne" }, "count": 0 } }
   ]
 }

@@ -19,8 +19,8 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@spell", "targets": ["@piker"], "modes": [2], "mana": ["@first", "@second"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "$spell", "targets": ["$piker"], "modes": [2], "mana": ["$first", "$second"] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } }
   ]
 }

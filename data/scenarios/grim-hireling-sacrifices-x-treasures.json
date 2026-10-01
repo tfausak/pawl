@@ -18,15 +18,15 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hireling"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$hireling"] } },
     { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTimestamps": ["Treasure Token", "Treasure Token#2"] } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 2 } } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Activate": { "object": "@hireling", "targets": ["@giant"], "x": 0, "mana": ["@swamp", null] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Activate": { "object": "$hireling", "targets": ["$giant"], "x": 0, "mana": ["$swamp", null] } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 2 } } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Activate": { "object": "@hireling", "targets": ["@giant"], "x": 2, "mana": ["@swamp-2", null] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Activate": { "object": "$hireling", "targets": ["$giant"], "x": 2, "mana": ["$swamp-2", null] } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 0 } } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 1, "toughness": 1 } } }
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 1, "toughness": 1 } } }
   ]
 }

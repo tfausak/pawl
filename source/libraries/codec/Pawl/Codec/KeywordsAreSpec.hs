@@ -12,6 +12,6 @@ import qualified Pawl.Types.Reference as Reference.Type
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.KeywordsAre" $ do
   Spec.it s "an object, a keyword and a count" $
-    Common.assertCodec s KeywordsAre.codec (KeywordsAre.Type.MkKeywordsAre (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bird"))) Keyword.Type.Flying 1) " {\"object\":\"@bird\",\"keyword\":{\"type\":\"Flying\"},\"count\":1} "
+    Common.assertCodec s KeywordsAre.codec (KeywordsAre.Type.MkKeywordsAre (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bird"))) Keyword.Type.Flying 1) " {\"object\":\"$bird\",\"keyword\":{\"type\":\"Flying\"},\"count\":1} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s KeywordsAre.codec

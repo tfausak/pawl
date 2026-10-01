@@ -28,8 +28,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@wretch", "targets": ["@bob-piker"], "mana": ["@swamp"]}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Tapped": {"object": "@swamp", "tapped": true}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "$wretch", "targets": ["$bob-piker"], "mana": ["$swamp"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Tapped": {"object": "$swamp", "tapped": true}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 1}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 0}}},

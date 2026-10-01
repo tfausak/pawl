@@ -29,13 +29,13 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@sphinx", "x": 2, "mana": ["@plains", "@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$sphinx", "x": 2, "mana": ["$plains", "$island-1", "$island-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Energy" }, "count": 3 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Mountain", "count": 2 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@plains", "tapped": true } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@island-1", "tapped": true } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@island-2", "tapped": true } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@sphinx", "tapped": true } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$plains", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$island-1", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$island-2", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$sphinx", "tapped": true } } }
   ]
 }

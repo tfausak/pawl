@@ -20,7 +20,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@hack", "targets": ["@outcast"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$hack", "targets": ["$outcast"], "mana": ["$island"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Swamp" }, "to": { "type": "Island" } } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Barbarian Outcast", "count": 1 } } }
   ],

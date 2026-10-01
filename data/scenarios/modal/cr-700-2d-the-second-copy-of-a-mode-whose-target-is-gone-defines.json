@@ -21,7 +21,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@refrain", "modes": [0, 0], "targetsBySlot": { "fallen": ["@dead"], "fallen#1": ["@dead"] }, "mana": ["@swamp-1", "@swamp-2"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$refrain", "modes": [0, 0], "targetsBySlot": { "fallen": ["$dead"], "fallen#1": ["$dead"] }, "mana": ["$swamp-1", "$swamp-2"] } } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } },

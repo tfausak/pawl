@@ -19,6 +19,6 @@ spec s = Spec.describe s "Pawl.Codec.Casting" $ do
         { Casting.Type.object = Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bolt")),
           Casting.Type.choices = Choices.Type.none {Choices.Type.targets = Just [Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bob"))]}
         }
-      " {\"object\":\"@bolt\",\"targets\":[\"@bob\"]} "
+      " {\"object\":\"$bolt\",\"targets\":[\"$bob\"]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Casting.codec

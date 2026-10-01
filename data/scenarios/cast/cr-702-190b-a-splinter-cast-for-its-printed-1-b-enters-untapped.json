@@ -27,7 +27,7 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@splinter", "mana": ["@swamp", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$splinter", "mana": ["$swamp", "$swamp-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "Splinter, Hamato Yoshi", "tapped": false } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Attackers": { "attackers": {} } } }

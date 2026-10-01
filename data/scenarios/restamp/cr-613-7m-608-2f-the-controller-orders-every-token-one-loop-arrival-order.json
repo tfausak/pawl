@@ -77,8 +77,8 @@
       "player": "alice",
       "do": {
         "Attack": [
-          "@godhead",
-          "@archon"
+          "$godhead",
+          "$archon"
         ]
       }
     },
@@ -86,18 +86,18 @@
       "turn": 1,
       "step": "DeclareAttackers",
       "player": "alice",
-      "source": "@godhead",
+      "source": "$godhead",
       "do": {
-        "ChooseAttackTarget": "@carol"
+        "ChooseAttackTarget": "$carol"
       }
     },
     {
       "turn": 1,
       "step": "DeclareAttackers",
       "player": "alice",
-      "source": "@archon",
+      "source": "$archon",
       "do": {
-        "ChooseAttackTarget": "@carol"
+        "ChooseAttackTarget": "$carol"
       }
     },
     {
@@ -106,14 +106,14 @@
       "player": "carol",
       "do": {
         "Cast": {
-          "object": "@mirror",
+          "object": "$mirror",
           "mana": [
-            "@island1",
-            "@island2",
-            "@island3",
-            "@island4",
-            "@island5",
-            "@island6"
+            "$island1",
+            "$island2",
+            "$island3",
+            "$island4",
+            "$island5",
+            "$island6"
           ]
         }
       }
@@ -141,7 +141,7 @@
       "player": "carol",
       "check": {
         "PowerToughness": {
-          "object": "@godhead",
+          "object": "$godhead",
           "power": 3,
           "toughness": 3
         }

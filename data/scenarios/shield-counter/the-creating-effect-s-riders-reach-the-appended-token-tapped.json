@@ -18,11 +18,11 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hero"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@hero", "@hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$hero", "$hero"] } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Soldier Token", "Soldier Token#2", "Soldier Token#3"] } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Soldier Token", "count": 3 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@hero": "@bob", "Soldier Token": "@bob", "Soldier Token#2": "@bob", "Soldier Token#3": "@bob" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "$hero": "$bob", "Soldier Token": "$bob", "Soldier Token#2": "$bob", "Soldier Token#3": "$bob" } } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Soldier Token", "tapped": true } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Soldier Token#2", "tapped": true } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Soldier Token#3", "tapped": true } } }

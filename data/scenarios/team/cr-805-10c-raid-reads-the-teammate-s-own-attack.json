@@ -34,11 +34,11 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@bobs"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@bobs" },
-    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": { "Cast": { "object": "@skullhunter", "mana": ["@swamp-1", "@swamp-2"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$bobs"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "$carol" }, "source": "$bobs" },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": { "Cast": { "object": "$skullhunter", "mana": ["$swamp-1", "$swamp-2"] } } },
     { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": "Pass" },
-    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@carol"] } }, "source": "Mardu Skullhunter" },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["$carol"] } }, "source": "Mardu Skullhunter" },
     { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": "Pass" },
     { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Mardu Skullhunter", "count": 1 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Count": { "player": "carol", "zone": "Hand", "card": "Island", "count": 0 } } },

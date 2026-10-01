@@ -35,7 +35,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "Activate": { "object": "@carols-greed", "mana": ["@carols-swamp"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "Activate": { "object": "$carols-greed", "mana": ["$carols-swamp"] } } }
   ],
   "final": [
     { "Life": { "player": "carol", "life": 18 } },

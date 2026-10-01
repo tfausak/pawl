@@ -49,9 +49,9 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@cry", "targets": ["@bob"], "mana": ["@s1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$cry", "targets": ["$bob"], "mana": ["$s1", null]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@cancel", "targets": ["Cry of Contrition"], "mana": ["@i1", "@i2", "@i3"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$cancel", "targets": ["Cry of Contrition"], "mana": ["$i1", "$i2", "$i3"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Cry of Contrition", "count": 1}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Exile", "card": "Cry of Contrition", "count": 0}}},

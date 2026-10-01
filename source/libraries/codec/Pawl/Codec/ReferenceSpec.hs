@@ -12,8 +12,8 @@ import qualified Pawl.Types.Reference as Reference.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Reference" $ do
-  Spec.it s "a label is written after @" $
-    Common.assertCodec s Reference.codec (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))) " \"@bear\" "
+  Spec.it s "a label is written after $" $
+    Common.assertCodec s Reference.codec (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))) " \"$bear\" "
   Spec.it s "the first object with a card name is the bare name" $
     Common.assertCodec s Reference.codec (Reference.Type.Printed (CardName.Type.MkCardName (Text.pack "Grizzly Bears")) 1) " \"Grizzly Bears\" "
   Spec.it s "a later one carries its occurrence after #" $
@@ -23,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.Reference" $ do
   Spec.it s "rejects a bare @, an empty string and a non-number occurrence" $
     Spec.assertBool
       s
-      (all (Either.isLeft . Reference.fromText . Text.pack) ["@", "", "Grizzly Bears#", "Grizzly Bears#two"])
+      (all (Either.isLeft . Reference.fromText . Text.pack) ["$", "", "Grizzly Bears#", "Grizzly Bears#two"])
       "expected every one to fail"
   Spec.it s "has a schema" $
     Common.assertHasSchema s Reference.codec

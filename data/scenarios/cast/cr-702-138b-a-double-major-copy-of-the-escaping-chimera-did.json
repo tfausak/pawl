@@ -32,8 +32,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@chimera", "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4", "@forest-5", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@major", "targets": ["Loathsome Chimera"], "mana": ["@forest-6", "@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$chimera", "mana": ["$forest-1", "$forest-2", "$forest-3", "$forest-4", "$forest-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$major", "targets": ["Loathsome Chimera"], "mana": ["$forest-6", "$island"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },

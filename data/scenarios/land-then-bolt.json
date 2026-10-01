@@ -15,12 +15,12 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "PlayLand": "@land" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "PlayLand": "$land" } },
     {
       "turn": 1,
       "step": "PrecombatMain",
       "player": "alice",
-      "do": { "Cast": { "object": "@bolt", "targets": ["@bob"], "mana": ["Mountain"] } }
+      "do": { "Cast": { "object": "$bolt", "targets": ["$bob"], "mana": ["Mountain"] } }
     },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },

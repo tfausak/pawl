@@ -26,9 +26,9 @@
     "step": "Upkeep"
   },
   "timeline": [
-    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@exchanger", "mana": ["@island-1", "@island-2", "@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$exchanger", "mana": ["$island-1", "$island-2", "$island-3", "$island-4"] } } },
     { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Life": { "player": "alice", "life": 5 } } },
-    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@exchanger", "power": 10, "toughness": 5 } } }
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "$exchanger", "power": 10, "toughness": 5 } } }
   ]
 }

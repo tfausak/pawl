@@ -74,7 +74,7 @@
       "player": "alice",
       "do": {
         "Attack": [
-          "@wraith"
+          "$wraith"
         ]
       }
     },
@@ -82,9 +82,9 @@
       "turn": 1,
       "step": "DeclareAttackers",
       "player": "alice",
-      "source": "@wraith",
+      "source": "$wraith",
       "do": {
-        "ChooseAttackTarget": "@jace"
+        "ChooseAttackTarget": "$jace"
       }
     },
     {
@@ -94,7 +94,7 @@
       "check": {
         "Attackers": {
           "attackers": {
-            "@wraith": "@jace"
+            "$wraith": "$jace"
           }
         }
       }
@@ -118,8 +118,8 @@
       "player": "bob",
       "refuse": {
         "Block": {
-          "@blocker": [
-            "@wraith"
+          "$blocker": [
+            "$wraith"
           ]
         }
       }
@@ -138,7 +138,7 @@
       "player": "alice",
       "check": {
         "Blockers": {
-          "attacker": "@wraith",
+          "attacker": "$wraith",
           "blockers": null
         }
       }

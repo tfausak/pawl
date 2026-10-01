@@ -13,8 +13,8 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.SlotName as SlotName
 
--- | Keyed, so a move reads @{"Attack": ["\@bear"]}@ and a pass @"Pass"@. Blocks
--- and assignments are objects keyed by reference: @{"\@wall": ["\@bear"]}@.
+-- | Keyed, so a move reads @{"Attack": ["$bear"]}@ and a pass @"Pass"@. Blocks
+-- and assignments are objects keyed by reference: @{"$wall": ["$bear"]}@.
 codec :: Codec.Codec Move.Move
 codec =
   Arm.keyed

@@ -21,7 +21,7 @@
     "step": "Upkeep"
   },
   "timeline": [
-    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@mirror-universe", "targets": ["@carol"], "costOrder": [0, 1] } } }
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$mirror-universe", "targets": ["$carol"], "costOrder": [0, 1] } } }
   ],
   "final": [
     { "Life": { "player": "alice", "life": 13 } },

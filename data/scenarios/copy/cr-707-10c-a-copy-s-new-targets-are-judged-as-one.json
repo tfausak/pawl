@@ -30,13 +30,13 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hammer", "targetsBySlot": { "dealer": ["@giant"], "victim": ["@wall"] }, "mana": ["@mountain-1", "@mountain-2", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@twincast", "targets": ["Fall of the Hammer"], "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$hammer", "targetsBySlot": { "dealer": ["$giant"], "victim": ["$wall"] }, "mana": ["$mountain-1", "$mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$twincast", "targets": ["Fall of the Hammer"], "mana": ["$island-1", "$island-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "dealer": ["@giant"], "victim": ["@giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "dealer": ["$giant"], "victim": ["$giant"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@wall", "damage": 6 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@giant", "damage": 0 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "$wall", "damage": 6 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "$giant", "damage": 0 } } }
   ]
 }

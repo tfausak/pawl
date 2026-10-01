@@ -20,9 +20,9 @@
     ]
   },
   "timeline": [
-    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$attacker"]}},
     {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@screen": ["@attacker"]}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": ["@screen"]}}}
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"$screen": ["$attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$attacker", "blockers": ["$screen"]}}}
   ]
 }

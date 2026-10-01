@@ -21,10 +21,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@mammoth", "keyword": { "type": "Deathtouch" }, "count": 0 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@gift", "targets": ["@mammoth"], "mana": ["@forest-1", "@forest-2", "@forest-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$mammoth", "keyword": { "type": "Deathtouch" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$gift", "targets": ["$mammoth"], "mana": ["$forest-1", "$forest-2", "$forest-3"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@mammoth", "keyword": { "type": "Trample" }, "count": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@mammoth", "keyword": { "type": "Deathtouch" }, "count": 1 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$mammoth", "keyword": { "type": "Trample" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$mammoth", "keyword": { "type": "Deathtouch" }, "count": 1 } } }
   ]
 }

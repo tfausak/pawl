@@ -18,9 +18,9 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@first": ["@attacker"], "@second": ["@attacker"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@attacker", "do": { "AssignDamage": { "@first": 2 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$first": ["$attacker"], "$second": ["$attacker"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "$attacker", "do": { "AssignDamage": { "$first": 2 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
   ]
 }

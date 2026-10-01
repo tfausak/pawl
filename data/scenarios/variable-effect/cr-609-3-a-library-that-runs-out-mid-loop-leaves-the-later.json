@@ -34,7 +34,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@eruption", "targets": ["@alice", "@bob", "@carol"], "mana": ["@mountain1", "@mountain2", "@mountain3", "@mountain4", "@mountain5", "@mountain6", "@mountain7", "@mountain8", "@mountain9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$eruption", "targets": ["$alice", "$bob", "$carol"], "mana": ["$mountain1", "$mountain2", "$mountain3", "$mountain4", "$mountain5", "$mountain6", "$mountain7", "$mountain8", "$mountain9"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 19 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },

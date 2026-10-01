@@ -25,7 +25,7 @@
   },
   "timeline": [
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "ChooseDefender": "carol" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@one", "@two"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@one": "@carol", "@two": "@carol" } } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$one", "$two"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "$one": "$carol", "$two": "$carol" } } } }
   ]
 }

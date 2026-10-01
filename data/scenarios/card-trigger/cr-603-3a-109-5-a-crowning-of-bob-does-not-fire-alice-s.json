@@ -31,7 +31,7 @@
   },
   "timeline": [
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": null } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@denethor", "targetsBySlot": { "player": ["@bob"], "damage": ["@carol"] }, "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4"], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$denethor", "targetsBySlot": { "player": ["$bob"], "damage": ["$carol"] }, "mana": ["$mountain-1", "$mountain-2", "$mountain-3", "$mountain-4"], "costOrder": [0, 1] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": "bob" } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Custodi Lich", "count": 1 } } },

@@ -19,11 +19,11 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "@statue", "types": ["Artifact"] } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@statue", "subtypes": [] } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Activate": { "object": "@statue", "mana": ["@mountain-1", "@mountain-2"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "$statue", "types": ["Artifact"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "$statue", "subtypes": [] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Activate": { "object": "$statue", "mana": ["$mountain-1", "$mountain-2"] } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "@statue", "types": ["Artifact", "Creature"] } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@statue", "subtypes": ["Golem"] } } }
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "$statue", "types": ["Artifact", "Creature"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "$statue", "subtypes": ["Golem"] } } }
   ]
 }

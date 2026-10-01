@@ -23,31 +23,31 @@ import qualified Pawl.Types.TypeSwap as TypeSwap.Type
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Move" $ do
   Spec.it s "Cast" $
-    Common.assertCodec s Move.codec (Move.Type.Cast (Casting.Type.MkCasting (ref "bolt") Choices.Type.none)) " {\"Cast\":{\"object\":\"@bolt\"}} "
+    Common.assertCodec s Move.codec (Move.Type.Cast (Casting.Type.MkCasting (ref "bolt") Choices.Type.none)) " {\"Cast\":{\"object\":\"$bolt\"}} "
   Spec.it s "PlayLand" $
-    Common.assertCodec s Move.codec (Move.Type.PlayLand (ref "land")) " {\"PlayLand\":\"@land\"} "
+    Common.assertCodec s Move.codec (Move.Type.PlayLand (ref "land")) " {\"PlayLand\":\"$land\"} "
   Spec.it s "Activate" $
-    Common.assertCodec s Move.codec (Move.Type.Activate (Activation.Type.MkActivation (ref "stone") Nothing Choices.Type.none)) " {\"Activate\":{\"object\":\"@stone\"}} "
+    Common.assertCodec s Move.codec (Move.Type.Activate (Activation.Type.MkActivation (ref "stone") Nothing Choices.Type.none)) " {\"Activate\":{\"object\":\"$stone\"}} "
   Spec.it s "Attack" $
-    Common.assertCodec s Move.codec (Move.Type.Attack (Seq.fromList [ref "bear", ref "wolf"])) " {\"Attack\":[\"@bear\",\"@wolf\"]} "
+    Common.assertCodec s Move.codec (Move.Type.Attack (Seq.fromList [ref "bear", ref "wolf"])) " {\"Attack\":[\"$bear\",\"$wolf\"]} "
   Spec.it s "Block is keyed by blocker" $
-    Common.assertCodec s Move.codec (Move.Type.Block (Map.singleton (ref "wall") (Set.singleton (ref "bear")))) " {\"Block\":{\"@wall\":[\"@bear\"]}} "
+    Common.assertCodec s Move.codec (Move.Type.Block (Map.singleton (ref "wall") (Set.singleton (ref "bear")))) " {\"Block\":{\"$wall\":[\"$bear\"]}} "
   Spec.it s "AssignDamage is keyed by recipient" $
-    Common.assertCodec s Move.codec (Move.Type.AssignDamage (Map.fromList [(ref "first", 1), (ref "second", 1)])) " {\"AssignDamage\":{\"@first\":1,\"@second\":1}} "
+    Common.assertCodec s Move.codec (Move.Type.AssignDamage (Map.fromList [(ref "first", 1), (ref "second", 1)])) " {\"AssignDamage\":{\"$first\":1,\"$second\":1}} "
   Spec.it s "ChooseDefender" $
     Common.assertCodec s Move.codec (Move.Type.ChooseDefender (Label.Type.MkLabel (Text.pack "bob"))) " {\"ChooseDefender\":\"bob\"} "
   Spec.it s "ChooseAttackTarget" $
-    Common.assertCodec s Move.codec (Move.Type.ChooseAttackTarget (ref "bob")) " {\"ChooseAttackTarget\":\"@bob\"} "
+    Common.assertCodec s Move.codec (Move.Type.ChooseAttackTarget (ref "bob")) " {\"ChooseAttackTarget\":\"$bob\"} "
   Spec.it s "OrderTimestamps" $
-    Common.assertCodec s Move.codec (Move.Type.OrderTimestamps (Seq.fromList [ref "first", ref "second"])) " {\"OrderTimestamps\":[\"@first\",\"@second\"]} "
+    Common.assertCodec s Move.codec (Move.Type.OrderTimestamps (Seq.fromList [ref "first", ref "second"])) " {\"OrderTimestamps\":[\"$first\",\"$second\"]} "
   Spec.it s "ChooseOptional" $
     Common.assertCodec s Move.codec (Move.Type.ChooseOptional OptionalDecision.Type.Exercises) " {\"ChooseOptional\":{\"type\":\"Exercises\"}} "
   Spec.it s "ChooseToPay" $
     Common.assertCodec s Move.codec (Move.Type.ChooseToPay (Paying.Type.MkPaying PaymentDecision.Type.Pays Choices.Type.none)) " {\"ChooseToPay\":{\"decision\":{\"type\":\"Pays\"}}} "
   Spec.it s "ChooseTargets is keyed by slot" $
-    Common.assertCodec s Move.codec (Move.Type.ChooseTargets (Map.singleton (SlotName.Type.MkSlotName (Text.pack "target")) (Seq.singleton (ref "moon")))) " {\"ChooseTargets\":{\"target\":[\"@moon\"]}} "
+    Common.assertCodec s Move.codec (Move.Type.ChooseTargets (Map.singleton (SlotName.Type.MkSlotName (Text.pack "target")) (Seq.singleton (ref "moon")))) " {\"ChooseTargets\":{\"target\":[\"$moon\"]}} "
   Spec.it s "OrderTriggers, null for a sourceless trigger" $
-    Common.assertCodec s Move.codec (Move.Type.OrderTriggers (Seq.fromList [Just (ref "ghoul"), Nothing])) " {\"OrderTriggers\":[\"@ghoul\",null]} "
+    Common.assertCodec s Move.codec (Move.Type.OrderTriggers (Seq.fromList [Just (ref "ghoul"), Nothing])) " {\"OrderTriggers\":[\"$ghoul\",null]} "
   Spec.it s "ChooseTypeSwap" $
     Common.assertCodec s Move.codec (Move.Type.ChooseTypeSwap (TypeSwap.Type.MkTypeSwap Subtype.Type.Goblin Subtype.Type.Elf)) " {\"ChooseTypeSwap\":{\"from\":{\"type\":\"Goblin\"},\"to\":{\"type\":\"Elf\"}}} "
   Spec.it s "Concede" $

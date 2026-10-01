@@ -49,10 +49,10 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@escape", "mana": ["@p1", "@p2", "@p3", "@p4", "@p5", "@p6"] } } },
-    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@late", "mana": ["@m1", "@m2", "@m3"] } } },
-    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@early", "Goblin Chariot"] } },
-    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": { "@early": "@carol", "Goblin Chariot": "@carol" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$escape", "mana": ["$p1", "$p2", "$p3", "$p4", "$p5", "$p6"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$late", "mana": ["$m1", "$m2", "$m3"] } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$early", "Goblin Chariot"] } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": { "$early": "$carol", "Goblin Chariot": "$carol" } } } },
     { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } },
     { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "carol", "life": 16 } } }
   ]

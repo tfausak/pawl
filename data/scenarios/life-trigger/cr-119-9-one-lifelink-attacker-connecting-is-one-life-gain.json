@@ -27,11 +27,11 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@child", "@pridemate"] } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@vigil", "@pridemate"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$child", "$pridemate"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["$vigil", "$pridemate"] } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 1 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 22 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "@pridemate", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "$pridemate", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
   ]
 }

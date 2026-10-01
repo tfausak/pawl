@@ -18,8 +18,8 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@blade-instructor", "@hill-giant"] } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@hill-giant", "power": 3, "toughness": 3 } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@blade-instructor", "power": 3, "toughness": 1 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$blade-instructor", "$hill-giant"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "$hill-giant", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "$blade-instructor", "power": 3, "toughness": 1 } } }
   ]
 }

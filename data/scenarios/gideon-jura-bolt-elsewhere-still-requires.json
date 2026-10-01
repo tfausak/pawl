@@ -24,11 +24,11 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@gideon", "ability": 0, "targets": ["@bob"] } } },
-    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@alice"], "mana": ["@m1"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$gideon", "ability": 0, "targets": ["$bob"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bolt", "targets": ["$alice"], "mana": ["$m1"] } } },
     { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
     { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
-    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@gideon" } } } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": { "$piker": "$gideon" } } } },
     { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 17 } } }
   ]
 }

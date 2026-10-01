@@ -25,7 +25,7 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@celestine-the-living-saint", "@child-of-night"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$celestine-the-living-saint", "$child-of-night"] } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Block": {} } },
     { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Life": { "player": "alice", "life": 1 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Life": { "player": "bob", "life": 25 } } }

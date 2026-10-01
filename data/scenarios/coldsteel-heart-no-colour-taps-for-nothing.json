@@ -19,10 +19,10 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@elves", "mana": ["@heart", "@forest"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$elves", "mana": ["$heart", "$forest"] } } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Llanowar Elves", "count": 1 } },
-    { "Tapped": { "object": "@heart", "tapped": true } }
+    { "Tapped": { "object": "$heart", "tapped": true } }
   ]
 }

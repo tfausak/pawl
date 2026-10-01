@@ -19,14 +19,14 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@swine"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$swine"] } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@swine"], "@sorcerer": ["@swine"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@swine", "do": { "AssignDamage": { "@piker": 2, "@sorcerer": 2 } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@swine", "@swine"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$piker": ["$swine"], "$sorcerer": ["$swine"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "$swine", "do": { "AssignDamage": { "$piker": 2, "$sorcerer": 2 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["$swine", "$swine"] } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "alice", "life": 17 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@swine", "damage": 3 } } }
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "$swine", "damage": 3 } } }
   ]
 }

@@ -65,8 +65,8 @@
   },
   "timeline": [
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@burst", "targets": ["@alice"], "mana": ["@mountain1", null]}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Activate": {"object": "@brothers", "targets": ["@alice"], "mana": ["@mountain2", "@mountain3", "@mountain4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$burst", "targets": ["$alice"], "mana": ["$mountain1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Activate": {"object": "$brothers", "targets": ["$alice"], "mana": ["$mountain2", "$mountain3", "$mountain4"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 19}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "bob", "life": 19}}},
@@ -78,7 +78,7 @@
     {"turn": 1, "step": "PostcombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 10}}},
     {"turn": 1, "step": "EndStep", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 9}}},
-    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Counters": {"object": "@gnarlbark", "kind": {"type": "MinusOneMinusOne"}, "count": 1}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Counters": {"object": "$gnarlbark", "kind": {"type": "MinusOneMinusOne"}, "count": 1}}},
     {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "alice", "life": 17}}},
     {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "bob", "life": 19}}},
     {"turn": 2, "step": "Upkeep", "player": "bob", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 9}}}

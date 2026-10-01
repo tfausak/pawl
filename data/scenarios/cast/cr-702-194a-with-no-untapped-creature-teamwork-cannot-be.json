@@ -21,9 +21,9 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@tactics", "targets": ["@giant"], "mana": ["@m1", "@m2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$tactics", "targets": ["$giant"], "mana": ["$m1", "$m2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@giant", "keyword": { "type": "DoubleStrike" }, "count": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@giant", "keyword": { "type": "Trample" }, "count": 0 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$giant", "keyword": { "type": "DoubleStrike" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$giant", "keyword": { "type": "Trample" }, "count": 0 } } }
   ]
 }

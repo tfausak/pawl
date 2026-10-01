@@ -20,11 +20,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@draught", "targets": ["@piker"], "mana": ["@plains"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["@pridemate", "@pridemate"] } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$draught", "targets": ["$piker"], "mana": ["$plains"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["$pridemate", "$pridemate"] } }
   ],
   "final": [
     { "Life": { "player": "alice", "life": 25 } },
-    { "Counters": { "object": "@pridemate", "kind": { "type": "PlusOnePlusOne" }, "count": 2 } }
+    { "Counters": { "object": "$pridemate", "kind": { "type": "PlusOnePlusOne" }, "count": 2 } }
   ]
 }

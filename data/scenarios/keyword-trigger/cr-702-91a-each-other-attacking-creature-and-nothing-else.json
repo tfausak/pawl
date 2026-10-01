@@ -19,13 +19,13 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hero", "@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@hero", "@hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$hero", "$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$hero", "$hero"] } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Soldier Token", "Soldier Token#2"] } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 1 } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@hero", "power": 3, "toughness": 4 } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@wall", "power": 0, "toughness": 8 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 3, "toughness": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$hero", "power": 3, "toughness": 4 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$wall", "power": 0, "toughness": 8 } } }
   ]
 }

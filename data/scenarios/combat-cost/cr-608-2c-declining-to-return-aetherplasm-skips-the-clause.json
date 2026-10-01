@@ -17,11 +17,11 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@golem"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@plasm": ["@golem"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$golem"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$plasm": ["$golem"] } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "ChooseOptional": { "type": "Declines" } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Icehide Golem", "count": 1 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@golem", "damage": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "$golem", "damage": 1 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Cabal Evangel", "count": 0 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Cabal Evangel", "count": 1 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Aetherplasm", "count": 0 } } },

@@ -20,6 +20,6 @@ spec s = Spec.describe s "Pawl.Codec.Paying" $ do
       s
       Paying.codec
       (Paying.Type.MkPaying PaymentDecision.Type.Pays Choices.Type.none {Choices.Type.manaSources = Seq.fromList [Just (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "island")))]})
-      " {\"decision\":{\"type\":\"Pays\"},\"mana\":[\"@island\"]} "
+      " {\"decision\":{\"type\":\"Pays\"},\"mana\":[\"$island\"]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Paying.codec

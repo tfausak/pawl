@@ -52,8 +52,8 @@
     "sharedTeamTurns": true
   },
   "timeline": [
-    { "turn": 1, "step": "Upkeep", "player": "carol", "do": { "OrderTriggers": ["@lair", "@lair"] } },
-    { "turn": 1, "step": "EndStep", "player": "carol", "do": { "OrderTriggers": ["@lair", "@lair"] } },
+    { "turn": 1, "step": "Upkeep", "player": "carol", "do": { "OrderTriggers": ["$lair", "$lair"] } },
+    { "turn": 1, "step": "EndStep", "player": "carol", "do": { "OrderTriggers": ["$lair", "$lair"] } },
     { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Island", "count": 1 } } },

@@ -20,6 +20,6 @@
   "timeline": [
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "@jace", "kind": { "type": "Loyalty" }, "count": 3 } } }
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "$jace", "kind": { "type": "Loyalty" }, "count": 3 } } }
   ]
 }

@@ -27,7 +27,7 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@unbury", "modes": [1], "targetsBySlot": {"first": ["@piker"], "second": ["@changeling"]}, "mana": ["@swamp1", "@swamp2"]}} },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$unbury", "modes": [1], "targetsBySlot": {"first": ["$piker"], "second": ["$changeling"]}, "mana": ["$swamp1", "$swamp2"]}} },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1}} },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Woodland Changeling", "count": 1}} },

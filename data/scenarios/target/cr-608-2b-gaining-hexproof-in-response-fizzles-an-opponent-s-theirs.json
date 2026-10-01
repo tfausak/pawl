@@ -29,13 +29,13 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@doom-blade", "targets": ["@piker"], "mana": ["@swamp1", "@swamp2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$doom-blade", "targets": ["$piker"], "mana": ["$swamp1", "$swamp2"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@saiba", "mana": ["@island1", "@island2"]}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "source": "Saiba Cryptomancer", "do": {"ChooseTargets": {"backupRecipient": ["@piker"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$saiba", "mana": ["$island1", "$island2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "source": "Saiba Cryptomancer", "do": {"ChooseTargets": {"backupRecipient": ["$piker"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "@piker", "keyword": {"type": "Hexproof"}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$piker", "keyword": {"type": "Hexproof"}, "count": 1}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 0}}},

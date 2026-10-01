@@ -43,10 +43,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@soulfire", "targets": ["@bob"], "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5", "@mountain-6", "@mountain-7", "@mountain-8", "@mountain-9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$soulfire", "targets": ["$bob"], "mana": ["$mountain-1", "$mountain-2", "$mountain-3", "$mountain-4", "$mountain-5", "$mountain-6", "$mountain-7", "$mountain-8", "$mountain-9"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 1 } } },
-    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Goblin Piker", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Goblin Piker", "mana": ["$mountain-1", "$mountain-2", null] } } },
     { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
     { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 0 } } }

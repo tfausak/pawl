@@ -23,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackersAre" $ do
               ]
           )
       )
-      " {\"attackers\":{\"@bear\":\"@bob\",\"Goblin Piker#2\":\"Jace Beleren\"}} "
+      " {\"attackers\":{\"$bear\":\"$bob\",\"Goblin Piker#2\":\"Jace Beleren\"}} "
   Spec.it s "nothing attacking" $
     Common.assertCodec s AttackersAre.codec (AttackersAre.Type.MkAttackersAre Map.empty) " {\"attackers\":{}} "
   Spec.it s "has a schema" $

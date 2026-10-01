@@ -47,11 +47,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@fodder", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$fodder", "mana": ["$mountain-1", "$mountain-2", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Token", "count": 2 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "PowerToughness": { "object": "Goblin Token", "power": 0, "toughness": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "PowerToughness": { "object": "Goblin Token#2", "power": 0, "toughness": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "PowerToughness": { "object": "$piker", "power": 2, "toughness": 1 } } }
   ]
 }
