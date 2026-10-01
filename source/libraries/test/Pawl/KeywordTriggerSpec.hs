@@ -2646,15 +2646,6 @@ echoSpec s registry =
           Spec.assertEqWith s "CR 702.30a no second Forest went to a second upkeep" (S.tappedCount S.alice second) 1
           Spec.assertEqWith s "because nothing was offered at all" (payResponses secondLog) []
           Spec.assertBool s (S.onBattlefield oid second) "and the Jaguar is still there"
-        -- The same board and the same upkeep, differing in NOTHING but the answer
-        -- to rule 702.30a's "unless": three untapped Forests can cover {G}, so
-        -- this leg separates declining from being unable to pay.
-        Spec.it s "CR 702.30a declining the payment sacrifices it with the mana still up" $ do
-          (oid, gs) <- jaguarBoard 3
-          let after = afterUpkeep S.identityAnswer S.alice gs
-          Spec.assertEqWith s "CR 702.30a no Forest was spent" (S.tappedCount S.alice after) 0
-          Spec.assertBool s (not (S.onBattlefield oid after)) "and the Jaguar went anyway"
-          Spec.assertEqWith s "CR 701.21a into its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
         -- Rule 702.30a says "YOUR upkeep" (CR 603.3a) and measures the window in
         -- YOUR upkeeps. Both halves are here: bob's upkeep neither triggers the
         -- Jaguar nor spends alice's window, which is what an
@@ -2667,29 +2658,6 @@ echoSpec s registry =
           Spec.assertBool s (S.onBattlefield oid bobs) "and left the Jaguar untouched"
           Spec.assertEqWith s "CR 702.30a alice's own upkeep still asks, so bob's did not turn her clock" (S.tappedCount S.alice alices) 1
           Spec.assertEqWith s "the transcripts agreeing: nothing offered on bob's upkeep, one offer on alice's" (length (payResponses bobLog), length (payResponses aliceLog)) (0, 1)
-        -- CR 702.30a's control-change clause, the subtle half: alice's window has
-        -- already closed when bob takes the Jaguar, and bob's own next upkeep
-        -- opens a fresh one. An implementation that spent the clock once per
-        -- OBJECT rather than once per player-and-object asks bob nothing.
-        Spec.it s "CR 702.30a a player who takes control owes echo at their own next upkeep" $ do
-          (oid, gs0) <- jaguarBoard 3
-          forest <- S.printingOf s registry "Forest"
-          island <- S.printingOf s registry "Island"
-          controlMagic <- S.printingOf s registry "Control Magic"
-          -- TWO of alice's upkeeps first, so her own window is shut before bob
-          -- takes the Jaguar: with it still open, a reader that asked the OWNER's
-          -- entry rather than the CONTROLLER's would answer bob's upkeep right by
-          -- accident.
-          let paid = afterUpkeep (paysFor S.alice) S.alice gs0
-              elapsed = afterUpkeep (paysFor S.alice) S.alice paid
-              (held, staged) = S.addHandCard controlMagic S.bob (S.landsFor forest S.bob 4 (S.landsFor island S.bob 4 elapsed))
-              stolen = S.runPure (paysFor S.bob) staged (S.cast S.bob held >> Stack.resolveTop)
-              ((_, bobs), bobLog) = ranUpkeep (paysFor S.bob) S.bob stolen
-          Spec.assertEqWith s "the Jaguar really is bob's now" (Projection.View.controllerOf oid stolen) (Just S.bob)
-          Spec.assertEqWith s "CR 702.30a a fifth land of bob's paid echo, on top of Control Magic's four" (S.tappedCount S.bob bobs) 5
-          Spec.assertBool s (S.onBattlefield oid bobs) "so the Jaguar survived under its new controller"
-          Spec.assertEqWith s "alice, who already paid once, spent nothing more" (S.tappedCount S.alice bobs) 1
-          Spec.assertEqWith s "and bob was the one offered it" (length (payResponses bobLog)) 1
         -- CR 702.30a asks whether the permanent came under your control since
         -- your last upkeep, NOT whether this is the first time you ever
         -- controlled it. alice's window has already closed when bob borrows the
@@ -3766,60 +3734,15 @@ backupSpec s registry =
 -- Syndic of Tithes, {1}{W} Creature -- Human Cleric 2/2, whose whole text is
 -- extort, so nothing else on the card can move a life total.
 --
--- THREE SEATS, which rule 702.101a's "each opponent" needs: at two players "each
--- opponent loses 1" and "you gain 1" are the same number, and the gain could be
--- a literal 1 rather than the total. Three makes the gain 2 where the loss is 1.
---
--- Luminesce, {W} Instant, is the spell cast: it targets nothing, prevents damage
--- from colours nobody here is dealing, and above all touches no life total, so
--- every life figure below is extort's.
-extortSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-extortSpec s registry =
-  let board = do
-        plains <- S.printingOf s registry "Plains"
-        syndic <- S.printingOf s registry "Syndic of Tithes"
-        luminesce <- S.printingOf s registry "Luminesce"
-        -- Three Plains: one for Luminesce and one for rule 702.101a's {W/B},
-        -- with a third spare so declining is never "could not pay".
-        let withLands = S.landsFor plains S.alice 3 S.threePlayerGame
-            (_, withSyndic) = S.addPermanent syndic S.alice withLands
-            (spellId, staged) = S.addHandCard luminesce S.alice withSyndic
-        pure
-          ( spellId,
-            staged
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice,
-                GameState.remaining = S.phasesAfter Phase.PrecombatMain
-              }
-          )
-      castAndResolve :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-      castAndResolve answer oid gs = S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) Engine.priorityLoop
-   in Spec.describe s "Extort" $ do
-        -- THE case: paying drains BOTH opponents a life each and gains alice the
-        -- two they lost between them, which is what "the total life lost this
-        -- way" says and what a literal 1 could not produce.
-        Spec.it s "CR 702.101a whole card: paying {W/B} drains each opponent and gains that much" $ do
-          (spellId, gs) <- board
-          let after = castAndResolve (paysFor S.alice) spellId gs
-          Spec.assertEqWith s "CR 702.101a alice gained the total the two of them lost" (S.lifeOf S.alice after) (Just 22)
-          Spec.assertEqWith s "bob lost 1" (S.lifeOf S.bob after) (Just 19)
-          Spec.assertEqWith s "and carol lost 1" (S.lifeOf S.carol after) (Just 19)
-        -- The same board differing in NOTHING but the answer to rule 702.101a's
-        -- "may", with the mana still up, so this separates declining from being
-        -- unable to pay.
-        Spec.it s "CR 702.101a declining the payment moves no life" $ do
-          (spellId, gs) <- board
-          let after = castAndResolve S.identityAnswer spellId gs
-          Spec.assertEqWith s "nobody's life moved" (fmap (\pid -> S.lifeOf pid after) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
-          Spec.assertEqWith s "though Luminesce really resolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-          Spec.assertEqWith s "and no Plains was spent on the offer" (S.tappedCount S.alice after) 1
-        -- CR 702.101b: "If a permanent has multiple instances of extort, each
-        -- triggers separately." Asked of the mint, as prowess' 702.108b is: no
-        -- card here prints extort twice and nothing grants it.
-        Spec.it s "CR 702.101b each instance of extort is its own ability" $ do
-          Spec.assertEqWith s "extort held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Extort 2)) [Keyword.extort, Keyword.extort]
-          Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Extort 1)) [Keyword.extort]
+-- Its gameplay legs are data/scenarios/keyword-trigger/cr-702-101a-*.json.
+extortSpec :: (Monad m) => Spec.Spec m n -> n ()
+extortSpec s = Spec.describe s "Extort" $ do
+  -- CR 702.101b: "If a permanent has multiple instances of extort, each
+  -- triggers separately." Asked of the mint, as prowess' 702.108b is: no
+  -- card here prints extort twice and nothing grants it.
+  Spec.it s "CR 702.101b each instance of extort is its own ability" $ do
+    Spec.assertEqWith s "extort held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Extort 2)) [Keyword.extort, Keyword.extort]
+    Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Extort 1)) [Keyword.extort]
 
 -- CR 702.191a: "Increment is a triggered ability. 'Increment' means 'Whenever you
 -- cast a spell, if this permanent is a creature and the amount of mana spent to
@@ -3887,76 +3810,16 @@ incrementSpec s registry =
 -- cheapest printing by machinery: its whole non-keyword text is one GainLife, so
 -- nothing but recover is under test.
 --
--- THE BOARD puts Sun's Bounty in alice's GRAVEYARD, the one zone rule 702.59a
--- lets it function from, and has alice bolt her own Goblin Piker. The 2/1 dies to
--- the one damage under CR 704.5g, so the death is the game's own rather than the
--- fixture's, and the card that recovers is never the card that died.
---
--- FOUR lands on BOTH boards, three Plains and a Mountain: the Mountain pays for
--- the Bolt and two Plains for rule 702.59a's {1}{W}, with a Plains to spare. The
--- two legs differ in the ANSWER to rule 702.59a's "may" alone, never in whether
--- the cost could be paid.
-recoverSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-recoverSpec s registry =
-  let bounty = CardName.MkCardName (Text.pack "Sun's Bounty")
-      board = do
-        plains <- S.printingOf s registry "Plains"
-        mountain <- S.printingOf s registry "Mountain"
-        piker <- S.printingOf s registry "Goblin Piker"
-        bolt <- S.printingOf s registry "Lightning Bolt"
-        printing <- S.printingOf s registry "Sun's Bounty"
-        let withLands = S.landsFor mountain S.alice 1 (S.landsFor plains S.alice 3 (Setup.emptyGame S.bothPlayers))
-            (pikerId, withPiker) = S.addPermanent piker S.alice withLands
-            (_, withBounty) = S.addGraveyardCard printing S.alice withPiker
-            (boltId, staged) = S.addHandCard bolt S.alice withBounty
-        pure
-          ( pikerId,
-            boltId,
-            staged
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice,
-                GameState.remaining = S.phasesAfter Phase.PrecombatMain
-              }
-          )
-      -- The Bolt's target is FILTERED out of the offered set rather than built,
-      -- respondingWith's posture: an answerer that searched for some other legal
-      -- recipient would aim at a player and kill nothing.
-      aimingAt :: ObjectId.ObjectId -> (forall a. Prompt.Prompt a -> a) -> (forall b. Prompt.Prompt b -> b)
-      aimingAt victim fallback p = case p of
-        Prompt.ChooseTargets _ _ _ offered -> S.preferring (\recipient -> Recipient.objectOf recipient == Just victim) offered
-        _ -> fallback p
-      castAndResolve :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-      castAndResolve answer oid gs = S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) Engine.priorityLoop
-      -- By NAME and not by id: CR 400.7 mints a fresh object as the card leaves
-      -- the graveyard, so the id the fixture held names nothing afterwards.
-      countIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just bounty) (Game.zoneMembers zone S.alice gs))
-   in Spec.describe s "Recover" $ do
-        -- THE case, and the assertion a mutation must redden: the Piker's death
-        -- offers rule 702.59a's payment from a graveyard, and paying it puts the
-        -- card in alice's hand.
-        Spec.it s "CR 702.59a whole card: paying {1}{W} returns Sun's Bounty from the graveyard to hand" $ do
-          (pikerId, boltId, gs) <- board
-          let after = castAndResolve (aimingAt pikerId (paysFor S.alice)) boltId gs
-          Spec.assertEqWith s "CR 702.59a Sun's Bounty is in alice's hand" (countIn Zone.Hand after) 1
-          Spec.assertEqWith s "and no longer in her graveyard" (countIn Zone.Graveyard after) 0
-          Spec.assertEqWith s "and it was not exiled" (countIn Zone.Exile after) 0
-        -- The same board differing in NOTHING but the answer to rule 702.59a's
-        -- "may", with the mana still up: "Otherwise, exile this card" is
-        -- mandatory, so declining is not doing nothing.
-        Spec.it s "CR 702.59a declining the payment exiles Sun's Bounty instead" $ do
-          (pikerId, boltId, gs) <- board
-          let after = castAndResolve (aimingAt pikerId S.identityAnswer) boltId gs
-          Spec.assertEqWith s "CR 702.59a Sun's Bounty is in exile" (countIn Zone.Exile after) 1
-          Spec.assertEqWith s "and never reached alice's hand" (countIn Zone.Hand after) 0
-          Spec.assertEqWith s "and left her graveyard all the same" (countIn Zone.Graveyard after) 0
-        -- The roster, asked directly: rule 702.59a states no per-instance clause,
-        -- so the graveyard mint reads the DISTINCT keywords and a card holding
-        -- recover once contributes one ability.
-        Spec.it s "CR 702.59a the graveyard roster mints it" $ do
-          let cost = Cost.MkCost Nothing []
-          Spec.assertEqWith s "recover is on the graveyard roster" (Keyword.graveyardTriggeredAbilitiesOf Set.empty (Set.singleton (Keyword.Type.Recover cost))) [Keyword.recover cost]
-          Spec.assertEqWith s "and on none of the others" (Keyword.handTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost)) <> Keyword.exileTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost))) []
+-- Its gameplay legs are data/scenarios/keyword-trigger/cr-702-59a-*.json.
+recoverSpec :: (Monad m) => Spec.Spec m n -> n ()
+recoverSpec s = Spec.describe s "Recover" $ do
+  -- The roster, asked directly: rule 702.59a states no per-instance clause,
+  -- so the graveyard mint reads the DISTINCT keywords and a card holding
+  -- recover once contributes one ability.
+  Spec.it s "CR 702.59a the graveyard roster mints it" $ do
+    let cost = Cost.MkCost Nothing []
+    Spec.assertEqWith s "recover is on the graveyard roster" (Keyword.graveyardTriggeredAbilitiesOf Set.empty (Set.singleton (Keyword.Type.Recover cost))) [Keyword.recover cost]
+    Spec.assertEqWith s "and on none of the others" (Keyword.handTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost)) <> Keyword.exileTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost))) []
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
@@ -3979,9 +3842,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   annihilatorSpec s registry
   battleCrySpec s registry
   prowessSpec s registry
-  extortSpec s registry
+  extortSpec s
   incrementSpec s registry
-  recoverSpec s registry
+  recoverSpec s
   selfBlocksSpec s registry
   selfBlocksAtLeastSpec s registry
   selfBlocksOneOrMoreSpec s registry

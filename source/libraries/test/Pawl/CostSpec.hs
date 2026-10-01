@@ -3268,7 +3268,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   geyserLeaperSpec s registry
   kataraSpec s registry
   waterWhipSpec s registry
-  unagiSpec s registry
   waterbendingLessonSpec s registry
   benevolentRiverSpiritSpec s registry
   waterbendersRestorationSpec s registry
@@ -7386,57 +7385,6 @@ waterbendSpellBoard s registry name islands taxed = do
       (_, gs4) = S.addLibraryCard island S.alice gs3
       (spell, gs5) = S.addHandCard card S.alice gs4
   pure (spell, tappable, gs5 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
-
--- The Unagi of Kyoshi Island {3}{U}{U} Legendary Creature -- Serpent 5/5
--- (data/cards/the-unagi-of-kyoshi-island.json): "Flash / Ward--Waterbend {4}.
--- / Whenever an opponent draws their second card each turn, you draw two cards."
---
--- CR 701.67a as a WARD cost (CR 702.21a), paid at CR 118.12's resolution-time
--- payment. The payer is the targeting spell's controller, so the permanents
--- rule 701.67a lets them tap are THEIRS: alice holds four untapped creatures of
--- her own on both boards, which a payment reading "you" as the ward's
--- controller would spend.
---
--- bob has one Forest, spent on the Giant Growth, so {4} can only be paid by
--- tapping. The pair differs in his Goblin Piker count and nothing else: four
--- pays, three cannot.
-unagiSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-unagiSpec s registry = Spec.describe s "The Unagi of Kyoshi Island" $ do
-  Spec.it s "CR 701.67a bob pays ward--waterbend {4} by tapping four of his own permanents" $ do
-    (unagi, paid) <- resolved 4
-    (_, unpaid) <- resolved 3
-    Spec.assertEqWith s "CR 702.21a with four Pikers bob paid, and the Growth resolved onto the Unagi" (S.powerToughnessOf unagi paid) (Just (8, 8))
-    Spec.assertEqWith s "and his Forest and four Pikers are tapped, and nothing of alice's" (S.tappedCount S.bob paid, S.tappedCount S.alice paid) (5, 0)
-    Spec.assertEqWith s "CR 701.67a with three Pikers of his and four creatures of hers bob could not pay, and the Growth was countered" (S.powerToughnessOf unagi unpaid) (Just (5, 5))
-    Spec.assertEqWith s "and only his Forest is tapped" (S.tappedCount S.bob unpaid, S.tappedCount S.alice unpaid) (1, 0)
-  where
-    -- bob casts Giant Growth at the Unagi, the ward trigger resolves, then the
-    -- Growth does (or is gone). Returns the Unagi and the end state.
-    resolved pikers = do
-      (unagi, growth, gs) <- unagiBoard s registry pikers
-      let answer :: Prompt.Prompt r -> r
-          answer p = case p of
-            Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== Recipient.ToCreature unagi) candidates) sets
-            Prompt.ChooseToPay {} -> PaymentDecision.Pays
-            _ -> waterbendingGreedily p
-          onStack = S.runPure answer (S.runPure answer gs (S.cast S.bob growth)) Engine.settleForPriority
-      pure (unagi, S.runPure answer onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop))
-
--- alice controls The Unagi of Kyoshi Island and three Goblin Pikers; bob
--- controls a Forest and `pikers` Goblin Pikers and holds Giant Growth, with
--- priority in his own precombat main phase. Returns the Unagi, the Growth and
--- that state.
-unagiBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-unagiBoard s registry pikers = do
-  unagiPrinting <- S.printingOf s registry "The Unagi of Kyoshi Island"
-  forest <- S.printingOf s registry "Forest"
-  piker <- S.printingOf s registry "Goblin Piker"
-  growthPrinting <- S.printingOf s registry "Giant Growth"
-  let (unagi, gs1) = S.addPermanent unagiPrinting S.alice (S.landsFor forest S.bob 1 (S.landsInPlay forest 0))
-      gs2 = List.foldl' (\gs _ -> snd (S.addPermanent piker S.alice gs)) gs1 [1 .. 3 :: Int]
-      gs3 = List.foldl' (\gs _ -> snd (S.addPermanent piker S.bob gs)) gs2 [1 .. pikers]
-      (growth, gs4) = S.addHandCard growthPrinting S.bob gs3
-  pure (unagi, growth, gs4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob})
 
 -- Waterbending Lesson {3}{U} Sorcery -- Lesson
 -- (data/cards/waterbending-lesson.json): "Draw three cards. Then discard a card

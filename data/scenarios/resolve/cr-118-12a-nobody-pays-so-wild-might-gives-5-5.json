@@ -1,0 +1,40 @@
+{
+  "description": "CR 118.12a nobody pays, so Wild Might gives +5/+5",
+  "note": "The control for carol paying: the same board with every seat declining Wild Might's {2}, so both clauses apply and the 2/1 Goblin Piker gets +1/+1 and +4/+4. Alice tapped her Forests for the cast, so only bob and carol are offered.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Wild Might", "label": "wild-might" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "bob-island" },
+          { "card": "Island", "label": "bob-island-2" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Island", "label": "carol-island" },
+          { "card": "Island", "label": "carol-island-2" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@wild-might", "targets": ["@piker"], "mana": ["@forest", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "Wild Might" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "Wild Might" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 7, "toughness": 6 } } }
+  ]
+}

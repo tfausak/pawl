@@ -1,0 +1,41 @@
+{
+  "description": "CR 702.101a declining the payment moves no life",
+  "note": "The same board differing in nothing but the answer to extort's \"may\", with the mana still up, so declining is separated from being unable to pay: no life moves, Luminesce really resolved, and no Plains beyond Luminesce's own was spent on the offer.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Syndic of Tithes", "label": "syndic" },
+          { "card": "Plains", "label": "plains-1" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Plains", "label": "plains-3" }
+        ],
+        "hand": [{ "card": "Luminesce", "label": "luminesce" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@luminesce", "mana": ["@plains-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "@syndic" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 20 } },
+    { "Life": { "player": "bob", "life": 20 } },
+    { "Life": { "player": "carol", "life": 20 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Luminesce", "count": 1 } },
+    { "Tapped": { "object": "@plains-1", "tapped": true } },
+    { "Tapped": { "object": "@plains-2", "tapped": false } },
+    { "Tapped": { "object": "@plains-3", "tapped": false } },
+    { "Tapped": { "object": "@syndic", "tapped": false } }
+  ]
+}

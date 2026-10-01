@@ -1,0 +1,38 @@
+{
+  "description": "CR 118.12 bob and carol each pay half their own life, so Temporal Extortion is countered",
+  "note": "CR 119.4 / 107.1a: \"half their life, rounded up\" is each payer's own half, bob 8 of 15 and carol 5 of 9, and carol is still asked after bob paid, per Temporal Extortion's ruling. Alice declines her own cast trigger's offer.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Swamp", "label": "swamp-4" }
+        ],
+        "hand": [{ "card": "Temporal Extortion", "label": "extortion" }]
+      },
+      {
+        "name": "bob",
+        "life": 15
+      },
+      {
+        "name": "carol",
+        "life": 9
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@extortion", "mana": ["@swamp", "@swamp-2", "@swamp-3", "@swamp-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "Temporal Extortion" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "Temporal Extortion" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "Temporal Extortion" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 7 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Temporal Extortion", "count": 1 } } }
+  ]
+}

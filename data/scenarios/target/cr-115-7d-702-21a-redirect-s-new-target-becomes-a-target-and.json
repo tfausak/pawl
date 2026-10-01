@@ -1,0 +1,51 @@
+{
+  "description": "CR 115.7d / 702.21a Redirect's NEW target becomes a target, and ward fires",
+  "note": "CR 115.7 makes the new target a target of the Growth, so bob's Tomakul Honor Guard's ward fires against alice's spell. The Growth first named alice's Piker, so nothing but the re-target ever names the Guard: 3/1 is the Growth countered, 6/4 a re-target nothing observed. Alice keeps two Forests open, so the countered Growth is her declining rather than being unable. Alice's ward prompt arriving is the ward trigger on the stack over the Growth. Three seats, the board Redirect's cases share.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest1" },
+          { "card": "Forest", "label": "forest2" },
+          { "card": "Forest", "label": "forest3" },
+          { "card": "Goblin Piker", "label": "alice-piker" }
+        ],
+        "hand": [{ "card": "Giant Growth", "label": "growth" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain1" },
+          { "card": "Mountain", "label": "mountain2" },
+          { "card": "Mountain", "label": "mountain3" },
+          { "card": "Mountain", "label": "mountain4" },
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" },
+          { "card": "Tomakul Honor Guard", "label": "guard" },
+          { "card": "Slippery Bogle", "label": "bogle" },
+          { "card": "Goblin Piker", "label": "bob-piker" }
+        ],
+        "hand": [
+          { "card": "Redirect", "label": "redirect" },
+          { "card": "Wild Ricochet", "label": "ricochet" }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@growth", "targets": ["@alice-piker"], "mana": ["@forest1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@redirect", "targets": ["Giant Growth"], "mana": ["@island1", "@island2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@guard"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "@guard" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@guard", "power": 3, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@alice-piker", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Giant Growth", "count": 1 } } }
+  ]
+}
