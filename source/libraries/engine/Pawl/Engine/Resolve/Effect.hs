@@ -2906,7 +2906,14 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- own road seeds no target either (Pawl.Engine.Cast.castProposed). The
         -- second pass below is what relates one re-chosen slot to another.
         seed = Map.withoutKeys (Object.bindings copy) (Map.keysSet slots)
-        fresh = Target.legalSets (Just controller) False seed copyId slots gs
+        -- CR 113.7: what the slots are judged against is the ability's SOURCE
+        -- -- the object CR 113.7a's source reads (power, owner, CR 607.2d's
+        -- chosen colour) are asked of -- and a copied ability keeps its
+        -- original's source (Game.abilitySourceOf). A spell copy is its own
+        -- source. Pawl.TargetSpec's "a Lithoform Engine copy of the Paladin's
+        -- ability" is the proof.
+        aimer = Maybe.fromMaybe copyId (Game.abilitySourceOf copyId gs)
+        fresh = Target.legalSets (Just controller) False seed aimer slots gs
         -- CR 406.4: what this player may not name specifically is offered as
         -- the pile it sits in, exactly as at CR 601.2c. The targets already
         -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
@@ -2945,9 +2952,9 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- target already illegal stands, one legal before must stay legal.
         -- Pawl.TargetSpec's Bioshift cases prove both halves.
         let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
-            already = Target.jointlyIllegal (Just controller) seed copyId slots current gs
+            already = Target.jointlyIllegal (Just controller) seed aimer slots current gs
             caused slot refused = not (Set.isSubsetOf refused (Map.findWithDefault Set.empty slot already))
-            coherent = not (or (Map.mapWithKey caused (Target.jointlyIllegal (Just controller) seed copyId slots drawn gs)))
+            coherent = not (or (Map.mapWithKey caused (Target.jointlyIllegal (Just controller) seed aimer slots drawn gs)))
         Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && coherent) $ do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients (Map.filter (not . Set.null) drawn)) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})

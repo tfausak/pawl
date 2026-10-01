@@ -451,6 +451,29 @@ pentarchPaladinSpec s registry = Spec.describe s "Pentarch Paladin" $ do
         Spec.assertBool s (not (S.onBattlefield pikerId resolved)) "the Piker is destroyed by the dead Paladin's ability"
         Spec.assertBool s (not (S.onBattlefield paladinId murdered)) "because the Paladin had already left before it resolved"
       Nothing -> pure ()
+  -- CR 707.10c with CR 113.7: a copy of the ability keeps the Paladin as its
+  -- source, so its new targets are judged against the colour the Paladin chose.
+  -- A second red Piker joins bob's side after the Paladin aims at the first, and
+  -- Lithoform Engine ({2}, {T}: "Copy target activated or triggered ability you
+  -- control. You may choose new targets for the copy.") copies the ability with
+  -- an answerer preferring the second.
+  Spec.it s "CR 707.10c a Lithoform Engine copy of the Paladin's ability can aim at another permanent of the chosen colour" $ do
+    red <- paladinBoard Color.Red
+    engine <- S.printingOf s registry "Lithoform Engine"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    case (red, Face.activatedAbilities (S.combinedFace engine)) of
+      (Just (_, firstId, _, _, activated), copying : _) -> do
+        let (secondId, g0) = S.addPermanent piker S.bob activated
+            (engineId, g1) = S.addPermanent engine S.alice (S.landsFor plains S.alice 2 g0)
+            copied = S.runPure S.identityAnswer (g1 {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice engineId copying)
+            retargeted = S.runPure (aimAtCreature secondId) copied Stack.resolveTop
+            copyResolved = resolve retargeted
+            bothResolved = resolve copyResolved
+        Spec.assertBool s (not (S.onBattlefield secondId copyResolved)) "the copy, re-aimed, destroys the second red Piker"
+        Spec.assertBool s (S.onBattlefield firstId copyResolved) "while the original has not resolved yet"
+        Spec.assertBool s (not (S.onBattlefield firstId bothResolved)) "and the original then destroys the first"
+      _ -> Spec.assertFailure s "the Paladin board and Lithoform Engine's copying ability"
 
 -- CR 607.2d one road over: From the Rubble's "At the beginning of your end step,
 -- return target creature card of the chosen type from your graveyard to the
