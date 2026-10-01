@@ -430,7 +430,17 @@ candidateCostsGiven permitted pid name oid gs =
                     gs
                     oid
                     cond
-              alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
+              -- CR 113.6d / 613.1f: a printed alternative cost is an ability, so
+              -- a layer-6 wipe takes it from the card wherever it lies. The
+              -- projection is asked only of a face printing one. Pawl.CostSpec's
+              -- "CR 118.9 an Asmoranomardicadaistinaculdacar that perpetually
+              -- lost all abilities has no alternative cost" proves it.
+              alternatives = case Face.alternativeCosts face of
+                [] -> []
+                printedAlternatives ->
+                  if PC.lostAllAbilities (Projection.project oid gs)
+                    then []
+                    else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
               -- CR 702.103a: bestow, offered from EVERY zone the printed cost is
               -- -- "a static ability that functions in any zone from which you
               -- could play the card it's on" -- so it joins `ordinary` below
@@ -1002,14 +1012,15 @@ spellAdjustments targets pid oid gs =
 --
 -- The PRINTED reductions come straight off the object rather than through a
 -- projection: it is the half Cast.asProposed already stamped (CR 709.3b), with
--- its copy stamp's costs laid over it (Game.castingFaceOf, CR 707.2). The
--- GRANTED ones (CR 613.1f) are read off the projection, which is where layer 6
--- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. The
--- KEYWORDS are the projection's too, printed and granted alike (CR 702.41a, CR
--- 702.125a), so a spell given affinity is reduced by it -- Pawl.CostSpec's
--- Mycosynth Golem group proves it. Not
--- implemented: an effect removing a printed reduction from a card off the
--- battlefield (#1859).
+-- its copy stamp's costs laid over it (Game.castingFaceOf, CR 707.2). They are
+-- abilities (CR 113.6d), so a layer-6 wipe in force on the spell takes them
+-- (CR 613.1f) -- Pawl.CostSpec's "CR 601.2f a Thrasta that perpetually lost all
+-- abilities is not reduced" proves it. The GRANTED ones (CR 613.1f) are read
+-- off the projection, which is where layer 6 records them -- Pawl.CostSpec's
+-- Richlau, Headmaster group proves it. The KEYWORDS are the projection's too,
+-- printed and granted alike (CR 702.41a, CR 702.125a), so a spell given
+-- affinity is reduced by it -- Pawl.CostSpec's Mycosynth Golem group proves
+-- it.
 selfReductions :: Set.Set ObjectId -> PlayerId -> ObjectId -> GameState -> [(CostDirection.CostDirection, ManaCost.ManaCost)]
 selfReductions targets pid oid gs =
   let -- CR 109.5: the perspective is the would-be controller, `pid` -- not
@@ -1037,7 +1048,8 @@ selfSentences pid oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, G
   (Just obj, Just card, Just printedFace) ->
     let face = Game.castingFaceOf obj card printedFace
         projected = asSpellProjected pid oid gs
-     in Face.costReductions face <> PC.grantedCostReductions projected <> Keyword.selfCostReductionsOf (PC.keywords projected)
+        printed = if PC.lostAllAbilities projected then [] else Face.costReductions face
+     in printed <> PC.grantedCostReductions projected <> Keyword.selfCostReductionsOf (PC.keywords projected)
   _ -> []
 
 -- CR 601.2a / 613.1f: the keywords of the spell `pid` is casting, printed and
