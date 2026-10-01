@@ -20,7 +20,10 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "CantCastChosenName"
+            "type": "CantCastMatching",
+            "value": {
+              "type": "HasChosenName"
+            }
           },
           "scope": {
             "type": "EachPlayer"
@@ -28,7 +31,10 @@
         },
         {
           "effect": {
-            "type": "CantPlayLandChosenName"
+            "type": "CantPlayLands",
+            "value": {
+              "type": "HasChosenName"
+            }
           },
           "scope": {
             "type": "EachPlayer"

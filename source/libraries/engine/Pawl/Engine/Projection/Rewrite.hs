@@ -462,8 +462,6 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantCastSpells -> effect
   PlayerEffect.CantActivateAbilities _ -> effect
   PlayerEffect.CantCastMoreThan _ -> effect
-  PlayerEffect.CantCastChosenName -> effect
-  PlayerEffect.CantPlayLandChosenName -> effect
   PlayerEffect.PlayAdditionalLands _ -> effect
   PlayerEffect.NoMaximumHandSize -> effect
   PlayerEffect.SetMaximumHandSize _ -> effect
@@ -476,9 +474,6 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.DamageCantBePrevented _ -> effect
   PlayerEffect.DamageCantBeRedirected _ -> effect
   PlayerEffect.CantSearchLibraries _ -> effect
-  -- CR 702.16a's quality here is a chosen card NAME, and CR 612.2's second
-  -- sentence keeps a subtype swap off a name.
-  PlayerEffect.HasProtectionFromChosenName -> effect
   PlayerEffect.CantBecomeMonarch -> effect
   PlayerEffect.CantSetSchemesInMotion -> effect
   PlayerEffect.CantAttackWithCreatures -> effect

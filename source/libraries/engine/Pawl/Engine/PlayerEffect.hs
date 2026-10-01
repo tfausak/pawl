@@ -47,6 +47,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityKind as AbilityKind
@@ -58,7 +59,6 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
-import Pawl.Types.CardName (CardName)
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import Pawl.Types.CostAdjustments (CostAdjustments)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -441,7 +441,7 @@ affectedBy pid oid name gs =
 -- it is what makes Filter.IsSource answerable for Lava Burst's self-naming
 -- clause, which was vacuously False while this walk hardcoded Nothing. It is also
 -- what carries Conjurer's Ban's own chosen name, through CR 608.2h rather than
--- off the board, since that source is in a graveyard by then (chosenNamesOf
+-- off the board, since that source is in a graveyard by then (contextFor
 -- below).
 applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
 applying pid gs =
@@ -527,31 +527,18 @@ castsThisTurn pid gs = Map.findWithDefault 0 pid (Game.castsPerPlayer gs)
 -- over anything allowing or directing. One applicable prohibition is enough and
 -- nothing outvotes it.
 --
--- Takes the SPELL, as one half NAMED: CR 709.3a evaluates only the chosen half
--- to see if it can be cast, so the name compared is that half's own and a split
--- card is asked this question once per half. Two of the prohibitions are
--- quality-free -- "can't cast spells", "can't cast more than one spell" -- and
--- so ignore both arguments; CR 601.3a's quality-bearing shape is what the rest
--- need them for (Null Chamber's "spells with the chosen names", Damping Engine's
--- "artifact, creature, or enchantment spells").
---
--- ONE name rather than the set the play-side twin below takes, and by RULE
--- rather than for want of one: CR 709.3b leaves a spell on the stack the
--- characteristics of the half being cast alone, and the proposal has already
--- fixed that half. CR 709.4a's "one of its names" therefore has one candidate
--- here, which is why naming "Wax" stops Wax and leaves Wane castable (CR
--- 709.3a).
---
--- BOTH the object and the name, because CR 601.3a's qualities come in two kinds
--- and neither argument answers the other's. A name is compared AS A NAME, and the
--- caller takes it off the chosen face -- the only place it could come from, since
--- the card is still in the zone it is cast from and a face-down proposal
--- carries CR 708.2a's empty name rather than the card's. Any other quality is a
--- Filter over the spell's characteristics, which is a question about the OBJECT
--- and is asked of the proposal's projection through matchesObject, the same
--- direction spellCostAdjustments reads Thalia's tax. `gs` must therefore be
--- Cast.asProposed-stamped for the half being asked about, as it already had to be
--- for the adjustments.
+-- Takes the SPELL as the proposal shows it: CR 709.3a evaluates only the chosen
+-- half to see if it can be cast, so a split card is asked this question once
+-- per half. Two of the prohibitions are quality-free -- "can't cast spells",
+-- "can't cast more than one spell"; CR 601.3a's quality-bearing shape is a
+-- Filter over the spell's characteristics (Null Chamber's "spells with the
+-- chosen names" is Filter.HasChosenName, Damping Engine's "artifact, creature,
+-- or enchantment spells"), asked of the proposal's projection through
+-- matchesObjectFor, the same direction spellCostAdjustments reads Thalia's tax.
+-- `gs` must therefore be Cast.asProposed-stamped for the half and facing being
+-- asked about: CR 709.3b leaves the view one half's name, which is why naming
+-- "Wax" stops Wax and leaves Wane castable, and a face-down proposal carries CR
+-- 708.2a's empty name rather than the card's.
 --
 -- CR 601.3a's LOOKAHEAD rides on the Filter arm, in choiceCouldEscape below: a
 -- prohibition that names the spell as it stands is ignored when a choice still to
@@ -573,29 +560,17 @@ castsThisTurn pid gs = Map.findWithDefault 0 pid (Game.castsPerPlayer gs)
 -- cast a spell with flashback from a graveyard or choosing to cast a creature
 -- with morph face down" -- need no search, because each is its own Action here:
 -- the offer is per (half, facing) pair and this predicate is asked once per pair
--- with that pair's own name. CR 708.2a's empty name is what a morph cast brings,
--- which is why a Null Chamber naming the card stops its face-up cast and not its
--- face-down one -- Pawl.FaceDownSpec's "CR 708.4 a prohibition naming the card
--- stops the face-up cast and not the morph one".
---
--- A NAME cannot be searched over, and no card asks it to: CR 201.1 fixes a
--- spell's name with the half and the facing, both of which are already chosen
--- here.
-prohibitsCasting :: PlayerId -> ObjectId -> CardName -> VariableChoice.VariableChoice -> GameState -> Bool
-prohibitsCasting pid oid name variable gs =
+-- on that pair's own proposal. CR 708.2a's empty name is what a morph cast
+-- brings, which is why a Null Chamber naming the card stops its face-up cast and
+-- not its face-down one -- Pawl.FaceDownSpec's "CR 708.4 a prohibition naming
+-- the card stops the face-up cast and not the morph one".
+prohibitsCasting :: PlayerId -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
+prohibitsCasting pid oid variable gs =
   let cast = castsThisTurn pid gs
       prohibits (source, effect) = case effect of
         PlayerEffect.CantCastSpells -> True
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan limit -> cast >= limit
-        -- CR 601.3a / 614.1c: the quality is the name chosen as the SOURCE
-        -- entered, so an ability whose permanent has chosen nothing prohibits
-        -- nothing.
-        PlayerEffect.CantCastChosenName -> Set.member name (chosenNamesOf source gs)
-        -- CR 305.1: playing a land is a special action and never a cast, so the
-        -- play-side twin stops nothing here. Pawl.Engine.Action.playableLands is
-        -- the gate that reads it.
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -634,7 +609,6 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -678,9 +652,9 @@ prohibitsCasting pid oid name variable gs =
         -- after the move, the spell itself would make the window False and the
         -- clause would prohibit every cast.
         PlayerEffect.CastOnlyAtSorcerySpeed -> not (Turn.sorcerySpeedWindow pid gs)
-        -- CR 305.1 again, exactly as CantPlayLandChosenName above: a land is
-        -- played and never cast, so the play-side prohibition stops nothing here
-        -- either, however its Filter reads.
+        -- CR 305.1: a land is played and never cast, so the play-side
+        -- prohibition stops nothing here, however its Filter reads.
+        -- Pawl.Engine.Action.playableLands is the gate that reads it.
         PlayerEffect.CantPlayLands _ -> False
         -- CR 601.3's other half: this arm ALLOWS a cast the rules would refuse,
         -- and no permission prohibits anything. mayCastFromGraveyard below is
@@ -729,28 +703,19 @@ prohibitsActivating stamp pid gs = prohibitsActivatingGiven stamp (applying pid 
 -- never uses the stack, so a land is never a spell and none of the cast-side
 -- prohibitions reaches it (Silence stops no land).
 --
--- Takes the card's NAMES rather than one name, where prohibitsCasting above
--- takes one: nothing has singled out a half here, so what the player is playing
--- is the card as their hand shows it -- CR 709.4's combined view, which has a
--- name per half. CR 709.4a is then a membership test, and a chosen name stops
--- the land if it is ONE of them. No printed land has two, so the set is a
--- singleton in this pool.
---
--- And takes the OBJECT beside them, for the reason prohibitsCasting above does:
--- CantPlayLands narrows by a quality a Filter states (City in a Bottle's "a name
--- originally printed in the Arabian Nights expansion"), and that is a question
--- about the card in the zone rather than about the player.
---
--- The Filter is read against the card AS THAT ZONE SHOWS IT (CR 712.8a's front
--- face), where the name set beside it is CR 709.4's combined view. No printed
--- land has two names, so nothing in this pool tells the two readings apart.
+-- Takes the OBJECT, for the reason prohibitsCasting above does: CantPlayLands
+-- narrows by a quality a Filter states (City in a Bottle's "a name originally
+-- printed in the Arabian Nights expansion", Null Chamber's chosen names), and
+-- that is a question about the card in the zone rather than about the player.
+-- The Filter is read against the card AS THAT ZONE SHOWS IT: CR 712.8a's front
+-- face, and CR 709.4's combined view, under which Filter.HasChosenName is CR
+-- 709.4a's "one of its names".
 --
 -- A DISJUNCTION for CR 101.2's reason.
-prohibitsPlayingLand :: PlayerId -> Set.Set CardName -> ObjectId -> GameState -> Bool
-prohibitsPlayingLand pid names oid gs =
+prohibitsPlayingLand :: PlayerId -> ObjectId -> GameState -> Bool
+prohibitsPlayingLand pid oid gs =
   let prohibits (source, effect) = case effect of
-        PlayerEffect.CantPlayLandChosenName -> not (Set.disjoint names (chosenNamesOf source gs))
-        -- CR 305.1 in the direction CantCastChosenName below takes: Teferi's
+        -- CR 305.1 in the direction CantCastMatching below takes: Teferi's
         -- clause narrows when this player may CAST, and playing a land is never
         -- casting. CR 305.1's own window happens to be the same three conjuncts,
         -- but Action.legalActions is what asks that of a land play, and an
@@ -781,7 +746,6 @@ prohibitsPlayingLand pid names oid gs =
         -- (landPlaysAllowed below is only its left-hand side), the second as
         -- part of Turn.sorcerySpeedWindow. Neither is a question about WHICH
         -- land, which is all this one asks.
-        PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
@@ -816,7 +780,6 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -861,7 +824,6 @@ prohibitsSearching pid owner causeController gs =
             && inScope causeController pid gs (CantSearchLibraries.cause narrowing)
         -- CR 702.16 states no clause about searching, its consequences being
         -- targeting, enchanting, equipping, blocking and damage.
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         -- Every other arm is about casting, playing, targeting, countering,
         -- paying, keeping mana, gaining or losing life, or how a coin flip came
@@ -873,8 +835,6 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -940,13 +900,10 @@ prohibitsCounters pid kind gs =
         -- already resolved or by a rule, so none of them reaches one -- Silence
         -- stops the spell, never the counters a resolved one puts on a player.
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -1015,8 +972,6 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -1046,7 +1001,6 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -1077,8 +1031,6 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -1103,7 +1055,6 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -1134,8 +1085,6 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -1160,7 +1109,6 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -1177,37 +1125,6 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (prohibits . snd) (applying pid gs)
-
--- CR 201.4: the card names chosen for this effect's source, as it entered (CR
--- 614.1c) or while it resolved (CR 608.2c) -- Object.chosenNames. Empty for an
--- effect with no source at all, and for a source that chose nothing.
---
--- CR 608.2h is what the fallback is: this asks for information from a SPECIFIC
--- object, so it reads that object's current information while the object is
--- there and its LAST KNOWN information once it is gone. Both roads are live.
--- Null Chamber is a permanent and answers off the board; Conjurer's Ban chooses
--- during its own resolution and is in a graveyard by CR 608.2n before the two
--- rows it stored are ever read, so a current-information-only reading would make
--- that card's whole sentence do nothing (Pawl.PlayerEffectSpec's ConjurersBan
--- group is the proof).
---
--- The names are NOT baked onto Pawl.Types.ActivePlayerEffect as the controller
--- is, because nothing in the pool can tell the two readings apart and baking
--- would widen the (source, effect) pair `applying` deliberately holds its
--- consumers to.
---
--- Not implemented: a stored row whose source is still on the battlefield and
--- chooses a SECOND name afterwards reads that later name instead, where CR 608.2c
--- made the choice once and the effect should hold the one it was made with. No
--- printed card can reach it --
--- every chosen-name prohibition in the pool either is a permanent's own static
--- ability or comes from a resolution that leaves the zone at once (#2531).
---
--- The empty set is the answer that matches NO object rather than every object,
--- which is the shape CR 201.2a describes for an object with no name: having no
--- name is not sharing one.
-chosenNamesOf :: Maybe ObjectId -> GameState -> Set.Set CardName
-chosenNamesOf source gs = maybe Set.empty (`Game.chosenNamesWithLastKnown` gs) source
 
 -- Does this OBJECT match a player effect's Filter? Shared by the four questions
 -- that carry one -- CR 601.2f's cost adjustments in both of their moments, CR
@@ -1278,11 +1195,20 @@ contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
 
 -- contextFrom with the perspective supplied, which matchesObjectFor above is the
 -- one caller of.
+--
+-- The source's CR 607.2d choices come from SourceContext.withChoicesOf, read
+-- through CR 608.2h's last known information: Conjurer's Ban is in a graveyard
+-- by CR 608.2n before the rows it stored are read (Pawl.PlayerEffectSpec's
+-- ConjurersBan group).
+--
+-- Not implemented: a stored row whose source is still on the battlefield and
+-- chooses a SECOND name afterwards reads that later name instead, where CR 608.2c
+-- made the choice once and the effect should hold the one it was made with
+-- (#2531).
 contextFor :: Maybe PlayerId -> Maybe ObjectId -> GameState -> Filter.Context
 contextFor you src gs =
-  (Filter.contextFor (Game.teams gs) you src)
-    { Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs
-    }
+  let framed = maybe id (`SourceContext.withChoicesOf` gs) src (Filter.contextFor (Game.teams gs) you src)
+   in framed {Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs}
 
 -- CR 601.3a's LOOKAHEAD, asked of a prohibition that matches the spell as it
 -- stands: could a choice still to be made during this spell's proposal cause the
@@ -1425,8 +1351,6 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -1444,7 +1368,6 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -1479,8 +1402,6 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -1498,7 +1419,6 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -1536,8 +1456,6 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -1555,7 +1473,6 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -1743,8 +1660,6 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -1762,7 +1677,6 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -1810,8 +1724,6 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -1829,7 +1741,6 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -1876,8 +1787,6 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -1895,7 +1804,6 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -2026,8 +1934,6 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CantCastSpells -> Nothing
   PlayerEffect.CantActivateAbilities _ -> Nothing
   PlayerEffect.CantCastMoreThan _ -> Nothing
-  PlayerEffect.CantCastChosenName -> Nothing
-  PlayerEffect.CantPlayLandChosenName -> Nothing
   PlayerEffect.IncreaseSpellCost {} -> Nothing
   PlayerEffect.IncreaseActivationCost {} -> Nothing
   PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -2048,7 +1954,6 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.DamageCantBePrevented _ -> Nothing
   PlayerEffect.DamageCantBeRedirected _ -> Nothing
   PlayerEffect.CantSearchLibraries _ -> Nothing
-  PlayerEffect.HasProtectionFromChosenName -> Nothing
   PlayerEffect.HasProtectionFrom _ -> Nothing
   PlayerEffect.CantBecomeMonarch -> Nothing
   PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -2280,8 +2185,6 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -2301,7 +2204,6 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -2551,8 +2453,6 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         -- CR 118.7's increases and reductions, which change what a cost COMES
         -- TO; this arm supplies a different cost to start from (CR 118.9c). The
         -- two compose at Pawl.Engine.Cost.total, which is handed whichever
@@ -2577,7 +2477,6 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -2633,8 +2532,6 @@ playLandPiles pid gs =
         PlayerEffect.CantCastSpells -> []
         PlayerEffect.CantActivateAbilities _ -> []
         PlayerEffect.CantCastMoreThan _ -> []
-        PlayerEffect.CantCastChosenName -> []
-        PlayerEffect.CantPlayLandChosenName -> []
         PlayerEffect.IncreaseSpellCost {} -> []
         PlayerEffect.IncreaseActivationCost {} -> []
         PlayerEffect.ReduceSpellCost {} -> []
@@ -2654,7 +2551,6 @@ playLandPiles pid gs =
         PlayerEffect.DamageCantBePrevented _ -> []
         PlayerEffect.DamageCantBeRedirected _ -> []
         PlayerEffect.CantSearchLibraries _ -> []
-        PlayerEffect.HasProtectionFromChosenName -> []
         PlayerEffect.HasProtectionFrom _ -> []
         PlayerEffect.CantBecomeMonarch -> []
         PlayerEffect.CantSetSchemesInMotion -> []
@@ -2723,8 +2619,6 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -2751,7 +2645,6 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -2787,12 +2680,6 @@ protectedFromTargeting rows caster pid gs =
 -- 702.16b and 702.16c each read it and then say what it forbids. Which
 -- consequence follows is the caller's, exactly as it is for the keyword.
 --
--- CR 201.4 with CR 201.2a: the chosen names are the SOURCE's, read through
--- chosenNamesOf so that a source already in a graveyard still answers (CR
--- 608.2h), and the object's are its projected ones. Set intersection is CR
--- 201.4g's and CR 709.4a's interchangeable names said once, which is
--- Filter.HasChosenName's own posture; an object with no name shares none.
---
 -- MEMBERSHIP, never a tally: CR 702.16m makes multiple instances of protection
 -- from the same quality redundant for the player case as much as the permanent
 -- one.
@@ -2803,13 +2690,11 @@ protectedFrom oid pid gs = protectedFromGiven (applying pid gs) oid gs
 -- protectedFromTargetingGiven's reason above.
 protectedFromGiven :: [(Maybe ObjectId, PlayerEffect)] -> ObjectId -> GameState -> Bool
 protectedFromGiven rows oid gs =
-  let names = Filter.names (Projection.viewOfObject oid gs)
-      stops (source, effect) = case effect of
-        PlayerEffect.HasProtectionFromChosenName -> not (Set.null (Set.intersection (chosenNamesOf source gs) names))
-        -- CR 702.16a's other kind of quality: one the CARD states rather than
-        -- one the source chose, matched through the identity-blind
-        -- matchesObjectFrom against the same projected view `names` above is
-        -- read off. CR 702.16j's "protection from everything" is the empty
+  let stops (source, effect) = case effect of
+        -- CR 702.16a's quality, matched through the identity-blind
+        -- matchesObjectFrom against the object's projected view. Runed Halo's
+        -- chosen name is Filter.HasChosenName, answered off the row's source
+        -- (contextFor). CR 702.16j's "protection from everything" is the empty
         -- conjunction, which matches every source.
         PlayerEffect.HasProtectionFrom quality -> matchesObjectFrom source quality oid gs
         -- CR 702.18a and CR 702.11c are a different immunity, and a narrower
@@ -2825,8 +2710,6 @@ protectedFromGiven rows oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -2881,8 +2764,8 @@ protectedFromGiven rows oid gs =
 -- which is where every other prevention shield is built.
 --
 -- The QUALITY as the row wrote it, never the set of things it currently matches:
--- for HasProtectionFromChosenName that quality is Filter.HasChosenName, which the
--- shield's Context answers off the carrier, so CR 201.4's names stay a LIVE read
+-- for Runed Halo that quality is Filter.HasChosenName, which the shield's
+-- Context answers off the carrier, so CR 201.4's names stay a LIVE read
 -- at the damage event (CR 609.7b's recheck) rather than a set frozen when the row
 -- was gathered. A card-stated quality needs the same treatment for CR 613's sake
 -- and gets it for free, being a Filter either way.
@@ -2901,7 +2784,6 @@ protectedFromGiven rows oid gs =
 protectionCarriers :: GameState -> [(PlayerId, ObjectId, Filter Keyword)]
 protectionCarriers gs =
   let carrier pid (source, effect) = case effect of
-        PlayerEffect.HasProtectionFromChosenName -> fmap (\oid -> (pid, oid, Filter.Type.HasChosenName)) source
         -- The quality the CARD states, handed on as written: the shield's source
         -- side is this Filter, so the three consequences of rule 702.16 read one
         -- quality (protectedFromGiven above is the other two).
@@ -2911,8 +2793,6 @@ protectionCarriers gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -2991,11 +2871,6 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        -- CR 305.1's name-based prohibition stops ONE land rather than changing
-        -- the turn's allowance, which is why Action.playableLands asks it per
-        -- card and this per player.
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3015,7 +2890,6 @@ landPlaysAllowed pid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -3061,8 +2935,6 @@ votesAllowed pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan {} -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3079,7 +2951,6 @@ votesAllowed pid gs =
         PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough {} -> Nothing
         PlayerEffect.CantBeTargetedBy {} -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom {} -> Nothing
         PlayerEffect.CastAsThoughItHadFlash {} -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash {} -> Nothing
@@ -3121,8 +2992,6 @@ surveilExtra pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan {} -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3139,7 +3008,6 @@ surveilExtra pid gs =
         PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough {} -> Nothing
         PlayerEffect.CantBeTargetedBy {} -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom {} -> Nothing
         PlayerEffect.CastAsThoughItHadFlash {} -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash {} -> Nothing
@@ -3219,8 +3087,6 @@ maximumHandSize pid gs =
         PlayerEffect.CantCastSpells -> current
         PlayerEffect.CantActivateAbilities _ -> current
         PlayerEffect.CantCastMoreThan _ -> current
-        PlayerEffect.CantCastChosenName -> current
-        PlayerEffect.CantPlayLandChosenName -> current
         PlayerEffect.IncreaseSpellCost {} -> current
         PlayerEffect.IncreaseActivationCost {} -> current
         PlayerEffect.ReduceSpellCost {} -> current
@@ -3241,7 +3107,6 @@ maximumHandSize pid gs =
         PlayerEffect.DamageCantBePrevented _ -> current
         PlayerEffect.DamageCantBeRedirected _ -> current
         PlayerEffect.CantSearchLibraries _ -> current
-        PlayerEffect.HasProtectionFromChosenName -> current
         PlayerEffect.HasProtectionFrom _ -> current
         PlayerEffect.CantBecomeMonarch -> current
         PlayerEffect.CantSetSchemesInMotion -> current
@@ -3297,8 +3162,6 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3320,7 +3183,6 @@ keepsUnspentMana pid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -3365,8 +3227,6 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ -> False
         PlayerEffect.IncreaseActivationCost _ -> False
         PlayerEffect.ReduceSpellCost _ -> False
@@ -3391,7 +3251,6 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -3437,8 +3296,6 @@ prohibitsGainingLife pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ -> False
         PlayerEffect.IncreaseActivationCost _ -> False
         PlayerEffect.ReduceSpellCost _ -> False
@@ -3463,7 +3320,6 @@ prohibitsGainingLife pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -3504,8 +3360,6 @@ prohibitsLosingLife pid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ -> False
         PlayerEffect.IncreaseActivationCost _ -> False
         PlayerEffect.ReduceSpellCost _ -> False
@@ -3530,7 +3384,6 @@ prohibitsLosingLife pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -3575,8 +3428,6 @@ spendManaAsThough pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3598,7 +3449,6 @@ spendManaAsThough pid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -3657,8 +3507,6 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
         PlayerEffect.ReduceSpellCost {} -> False
@@ -3685,7 +3533,6 @@ cantBeCountered pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
@@ -3754,7 +3601,6 @@ unpreventable gs =
         PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -3777,8 +3623,6 @@ unpreventable gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3831,7 +3675,6 @@ unredirectable gs =
         PlayerEffect.DamageCantBeRedirected pattern_ -> Just (src, pattern_)
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -3854,8 +3697,6 @@ unredirectable gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3911,8 +3752,6 @@ statedFlips pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -3937,7 +3776,6 @@ statedFlips pid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -3984,8 +3822,6 @@ rollModifiers pid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
-        PlayerEffect.CantCastChosenName -> Nothing
-        PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
@@ -4010,7 +3846,6 @@ rollModifiers pid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
-        PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantSetSchemesInMotion -> Nothing
@@ -4076,8 +3911,6 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.CantCastSpells -> pure effect
   PlayerEffect.CantActivateAbilities _ -> pure effect
   PlayerEffect.CantCastMoreThan _ -> pure effect
-  PlayerEffect.CantCastChosenName -> pure effect
-  PlayerEffect.CantPlayLandChosenName -> pure effect
   PlayerEffect.IncreaseSpellCost _ -> pure effect
   PlayerEffect.IncreaseActivationCost _ -> pure effect
   PlayerEffect.ReduceSpellCost _ -> pure effect
@@ -4094,7 +3927,6 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.LoseLifeForUnspentMana -> pure effect
   PlayerEffect.SpendManaAsThough _ -> pure effect
   PlayerEffect.CantBeTargetedBy _ -> pure effect
-  PlayerEffect.HasProtectionFromChosenName -> pure effect
   PlayerEffect.HasProtectionFrom _ -> pure effect
   PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
   PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect
@@ -4151,8 +3983,6 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.CantCastSpells -> pure effect
   PlayerEffect.CantActivateAbilities _ -> pure effect
   PlayerEffect.CantCastMoreThan _ -> pure effect
-  PlayerEffect.CantCastChosenName -> pure effect
-  PlayerEffect.CantPlayLandChosenName -> pure effect
   PlayerEffect.IncreaseSpellCost _ -> pure effect
   PlayerEffect.IncreaseActivationCost _ -> pure effect
   PlayerEffect.ReduceSpellCost _ -> pure effect
@@ -4169,7 +3999,6 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.LoseLifeForUnspentMana -> pure effect
   PlayerEffect.SpendManaAsThough _ -> pure effect
   PlayerEffect.CantBeTargetedBy _ -> pure effect
-  PlayerEffect.HasProtectionFromChosenName -> pure effect
   PlayerEffect.HasProtectionFrom _ -> pure effect
   PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
   PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect

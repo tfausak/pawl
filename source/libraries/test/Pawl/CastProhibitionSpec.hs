@@ -29,7 +29,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Interpreter as Interpreter
-import Pawl.PlayerEffectSpec (anySpell, anySpellId, isCast, isSilenceActivate, silenceAfter, swapAt, threeSeatSilenceBoard)
+import Pawl.PlayerEffectSpec (anySpellId, isCast, isSilenceActivate, silenceAfter, swapAt, threeSeatSilenceBoard)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -92,7 +92,7 @@ silenceSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects after)) 1
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced after) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced after) "bob is prohibited"
       Spec.assertEqWith
         s
         "and no cast is offered"
@@ -108,7 +108,7 @@ silenceSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, silence2Id, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced after)) "alice is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced after)) "alice is not prohibited"
       Spec.assertBool s (S.castable S.alice silence2Id after) "and may cast her second Silence"
 
     -- Ruling: "The only thing Silence stops is casting spells. Your
@@ -133,7 +133,7 @@ silenceSpec s registry =
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
           ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
       Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced ended)) "bob may cast again"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced ended)) "bob may cast again"
 
     -- CR 806.1: in a free-for-all the players compete as individuals, so the
     -- card's your-opponents is EVERY other player, not the next seat. This is
@@ -166,15 +166,15 @@ silenceSpec s registry =
       -- THE DISCRIMINATOR. carol is the far seat: an Opponents scope resolved as
       -- "the next player in turn order" prohibits bob and leaves carol free, and
       -- that is the reading the doc comments claimed was in here.
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced resolved) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell VariableChoice.Announced resolved) "carol is prohibited too"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced resolved) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId VariableChoice.Announced resolved) "carol is prohibited too"
       Spec.assertEqWith
         s
         "and nothing is offered to either, even on their own main phase"
         (filter isCast (Action.legalActions S.bob resolvedBobsTurn) <> filter isCast (Action.legalActions S.carol resolvedCarolsTurn))
         []
       -- CR 109.5: the scope is resolved off the effect's controller.
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced resolved)) "alice is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced resolved)) "alice is not prohibited"
 
 -- CR 601.2c: the three-seat Cease-Fire board. alice has three Plains and the
 -- Cease-Fire; all three seats have two Mountains, a Goblin Piker in hand and two
@@ -599,9 +599,9 @@ conditionalSilenceSpec s registry =
       case fmap ActivePlayerEffect.expiry (GameState.playerEffects resolved) of
         [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
         other -> Spec.assertFailure s ("expected one conditional player effect, got " <> show other)
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced resolved) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell VariableChoice.Announced resolved) "carol is prohibited too"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced resolved)) "alice is not"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced resolved) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId VariableChoice.Announced resolved) "carol is prohibited too"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced resolved)) "alice is not"
       Spec.assertEqWith s "and nothing is offered to either" (conditionalSilenceCasts S.bob resolved <> conditionalSilenceCasts S.carol resolved) []
 
     -- THE POSITIVE HALF of the sweep. Without it, "deletes when the condition
@@ -635,7 +635,7 @@ conditionalSilenceSpec s registry =
           settled = S.runPure S.identityAnswer stolen Engine.settleForPriority
       Spec.assertEqWith s "one stored before the Swamp moved" (length (GameState.playerEffects resolved)) 1
       Spec.assertEqWith s "none after" (GameState.playerEffects settled) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced settled)) "bob is no longer prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced settled)) "bob is no longer prohibited"
       Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "and his Piker is offered again"
 
     -- CR 611.2b's first sentence: a duration that never STARTS means the effect
@@ -780,9 +780,9 @@ hackedSilenceSpec s registry =
       let (hushId, hackId, _, _, _, _, before) = hackedSilenceBoard island hush magicalHack mountain piker
           after = hackedSilenceAfter True hushId hackId before
       Spec.assertEqWith s "nothing is offered to either opponent" (conditionalSilenceCasts S.bob after <> conditionalSilenceCasts S.carol after) []
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced after) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell VariableChoice.Announced after) "carol is prohibited too"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced after)) "alice is not"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced after) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId VariableChoice.Announced after) "carol is prohibited too"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced after)) "alice is not"
       Spec.assertEqWith s "and both spells resolved" (length (GameState.stack after)) 0
       case fmap ActivePlayerEffect.expiry (GameState.playerEffects after) of
         [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
@@ -1395,7 +1395,7 @@ nullChamberSpec s registry =
           casts = Action.legalActions S.bob
       Spec.assertBool s (elem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts before)) "bob may cast his Bolt before the Chamber lands"
       Spec.assertBool s (notElem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts after)) "and may not once it has"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId (S.printingName lightningBolt) VariableChoice.Announced after) "bob is prohibited by alice's name"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob bobsBolt VariableChoice.Announced after) "bob is prohibited by alice's name"
       Spec.assertBool s (elem (bobsBarrens, Nothing) (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
       Spec.assertBool s (notElem (bobsBarrens, Nothing) (Action.playableLands S.bob after)) "and not once it has"
 
@@ -1434,8 +1434,38 @@ nullChamberSpec s registry =
           picks pid = if pid == S.alice then S.printingName cancel else S.printingName piker
           after = castChamber S.bob picks board oid
           (pikerId, gs) = S.addHandCard piker S.alice after
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced gs) "alice is prohibited by bob's name"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice pikerId VariableChoice.Announced gs) "alice is prohibited by bob's name"
       Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gs)) "and no cast is offered"
+
+    -- CR 709.3a / 709.3b: only the half being cast is asked about, so naming
+    -- "Wax" stops Wax and leaves Wane castable. The prohibition reads the
+    -- proposal's view (Filter.HasChosenName), where CR 709.4a's combined view in
+    -- the hand would carry both names and stop both halves. A Forest, a Piker for
+    -- Wax to target and the Chamber itself for Wane keep either half castable.
+    Spec.it s "CR 709.3a naming one half of a split card stops that half and not the other" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      forest <- S.printingOf s registry "Forest"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      waxWane <- S.printingOf s registry "Wax"
+      cancel <- S.printingOf s registry "Cancel"
+      let wax = CardName.MkCardName (Text.pack "Wax")
+          wane = CardName.MkCardName (Text.pack "Wane")
+          (oid, board) = nullChamberBoard plains mountain nullChamber
+          withSplit aliceName =
+            let after = castChamber S.bob (\pid -> if pid == S.alice then aliceName else S.printingName cancel) board oid
+                (_, withForest) = S.addPermanent forest S.alice after
+                (_, withPiker) = S.addPermanent piker S.alice withForest
+             in S.addHandCard waxWane S.alice withPiker
+          (splitId, gs) = withSplit wax
+          offered = Action.legalActions S.alice gs
+          -- The control differs in alice's name alone: the Piker, which she is
+          -- not holding.
+          (controlId, control) = withSplit (S.printingName piker)
+      Spec.assertBool s (notElem (Action.Type.Cast splitId wax Facing.FaceUp) offered) "the named Wax half is not offered"
+      Spec.assertBool s (elem (Action.Type.Cast splitId wane Facing.FaceUp) offered) "the Wane half still is"
+      Spec.assertBool s (elem (Action.Type.Cast controlId wax Facing.FaceUp) (Action.legalActions S.alice control)) "and Wax is offered when nobody named it"
 
     -- CR 305.1: playing a land is a SPECIAL ACTION that never uses the stack, so
     -- the land half of the card is a different gate from the cast half --
@@ -1485,8 +1515,8 @@ nullChamberSpec s registry =
         Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
         Just chamber -> do
           let gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [chamber])
-          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced gs) "prohibited while it stands"
-          Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced gone)) "not prohibited once it is gone"
+          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice pikerId VariableChoice.Announced gs) "prohibited while it stands"
+          Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice pikerId VariableChoice.Announced gone)) "not prohibited once it is gone"
           Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gone)) "and the cast is offered again"
           Spec.assertBool s (elem (barrensId, Nothing) (Action.playableLands S.alice gone)) "and the land may be played again"
 
@@ -2102,10 +2132,10 @@ stasisCoffinSpec s registry =
 -- be played. Draw a card."
 --
 -- The STORED twin of nullChamberSpec above, and the whole reason this group
--- exists: it is the pool's only writer of either chosen-name arm as a resolution
--- (CR 611.2c) rather than as a permanent's printed ability, so it is the only
--- card that reaches PlayerEffect.chosenNamesOf through a GameState.playerEffects
--- row. The name is chosen by CR 201.4 during the resolution (Effect
+-- exists: it is the pool's only writer of a chosen-name prohibition as a
+-- resolution (CR 611.2c) rather than as a permanent's printed ability, so it is
+-- the only card whose Filter.HasChosenName is read through a
+-- GameState.playerEffects row. The name is chosen by CR 201.4 during the resolution (Effect
 -- .ChooseCardName) and the two rows stored a clause later read it back.
 --
 -- alice has four Plains, four Mountains and four Swamps -- mana is never the
@@ -2155,7 +2185,7 @@ conjurersBanSpec s registry =
       Spec.assertBool s (elem castPiker (Action.legalActions S.alice before)) "alice may cast her Piker before the Ban resolves"
       Spec.assertBool s (notElem castPiker (Action.legalActions S.alice after)) "and may not once it has"
       Spec.assertBool s (elem castBolt (Action.legalActions S.alice after)) "the unnamed Bolt still is offered"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced after) "and the prohibition is the named one"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice pikerId VariableChoice.Announced after) "and the prohibition is the named one"
       -- The carrier, asserted AFTER the behaviour: nothing this card makes is a
       -- permanent, so both rows are CR 611.2c stored ones.
       Spec.assertEqWith s "two stored rows" (length (GameState.playerEffects after)) 2
@@ -2244,8 +2274,8 @@ cityInABottleSpec s registry =
       let (_, withBottle) = S.addPermanent bottle S.alice (S.landsInPlay plains 4)
           (apeId, withApe) = S.addHandCard kirdApe S.alice withBottle
           (pikerId, gs) = S.addHandCard piker S.alice withApe
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice apeId (S.printingName kirdApe) VariableChoice.Announced gs) "CR 601.3a alice may not cast her Kird Ape, whose name CR 206.3a lists"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice pikerId (S.printingName piker) VariableChoice.Announced gs)) "and her Goblin Piker, which that list does not name, is untouched"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice apeId VariableChoice.Announced gs) "CR 601.3a alice may not cast her Kird Ape, whose name CR 206.3a lists"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice pikerId VariableChoice.Announced gs)) "and her Goblin Piker, which that list does not name, is untouched"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do

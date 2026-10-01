@@ -37,7 +37,7 @@
 -- what makes the pair worth having: its name is chosen by CR 608.2c during the
 -- resolution rather than by CR 614.1c as a permanent enters, and its source is in
 -- a graveyard before the rows it stored are read, so it is the only card that
--- reaches CR 608.2h's last-known road into Pawl.Engine.PlayerEffect.chosenNamesOf.
+-- reaches CR 608.2h's last-known road into Pawl.Engine.SourceContext.withChoicesOf.
 --
 -- Runed Halo is the card-name choice's other shape -- CR 614.1c with ONE chooser
 -- rather than Null Chamber's two -- and the pool's one card that gives a PLAYER
@@ -193,24 +193,15 @@ ruleOfLawAfterFirst plains ruleOfLaw =
       (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
    in (a, b, resolveAll (S.runPure S.identityAnswer board (S.cast S.alice a)))
 
--- The name every assertion below about a QUALITY-FREE prohibition passes to
--- prohibitsCasting. CR 601.3's "can't cast spells" (Silence) and "can't cast
--- more than one spell" (Rule of Law) do not depend on WHICH spell, so their
--- arms ignore this; naming a card in the test's own hand would suggest a
--- dependence those rules do not have. Null Chamber's arm, which does depend on
--- the name, passes a real card's name in nullChamberSpec below -- to this
--- function directly, and through Cast.castable and Action.legalActions.
-anySpell :: CardName.CardName
-anySpell = CardName.MkCardName (Text.pack "any spell")
-
--- The object those same assertions pass beside anySpell above, and a made-up one
--- for that name's own reason: an arm that reads neither the spell's name nor its
--- characteristics must not be handed a real card, or the assertion would suggest
--- a dependence the rule does not have. Nothing dereferences it -- only
--- PlayerEffect.CantCastMatching reads the object, and no board below carries one
--- -- so an id no fixture mints is the honest argument. That arm is asked about a
--- real proposal instead, through Cast.castable, in Pawl.SpecialActionSpec's
--- Damping Engine cases.
+-- The object every assertion below about a QUALITY-FREE prohibition passes to
+-- prohibitsCasting, and a made-up one: CR 601.3's "can't cast spells" (Silence)
+-- and "can't cast more than one spell" (Rule of Law) do not depend on WHICH
+-- spell, and handing them a real card would suggest a dependence the rule does
+-- not have. Nothing dereferences it -- only PlayerEffect.CantCastMatching reads
+-- the object, and no board below carries one -- so an id no fixture mints is
+-- the honest argument. That arm is asked about a real proposal instead, through
+-- Cast.castable, in Pawl.SpecialActionSpec's Damping Engine cases and
+-- Pawl.CastProhibitionSpec's Null Chamber ones.
 anySpellId :: ObjectId.ObjectId
 anySpellId = ObjectId.MkObjectId 999999
 
@@ -221,7 +212,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced board)) "not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced board)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "a offered"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "b offered"
 
@@ -235,7 +226,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced afterFirst) "alice is now prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced afterFirst) "alice is now prohibited"
       Spec.assertEqWith
         s
         "no cast is offered at all"
@@ -248,7 +239,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced afterFirst)) "bob is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced afterFirst)) "bob is not prohibited"
 
     -- Engine.handoffTurn clears the event log at the turn handoff, so
     -- "this turn" (castsThisTurn's fold over the log) is exactly the
@@ -266,7 +257,7 @@ ruleOfLawSpec s registry =
                 GameState.priority = Just S.alice
               }
       Spec.assertEqWith s "alice is active again" (GameState.activePlayer nextOwnTurn) S.alice
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced nextOwnTurn)) "not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced nextOwnTurn)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
 
     -- Ruling: "If you cast a spell that was countered, you can't cast
@@ -282,7 +273,7 @@ ruleOfLawSpec s registry =
         top : _ -> do
           let countered = S.runPure S.identityAnswer cast (Event.counter S.noSource S.bob top)
           Spec.assertEqWith s "the stack is empty again" (GameState.stack countered) []
-          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced countered) "still prohibited"
+          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced countered) "still prohibited"
 
     -- The effect is RE-DERIVED from the battlefield on every read, so there
     -- is no stored state to unwind when its source leaves.
@@ -293,8 +284,8 @@ ruleOfLawSpec s registry =
           (rol, onBoard) = S.addPermanent ruleOfLaw S.alice plain
           castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand) Nothing)] onBoard
           gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced castOne) "prohibited while it stands"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced gone)) "not prohibited once it is gone"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced castOne) "prohibited while it stands"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced gone)) "not prohibited once it is gone"
       Spec.assertBool s (elem (Action.Type.Cast z (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice gone)) "and a cast is offered again"
 
     -- CR 601.3's prohibit half applies to EVERY cast, including a
@@ -1176,11 +1167,11 @@ humilitySpec s registry =
           castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand) Nothing)]
       Spec.assertBool
         s
-        (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced (castOne withHumility))
+        (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced (castOne withHumility))
         "control: Humility alone does not reach an enchantment"
       Spec.assertBool
         s
-        (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced (castOne withOpalescence)))
+        (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced (castOne withOpalescence)))
         "once animated, Rule of Law loses the ability and the limit lifts"
 
 -- alice controls a Sapphire Medallion and two untapped Islands, with Divination
@@ -2731,15 +2722,15 @@ storedSpec s registry =
 
     Spec.it s "CR 611.1 a stored effect applies through its scope" $
       do
-        Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced silenced) "bob is prohibited"
-        Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced silenced)) "alice is not"
+        Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced silenced) "bob is prohibited"
+        Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced silenced)) "alice is not"
 
     Spec.it s "CR 514.2 the cleanup sweep drops an AtCleanup player effect" $
       let after = Expiry.dropAtCleanup silenced
        in do
             Spec.assertEqWith s "one stored before" (length (GameState.playerEffects silenced)) 1
             Spec.assertEqWith s "none after" (GameState.playerEffects after) []
-            Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced after)) "and bob may cast again"
+            Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced after)) "and bob may cast again"
 
     Spec.it s "CR 514.2 the cleanup sweep keeps a Never player effect" $
       let forever = S.addPlayerEffect Expiry.Type.Never (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice base
@@ -2770,10 +2761,10 @@ storedSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, conditional) = storedConditional piker
           (changed, swept) = Engine.runGamePure S.identityAnswer conditional Expiry.sweepConditional
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced conditional) "still prohibited while the source stands"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced conditional) "still prohibited while the source stands"
       Spec.assertBool s (not changed) "the sweep reports no change"
       Spec.assertEqWith s "still stored" (length (GameState.playerEffects swept)) 1
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced swept) "still prohibited after a no-op sweep"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced swept) "still prohibited after a no-op sweep"
 
     Spec.it s "CR 611.2b the conditional sweep deletes a player effect whose condition has failed" $ do
       piker <- S.printingOf s registry "Goblin Piker"
@@ -2782,7 +2773,7 @@ storedSpec s registry =
           (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
       Spec.assertBool s changed "the sweep reports a change"
       Spec.assertEqWith s "deleted, not masked" (GameState.playerEffects swept) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced swept)) "no longer prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced swept)) "no longer prohibited"
 
 -- The board is BOB's turn on purpose: the "only casting is stopped" ruling
 -- names playing a land and activating an ability, and both are only
