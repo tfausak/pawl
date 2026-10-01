@@ -34,9 +34,11 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   damage assignment per attacker. `OrderTimestamps` answers CR 613.7m's
   prompt by naming every object in it, earliest first, and `ChooseOptional`
   answers a "may" with `Exercises` or `Declines`, its `source` the spell
-  resolving or the object whose ability is. `ChooseToPay` answers a cost a
-  resolving object offers (CR 118.12a), keyed the same way: its `decision` is
-  `Pays` or `Declines`, and paying takes a cast's choices, such as `mana`. `ChooseTargets` names each slot's
+  resolving or the object whose ability is; it answers CR 614.1a's optional
+  redirect too, its `source` the object whose replacement it is. `ChooseToPay`
+  answers a cost a resolving object offers (CR 118.12a), keyed the same way:
+  its `decision` is `Pays` or `Declines`, and paying takes a cast's choices,
+  such as `mana`. `ChooseTargets` names each slot's
   targets, `{ "target": ["@moon"] }`, for a target prompt no cast or activation
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`

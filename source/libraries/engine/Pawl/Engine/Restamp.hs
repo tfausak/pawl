@@ -9,6 +9,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Event.Trigger as Trigger
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -109,6 +110,10 @@ settle start arrivals = do
     Nothing -> do
       ordered <- order (filter (\oid -> fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield) arrivals)
       State.modify' (reassign start ordered)
+      -- CR 603.10: the board just after the entry is the one under the chosen
+      -- stamps. data/scenarios/restamp's "an enters trigger reads the chosen
+      -- stamps" pair (Kiora beside Replenish's Humility) proves it.
+      State.modify' (\after -> foldr Trigger.resampleEntry after ordered)
 
 -- The permutation `settle` asks for: the batch's stamps, pooled and sorted, dealt
 -- out again block by block in `ordered`, each block in its own old order.
