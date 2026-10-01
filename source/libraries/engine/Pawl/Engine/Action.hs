@@ -2,8 +2,8 @@ module Pawl.Engine.Action where
 
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Activatable as Activatable
-import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Companion as Companion
 import qualified Pawl.Engine.Cost as Cost
@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Action (Action)
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.Object as Object
@@ -124,21 +123,21 @@ playableLands pid gs =
       fromMayhem = filter (\oid -> PlayerEffect.mayPlayByMayhem pid oid gs) (Game.zoneMembers Zone.Graveyard pid gs)
    in concatMap playable (ListUtils.nubOrd (fromHand <> fromGranted <> fromPermitted <> fromExile <> fromMayhem))
 
--- The cards in this player's hand whose own text grants CR 116.2e's special
+-- The cards in this player's hand whose text grants CR 116.2e's special
 -- action: Circling Vultures' "you may discard this card any time you could cast
 -- an instant".
 --
--- Read off the CARD (Card.combined) and never a projection, the field's own rule
--- in Pawl.Types.Face: the ability functions in the hand, where this reader takes
--- the printed card (#1859). A hand member with no card behind it -- a token, an
--- ability -- contributes nothing, playableLands' reading one function above.
+-- Read through Projection.specialActionsOf (CR 613.1f), since the ability
+-- functions in the hand and an effect may take it away there: Patriar's
+-- Humiliation's perpetual "loses all abilities" follows the card back to its
+-- owner's hand. A hand member with no card behind it -- a token, an ability --
+-- contributes nothing, playableLands' reading one function above.
 --
 -- The permission is a CLASSIFICATION and not an identity: this asks whether the
 -- card data grants the operation, never which card it is.
 discardableCards :: PlayerId -> GameState -> [ObjectId]
 discardableCards pid gs =
-  let grantsIt oid = maybe False granted (Game.cardOfHandMember oid gs)
-      granted card = List.elem SpecialAction.DiscardThisAnyTime (Face.specialActions (Card.combined card))
+  let grantsIt oid = Maybe.isJust (Game.cardOfHandMember oid gs) && List.elem SpecialAction.DiscardThisAnyTime (Projection.specialActionsOf oid gs)
    in filter grantsIt (Game.zoneMembers Zone.Hand pid gs)
 
 legalActions :: PlayerId -> GameState -> [Action]

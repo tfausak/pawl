@@ -2181,6 +2181,22 @@ perpetualLoss s registry = Spec.describe s "CR 613.1f Patriar's Humiliation" $ d
     Spec.assertBool s (not (offered lostId lost)) "CR 613.1f the humiliated Djinn back in hand offers no plot"
     Spec.assertBool s (offered keptId kept) "the control: with the Piker humiliated instead, the bounced Djinn may be plotted"
     Spec.assertBool s (Maybe.isJust lostId) "the Djinn is the one card in alice's hand"
+  -- CR 116.2e's discard, through Projection.specialActionsOf. No lands beyond
+  -- the two spells': the action costs nothing.
+  Spec.it s "CR 613.1f a Circling Vultures that perpetually lost all abilities cannot be discarded" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    vultures <- S.printingOf s registry "Circling Vultures"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humiliation <- S.printingOf s registry "Patriar's Humiliation"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let build = humiliatedBoard (Setup.emptyGame S.bothPlayers) vultures plains island piker humiliation unsummon
+        (lostId, lost) = build True
+        (keptId, kept) = build False
+        offered mId gs = maybe False (\oid -> List.elem (Action.Type.DiscardFromHand oid) (Action.legalActions S.alice gs)) mId
+    Spec.assertBool s (not (offered lostId lost)) "CR 613.1f the humiliated Vultures back in hand offer no discard"
+    Spec.assertBool s (offered keptId kept) "the control: with the Piker humiliated instead, the bounced Vultures may be discarded"
+    Spec.assertBool s (Maybe.isJust lostId) "the Vultures are the one card in alice's hand"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do

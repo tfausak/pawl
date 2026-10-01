@@ -1296,9 +1296,9 @@ grantedStaticAbilitiesOf oid gs =
 -- same snapshot. Pawl.SpecialActionSpec's "CR 707.2a a copy of the Arbiter
 -- carries the offer with the ban" proves it.
 --
--- CR 116.2e's discard is not asked of this: that permission is read of a card in
--- HAND (Pawl.Engine.Action.discardableCards, off Pawl.Engine.Card.combined), a
--- zone in which nothing in data/cards/ can make an object a copy.
+-- CR 116.2e's discard is asked of this too, of a card in HAND
+-- (Pawl.Engine.Action.discardableCards), where the printed face is the answer
+-- unless something made the object a copy.
 copiableSpecialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
 copiableSpecialActionsOf carrier gs =
   let oid = textBoxHolderOf carrier gs
