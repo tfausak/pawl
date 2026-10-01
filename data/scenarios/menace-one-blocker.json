@@ -15,9 +15,9 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@brute"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@first": ["@brute"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@first": ["@brute"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$brute"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$first": ["$brute"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$first": ["$brute"] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Boggart Brute", "count": 1 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }

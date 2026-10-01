@@ -15,7 +15,7 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@chariot"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@chariot": "@bob" } } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$chariot"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "$chariot": "$bob" } } } }
   ]
 }

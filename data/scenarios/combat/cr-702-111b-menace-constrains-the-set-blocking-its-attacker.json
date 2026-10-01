@@ -21,10 +21,10 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@brute", "@plain"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@blocker": ["@brute"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@plain"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@plain", "blockers": ["@blocker"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@brute", "blockers": null } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$brute", "$plain"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "$blocker": ["$brute"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$blocker": ["$plain"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$plain", "blockers": ["$blocker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$brute", "blockers": null } } }
   ]
 }

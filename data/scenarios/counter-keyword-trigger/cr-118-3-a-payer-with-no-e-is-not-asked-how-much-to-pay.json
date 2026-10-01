@@ -15,7 +15,7 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@pia"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$pia"] } },
     { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "EndStep", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Energy" }, "count": 0 } } },
     { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Nalaar Aetherjet", "count": 0 } } }

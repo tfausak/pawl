@@ -35,13 +35,13 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@cutpurse", "mana": ["@island-1", "@island-2", "@island-3"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@forest-1", null] } }, "source": "Rishadan Cutpurse" },
-    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@swamp-1", null] } }, "source": "Rishadan Cutpurse" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$cutpurse", "mana": ["$island-1", "$island-2", "$island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$forest-1", null] } }, "source": "Rishadan Cutpurse" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$swamp-1", null] } }, "source": "Rishadan Cutpurse" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@forest-1", "tapped": true } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@swamp-1", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$forest-1", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$swamp-1", "tapped": true } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Island", "count": 3 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Rishadan Cutpurse", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Forest", "count": 2 } } },

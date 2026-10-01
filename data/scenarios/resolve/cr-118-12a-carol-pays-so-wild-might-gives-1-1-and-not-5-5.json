@@ -31,10 +31,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@wild-might", "targets": ["@piker"], "mana": ["@forest", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$wild-might", "targets": ["$piker"], "mana": ["$forest", "$forest-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "Wild Might" },
-    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@carol-island", "@carol-island-2"] } }, "source": "Wild Might" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$carol-island", "$carol-island-2"] } }, "source": "Wild Might" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 2 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 3, "toughness": 2 } } }
   ]
 }

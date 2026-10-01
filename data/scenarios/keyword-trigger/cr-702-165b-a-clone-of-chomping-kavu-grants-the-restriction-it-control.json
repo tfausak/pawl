@@ -28,8 +28,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@piker"]}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@evangel": ["@piker"]}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@piker", "blockers": ["@evangel"]}}}
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$piker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"$evangel": ["$piker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$piker", "blockers": ["$evangel"]}}}
   ]
 }

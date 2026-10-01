@@ -19,9 +19,9 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Haste" }, "count": 0 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@charm", "modes": [2], "targets": ["@piker"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$piker", "keyword": { "type": "Haste" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$charm", "modes": [2], "targets": ["$piker"], "mana": ["$mountain"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Haste" }, "count": 1 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$piker", "keyword": { "type": "Haste" }, "count": 1 } } }
   ]
 }

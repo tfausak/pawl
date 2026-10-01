@@ -20,7 +20,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@enthusiast", "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$enthusiast", "mana": ["$swamp-1", "$swamp-2", "$swamp-3"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Weaponcraft Enthusiast", "power": 0, "toughness": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Weaponcraft Enthusiast", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },

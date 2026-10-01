@@ -31,10 +31,10 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@rollicker",
+          "object": "$rollicker",
           "cost": [{ "type": "Generic", "value": 1 }, { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Red" } } }],
-          "targets": ["@mammoth"],
-          "mana": ["@mountain-1", "@mountain-2", null]
+          "targets": ["$mammoth"],
+          "mana": ["$mountain-1", "$mountain-2", null]
         }
       }
     },
@@ -42,14 +42,14 @@
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "War Mammoth", "count": 0 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@mammoth"], "mana": ["@bob-mountain"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bolt", "targets": ["$mammoth"], "mana": ["$bob-mountain"] } } }
   ],
   "final": [
     { "Types": { "object": "Nyxborn Rollicker", "types": ["Creature", "Enchantment"] } },
     { "Subtypes": { "object": "Nyxborn Rollicker", "subtypes": ["Satyr"] } },
     { "PowerToughness": { "object": "Nyxborn Rollicker", "power": 1, "toughness": 1 } },
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Nyxborn Rollicker", "count": 1 } },
-    { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } },
+    { "PowerToughness": { "object": "$piker", "power": 2, "toughness": 1 } },
     { "Count": { "player": "alice", "zone": "Graveyard", "card": "War Mammoth", "count": 1 } },
     { "Count": { "player": "alice", "zone": "Graveyard", "card": "Nyxborn Rollicker", "count": 0 } }
   ]

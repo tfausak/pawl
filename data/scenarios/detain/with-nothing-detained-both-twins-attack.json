@@ -20,9 +20,9 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@victim", "@control"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "@victim", "do": { "ChooseAttackTarget": "@alice" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "@control", "do": { "ChooseAttackTarget": "@alice" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "@victim": "@alice", "@control": "@alice" } } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$victim", "$control"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "$victim", "do": { "ChooseAttackTarget": "$alice" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "$control", "do": { "ChooseAttackTarget": "$alice" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "$victim": "$alice", "$control": "$alice" } } } }
   ]
 }

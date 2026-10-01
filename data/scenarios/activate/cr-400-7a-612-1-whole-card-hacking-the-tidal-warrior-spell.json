@@ -31,13 +31,13 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@warrior", "mana": ["@island1", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["Tidal Warrior"], "mana": ["@island2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$warrior", "mana": ["$island1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$hack", "targets": ["Tidal Warrior"], "mana": ["$island2", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "Tidal Warrior", "targets": ["@forest"], "mana": [null] } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "Tidal Warrior", "targets": ["$forest"], "mana": [null] } } },
     { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "@forest", "subtypes": ["Swamp"] } } }
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "$forest", "subtypes": ["Swamp"] } } }
   ]
 }

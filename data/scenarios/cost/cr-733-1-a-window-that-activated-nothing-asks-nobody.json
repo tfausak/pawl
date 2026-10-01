@@ -26,12 +26,12 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@piker", "mana": ["@mountain-1", "@mountain-2", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@leak", "targets": ["Goblin Piker"], "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$piker", "mana": ["$mountain-1", "$mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$leak", "targets": ["Goblin Piker"], "mana": ["$island-1", "$island-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": [null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@tomb", "tapped": false } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@bob-island", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$tomb", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$bob-island", "tapped": false } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Life": { "player": "bob", "life": 20 } } }

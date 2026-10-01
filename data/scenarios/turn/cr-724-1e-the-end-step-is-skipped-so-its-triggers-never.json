@@ -65,10 +65,10 @@
   },
   "timeline": [
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@burst", "targets": ["@alice"], "mana": ["@mountain1", null]}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Activate": {"object": "@brothers", "targets": ["@alice"], "mana": ["@mountain2", "@mountain3", "@mountain4"]}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@time-stop", "mana": ["@island1", "@island2", "@island3", "@island4", "@island5", "@island6", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$burst", "targets": ["$alice"], "mana": ["$mountain1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Activate": {"object": "$brothers", "targets": ["$alice"], "mana": ["$mountain2", "$mountain3", "$mountain4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$time-stop", "mana": ["$island1", "$island2", "$island3", "$island4", "$island5", "$island6", null]}}},
     {"turn": 2, "step": "Upkeep", "player": "bob", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 10}}},
-    {"turn": 2, "step": "Upkeep", "player": "bob", "check": {"Counters": {"object": "@gnarlbark", "kind": {"type": "MinusOneMinusOne"}, "count": 0}}}
+    {"turn": 2, "step": "Upkeep", "player": "bob", "check": {"Counters": {"object": "$gnarlbark", "kind": {"type": "MinusOneMinusOne"}, "count": 0}}}
   ]
 }

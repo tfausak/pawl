@@ -16,8 +16,8 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@hanweir-garrison": ["@goblin-piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$goblin-piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$hanweir-garrison": ["$goblin-piker"] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Human Token", "count": 0 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Human Token", "count": 0 } } }
   ]

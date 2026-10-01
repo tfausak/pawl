@@ -19,8 +19,8 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@giant"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@squire", "@squire-2"] } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 5, "toughness": 5 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$giant"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$squire", "$squire-2"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 5, "toughness": 5 } } }
   ]
 }

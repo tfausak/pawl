@@ -19,11 +19,11 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second", "@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@first", "@second"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@first", "do": { "ChooseTargets": { "mentored": ["@piker"] } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@second", "do": { "ChooseTargets": { "mentored": ["@piker"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 2 } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$first", "$second", "$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$first", "$second"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$first", "do": { "ChooseTargets": { "mentored": ["$piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$second", "do": { "ChooseTargets": { "mentored": ["$piker"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "Counters": { "object": "$piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
   ]
 }

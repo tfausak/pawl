@@ -21,10 +21,10 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@entourage": ["@first", "@second"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@entourage": ["@first"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@first", "blockers": ["@entourage"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@second", "blockers": null } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$first", "$second"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "$entourage": ["$first", "$second"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$entourage": ["$first"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$first", "blockers": ["$entourage"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$second", "blockers": null } } }
   ]
 }

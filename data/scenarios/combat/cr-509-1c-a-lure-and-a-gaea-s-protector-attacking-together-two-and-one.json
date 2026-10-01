@@ -24,9 +24,9 @@
     ]
   },
   "timeline": [
-    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@protector", "@lured"]}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@b1": ["@lured"], "@b2": ["@lured"], "@b3": ["@protector"]}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@protector", "blockers": ["@b3"]}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@lured", "blockers": ["@b1", "@b2"]}}}
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$protector", "$lured"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"$b1": ["$lured"], "$b2": ["$lured"], "$b3": ["$protector"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$protector", "blockers": ["$b3"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$lured", "blockers": ["$b1", "$b2"]}}}
   ]
 }

@@ -37,14 +37,14 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@first-bolt", "targets": ["@first-giant"], "mana": ["@mountain-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$first-bolt", "targets": ["$first-giant"], "mana": ["$mountain-1", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@second-bolt", "targets": ["@second-giant"], "mana": ["@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$second-bolt", "targets": ["$second-giant"], "mana": ["$mountain-2", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 0 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@harvest", "targets": ["@bob"], "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@bob"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@bob"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$harvest", "targets": ["$bob"], "mana": ["$swamp-1", "$swamp-2", "$swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$bob"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$bob"] } } }
   ],
   "final": [
     { "Life": { "player": "bob", "life": 17 } },

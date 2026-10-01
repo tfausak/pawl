@@ -39,18 +39,18 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@gargantuan", "mana": ["Island", "Island#2", "Island#3", "Island#4", "Island#5", "Island#6", "Island#7", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$gargantuan", "mana": ["Island", "Island#2", "Island#3", "Island#4", "Island#5", "Island#6", "Island#7", null]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseCopyTarget": "@goyf"}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@counterpart", "targets": ["Quicksilver Gargantuan"], "mana": ["Island#8", "Island#9", "Island#10", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseCopyTarget": "$goyf"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$counterpart", "targets": ["Quicksilver Gargantuan"], "mana": ["Island#8", "Island#9", "Island#10", null]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Names": {"object": "Quicksilver Gargantuan#2", "names": ["Tarmogoyf"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "Quicksilver Gargantuan#2", "power": 7, "toughness": 7}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "@goyf", "power": 1, "toughness": 2}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@bolt", "targets": ["@piker"], "mana": ["Mountain"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$goyf", "power": 1, "toughness": 2}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$bolt", "targets": ["$piker"], "mana": ["Mountain"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1}}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "@goyf", "power": 2, "toughness": 3}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$goyf", "power": 2, "toughness": 3}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "Quicksilver Gargantuan#2", "power": 7, "toughness": 7}}}
   ]
 }

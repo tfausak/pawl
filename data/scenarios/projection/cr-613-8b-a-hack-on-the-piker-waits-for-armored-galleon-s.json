@@ -27,14 +27,14 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@piker"], "mana": ["@island1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$hack", "targets": ["$piker"], "mana": ["$island1", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@exchange", "mana": ["@island2", "@island3", "@island4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$exchange", "mana": ["$island2", "$island3", "$island4"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Exchange of Words", "do": { "ChooseTargets": { "creatures": ["@galleon", "@piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Exchange of Words", "do": { "ChooseTargets": { "creatures": ["$galleon", "$piker"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@galleon", "@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@galleon": "@bob", "@piker": "@bob" } } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$galleon", "$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "$galleon": "$bob", "$piker": "$bob" } } } }
   ]
 }

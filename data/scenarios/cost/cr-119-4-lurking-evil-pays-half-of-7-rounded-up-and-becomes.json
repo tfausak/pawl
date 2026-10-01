@@ -16,12 +16,12 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@evil" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$evil" } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 3 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@evil", "power": 4, "toughness": 4 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@evil", "types": ["Creature"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "@evil", "subtypes": ["Phyrexian", "Horror"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@evil", "keyword": { "type": "Flying" }, "count": 1 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$evil", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "$evil", "types": ["Creature"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "$evil", "subtypes": ["Phyrexian", "Horror"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$evil", "keyword": { "type": "Flying" }, "count": 1 } } }
   ]
 }

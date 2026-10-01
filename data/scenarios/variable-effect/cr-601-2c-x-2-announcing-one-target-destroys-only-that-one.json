@@ -27,7 +27,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@infestation", "x": 2, "targets": ["@ring"], "mana": ["@forest1", "@forest2", "@forest3", "@forest4", "@forest5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$infestation", "x": 2, "targets": ["$ring"], "mana": ["$forest1", "$forest2", "$forest3", "$forest4", "$forest5"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Pest Token", "Pest Token#2", "Pest Token#3", "Pest Token#4"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Ornithopter", "count": 1 } } },

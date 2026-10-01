@@ -46,11 +46,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@pact", "mana": [null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$pact", "mana": [null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Giant Token", "count": 1 } } },
-    { "turn": 3, "step": "Upkeep", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@mountain1", "@mountain2", "@mountain3", "@mountain4", "@mountain5"] } } },
-    { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@mountain5", "tapped": true } } },
+    { "turn": 3, "step": "Upkeep", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$mountain1", "$mountain2", "$mountain3", "$mountain4", "$mountain5"] } } },
+    { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "$mountain5", "tapped": true } } },
     { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
     { "turn": 4, "step": "Upkeep", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } },
     { "turn": 5, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },

@@ -23,8 +23,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@piker"], "mana": ["@mountain", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@plains-1", "@plains-2", null] } }, "source": "Sun's Bounty" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$bolt", "targets": ["$piker"], "mana": ["$mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$plains-1", "$plains-2", null] } }, "source": "Sun's Bounty" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Sun's Bounty", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Sun's Bounty", "count": 0 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Sun's Bounty", "count": 0 } } }

@@ -22,6 +22,6 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@history-of-benalia", "kind": { "type": "Lore" }, "count": 1 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "$history-of-benalia", "kind": { "type": "Lore" }, "count": 1 } } }
   ]
 }

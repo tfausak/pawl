@@ -31,9 +31,9 @@
   },
   "timeline": [
     { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@false-cure", "mana": ["@swamp", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$false-cure", "mana": ["$swamp", "$swamp-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "PlayLand": "@fountain" } }
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "PlayLand": "$fountain" } }
   ],
   "final": [
     { "Life": { "player": "carol", "life": 22 } }

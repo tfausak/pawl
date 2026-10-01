@@ -17,9 +17,9 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@attacker", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@curse", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$attacker", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$curse", "do": { "ChooseOptional": { "type": "Exercises" } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Zombie Token", "count": 1 } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "Zombie Token", "tapped": true } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Zombie Token", "count": 0 } } }

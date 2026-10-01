@@ -16,8 +16,8 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@sacred-prey"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@pride-guardian": ["@sacred-prey"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$sacred-prey"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$pride-guardian": ["$sacred-prey"] } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 21 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 23 } } }
   ]

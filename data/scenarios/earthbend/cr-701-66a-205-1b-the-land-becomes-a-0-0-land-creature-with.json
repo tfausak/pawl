@@ -22,14 +22,14 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lesson", "targets": ["@target"], "mana": ["@forest-1", "@forest-2", "@forest-3", "@twin", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$lesson", "targets": ["$target"], "mana": ["$forest-1", "$forest-2", "$forest-3", "$twin", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@target", "power": 4, "toughness": 4 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@target", "kind": { "type": "PlusOnePlusOne" }, "count": 4 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@target", "types": ["Creature", "Land"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "@target", "subtypes": ["Forest"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@target", "keyword": { "type": "Haste" }, "count": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@twin", "types": ["Land"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@twin", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$target", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "$target", "kind": { "type": "PlusOnePlusOne" }, "count": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "$target", "types": ["Creature", "Land"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "$target", "subtypes": ["Forest"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$target", "keyword": { "type": "Haste" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "$twin", "types": ["Land"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "$twin", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } }
   ]
 }

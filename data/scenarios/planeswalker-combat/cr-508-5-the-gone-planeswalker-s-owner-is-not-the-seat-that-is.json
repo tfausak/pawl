@@ -80,7 +80,7 @@
       "player": "alice",
       "do": {
         "Attack": [
-          "@wraith"
+          "$wraith"
         ]
       }
     },
@@ -88,9 +88,9 @@
       "turn": 1,
       "step": "DeclareAttackers",
       "player": "alice",
-      "source": "@wraith",
+      "source": "$wraith",
       "do": {
-        "ChooseAttackTarget": "@jace"
+        "ChooseAttackTarget": "$jace"
       }
     },
     {
@@ -100,7 +100,7 @@
       "check": {
         "Attackers": {
           "attackers": {
-            "@wraith": "@jace"
+            "$wraith": "$jace"
           }
         }
       }
@@ -111,12 +111,12 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@bolt",
+          "object": "$bolt",
           "targets": [
-            "@jace"
+            "$jace"
           ],
           "mana": [
-            "@mountain"
+            "$mountain"
           ]
         }
       }
@@ -159,8 +159,8 @@
       "player": "bob",
       "do": {
         "Block": {
-          "@blocker": [
-            "@wraith"
+          "$blocker": [
+            "$wraith"
           ]
         }
       }
@@ -171,9 +171,9 @@
       "player": "alice",
       "check": {
         "Blockers": {
-          "attacker": "@wraith",
+          "attacker": "$wraith",
           "blockers": [
-            "@blocker"
+            "$blocker"
           ]
         }
       }

@@ -26,7 +26,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@vandalize", "modes": [0, 1], "targetsBySlot": { "artifact": ["@bonesplitter"], "land": ["@forest"] }, "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$vandalize", "modes": [0, 1], "targetsBySlot": { "artifact": ["$bonesplitter"], "land": ["$forest"] }, "mana": ["$mountain-1", "$mountain-2", "$mountain-3", "$mountain-4", "$mountain-5"] } } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Graveyard", "card": "Vandalize", "count": 1 } },

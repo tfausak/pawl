@@ -16,9 +16,9 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@inner-chamber-guard"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$inner-chamber-guard"] } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@inner-chamber-guard", "power": 0, "toughness": 2 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$inner-chamber-guard", "power": 0, "toughness": 2 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
   ]
 }

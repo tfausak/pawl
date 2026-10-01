@@ -44,7 +44,7 @@
   },
   "timeline": [
     { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "ChooseDefender": "dave" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@dave" } } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "$piker": "$dave" } } } }
   ]
 }

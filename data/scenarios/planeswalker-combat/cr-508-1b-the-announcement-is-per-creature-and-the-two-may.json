@@ -26,10 +26,10 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker", "@goblin-piker-2"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@goblin-piker", "do": { "ChooseAttackTarget": "@jace-beleren" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@goblin-piker-2", "do": { "ChooseAttackTarget": "@bob" } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "@jace-beleren", "kind": { "type": "Loyalty" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$goblin-piker", "$goblin-piker-2"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$goblin-piker", "do": { "ChooseAttackTarget": "$jace-beleren" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$goblin-piker-2", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "$jace-beleren", "kind": { "type": "Loyalty" }, "count": 1 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } }
   ]
 }

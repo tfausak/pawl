@@ -20,7 +20,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fodder", "mana": ["@mountain-1", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$fodder", "mana": ["$mountain-1", "$mountain-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2", "Goblin Token#3", "Goblin Token#4"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 4 } } }
   ]

@@ -16,6 +16,6 @@ spec s = Spec.describe s "Pawl.Codec.CountersAre" $ do
       s
       CountersAre.codec
       (CountersAre.Type.MkCountersAre (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "jace"))) CounterKind.Type.Loyalty 3)
-      " {\"object\":\"@jace\",\"kind\":{\"type\":\"Loyalty\"},\"count\":3} "
+      " {\"object\":\"$jace\",\"kind\":{\"type\":\"Loyalty\"},\"count\":3} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s CountersAre.codec

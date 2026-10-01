@@ -28,7 +28,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@sign-in-blood", "targets": ["@alice"], "mana": ["@swamp", "@swamp-2"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$sign-in-blood", "targets": ["$alice"], "mana": ["$swamp", "$swamp-2"] } } }
   ],
   "final": [
     { "Life": { "player": "alice", "life": 18 } },

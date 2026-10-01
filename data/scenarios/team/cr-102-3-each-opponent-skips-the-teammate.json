@@ -30,7 +30,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@prologue", "mana": ["@island", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$prologue", "mana": ["$island", "$island-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Poison" }, "count": 0 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 0 } } },

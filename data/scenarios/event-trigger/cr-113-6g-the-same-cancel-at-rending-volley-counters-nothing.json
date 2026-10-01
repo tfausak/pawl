@@ -32,9 +32,9 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@volley", "targets": ["@baral"], "mana": ["@m1"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$volley", "targets": ["$baral"], "mana": ["$m1"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@cancel", "targets": ["Rending Volley"], "mana": ["@i1", "@i2", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$cancel", "targets": ["Rending Volley"], "mana": ["$i1", "$i2", null]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Rending Volley", "count": 0}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Cancel", "count": 1}}},

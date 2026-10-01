@@ -25,7 +25,7 @@
   "timeline": [
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 22 } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@alice"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "Cast": { "object": "$bolt", "targets": ["$alice"], "mana": ["$mountain"] } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 19 } } }
   ]
 }

@@ -41,7 +41,7 @@
       "player": "alice",
       "do": {
         "Attack": [
-          "@giant"
+          "$giant"
         ]
       }
     },
@@ -51,13 +51,13 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@telekinesis",
+          "object": "$telekinesis",
           "targets": [
-            "@giant"
+            "$giant"
           ],
           "mana": [
-            "@island1",
-            "@island2"
+            "$island1",
+            "$island2"
           ]
         }
       }

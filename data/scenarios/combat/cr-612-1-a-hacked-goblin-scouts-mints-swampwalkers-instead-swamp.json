@@ -38,15 +38,15 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@scouts", "mana": ["@m1", "@m2", "@m3", "@m4", "@m5", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["Goblin Scouts"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$scouts", "mana": ["$m1", "$m2", "$m3", "$m4", "$m5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$hack", "targets": ["Goblin Scouts"], "mana": ["$island"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Mountain" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Scout Token", "Goblin Scout Token#2", "Goblin Scout Token#3"] } },
     { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
     { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["Goblin Scout Token", "Goblin Scout Token#2", "Goblin Scout Token#3"] } },
-    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["Goblin Scout Token"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$piker": ["Goblin Scout Token"] } } },
     { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
     { "turn": 3, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "Goblin Scout Token", "blockers": null } } }
   ]

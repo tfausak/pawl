@@ -23,13 +23,13 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@ground", "@flier"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@inq": ["@ground"], "@spider": ["@flier"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@path", "targetsBySlot": { "first": ["@inq"], "second": ["@spider"] } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$ground", "$flier"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$inq": ["$ground"], "$spider": ["$flier"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "$path", "targetsBySlot": { "first": ["$inq"], "second": ["$spider"] } } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@flier", "blockers": ["@spider"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@ground", "blockers": ["@inq"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "@path", "tapped": true } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$flier", "blockers": ["$spider"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$ground", "blockers": ["$inq"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "$path", "tapped": true } } }
   ]
 }

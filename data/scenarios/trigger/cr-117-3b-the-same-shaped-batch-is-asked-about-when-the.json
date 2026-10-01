@@ -20,9 +20,9 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@dragon-fodder", "mana": ["@mountain", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$dragon-fodder", "mana": ["$mountain", "$mountain-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2"] } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["@aether-flash", "@aether-flash"] } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["$aether-flash", "$aether-flash"] } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 0 } }

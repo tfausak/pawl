@@ -25,16 +25,16 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@aviator"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$aviator"] } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "Jump#2", "targets": ["@piker"], "mana": ["@island-1", null] } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@twincast", "targets": ["Jump#2"], "mana": ["@island-2", "@island-3", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "Jump#2", "targets": ["$piker"], "mana": ["$island-1", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "$twincast", "targets": ["Jump#2"], "mana": ["$island-2", "$island-3", null] } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@wolves"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["$wolves"] } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@wolves", "keyword": { "type": "Flying" }, "count": 1 } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Flying" }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "$wolves", "keyword": { "type": "Flying" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "$piker", "keyword": { "type": "Flying" }, "count": 0 } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Flying" }, "count": 1 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "$piker", "keyword": { "type": "Flying" }, "count": 1 } } }
   ]
 }

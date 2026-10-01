@@ -24,7 +24,7 @@
   },
   "timeline": [
     { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede" },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Cast": { "object": "@prologue", "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Cast": { "object": "$prologue", "mana": ["$island-1", "$island-2"] } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 1 } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "carol", "kind": { "type": "Poison" }, "count": 0 } } },

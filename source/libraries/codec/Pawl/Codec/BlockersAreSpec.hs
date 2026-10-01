@@ -16,11 +16,11 @@ spec s = Spec.describe s "Pawl.Codec.BlockersAre" $ do
       s
       BlockersAre.codec
       (BlockersAre.Type.MkBlockersAre (labelled "bear") (Just (Set.fromList [labelled "wall", labelled "guard"])))
-      " {\"attacker\":\"@bear\",\"blockers\":[\"@guard\",\"@wall\"]} "
+      " {\"attacker\":\"$bear\",\"blockers\":[\"$guard\",\"$wall\"]} "
   Spec.it s "blocked by nothing" $
-    Common.assertCodec s BlockersAre.codec (BlockersAre.Type.MkBlockersAre (labelled "bear") (Just Set.empty)) " {\"attacker\":\"@bear\",\"blockers\":[]} "
+    Common.assertCodec s BlockersAre.codec (BlockersAre.Type.MkBlockersAre (labelled "bear") (Just Set.empty)) " {\"attacker\":\"$bear\",\"blockers\":[]} "
   Spec.it s "unblocked is null" $
-    Common.assertCodec s BlockersAre.codec (BlockersAre.Type.MkBlockersAre (labelled "bear") Nothing) " {\"attacker\":\"@bear\",\"blockers\":null} "
+    Common.assertCodec s BlockersAre.codec (BlockersAre.Type.MkBlockersAre (labelled "bear") Nothing) " {\"attacker\":\"$bear\",\"blockers\":null} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s BlockersAre.codec
 

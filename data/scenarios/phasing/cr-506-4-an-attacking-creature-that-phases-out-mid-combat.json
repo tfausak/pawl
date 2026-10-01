@@ -19,13 +19,13 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@victim", "@other"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@victim": "@bob", "@other": "@bob" } } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@ripple", "targets": ["@victim"], "mana": ["@island1", "@island2"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$victim", "$other"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "$victim": "$bob", "$other": "$bob" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "$ripple", "targets": ["$victim"], "mana": ["$island1", "$island2"] } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 0 } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@other": "@bob" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "$other": "$bob" } } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } }
   ]
 }

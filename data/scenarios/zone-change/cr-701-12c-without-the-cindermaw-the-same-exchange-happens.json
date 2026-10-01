@@ -29,7 +29,7 @@
     "step": "Upkeep"
   },
   "timeline": [
-    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@soul-conduit", "targets": ["@bob", "@carol"], "mana": ["@island", "@island-2", "@island-3", "@island-4", "@island-5", "@island-6"] } } }
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$soul-conduit", "targets": ["$bob", "$carol"], "mana": ["$island", "$island-2", "$island-3", "$island-4", "$island-5", "$island-6"] } } }
   ],
   "final": [
     { "Life": { "player": "carol", "life": 27 } }

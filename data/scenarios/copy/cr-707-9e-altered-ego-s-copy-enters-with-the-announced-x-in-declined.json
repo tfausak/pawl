@@ -24,7 +24,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@ego", "x": 2, "mana": ["Forest", "Forest#2", "Forest#3", "Island", "Island#2", "Island#3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$ego", "x": 2, "mana": ["Forest", "Forest#2", "Forest#3", "Island", "Island#2", "Island#3"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": null } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Altered Ego", "count": 0 } } },

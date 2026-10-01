@@ -18,11 +18,11 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@mongoose", "power": 2, "toughness": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@splitter", "mana": ["@plains"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$mongoose", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$splitter", "mana": ["$plains"] } } }
   ],
   "final": [
-    { "PowerToughness": { "object": "@mongoose", "power": 2, "toughness": 1 } },
+    { "PowerToughness": { "object": "$mongoose", "power": 2, "toughness": 1 } },
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bonesplitter", "count": 1 } }
   ]
 }

@@ -36,10 +36,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@impact", "targets": ["@bob"], "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$impact", "targets": ["$bob"], "mana": ["$mountain-1", "$mountain-2", "$mountain-3", "$mountain-4"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@gush", "cost": [{ "type": "Generic", "value": 4 }, { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Blue" } } }], "mana": ["@island-1", "@island-2", "@island-3", "@island-4", "@island-5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$gush", "cost": [{ "type": "Generic", "value": 4 }, { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Blue" } } }], "mana": ["$island-1", "$island-2", "$island-3", "$island-4", "$island-5"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 3 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },

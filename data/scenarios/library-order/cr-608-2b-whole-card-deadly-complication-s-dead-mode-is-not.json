@@ -30,12 +30,12 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@person-card", "mana": ["@mountain", "@mountain-2", "@mountain-3", "@mountain-4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$person-card", "mana": ["$mountain", "$mountain-2", "$mountain-3", "$mountain-4", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Detective Token", "count": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@complication", "modes": [0, 1], "targetsBySlot": { "creature": ["@piker"], "suspect": ["Person of Interest"] }, "mana": ["@swamp", "@swamp-2", "@mountain-5", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["Person of Interest"], "mana": ["@mountain-6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$complication", "modes": [0, 1], "targetsBySlot": { "creature": ["$piker"], "suspect": ["Person of Interest"] }, "mana": ["$swamp", "$swamp-2", "$mountain-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$bolt", "targets": ["Person of Interest"], "mana": ["$mountain-6"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Person of Interest", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },

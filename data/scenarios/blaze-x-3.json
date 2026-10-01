@@ -24,10 +24,10 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@spell",
-          "targets": ["@bob"],
+          "object": "$spell",
+          "targets": ["$bob"],
           "x": 3,
-          "mana": ["@first mana", "@second mana", "@third mana", "@fourth mana"]
+          "mana": ["$first mana", "$second mana", "$third mana", "$fourth mana"]
         }
       }
     },
@@ -35,9 +35,9 @@
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } }
   ],
   "final": [
-    { "Tapped": { "object": "@first mana", "tapped": true } },
-    { "Tapped": { "object": "@second mana", "tapped": true } },
-    { "Tapped": { "object": "@third mana", "tapped": true } },
-    { "Tapped": { "object": "@fourth mana", "tapped": true } }
+    { "Tapped": { "object": "$first mana", "tapped": true } },
+    { "Tapped": { "object": "$second mana", "tapped": true } },
+    { "Tapped": { "object": "$third mana", "tapped": true } },
+    { "Tapped": { "object": "$fourth mana", "tapped": true } }
   ]
 }

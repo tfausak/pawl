@@ -22,7 +22,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@salt-road-skirmish", "targets": ["@rats"], "mana": ["@swamp", "@swamp-2", "@swamp-3", "@swamp-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$salt-road-skirmish", "targets": ["$rats"], "mana": ["$swamp", "$swamp-2", "$swamp-3", "$swamp-4"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Typhoid Rats", "count": 0 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Typhoid Rats", "count": 1 } } },

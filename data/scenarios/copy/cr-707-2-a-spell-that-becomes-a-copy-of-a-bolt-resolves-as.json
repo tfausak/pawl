@@ -33,9 +33,9 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@bob"], "mana": ["@mountain", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@think-twice", "mana": ["@island", "@island-2", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mimicry", "targetsBySlot": { "subject": ["Think Twice"], "original": ["Lightning Bolt"] }, "mana": ["@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$bolt", "targets": ["$bob"], "mana": ["$mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$think-twice", "mana": ["$island", "$island-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$mimicry", "targetsBySlot": { "subject": ["Think Twice"], "original": ["Lightning Bolt"] }, "mana": ["$island-3", "$island-4"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },

@@ -29,10 +29,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@shade", "mana": ["@swamp"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@bob-island", "@bob-island-2"] } }, "source": "@shade" },
-    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "@shade" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$shade", "mana": ["$swamp"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$bob-island", "$bob-island-2"] } }, "source": "$shade" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "$shade" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@shade", "power": 1, "toughness": 1 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$shade", "power": 1, "toughness": 1 } } }
   ]
 }

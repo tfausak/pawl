@@ -34,7 +34,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@replenish", "mana": ["@plains", "@plains-2", "@plains-3", "@plains-4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$replenish", "mana": ["$plains", "$plains-2", "$plains-3", "$plains-4", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Opalescence", "Humility"] } }
   ],
   "final": [

@@ -54,7 +54,7 @@
     "sharedTeamTurns": true
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fatigue", "targets": ["@bob"], "mana": ["@island1", "@island2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$fatigue", "targets": ["$bob"], "mana": ["$island1", "$island2"] } } },
     { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 0 } } },
     { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Island", "count": 0 } } },
     { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 0 } } },

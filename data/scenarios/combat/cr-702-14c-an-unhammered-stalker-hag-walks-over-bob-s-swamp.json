@@ -44,12 +44,12 @@
     ]
   },
   "timeline": [
-    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@hag"]}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@blocker": ["@hag"]}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$hag"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"$blocker": ["$hag"]}}},
     {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@hag", "blockers": null}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "@hag", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Swamp"}}}, "count": 1}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "@hag", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Forest"}}}, "count": 1}}},
-    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "@hag", "keyword": {"type": "Haste"}, "count": 1}}}
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$hag", "blockers": null}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "$hag", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Swamp"}}}, "count": 1}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "$hag", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Forest"}}}, "count": 1}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "$hag", "keyword": {"type": "Haste"}, "count": 1}}}
   ]
 }

@@ -30,7 +30,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@rise", "mana": ["Swamp", "Swamp#2", "Swamp#3", "Swamp#4", "Swamp#5", "Swamp#6", "Swamp#7", "Swamp#8", "Swamp#9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$rise", "mana": ["Swamp", "Swamp#2", "Swamp#3", "Swamp#4", "Swamp#5", "Swamp#6", "Swamp#7", "Swamp#8", "Swamp#9"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Piker", "Clone"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },

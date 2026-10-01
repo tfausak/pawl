@@ -23,14 +23,14 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@attacker"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@ray", "targets": ["@blocker"], "mana": ["@i1", "@i2", "@i3", "@i4"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$blocker": ["$attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "$ray", "targets": ["$blocker"], "mana": ["$i1", "$i2", "$i3", "$i4"] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 2 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@attacker", "damage": 0 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@blocker", "damage": 0 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": [] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "$attacker", "damage": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "$blocker", "damage": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Blockers": { "attacker": "$attacker", "blockers": [] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
   ]
 }

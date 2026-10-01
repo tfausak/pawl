@@ -20,9 +20,9 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@brute"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@blocker": ["@brute"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$brute"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "$blocker": ["$brute"] } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@brute", "blockers": null } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$brute", "blockers": null } } }
   ]
 }

@@ -23,13 +23,13 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@aura", "targets": ["@split"], "mana": ["@i1", "@i2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$aura", "targets": ["$split"], "mana": ["$i1", "$i2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bonesplitter", "count": 1 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 1 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 4, "toughness": 1 } } }
   ],
   "final": [
-    { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } },
+    { "PowerToughness": { "object": "$piker", "power": 2, "toughness": 1 } },
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bonesplitter", "count": 1 } }
   ]
 }

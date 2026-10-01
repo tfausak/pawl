@@ -20,6 +20,6 @@ spec s = Spec.describe s "Pawl.Codec.Activation" $ do
           Activation.Type.ability = Just 1,
           Activation.Type.choices = Choices.Type.none {Choices.Type.x = Just 2}
         }
-      " {\"object\":\"@stone\",\"ability\":1,\"x\":2} "
+      " {\"object\":\"$stone\",\"ability\":1,\"x\":2} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Activation.codec

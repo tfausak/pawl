@@ -27,8 +27,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@piker", "mana": ["@mountain-1", "@mountain-2"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@dash", "targets": ["Goblin Piker"], "mana": ["@swamp-1", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$piker", "mana": ["$mountain-1", "$mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$dash", "targets": ["Goblin Piker"], "mana": ["$swamp-1", "$swamp-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Stack", "card": "Goblin Piker", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Stack", "card": "Dash Hopes", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "Dash Hopes" },

@@ -25,11 +25,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["@ministrant"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$evolution", "targets": ["$ministrant"], "mana": ["$island", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Spirit" }, "to": { "type": "Elf" } } }, "source": "Artificial Evolution" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "@ministrant", "subtypes": ["Human", "Cleric"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["@ministrant"], "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "$ministrant", "subtypes": ["Human", "Cleric"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$murder", "targets": ["$ministrant"], "mana": ["$swamp-1", "$swamp-2", "$swamp-3"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Elf Token", "Elf Token#2"] } },

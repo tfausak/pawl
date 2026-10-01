@@ -26,9 +26,9 @@
     "sharedTeamTurns": true
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@prankster"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@prankster", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseTargets": { "target": ["@prankster"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$prankster"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$prankster", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseTargets": { "target": ["$prankster"] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } }
   ]
 }

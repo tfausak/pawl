@@ -19,9 +19,9 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@sacred-prey"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@goblin-piker": ["@sacred-prey"], "@goblin-piker-2": ["@sacred-prey"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@sacred-prey", "do": { "AssignDamage": { "@goblin-piker": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$sacred-prey"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$goblin-piker": ["$sacred-prey"], "$goblin-piker-2": ["$sacred-prey"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "$sacred-prey", "do": { "AssignDamage": { "$goblin-piker": 1 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 21 } } }
   ]
 }

@@ -21,7 +21,7 @@
     "monarch": "alice"
   },
   "timeline": [
-    { "turn": 1, "step": "EndStep", "player": "alice", "do": { "OrderTriggers": [null, "@ghoul"] } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": { "OrderTriggers": [null, "$ghoul"] } },
     { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1 } } }

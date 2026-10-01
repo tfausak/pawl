@@ -28,10 +28,10 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@bobs-piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "@bobs-piker", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "@bobs-piker": "@carol" } } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@spell", "mana": ["@land"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$bobs-piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "$bobs-piker", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "$bobs-piker": "$carol" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "$spell", "mana": ["$land"] } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "carol", "do": { "Block": {} } },
     { "turn": 1, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "carol", "life": 20 } } }
   ]

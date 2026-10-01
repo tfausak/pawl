@@ -78,15 +78,15 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@think", "mana": ["@i1", "@i2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$think", "mana": ["$i1", "$i2", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@divination", "mana": ["@i3", "@i4", "@i5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$divination", "mana": ["$i3", "$i4", "$i5", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@skeins", "mana": ["@i6", "@i7", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$skeins", "mana": ["$i6", "$i7", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Spirit Token", "count": 1 } } },
-    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fourth", "mana": ["@i8", "@i9", null] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$fourth", "mana": ["$i8", "$i9", null] } } },
     { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 2, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Spirit Token", "count": 2 } } }

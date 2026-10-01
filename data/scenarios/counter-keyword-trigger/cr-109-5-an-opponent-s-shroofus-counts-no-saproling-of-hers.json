@@ -20,8 +20,8 @@
     "step": "BeginningOfCombat"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@shroofus"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@shroofus", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$shroofus"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$shroofus", "do": { "ChooseAttackTarget": "$bob" } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
     { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTimestamps": ["Saproling Token", "Saproling Token#2", "Saproling Token#3", "Saproling Token#4", "Saproling Token#5"] } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } },

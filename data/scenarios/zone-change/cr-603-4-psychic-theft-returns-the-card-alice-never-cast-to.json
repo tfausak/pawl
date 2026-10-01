@@ -25,7 +25,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@psychic-theft", "targets": ["@bob"], "mana": ["@mountain", "@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$psychic-theft", "targets": ["$bob"], "mana": ["$mountain", "$island", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Lightning Bolt", "count": 1 } } },
     { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },

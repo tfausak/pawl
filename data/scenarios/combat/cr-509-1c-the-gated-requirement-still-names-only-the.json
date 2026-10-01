@@ -31,11 +31,11 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@enchanted", "@other"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@blocker": ["@other"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$enchanted", "$other"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "$blocker": ["$other"] } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": {} } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@enchanted"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@enchanted", "blockers": ["@blocker"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@other", "blockers": null } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$blocker": ["$enchanted"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$enchanted", "blockers": ["$blocker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$other", "blockers": null } } }
   ]
 }

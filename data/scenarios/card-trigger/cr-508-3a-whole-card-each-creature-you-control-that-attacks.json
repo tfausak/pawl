@@ -20,11 +20,11 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker", "@giant"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@charge", "@charge"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$piker", "$giant"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$charge", "$charge"] } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 3 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 5, "toughness": 5 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@piker": "@bob", "@giant": "@bob" } } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 4, "toughness": 3 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 5, "toughness": 5 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "$piker": "$bob", "$giant": "$bob" } } } }
   ]
 }

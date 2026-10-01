@@ -23,8 +23,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@twice", "mana": ["@island", "@island-2"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["@lam", "@lam"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$twice", "mana": ["$island", "$island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["$lam", "$lam"] } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Monastery Mentor", "count": 1 } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "Monastery Mentor", "power": 2, "toughness": 2 } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Life": { "player": "alice", "life": 21 } } },

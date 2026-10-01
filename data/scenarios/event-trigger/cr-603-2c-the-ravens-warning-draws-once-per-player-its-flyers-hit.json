@@ -27,10 +27,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@first", "do": { "ChooseAttackTarget": "@bob" } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@second", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@raven", "@raven"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$first", "$second"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$first", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$second", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["$raven", "$raven"] } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 2 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 19 } } }

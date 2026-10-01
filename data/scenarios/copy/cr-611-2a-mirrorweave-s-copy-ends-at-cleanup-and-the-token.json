@@ -35,23 +35,23 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@piker" } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mirrorweave", "targets": ["@giant"], "mana": ["Island#5", "Island#6", "Island#7", "Island#8", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$mirrorweave", "targets": ["$giant"], "mana": ["Island#5", "Island#6", "Island#7", "Island#8", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@counterpart", "targets": ["@piker"], "mana": ["Island#9", "Island#10", "Island#11"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$counterpart", "targets": ["$piker"], "mana": ["Island#9", "Island#10", "Island#11"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 3 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "@piker", "names": ["Blind-Spot Giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 4, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "$piker", "names": ["Blind-Spot Giant"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 4, "toughness": 3 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Goblin Piker#2", "power": 4, "toughness": 3 } } },
-    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } },
-    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Names": { "object": "@piker", "names": ["Goblin Piker"] } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 2, "toughness": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Names": { "object": "$piker", "names": ["Goblin Piker"] } } },
     { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "Goblin Piker#2", "power": 4, "toughness": 3 } } },
     { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Names": { "object": "Goblin Piker#2", "names": ["Blind-Spot Giant"] } } },
     { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 2, "toughness": 1 } } },
     { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Goblin Piker"] } } },
-    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 4, "toughness": 3 } } }
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 4, "toughness": 3 } } }
   ]
 }

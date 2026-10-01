@@ -69,7 +69,7 @@
   "timeline": [
     { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede" },
     { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": {} } } },
-    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
-    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@dave" } } } }
+    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "$piker": "$dave" } } } }
   ]
 }

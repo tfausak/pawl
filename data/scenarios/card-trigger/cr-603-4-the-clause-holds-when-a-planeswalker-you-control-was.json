@@ -25,9 +25,9 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "@piker", "do": { "ChooseAttackTarget": "@jace" } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@jace" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "$piker", "do": { "ChooseAttackTarget": "$jace" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "check": { "Attackers": { "attackers": { "$piker": "$jace" } } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 1 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Island", "count": 2 } } }
   ]

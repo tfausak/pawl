@@ -16,7 +16,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@sapphire-medallion", "mana": ["@ancient-tomb"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$sapphire-medallion", "mana": ["$ancient-tomb"] } } }
   ],
   "final": [
     { "Life": { "player": "alice", "life": 18 } },

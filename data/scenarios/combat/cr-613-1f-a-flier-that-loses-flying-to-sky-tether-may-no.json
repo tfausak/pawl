@@ -22,11 +22,11 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@tethered": ["@attacker"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@other": ["@attacker"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@other"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@tethered", "keyword": { "type": "Flying" }, "count": 0 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@other", "keyword": { "type": "Flying" }, "count": 1 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "$tethered": ["$attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$other": ["$attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$attacker", "blockers": ["$other"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "$tethered", "keyword": { "type": "Flying" }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "$other", "keyword": { "type": "Flying" }, "count": 1 } } }
   ]
 }

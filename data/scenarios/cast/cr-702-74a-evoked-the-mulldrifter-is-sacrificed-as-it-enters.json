@@ -36,7 +36,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mulldrifter", "cost": [{ "type": "Generic", "value": 2 }, { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Blue" } } }], "mana": ["@island", "@island-2", "@island-3", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$mulldrifter", "cost": [{ "type": "Generic", "value": 2 }, { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Blue" } } }], "mana": ["$island", "$island-2", "$island-3", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["Mulldrifter", "Mulldrifter"] } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Mulldrifter", "count": 0 } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Mulldrifter", "count": 1 } } },

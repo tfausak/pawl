@@ -31,14 +31,14 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@trygon"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@trygon", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["@carol-moon"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$trygon"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$trygon", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["$carol-moon"] } } },
     {
       "turn": 1,
       "step": "CombatDamage",
       "player": "bob",
-      "do": { "Cast": { "object": "@seizing", "targets": ["@carol-moon"], "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5"] } }
+      "do": { "Cast": { "object": "$seizing", "targets": ["$carol-moon"], "mana": ["$mountain-1", "$mountain-2", "$mountain-3", "$mountain-4", "$mountain-5"] } }
     },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Bad Moon", "count": 2 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Bad Moon", "count": 0 } } },

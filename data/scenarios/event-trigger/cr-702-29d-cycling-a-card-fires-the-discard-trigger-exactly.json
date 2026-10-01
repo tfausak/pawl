@@ -27,7 +27,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@mauler", "mana": ["@f1", "@f2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "$mauler", "mana": ["$f1", "$f2"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Barkhide Mauler", "count": 1}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 20}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},

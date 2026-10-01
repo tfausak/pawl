@@ -22,7 +22,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@planeswalkers-mischief", "targets": ["@bob"], "mana": ["@island", "@island-2", "@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$planeswalkers-mischief", "targets": ["$bob"], "mana": ["$island", "$island-2", "$island-3", "$island-4"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Lightning Bolt", "count": 1 } } },
     { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },

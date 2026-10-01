@@ -41,11 +41,11 @@
     "step": "Upkeep"
   },
   "timeline": [
-    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Cast": { "object": "@gather", "mana": ["@a-island-1", "@a-island-2", "@a-island-3", "@a-island-4", "@a-island-5", "@a-island-6"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bob-gather", "mana": ["@b-island-1", "@b-island-2", "@b-island-3", "@b-island-4", "@b-island-5", "@b-island-6", null] } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Cast": { "object": "$gather", "mana": ["$a-island-1", "$a-island-2", "$a-island-3", "$a-island-4", "$a-island-5", "$a-island-6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bob-gather", "mana": ["$b-island-1", "$b-island-2", "$b-island-3", "$b-island-4", "$b-island-5", "$b-island-6", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@clone", "mana": ["@b-island-7", "@b-island-8", "@b-island-9", "@b-island-10"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseCopyTarget": "@piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$clone", "mana": ["$b-island-7", "$b-island-8", "$b-island-9", "$b-island-10"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseCopyTarget": "$piker" } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Gather Specimens", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Gather Specimens", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },

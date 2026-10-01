@@ -17,8 +17,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@battlegrowth", "targets": ["@goblin-piker"], "mana": ["@forest"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$battlegrowth", "targets": ["$goblin-piker"], "mana": ["$forest"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@goblin-piker", "power": 3, "toughness": 2 } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$goblin-piker", "power": 3, "toughness": 2 } } }
   ]
 }

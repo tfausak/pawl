@@ -19,9 +19,9 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@goblin-piker-2": ["@goblin-piker"], "@pride-guardian": ["@goblin-piker"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@goblin-piker", "do": { "AssignDamage": { "@pride-guardian": 2 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$goblin-piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$goblin-piker-2": ["$goblin-piker"], "$pride-guardian": ["$goblin-piker"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "$goblin-piker", "do": { "AssignDamage": { "$pride-guardian": 2 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 23 } } }
   ]
 }

@@ -35,18 +35,18 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@doppelganger", "targets": ["@giant"], "mana": ["Island", "Island#2", "Swamp", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mirrorweave", "targets": ["@piker"], "mana": ["Island#3", "Island#4", "Island#5", "Island#6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$doppelganger", "targets": ["$giant"], "mana": ["Island", "Island#2", "Swamp", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$mirrorweave", "targets": ["$piker"], "mana": ["Island#3", "Island#4", "Island#5", "Island#6", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@doppelganger", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$doppelganger", "power": 2, "toughness": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@doppelganger", "power": 3, "toughness": 3 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "@doppelganger", "names": ["Hill Giant"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["Island#7", "Island#8", "Island#9", "Island#10"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$doppelganger", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "$doppelganger", "names": ["Hill Giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island#7", "Island#8", "Island#9", "Island#10"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@doppelganger" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$doppelganger" } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 3, "toughness": 3 } } },
     { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 3, "toughness": 3 } } },
-    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@doppelganger", "power": 3, "toughness": 3 } } }
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "$doppelganger", "power": 3, "toughness": 3 } } }
   ]
 }

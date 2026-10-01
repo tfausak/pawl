@@ -35,7 +35,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@biorhythm", "mana": ["@forest", "@forest-2", "@forest-3", "@forest-4", "@forest-5", "@forest-6", "@forest-7", "@forest-8"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$biorhythm", "mana": ["$forest", "$forest-2", "$forest-3", "$forest-4", "$forest-5", "$forest-6", "$forest-7", "$forest-8"] } } }
   ],
   "final": [
     { "Life": { "player": "bob", "life": -20 } },

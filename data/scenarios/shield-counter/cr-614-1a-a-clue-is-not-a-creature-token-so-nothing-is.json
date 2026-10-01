@@ -28,7 +28,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@eliminate-the-impossible", "mana": ["@mountain", "@mountain-2", "@island", null] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$eliminate-the-impossible", "mana": ["$mountain", "$mountain-2", "$island", null] } } }
   ],
   "final": [
     { "Count": { "player": "alice", "zone": "Battlefield", "card": "Soldier Token", "count": 0 } },

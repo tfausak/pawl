@@ -18,11 +18,11 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@sharpshooter", "@aurelia"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@sharpshooter", "@aurelia"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@sharpshooter", "power": 2, "toughness": 5 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$sharpshooter", "$aurelia"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$sharpshooter", "$aurelia"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "$sharpshooter", "power": 2, "toughness": 5 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@sharpshooter"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@sharpshooter", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$sharpshooter"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "$sharpshooter", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
   ]
 }

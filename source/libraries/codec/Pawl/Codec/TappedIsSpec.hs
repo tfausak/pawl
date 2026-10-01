@@ -12,6 +12,6 @@ import qualified Pawl.Types.TappedIs as TappedIs.Type
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TappedIs" $ do
   Spec.it s "tapped is a flag" $
-    Common.assertCodec s TappedIs.codec (TappedIs.Type.MkTappedIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))) TapState.Type.Tapped) " {\"object\":\"@bear\",\"tapped\":true} "
+    Common.assertCodec s TappedIs.codec (TappedIs.Type.MkTappedIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))) TapState.Type.Tapped) " {\"object\":\"$bear\",\"tapped\":true} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s TappedIs.codec

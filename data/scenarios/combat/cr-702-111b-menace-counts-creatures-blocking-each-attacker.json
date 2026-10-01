@@ -23,10 +23,10 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@brigade": ["@first", "@second"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@brigade": ["@first", "@second"], "@x": ["@first"], "@y": ["@second"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@first", "blockers": ["@brigade", "@x"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@second", "blockers": ["@brigade", "@y"] } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$first", "$second"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "$brigade": ["$first", "$second"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$brigade": ["$first", "$second"], "$x": ["$first"], "$y": ["$second"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$first", "blockers": ["$brigade", "$x"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$second", "blockers": ["$brigade", "$y"] } } }
   ]
 }

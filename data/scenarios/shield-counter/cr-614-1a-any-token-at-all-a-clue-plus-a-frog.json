@@ -20,7 +20,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@eliminate-the-impossible", "mana": ["@island", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$eliminate-the-impossible", "mana": ["$island", "$island-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Clue Token", "Frog Token"] } }
   ],
   "final": [

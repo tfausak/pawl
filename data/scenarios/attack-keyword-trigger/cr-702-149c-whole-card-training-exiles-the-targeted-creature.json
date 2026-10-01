@@ -19,10 +19,10 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@savior", "@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@giant"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@savior", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$savior", "$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["$giant"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "$savior", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "$piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Hill Giant", "count": 1 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 0 } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 0 } } },

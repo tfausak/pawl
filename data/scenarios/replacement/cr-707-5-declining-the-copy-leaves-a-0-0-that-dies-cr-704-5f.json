@@ -22,7 +22,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["@island-1", "@island-2", "@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["$island-1", "$island-2", "$island-3", "$island-4"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": null } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Clone", "count": 0 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Clone", "count": 1 } } }
