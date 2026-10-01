@@ -1,0 +1,33 @@
+{
+  "description": "CR 613.1 Blood Moon spares a land Mirrorweave made a Lord of Atlantis",
+  "note": "Mirrorweave makes Dryad Arbor a copy of Lord of Atlantis. Layer 1 takes the Arbor's land type away before Blood Moon's layer-4 effect asks what is a nonbasic land, so Blood Moon does not reach it and its copied lord ability pumps the real Lord to 3/3. Judging land-ness from the printed card instead strips that ability and leaves the Lord 2/2. The mana is basic Plains so Blood Moon touches nothing else.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains1", "ready": true },
+          { "card": "Plains", "label": "plains2", "ready": true },
+          { "card": "Plains", "label": "plains3", "ready": true },
+          { "card": "Plains", "label": "plains4", "ready": true },
+          { "card": "Blood Moon", "label": "moon" },
+          { "card": "Lord of Atlantis", "label": "lord" },
+          { "card": "Dryad Arbor", "label": "arbor" }
+        ],
+        "hand": [{ "card": "Mirrorweave", "label": "mirrorweave" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mirrorweave", "targets": ["@lord"], "mana": ["@plains1", "@plains2", "@plains3", "@plains4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@lord", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@arbor", "types": ["Creature"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@arbor", "power": 3, "toughness": 3 } } }
+  ]
+}
