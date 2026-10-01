@@ -2860,6 +2860,39 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     Spec.assertEqWith s "no land and not the Sphinx is tapped" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
 
+  -- CR 601.2h at X = 2 with exactly two energy, on sphinxBoard plus a Synthetic
+  -- Dynamo Conduit ("Pay {E}: Add one mana of any color"). The lands alone pay
+  -- {W}{U}{U}, so the activation is rightly offered; CR 605.3a then lets alice
+  -- pay a {U} through the Conduit, spending one of the two counters the "Pay X
+  -- {E}" half still needs. CR 118.3 makes that order unpayable and CR 733.1
+  -- reverses the activation. A PAIR differing in the source named: the same
+  -- answerer naming the lands pays both counters and draws two.
+  Spec.it s "CR 601.2h energy a Conduit spends mid-payment is not there for Pay X {E}" $ do
+    spent <- conduitAtTwo True
+    Spec.assertEqWith s "nothing was drawn" (S.handSize S.alice spent) 0
+    Spec.assertEqWith s "CR 733.1 both counters are back" (S.playerCounterOf PlayerCounterKind.Energy S.alice spent) 2
+    Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack spent) []
+  Spec.it s "CR 605.3a naming the lands instead pays X = 2 and draws two" $ do
+    paid <- conduitAtTwo False
+    Spec.assertEqWith s "alice drew two" (S.handSize S.alice paid) 2
+    Spec.assertEqWith s "spending both counters" (S.playerCounterOf PlayerCounterKind.Energy S.alice paid) 0
+  where
+    -- sphinxBoard at two energy with a Conduit beside the lands, activated at X
+    -- = 2 and resolved; `viaConduit` is whether the window names the Conduit
+    -- wherever it is offered or never does.
+    conduitAtTwo viaConduit = do
+      (sphinx, srcId, g1) <- sphinxBoard s registry 2
+      conduit <- S.printingOf s registry "Synthetic Dynamo Conduit"
+      let (conduitId, g2) = S.addPermanent conduit S.alice g1
+          naming :: Prompt.Prompt r -> r
+          naming p = case p of
+            Prompt.ChooseManaSource _ _ candidates ->
+              let wanted c = (c == conduitId) == viaConduit
+               in Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find wanted (NonEmpty.toList candidates)))
+            _ -> answerXMakingBlue 2 S.bob p
+          after = snd (Engine.runGamePure naming g2 (Activate.activateAbility S.alice srcId (theAbility sphinx) >> Stack.resolveTop))
+      pure after
+
 -- Aims every target slot at one CREATURE. aimAt's counterpart for a board whose
 -- point is that no PLAYER was targeted: CR 115.4's "any target" pool offers a
 -- creature as Recipient.ToCreature, so a life total left at 20 is proof the
