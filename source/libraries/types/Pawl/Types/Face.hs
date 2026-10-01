@@ -141,14 +141,14 @@ data Face card = MkFace
     --
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
-    -- keyword whose ability functions in a zone where no pool effect changes a
-    -- card's keywords (#1859) -- the carve-out additionalCosts takes. A
-    -- GRAVEYARD is no longer one of those zones: rule 702.34a's flashback is read
-    -- there through the projection, so a granted one reaches the cost
-    -- (Pawl.Engine.Cost.costsFor). Nor is a HAND for FLASH:
-    -- Pawl.Engine.Cast.instantSpeed reads rule 702.8a's keyword through the
-    -- projection, which is what lets Teferi, Mage of Zhalfir grant it to a card
-    -- in a hand.
+    -- reader off the battlefield that still takes the printed card (#1859) --
+    -- the carve-out additionalCosts takes. A GRAVEYARD reader of rule
+    -- 702.34a's flashback goes through the projection, so a granted one reaches
+    -- the cost (Pawl.Engine.Cost.costsFor). So do the HAND readers of rule
+    -- 702.8a's flash (Pawl.Engine.Cast.instantSpeed, Teferi, Mage of Zhalfir's
+    -- grant) and of rule 702.62a's suspend and rule 702.170a's plot
+    -- (Pawl.Engine.Suspend.suspendOf, Pawl.Engine.Plot.plotCostsOf, Patriar's
+    -- Humiliation's perpetual removal).
     keywords :: Map.Map Keyword.Keyword Natural.Natural,
     -- | CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana

@@ -2098,6 +2098,90 @@ foretellGrant s registry = Spec.describe s "CR 702.143a Dream Devourer's grant" 
       Spec.assertBool s (not (S.castable S.alice exiledId (tapOne later))) "one Mountain does not, so the cast is not free"
     Spec.assertEqWith s "the control: the Devourer is off the battlefield" (S.creaturesInPlay S.alice later) 0
 
+-- Patriar's Humiliation (HBG, Arena) {W} Instant, "Target creature perpetually
+-- loses all abilities, then Patriar's Humiliation deals damage to it equal to
+-- the number of creatures you control", then Unsummon bouncing alice's `victim`
+-- to her hand, where its suspend or plot functions (CR 702.62a, 702.170a). The
+-- perpetual effect follows the card there (Duration.Perpetual).
+--
+-- The pair differs in what the Humiliation targets and in nothing else: the
+-- victim, or bob's Goblin Piker. Both boards spend the same Plains and Island,
+-- so the lands `base` holds are untapped on each.
+--
+-- Answers the bounced card, when it is the only card in alice's hand, and the
+-- board after the bounce.
+humiliatedBoard ::
+  GameState.GameState ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Bool ->
+  (Maybe ObjectId.ObjectId, GameState.GameState)
+humiliatedBoard base victim plains island piker humiliation unsummon onVictim =
+  let lands = S.landsFor island S.alice 1 (S.landsFor plains S.alice 1 base)
+      (victimId, g1) = S.addPermanent victim S.alice lands
+      (pikerId, g2) = S.addPermanent piker S.bob g1
+      (humiliationId, g3) = S.addHandCard humiliation S.alice g2
+      (unsummonId, g4) = S.addHandCard unsummon S.alice g3
+      atMain =
+        g4
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      castAt spell target g = S.runPure (aimAtObject target) g (S.cast S.alice spell >> Stack.resolveTop)
+      humiliated = castAt humiliationId (if onVictim then victimId else pikerId) atMain
+      bounced = castAt unsummonId victimId humiliated
+      inHand = case Game.zoneMembers Zone.Hand S.alice bounced of
+        [oid] -> Just oid
+        _ -> Nothing
+   in (inHand, bounced)
+
+-- Aims a spell at `oid`, PICKED OUT OF THE OFFERED SET rather than built,
+-- suspendAnswer's reason (CR 608.2b).
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (\r -> Recipient.objectOf r == Just oid) (Set.toList recipients))) slots
+  _ -> S.identityAnswer p
+
+perpetualLoss :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perpetualLoss s registry = Spec.describe s "CR 613.1f Patriar's Humiliation" $ do
+  -- One Forest for the Baloth's {G}.
+  Spec.it s "CR 613.1f a Durkwood Baloth that perpetually lost all abilities cannot be suspended" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humiliation <- S.printingOf s registry "Patriar's Humiliation"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let build = humiliatedBoard (S.landsInPlay forest 1) baloth plains island piker humiliation unsummon
+        (lostId, lost) = build True
+        (keptId, kept) = build False
+        offered mId gs = maybe False (\oid -> List.elem (Action.Type.Suspend oid) (Action.legalActions S.alice gs)) mId
+    Spec.assertBool s (not (offered lostId lost)) "CR 613.1f the humiliated Baloth back in hand offers no suspend"
+    Spec.assertBool s (offered keptId kept) "the control: with the Piker humiliated instead, the bounced Baloth may be suspended"
+    Spec.assertBool s (Maybe.isJust lostId) "the Baloth is the one card in alice's hand"
+  -- Four Islands for the Djinn's {3}{U}.
+  Spec.it s "CR 613.1f a Djinn of Fool's Fall that perpetually lost all abilities cannot be plotted" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humiliation <- S.printingOf s registry "Patriar's Humiliation"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let build = humiliatedBoard (S.landsInPlay island 4) djinn plains island piker humiliation unsummon
+        (lostId, lost) = build True
+        (keptId, kept) = build False
+        offered mId gs = maybe False (\oid -> List.elem (Action.Type.Plot oid djinnPlotCost) (Action.legalActions S.alice gs)) mId
+    Spec.assertBool s (not (offered lostId lost)) "CR 613.1f the humiliated Djinn back in hand offers no plot"
+    Spec.assertBool s (offered keptId kept) "the control: with the Piker humiliated instead, the bounced Djinn may be plotted"
+    Spec.assertBool s (Maybe.isJust lostId) "the Djinn is the one card in alice's hand"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
@@ -2119,6 +2203,7 @@ spec s registry = do
   suspendingForX s registry
   whileExiled s registry
   delaying s registry
+  perpetualLoss s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and how

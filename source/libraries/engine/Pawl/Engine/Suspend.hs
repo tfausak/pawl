@@ -17,6 +17,7 @@ module Pawl.Engine.Suspend where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
@@ -26,6 +27,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
@@ -44,17 +46,19 @@ import qualified Pawl.Types.Suspend as Suspend
 import qualified Pawl.Types.SuspendCounters as SuspendCounters
 import qualified Pawl.Types.Zone as Zone
 
--- CR 702.62a: the suspend ability this object prints -- the counters and the
--- cost together -- or Nothing when it has none.
+-- CR 702.62a: the suspend ability this object has -- the counters and the
+-- cost together -- or Nothing when it has none. A hand member with no card
+-- behind it -- a token, an ability -- has no suspend ability.
 --
--- Read off the CARD (Card.combined) and never a projection, the reading
--- Pawl.Engine.Plot.plotCostsOf gives one rule over: the ability functions in the
--- hand, where this reader takes the printed card (#1859). A hand member with no
--- card behind it -- a token, an ability -- has no suspend ability.
+-- Read through the projection (CR 613.1f), since the ability functions in the
+-- hand and an effect may take it away there: Patriar's Humiliation's perpetual
+-- "loses all abilities" follows the card back to its owner's hand.
+-- Pawl.SpecialActionSpec's "CR 613.1f a Durkwood Baloth that perpetually lost
+-- all abilities cannot be suspended" proves it.
 suspendOf :: ObjectId -> GameState -> Maybe (Suspend.Suspend Keyword)
 suspendOf oid gs = do
-  card <- Game.cardOfHandMember oid gs
-  Keyword.suspend (Face.keywordSet (Card.combined card))
+  _ <- Game.cardOfHandMember oid gs
+  Keyword.suspend (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 702.62a / 116.2f: may this player suspend this card right now? Three
 -- conjuncts, each a clause of the rule:
