@@ -79,8 +79,14 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   projected `power` and `toughness`) and `PlayerCounters` (how many of one
   `kind` a `player` has), `Subtypes` (an object's projected subtypes, all of
   them, as bare names) and `Keywords` (how many instances of one `keyword` an
-  object has, 0 when it has none). Assert combat at `EndOfCombat` or
-  earlier: it is cleared as that step ends.
+  object has, 0 when it has none), `Names` (an object's projected names) and
+  `View`, which renders part of the state as JSON and compares it whole:
+  `{ "of": "Stack", "is": ["$bolt"] }`. Its views are `Stack` (top first),
+  `Step`, `Offered` (a `player`'s actions at priority, as `"Cast $bolt"`),
+  `AttachedTo` and `Controller` (of an `object`), `Result`, `ActivePlayer`,
+  `Priority`, `Zone` (a `player`'s `zone`, in order) and `Colors`; an object
+  is named as the runner's messages name it, by label while it keeps one.
+  Assert combat at `EndOfCombat` or earlier: it is cleared as that step ends.
 - **Final.** The run plays whole steps until the timeline is spent, the game
   ends, or the turn passes the last one named; `final` checks that state.
 

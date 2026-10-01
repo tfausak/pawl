@@ -103,6 +103,12 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.SubtypesAre as SubtypesAre
 import qualified Pawl.Types.Answer as Answer
+import qualified Pawl.Types.ViewIs as ViewIs
+import qualified Pawl.Types.View as View
+import qualified Pawl.Types.Reply as ReplyType
+import qualified Pawl.Types.Result as Result
+import qualified Pawl.Codec.Reply as Codec.Reply
+import qualified Pawl.Engine.Action as ActionEngine
 import qualified Pawl.Scenario.Reply as Reply
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
@@ -879,6 +885,11 @@ observe gs check = case check of
     oid <- resolveObject ref gs
     let actual = Projection.namesOf oid gs
     pure (if actual == names then Nothing else Just (Text.pack (show (fmap CardName.unwrap (Set.toList actual)))))
+  -- A rendered view, compared as JSON; objects named as the runner's
+  -- messages name them.
+  Check.View viewIs -> do
+    actual <- renderView gs viewIs
+    pure (if actual == ViewIs.is viewIs then Nothing else Just (Common.render (Codec.Reply.toValue actual)))
   -- The projected keywords (CR 613.1f), counted by instance.
   Check.Keywords (KeywordsAre.MkKeywordsAre ref keyword count) -> do
     oid <- resolveObject ref gs
@@ -1108,6 +1119,47 @@ describeObject gs oid = do
         let name = Face.name (NonEmpty.head (Card.faces card))
             occurrence = Natural.length (takeWhile (/= oid) (namedObjects name gs)) + 1
          in Codec.Reference.toText (Reference.Printed name occurrence)
+
+renderView :: GameState.GameState -> ViewIs.ViewIs -> Run ReplyType.Reply
+renderView gs viewIs =
+  let texts :: Run [Text.Text] -> Run ReplyType.Reply
+      texts = fmap (ReplyType.Array . fmap ReplyType.Text)
+      named :: Run Label.Label -> Run ReplyType.Reply
+      named = fmap (ReplyType.Text . Label.unwrap)
+      needPlayer = maybe (failWith (Failure.MkCheckFailed Nothing (Check.View viewIs) (Text.pack "this view needs a player"))) resolvePlayer (ViewIs.player viewIs)
+      needObject = maybe (failWith (Failure.MkCheckFailed Nothing (Check.View viewIs) (Text.pack "this view needs an object"))) (`resolveObject` gs) (ViewIs.object viewIs)
+   in case ViewIs.view viewIs of
+        View.Stack -> texts (describeAll gs (GameState.stack gs))
+        View.Step -> pure (ReplyType.Text (Text.pack (Codec.Phase.flatName (GameState.phase gs))))
+        View.Offered -> do
+          pid <- needPlayer
+          texts (mapM (describeAction gs) (ActionEngine.legalActions pid gs))
+        View.AttachedTo -> do
+          oid <- needObject
+          case Game.lookupObject oid gs >>= Object.attachedTo of
+            Nothing -> pure ReplyType.Null
+            Just recipient -> case Recipient.objectOf recipient of
+              Just host -> fmap ReplyType.Text (describeObject gs host)
+              Nothing -> case recipient of
+                Recipient.ToPlayer pid -> named (labelOf pid)
+                _ -> pure (ReplyType.Text (Text.pack (show recipient)))
+        View.Controller -> do
+          oid <- needObject
+          maybe (pure ReplyType.Null) named (fmap labelOf (Projection.controllerOf oid gs))
+        View.Result -> case GameState.result gs of
+          Nothing -> pure ReplyType.Null
+          Just (Result.Won pid) -> fmap (\l -> ReplyType.Object [(Text.pack "won", ReplyType.Text (Label.unwrap l))]) (labelOf pid)
+          Just (Result.TeamWon team) -> pure (ReplyType.Object [(Text.pack "teamWon", ReplyType.Text (Text.pack (show team)))])
+          Just Result.Drawn -> pure (ReplyType.Text (Text.pack "Drawn"))
+        View.ActivePlayer -> named (labelOf (GameState.activePlayer gs))
+        View.Priority -> maybe (pure ReplyType.Null) named (fmap labelOf (GameState.priority gs))
+        View.Zone -> do
+          pid <- needPlayer
+          zone <- maybe (failWith (Failure.MkCheckFailed Nothing (Check.View viewIs) (Text.pack "this view needs a zone"))) pure (ViewIs.zone viewIs)
+          texts (describeAll gs (Game.zoneMembers zone pid gs))
+        View.Colors -> do
+          oid <- needObject
+          pure (ReplyType.Array (fmap (ReplyType.Text . Text.pack . show) (Set.toList (Projection.colorsOf oid gs))))
 
 describeAll :: GameState.GameState -> [ObjectId.ObjectId] -> Run [Text.Text]
 describeAll gs = mapM (describeObject gs)

@@ -10,6 +10,7 @@ import qualified Pawl.Types.KeywordsAre as KeywordsAre
 import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.MonarchIs as MonarchIs
 import qualified Pawl.Types.NamesAre as NamesAre
+import qualified Pawl.Types.ViewIs as ViewIs
 import qualified Pawl.Types.PlayerCountersAre as PlayerCountersAre
 import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.SubtypesAre as SubtypesAre
@@ -33,5 +34,6 @@ data Check
   | PlayerCounters PlayerCountersAre.PlayerCountersAre
   | Subtypes SubtypesAre.SubtypesAre
   | Names NamesAre.NamesAre
+  | View ViewIs.ViewIs
   | Keywords KeywordsAre.KeywordsAre
   deriving (Eq, Ord, Show)

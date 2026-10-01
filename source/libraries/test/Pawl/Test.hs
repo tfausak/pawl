@@ -559,6 +559,7 @@ import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SubtypesAreSpec
 import qualified Pawl.Codec.AnswerSpec
+import qualified Pawl.Codec.ViewIsSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.SuspendCountersSpec
 import qualified Pawl.Codec.SuspendSpec
@@ -1374,6 +1375,7 @@ spec s registry = do
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SubtypesAreSpec.spec s
   Pawl.Codec.AnswerSpec.spec s
+  Pawl.Codec.ViewIsSpec.spec s
   Pawl.Codec.NamesAreSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.SuspendCountersSpec.spec s

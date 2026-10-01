@@ -1267,6 +1267,8 @@ library codec
     Pawl.Codec.VanguardSpec
     Pawl.Codec.VentureMarkerEntered
     Pawl.Codec.VentureMarkerEnteredSpec
+    Pawl.Codec.ViewIs
+    Pawl.Codec.ViewIsSpec
     Pawl.Codec.VillainousChoiceR
     Pawl.Codec.VillainousChoiceRewrite
     Pawl.Codec.VillainousChoiceRewriteSpec
@@ -2555,6 +2557,8 @@ library types
     Pawl.Types.Vanguard
     Pawl.Types.VariableChoice
     Pawl.Types.VentureMarkerEntered
+    Pawl.Types.View
+    Pawl.Types.ViewIs
     Pawl.Types.VillainousChoiceR
     Pawl.Types.VillainousChoiceRewrite
     Pawl.Types.Vote
