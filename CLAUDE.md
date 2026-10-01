@@ -28,6 +28,9 @@ The second invariant: the engine never makes a player's choice. Eliding a
 prompt is legitimate only for indistinguishable options, and every elision
 carries an issue. Where the rules leave nothing to ask, don't prompt.
 
+Scope is four rings, worked in order: basic paper Magic, paper extras,
+digital-only, non-engine (`docs/design.md` section 6). Rank work by ring first.
+
 Design notes live in `docs/`. Read them by section, on demand --- a whole doc
 "for context" costs tens of thousands of tokens.
 
