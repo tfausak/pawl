@@ -390,8 +390,7 @@ fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
             -- above cannot carry it: a player has no keywords for
             -- Pawl.Engine.Keyword to mint an AttachRestriction row from, so the
             -- prohibition rides the CR 613.11 player axis instead
-            -- (Pawl.Types.PlayerEffect.HasProtectionFromChosenName and its
-            -- Filter-carrying sibling). Rule
+            -- (Pawl.Types.PlayerEffect.HasProtectionFrom). Rule
             -- 702.16d has no player half, so becomesUnattached above needs no
             -- twin of this.
             --

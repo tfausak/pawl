@@ -55,13 +55,6 @@ data PlayerEffect
   | -- | CR 601.3 / Rule of Law: this player can't cast more than this many spells
     -- each turn.
     CantCastMoreThan Natural.Natural
-  | -- | CR 601.3a / Null Chamber: this player can't cast a spell whose name is one
-    -- of the names chosen for this effect's source, read off Object.chosenNames
-    -- there (CR 608.2h once it has left).
-    CantCastChosenName
-  | -- | CR 305.1 / Null Chamber: this player can't PLAY a land whose name is one
-    -- of the names chosen for this effect's source.
-    CantPlayLandChosenName
   | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
     IncreaseSpellCost IncreaseSpellCost.IncreaseSpellCost
@@ -116,16 +109,10 @@ data PlayerEffect
     -- be the target of spells or abilities controlled by the players the scope
     -- names -- the shroud and hexproof scopes respectively.
     CantBeTargetedBy PlayerScope.PlayerScope
-  | -- | CR 702.16c / 702.16b / Runed Halo: this player has protection from the
-    -- card name the source has chosen. Rule 702.16e's prevention reaches the
-    -- player through Pawl.Engine.PlayerEffect.protectionCarriers, proven by
-    -- Pawl.CastProhibitionSpec's "CR 702.16e" Runed Halo case.
-    HasProtectionFromChosenName
-  | -- | CR 702.16a / 702.16j / The Stasis Coffin: this player has protection from
-    -- the quality the CARD states, where the sibling above reads CR 201.4's
-    -- chosen name off the source. Rule 702.16j's "protection from everything" is
-    -- the quality @Filter.And []@, the spelling Progenitus writes for the
-    -- permanent half.
+  | -- | CR 702.16a / 702.16j / The Stasis Coffin, Runed Halo: this player has
+    -- protection from the quality the Filter states. Rule 702.16e's prevention
+    -- reaches the player through Pawl.Engine.PlayerEffect.protectionCarriers,
+    -- proven by Pawl.CastProhibitionSpec's "CR 702.16e" Runed Halo case.
     HasProtectionFrom (Filter.Filter Keyword.Keyword)
   | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
     -- though it had flash.

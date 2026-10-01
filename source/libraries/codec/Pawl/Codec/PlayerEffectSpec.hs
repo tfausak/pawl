@@ -64,21 +64,6 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CantCastMoreThan 1)
       " {\"type\":\"CantCastMoreThan\",\"value\":1} "
-  -- CR 601.3 / Null Chamber's cast half. Payload-free: the names come from the
-  -- source's Object.chosenNames, which no card can write INTO THE PAYLOAD.
-  Spec.it s "CantCastChosenName" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      PlayerEffect.CantCastChosenName
-      " {\"type\":\"CantCastChosenName\"} "
-  -- CR 305.1 / Null Chamber's play half, which is a different gate.
-  Spec.it s "CantPlayLandChosenName" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      PlayerEffect.CantPlayLandChosenName
-      " {\"type\":\"CantPlayLandChosenName\"} "
   -- CR 613.11 / 601.2f / Thalia.
   Spec.it s "IncreaseSpellCost" $
     Common.assertCodec
@@ -374,13 +359,6 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CantSearchLibraries CantSearchLibraries.MkCantSearchLibraries {CantSearchLibraries.library = PlayerScope.EachPlayer, CantSearchLibraries.cause = PlayerScope.EachPlayer})
       " {\"type\":\"CantSearchLibraries\",\"value\":{\"library\":{\"type\":\"EachPlayer\"},\"cause\":{\"type\":\"EachPlayer\"}}} "
-  -- CR 702.16c / Runed Halo.
-  Spec.it s "HasProtectionFromChosenName" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      PlayerEffect.HasProtectionFromChosenName
-      " {\"type\":\"HasProtectionFromChosenName\"} "
   -- CR 702.16j / The Stasis Coffin: "protection from everything" as the empty
   -- conjunction.
   Spec.it s "HasProtectionFrom" $

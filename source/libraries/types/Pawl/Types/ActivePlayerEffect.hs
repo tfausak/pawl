@@ -56,7 +56,7 @@ data ActivePlayerEffect = MkActivePlayerEffect
     -- own effect is ever read. That is not a reason to drop it:
     -- Pawl.Engine.PlayerEffect.applying hands it to every consumer, and CR
     -- 608.2h's last-known record is filed under exactly this id, which is what
-    -- lets `chosenNamesOf` still answer Conjurer's Ban's chosen name. A dead id
+    -- lets Pawl.Engine.SourceContext.withChoicesOf still answer Conjurer's Ban's chosen name. A dead id
     -- equals no live candidate, so Filter.IsSource simply answers False for one.
     source :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,
