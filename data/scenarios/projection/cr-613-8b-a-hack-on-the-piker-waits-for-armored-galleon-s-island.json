@@ -1,0 +1,39 @@
+{
+  "description": "CR 613.8b a Hack on the Piker waits for Armored Galleon's restriction",
+  "note": "The pair: bob controls an Island instead, which no longer frees the Piker, whose restriction now asks for a Swamp. No Attack is scheduled, so offering the Piker would fail the run as an unscheduled prompt; the Galleon is not ready, so it is no candidate either.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Armored Galleon", "label": "galleon" },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" },
+          { "card": "Island", "label": "island3" },
+          { "card": "Island", "label": "island4" }
+        ],
+        "hand": [
+          { "card": "Magical Hack", "label": "hack" },
+          { "card": "Exchange of Words", "label": "exchange" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@piker"], "mana": ["@island1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@exchange", "mana": ["@island2", "@island3", "@island4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Exchange of Words", "do": { "ChooseTargets": { "creatures": ["@galleon", "@piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } }
+  ]
+}

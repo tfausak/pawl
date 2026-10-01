@@ -1922,35 +1922,6 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     Spec.assertEqWith s "no untap-step action happened" (GameState.landsPlayed after) (Map.singleton S.alice 1)
     Spec.assertEqWith s "a playing active player's land play IS cleared" (GameState.landsPlayed control) Map.empty
 
-  Spec.it s "CR 800.4j/703.4i a departed active player is not asked to declare attackers" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    -- The board sits at the declare attackers step, so CR 703.4h has already
-    -- settled the defending player and it has to say who: alice is active, so
-    -- bob is her first candidate (CR 506.2a). Without it Combat.defenders is
-    -- empty, no attack is possible for either run, and askedControl below
-    -- would be [] for a reason that has nothing to do with the CR 800.4j guard.
-    let seated =
-          S.threePlayerGame
-            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defenders = [S.bob]}
-            }
-        (pikerId, board) = S.addPermanent piker S.alice seated
-        gone = S.departs Departure.Type.Conceded S.alice board
-        ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
-        ((_, control), askedControl) = State.runState (Engine.runGame declareAttackersAskAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
-    -- At three seats, CR 800.4a has already stripped her battlefield by the
-    -- time this step runs -- checked directly below, not inferred from the
-    -- ask -- so askedAfter == [] is over-determined: it holds with or
-    -- without the hasActive guard in Engine.runTurnBasedActions, because
-    -- Combat.declareAttackers has nothing to offer her regardless. The
-    -- sibling case that isolates the guard itself needs a board CR 800.4a
-    -- does NOT empty, which only happens at two seats -- see "the
-    -- declare-attackers guard is load-bearing at two seats" below.
-    Spec.assertEqWith s "CR 800.4a: her Piker left the game with her" (Game.lookupObject pikerId gone) Nothing
-    Spec.assertEqWith s "so there is nothing left to ask her about" askedAfter []
-    Spec.assertEqWith s "a playing active player WITH a real candidate IS asked" askedControl [S.alice]
-    Spec.assertBool s (Map.null (Combat.Type.attackers (GameState.combat after))) "and nothing attacked"
-    Spec.assertBool s (not (Map.null (Combat.Type.attackers (GameState.combat control)))) "while the control run did attack"
 
   Spec.it s "CR 800.4j/703.4i the declare-attackers guard is load-bearing at two seats, where the game loop cannot reach this state" $ do
     -- At two seats Departure.continuesAfterDeparture is False (CR 800.1's

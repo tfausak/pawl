@@ -2746,39 +2746,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (not (Set.member Subtype.Type.Island subtypes)) "and not a land type"
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId after) "and flying"
 
-  -- CR 205.1a's LAST sentence -- "removing an object's subtype doesn't affect
-  -- its card types at all" -- which is the layer-4 removal beside the add above.
-  -- Nameless Inversion is the card ("target creature gets +3/-3 and loses all
-  -- creature types until end of turn"), and Otarian Juggernaut is the reader:
-  -- its CR 509.1b restriction is "can't be blocked by Walls", so a Wall's
-  -- Wall-ness is observable in a real declare blockers step rather than only in
-  -- a projection.
-  --
-  -- Secret Door is an Artifact Creature -- Wall 0/4, so the +3/-3 leaves a 3/1
-  -- that survives the block, kills the 2/3 Juggernaut, and is still an artifact.
-  -- alice's own Wall of Stone is the control: it is not the target and keeps its
-  -- Wall type. It sits on the ATTACKING side and has defender, so it neither
-  -- attacks nor is ever offered as a blocker -- which is what keeps
-  -- aggressiveAnswer's declaration legal as a whole (CR 509.1b).
-  Spec.it s "CR 205.1a Nameless Inversion strips the Wall type, and the Wall blocks what no Wall may block" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    juggernaut <- S.printingOf s registry "Otarian Juggernaut"
-    wallOfStone <- S.printingOf s registry "Wall of Stone"
-    secretDoor <- S.printingOf s registry "Secret Door"
-    inversion <- S.printingOf s registry "Nameless Inversion"
-    let (base, mine, theirs) = S.combatBoardOf [juggernaut, wallOfStone] [secretDoor]
-    case (mine, theirs) of
-      ([_, wallId], [doorId]) -> do
-        let stripped = castAtCreature doorId inversion (S.landsFor swamp S.alice 2 base)
-            after = S.settleSba (S.fightWith S.aggressiveAnswer stripped)
-        Spec.assertEqWith s "the stripped Door was a legal blocker, so bob took nothing" (S.lifeOf S.bob after) (Just 20)
-        Spec.assertEqWith s "and the 3/1 it became killed the 2/3 Juggernaut" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Otarian Juggernaut")) S.alice after) 0
-        Spec.assertEqWith
-          s
-          "CR 205.1a no creature type left, still an Artifact Creature, and the untargeted Wall keeps its type"
-          (Projection.subtypesOf doorId stripped, Projection.cardTypesOf doorId stripped, Projection.subtypesOf wallId stripped)
-          (Set.empty, Set.fromList [CardType.Artifact, CardType.Creature], Set.singleton Subtype.Type.Wall)
-      _ -> Spec.assertFailure s "fixture should have two attacking printings and one blocker"
 
   -- THE TWO ROUTES, ONE BOARD. CR 604.3a(2) gives CDA status only to an ability
   -- printed on the card it affects (or on a token's creating effect, or acquired
@@ -5182,29 +5149,6 @@ textChangeDependencySpec s registry = Spec.describe s "TextChangeDependency" $ d
     -- on the Galleon.
     Spec.assertEqWith s "the Hack resolved onto the Galleon" (Projection.textChangesAffecting galleonId hacked) [(Subtype.Type.Island, Subtype.Type.Swamp)]
 
-  -- The one-way dependency again, with the word only in the Galleon's rule
-  -- ability: Island -> Swamp on the Piker, then the exchange, so the Piker's
-  -- restriction asks for a Swamp. The Island board is the pair.
-  Spec.it s "CR 613.8b a Hack on the Piker waits for Armored Galleon's restriction" $ do
-    island <- S.printingOf s registry "Island"
-    swamp <- S.printingOf s registry "Swamp"
-    galleon <- S.printingOf s registry "Armored Galleon"
-    piker <- S.printingOf s registry "Goblin Piker"
-    hack <- S.printingOf s registry "Magical Hack"
-    exchange <- S.printingOf s registry "Exchange of Words"
-    let base = S.landsInPlay island 1
-        swap = (Subtype.Type.Island, Subtype.Type.Swamp)
-        -- CR 506.2's defending player, stated as S.combatBoardOf states it: the
-        -- gate names one, and a direct call runs no turn-based action to fill
-        -- it in.
-        defended g = g {GameState.combat = (GameState.combat g) {Combat.Type.defenders = [S.bob]}}
-        (galleonId, pikerId, _, bobSwamp) = wordExchangeBoard snd swap (defended (S.landsFor swamp S.bob 1 base)) galleon piker hack exchange
-        (_, islandPikerId, _, bobIsland) = wordExchangeBoard snd swap (defended (S.landsFor island S.bob 1 base)) galleon piker hack exchange
-    Spec.assertBool s (Combat.canAttack S.alice pikerId bobSwamp) "CR 613.8b the Piker's restriction asks for a Swamp, which bob controls"
-    Spec.assertBool s (not (Combat.canAttack S.alice islandPikerId bobIsland)) "and bob's Island no longer frees it"
-    -- The anti-vacuity check, after the behaviour: the Galleon gave its
-    -- restriction away.
-    Spec.assertBool s (Combat.canAttack S.alice galleonId bobSwamp) "while the Galleon, with the Piker's empty text, may attack"
 
   -- The exchange FIRST, between two Kird Apes (same check), and a Magical Hack
   -- (Forest -> Island) on one of them afterwards, with alice controlling an

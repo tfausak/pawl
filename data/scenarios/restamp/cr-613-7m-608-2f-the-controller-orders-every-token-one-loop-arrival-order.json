@@ -1,0 +1,188 @@
+{
+  "description": "CR 613.7m / 608.2f the controller orders every token one loop made",
+  "note": "The pair: carol keeps the arrival order, which leaves the Archon copy last, so alice's Godhead is 3/3.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "Godhead of Awe",
+            "label": "godhead",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "Harmonious Archon",
+            "label": "archon",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island1"
+          },
+          {
+            "card": "Island",
+            "label": "island2"
+          },
+          {
+            "card": "Island",
+            "label": "island3"
+          },
+          {
+            "card": "Island",
+            "label": "island4"
+          },
+          {
+            "card": "Island",
+            "label": "island5"
+          },
+          {
+            "card": "Island",
+            "label": "island6"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mirror Match",
+            "label": "mirror"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "@godhead",
+          "@archon"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "@godhead",
+      "do": {
+        "ChooseAttackTarget": "@carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "@archon",
+      "do": {
+        "ChooseAttackTarget": "@carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "@mirror",
+          "mana": [
+            "@island1",
+            "@island2",
+            "@island3",
+            "@island4",
+            "@island5",
+            "@island6"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "OrderTimestamps": [
+          "Godhead of Awe#2",
+          "Harmonious Archon#2"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "PowerToughness": {
+          "object": "@godhead",
+          "power": 3,
+          "toughness": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Battlefield",
+          "card": "Godhead of Awe",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Battlefield",
+          "card": "Harmonious Archon",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "OrderTimestamps": [
+          "Human Token",
+          "Human Token#2"
+        ]
+      }
+    }
+  ]
+}

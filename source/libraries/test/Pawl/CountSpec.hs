@@ -1233,45 +1233,6 @@ relicRunnerSpec s registry =
                 else go (n - 1) (S.runPure S.aggressiveAnswer g Engine.runStep)
          in go 12 gs0
    in Spec.describe s "Relic Runner" $ do
-        Spec.it s "CR 700.6 a LEGENDARY spell cast this turn is historic, and the block is illegal" $ do
-          relicRunner <- S.printingOf s registry "Relic Runner"
-          piker <- S.printingOf s registry "Goblin Piker"
-          swamp <- S.printingOf s registry "Swamp"
-          kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
-          let after = throughCombat (castOne kalakscion (board relicRunner piker swamp))
-          Spec.assertEqWith s "bob is dealt 2 by an unblocked Runner" (S.lifeOf S.bob after) (Just 18)
-          Spec.assertEqWith s "bob's blocker never traded" (S.creaturesInPlay S.bob after) 1
-          Spec.assertEqWith s "and the Runner lived, beside the Crocodile" (S.creaturesInPlay S.alice after) 2
-        Spec.it s "CR 205.4a a NONlegendary spell of the same cost and colour is not historic" $ do
-          -- The discriminating twin: Legions of Lim-Dul is {1}{B}{B} like
-          -- Kalakscion, is no artifact and no Saga, and differs from it in the
-          -- Legendary supertype and nothing this case reads.
-          relicRunner <- S.printingOf s registry "Relic Runner"
-          piker <- S.printingOf s registry "Goblin Piker"
-          swamp <- S.printingOf s registry "Swamp"
-          legions <- S.printingOf s registry "Legions of Lim-Dûl"
-          let after = throughCombat (castOne legions (board relicRunner piker swamp))
-          Spec.assertEqWith s "bob takes nothing: the block stood" (S.lifeOf S.bob after) (Just 20)
-          Spec.assertEqWith s "his blocker traded with the Runner" (S.creaturesInPlay S.bob after) 0
-          Spec.assertEqWith s "leaving alice the Zombie alone" (S.creaturesInPlay S.alice after) 1
-        Spec.it s "CR 509.1b with no spell cast at all the Runner is blocked" $ do
-          -- The floor: the restriction is gated, not unconditional.
-          relicRunner <- S.printingOf s registry "Relic Runner"
-          piker <- S.printingOf s registry "Goblin Piker"
-          swamp <- S.printingOf s registry "Swamp"
-          let after = throughCombat (board relicRunner piker swamp)
-          Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
-          Spec.assertEqWith s "the two 2/1s traded" (S.creaturesInPlay S.bob after) 0
-          Spec.assertEqWith s "on both sides" (S.creaturesInPlay S.alice after) 0
-        Spec.it s "CR 700.6 an ARTIFACT spell is historic too, through the other disjunct" $ do
-          relicRunner <- S.printingOf s registry "Relic Runner"
-          piker <- S.printingOf s registry "Goblin Piker"
-          swamp <- S.printingOf s registry "Swamp"
-          worker <- S.printingOf s registry "Arcbound Worker"
-          let after = throughCombat (castOne worker (board relicRunner piker swamp))
-          Spec.assertEqWith s "bob is dealt 2" (S.lifeOf S.bob after) (Just 18)
-          Spec.assertEqWith s "bob's blocker never traded" (S.creaturesInPlay S.bob after) 1
-          Spec.assertEqWith s "and the Runner lived, beside the Worker" (S.creaturesInPlay S.alice after) 2
 
 -- Fill every target slot with the candidate naming `oid`. The offered set is
 -- FILTERED rather than answered with a hand-built recipient, so CR 608.2b's

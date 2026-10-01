@@ -1,0 +1,34 @@
+{
+  "description": "CR 603.4 the clause holds when the declaring opponent attacked you",
+  "note": "Ever-Watching Threshold: bob, alice's opponent, declares his Piker at alice, so the intervening if holds and she draws. Three seats so the declaration can go elsewhere on the board that fails. Jace carries loyalty so CR 704.5i leaves him on the battlefield. The Haskell test also counted the triggers logged; here one card drawn from a library of three, with no other draw, is that count.",
+  "board": {
+    "active": "bob",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Ever-Watching Threshold" },
+          { "card": "Jace Beleren", "label": "jace", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "@piker", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@alice" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Island", "count": 2 } } }
+  ]
+}
