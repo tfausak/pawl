@@ -1236,6 +1236,26 @@ damageSpec s registry = Spec.describe s "Damage" $ do
           (Just (AttackTarget.OfBattle battle))
         Spec.assertEqWith s "three defense counters left" (S.counterOf CounterKind.Defense battle dealt) 3
       _ -> Spec.assertFailure s "fixture should have exactly one attacker"
+  -- CR 510.1b: Archpriest of Shadows ({3}{B}{B} 4/4, "Whenever this creature
+  -- deals combat damage to a player or battle, return target creature card from
+  -- your graveyard to the battlefield", Oracle text checked against Scryfall
+  -- 2026-09-30) attacks the Siege unblocked, so the battle is the only thing it
+  -- deals damage to, and its trigger returns the Hill Giant.
+  Spec.it s "CR 510.1b combat damage to a battle fires a player-or-battle trigger" $ do
+    archpriest <- S.printingOf s registry "Archpriest of Shadows"
+    giant <- S.printingOf s registry "Hill Giant"
+    (gs0, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [archpriest] [] []
+    let (giantId, gs) = S.addGraveyardCard giant S.alice gs0
+        returning :: Prompt.Prompt r -> r
+        returning p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just giantId) . Recipient.objectOf) sets
+          _ -> attackTheBattle battle p
+        attacked = S.runPure returning gs (Combat.declareAttackers S.manaPerformer S.alice)
+        dealt = S.runPure returning attacked (Monad.void Damage.dealCombatDamage >> Engine.settleForPriority)
+        resolved = S.runPure returning dealt Stack.resolveTop
+    Spec.assertEqWith s "CR 603.2 the Hill Giant returned to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.alice resolved) 1
+    Spec.assertEqWith s "the Archpriest attacked the battle" (fmap (\a -> Map.lookup a (Combat.Type.attackers (GameState.combat attacked))) mine) [Just (AttackTarget.OfBattle battle)]
+    Spec.assertEqWith s "CR 310.6 and dealt it 4 of its 5 defense" (S.counterOf CounterKind.Defense battle dealt) 1
   Spec.it s "CR 506.4 a battle that has left the battlefield is assigned no combat damage" $ do
     -- THE FALSIFIER for combatRecipient answering with the battle unconditionally.
     -- The same declaration with the Siege destroyed inside CR 510.4's window, so CR

@@ -3376,8 +3376,7 @@ graftSpec s registry =
 -- what it prints below its backup line is a KEYWORD (deathtouch) and a
 -- TRIGGERED ABILITY (its combat-damage reanimation), which travel through two
 -- different arms of Pawl.Engine.Resolve.Effect's expandGrant. (Name, cost, type
--- line, P/T and Oracle text checked against api.scryfall.com 2026-09-20; the
--- trigger's "or battle" is the one clause pawl's card omits -- #3940.)
+-- line, P/T and Oracle text checked against api.scryfall.com 2026-09-20.)
 --
 -- Goblin Piker ({1}{R} Creature -- Goblin 2/1, no abilities) is the recipient,
 -- so every keyword and every ability it shows below is one backup gave it.

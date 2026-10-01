@@ -2246,6 +2246,15 @@ representativeEvents cond =
         -- event). Any event is therefore as representative as any other.
         TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
         TriggerCondition.SelfDealsCombatDamageToPlayer _ -> one combatDamage
+        -- TWO, one per recipient kind this arm admits: a floor claimed for the
+        -- player alone would come apart on the battle.
+        TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle ->
+          noTable combatDamage
+            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToBattle arrived) 3 False False False 0 Nothing Nothing mempty False DamageKind.Combat))]
+        -- TWO again, a player and a creature: this arm admits any recipient.
+        TriggerCondition.SelfDealsCombatDamage ->
+          noTable combatDamage
+            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToCreature arrived) 3 False False False 0 Nothing Nothing mempty False DamageKind.Combat))]
         -- TWO of them, for SelfIsDealtDamage's reason below: this arm admits
         -- both of CR 120.3's damage kinds, so a floor claimed for combat alone
         -- would come apart on the noncombat one.
@@ -2838,6 +2847,8 @@ everyTriggerCondition =
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
+    TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle,
+    TriggerCondition.SelfDealsCombatDamage,
     TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.AnyPlayer,
     TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.Opponent,
     TriggerCondition.SelfDealsDamageToCreature,
