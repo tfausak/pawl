@@ -21,6 +21,7 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
@@ -52,6 +53,7 @@ import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -103,7 +105,13 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- shield stamped for more than one player (#3079), and CardsLeaveZone reads
 -- both, to re-ask its filter of each card that left.
 eventBindings :: GameState -> Maybe ObjectId -> Map.Map ObjectId ObjectId -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
-eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (cond, event) of
+eventBindings = eventBindingsOver Map.empty
+
+-- `eventBindings` given the event's CR 603.10 sample (Event.Trigger.battlefieldAt),
+-- the board matchesTriggerGiven read the same event against; empty answers
+-- every id off the live board (`postEventView`).
+eventBindingsOver :: Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics) -> GameState -> Maybe ObjectId -> Map.Map ObjectId ObjectId -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
+eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event = case (cond, event) of
   -- CR 603.2b's "that player": the active player, on whose turn the step began.
   -- Shizuko, Caller of Autumn's "at the beginning of each player's upkeep, THAT
   -- PLAYER adds {G}{G}{G}" is the reader, and the seat it names is nobody the
@@ -207,16 +215,19 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   (TriggerCondition.PermanentDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     maybe id Binding.setTriggerPlayer (Recipient.playerOf (DamageEvent.target ev)) (Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty))
   -- CR 603.2c's batch reading: the damagers' CONTROLLER, Norn's Decree's "that
-  -- opponent", off the same CR 608.2h-aware view the matcher read the Filter
+  -- opponent", off the same `postEventView` the matcher read the Filter
   -- through, so "whose was it" and "did it qualify" come from one sample. One
   -- seat per member, and one per trigger: `batchPartition` below is what splits
   -- the batch by it.
   --
   -- Unconditional given a match: that matcher answers False for a damager with
   -- no view, and a permanent's view always carries its controller.
+  --
+  -- The sample is a regression fence here: no board in the suite changes a
+  -- damager's controller between the damage and the scan.
   (TriggerCondition.PermanentsDealCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     let damager = DamageEvent.source ev
-     in maybe id Binding.setDamagersController (Filter.controller =<< Projection.viewWithLastKnown damager gs damager) Map.empty
+     in maybe id Binding.setDamagersController (Filter.controller =<< postEventView board gs damager) Map.empty
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -1013,7 +1024,7 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- promises is stamped by whichever branch matched. The slots only some branch
   -- binds are eventBindingSlotsSometimes' AnyOf arm.
   (TriggerCondition.AnyOf conditions, _) ->
-    Map.unions (fmap (\c -> eventBindings gs bearerBecame becameInGraveyard bearer you c event) conditions)
+    Map.unions (fmap (\c -> eventBindingsOver board gs bearerBecame becameInGraveyard bearer you c event) conditions)
   -- The CR 701/702 keyword-action conditions reach this fallthrough and
   -- stamp nothing, deliberately: no card in the pool reads the scrying player,
   -- the plotted card, the explorer or the forager, and
@@ -1080,6 +1091,15 @@ batchBindings (first NonEmpty.:| rest) = List.foldl' (Map.unionWith join) first 
         { Binding.Type.amount = (+) <$> Binding.Type.amount a <*> Binding.Type.amount b <|> Binding.Type.amount a <|> Binding.Type.amount b,
           Binding.Type.objects = Binding.Type.objects a <> Binding.Type.objects b
         }
+
+-- CR 603.10's first sentence: `oid` as the event's own board sample shows it
+-- (Projection.sampledView), and CR 608.2h's last known information for an id
+-- the sample does not hold -- one gone before the sample was taken, or any id
+-- when the caller has no sample (an empty board).
+postEventView :: Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics) -> GameState -> ObjectId -> Maybe Filter.View
+postEventView board gs oid = case Map.lookup oid board of
+  Just candidate -> Just (Projection.sampledView oid candidate gs)
+  Nothing -> Projection.viewWithLastKnown oid gs oid
 
 -- The cards a Moved event took out of the condition's zone that its filter
 -- admits, read off CR 608.2h's last known information: by the time CR 603.10
