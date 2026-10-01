@@ -112,7 +112,7 @@ layer m = case m of
   Modification.GainKeyword _ -> Layer.Ability
   -- The keyword it hands out is materialised in applyModification, but the ARM
   -- is an ability-adding effect wherever it is classified (CR 613.1f).
-  Modification.GainFlashbackAtManaCost -> Layer.Ability
+  Modification.GainKeywordAtManaCost _ -> Layer.Ability
   -- CR 613.1f, not layer 4: CR 702.5a makes enchant a static ABILITY, so
   -- granting one is an ability-adding effect however much the clause it comes
   -- from ("becomes an Aura enchantment with enchant creature") also changes
@@ -203,9 +203,9 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- keyword count twice.
         Modification.GainKeyword k ->
           pc {PC.keywords = Map.insertWith (+) k 1 (PC.keywords pc)}
-        -- CR 613.1f layer 6 / CR 702.34a: the same grant, with rule 702.34a's
+        -- CR 613.1f layer 6 / CR 202.1a: the same grant, with the keyword's
         -- [cost] read off the RECEIVING object rather than written on the granter
-        -- -- "the flashback cost is equal to that card's mana cost".
+        -- -- "the scavenge cost is equal to its mana cost".
         --
         -- Read from `pc` rather than from the face, which is CR 707.2's copiable
         -- mana cost: a card in a graveyard that is a copy of something else is
@@ -222,9 +222,9 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- CR 601.2a has put the spell on the stack. Pawl.CastSpec's "CR 107.3a
         -- a granted flashback {X}{R} announces X rather than treating it as 0"
         -- proves it, with Lier granting Blaze its own {X}{R}.
-        Modification.GainFlashbackAtManaCost ->
+        Modification.GainKeywordAtManaCost keyword ->
           let cost = Cost.MkCost (PC.manaCost pc) []
-           in pc {PC.keywords = Map.insertWith (+) (Keyword.Type.Flashback cost) 1 (PC.keywords pc)}
+           in pc {PC.keywords = Map.insertWith (+) (Keyword.withCost keyword cost) 1 (PC.keywords pc)}
         -- CR 613.1f layer 6 / CR 702.5c: an APPEND, since "if an Aura has
         -- multiple instances of enchant, all of them apply" -- the printed
         -- instances are in the seed and this adds to them, so
@@ -623,7 +623,7 @@ cardTypesAfter m types = case m of
   -- exception, which rule 205.1a states of the SET alone.
   Modification.LoseCardType t -> Set.delete t types
   Modification.GainKeyword _ -> types
-  Modification.GainFlashbackAtManaCost -> types
+  Modification.GainKeywordAtManaCost _ -> types
   Modification.GainEnchant _ -> types
   Modification.LoseEnchant _ -> types
   Modification.GainCastingPermission _ -> types
@@ -1316,7 +1316,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.GainKeyword _ -> Just m
         -- Its cost is derived at projection time, not evaluated from a Quantity,
         -- so there is nothing here to freeze.
-        Modification.GainFlashbackAtManaCost -> Just m
+        Modification.GainKeywordAtManaCost _ -> Just m
         Modification.GainEnchant _ -> Just m
         Modification.LoseEnchant _ -> Just m
         Modification.GainCastingPermission _ -> Just m
@@ -1365,7 +1365,7 @@ quantitiesOf m = case m of
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> Maybe.maybeToList p <> Maybe.maybeToList t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> [p, t]
   Modification.GainKeyword _ -> []
-  Modification.GainFlashbackAtManaCost -> []
+  Modification.GainKeywordAtManaCost _ -> []
   -- A target slot's Filter can nest a Count, but a Filter's quantities are read
   -- where the Filter is matched rather than frozen here -- the answer GainKeyword
   -- gives above, whose keyword can nest one too.
@@ -1417,7 +1417,7 @@ referenceQuery m = case m of
   Modification.SetBasePowerToughness _ -> Nothing
   Modification.ModifyPowerToughness _ -> Nothing
   Modification.GainKeyword _ -> Nothing
-  Modification.GainFlashbackAtManaCost -> Nothing
+  Modification.GainKeywordAtManaCost _ -> Nothing
   Modification.GainEnchant _ -> Nothing
   Modification.LoseEnchant _ -> Nothing
   Modification.GainCastingPermission _ -> Nothing
@@ -1472,7 +1472,7 @@ setsLandSubtype m = case m of
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
   Modification.GainKeyword _ -> False
-  Modification.GainFlashbackAtManaCost -> False
+  Modification.GainKeywordAtManaCost _ -> False
   Modification.GainEnchant _ -> False
   Modification.LoseEnchant _ -> False
   Modification.GainCastingPermission _ -> False
@@ -2590,7 +2590,7 @@ removesAbilities m = case m of
   -- has, so nothing gatherStatic generates is gated.
   Modification.LoseKeywordFamily _ -> False
   Modification.GainKeyword _ -> False
-  Modification.GainFlashbackAtManaCost -> False
+  Modification.GainKeywordAtManaCost _ -> False
   -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
   -- GainAbility below.
   Modification.GainEnchant _ -> False
@@ -3655,7 +3655,7 @@ modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords
   -- Writes PC.keywords exactly as the arm above does; that the cost comes from
   -- the receiver changes what is written, not where.
-  Modification.GainFlashbackAtManaCost -> Set.singleton Keywords
+  Modification.GainKeywordAtManaCost _ -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.enchant, which Aspect has no finer grain for
   -- than Keywords -- CR 702.5a's enchant is an ability, and
   -- Filter.CanHostSubject, the atom that reads it, declares Keywords. A
@@ -3767,7 +3767,7 @@ modificationReads m = case m of
   -- Carries no Quantity either. It DOES read the receiver's mana cost, which is
   -- printed rather than projected -- no layer writes one, so no Aspect names it
   -- and CR 613.8a's dependency cannot turn on it.
-  Modification.GainFlashbackAtManaCost -> Set.empty
+  Modification.GainKeywordAtManaCost _ -> Set.empty
   -- Carries no Quantity of its own; its Filter is read where the slot is matched.
   Modification.GainEnchant _ -> Set.empty
   Modification.LoseEnchant _ -> Set.empty
@@ -5439,21 +5439,20 @@ grantedStaticWrites p g = case g of
 grantsKeywordWhere :: (Keyword -> Bool) -> Modification -> Bool
 grantsKeywordWhere p m = case m of
   Modification.GainKeyword k -> p k
-  -- Hands out rule 702.34a's flashback, whose COST this function cannot compute
-  -- -- it holds a modification and not the object receiving it. Answered with an
-  -- unpayable cost (CR 118.6) rather than False, since every predicate this
-  -- function is asked with classifies a keyword by its constructor:
-  -- Keyword.permissionsFor, Keyword.mintsReplacement and
-  -- Keyword.mintsCombatRestriction all match `Keyword.Flashback _`. False here
-  -- would be a MISSING row -- fromGraveyardCard's CR 113.6f gate would stop
-  -- offering the granted cast at all.
+  -- Hands out a keyword whose COST this function cannot compute -- it holds a
+  -- modification and not the object receiving it. Answered with an unpayable
+  -- cost (CR 118.6) rather than False, since every predicate this function is
+  -- asked with classifies a keyword by its constructor (Keyword.permissionsFor,
+  -- Keyword.mintsReplacement, Keyword.mintsCombatRestriction). False here would
+  -- be a MISSING row -- fromGraveyardCard's CR 113.6f gate would stop offering a
+  -- granted flashback cast at all.
   --
   -- A REGRESSION FENCE rather than a proved answer: the two mint predicates are
-  -- False of flashback whatever cost it carries, and fromGraveyardCard asks this
-  -- of an ability on the GRAVEYARD CARD itself, where no card in the pool grants
-  -- a computed flashback -- Lier grants one from the battlefield. So flipping
-  -- this arm to False leaves the suite green.
-  Modification.GainFlashbackAtManaCost -> p (Keyword.Type.Flashback (Cost.MkCost Nothing []))
+  -- False of these keywords whatever cost they carry, and fromGraveyardCard asks
+  -- this of an ability on the GRAVEYARD CARD itself, where no card in the pool
+  -- grants a computed flashback -- Lier grants one from the battlefield. So
+  -- flipping this arm to False leaves the suite green.
+  Modification.GainKeywordAtManaCost keyword -> p (Keyword.withCost keyword (Cost.MkCost Nothing []))
   -- Hands out CR 702.5a's enchant, which is not a Pawl.Types.Keyword at all, so
   -- there is nothing here for `p` to be asked about.
   Modification.GainEnchant _ -> False
@@ -5538,7 +5537,7 @@ grantsMintingType m = case m of
   -- type it takes away is.
   Modification.LoseCardType _ -> False
   Modification.GainKeyword _ -> False
-  Modification.GainFlashbackAtManaCost -> False
+  Modification.GainKeywordAtManaCost _ -> False
   Modification.GainEnchant _ -> False
   Modification.LoseEnchant _ -> False
   Modification.GainCastingPermission _ -> False
@@ -5617,7 +5616,7 @@ grantsAbilityWhere p m = case m of
   Modification.SetCardType _ -> False
   Modification.LoseCardType _ -> False
   Modification.GainKeyword _ -> False
-  Modification.GainFlashbackAtManaCost -> False
+  Modification.GainKeywordAtManaCost _ -> False
   Modification.GainEnchant _ -> False
   Modification.LoseEnchant _ -> False
   Modification.GainCastingPermission _ -> False

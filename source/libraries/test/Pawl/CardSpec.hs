@@ -877,9 +877,9 @@ durationCounts = concatMap conditionCounts . durationConditions
 modificationCounts :: Projection.Modification -> [Count.Type.Count Quantity.Type.Quantity]
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
-  -- CR 702.34a's computed flashback carries no payload at all, so it reaches
-  -- neither a Count nor, below, a Filter.
-  Modification.GainFlashbackAtManaCost -> []
+  -- A computed-cost keyword carries no cost at all, so it reaches neither a
+  -- Count nor, below, a Filter.
+  Modification.GainKeywordAtManaCost _ -> []
   -- CR 702.5a's granted enchant carries a TargetSlot, whose Filter can nest a
   -- Count -- but a Filter's Counts are reached through modificationFilters below
   -- and countFilters, never through this sweep, which is the answer GainKeyword
@@ -4053,7 +4053,7 @@ modificationFilters :: Projection.Modification -> [(Framing, Filter.Type.Filter 
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
   -- Payload-free, so there is no Filter to sweep -- see modificationCounts.
-  Modification.GainFlashbackAtManaCost -> []
+  Modification.GainKeywordAtManaCost _ -> []
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
   -- other and has to be swept. NOT [] -- this, LoseEnchant beside it,
   -- GainKeyword above, LoseKeyword and AddNamesMatching below are the arms that

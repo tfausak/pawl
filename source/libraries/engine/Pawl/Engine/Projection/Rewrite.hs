@@ -267,10 +267,10 @@ rewriteModification pairs m =
         -- is CR 612.3. Filter.rewriteKeyword since the word is inside a Filter; no
         -- family gate is restated there -- the word's use is its family.
         Modification.GainKeyword k -> Modification.GainKeyword (Filter.rewriteKeyword [(from, to)] k)
-        -- Carries no word: the keyword is rule 702.34a's and the cost is the
+        -- Carries no word: the keyword is rule 702's and the cost is the
         -- RECEIVER's mana cost, so neither half is text a pair could name --
         -- SetLandSubtypeToChosen's answer for the same reason.
-        Modification.GainFlashbackAtManaCost -> acc
+        Modification.GainKeywordAtManaCost _ -> acc
         -- CR 612.1 through the granted enchant's own Filter, which is text
         -- printed on the GRANTER (CR 612.3) exactly as the keyword above is.
         -- rewriteTargetSlot is the same descent a mode's target slots take.

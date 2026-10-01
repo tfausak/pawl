@@ -378,6 +378,8 @@ library codec
     Pawl.Codec.CostComponentSpec
     Pawl.Codec.CostDirection
     Pawl.Codec.CostDirectionSpec
+    Pawl.Codec.CostKeyword
+    Pawl.Codec.CostKeywordSpec
     Pawl.Codec.CostReduction
     Pawl.Codec.CostReductionSpec
     Pawl.Codec.CostScale
@@ -2018,6 +2020,7 @@ library types
     Pawl.Types.CostChoice
     Pawl.Types.CostComponent
     Pawl.Types.CostDirection
+    Pawl.Types.CostKeyword
     Pawl.Types.CostReduction
     Pawl.Types.CostScale
     Pawl.Types.Count

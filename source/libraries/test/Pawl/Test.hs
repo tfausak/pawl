@@ -167,6 +167,7 @@ import qualified Pawl.Codec.CostBasisSpec
 import qualified Pawl.Codec.CostChoiceSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostDirectionSpec
+import qualified Pawl.Codec.CostKeywordSpec
 import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
 import qualified Pawl.Codec.CostSpec
@@ -961,6 +962,7 @@ spec s registry = do
   Pawl.Codec.CostChoiceSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostDirectionSpec.spec s
+  Pawl.Codec.CostKeywordSpec.spec s
   Pawl.Codec.CostReductionSpec.spec s
   Pawl.Codec.CostScaleSpec.spec s
   Pawl.Codec.CostSpec.spec s
