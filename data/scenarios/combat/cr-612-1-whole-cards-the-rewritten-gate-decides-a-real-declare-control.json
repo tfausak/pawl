@@ -1,0 +1,25 @@
+{
+  "description": "CR 612.1 whole cards: the rewritten gate decides a real declare attackers step",
+  "note": "The unhacked control: with no Mountain on the battlefield Glacial Crasher's printed gate holds, so alice has no legal attacker, nothing is declared and bob stays at 20. alice holds the Magical Hack and its Island as on the hacked board, unused.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Glacial Crasher", "label": "crasher", "ready": true },
+          { "card": "Island", "label": "island" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

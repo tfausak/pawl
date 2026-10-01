@@ -1,0 +1,37 @@
+{
+  "description": "CR 608.2b an evolved Piety Charm finds its target illegal and fizzles",
+  "note": "Piety Charm's second mode, \"target Soldier creature gets +2/+2\", aims at alice's Blade Instructor (3/1 Human Soldier), legal when chosen. An Artificial Evolution resolved at the charm on the stack swaps Soldier for Goblin, so CR 608.2b's re-check finds a Soldier where the clause now asks for a Goblin and the charm fizzles: the Instructor stays 3/1, and the Goblin Piker beside it gets nothing either. 5/3 is a number neither creature prints, so no check can be met by the wrong one.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Island", "label": "island" },
+          { "card": "Blade Instructor", "label": "instructor" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [
+          { "card": "Piety Charm", "label": "charm" },
+          { "card": "Artificial Evolution", "label": "evolution" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@charm", "modes": [1], "targets": ["@instructor"], "mana": ["@plains", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Piety Charm"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Soldier" }, "to": { "type": "Goblin" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Piety Charm", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Artificial Evolution", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@instructor", "power": 3, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } }
+  ]
+}

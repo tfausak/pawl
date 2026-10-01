@@ -1,0 +1,39 @@
+{
+  "description": "CR 612.1 hacked Zombie -> Goblin, RemoveCounters takes the hexproof from Goblins counter off",
+  "note": "alice's Goblin Piker bears a hexproof from Goblins counter, and Synthetic Erode the Warding removes a hexproof from Zombies counter, a kind the Piker lacks. An Artificial Evolution resolved at the Erode spell swaps Zombie for Goblin, so it takes the Goblins counter off, and bob's Tarfire, a Goblin spell (CR 702.11d), may target the Piker once more. Synthetic because no printing names a swappable word in a counter kind.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Goblin Piker", "label": "piker", "counters": [{ "key": { "type": "Keyword", "value": { "type": "Hexproof", "value": { "type": "HasSubtype", "value": { "type": "Goblin" } } } }, "value": 1 }] }
+        ],
+        "hand": [
+          { "card": "Synthetic Erode the Warding", "label": "erode" },
+          { "card": "Artificial Evolution", "label": "evolution" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Mountain", "label": "mountain" }],
+        "hand": [{ "card": "Tarfire", "label": "tarfire" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@erode", "targets": ["@piker"], "mana": ["@island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Synthetic Erode the Warding"], "mana": ["@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Zombie" }, "to": { "type": "Goblin" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "Keyword", "value": { "type": "Hexproof", "value": { "type": "HasSubtype", "value": { "type": "Goblin" } } } }, "count": 0 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "Cast": { "object": "@tarfire", "targets": ["@piker"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}
