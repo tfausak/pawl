@@ -600,6 +600,7 @@ happenedBetween before after =
             GameState.nextPrintingId = GameState.nextPrintingId before,
             GameState.printings = GameState.printings before,
             GameState.printingIds = GameState.printingIds before,
+            GameState.readsGraveyardOrder = GameState.readsGraveyardOrder before,
             GameState.lookedUp = GameState.lookedUp before,
             GameState.referenceNames = GameState.referenceNames before,
             GameState.lastChoice = GameState.lastChoice before,

@@ -175,6 +175,9 @@ codec resolve = Fields.object $ do
   endTurnSignal <- Fields.defaulted "endTurnSignal" EndTurnSignal.Type.Running EndTurnSignal.codec GameState.endTurnSignal
   nextObjectId <- Fields.required "nextObjectId" ObjectId.codec GameState.nextObjectId
   printings <- Fields.defaulted "printings" Map.empty (Common.naturalMap PrintingId.codec (Printing.reference resolve)) GameState.printings
+  -- Written, unlike printingIds: the codec cannot reach Pawl.Engine.Game's
+  -- reading of a printing to rebuild it.
+  readsGraveyardOrder <- Fields.defaulted "readsGraveyardOrder" False Common.boolean GameState.readsGraveyardOrder
   lookedUp <- Fields.defaulted "lookedUp" Set.empty (Common.set PrintingId.codec) GameState.lookedUp
   referenceNames <- Fields.defaulted "referenceNames" Map.empty (Common.keyedList (Common.keyValue (Filter.codec Keyword.codec) (Common.set CardName.codec))) GameState.referenceNames
   outsideCopies <- Fields.defaulted "outsideCopies" Set.empty (Common.set ObjectId.codec) GameState.outsideCopies
@@ -282,6 +285,7 @@ codec resolve = Fields.object $ do
         GameState.endTurnSignal = endTurnSignal,
         GameState.nextObjectId = nextObjectId,
         GameState.printings = printings,
+        GameState.readsGraveyardOrder = readsGraveyardOrder,
         GameState.lookedUp = lookedUp,
         GameState.referenceNames = referenceNames,
         GameState.outsideCopies = outsideCopies,

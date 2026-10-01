@@ -2140,6 +2140,7 @@ oneMountainState mountain ph =
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.printings = Map.singleton printingId mountain,
           GameState.printingIds = Map.singleton mountain printingId,
+          GameState.readsGraveyardOrder = False,
           GameState.lookedUp = Set.empty,
           GameState.referenceNames = Map.empty,
           GameState.outsideCopies = Set.empty,

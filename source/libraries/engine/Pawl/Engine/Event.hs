@@ -398,7 +398,7 @@ arrivingTogether body = do
 -- cards were arranged by CR 712.21a as they moved. Only CARDS are arranged (CR
 -- 404.3's "two or more cards"): a token in the group keeps its slot. A
 -- graveyard batch is asked only where the game can tell its orders apart
--- (Game.readsGraveyardOrder).
+-- (Game.printingReadsGraveyardOrder).
 --
 -- After the fact rather than before each move, which no reader can tell apart:
 -- nothing inside the scope reads a library's or a graveyard's order.
@@ -414,9 +414,8 @@ arrangeArrivals = do
     let movesAt owner end = filter (\arrival -> Arrival.owner arrival == owner && Arrival.end arrival == end) (Foldable.toList pending)
         ends = Set.toAscList (Set.fromList (fmap Arrival.end (Foldable.toList pending)))
         -- docs/design.md section 2.9: with no reader of graveyard order in the
-        -- game, every arrangement of a graveyard batch is the same game. Read
-        -- only for a batch, and once, since it walks every printing.
-        observed = Game.readsGraveyardOrder gs0
+        -- game, every arrangement of a graveyard batch is the same game.
+        observed = GameState.readsGraveyardOrder gs0
         distinguishable end = case end of
           ArrivalEnd.IntoLibrary _ -> True
           ArrivalEnd.OntoGraveyard -> observed

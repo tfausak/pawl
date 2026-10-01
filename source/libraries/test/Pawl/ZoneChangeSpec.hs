@@ -1049,18 +1049,21 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   -- The same rule through the destroy funnel: Day of Judgment's two victims
   -- reach bob's graveyard at once, and bob orders them -- where the game can
   -- tell the orders apart. A Volrath's Shapeshifter in his library reads the
-  -- top card; so does Circling Vultures' cost ("the top creature card of your
-  -- graveyard"), and Ornate Imitations can conjure either. With none of them
+  -- top card, and so does Soldevi Digger's ability; so does Circling Vultures'
+  -- cost ("the top creature card of your graveyard"), and Ornate Imitations can
+  -- conjure any of them. With none of them
   -- nothing in the game reads a graveyard's order, so docs/design.md section
   -- 2.9 asks nothing and his reversing answer is never given.
   Spec.it s "CR 404.3 bob orders the two creatures Day of Judgment puts into his graveyard" $ do
     reversed <- judgmentBoard s registry (Just "Volrath's Shapeshifter") True
     kept <- judgmentBoard s registry (Just "Volrath's Shapeshifter") False
     unread <- judgmentBoard s registry Nothing True
+    digger <- judgmentBoard s registry (Just "Soldevi Digger") True
     vultures <- judgmentBoard s registry (Just "Circling Vultures") True
     imitations <- judgmentBoard s registry (Just "Ornate Imitations") True
     Spec.assertEqWith s "reversed is kept, the other way up" (namesIn Zone.Graveyard S.bob reversed) (reverse (namesIn Zone.Graveyard S.bob kept))
     Spec.assertEqWith s "with no reader of graveyard order, bob is not asked" (namesIn Zone.Graveyard S.bob unread) (namesIn Zone.Graveyard S.bob kept)
+    Spec.assertEqWith s "Soldevi Digger's ability reads it, so bob is asked" (namesIn Zone.Graveyard S.bob digger) (namesIn Zone.Graveyard S.bob reversed)
     Spec.assertEqWith s "Circling Vultures' cost reads it, so bob is asked" (namesIn Zone.Graveyard S.bob vultures) (namesIn Zone.Graveyard S.bob reversed)
     Spec.assertEqWith s "Ornate Imitations could conjure a reader, so bob is asked" (namesIn Zone.Graveyard S.bob imitations) (namesIn Zone.Graveyard S.bob reversed)
     Spec.assertEqWith s "two cards" (length (namesIn Zone.Graveyard S.bob kept)) 2

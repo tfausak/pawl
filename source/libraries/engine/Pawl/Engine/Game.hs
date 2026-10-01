@@ -225,7 +225,8 @@ intern printing gs = case Map.lookup printing (GameState.printingIds gs) of
      in ( pid,
           gs1
             { GameState.printings = Map.insert pid printing (GameState.printings gs1),
-              GameState.printingIds = Map.insert printing pid (GameState.printingIds gs1)
+              GameState.printingIds = Map.insert printing pid (GameState.printingIds gs1),
+              GameState.readsGraveyardOrder = GameState.readsGraveyardOrder gs1 || printingReadsGraveyardOrder printing
             }
         )
 
@@ -421,28 +422,33 @@ zoneMembers zone pid gs =
 topOfGraveyard :: PlayerId -> GameState -> Maybe ObjectId
 topOfGraveyard pid gs = Maybe.listToMaybe (reverse (zoneMembers Zone.Graveyard pid gs))
 
--- docs/design.md section 2.9's question: does any printing this game knows read
--- a graveyard's order? Where none does, every CR 404.3 arrangement is the same
--- game, and Pawl.Engine.Event.arrangeArrivals asks none.
+-- docs/design.md section 2.9's question, for one printing: can it read a
+-- graveyard's order? intern folds the answer into GameState.readsGraveyardOrder
+-- as each printing arrives; where no printing can, every CR 404.3 arrangement is
+-- the same game and Pawl.Engine.Event.arrangeArrivals asks none.
 --
--- The readers are named by CONSTRUCTOR, found in each card's derived Show, so a
+-- The readers are named by CONSTRUCTOR, found in the card's derived Show, so a
 -- token, a conjured card or a granted ability written inside a card is read with
 -- it: Pawl.Types.ObjectRef.TopOfGraveyard and Pawl.Types.Scope.TopOfGraveyard
--- (Volrath's Shapeshifter, Soldevi Digger, Guiding Spirit), and
--- Pawl.Types.CostComponent.ExileTopFromGraveyard (Circling Vultures). A new
--- reader of graveyard order adds its constructor here. A conjure by reference
--- (Pawl.Types.FromReference, Ornate Imitations) counts as one, since it can
--- bring any reader into the game.
+-- (Soldevi Digger, Guiding Spirit), Pawl.Types.Modification.HasFullText
+-- (Volrath's Shapeshifter, which also carries Scope.TopOfGraveyard, so nothing
+-- observes this entry alone), and Pawl.Types.CostComponent.ExileTopFromGraveyard
+-- (Circling Vultures). A conjure by reference (Pawl.Types.FromReference,
+-- Ornate Imitations) counts as one, since it can bring any reader into the
+-- game.
+--
+-- Not implemented: a typed, exhaustive classification in place of the name
+-- list, which a new reader constructor slips past unread (#4562).
 --
 -- Not implemented: a reader whose text enters the game by a NAME the pool
 -- writes (Pawl.Types.CopyOriginal.Named, Effect.OfferNamedCopy) after a batch
 -- was put down unasked finds the engine's order rather than the owner's
 -- (#4557).
-readsGraveyardOrder :: GameState -> Bool
-readsGraveyardOrder gs =
-  let readers = ["TopOfGraveyard", "ExileTopFromGraveyard", "MkFromReference"]
-      namesOne printing = let shown = show (Printing.card printing) in any (`List.isInfixOf` shown) readers
-   in any namesOne (GameState.printings gs)
+printingReadsGraveyardOrder :: Printing.Printing -> Bool
+printingReadsGraveyardOrder printing =
+  let readers = ["TopOfGraveyard", "HasFullText", "ExileTopFromGraveyard", "MkFromReference"]
+      shown = show (Printing.card printing)
+   in any (`List.isInfixOf` shown) readers
 
 -- CR 506.4: remove a permanent from combat. The one performer, shared by CR
 -- 701.19a regeneration (Pawl.Engine.Replacement), an effect that specifically

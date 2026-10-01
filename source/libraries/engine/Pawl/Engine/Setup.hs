@@ -255,6 +255,7 @@ emptyGame order =
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.printings = Map.empty,
           GameState.printingIds = Map.empty,
+          GameState.readsGraveyardOrder = False,
           GameState.lookedUp = Set.empty,
           GameState.referenceNames = Map.empty,
           GameState.outsideCopies = Set.empty,
@@ -1658,6 +1659,7 @@ funnelBack finalSub parent =
           -- two tables never disagree about an id.
           GameState.printings = Map.union (GameState.printings finalSub) (GameState.printings parent),
           GameState.printingIds = Map.union (GameState.printingIds finalSub) (GameState.printingIds parent),
+          GameState.readsGraveyardOrder = GameState.readsGraveyardOrder finalSub || GameState.readsGraveyardOrder parent,
           GameState.lookedUp = Set.union (GameState.lookedUp finalSub) (GameState.lookedUp parent),
           GameState.referenceNames = Map.union (GameState.referenceNames finalSub) (GameState.referenceNames parent),
           GameState.nextPrintingId = max (GameState.nextPrintingId parent) (GameState.nextPrintingId finalSub),
