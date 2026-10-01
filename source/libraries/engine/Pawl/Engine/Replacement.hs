@@ -756,7 +756,7 @@ matchesPrinted viewOf gs event candidate =
           maybe True (== kind) (CounterPattern.whichKind pat)
             && matchesPutter gs src (CounterPattern.subject pat) cause
             && matchesController gs src (CounterPattern.whose pat) oid
-            && matchesPermanent viewOf gs Map.empty Nothing (CounterPattern.onWhat pat) oid
+            && matchesPermanent viewOf gs Nothing Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 122.1 / 614.1: the same pattern against a PLAYER recipient. A
         -- pattern naming a kind admits none of these: `whichKind` is the object
         -- kinds, and a player can hold no counter of one (see
@@ -783,7 +783,7 @@ matchesPrinted viewOf gs event candidate =
               not (Map.null (matchingEnteringCounters gs pat oid))
                 && matchesPutter gs src (CounterPattern.subject pat) (CounterCause.ByEffect putter)
                 && matchesController gs src (CounterPattern.whose pat) oid
-                && matchesPermanent viewOf gs Map.empty Nothing (CounterPattern.onWhat pat) oid
+                && matchesPermanent viewOf gs Nothing Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
         -- effect source's controller. CR 102.2's Opponents has no producer today.
         --
@@ -1593,9 +1593,13 @@ matchesZoneOwner gs src you rel oid = relationHolds gs src you rel (fmap Object.
 -- criterion that names one of them -- "a creature other than the target",
 -- Filter.IsBound. A counter pattern is read off a static ability with nothing
 -- announced, so its two callers hand over none.
-matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesPermanent viewOf gs slots source filter_ oid =
-  Filter.matches (Filter.contextWithSlots (Game.teams gs) Nothing source slots) (viewOf oid) filter_
+--
+-- `you` is CR 109.5's "you" the criterion is read from -- "Sacrifice X
+-- Treasures you control" names the payer -- and Nothing for a counter pattern,
+-- which names whose permanent through its own field.
+matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesPermanent viewOf gs you slots source filter_ oid =
+  Filter.matches (Filter.contextWithSlots (Game.teams gs) you source slots) (viewOf oid) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
 -- the order Prompt.ChooseSacrifices and Prompt.ChooseAnyNumberToSacrifice offer
@@ -1627,10 +1631,15 @@ matchesPermanent viewOf gs slots source filter_ oid =
 -- `slots` is matchesPermanent's: Pawl.Engine.Cost hands over CR 601.2c's targets
 -- (Cost.announcedSlots) and Pawl.Engine.Resolve's edict its Context's, while the
 -- as-enters offer has nothing to hand, no announcement being in flight there.
-sacrificeCandidates :: Map.Map SlotName.SlotName (Set ObjectId) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-sacrificeCandidates slots pid source filter_ gs =
+--
+-- `you` is matchesPermanent's: the payer of a cost or the controller of the
+-- entering permanent, who is also `pid` there, but the edict's CONTROLLER rather
+-- than its victim. data/scenarios/grim-hireling-sacrifices-x-treasures.json
+-- proves the cost reading.
+sacrificeCandidates :: Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+sacrificeCandidates you slots pid source filter_ gs =
   let viewOf = Projection.viewsOf gs
-      matching = List.sort (filter (matchesPermanent viewOf gs slots source filter_) (Projection.controls pid gs))
+      matching = List.sort (filter (matchesPermanent viewOf gs you slots source filter_) (Projection.controls pid gs))
       forbidden = SacrificeRestriction.cantBeSacrificed matching gs
    in filter (\oid -> not (Set.member oid forbidden)) matching
 

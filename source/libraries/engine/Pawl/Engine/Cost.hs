@@ -365,7 +365,7 @@ withOffering pid oid gs candidate =
             CandidateCost.instantSpeed = True
           }
       | quality <- Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs)),
-        vid <- Replacement.sacrificeCandidates Map.empty pid (Just oid) quality gs
+        vid <- Replacement.sacrificeCandidates (Just pid) Map.empty pid (Just oid) quality gs
       ]
 
 -- | candidateCostsFor, told whether CR 601.3's permission comes from the EFFECT
@@ -546,7 +546,7 @@ candidateCostsGiven permitted pid name oid gs =
                 let victims criterion =
                       Maybe.mapMaybe
                         (\vid -> fmap ((,) vid) (Filter.manaValue (Projection.viewOfObject vid gs)))
-                        (Replacement.sacrificeCandidates Map.empty pid (Just oid) criterion gs)
+                        (Replacement.sacrificeCandidates (Just pid) Map.empty pid (Just oid) criterion gs)
                     offer emerge (vid, n) =
                       CandidateCost.MkCandidateCost
                         (Just (Keyword.Type.Emerge emerge))
@@ -2644,7 +2644,7 @@ claimOf slots pid oid component gs =
    in case component of
         -- CR 701.21a: the permanents this player controls that match the criterion.
         CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-          claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs)) n
+          claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs)) n
         CostComponent.SacrificeThis ->
           claim
             (ClaimAxis.Removal Zone.Battlefield)
@@ -3833,7 +3833,7 @@ canPayComponent slots pid oid component gs = case component of
   -- component ALONE, PayLife's caveat -- two Sacrifice components of one cost can
   -- each find the same permanent here, and `jointlyPayable` asks them together.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    Natural.length (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs) >= n
+    Natural.length (Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs) >= n
   -- CR 702.122a: payable iff SOME subset of the candidates reaches the
   -- threshold, decided without enumerating one -- the greatest total any subset
   -- can reach is the sum of the candidates' POSITIVE powers, since adding one of
@@ -5870,7 +5870,7 @@ payComponent moment slots pid oid component = case component of
   -- Townsfolk once" proves it.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> do
     gs <- State.get
-    let candidates = Replacement.sacrificeCandidates slots pid (Just oid) criterion gs
+    let candidates = Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if n == 0 || Natural.length candidates <= n

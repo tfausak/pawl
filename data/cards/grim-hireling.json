@@ -8,10 +8,21 @@
               {
                 "type": "SacrificeX",
                 "value": {
-                  "type": "HasSubtype",
-                  "value": {
-                    "type": "Treasure"
-                  }
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Treasure"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  ]
                 }
               }
             ],

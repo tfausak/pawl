@@ -2732,7 +2732,7 @@ apply batch candidate event =
             -- which is channel 3 of applyReplacementsIn's note and not this
             -- exclusion.
             let entering oid2 = oid2 == oid || Set.member oid2 batch
-                offered = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
+                offered = filter (not . entering) (Replacement.sacrificeCandidates (Just controller) Map.empty controller (Just oid) criterion gs)
             chosen <-
               -- Where the rules leave nothing to ask, don't prompt: with no
               -- candidate the empty set is the only answer. ONE candidate is
@@ -2817,7 +2817,7 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             let entering oid2 = oid2 == oid || Set.member oid2 batch || Set.member oid2 (GameState.enteringSubjects gs)
-                own = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
+                own = filter (not . entering) (Replacement.sacrificeCandidates (Just controller) Map.empty controller (Just oid) criterion gs)
                 owed = fmap (fmap (filter (not . entering))) (pendingSacrifices controller gs)
                 sets = Replacement.subsetsOf n own
                 joint = filter (\chosen -> Replacement.jointlyPayable (Set.fromList chosen) owed) sets
@@ -4431,7 +4431,7 @@ runEntry given oid = do
 -- two players' SacrificeToEnter cards in one batch (Second Sunrise would).
 pendingSacrifices :: PlayerId -> GameState -> [(Natural, [ObjectId])]
 pendingSacrifices chooser gs =
-  [ (count, Replacement.sacrificeCandidates Map.empty chooser (Just member) criterion gs)
+  [ (count, Replacement.sacrificeCandidates (Just chooser) Map.empty chooser (Just member) criterion gs)
   | (member, controller) <- Map.toAscList (GameState.enteringPending gs),
     controller == chooser,
     Just obj <- [Game.lookupObject member gs],
