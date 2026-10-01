@@ -80,6 +80,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCountersAre as PlayerCountersAre
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.Printing as Printing
@@ -195,12 +196,13 @@ stage registry board =
         (Nothing, Just active, Right monarch) -> do
           let base = Setup.emptyGame (fmap snd seated)
               lives = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.life seat)) (NonEmpty.toList seated))
+              counters = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.counters seat)) (NonEmpty.toList seated))
               positioned =
                 base
                   { GameState.activePlayer = active,
                     GameState.phase = Board.phase board,
                     GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
-                    GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives}) (GameState.players base),
+                    GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives, Player.counters = Map.findWithDefault (Player.counters p) pid counters}) (GameState.players base),
                     GameState.monarch = monarch,
                     GameState.settings = (GameState.settings base) {GameSettings.attackOption = Board.attackOption board}
                   }
@@ -735,6 +737,10 @@ observe gs check = case check of
   Check.Defenders (DefendersAre.MkDefendersAre expected) -> do
     actual <- mapM labelOf (Combat.Type.defenders (GameState.combat gs))
     pure (if actual == expected then Nothing else Just (Text.pack (show (fmap Label.unwrap actual))))
+  Check.PlayerCounters (PlayerCountersAre.MkPlayerCountersAre label kind count) -> do
+    pid <- resolvePlayer label
+    let actual = fmap (Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
+    pure (if actual == Just count then Nothing else Just (Text.pack (maybe "no such player" show actual)))
   Check.Monarch (MonarchIs.MkMonarchIs expected) -> do
     actual <- traverse labelOf (GameState.monarch gs)
     pure (if actual == expected then Nothing else Just (maybe (Text.pack "nobody") Label.unwrap actual))

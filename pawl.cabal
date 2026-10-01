@@ -924,6 +924,8 @@ library codec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerCounters
+    Pawl.Codec.PlayerCountersAre
+    Pawl.Codec.PlayerCountersAreSpec
     Pawl.Codec.PlayerCountersSpec
     Pawl.Codec.PlayerCounterTally
     Pawl.Codec.PlayerCounterTallySpec
@@ -2331,6 +2333,7 @@ library types
     Pawl.Types.PlayerControl
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerCounters
+    Pawl.Types.PlayerCountersAre
     Pawl.Types.PlayerCounterTally
     Pawl.Types.PlayerDesignation
     Pawl.Types.PlayerDesignationTally
