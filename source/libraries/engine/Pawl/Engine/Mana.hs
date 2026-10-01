@@ -640,10 +640,12 @@ yieldUnits option = concatMap unitsOf (Map.elems (ManaOption.yield option))
 -- object -- EachPlayerExcept, EachOpponentExcept -- names nobody here, and so do
 -- the ones naming an OBJECT slot (ControllerOfBound, OwnerOfBound,
 -- ChosenPlayerOfBound, Attacking), the injected view being Nothing. CR 605.1a
--- leaves a mana ability no target to have bound one, and no printed mana
--- ability's own clauses bind an object for its addition to read (MTGJSON dump
--- of 2026-08-23, activated lines matching "player adds": Spectral Searchlight
--- and Valleymaker are the off-stack ones, and both name a chosen player).
+-- leaves a mana ability no target to have bound one. MTGJSON's dump of
+-- 2026-08-23, activated lines matching "(controller|owner|player|opponent|they)
+-- adds": the mana abilities among them are Spectral Searchlight and Valleymaker
+-- (a chosen player) and Yurlok of Scorch Thrash and Rafi, Retro Racer (each
+-- player); every other hit targets. A mana ability adding to "that creature's
+-- controller" would refute this.
 -- EachPlayerExcept matters most: Count.playersFor's arm reads "a slot naming
 -- nobody excludes nobody" off a LIVE source and answers EVERY player, which
 -- would put the excluded seat's share in manaSuppliesGiven's count of the

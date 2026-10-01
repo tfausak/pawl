@@ -5386,8 +5386,8 @@ tapForManaWith perform window inFlight refused activator oid = do
         [] -> pure (False, [], everyRoute)
         first : rest -> do
           -- CR 106.3 / 608.2d: the activator picks the route and the mana for
-          -- their OWN pool. A share naming somebody else is that player's to
-          -- pick as it is added (`pickShare` below), so routes differing only
+          -- their OWN pool (@Relative You@). A share under any other reference
+          -- is its recipient's to pick as it is added (`pickShare` below), so routes differing only
           -- there are one choice here -- Spectral Searchlight's five colours
           -- are one route until "that player" is known.
           let ownPart option = option {ManaOption.yield = Map.filterWithKey (\ref _ -> ref == you) (ManaOption.yield option), ManaOption.steps = fmap (fmap (Map.filterWithKey (\ref _ -> ref == you))) (ManaOption.steps option)}
@@ -5438,11 +5438,11 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- for a source the cost sacrificed.
               --
               -- A clause that happens adds its share of the yield, then runs the
-              -- other effects printed after it -- CR 405.6c's "the mana is produced and the other
-              -- effect happens immediately", HERE, inside the window this
-              -- activation was made in. Ancient Tomb's 2 damage is charged before
-              -- the rest of the payment can spend the mana it just made
-              -- (Pawl.ManaSpec's Ancient Tomb group). The performer runs them;
+              -- other effects printed after it -- CR 405.6c's "the mana is
+              -- produced and the other effect happens immediately", HERE, inside
+              -- the window this activation was made in. Ancient Tomb's 2 damage
+              -- is charged before the rest of the payment can spend the mana it
+              -- just made (Pawl.ManaSpec's Ancient Tomb group). The performer runs them;
               -- Pawl.Engine.Resolve.Effect.performManaAbility is where the source
               -- stands in for the ability object.
               --
@@ -5473,10 +5473,10 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- addition's recipient reads -- Valleymaker's "Choose a player.
               -- That player adds {G}{G}{G}" (Pawl.ManaSpec's Valleymaker group).
               -- The slots are threaded through the performer, CR 605.3b leaving
-              -- no ability object to hold them. A share for anybody but the
-              -- activator is then picked by its RECIPIENT among the routes alike
-              -- in the activator's own part: Spectral Searchlight's "any color
-              -- they choose" (Pawl.ManaSpec's Spectral Searchlight group).
+              -- no ability object to hold them. A share under any reference but
+              -- @Relative You@ is then picked by each RECIPIENT among the routes
+              -- alike in the activator's own part: Spectral Searchlight's "any
+              -- color they choose" (Pawl.ManaSpec's Spectral Searchlight group).
               let shareAt i ref option = Map.lookup ref . snd =<< Maybe.listToMaybe (drop i (ManaOption.steps option))
                   pickShare i ref recipient mana = case ListUtils.nubOrdOn (shareAt i ref) alike of
                     representative : more@(_ : _) | ref /= you -> do
@@ -5682,7 +5682,7 @@ payActivation perform inFlight pid oid cost = do
 -- mint mana out of nothing, or charge the wrong cost for it.
 --
 -- `pid` is whoever picks: the activator for the route and their own share, and
--- the recipient for a share naming somebody else (tapForManaWith's
+-- the recipient for a share under any other reference (tapForManaWith's
 -- `pickShare`).
 chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty ManaOption.ManaOption -> GameState -> Game ManaOption.ManaOption
 chooseManaYield pid oid candidates gs = case candidates of
