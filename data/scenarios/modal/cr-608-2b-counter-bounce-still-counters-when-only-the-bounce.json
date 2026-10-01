@@ -1,0 +1,49 @@
+{
+  "description": "CR 608.2b counter + bounce still counters when only the bounce target is gone",
+  "note": "Cryptic Command cast for its counter and bounce modes, at bob's Slaughter Drone spell and his Goblin Piker; bob then Bolts his own Piker in response, so only one of the two targets is illegal as the Command resolves. The spell is not countered whole: the Drone is still countered, and the bounce mode alone is skipped, so nothing reaches bob's hand. An engine that fizzled per mode rather than per spell would pass the bounce test and fail the counter. Played rather than placed, so bob's graveyard also holds his Bolt.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ],
+        "hand": [{ "card": "Cryptic Command", "label": "cryptic" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Mountain", "label": "mountain" }
+        ],
+        "hand": [
+          { "card": "Slaughter Drone", "label": "drone" },
+          { "card": "Lightning Bolt", "label": "bolt" }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@drone", "mana": ["@swamp-1", "@swamp-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@cryptic", "modes": [0, 1], "targetsBySlot": { "spell": ["Slaughter Drone"], "permanent": ["@piker"] }, "mana": ["@island-1", "@island-2", "@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@piker"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Stack", "card": "Slaughter Drone", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Slaughter Drone", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Slaughter Drone", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Cryptic Command", "count": 1 } } }
+  ]
+}

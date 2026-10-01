@@ -3657,22 +3657,6 @@ escapeSpec s registry = Spec.describe s "Escape" $ do
         Spec.assertEqWith s "CR 707.2 the token copy is the printed 4/1" (fmap (`S.powerToughnessOf` copied) (filter (/= original) (chimerasOn copied))) [Just (4, 1)]
         Spec.assertEqWith s "and the escaped original is still a 5/2" (S.powerToughnessOf original copied) (Just (5, 2))
       other -> Spec.assertFailure s ("expected one Chimera, got " <> show (length other))
-  -- CR 702.138b with CR 707.10: Double Major copies the escaping Chimera on the
-  -- stack. The copy copies the alternative cost but was never CAST, so the token
-  -- it becomes did not escape; the original did.
-  Spec.it s "CR 702.138b a Double Major copy of the escaping Chimera did not escape" $ do
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    chimera <- S.printingOf s registry "Loathsome Chimera"
-    doubleMajor <- S.printingOf s registry "Double Major"
-    let (inGraveyard, gs) = escapeBoard forest chimera piker 4
-        onStack = S.runPure S.identityAnswer gs (S.cast S.alice inGraveyard)
-        -- Double Major's {G}{U}, added once the escape has been paid for.
-        (majorId, withMajor) = S.addHandCard doubleMajor S.alice (S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 onStack))
-        after = S.runPure S.identityAnswer withMajor (S.cast S.alice majorId >> Monad.replicateM_ (3 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
-    Spec.assertEqWith s "CR 702.138b the token copy is the printed 4/1 beside the escaped 5/2" (List.sort (fmap (`S.powerToughnessOf` after) (chimerasOn after))) [Just (4, 1), Just (5, 2)]
-    Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
 
 -- The battlefield's Loathsome Chimeras, by name: CR 400.7 gives the permanent a
 -- new id.

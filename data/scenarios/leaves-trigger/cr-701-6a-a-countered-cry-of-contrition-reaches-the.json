@@ -1,0 +1,61 @@
+{
+  "description": "CR 701.6a a countered Cry of Contrition reaches the graveyard and haunts nothing",
+  "note": "CR 701.6a: a countered Cry of Contrition reaches alice's graveyard from the stack, the same zone change CR 608.2n's resolution makes, yet haunt (CR 702.55a) only fires for a resolved spell. bob's Cancel counters it. 'Nothing haunts anything' is read as state: the Cry is in the graveyard, not exile, and a haunt trigger would ask for a creature target, an unscheduled prompt that fails the run. Same three-seat board and mana as the haunting case.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "s1" },
+          { "card": "Mountain", "label": "m1" }
+        ],
+        "hand": [
+          { "card": "Cry of Contrition", "label": "cry" },
+          { "card": "Lightning Bolt" }
+        ],
+        "library": [
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Goblin Piker", "label": "victim" },
+          { "card": "Goblin Piker", "label": "bystander" }
+        ],
+        "hand": [
+          { "card": "Cancel", "label": "cancel" },
+          { "card": "Goblin Piker" }
+        ],
+        "library": [
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "carol",
+        "hand": [
+          { "card": "Goblin Piker" },
+          { "card": "Lightning Bolt" }
+        ],
+        "library": [
+          { "card": "Mountain" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@cry", "targets": ["@bob"], "mana": ["@s1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@cancel", "targets": ["Cry of Contrition"], "mana": ["@i1", "@i2", "@i3"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Cry of Contrition", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Exile", "card": "Cry of Contrition", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Cancel", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 1}}}
+  ]
+}

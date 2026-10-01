@@ -1,0 +1,49 @@
+{
+  "description": "CR 608.2h the number is read as the effect is applied, not as the spell is cast",
+  "note": "Sudden Impact deals damage equal to the cards in its target's hand. bob holds two when alice casts it at him, and his Gush in response draws two for the one it spends, so he holds three as it resolves and takes three, not two. Played rather than placed: the Haskell fixture added the third card by hand, and here bob casts Gush for its {4}{U} off five Islands.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" },
+          { "card": "Mountain", "label": "mountain-4" }
+        ],
+        "hand": [{ "card": "Sudden Impact", "label": "impact" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" },
+          { "card": "Island", "label": "island-5" }
+        ],
+        "hand": [
+          { "card": "Goblin Piker" },
+          { "card": "Gush", "label": "gush" }
+        ],
+        "library": [
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@impact", "targets": ["@bob"], "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@gush", "cost": [{ "type": "Generic", "value": 4 }, { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Blue" } } }], "mana": ["@island-1", "@island-2", "@island-3", "@island-4", "@island-5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } }
+  ]
+}

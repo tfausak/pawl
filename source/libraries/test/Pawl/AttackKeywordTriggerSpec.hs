@@ -910,20 +910,6 @@ trygonPredatorSpec s registry =
               Spec.assertBool s (S.onBattlefield bobs after) "bob's Moon is untouched"
               Spec.assertBool s (S.onBattlefield alices after) "and so is alice's own"
             _ -> Spec.assertFailure s "fixture should give each seat a Moon"
-        -- CR 608.2b at the OTHER moment: the target changes hands after it was
-        -- chosen, so it is no longer a permanent that player controls and the
-        -- ability's only target is illegal. The pair differs in exactly the
-        -- control change -- same board, same answers, same stack -- which is
-        -- what makes the survival the rule's and not the fixture's.
-        Spec.it s "CR 608.2b a target that changes hands is no longer that player's" $ do
-          (_, _, others, placed) <- board
-          case others of
-            [carols] -> do
-              let stolen = S.runPure plan (S.giveControl carols S.bob placed) Engine.priorityLoop
-                  kept = S.runPure plan placed Engine.priorityLoop
-              Spec.assertBool s (S.onBattlefield carols stolen) "bob controls it now, so the ability fizzles"
-              Spec.assertBool s (not (S.onBattlefield carols kept)) "and without the change it is destroyed"
-            _ -> Spec.assertFailure s "fixture should give carol a Moon"
 
 -- BOTH halves of one DamageDealt event read by one bearer-scoped trigger:
 -- Questing Beast {2}{G}{G} Legendary Creature -- Beast 4/4, "whenever Questing
@@ -954,7 +940,7 @@ trygonPredatorSpec s registry =
 -- controller changes. A creature can only ever deal combat damage to a player who
 -- is its controller's opponent, so the nullary condition admits exactly the
 -- printed events.
-questingBeastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+questingBeastSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 questingBeastSpec s registry =
   let plan :: Prompt.Prompt r -> r
       plan p = case p of
@@ -981,22 +967,6 @@ questingBeastSpec s registry =
             placed = S.runPure plan fought Engine.settleForPriority
         pure (mine, theirs, others, shrunk, placed)
    in Spec.describe s "QuestingBeast" $ do
-        -- THE proving test, at gameplay level: what carol's planeswalker lost.
-        Spec.it s "CR 120.3c whole card: that much is the damage the event carried" $ do
-          (mine, theirs, others, before, placed) <- board
-          case (mine, theirs, others) of
-            ([beastId], [bobs], [carols]) -> do
-              let bumped = S.addCounter CounterKind.PlusOnePlusOne 4 beastId placed
-                  after = S.runPure plan bumped Engine.priorityLoop
-              -- The fixture's own preconditions, asserted rather than assumed:
-              -- neither can be reddened by the binding under test.
-              Spec.assertEqWith s "the -1/-1 counter makes the Beast a 3/3 before it connects" (S.powerToughnessOf beastId before) (Just (3, 3))
-              Spec.assertEqWith s "and both walkers start on 6 loyalty" (S.counterOf CounterKind.Loyalty bobs before, S.counterOf CounterKind.Loyalty carols before) (6, 6)
-              Spec.assertEqWith s "CR 120.3c: 6 - 3, not 6 - 4 and not dead on 7" (S.counterOf CounterKind.Loyalty carols after) 3
-              Spec.assertEqWith s "and bob's planeswalker is untouched" (S.counterOf CounterKind.Loyalty bobs after) 6
-              Spec.assertEqWith s "CR 510.1b: carol herself took the Beast's 3" (S.lifeOf S.carol after) (Just 17)
-              Spec.assertEqWith s "CR 704.5q: the Beast is a 7/7 by the time the ability resolves" (S.powerToughnessOf beastId after) (Just (7, 7))
-            _ -> Spec.assertFailure s "fixture should give alice a Beast and bob and carol a planeswalker each"
         -- The slots themselves, read back off the placed ability rather than
         -- inferred from what happened -- so this says which player the event
         -- named and which permanent the filter OFFERED.

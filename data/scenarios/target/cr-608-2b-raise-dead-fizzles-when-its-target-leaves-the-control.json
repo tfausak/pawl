@@ -1,0 +1,35 @@
+{
+  "description": "CR 608.2b Raise Dead fizzles when its target leaves the graveyard in response",
+  "note": "The control for the fizzle: the same board, with bob's Withered Wretch left unactivated, so Raise Dead returns the Piker card to alice's hand. Without it the fizzle could be a Raise Dead that never worked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Swamp", "label": "swamp"}
+        ],
+        "graveyard": [
+          {"card": "Goblin Piker", "label": "piker"}
+        ],
+        "hand": [
+          {"card": "Raise Dead", "label": "raise-dead"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Swamp", "label": "bob-swamp"},
+          {"card": "Withered Wretch", "label": "wretch"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@raise-dead", "targets": ["@piker"], "mana": ["@swamp"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Raise Dead", "count": 1}}}
+  ]
+}

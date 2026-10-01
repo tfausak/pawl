@@ -561,14 +561,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "Bolt in the graveyard, unresolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "no damage was dealt" (S.damageEventsOf after) []
     Spec.assertEqWith s "bob untouched" (S.lifeOf S.bob after) (Just 20)
-  Spec.it s "CR 608.2b a fizzled spell applies none of its effects" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    mountain <- S.printingOf s registry "Mountain"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (base, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
-        dead = S.settleSba (S.markDamage (S.pikerOf base) 3 cast)
-        after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
-    Spec.assertEqWith s "life totals unchanged" (S.lifeOf S.alice after) (Just 20)
   -- The deterministic successor to the retired "instants happen" property: a
   -- Bolt cast in a game and resolved ends in its owner's graveyard.
   Spec.it s "a cast Bolt reaches its owner's graveyard" $ do
@@ -2865,21 +2857,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         before = S.lifeOf S.bob cast
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "two damage" (S.lifeOf S.bob after) (fmap (subtract 2) before)
-  Spec.it s "CR 608.2h the number is read as the effect is applied, not as the spell is cast" $ do
-    -- Bob's hand grows AFTER Sudden Impact is on the stack and BEFORE it
-    -- resolves; the damage follows the hand size at resolution.
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    suddenImpact <- S.printingOf s registry "Sudden Impact"
-    let gs0 = S.landsInPlay mountain 4
-        fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard piker pid g)) g0 [1 .. (n :: Int)]
-        gs1 = fill S.bob 2 gs0
-        (spellId, gs2) = S.addHandCard suddenImpact S.alice gs1
-        cast = snd (Engine.runGamePure atBobAnswer gs2 (S.cast S.alice spellId))
-        (_, cast1) = S.addHandCard piker S.bob cast
-        before = S.lifeOf S.bob cast1
-        after = snd (Engine.runGamePure atBobAnswer cast1 Stack.resolveTop)
-    Spec.assertEqWith s "three damage" (S.lifeOf S.bob after) (fmap (subtract 3) before)
   Spec.it s "the same count with Relative You reads the caster's hand" $ do
     -- The direct contrast: the SAME Count shape (InZone Hand, Members) that
     -- Sudden Impact scopes with PlayerRef.InSlot also serves Inner Calm,
@@ -4998,9 +4975,6 @@ rhysticSpec s registry =
             (gs, dashId) = S.handOne dash withPiker
             onStack = S.runPure S.identityAnswer gs (S.cast S.alice dashId >> Engine.settleForPriority)
         pure onStack
-      -- By NAME: casting made Dash Hopes a new object on the stack (CR 400.7).
-      stackNames gs = List.sort (fmap (`S.soleFaceName` gs) (GameState.stack gs))
-      named = CardName.MkCardName . Text.pack
    in Spec.describe s "CR 118.12a unless any player pays" $ do
         Spec.it s "CR 118.12a bob alone pays, so alice does not search" $ do
           (pikerId, onStack) <- tutorBoard
@@ -5017,16 +4991,6 @@ rhysticSpec s registry =
           Spec.assertEqWith s "into her hand" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Hand S.alice after)) [CardName.MkCardName (Text.pack "Goblin Piker")]
           Spec.assertEqWith s "CR 701.23e: \"put that card into your hand\" reveals nothing" (S.revealsOf after) []
           Spec.assertEqWith s "all three declined" (payResponses transcript) (replicate 3 (Response.ChoseToPay PaymentDecision.Declines))
-        -- The positive "if a player does" over the whole table: Dash Hopes'
-        -- cast trigger offers 5 life to every player, and bob's payment alone
-        -- counters it (CR 118.12, IfPaid over PlayerRef.EachPlayer).
-        Spec.it s "CR 118.12 bob pays 5 life, so Dash Hopes is countered and the Piker is not" $ do
-          onStack <- dashBoard
-          let after = S.runPure (paysFor (Just S.bob)) onStack Stack.resolveTop
-          Spec.assertEqWith s "setup: the trigger is on top of Dash Hopes and the Piker" (length (GameState.stack onStack)) 3
-          Spec.assertEqWith s "CR 118.12: Dash Hopes left the stack and the Piker did not" (stackNames after) [named "Goblin Piker"]
-          Spec.assertEqWith s "into alice's graveyard" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [named "Dash Hopes"]
-          Spec.assertEqWith s "bob paid the 5 life" (S.lifeOf S.bob after) (Just 15)
         -- A pair differing only in bob's answer; carol pays exactly when her
         -- prompt says bob did.
         Spec.it s "CR 101.4b a later payer is told what the payers before it answered" $ do
@@ -5041,11 +5005,6 @@ rhysticSpec s registry =
               declined = S.runPure (copying False) onStack Stack.resolveTop
           Spec.assertEqWith s "CR 101.4b told bob paid, carol paid too" (fmap (`S.lifeOf` paid) [S.alice, S.bob, S.carol]) [Just 20, Just 15, Just 15]
           Spec.assertEqWith s "CR 101.4b told bob declined, carol declined" (fmap (`S.lifeOf` declined) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
-        Spec.it s "CR 118.12 nobody pays, so Dash Hopes stays on the stack" $ do
-          onStack <- dashBoard
-          let after = S.runPure (paysFor Nothing) onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 118.12: Dash Hopes and the Piker are both still on the stack" (stackNames after) [named "Dash Hopes", named "Goblin Piker"]
-          Spec.assertEqWith s "nobody paid life" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
 
 -- CR 118.12a inside CR 608.2f's loop: Cleansing's "for each land, destroy that
 -- land unless any player pays 1 life" is one offer PER LAND, each land's

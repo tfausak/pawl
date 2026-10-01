@@ -61,8 +61,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   asked again takes the next entry at that key. An illegal `do` is asked
   again too, so turning a `refuse` into `do` proves nothing: a `refuse` is
   proven by changing the board until the move is legal.
-- **Checks.** `Life`, `Count` (cards of one name in one of a player's zones;
-  the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
+- **Checks.** `Life`, `Count` (cards of one name in one of a player's zones,
+  `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),
   `Attackers` (every attacker and what it attacks), `Blockers` (an attacker's
   blockers, `null` when unblocked), `Defenders` (the defending players, in
