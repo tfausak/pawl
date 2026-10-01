@@ -106,7 +106,9 @@ awaiting a design call from the owner (#146, #1828, #2167 carry the label with
 no linked blocker). Neither is dispatchable unattended.
 
 Dispatch an implementation agent, with `isolation: "worktree"`, to work it end
-to end and open a PR. Its brief must open with: read
+to end and open a PR. Claim the pick first by assigning it to `tfausak`, and
+unassign it if the unit is dropped or leaves it open: parallel loops pick only
+unassigned issues. Its brief must open with: read
 `docs/agents/implementing.md` first, then `CLAUDE.md` and `CONTRIBUTING.md`.
 Everything else is specific to the unit. **Model**: opus, for every unit and
 every audit. A 2026-09-22/23 sonnet trial over four engine units was no

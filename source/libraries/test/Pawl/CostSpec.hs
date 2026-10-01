@@ -1323,6 +1323,27 @@ costBatchSpec s registry =
           -- The proxies, AFTER the assertion above.
           Spec.assertEqWith s "one trigger above the Tribute" (length (GameState.stack placed)) 2
           Spec.assertEqWith s "and only the Townsfolk is left" (S.creaturesInPlay S.alice after) 1
+        -- Anafenza, the Foremost (Scryfall 2026-10-01): "If a nontoken creature
+        -- an opponent owns would die ..., exile that card instead." Alice
+        -- sacrifices her and a Piker she controls but bob owns. One event on one
+        -- board, so Anafenza's replacement still applies to the Piker. Anafenza has
+        -- the lower id, so she moves first.
+        Spec.it s "CR 601.2h Phyrexian Tribute sacrificing Anafenza beside bob's Piker still exiles the Piker" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+          solRing <- S.printingOf s registry "Sol Ring"
+          tribute <- S.printingOf s registry "Phyrexian Tribute"
+          let (anafenzaId, g0) = S.addPermanent anafenza S.alice (S.landsInPlay swamp 3)
+              (pikerId, g1) = S.addPermanent piker S.bob g0
+              (_, g2) = S.addPermanent solRing S.bob (S.giveControl pikerId S.alice g1)
+              (tributeId, gs) = S.addHandCard tribute S.alice (mainPhase g2)
+              cast = S.runPure S.identityAnswer gs (S.cast S.alice tributeId)
+              after = resolveAll (S.runPure S.identityAnswer cast Engine.settleForPriority)
+          Spec.assertEqWith s "CR 614.1a bob's Piker is exiled, not put into his graveyard" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+          -- The preconditions and proxies, AFTER the assertion above.
+          Spec.assertBool s (anafenzaId < pikerId) "Anafenza moves first"
+          Spec.assertEqWith s "both were sacrificed" (S.creaturesInPlay S.alice after) 0
         Spec.it s "CR 601.2h Gush's two returned Islands draw once for Synthetic Return Ledger" $ do
           island <- S.printingOf s registry "Island"
           ledger <- S.printingOf s registry "Synthetic Return Ledger"
@@ -1841,7 +1862,7 @@ jaradSpec s registry =
     -- guard: Cost.payComponents folds the components in the Game state monad and
     -- Cost.payComponent's Sacrifice arm reads the state afresh, so the second
     -- component's candidates are computed after the first component's
-    -- Event.sacrifice has moved its permanent off the battlefield. It still
+    -- Event.sacrificeAll has moved its permanent off the battlefield. It still
     -- DISCRIMINATES: threading the pre-payment state down from Cost.pay and
     -- computing the candidates off that snapshot instead makes this ask twice
     -- and sacrifice the Bayou twice.
