@@ -14,7 +14,8 @@
 -- reaches the same function and no board can observe it -- see the note on
 -- restampOrderSpec. Objects ENTERING together are Restamp.settle's, driven on
 -- Replenish's MoveToZone road by the data/scenarios/restamp/ files and on the token road by
--- tokenOrderSpec, on Mirror Match's CR 608.2f loop by simultaneousCopiesSpec,
+-- tokenOrderSpec, on Mirror Match's CR 608.2f loop by
+-- cr-613-7m-608-2f-the-controller-orders-every-token-one-loop.json,
 -- and on Ornate Imitations' conjure loop by conjuredOrderSpec.
 module Pawl.RestampSpec where
 
@@ -62,7 +63,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
   restampOrderSpec s registry
   apnapOrderSpec s registry
   tokenOrderSpec s registry
-  simultaneousCopiesSpec s registry
   conjuredOrderSpec s registry
   mirrorMatchSiblingSpec s registry
 
@@ -280,24 +280,6 @@ replicate5 reversing cloneId archonId godheadId gs =
       spell = lastInHand gs
       ((_, after), (_, asked)) = State.runState (Engine.runGame answer gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) (0, [])
    in (after, asked)
-
--- | CR 613.7m over CR 608.2f's loop: Mirror Match's tokens enter in one action,
--- so the seat that controls them orders ALL their stamps, not one iteration's.
---
--- SHARED TEAM TURNS (CR 805.10a) is the board that can tell. In a two-player
--- game every attacker is one seat's, so the loop's own CR 608.2f order
--- (Prompt.OrderForEach, the caster's) already reaches every permutation of the
--- one-token iterations. Here alice attacks with Godhead of Awe and her teammate
--- bob with Harmonious Archon, so the loop's APNAP key puts alice's copy first
--- and nobody may reorder it -- while CR 613.7m hands both tokens to carol, who
--- controls them.
---
--- The copies write base P/T in layer 7b (1/1 and 3/3) and are stamped after both
--- originals, so alice's Godhead reads whichever copy is later: 1/1 only if
--- carol's answer put the Godhead copy last.
-simultaneousCopiesSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-simultaneousCopiesSpec s registry =
-  Spec.describe s "ForEach" $ do
 
 -- | CR 613.7m over a conjure: Ornate Imitations ({X}{G}{U} Sorcery, "For each
 -- number between 1 and X, conjure a duplicate of a random creature card with

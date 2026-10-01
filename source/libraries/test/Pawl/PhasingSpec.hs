@@ -82,7 +82,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent

@@ -1332,7 +1332,7 @@ savePointAnswer pointId ability p = case p of
 -- The activation happens in the declare blockers step, which is inside the
 -- rider's window (Pawl.ActivateSpec's Save Point case is what pins the window
 -- itself).
-savePointSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+savePointSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 savePointSpec s registry = Spec.describe s "Save Point" $ do
   Spec.it s "CR 701.26b/500.8 the same activation untaps both attackers and adds a combat phase after this one" $ do
     piker <- S.printingOf s registry "Goblin Piker"

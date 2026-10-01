@@ -578,7 +578,7 @@ lastKnownTokenSpec s registry =
 -- 1-toughness creature), declared blockers or not, so the draw cannot be the
 -- kill's doing. Combat damage is never dealt: the fixture stops at the top of the
 -- combat damage step.
-lastKnownBlockingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownBlockingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 lastKnownBlockingSpec s registry =
   let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
       run giant prowler swamp blocks k = case S.combatBoardOf [giant] [prowler] of
@@ -637,7 +637,7 @@ attackingOnly attacks victim p = case p of
 -- Combat damage is never dealt: the fixture stops at the top of the combat damage
 -- step, so the attacking leg's Giant does not hit bob and his life total answers
 -- for Garna's 1 damage alone.
-lastKnownAttackingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownAttackingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 lastKnownAttackingSpec s registry =
   let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
       run garna giant swamp attacks k = case S.combatBoardOf [garna, giant] [] of

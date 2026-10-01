@@ -957,12 +957,6 @@ withMenace oid gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
--- CR 613.1f layer 6 scoped to CR 702.14a's GENERIC TERM: "loses all landwalk
--- abilities" reaches every written [type]walk at once, which no removal naming an
--- instance can do.
-landwalkFamilyRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-landwalkFamilyRemovalSpec s registry = Spec.describe s "LandwalkFamilyRemoval" $ do
-
 -- CR 509.1a: the defending player chooses ONE creature for each blocker to
 -- block, and an effect can raise that number. Foriysian Brigade {3}{W} 2/4,
 -- "This creature can block an additional creature each combat", is the pool's
@@ -3143,7 +3137,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   hasteSpec s registry
   evasionSpec s registry
   textChangedLandwalkSpec s registry
-  landwalkFamilyRemovalSpec s registry
   menaceSpec s registry
   blockPermissionSpec s registry
   blockRequirementSpec s registry
