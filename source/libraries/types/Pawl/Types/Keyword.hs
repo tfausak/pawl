@@ -107,9 +107,9 @@ data Keyword
     -- and so are a transcription nothing checks (#3200).
     --
     -- Rule 702.16n's exception is the payload's second field rather than a
-    -- variant constructor: Spectra Ward writes it, and Pawl.AuraSpec's "CR
-    -- 702.16n" proves that the spared Aura stays and an unspared attachment
-    -- still goes.
+    -- variant constructor: Spectra Ward and White Ward write it, and
+    -- Pawl.AuraSpec's "CR 702.16n" cases prove that the spared Aura stays and
+    -- an unspared attachment still goes.
     Protection (Protection.Protection Keyword)
   | Reach -- 702.17
   | -- | 702.18a: this permanent or player can't be the target of spells or

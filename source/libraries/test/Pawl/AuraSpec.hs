@@ -2797,6 +2797,23 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     Spec.assertBool s (S.onBattlefield wardId after) "and on the battlefield rather than in its owner's graveyard"
     Spec.assertEqWith s "CR 702.16c: the black Aura lands on the Spider, not the warded creature" (fmap Object.attachedTo (Game.lookupObject auraId after)) (Just (Just (Recipient.ToCreature willing)))
     Spec.assertEqWith s "so the Mammoth still carries its +2/+2" (S.powerToughnessOf protected after) (Just (5, 5))
+  -- CR 702.16n's "this Aura" form and its last sentence, on a pair of boards
+  -- differing only in a second White Ward. Placed by hand, since CR 702.16b
+  -- and CR 702.16c keep a second Ward from being cast or attached onto a
+  -- creature the first protects; data/scenarios/white-ward-spares-itself.json
+  -- is the cast road.
+  Spec.it s "CR 702.16n whole cards: one White Ward stays on its creature, and two bury each other" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    ward <- S.printingOf s registry "White Ward"
+    let (host, base1) = S.addPermanent piker S.alice S.threePlayerGame
+        (firstWard, base2) = S.addPermanent ward S.alice base1
+        alone = S.attach firstWard host base2
+        (secondWard, base3) = S.addPermanent ward S.alice alone
+        paired = S.attach secondWard host base3
+        afterAlone = S.settleSba alone
+        afterPaired = S.settleSba paired
+    Spec.assertBool s (not (S.onBattlefield firstWard afterPaired) && not (S.onBattlefield secondWard afterPaired)) "CR 702.16n: each Ward's protection from white buries the other"
+    Spec.assertBool s (S.onBattlefield firstWard afterAlone) "and a lone Ward stays on the creature it protects"
   -- CR 702.16k's Aura sentence: "Such a permanent or player ... can't be
   -- enchanted by Auras that player controls." True-Name Nemesis, whose quality is
   -- Filter.OfChosenPlayer -- read by Pawl.Engine.AttachRestriction.barredBy

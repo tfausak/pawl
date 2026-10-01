@@ -5084,6 +5084,22 @@ mintedRemovalRestrictionsFor keyword =
           Just spared -> fmap (sparing spared) rows
         _ -> rows
 
+-- CR 702.16n's "this effect doesn't remove this Aura": the keyword as
+-- `granter` grants it. The card writes the spare in the GRANTER's frame, where
+-- Filter.IsSource is the Aura, but mintedRemovalRestrictionsFor reads it in the
+-- host's, so the grant bakes the granter's id in. Two White Wards then grant
+-- distinct keys, each sparing only itself, which is rule 702.16n's last
+-- sentence.
+--
+-- A bare IsSource only, and the wildcard is right: rule 702.16n's spare is
+-- "that specific Aura or all Auras", and the second names no object.
+grantedBy :: ObjectId -> Keyword -> Keyword
+grantedBy granter keyword = case keyword of
+  Keyword.Protection protection
+    | Protection.spares protection == Just Filter.IsSource ->
+        Keyword.Protection protection {Protection.spares = Just (Filter.IsObject granter)}
+  _ -> keyword
+
 -- Exhaustive for `abilitiesFor`'s reason: the next keyword that forbids an
 -- attachment must break this build rather than silently forbid nothing.
 mintedAttachRestrictionsFor :: Keyword -> [AttachRestriction.AttachRestriction]
@@ -5163,13 +5179,10 @@ mintedAttachRestrictionsFor keyword = case keyword of
   --
   -- The QUALITY alone, rule 702.16n's exception being about removal and not
   -- about becoming attached: mintedRemovalRestrictionsFor above narrows this row
-  -- for the state-based halves, and Spectra Ward is the card.
+  -- for the state-based halves, and Spectra Ward and White Ward are the cards.
   --
-  -- Not implemented: rule 702.16n's "this Aura" form (White Ward) and rule
-  -- 702.16p (Benevolent Blessing). The first needs the projection to keep which
-  -- grant put a keyword on a permanent, since no Filter atom in the host's frame
-  -- names the Aura that granted it; the second adds "already attached to", a
-  -- moment rather than a state (#3046).
+  -- Not implemented: rule 702.16p (Benevolent Blessing), whose "already
+  -- attached to" is a moment rather than a state (#3046).
   Keyword.Protection protection ->
     [ AttachRestriction.MkAttachRestriction
         { AttachRestriction.affected = Affected.Matching Filter.IsSource,
