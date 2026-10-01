@@ -31,7 +31,10 @@
             "type": "PlayerAttacksPlayer",
             "value": {
               "attacked": {
-                "type": "AnyPlayer"
+                "type": "Related",
+                "value": {
+                  "type": "AnyPlayer"
+                }
               },
               "attacker": {
                 "type": "You"
