@@ -2771,7 +2771,7 @@ applyCopyException this own snapshot exception = case exception of
 -- "any enchantment", and this function must not know which. The zone is the
 -- card's too (Pawl.Types.AsCopy's `zone`): the battlefield for Clone, and for
 -- Superior Spider-Man's "any creature card in a graveyard" every player's
--- graveyard. No printing names another zone, so any other answers nothing.
+-- graveyard. Any other zone answers nothing.
 --
 -- Matched through each candidate's own CR 613 projection, revealableFromHand's
 -- reading, so a continuous effect that made a permanent an enchantment reaches
