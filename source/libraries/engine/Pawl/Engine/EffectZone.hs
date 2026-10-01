@@ -232,6 +232,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ChooseNumber _ -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
+  Effect.Unattach _ -> Nothing
   Effect.Detain _ -> Nothing
   Effect.Goad _ -> Nothing
   Effect.Pair _ -> Nothing

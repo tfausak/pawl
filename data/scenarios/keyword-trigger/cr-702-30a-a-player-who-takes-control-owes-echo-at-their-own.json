@@ -1,0 +1,65 @@
+{
+  "description": "CR 702.30a a player who takes control owes echo at their own next upkeep",
+  "note": "Rule 702.30a's control-change clause: alice pays echo at her first upkeep and her second asks nothing, so her own window is shut before bob takes the Jaguar with Control Magic; bob's next upkeep opens a fresh one and asks him. A clock spent once per object rather than once per player and object asks bob nothing, and one read from the owner's entry rather than the controller's would answer bob's upkeep right by accident were alice's window still open. Any unscheduled offer to alice fails the run.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Pouncing Jaguar", "label": "jaguar" },
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" }
+        ],
+        "library": [
+          { "card": "Forest" },
+          { "card": "Forest" },
+          { "card": "Forest" },
+          { "card": "Forest" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" },
+          { "card": "Forest", "label": "bob-forest-1" },
+          { "card": "Forest", "label": "bob-forest-2" },
+          { "card": "Forest", "label": "bob-forest-3" },
+          { "card": "Forest", "label": "bob-forest-4" }
+        ],
+        "hand": [{ "card": "Control Magic", "label": "control-magic" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@forest-1", null] } }, "source": "@jaguar" },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@forest-1", "tapped": true } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Pouncing Jaguar", "count": 1 } } },
+    { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@forest-1", "tapped": false } } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 4, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@control-magic", "targets": ["@jaguar"], "mana": ["@island-1", "@island-2", "@island-3", "@island-4", null] } } },
+    { "turn": 4, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 4, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Pouncing Jaguar", "count": 1 } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@bob-forest-1", null] } }, "source": "@jaguar" },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Pouncing Jaguar", "count": 1 } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-1", "tapped": true } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-2", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-3", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-4", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@island-1", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@forest-1", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@forest-2", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@forest-3", "tapped": false } } }
+  ]
+}

@@ -203,6 +203,9 @@ data Effect card ability
   | -- | CR 701.3a: every object the ObjectRef names moves to one permanent
     -- chosen as this resolves (Glamer Spinners, Balan, Wandering Knight).
     AttachAll AttachAll.AttachAll
+  | -- | CR 701.3d: each object the ObjectRef names stops being attached to
+    -- anything and stays on the battlefield (Disarm, reconfigure's second ability).
+    Unattach ObjectRef.ObjectRef
   | -- | CR 400.7: move the objects the ObjectRef names to a zone through the
     -- changeZone funnel; the destination, the entry riders, the binding for CR
     -- 400.7j's new incarnations, CR 113.6m's stated origin zone and CR 401.2's

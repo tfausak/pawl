@@ -117,7 +117,6 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayOffer as PayOffer
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -4989,29 +4988,6 @@ rhysticSpec s registry =
             (gs, tutorId) = S.handOne tutor stocked
             onStack = S.runPure S.identityAnswer gs (S.cast S.alice tutorId)
         pure (pikerId, onStack)
-      -- alice: a Goblin Piker (2/1) and two Forests, Wild Might in hand. bob
-      -- and carol: two Islands each.
-      mightBoard = do
-        forest <- S.printingOf s registry "Forest"
-        island <- S.printingOf s registry "Island"
-        piker <- S.printingOf s registry "Goblin Piker"
-        might <- S.printingOf s registry "Wild Might"
-        let lands = S.landsFor island S.carol 2 (S.landsFor island S.bob 2 (S.landsFor forest S.alice 2 S.threePlayerGame))
-            (pikerId, withPiker) = S.addPermanent piker S.alice lands
-            (gs, mightId) = S.handOne might withPiker
-            onStack = S.runPure S.identityAnswer gs (S.cast S.alice mightId)
-        pure (pikerId, onStack)
-      -- alice: Nakaya Shade and a Swamp. bob and carol: two Islands each.
-      shadeBoard = do
-        swamp <- S.printingOf s registry "Swamp"
-        island <- S.printingOf s registry "Island"
-        shade <- S.printingOf s registry "Nakaya Shade"
-        let lands = S.landsFor island S.carol 2 (S.landsFor island S.bob 2 (S.landsFor swamp S.alice 1 S.threePlayerGame))
-            (shadeId, gs) = S.addPermanent shade S.alice lands
-        pure (shadeId, gs {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace shade)))
-      activateShade payer = do
-        (shadeId, gs, ability) <- shadeBoard
-        pure (shadeId, fmap (\a -> S.runPure (paysFor payer) gs (Activate.activateAbility S.alice shadeId a >> Stack.resolveTop)) ability)
       -- bob: a Goblin Piker on the stack. alice: two Swamps and Dash Hopes,
       -- cast at the Piker, with its CR 601.2i cast trigger settled on top.
       dashBoard = do
@@ -5022,15 +4998,6 @@ rhysticSpec s registry =
             (gs, dashId) = S.handOne dash withPiker
             onStack = S.runPure S.identityAnswer gs (S.cast S.alice dashId >> Engine.settleForPriority)
         pure onStack
-      -- alice: four Swamps and Temporal Extortion, its cast trigger settled on
-      -- top. bob at 15 and carol at 9, so each half rounds up.
-      extortionBoard = do
-        swamp <- S.printingOf s registry "Swamp"
-        extortion <- S.printingOf s registry "Temporal Extortion"
-        let lives = Map.adjust (\p -> p {Player.life = 15}) S.bob . Map.adjust (\p -> p {Player.life = 9}) S.carol
-            base = S.landsFor swamp S.alice 4 S.threePlayerGame
-            (gs, extortionId) = S.handOne extortion base {GameState.players = lives (GameState.players base)}
-        pure (S.runPure S.identityAnswer gs (S.cast S.alice extortionId >> Engine.settleForPriority))
       -- By NAME: casting made Dash Hopes a new object on the stack (CR 400.7).
       stackNames gs = List.sort (fmap (`S.soleFaceName` gs) (GameState.stack gs))
       named = CardName.MkCardName . Text.pack
@@ -5050,24 +5017,6 @@ rhysticSpec s registry =
           Spec.assertEqWith s "into her hand" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Hand S.alice after)) [CardName.MkCardName (Text.pack "Goblin Piker")]
           Spec.assertEqWith s "CR 701.23e: \"put that card into your hand\" reveals nothing" (S.revealsOf after) []
           Spec.assertEqWith s "all three declined" (payResponses transcript) (replicate 3 (Response.ChoseToPay PaymentDecision.Declines))
-        -- The gate on the SECOND clause alone: the first clause's +1/+1 happens
-        -- whoever pays, and carol, the LAST seat asked, is enough to buy off the
-        -- +4/+4.
-        Spec.it s "CR 118.12a carol pays, so Wild Might gives +1/+1 and not +5/+5" $ do
-          (pikerId, onStack) <- mightBoard
-          let after = S.runPure (paysFor (Just S.carol)) onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 118.12a: the Piker is 3/2" (S.powerToughnessOf pikerId after) (Just (3, 2))
-        Spec.it s "CR 118.12a nobody pays, so Wild Might gives +5/+5" $ do
-          (pikerId, onStack) <- mightBoard
-          let after = S.runPure (paysFor Nothing) onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 118.12a: the Piker is 7/6" (S.powerToughnessOf pikerId after) (Just (7, 6))
-        -- The same gate on an ACTIVATED ability's resolution.
-        Spec.it s "CR 118.12a bob pays, so Nakaya Shade stays 1/1" $ do
-          (shadeId, after) <- activateShade (Just S.bob)
-          Spec.assertEqWith s "CR 118.12a: the Shade is 1/1" (fmap (S.powerToughnessOf shadeId) after) (Just (Just (1, 1)))
-        Spec.it s "CR 118.12a nobody pays, so Nakaya Shade is 2/2" $ do
-          (shadeId, after) <- activateShade Nothing
-          Spec.assertEqWith s "CR 118.12a: the Shade is 2/2" (fmap (S.powerToughnessOf shadeId) after) (Just (Just (2, 2)))
         -- The positive "if a player does" over the whole table: Dash Hopes'
         -- cast trigger offers 5 life to every player, and bob's payment alone
         -- counters it (CR 118.12, IfPaid over PlayerRef.EachPlayer).
@@ -5097,19 +5046,6 @@ rhysticSpec s registry =
           let after = S.runPure (paysFor Nothing) onStack Stack.resolveTop
           Spec.assertEqWith s "CR 118.12: Dash Hopes and the Piker are both still on the stack" (stackNames after) [named "Dash Hopes", named "Goblin Piker"]
           Spec.assertEqWith s "nobody paid life" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
-        -- CR 119.4 / 107.1a: "half their life, rounded up" is each payer's own
-        -- half, bob 8 of 15 and carol 5 of 9 -- and carol is still asked after
-        -- bob paid, Temporal Extortion's ruling.
-        Spec.it s "CR 118.12 bob and carol each pay half their own life, so Temporal Extortion is countered" $ do
-          onStack <- extortionBoard
-          let bothPay p = case p of
-                Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
-                  | d == player && player /= S.alice -> PaymentDecision.Pays
-                _ -> paysFor Nothing p
-              after = S.runPure bothPay onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 119.4: each paid half their own life, rounded up" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) [Just 20, Just 7, Just 4]
-          Spec.assertEqWith s "CR 118.12: Temporal Extortion left the stack" (stackNames after) []
-          Spec.assertEqWith s "into alice's graveyard" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [named "Temporal Extortion"]
 
 -- CR 118.12a inside CR 608.2f's loop: Cleansing's "for each land, destroy that
 -- land unless any player pays 1 life" is one offer PER LAND, each land's

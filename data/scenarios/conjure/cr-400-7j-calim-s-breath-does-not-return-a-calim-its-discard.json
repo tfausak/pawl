@@ -1,0 +1,49 @@
+{
+  "description": "CR 400.7j Calim's Breath does not return a Calim its discard put into exile",
+  "note": "Calim's Breath with two other Calims in alice's graveyard, under bob's Leyline of the Void, which exiles the Calim its cost discards. CR 400.7j still finds that card in exile, but \"return Calim from your graveyard\" names a graveyard, so it stays there: alice pays the gate, exiles the two others, and all three Calims end in exile with none on the battlefield.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" }
+        ],
+        "hand": [{ "card": "Calim, Djinn Emperor", "label": "calim" }],
+        "graveyard": [
+          { "card": "Calim, Djinn Emperor" },
+          { "card": "Calim, Djinn Emperor" }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Leyline of the Void" },
+          { "card": "Goblin Piker", "label": "goblin-piker" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@calim", "targets": ["@goblin-piker"], "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Calim, Djinn Emperor", "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Exile", "card": "Calim, Djinn Emperor", "count": 3 } }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "description": "CR 702.101a whole card: paying {W/B} drains each opponent and gains that much",
+  "note": "Syndic of Tithes' extort, three seats so that each opponent losing 1 and alice gaining the total differ: she pays {W/B} when she casts Luminesce, which touches no life total, and bob and carol each lose 1 while she gains the 2 they lost between them. A literal gain of 1 would leave her at 21.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Syndic of Tithes", "label": "syndic" },
+          { "card": "Plains", "label": "plains-1" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Plains", "label": "plains-3" }
+        ],
+        "hand": [{ "card": "Luminesce", "label": "luminesce" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@luminesce", "mana": ["@plains-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@plains-2", null] } }, "source": "@syndic" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 22 } },
+    { "Life": { "player": "bob", "life": 19 } },
+    { "Life": { "player": "carol", "life": 19 } }
+  ]
+}

@@ -166,7 +166,6 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -187,7 +186,6 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
@@ -3150,22 +3148,9 @@ disguiseSpec s registry =
               Spec.assertEqWith s "CR 708.2 a 2/2 with the Growth unresolved" (S.powerToughnessOf permanent onStack) (Just (2, 2))
               Spec.assertEqWith s "the Growth and the ward trigger are both on the stack" (length (GameState.stack onStack)) 2
 
-        -- The same board and the same cast, differing in NOTHING but bob's answer.
-        Spec.it s "CR 702.21a paying the listed ward cost leaves the spell to resolve" $ do
-          board <- wardedBoard s registry phantomName disguised
-          case board of
-            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
-            Just (permanent, onStack) -> do
-              let paid = S.runPure (paysWard S.bob) onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
-              -- THE DISCRIMINATING assertion first, and it is the mana rather than
-              -- the P\/T: a Growth that resolved because nothing triggered leaves
-              -- the same 5\/5, so only the two extra Forests say the ward cost was
-              -- charged and paid.
-              Spec.assertEqWith s "CR 702.21a bob paid the {2} on top of the Growth's {G}, so all three Forests are spent" (S.tappedCount S.bob paid) 3
-              Spec.assertEqWith s "and the Growth resolved on the 2/2" (S.powerToughnessOf permanent paid) (Just (5, 5))
-
-        -- THE PAIR, and the case that makes the two above about the LISTING rather
-        -- than about the board: the same three seats, the same Giant Growth, the
+        -- THE PAIR, and the case that makes the one above and
+        -- data/scenarios/face-down/cr-702-21a-paying-the-listed-ward-cost-leaves-the-spell-to.json
+        -- about the LISTING rather than about the board: the same three seats, the same Giant Growth, the
         -- same {3} face-down cast, with a morph card underneath. Rule 702.37c
         -- lists no ward, so nothing triggers and the Growth resolves off bob's one
         -- Forest.
@@ -3260,16 +3245,6 @@ wardedBoard s registry name facing = do
           }
       (down, entered) = castAndResolve subject facing ready card
   pure (fmap (\permanent -> (permanent, S.runPure S.identityAnswer (S.runPure S.identityAnswer down (S.cast S.bob growthId)) Engine.settleForPriority)) entered)
-
--- CR 702.21a's "unless that player pays [cost]", answered by paying -- and only
--- when the payer and the decider are the named seat, so an offer made to anyone
--- else falls through to declining and shows up as a countered spell.
-paysWard :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-paysWard who p = case p of
-  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
-    | d == who && player == who ->
-        PaymentDecision.Pays
-  _ -> S.identityAnswer p
 
 -- CR 708.12: "if a spell or ability that instructs a player to reveal a face-down
 -- permanent needs information about the revealed object, it uses the

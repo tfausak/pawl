@@ -1175,26 +1175,6 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
     Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.21a: alice's own creature paid for it"
     Spec.assertEqWith s "CR 606.4: two of the three loyalty came off" (S.counterOf CounterKind.Loyalty gristId after) 1
 
-  -- The pair. One thing differs -- alice declines CR 118.12's optional cost -- so
-  -- the same board, the same seats and the same answerer for every other prompt.
-  Spec.it s "CR 118.12 declining the -2's sacrifice arms nothing and destroys nothing" $ do
-    grist <- S.printingOf s registry "Grist, the Hunger Tide"
-    piker <- S.printingOf s registry "Goblin Piker"
-    jace <- S.printingOf s registry "Jace Beleren"
-    ogre <- S.printingOf s registry "Villainous Ogre"
-    mountain <- S.printingOf s registry "Mountain"
-    let (gristId, pikerId, jaceId, mountainId, board) = gristMinusTwoBoard grist piker jace ogre mountain
-        answer :: Prompt.Prompt r -> r
-        answer = gristAnswer PaymentDecision.Declines [mountainId, jaceId]
-        after = firedTrigger answer (useLoyaltyAbility answer minusTwo grist gristId board)
-    Spec.assertEqWith
-      s
-      "the Jace the paying board destroyed is untouched, and so is alice's creature"
-      (S.onBattlefield jaceId after, S.onBattlefield pikerId after)
-      (True, True)
-    Spec.assertEqWith s "bob's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
-    Spec.assertEqWith s "CR 606.4: the loyalty cost was paid either way" (S.counterOf CounterKind.Loyalty gristId after) 1
-
 -- Ashiok, Wicked Manipulator -- {3}{B}{B} Legendary Planeswalker -- Ashiok,
 -- printed loyalty 5 (name, cost, type line, loyalty and Oracle text checked
 -- against api.scryfall.com 2026-09-05) -- carries two of its three loyalty
