@@ -160,6 +160,13 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- match.
   (TriggerCondition.SelfDealsDamageToCreature, GameEvent.DamageDealt ev) ->
     Binding.setEventAmount (DamageEvent.amount ev) Map.empty
+  -- Doomskar Warrior's "that many" for the player-or-battle arm, and Aisha of
+  -- Sparks and Smoke's "that damage" for the any-recipient one, whose batch
+  -- batchBindings sums across the CR 510.2 step. Unconditional given a match.
+  (TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle, GameEvent.DamageDealt ev) ->
+    Binding.setEventAmount (DamageEvent.amount ev) Map.empty
+  (TriggerCondition.SelfDealsCombatDamage, GameEvent.DamageDealt ev) ->
+    Binding.setEventAmount (DamageEvent.amount ev) Map.empty
   -- CR 603.2's "that much": how many counters actually came off, read off the
   -- event's own before/after pair. Chandra, Fire Artisan's "she deals that much
   -- damage" counts THAT and not the damage that caused it -- CR 306.8's removal
@@ -1274,6 +1281,10 @@ eventBindingSlots cond = case cond of
   -- same slot CR 615.13's prevention and CR 119.9's life gain stamp. Guaranteed
   -- given a match -- every DamageDealt event carries an amount.
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
+  -- Just the amount for the two wider arms: a battle or a creature recipient
+  -- names no player, so "that player" is not guaranteed given a match.
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> Set.singleton Binding.eventAmount
+  TriggerCondition.SelfDealsCombatDamage -> Set.singleton Binding.eventAmount
   -- The same pair for the arm without the combat narrowing, and equally guaranteed
   -- -- every DamageDealt event carries an amount, whichever CR 120.3 kind it was.
   TriggerCondition.SelfDealsDamageToPlayer _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]

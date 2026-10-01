@@ -1797,6 +1797,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins {} -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> condition
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> condition
+  TriggerCondition.SelfDealsCombatDamage -> condition
   TriggerCondition.SelfDealsDamageToPlayer _ -> condition
   TriggerCondition.SelfDealsDamageToCreature -> condition
   TriggerCondition.SelfIsDealtDamage -> condition
