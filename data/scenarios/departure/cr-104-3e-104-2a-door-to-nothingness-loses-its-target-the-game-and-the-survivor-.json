@@ -1,0 +1,189 @@
+{
+  "description": "CR 104.3e/104.2a Door to Nothingness loses its target the game, and the survivor wins",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Door to Nothingness",
+            "label": "door-to-nothingness",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$door-to-nothingness",
+          "targets": [
+            "$bob"
+          ],
+          "costOrder": [
+            0,
+            1
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$island",
+            "$island-2",
+            "$swamp",
+            "$swamp-2",
+            "$mountain",
+            "$mountain-2",
+            "$forest",
+            "$forest-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Door to Nothingness",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Door to Nothingness",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Result",
+        "is": {
+          "won": "alice"
+        }
+      }
+    }
+  ]
+}
