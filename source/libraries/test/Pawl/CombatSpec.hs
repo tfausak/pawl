@@ -1139,7 +1139,7 @@ hammerheimBoard s registry activated = do
 -- CR 613.1f layer 6 scoped to CR 702.14a's GENERIC TERM: "loses all landwalk
 -- abilities" reaches every written [type]walk at once, which no removal naming an
 -- instance can do.
-landwalkFamilyRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+landwalkFamilyRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 landwalkFamilyRemovalSpec s registry = Spec.describe s "LandwalkFamilyRemoval" $ do
   Spec.it s "CR 613.1f Hammerheim takes BOTH landwalks and the Hag can be blocked" $ do
     -- THE CASE. Bob's board never moves; the Hag's does. Both written landwalks
