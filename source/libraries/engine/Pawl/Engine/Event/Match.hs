@@ -2872,8 +2872,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- CR 508.3b: the player this ability's source is attached to was attacked.
   -- CreatureAttacksYou's question asked once per DECLARATION instead, which is
   -- the whole of what separates them: this matches the grouped
-  -- GameEvent.BecameAttacked, recorded once per distinct target, so the arity is
-  -- the event's and no dedup happens here.
+  -- GameEvent.BecameAttacked, and Pawl.Engine.Event.Trigger.batchScoped collapses
+  -- its group to one trigger per target.
   --
   -- The subject comes from Object.attachedTo (CR 303.4m), read live rather than
   -- through last known information as AttachedCreatureDies reads it: that arm
@@ -2972,7 +2972,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.CardArrived _ -> False
   -- CR 508.3b's other two subjects: the ability's own source is the planeswalker
   -- or the battle that was attacked. The arm above's event and its per-TARGET
-  -- arity -- one GameEvent.BecameAttacked per distinct target -- with the subject
+  -- arity, with the subject
   -- read off the SOURCE rather than off Object.attachedTo, so this arm looks
   -- nothing up on the board.
   --
