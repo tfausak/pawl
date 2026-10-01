@@ -62,3 +62,12 @@ playerOf r = case r of
   ToBattle _ -> Nothing
   ToObject _ -> Nothing
   ToPile _ -> Nothing
+
+-- | Whether two recipients name the same player or object, whichever of CR
+-- 115.4's pools tagged them -- a ToObject and a ToCreature of one permanent
+-- agree. False for a pile, which names no one thing.
+sameReferent :: Recipient -> Recipient -> Bool
+sameReferent a b = case (objectOf a, playerOf a) of
+  (Just oid, _) -> objectOf b == Just oid
+  (_, Just pid) -> playerOf b == Just pid
+  (Nothing, Nothing) -> False
