@@ -60,6 +60,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -1574,7 +1575,7 @@ sbaSpec s =
        in Spec.assertEqWith s "bob won" (GameState.result after) (Just (Result.Won S.bob))
 
     Spec.it s "life <= 0 loses" $
-      let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing, Player.counters = Map.empty, Player.ringTemptations = 0, Player.speed = Nothing, Player.designations = Set.empty, Player.commander = Set.empty, Player.commanderCasts = Map.empty, Player.commanderDamage = Map.empty, Player.dungeons = Set.empty, Player.outsideTheGame = Map.empty, Player.completedDungeons = 0, Player.completedDungeonNames = Set.empty, Player.startingDeck = Map.empty, Player.companion = Nothing, Player.companionTaken = False}) (GameState.players sbaBase)}
+      let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing, Player.counters = Map.empty, Player.ringTemptations = 0, Player.speed = Nothing, Player.designations = Set.empty, Player.commander = Set.empty, Player.commanderCasts = Map.empty, Player.commanderDamage = Map.empty, Player.dungeons = Set.empty, Player.outsideTheGame = Map.empty, Player.completedDungeons = 0, Player.completedDungeonNames = Set.empty, Player.startingDeck = Map.empty, Player.companion = Nothing, Player.companionTaken = False, Player.graveyardOrder = GraveyardOrder.Indifferent}) (GameState.players sbaBase)}
        in Spec.assertEqWith s "bob won" (GameState.result (S.settleSba gs)) (Just (Result.Won S.bob))
 
     Spec.it s "simultaneous last departures draw" $

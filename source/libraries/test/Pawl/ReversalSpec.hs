@@ -58,7 +58,6 @@ withoutAnnouncementSpec s registry = Spec.describe s "withoutAnnouncement" $ do
               GameState.nextObjectId = GameState.nextObjectId closed,
               GameState.printings = GameState.printings closed,
               GameState.printingIds = GameState.printingIds closed,
-              GameState.readsGraveyardOrder = GameState.readsGraveyardOrder closed,
               GameState.nextPrintingId = GameState.nextPrintingId closed,
               GameState.nextTimestamp = GameState.nextTimestamp closed,
               GameState.lastChoice = GameState.lastChoice closed,

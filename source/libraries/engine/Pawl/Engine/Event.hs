@@ -143,6 +143,8 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility.Type
+import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -393,12 +395,15 @@ arrivingTogether body = do
 -- library at the same time, the owner of those cards may arrange them in any
 -- order"; CR 404.3 says the same of a graveyard. The arrivals the scope recorded
 -- (noteArrival), grouped by owner and end; a group of two or more MOVES is asked
--- of its owner with Prompt.ArrangeArrivals, and the cards are rewritten into the
--- slots they already hold. A lone move is one order -- a melded permanent's two
--- cards were arranged by CR 712.21a as they moved. Only CARDS are arranged (CR
--- 404.3's "two or more cards"): a token in the group keeps its slot. A
--- graveyard batch is asked only where the game can tell its orders apart
--- (Game.printingReadsGraveyardOrder).
+-- of its owner -- Prompt.ArrangeLibraryArrivals or
+-- Prompt.ArrangeGraveyardArrivals -- and the cards are rewritten into the slots
+-- they already hold. A lone move is one order -- a melded permanent's two cards
+-- were arranged by CR 712.21a as they moved. Only CARDS are arranged (CR
+-- 404.3's "two or more cards"): a token in the group keeps its slot.
+--
+-- A graveyard batch is asked only of an owner whose Player.graveyardOrder is
+-- Matters. Otherwise it keeps the order it moved in, which is the owner's own
+-- standing answer (Pawl.Types.GraveyardOrder), not the engine's choice.
 --
 -- After the fact rather than before each move, which no reader can tell apart:
 -- nothing inside the scope reads a library's or a graveyard's order.
@@ -413,15 +418,12 @@ arrangeArrivals = do
     gs0 <- State.get
     let movesAt owner end = filter (\arrival -> Arrival.owner arrival == owner && Arrival.end arrival == end) (Foldable.toList pending)
         ends = Set.toAscList (Set.fromList (fmap Arrival.end (Foldable.toList pending)))
-        -- docs/design.md section 2.9: with no reader of graveyard order in the
-        -- game, every arrangement of a graveyard batch is the same game.
-        observed = GameState.readsGraveyardOrder gs0
-        distinguishable end = case end of
+        asked owner end = case end of
           ArrivalEnd.IntoLibrary _ -> True
-          ArrivalEnd.OntoGraveyard -> observed
+          ArrivalEnd.OntoGraveyard -> maybe GraveyardOrder.Indifferent Player.graveyardOrder (Map.lookup owner (GameState.players gs0)) == GraveyardOrder.Matters
     Monad.forM_ (Game.apnapOrder gs0) $ \owner -> Monad.forM_ ends $ \end -> do
       let moves = movesAt owner end
-      Monad.when (length moves >= 2 && distinguishable end) $ do
+      Monad.when (length moves >= 2 && asked owner end) $ do
         gs <- State.get
         let pile = case end of
               ArrivalEnd.IntoLibrary _ -> Map.findWithDefault Seq.empty owner (GameState.library gs)
@@ -436,12 +438,17 @@ arrangeArrivals = do
               ArrivalEnd.OntoGraveyard -> reverse held
             batch = fmap (Seq.index pile) slots
             rewrite arranged zone = List.foldl' (\acc (slot, oid) -> Seq.update slot oid acc) zone (zip slots arranged)
-        Monad.when (length batch >= 2) $ do
-          answer <- Game.choose (Prompt.ArrangeArrivals (Decide.deciderFor owner gs) owner end batch)
-          let arranged = Game.permute batch answer
-          State.modify' $ \g -> case end of
-            ArrivalEnd.IntoLibrary _ -> g {GameState.library = Map.adjust (rewrite arranged) owner (GameState.library g)}
-            ArrivalEnd.OntoGraveyard -> g {GameState.graveyard = Map.adjust (rewrite arranged) owner (GameState.graveyard g)}
+        Monad.when (length batch >= 2) $ case end of
+          ArrivalEnd.IntoLibrary position -> do
+            answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+            State.modify' (\g -> g {GameState.library = Map.adjust (rewrite (Game.permute batch answer)) owner (GameState.library g)})
+          ArrivalEnd.OntoGraveyard -> do
+            answer <- Game.choose (Prompt.ArrangeGraveyardArrivals (Decide.deciderFor owner gs) owner batch)
+            case answer of
+              -- Any order will do: the batch keeps the order it moved in.
+              GraveyardArrangement.AnyOrder -> pure ()
+              GraveyardArrangement.InOrder order ->
+                State.modify' (\g -> g {GameState.graveyard = Map.adjust (rewrite (Game.permute batch order)) owner (GameState.graveyard g)})
 
 -- CR 401.4 / 404.3's record: inside an arrivingTogether scope, note a move to
 -- an end of `owner`'s library or onto their graveyard. Outside one the move is

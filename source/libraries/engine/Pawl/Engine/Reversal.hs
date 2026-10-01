@@ -112,7 +112,6 @@ withoutAnnouncement before entry closed = do
   nextObjectId <- newest GameState.nextObjectId
   printings <- newest GameState.printings
   printingIds <- newest GameState.printingIds
-  readsGraveyardOrder <- newest GameState.readsGraveyardOrder
   lookedUp <- newest GameState.lookedUp
   referenceNames <- newest GameState.referenceNames
   outsideCopies <- setOf GameState.outsideCopies
@@ -228,7 +227,6 @@ withoutAnnouncement before entry closed = do
         GameState.nextObjectId = nextObjectId,
         GameState.printings = printings,
         GameState.printingIds = printingIds,
-        GameState.readsGraveyardOrder = readsGraveyardOrder,
         GameState.lookedUp = lookedUp,
         GameState.referenceNames = referenceNames,
         GameState.outsideCopies = outsideCopies,

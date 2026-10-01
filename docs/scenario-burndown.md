@@ -3351,8 +3351,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 400.7j a land discarded into exile still returns Psychic Miasma to its owner's hand | `check:hand-size` `check:helper-namesIn`
 - CR 401.2 a STATED end raises no ChooseLibraryEnd | `check:other-Game.cardOf` `check:zone-contents`
 - CR 401.2 each attacking creature's OWNER picks the end, not the resolving controller | `board:sickness`
-- CR 401.4 two cards reaching the BOTTOM at once are arranged by their owner | `move:ArrangeArrivals` `move:ChooseLibraryEnd`
-- CR 401.4 two cards reaching the TOP at once are arranged by their owner | `move:ArrangeArrivals` `move:ChooseLibraryEnd`
+- CR 401.4 two cards reaching the BOTTOM at once are arranged by their owner | `move:ArrangeLibraryArrivals` `move:ChooseLibraryEnd`
+- CR 401.4 two cards reaching the TOP at once are arranged by their owner | `move:ArrangeLibraryArrivals` `move:ChooseLibraryEnd`
 - CR 401.7 Oust into a one-card library puts the creature on the bottom | `board:sickness`
 - CR 401.7 Oust: second from the top, and its CONTROLLER gains 3 life | `board:sickness`
 - CR 401.7 Temporal Cleansing: the OWNER picks second from the top, and it lands under the top card | `board:sickness`

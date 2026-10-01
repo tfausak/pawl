@@ -294,9 +294,6 @@ data GameState = MkGameState
     -- too (CR 903.5b forbids it; #940 means pawl does not enforce it) behaves
     -- like a well-formed one.
     printingIds :: Map.Map Printing.Printing PrintingId.PrintingId,
-    -- | docs/design.md section 2.9: whether some printing in `printings` reads a
-    -- graveyard's order, kept by Pawl.Engine.Game.intern as each arrives.
-    readsGraveyardOrder :: Bool,
     -- | CR 108.1: the printings the Oracle card reference answered a chosen
     -- name with (Prompt.LookUpCard), part of the names CR 612.7 enumerates.
     lookedUp :: Set.Set PrintingId.PrintingId,

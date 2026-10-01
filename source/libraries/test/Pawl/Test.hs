@@ -305,6 +305,7 @@ import qualified Pawl.Codec.GiveControlSpec
 import qualified Pawl.Codec.GrantLookAtExiledSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
 import qualified Pawl.Codec.GrantedAbilitySpec
+import qualified Pawl.Codec.GraveyardOrderSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HalvedSpec
 import qualified Pawl.Codec.HandActionSpec
@@ -1110,6 +1111,7 @@ spec s registry = do
   Pawl.Codec.GameSettingsSpec.spec s
   Pawl.Codec.GiveControlSpec.spec s
   Pawl.Codec.GiftSpec.spec s
+  Pawl.Codec.GraveyardOrderSpec.spec s
   Pawl.Codec.GrantLookAtExiledSpec.spec s
   Pawl.Codec.GrantPlayFromExileSpec.spec s
   Pawl.Codec.GrantedAbilitySpec.spec s

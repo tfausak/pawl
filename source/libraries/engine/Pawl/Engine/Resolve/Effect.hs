@@ -108,7 +108,6 @@ import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
-import qualified Pawl.Types.ArrivalEnd as ArrivalEnd
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
@@ -600,7 +599,6 @@ happenedBetween before after =
             GameState.nextPrintingId = GameState.nextPrintingId before,
             GameState.printings = GameState.printings before,
             GameState.printingIds = GameState.printingIds before,
-            GameState.readsGraveyardOrder = GameState.readsGraveyardOrder before,
             GameState.lookedUp = GameState.lookedUp before,
             GameState.referenceNames = GameState.referenceNames before,
             GameState.lastChoice = GameState.lastChoice before,
@@ -1045,7 +1043,7 @@ settleArrivals depthOf zone placement targets =
                 pure (Game.honourShuffle batch answer)
               _ -> do
                 gs <- State.get
-                answer <- Game.choose (Prompt.ArrangeArrivals (Decide.deciderFor owner gs) owner (ArrivalEnd.IntoLibrary position) batch)
+                answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
                 pure (Game.permute batch answer)
             pure (fmap (\oid -> (oid, spot)) (reverse ordered))
           -- One card is one order, which is CR 401.4's own "two or more".

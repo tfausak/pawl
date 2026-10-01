@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Departure as Departure
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
@@ -43,7 +44,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.completedDungeonNames = Set.empty,
           Player.startingDeck = Map.empty,
           Player.companion = Nothing,
-          Player.companionTaken = False
+          Player.companionTaken = False,
+          Player.graveyardOrder = GraveyardOrder.Indifferent
         }
       " {\"life\":20,\"speed\":null} "
   -- Every axis away from the case above. `life` is NEGATIVE, which CR 104.3b
@@ -78,7 +80,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.completedDungeonNames = Set.fromList [CardName.MkCardName (Text.pack "Tomb of Annihilation"), CardName.MkCardName (Text.pack "Undercity")],
           Player.startingDeck = Map.singleton (PrintingId.MkPrintingId 14) 15,
           Player.companion = Just (PrintingId.MkPrintingId 16),
-          Player.companionTaken = True
+          Player.companionTaken = True,
+          Player.graveyardOrder = GraveyardOrder.Matters
         }
       ( " {\"life\":-1,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":2}"
@@ -87,7 +90,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           <> ",\"designations\":[{\"type\":\"CitysBlessing\"},{\"type\":\"EnduringStory\"}]"
           <> ",\"commander\":[5,17],\"commanderCasts\":{\"5\":6,\"17\":19}"
           <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]"
-          <> ",\"startingDeck\":{\"14\":15},\"companion\":16,\"companionTaken\":true} "
+          <> ",\"startingDeck\":{\"14\":15},\"companion\":16,\"companionTaken\":true"
+          <> ",\"graveyardOrder\":{\"type\":\"Matters\"}} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s Player.codec

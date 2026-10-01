@@ -20,6 +20,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ForageMode as ForageMode
+import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
@@ -757,14 +758,15 @@ data Response
     ChoseCommandZoneOfferFirst OptionalDecision.OptionalDecision
   | -- | CR 401.2's answer: the end of their library an owner picked for one card.
     ChoseLibraryEnd LibraryPosition.LibraryPosition
-  | -- | CR 401.4 / 404.3's answer: the order an owner chose for the cards
-    -- arriving at one end of their library or on their graveyard, as a
-    -- permutation of the offered indices.
-    ArrangedArrivals [Natural.Natural]
+  | -- | CR 401.4's answer: the order an owner chose for the cards arriving at one
+    -- end of their library, as a permutation of the offered indices.
+    ArrangedLibraryArrivals [Natural.Natural]
   | -- | CR 401.4's answer for cards that never left: the order an owner chose
     -- for cards put back into their library, as a permutation of the offered
     -- indices.
     ArrangedLibraryCards [Natural.Natural]
+  | -- | CR 404.3's answer for a graveyard: the order an owner chose, or any.
+    ArrangedGraveyardArrivals GraveyardArrangement.GraveyardArrangement
   | -- | CR 702.140c's answer: which side of the target creature a mutating
     -- creature spell was put on.
     ChoseMutateSide MutateSide.MutateSide

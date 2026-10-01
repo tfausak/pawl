@@ -2383,7 +2383,7 @@ rippling :: Prompt.Prompt r -> r
 rippling p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   Prompt.OfferedCast {} -> OptionalDecision.Exercises
-  Prompt.ArrangeArrivals _ _ _ ids -> case zipWith const [0 ..] ids of
+  Prompt.ArrangeLibraryArrivals _ _ _ ids -> case zipWith const [0 ..] ids of
     h : t -> t <> [h]
     [] -> []
   _ -> pinTarget (Recipient.ToPlayer S.bob) p
@@ -2399,7 +2399,7 @@ decliningTheReveal p = case p of
 -- board says only where the cards ended up.
 isArrangement :: Response.Response -> Bool
 isArrangement response = case response of
-  Response.ArrangedArrivals _ -> True
+  Response.ArrangedLibraryArrivals _ -> True
   _ -> False
 
 -- The cascade answerer above, plus CR 715.3's choice between an adventurer card's

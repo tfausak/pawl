@@ -39,6 +39,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -185,7 +186,8 @@ emptyGame order =
               Player.companion = Nothing,
               -- CR 116.2g's "only if they haven't done so yet this game": nobody
               -- has, the game not having started.
-              Player.companionTaken = False
+              Player.companionTaken = False,
+              Player.graveyardOrder = GraveyardOrder.Indifferent
             }
         )
    in GameState.MkGameState
@@ -255,7 +257,6 @@ emptyGame order =
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.printings = Map.empty,
           GameState.printingIds = Map.empty,
-          GameState.readsGraveyardOrder = False,
           GameState.lookedUp = Set.empty,
           GameState.referenceNames = Map.empty,
           GameState.outsideCopies = Set.empty,
@@ -1661,7 +1662,6 @@ funnelBack finalSub parent =
           -- two tables never disagree about an id.
           GameState.printings = Map.union (GameState.printings finalSub) (GameState.printings parent),
           GameState.printingIds = Map.union (GameState.printingIds finalSub) (GameState.printingIds parent),
-          GameState.readsGraveyardOrder = GameState.readsGraveyardOrder finalSub || GameState.readsGraveyardOrder parent,
           GameState.lookedUp = Set.union (GameState.lookedUp finalSub) (GameState.lookedUp parent),
           GameState.referenceNames = Map.union (GameState.referenceNames finalSub) (GameState.referenceNames parent),
           GameState.nextPrintingId = max (GameState.nextPrintingId parent) (GameState.nextPrintingId finalSub),

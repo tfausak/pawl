@@ -658,6 +658,8 @@ library codec
     Pawl.Codec.GrantLookAtExiledSpec
     Pawl.Codec.GrantPlayFromExile
     Pawl.Codec.GrantPlayFromExileSpec
+    Pawl.Codec.GraveyardOrder
+    Pawl.Codec.GraveyardOrderSpec
     Pawl.Codec.HalfUnlocked
     Pawl.Codec.HalfUnlockedSpec
     Pawl.Codec.Halved
@@ -2195,6 +2197,8 @@ library types
     Pawl.Types.GrantedAbility
     Pawl.Types.GrantLookAtExiled
     Pawl.Types.GrantPlayFromExile
+    Pawl.Types.GraveyardArrangement
+    Pawl.Types.GraveyardOrder
     Pawl.Types.HalfUnlocked
     Pawl.Types.Halved
     Pawl.Types.HandAction
