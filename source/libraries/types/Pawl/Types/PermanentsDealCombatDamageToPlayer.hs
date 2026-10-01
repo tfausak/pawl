@@ -14,6 +14,10 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 -- the same CR 109.5 perspective.
 data PermanentsDealCombatDamageToPlayer = MkPermanentsDealCombatDamageToPlayer
   { filter :: Filter.Filter Keyword.Keyword,
-    recipient :: PlayerRelation.PlayerRelation
+    recipient :: PlayerRelation.PlayerRelation,
+    -- | CR 603.2c: "to ONE OR MORE PLAYERS" (Forth Eorlingas!), one occurrence
+    -- however many players the step damaged, where False is "to a player", one
+    -- occurrence per damaged player.
+    oneOrMorePlayers :: Bool
   }
   deriving (Eq, Ord, Show)
