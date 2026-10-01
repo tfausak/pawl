@@ -653,7 +653,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "an enchantment beside it: one real decision" (asks withScales) 1
 
   -- CR 303.4f / 614.12a: Copy Enchantment that copies an Aura has its host
-  -- chosen as it enters, after the copy choice -- the 2006-02-01 ruling's
+  -- chosen as it enters, after the copy choice -- the 2023-09-01 ruling's
   -- "you choose what the Aura will enchant just before it enters". TWO legal
   -- hosts, and the answer pinned to the SECOND, so an engine that took the first
   -- candidate (or entered unattached for CR 704.5m to bury) fails the Mammoth's
@@ -711,7 +711,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "the Leech never saw an enchantment enter: bob keeps his life" (S.lifeOf S.bob after) (S.lifeOf S.bob staged)
     Spec.assertEqWith s "Copy Enchantment is in alice's graveyard" (fmap (\oid -> fmap Face.name (Game.faceOf oid after)) (Game.zoneMembers Zone.Graveyard S.alice after)) [Just (CardName.MkCardName (Text.pack "Copy Enchantment"))]
     Spec.assertEqWith s "and the spell is gone from the stack" (List.elem spellId (GameState.stack after)) False
-  Spec.it s "CR 303.4f the same board with a creature of bob's: the copy enters on it and the Leech drains" $ do
+  Spec.it s "CR 303.4f Copy Enchantment copying Betrayal over a creature of bob's enters on it and the Leech drains" $ do
     (bobPikerId, _, staged, after) <- betrayalBoard True
     Spec.assertEqWith s "the Leech saw an enchantment enter: bob loses 1" (S.lifeOf S.bob after) (fmap (subtract 1) (S.lifeOf S.bob staged))
     Spec.assertEqWith
