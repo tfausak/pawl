@@ -1178,14 +1178,6 @@ delayedSpec s registry =
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       walls gs = filter (\oid -> Set.member Subtype.Wall (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
-      -- Records the CONSTRUCTOR of every prompt the resolution issues, so a
-      -- test can assert that a doubled Create asks nothing a single one did not.
-      -- Kinds rather than payloads: the claim is about which questions are put,
-      -- and the two casts differ only in the doubler.
-      recordKinds :: Prompt.Prompt r -> State.State [Text.Text] r
-      recordKinds p = do
-        State.modify' (<> [Scenario.Prompt.kindOf p])
-        pure (S.identityAnswer p)
       -- Stamp an expiry onto every armed delayed ability, so the CR 603.7b
       -- stated-duration mechanism can be exercised on a real armed entry.
       withExpiry expiry gs =
@@ -1193,15 +1185,6 @@ delayedSpec s registry =
           { GameState.delayedTriggers =
               fmap (\entry -> entry {DelayedTrigger.expiry = expiry}) (GameState.delayedTriggers gs)
           }
-      -- alice casts the spell in hand and resolves it under recordKinds,
-      -- handing back the board alongside the prompts it issued.
-      castUnderChoice gs oid =
-        State.runState
-          ( Engine.runGame recordKinds gs $ do
-              S.cast S.alice oid
-              Engine.priorityLoop
-          )
-          []
    in Spec.describe s "DelayedTrigger" $ do
         Spec.it s "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability" $ do
           tidalWave <- S.printingOf s registry "Tidal Wave"
@@ -1294,18 +1277,6 @@ delayedSpec s registry =
           let once = resolveAll (settle (beginEndStep (castWave tidalWave island)))
               again = settle (beginEndStep once)
           Spec.assertEqWith s "nothing on the stack" (GameState.stack again) []
-        -- CR 603.7a: a delayed ability does not trigger on an event that
-        -- happened BEFORE it was created. Falls out of the watermark for free.
-        Spec.it s "CR 603.7a armed during an end step, it waits for the NEXT one" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          let (gs0, oid) = S.handOne tidalWave (S.landsInPlay island 3)
-              inEndStep = settle (beginEndStep gs0)
-              cast = resolveAll (snd (Engine.runGamePure S.identityAnswer inEndStep (S.cast S.alice oid)))
-              sameStep = settle cast
-              nextStep = resolveAll (settle (beginEndStep sameStep))
-          Spec.assertEqWith s "still alive during the step it was armed in" (length (walls sameStep)) 1
-          Spec.assertEqWith s "sacrificed at the next end step" (walls nextStep) []
         -- CR 603.7c: the ability still triggers and is still consumed even when
         -- the object it remembers is gone.
         Spec.it s "CR 603.7c with the token already gone the ability does nothing and is consumed" $ do
@@ -1393,39 +1364,6 @@ delayedSpec s registry =
           Spec.assertEqWith s "with bob still in the game the SAME ability IS placed -- the filter is what did it" (length (GameState.stack control)) 1
           Spec.assertEqWith s "nothing reached the stack, so placePendingTriggers honestly reports it placed nothing" placedAny False
           Spec.assertEqWith s "with bob still in the game, something genuinely got placed" controlAny True
-        -- CR 614.16 meets CR 603.7c. Doubling Season ("If an effect would
-        -- create one or more tokens under your control, it creates twice that
-        -- many of those tokens instead") scales Tidal Wave's Create at
-        -- RESOLUTION, so two Walls stand where CR 603.7c's "it" named one. The
-        -- rider goes on BOTH: Anointed Procession's rulings say "if the effect
-        -- creating the tokens instructs you to do something with those tokens at
-        -- a later time, like exiling them at the end of combat, you'll do that
-        -- for all the tokens", and Flamerush Rider's say the same in so many
-        -- words ("you'll exile each of those tokens"). So there is nothing for
-        -- the engine to ask.
-        --
-        -- Discriminating: the engine used to bind ONE of the two, so exactly one
-        -- Wall survived the end step, and it asked its controller which.
-        Spec.it s "CR 614.16/603.7c a doubled Create binds every minted token, so the rider takes both" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addPermanent doublingSeason S.alice (S.landsInPlay island 3)
-              (gs, waveId) = S.handOne tidalWave base
-              ((_, armed), asked) = castUnderChoice gs waveId
-              after = resolveAll (settle (beginEndStep armed))
-              (plainGs, plainWaveId) = S.handOne tidalWave (S.landsInPlay island 3)
-              (_, plain) = castUnderChoice plainGs plainWaveId
-          Spec.assertEqWith s "the replacement really doubled the Create" (length (walls armed)) 2
-          Spec.assertEqWith s "both minted Walls were sacrificed" (walls after) []
-          -- The proxy, after the behaviour: the doubled cast puts no question
-          -- the undoubled one did not. A COMPARISON and not an empty list, so a
-          -- recorder that saw nothing could not carry it; the non-empty check is
-          -- what says the recorder is live. CR 613.7m's order over the two
-          -- Walls' simultaneous stamps is the one question two tokens earn, and it
-          -- is not the rider's, so it is set aside.
-          Spec.assertBool s (not (null plain)) "the recorder sees the prompts the undoubled cast issues"
-          Spec.assertEqWith s "and the doubling asked nothing extra" (filter (/= Text.pack "OrderTimestamps") asked) plain
         -- CR 116.2c's OTHER use, beside ending a continuous effect: the special
         -- action is taken "usually to end a continuous effect or to stop a
         -- delayed triggered ability from triggering". Synthetic Standing Bounty
@@ -1524,26 +1462,6 @@ tokenSetSpec s registry =
           Spec.assertEqWith s "three were minted" (length (humans armed)) 3
           Spec.assertEqWith s "and none is left" (humans after) []
           Spec.assertEqWith s "the store is empty" (Seq.length (GameState.delayedTriggers after)) 0
-        -- CR 614.16 meets the plural binding: a replacement that multiplies the
-        -- count just makes the set bigger. "Those tokens" still names all of
-        -- them, so there is nothing to ask and nothing survives.
-        --
-        -- The prompt claim is a COMPARISON against the same cast without the
-        -- doubler rather than an empty list, so a recorder that saw nothing
-        -- could not carry it; the non-empty check on the control is what says
-        -- the recorder is live.
-        Spec.it s "CR 614.16 a doubled Create binds all six, asking nothing extra" $ do
-          revolt <- S.printingOf s registry "Thatcher Revolt"
-          mountain <- S.printingOf s registry "Mountain"
-          doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addPermanent doublingSeason S.alice (boardOf mountain)
-              ((_, armed), asked) = castRevolt revolt base
-              after = resolveAll (settle (beginEndStep armed))
-              (_, plain) = castRevolt revolt (boardOf mountain)
-          Spec.assertEqWith s "the replacement really doubled the Create" (length (humans armed)) 6
-          Spec.assertEqWith s "and all six are sacrificed" (humans after) []
-          Spec.assertBool s (not (null plain)) "the recorder sees the prompts the undoubled cast issues"
-          Spec.assertEqWith s "the doubling asked nothing extra" asked plain
         -- CR 603.7c's "no longer in the zone it's expected to be in": one token
         -- already gone does not spare the others, and the ability is still spent.
         Spec.it s "CR 603.7c one token already gone leaves the rest sacrificed" $ do
@@ -1570,10 +1488,7 @@ tokenSetSpec s registry =
 -- same two tokens, named by two different opcodes in one resolution.
 tokenGroupReadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenGroupReadSpec s registry =
-  let endStep = Phase.Ending EndingStep.EndStep
-      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
-      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
-      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       warriors gs = filter (\oid -> Set.member Subtype.Warrior (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
       -- alice casts the Skirmish off four Swamps with bob's creature the only
       -- one on the battlefield, so S.identityAnswer's lowest-legal-recipient
@@ -1601,18 +1516,6 @@ tokenGroupReadSpec s registry =
                 (fmap (\oid -> Projection.hasKeyword Keyword.Type.Haste oid after) tokens)
                 [True, True]
             other -> Spec.assertFailure s ("expected exactly two Warrior tokens, got " <> show (length other))
-        -- The group is read by TWO opcodes in one resolution, and the second
-        -- must still find it: ModifyTarget consuming the slot would leave the
-        -- delayed ability with nothing to sacrifice.
-        Spec.it s "CR 603.7c and the delayed ability still sacrifices both" $ do
-          skirmish <- S.printingOf s registry "Salt Road Skirmish"
-          swamp <- S.printingOf s registry "Swamp"
-          rats <- S.printingOf s registry "Typhoid Rats"
-          let (_, base) = board swamp rats
-              armed = castSkirmish skirmish base
-              after = resolveAll (settle (beginEndStep armed))
-          Spec.assertEqWith s "two before the end step" (length (warriors armed)) 2
-          Spec.assertEqWith s "none after it" (warriors after) []
         -- CR 608.2b: "if all its targets ... are now illegal, the spell doesn't
         -- resolve". The card's own Gatherer ruling spells out what that costs
         -- here -- "it won't resolve and none of its effects will happen" -- so
@@ -1700,22 +1603,6 @@ tokenGroupMoveSpec s registry =
           Spec.assertBool s (Set.member ratsId (GameState.battlefield after)) "bob's creature stayed"
           Spec.assertEqWith s "the store is empty" (Seq.length (GameState.delayedTriggers after)) 0
           Spec.assertEqWith s "nothing stuck on the stack" (GameState.stack after) []
-        -- CR 603.7c's "no longer in the zone it's expected to be in": one token
-        -- already gone does not spare the other two.
-        Spec.it s "CR 603.7c one token already gone leaves the rest exiled" $ do
-          lightning <- S.printingOf s registry "Feral Lightning"
-          mountain <- S.printingOf s registry "Mountain"
-          piker <- S.printingOf s registry "Goblin Piker"
-          rats <- S.printingOf s registry "Typhoid Rats"
-          let (pikerId, _, base) = board mountain piker rats
-              armed = castLightning lightning base
-              killed = case elementals armed of
-                token : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [token]))
-                [] -> armed
-              after = resolveAll (settle (beginEndStep killed))
-          Spec.assertEqWith s "two were left to exile" (length (elementals killed)) 2
-          Spec.assertEqWith s "and both are gone" (elementals after) []
-          Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "the bystander is still untouched"
 
 -- Harried Dronesmith {3}{R} Creature -- Human Artificer 2/3: "At the beginning of
 -- combat on your turn, create a 1/1 colorless Thopter artifact creature token with
