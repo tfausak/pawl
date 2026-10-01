@@ -1,0 +1,29 @@
+{
+  "description": "CR 702.16n whole cards: Tattoo Ward stays on the creature it gives protection from enchantments, and Unholy Strength on that creature is buried",
+  "note": "The quality is a card type rather than a colour, and Unholy Strength is black, so only the Ward's own exception keeps the white Ward and nothing keeps the black Aura.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "first", "ready": true },
+          { "card": "Plains", "label": "second", "ready": true },
+          { "card": "Plains", "label": "third", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Unholy Strength", "attached": "piker" }
+        ],
+        "hand": [{ "card": "Tattoo Ward", "label": "ward" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@ward", "targets": ["@piker"], "mana": ["@first", "@second", "@third"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Tattoo Ward", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Unholy Strength", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 2 } } }
+  ]
+}
