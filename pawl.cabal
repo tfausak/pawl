@@ -869,6 +869,8 @@ library codec
     Pawl.Codec.PayBranchSpec
     Pawl.Codec.PayGate
     Pawl.Codec.PayGateSpec
+    Pawl.Codec.PaymentDecision
+    Pawl.Codec.PaymentDecisionSpec
     Pawl.Codec.PayObligation
     Pawl.Codec.PayObligationSpec
     Pawl.Codec.PendingDamageEffect
