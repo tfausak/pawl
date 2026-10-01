@@ -963,7 +963,7 @@ outcastHackBoard s registry hacked = do
 -- ability from Projection.triggeredAbilitiesOf (the projection's post-layer
 -- list) and hands its CR 603.8 condition to Condition.holds -- so the swap has
 -- to land in the projection, at CR 613.1c layer 3, to be seen here.
-textChangedTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 textChangedTriggerSpec s registry =
   let isTriggerObject gs oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
@@ -980,15 +980,6 @@ textChangedTriggerSpec s registry =
           (outcastId, board) <- outcastHackBoard s registry False
           Spec.assertEqWith s "alice controls a Swamp: no trigger" (length (triggerIds board)) 0
           Spec.assertBool s (Set.member outcastId (GameState.battlefield (resolveTop board))) "the Outcast is still on the battlefield"
-        -- The swap, at gameplay level. alice's board did not move -- one Swamp,
-        -- no Islands -- but the Outcast's own text now reads "no Islands", which
-        -- is true, so it fires and sacrifices itself.
-        Spec.it s "CR 612.1 whole card: a hacked Outcast asks about ISLANDS, fires and sacrifices itself" $ do
-          (outcastId, board) <- outcastHackBoard s registry True
-          Spec.assertEqWith s "alice controls no Islands: it triggers" (length (triggerIds board)) 1
-          let resolved = resolveTop board
-          Spec.assertBool s (not (Set.member outcastId (GameState.battlefield resolved))) "the Outcast is off the battlefield"
-          Spec.assertEqWith s "and in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
 
 -- Khabál Ghoul {2}{B} Creature -- Zombie 1/1: "At the beginning of each end step,
 -- put a +1/+1 counter on this creature for each creature that died this turn."

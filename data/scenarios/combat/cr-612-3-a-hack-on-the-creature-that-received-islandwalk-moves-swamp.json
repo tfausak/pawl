@@ -1,0 +1,34 @@
+{
+  "description": "CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing",
+  "note": "The Swamp half of the Hack on Tidal Warrior: a Warrior that had wrongly picked up swampwalk would make bob's block illegal here, so the block sticking is what keeps the Island half from passing by the landwalk simply vanishing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Tidal Warrior", "label": "warrior", "ready": true },
+          { "card": "Lord of Atlantis", "label": "lord", "ready": true },
+          { "card": "Island", "label": "island" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Swamp" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@warrior"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@warrior", "@lord"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@warrior"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@warrior", "blockers": ["@piker"] } } }
+  ]
+}

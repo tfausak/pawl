@@ -1,0 +1,32 @@
+{
+  "description": "CR 612.2 an evolved Coulson counters the Goblin and not the Hero",
+  "note": "Artificial Evolution swaps Hero for Goblin on Agent Phil Coulson, reaching the ObjectRef inside his PutCounters: \"each other Hero you control\" becomes \"each other Goblin you control\", so the Goblin Piker takes the +1/+1 counter and the Spider-Punk none. Coulson is a Goblin by then and still takes nothing, since \"other\" is not a word the swap touches. Placed objects enter with no counters and no riot, so both counts start at zero.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island" },
+          { "card": "Agent Phil Coulson", "label": "coulson", "ready": true },
+          { "card": "Spider-Punk", "label": "punk" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Artificial Evolution", "label": "evolution" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["@coulson"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Hero" }, "to": { "type": "Goblin" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@coulson" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@punk", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } }
+  ]
+}

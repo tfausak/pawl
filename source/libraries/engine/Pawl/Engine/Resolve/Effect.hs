@@ -184,7 +184,6 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Discard as Discard
-import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
@@ -813,19 +812,15 @@ anyNumberMatchingBy chooser legal resolving controller source (AnyNumberMatching
 -- each seat's cards through the shared discard funnel, so the discard is
 -- recorded for a trigger to read. The funnel's own answers come back for the
 -- binding below; a move that did not complete answers Nothing and is dropped.
--- One event group across the seats, CR 101.4's "simultaneously".
---
--- Not implemented: an optional discard gated by a later clause's "if you do"
--- is a CR 118.12 cost, yet is recorded here as DiscardCause.ByEffect (#4416).
---
--- Not implemented: CR 401.4's arrangement by the owner of two or more cards a
--- redirect puts at one end of a library together; they land in move order
--- (#4417).
+-- One event group across the seats, CR 101.4's "simultaneously", whose close
+-- asks CR 401.4's arrangement of what a redirect put into a library. The cause
+-- is Event.resolvingDiscardCause's: a CR 118.12 cost is no effect.
 buryDiscards :: ObjectId -> Maybe SlotName -> [(PlayerId, [ObjectId])] -> Game ()
 buryDiscards resolving mDiscarded doomed = do
+  cause <- State.gets Event.resolvingDiscardCause
   moved <-
     Event.simultaneously . fmap concat . Monad.forM doomed $ \(victim, oids) ->
-      fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect victim) oids)
+      fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning cause victim) oids)
   -- The cards "discarded this way", for a later effect of the same resolution
   -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
   -- The CR 400.7 incarnations the funnel MINTED, never the hand ids it was
@@ -11018,7 +11013,8 @@ applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
   -- Order-independent: Game.removeFromZones takes each mover out of the library
   -- by identity rather than by position.
   State.modify' (reorderLibrary pid kept)
-  Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard
+  -- One CR 401.4 scope, for a redirect into a library (Event.arrivingTogether).
+  Event.arrivingTogether (Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard)
 
 -- CR 701.29a: one player's fateseal -- decideScry's question over an opponent's
 -- library.
@@ -11230,7 +11226,8 @@ conniveOne n oid = Monad.when (n > 0) $ do
               filler = filter (\c -> List.notElem c valid) held
           pure (List.genericTake n (valid <> filler))
     -- One event group: CR 701.50d discards the N cards as one action.
-    moved <- Event.simultaneously (fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect pid) chosen))
+    cause <- State.gets Event.resolvingDiscardCause
+    moved <- Event.simultaneously (fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning cause pid) chosen))
     after <- State.get
     let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
         grown = Natural.length (filter nonland moved)

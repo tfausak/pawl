@@ -17,6 +17,8 @@ import qualified Pawl.Types.Paying as Paying.Type
 import qualified Pawl.Types.PaymentDecision as PaymentDecision.Type
 import qualified Pawl.Types.Reference as Reference.Type
 import qualified Pawl.Types.SlotName as SlotName.Type
+import qualified Pawl.Types.Subtype as Subtype.Type
+import qualified Pawl.Types.TypeSwap as TypeSwap.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Move" $ do
@@ -46,6 +48,8 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.ChooseTargets (Map.singleton (SlotName.Type.MkSlotName (Text.pack "target")) (Seq.singleton (ref "moon")))) " {\"ChooseTargets\":{\"target\":[\"@moon\"]}} "
   Spec.it s "OrderTriggers, null for a sourceless trigger" $
     Common.assertCodec s Move.codec (Move.Type.OrderTriggers (Seq.fromList [Just (ref "ghoul"), Nothing])) " {\"OrderTriggers\":[\"@ghoul\",null]} "
+  Spec.it s "ChooseTypeSwap" $
+    Common.assertCodec s Move.codec (Move.Type.ChooseTypeSwap (TypeSwap.Type.MkTypeSwap Subtype.Type.Goblin Subtype.Type.Elf)) " {\"ChooseTypeSwap\":{\"from\":{\"type\":\"Goblin\"},\"to\":{\"type\":\"Elf\"}}} "
   Spec.it s "Concede" $
     Common.assertCodec s Move.codec Move.Type.Concede " \"Concede\" "
   Spec.it s "Pass" $
