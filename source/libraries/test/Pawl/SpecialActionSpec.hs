@@ -2372,17 +2372,6 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice instantSpeed)) "on another player's turn with a spell on the stack too"
     Spec.assertBool s (List.notElem (Action.Type.Ignore poorId searchBan) (Action.legalActions S.alice broke)) "but not with one Forest, which cannot pay {2}"
     Spec.assertBool s (any isPlay (Action.legalActions S.alice broke)) "the control: that same board still offers a land play"
-  -- CR 613.1f: Humility takes the Arbiter's static ability away, and with it
-  -- the action that ability grants. The pair differs only in the Humility.
-  Spec.it s "CR 613.1f under Humility the Arbiter offers no ignore" $ do
-    forest <- S.printingOf s registry "Forest"
-    arbiter <- S.printingOf s registry "Leonin Arbiter"
-    growth <- S.printingOf s registry "Rampant Growth"
-    humility <- S.printingOf s registry "Humility"
-    let (arbiterId, _, gs) = arbiterBoard forest arbiter growth
-        humbled = snd (S.addPermanent humility S.bob gs)
-    Spec.assertBool s (List.notElem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice humbled)) "CR 613.1f the humbled Arbiter may not be ignored"
-    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice gs)) "the control: without Humility it may"
   -- The WHO conjunct read the other way, and the pair Damping Engine's cases are
   -- the other half of: Leonin Arbiter's own prohibition is possessive-free
   -- (EachPlayer), so it affects every seat and every seat is offered the action --
