@@ -29,9 +29,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- printed on, and it carries a Quantity where that one carries a literal amount.
 --
 -- A printed one is read straight off the card, or its copy stamp
--- (Pawl.Engine.Game.castingFaceOf), by Pawl.Engine.Cost.selfReductions and NOT
--- through the projection: the ability is consulted while the object is in a
--- hand or on the stack, where this reader takes the printed card (#1859). A
+-- (Pawl.Engine.Game.castingFaceOf), by Pawl.Engine.Cost.selfReductions, which
+-- drops it when a layer-6 wipe is in force on the object (CR 613.1f). A
 -- granted one is read off the projection. CR 113.6d is the rule that makes
 -- an ability modifying what its own object costs to cast function on the stack.
 data CostReduction = MkCostReduction

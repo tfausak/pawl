@@ -410,6 +410,10 @@ data Face card = MkFace
     -- 118.9 is about SPELLS, so this lives on a face and never on
     -- ActivatedAbility -- a rules fact, not an elision.
     --
+    -- An ability (CR 113.6d), so Pawl.Engine.Cost.candidateCostsGiven offers
+    -- none once a layer-6 wipe is in force on the card where it lies (CR
+    -- 613.1f).
+    --
     -- CONDITIONED only where the card states a condition (CR 604.2), which is
     -- Pawl.Types.AlternativeCost's own field. Rule 702.34a's flashback cost is
     -- still deliberately NOT one of these: its gate is a ZONE rather than a
@@ -423,9 +427,9 @@ data Face card = MkFace
     --
     -- The third member of the additionalCosts/alternativeCosts family above, and
     -- read the way they are: straight off the card or its copy stamp
-    -- (Game.castingFaceOf), never through the projection, so an effect removing
-    -- one from a card off the battlefield is not seen (#1859). A GRANTED one is
-    -- read off the projection instead (ProjectedCharacteristics.grantedCostReductions).
+    -- (Game.castingFaceOf), and dropped when a layer-6 wipe is in force on the
+    -- object (CR 113.6d, 613.1f). A GRANTED one is read off the projection
+    -- instead (ProjectedCharacteristics.grantedCostReductions).
     -- Pawl.Engine.Cost.selfReductions is the one reader, and it folds both in
     -- alongside the CR 613.11 reductions other permanents generate, so CR
     -- 601.2f's "minus all cost reductions" is applied once over all of them.
