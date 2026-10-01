@@ -17,7 +17,7 @@ data MonarchWatch = MkMonarchWatch
     -- | The event group of the first crowning of an opponent of `controller`
     -- since the exile resolved, Nothing before one. The group is CR 610.3d's: the
     -- returns one crowning creates are one event. Written by Pawl.Engine.Monarch.crown at the crowning itself and
-    -- read by Pawl.Engine.Monarch.returnExiledForMonarch at the next settle, so
+    -- read by Pawl.Engine.MoveDuration.returnDue at the next settle, so
     -- no number of crownings between two settles can hide one of them from the
     -- watch.
     --
