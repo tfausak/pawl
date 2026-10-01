@@ -1,0 +1,40 @@
+{
+  "description": "CR 614.1a Ezuri's two proliferates under Tekuthal are four, and draw four",
+  "note": "Ezuri, Stalker of Spheres: when it enters you may pay {3}, and if you do, proliferate twice; whenever you proliferate, draw a card. Tekuthal doubles each proliferate instruction, so the two become four and draw four. One Forest and six Islands cover {2}{G}{U} and the {3}; nothing has a counter, so no proliferate choice is asked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" },
+          { "card": "Island", "label": "island-5" },
+          { "card": "Island", "label": "island-6" },
+          { "card": "Tekuthal, Inquiry Dominus" }
+        ],
+        "hand": [{ "card": "Ezuri, Stalker of Spheres", "label": "ezuri" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@ezuri", "mana": ["@forest", "@island-1", "@island-2", "@island-3", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@island-4", "@island-5", "@island-6"] } }, "source": "Ezuri, Stalker of Spheres" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 4 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Island", "count": 1 } } }
+  ]
+}

@@ -1265,28 +1265,6 @@ fortressKinGuardSpec s registry = Spec.describe s "FortressKinGuard" $ do
             Spec.assertEqWith s "CR 111.2: alice created it, so alice controls it" (Projection.controllerOf spiritId after) (Just S.alice)
           other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Fortress Kin-Guard, got " <> show (length other))
-  -- CR 614.1 over a cost paid DURING a resolution. The board differs from the
-  -- first case in NOTHING but the Hardened Scales, and what it proves is that the
-  -- payment places its counter through CR 122.6's funnel rather than writing it
-  -- onto the object directly: a direct write reads 2/3 here.
-  --
-  -- NOT the payment moment. Hardened Scales is CR 614.1's passive subject, which
-  -- reaches a placement at either moment; the moment's own split is pinned by
-  -- Pawl.ReplacementSpec's blight pair and by Pawl.PlaneswalkerSpec's loyalty
-  -- case, all three of them CR 614.16 subjects (Doubling Season).
-  Spec.it s "CR 614.1 Hardened Scales sees endure's counter, so the Kin-Guard reads 3/4" $ do
-    plains <- S.printingOf s registry "Plains"
-    kinGuard <- S.printingOf s registry "Fortress Kin-Guard"
-    scales <- S.printingOf s registry "Hardened Scales"
-    let onStack = kinGuardOnStack plains kinGuard [scales]
-        after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
-    case kinGuardOf onStack of
-      [guardId] -> do
-        Spec.assertEqWith s "it still entered as a 1/2" (S.powerToughnessOf guardId onStack) (Just (1, 2))
-        Spec.assertEqWith s "one counter became two" (S.counterOf CounterKind.PlusOnePlusOne guardId after) 2
-        Spec.assertEqWith s "so it reads 3/4" (S.powerToughnessOf guardId after) (Just (3, 4))
-        Spec.assertEqWith s "and still no Spirit" (S.tokensOf after) []
-      other -> Spec.assertFailure s ("expected one Fortress Kin-Guard, got " <> show (length other))
   -- CR 118.3 plus CR 701.63a's own ruling: "if you can't put +1/+1 counters on the
   -- creature for any reason (for example, if the creature is no longer on the
   -- battlefield), you'll just create a Spirit token." A Lightning Bolt kills the

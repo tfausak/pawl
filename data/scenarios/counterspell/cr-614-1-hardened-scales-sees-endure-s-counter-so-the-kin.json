@@ -1,0 +1,31 @@
+{
+  "description": "CR 614.1 Hardened Scales sees endure's counter, so the Kin-Guard reads 3/4",
+  "note": "Fortress Kin-Guard's endure 1 is CR 118.12a's \"unless\" over a cost that puts a +1/+1 counter. With Hardened Scales out alice pays, and the payment places its counter through CR 122.6's funnel, so Scales makes it two: 3/4 and no Spirit. A payment writing the counter onto the object directly reads 2/3. Not the payment moment: Scales is a CR 614.1 subject reaching a placement at either moment.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hardened Scales" },
+          { "card": "Plains", "label": "plains-1" },
+          { "card": "Plains", "label": "plains-2" }
+        ],
+        "hand": [{ "card": "Fortress Kin-Guard", "label": "kin-guard" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@kin-guard", "mana": ["@plains-1", "@plains-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Fortress Kin-Guard", "power": 1, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "Fortress Kin-Guard" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Fortress Kin-Guard", "kind": { "type": "PlusOnePlusOne" }, "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Fortress Kin-Guard", "power": 3, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Spirit Token", "count": 0 } } }
+  ]
+}

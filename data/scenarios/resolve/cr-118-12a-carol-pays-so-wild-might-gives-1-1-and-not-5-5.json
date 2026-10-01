@@ -1,0 +1,40 @@
+{
+  "description": "CR 118.12a carol pays, so Wild Might gives +1/+1 and not +5/+5",
+  "note": "The gate is on Wild Might's second clause alone: the first clause's +1/+1 happens whoever pays, and carol, the last seat asked, is enough to buy off the +4/+4. Three seats, offered {2} in APNAP order; alice tapped her Forests for the cast, so only bob and carol are asked. The Goblin Piker is 2/1.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Wild Might", "label": "wild-might" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "bob-island" },
+          { "card": "Island", "label": "bob-island-2" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Island", "label": "carol-island" },
+          { "card": "Island", "label": "carol-island-2" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@wild-might", "targets": ["@piker"], "mana": ["@forest", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "Wild Might" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@carol-island", "@carol-island-2"] } }, "source": "Wild Might" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 2 } } }
+  ]
+}

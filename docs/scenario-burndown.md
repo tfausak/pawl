@@ -51,7 +51,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:settings`: game settings other than the default
 - `check:keywords`: the keywords an object has
 - `board:face`: a face other than the front
-- `move:ChooseToPay`: the `ChooseToPay` prompt
 - `move:RollDie`: the `RollDie` prompt
 - `board:delayed-trigger`: a delayed trigger already armed
 - `move:ChooseDiscard`: the `ChooseDiscard` prompt
@@ -817,7 +816,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.3 a granted permission lets a creature card be cast while searching | `move:CastWhileSearching` `move:Search` `move:Shuffle`
 - CR 601.3 a searching SPELL offers the cast too | `move:CastWhileSearching` `move:Search` `move:Shuffle`
 - CR 601.3: cast Panglacial during Evolving Wilds' search, then it resolves 9/5 | `move:CastWhileSearching` `move:Search` `move:Shuffle`
-- CR 603.12/603.3d a reflexive ability's target is chosen as IT goes on the stack, after the payment | `move:ChooseToPay`
+- CR 603.12/603.3d a reflexive ability's target is chosen as IT goes on the stack, after the payment | `check:delayed-triggers` `check:offered-actions`
 - CR 603.4 a flickered evoked Mulldrifter is not sacrificed | `check:stack`
 - CR 603.4 unpromised, a gift instant makes no Treasure | `move:ChooseKicker`
 - CR 603.4 unpromised, a gift sorcery gives nothing | `move:ChooseKicker`
@@ -1207,8 +1206,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ConjureSpec`
 
 - CR 400.7j Calim's Breath cannot exile the discarded Calim as one of the two others | `move:LookUpCard` `move:ReferenceCards`
-- CR 400.7j Calim's Breath does not return a Calim its discard put into exile | `move:ChooseToPay`
-- CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped | `move:ChooseToPay` `move:LookUpCard` `move:ReferenceCards`
+- CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped | `move:LookUpCard` `move:ReferenceCards`
 - CR 603.4 and three life is one short, so nothing is conjured | `check:helper-moxPearl` `check:helper-namedIn` `check:other-GameState.triggeredThisGame` `check:step`
 - CR 603.4 conjure behind an intervening if: 4 life gained puts a castable Mox Pearl in hand | `board:stage-no-card-named-mox-pearl`
 - CR 702.140e a duplicate of a mutated Headless Skaab owes the Skaab's additional cost | `board:source-ofmerge`
@@ -1241,7 +1239,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `CopySpec`
 
-- CR 115.1 the copy's NEW target becomes a target, and ward fires | `move:ChooseToPay`
+- CR 115.1 the copy's NEW target becomes a target, and ward fires | `check:stack` `move:ChooseCopyTarget`
 - CR 305.7 Blood Moon strips the abilities Vesuva copied from another land | `board:controller` `board:hand-order` `board:object-bindings`
 - CR 400.11 casting the copy moves nothing out of a graveyard, so Kishla Skimmer does not trigger | `move:ChooseCardName` `move:LookUpCard` `move:OfferedCast`
 - CR 400.11 the copy is cast under Grafdigger's Cage and Aven Interrupter, and not under Drannith Magistrate | `move:ChooseCardName` `move:LookUpCard` `move:OfferedCast`
@@ -1257,7 +1255,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.99a Last Thoughts is encoded on the chosen Piker, which casts a copy when it connects | `board:combat`
 - CR 702.99c a flickered Piker is no longer encoded and offers nothing | `board:combat`
 - CR 707.10 a copied activated ability was not activated, so no mana was spent to activate it | `check:keywords`
-- CR 707.10 a target the copy KEPT becomes a target of the copy too | `move:ChooseToPay`
+- CR 707.10 a target the copy KEPT becomes a target of the copy too | `check:stack` `move:ChooseCopyTarget`
 - CR 707.10 a triggered ability is copied, and its copy takes a new target | `move:ChooseDiscard`
 - CR 707.10 the Charlatan's copy is bob's, and bob chooses its new target | `board:stack`
 - CR 707.10/702.150a a copy of a compleated planeswalker spell enters with the printed loyalty | `move:AnnouncePhyrexianPayment`
@@ -1320,7 +1318,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 107.6 whole card: a TAPPED Sentry untaps to pay {Q} and gets +0/+2 | `check:tapped-count`
 - CR 118.1 / 613.4c the cost removes the +1/+1 counter, so the 3/3 becomes a 2/2 that cannot pay again | `check:helper-counterRemovalsOf` `check:helper-isActivateOf` `check:keywords` `check:offered-actions` `check:other-Event.removeCounters`
 - CR 118.1 the payer chooses which land the cost returns | `move:ChooseReturns`
-- CR 118.12 Izoni makes its Spiders only when alice collects evidence | `move:ChooseCollectEvidence` `move:ChooseToPay`
+- CR 118.12 Izoni makes its Spiders only when alice collects evidence | `move:ChooseCollectEvidence`
 - CR 118.3 an answer naming a kind the creature lacks pays nothing | `move:ChooseMixedCounterRemoval` `move:ReverseManaAbilities`
 - CR 118.3 an answer past what a creature carries pays nothing | `move:ChooseCounterRemovalAtLeast` `move:ReverseManaAbilities`
 - CR 118.3 counters exactly covering the count are one division, so nothing is asked | `check:stack`
@@ -1361,7 +1359,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2f Bury in Books aimed at the attacking Giant is cast off three Islands | `board:combat`
 - CR 601.2f a different tapped creature is a different amount of damage | `check:helper-isTapped` `check:on-battlefield`
 - CR 601.2f a reduction past the whole cost floors at {0} | `check:offered-actions` `check:tapped-count`
-- CR 601.2f aimed at the Dreadnought instead, the Sliver keeps its {5}, and the Vehicle gets +2/+2 | `move:ChooseToPay`
+- CR 601.2f aimed at the Dreadnought instead, the Sliver keeps its {5}, and the Vehicle gets +2/+2 | `check:offered-actions`
 - CR 601.2f on one board, aiming at the Giant at home costs all five Islands and the attacker three | `board:combat`
 - CR 601.2f one opponent's two spells take {U} off; two opponents' one each do not | `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 601.2f one other spell takes only {3} off, and that does not pay | `check:offered-actions` `check:tapped-count`
@@ -1414,14 +1412,13 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.4b beholding a Dragon card in hand gains the 2 life too | `move:ChooseCost:unmatchable`
 - CR 701.4b beholding a Dragon permanent gains the 2 life | `move:ChooseCost:unmatchable`
 - CR 701.59a Evidence Examiner investigates when the Inspector's cost collects evidence | `move:ChooseCollectEvidence` `move:ChooseCost:unmatchable`
-- CR 701.59a Surveillance Monitor makes a Thopter only when alice collects evidence | `move:ChooseCollectEvidence` `move:ChooseToPay`
+- CR 701.59a Surveillance Monitor makes a Thopter only when alice collects evidence | `move:ChooseCollectEvidence`
 - CR 701.59a one card of mana value 3 pays it, and the rest stays put | `move:ChooseCollectEvidence`
 - CR 701.59a three one-drops total the mana value the cost asks for | `move:ChooseCollectEvidence`
 - CR 701.59b a graveyard totalling 2 cannot collect evidence 3 | `check:helper-collectsEvidenceFrom` `check:offered-actions` `check:zone-contents`
 - CR 701.59c Vitu-Ghazi Inspector's enters ability reads the evidence its spell collected | `move:ChooseCollectEvidence` `move:ChooseCost:unmatchable`
 - CR 701.67a a spell's additional waterbend {5} is paid by tapping five permanents | `move:ChooseTaps`
-- CR 701.67a alice waterbends {2} by tapping two Pikers, or discards with one | `move:ChooseDiscard` `move:ChooseToPay`
-- CR 701.67a bob pays ward--waterbend {4} by tapping four of his own permanents | `move:ChooseToPay`
+- CR 701.67a alice waterbends {2} by tapping two Pikers, or discards with one | `move:ChooseDiscard`
 - CR 701.67a waterbend {4} is paid by tapping two artifacts and two creatures | `move:ChooseTaps`
 - CR 701.67b a spell's waterbend taps pay its own {5} and not the tax on top of it | `move:ChooseTaps`
 - CR 701.67b a waterbend cost's taps pay for its own generic mana and not for the tax on top of it | `move:ChooseTaps`
@@ -1619,7 +1616,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 612.3 an evolved Goblin Piker's GRANTED afterlife still mints a Spirit Token | `move:ChooseCreatureTypeSwap`
 - CR 613.7 whole card: two Evolutions on the Turn to Frog spell compose | `move:ChooseCreatureTypeSwap`
 - CR 614 Cancel under Rest in Peace exiles the countered spell | `board:stack`
-- CR 614.1 Hardened Scales sees endure's counter, so the Kin-Guard reads 3/4 | `move:ChooseToPay`
 - CR 701.6 Cancel counters a spell into its owner's graveyard | `board:stack`
 - CR 702.135a an unevolved Ministrant of Obligation leaves two Spirit Tokens | `check:subtypes`
 - CR 702.135b an evolved Ministrant plus a granted afterlife leaves two Elves and a Spirit | `move:ChooseCreatureTypeSwap`
@@ -2053,8 +2049,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.40g a manifested SORCERY stays face down, and still deals a 2/2's damage | `board:controller` `board:entered-with` `board:face-down` `board:mana-pool`
 - CR 701.40g a turn-face-up trigger does not fire for a manifested sorcery | `board:controller` `board:entered-with` `board:face-down` `board:hand-order` `board:mana-pool`
 - CR 701.62a the chosen one of the two is manifested and the other is buried | `move:ChooseCardFromAmong`
-- CR 702.168b / 702.21a the listed ward fires on an opponent's spell, and declining counters it | `move:ChooseToPay`
-- CR 702.21a paying the listed ward cost leaves the spell to resolve | `move:ChooseToPay`
+- CR 702.168b / 702.21a the listed ward fires on an opponent's spell, and declining counters it | `check:stack`
 - CR 702.37b the manifest procedure pays no megamorph cost, so no counter lands | `board:controller` `board:entered-with` `board:face-down` `board:hand-order` `board:mana-pool`
 - CR 708 a manifested CREATURE turns face up, and deals its printed damage | `board:controller` `board:entered-with` `board:face-down` `board:mana-pool`
 - CR 708.12 a manifested land card is not a creature card, whatever CR 708.2a made the permanent | `board:controller` `board:face-down` `board:library-order`
@@ -2206,8 +2201,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.1f only a removal later than the grant takes the granted restriction away | `check:offered-actions` `move:expect-rejected`
 - CR 613.1f only a removal later than the grant takes the granted static ability away | `check:abilities`
 - CR 613.7 two Evolutions on Wanderwine Prophets champion a Merfolk | `board:hand-order` `board:objects-ids`
-- CR 702.101a declining the payment moves no life | `move:ChooseToPay`
-- CR 702.101a whole card: paying {W/B} drains each opponent and gains that much | `move:ChooseToPay`
 - CR 702.108a a CREATURE spell pumps nothing | `check:helper-sizeOf`
 - CR 702.108a whole card: casting an instant makes Monastery Swiftspear 2/3 | `check:helper-sizeOf`
 - CR 702.115a a blocked Culling Drone exiles nothing | `check:helper-nameOfCard` `check:helper-namesIn`
@@ -2224,13 +2217,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.165b a Clone of the Archpriest grants what it copied | `board:stack`
 - CR 702.191a three mana is not GREATER than the 3 power | `check:helper-sizeOf` `check:zone-contents`
 - CR 702.191a whole card: a four-mana spell grows Hungry Graffalon | `check:helper-sizeOf`
-- CR 702.30a a player who takes control owes echo at their own next upkeep | `move:ChooseToPay`
 - CR 702.30a control coming back re-opens the window it closed | `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 702.30a declining the payment sacrifices it with the mana still up | `move:ChooseToPay`
 - CR 702.40a Grapeshot copies itself once per spell cast before it, and not for one cast in response | `board:mana-pool`
 - CR 702.56a Pyromatics replicated twice deals its damage three times; unreplicated, once | `move:ChooseKicker`
-- CR 702.59a declining the payment exiles Sun's Bounty instead | `move:ChooseToPay`
-- CR 702.59a whole card: paying {1}{W} returns Sun's Bounty from the graveyard to hand | `move:ChooseToPay`
 - CR 702.70a Snake Cult Initiation gives the damaged player three poison | `check:keywords`
 - CR 702.78a Burn Trail with its conspire paid deals its damage twice; unpaid, once | `move:ChooseKicker` `move:ChooseTaps`
 - CR 702.78a creatures sharing none of the spell's colours cannot pay conspire | `check:helper-tappedOf` `check:tapped`
@@ -2257,7 +2246,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 113.6m an ability whose delayed trigger returns it from the graveyard functions there | `board:controller` `board:delayed-trigger` `board:entered-with` `board:mana-pool`
 - CR 113.6m the same ability does not function from the battlefield | `board:controller` `board:entered-with` `board:graveyard` `board:mana-pool`
 - CR 115.1 the Gomazoa becoming a target itself is not its controller becoming one | `check:helper-optionalResponses` `check:helper-tapStateOf` `check:stack`
-- CR 118.12a both opponents pay, so nobody sacrifices | `move:ChooseToPay`
 - CR 122.1 with a +1/+1 counter the Duskmage's death trigger draws a card | `check:hand-size` `check:helper-countersOn` `check:on-battlefield` `check:stack`
 - CR 305.7 under Blood Moon the same entry triggers nothing | `check:other-Mana.manaTypesOf` `check:stack` `check:subtypes`
 - CR 400.2 killed by Lightning Bolt, the Roaches returns itself from the graveyard | `check:helper-namesIn` `check:stack`
@@ -2281,17 +2269,13 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 603.6c whole card: alice's Piker is exiled and bob's Super Shredder grows | `check:other-Object.counters` `check:other-Object.zone`
 - CR 608.2a the intervening if is checked AGAIN as the ability resolves | `board:stack`
 - CR 608.2h a second Aether Flash resolves with the entrant already dead, and deals nothing | `check:events` `check:stack`
-- CR 614.1 Hardened Scales sees fabricate's counter, so the Artisan reads 4/4 | `move:ChooseToPay`
 - CR 614.1 Vizier of Remedies takes persist's counter to zero, so the Goblin returns bare and persists again | `check:helper-countersOn` `check:helper-inGraveyard` `check:helper-named`
 - CR 701.6a a countered Cry of Contrition reaches the graveyard and haunts nothing | `board:stack`
-- CR 702.123a declining fabricate 2 creates two Servos | `move:ChooseToPay`
-- CR 702.123a fabricate 2 puts two counters on the Enthusiast | `move:ChooseToPay`
 - CR 702.135a a dying Ministrant of Obligation leaves two 1/1 white and black flying Spirits | `check:colors` `check:keywords` `check:stack` `check:subtypes`
 - CR 702.135a a dying creature without afterlife leaves none | `check:helper-spirits` `check:stack`
 - CR 702.21a a spell naming a DIFFERENT permanent fires nothing | `check:helper-payResponses` `check:stack`
 - CR 702.21a the ward controller's OWN spell fires nothing | `check:helper-payResponses` `check:helper-paysFor` `check:other-Replay.record` `check:other-Stack.resolveTop` `check:stack`
 - CR 702.21b X counts the experience counters alice has when the ability RESOLVES, so bob cannot pay | `check:stack`
-- CR 702.21b one more Forest pays the same ward {2} and the Growth resolves | `move:ChooseToPay`
 - CR 702.55a/608.2n the resolved sorcery is exiled haunting the targeted creature | `move:ChooseDiscard`
 - CR 702.55b/702.55c the haunted creature dying fires the card's rider | `board:haunting` `check:hand-size` `check:stack`
 - CR 704.5g the control: an Ogre Sentry survives the same 2 damage, marked | `check:helper-markedOn` `check:helper-namesIn`
@@ -2328,7 +2312,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 609.3 an empty library raises no question | `check:helper-asks`
 - CR 613.1d a revealed card a continuous effect made a land goes to hand | `check:helper-namedOnBattlefield` `check:helper-plusOnePlusOnesOn` `check:helper-zoneNames`
 - CR 613.1d a revealed card a continuous effect made a land raises no question | `check:helper-asks`
-- CR 614.1a Ezuri's two proliferates under Tekuthal are four, and draw four | `move:ChooseToPay`
 - CR 614.1a Kenessos makes Crystal Ball's scry 2 a scry 3 | `move:ChooseScry`
 - CR 614.1a Tekuthal makes one proliferate two, each its own choice | `move:ChooseProliferate`
 - CR 616.1 Eligeth and Kenessos: the scryer orders them | `move:ChooseReplacement`
@@ -2505,7 +2488,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 107.4f whole card: Mutagenic Growth casts with no mana at all, for 2 life | `check:offered-actions` `check:stack`
 - CR 107.4h a Snow-Covered Mountain's mana pays {S}, and Icehide Golem resolves | `check:helper-poolSize` `check:tapped-count`
 - CR 107.4h whole card: Berg Strider's victim does not untap when snow mana paid for it, and does when it did not | `board:controller` `board:hand-order` `board:mana-pool` `board:object-doesnotuntapfor`
-- CR 118.13b the half announced as the trigger resolves is the mana that resolution spends | `move:AnnounceHybridHalf` `move:ChooseToPay`
+- CR 118.13b the half announced as the trigger resolves is the mana that resolution spends | `move:AnnounceHybridHalf`
 - CR 202.2d Mutagenic Growth is green on the stack even when 2 life paid for it | `check:colors`
 - CR 601.2b whichever half of {G/U} is announced, the OTHER floats | `board:stack`
 - CR 601.2f Baral's reduction reaches the castability gate for a {2/R} | `board:stack`
@@ -2750,7 +2733,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 111.6 a card put into exile from the battlefield satisfies the token's intervening if | `check:events`
 - CR 115.2 a 'player or planeswalker' spell offers neither Goblin | `check:legal-targets` `check:other-Recipient.objectOf` `check:other-S.spellTargetSlot`
 - CR 115.4 an 'any target' spell offers the planeswalker alongside the players | `check:legal-targets` `check:other-Recipient.objectOf` `check:other-S.spellTargetSlot`
-- CR 118.12 declining the -2's sacrifice arms nothing and destroys nothing | `move:ChooseToPay`
 - CR 205.1b the -6 untaps two lands and makes them 5/5 Elemental creature lands with flying and haste | `check:keywords` `check:subtypes` `check:tapped-count`
 - CR 306.5b / 107.3m Nissa enters with as many loyalty counters as the X she was cast for | `check:on-battlefield`
 - CR 306.5b Jace Beleren enters with three loyalty counters | `check:on-battlefield`
@@ -2759,7 +2741,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 306.8 Lightning Bolt's 3 damage removes all three loyalty counters, and CR 704.5i buries Jace | `board:controller` `board:mana-pool`
 - CR 306.8 a Goblin War Strike aimed at the planeswalker removes its loyalty | `board:controller` `board:mana-pool`
 - CR 400.7 the +1's remainder read finds the chosen card gone, so the other answer exiles the other card | `move:ChooseCardFromAmong`
-- CR 603.12 / 701.8a the -2's reflexive trigger destroys the planeswalker it targets, and no land is offered | `move:ChooseToPay`
+- CR 603.12 / 701.8a the -2's reflexive trigger destroys the planeswalker it targets, and no land is offered | `check:legal-targets`
 - CR 603.4 a card put into exile from a hand satisfies the token's intervening if | `check:events`
 - CR 603.4 with nothing exiled this turn the token's ability never triggers | `check:events`
 - CR 606.2 / 601.2f Carth's added +1 reaches Jace's own +2 | `board:controller` `board:hand-order` `board:mana-pool`
@@ -3018,7 +3000,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ReplacementSpec`
 
 - CR 109.5 Corpsejack Menace does not double an opponent's counters | `check:helper-countersOn` `check:helper-raceAnswer`
-- CR 118.12 Doubling Season DOES double a blight paid as the trigger resolves | `move:ChooseToPay`
 - CR 119.4 at 2 life the payment is ILLEGAL, so it enters tapped with no life paid | `check:helper-lostLife` `check:helper-warriorOut` `check:other-Engine.priorityLoop`
 - CR 119.4 at 4 life the payment is legal, so Sea Gate, Reborn enters untapped | `move:ChoosePayLifeOnEntry`
 - CR 208.2b Primal Plasma enters as the 2/2 with flying its controller picked | `move:ChooseEntryOption`
@@ -3091,23 +3072,18 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 101.2 whole card: Ashiok, Dream Render lets its own controller's spell make an opponent search | `move:Search` `move:Shuffle`
 - CR 101.2 whole card: Ashiok, Dream Render stops the opponent's own spell searching his own library | `move:Shuffle`
 - CR 101.2 whole card: Leonin Arbiter stops Delivery Moogle's library half, not its graveyard half | `move:ChooseSearchZones` `move:Search` `move:Shuffle`
-- CR 101.4 Killing Wave: a payer's agreed payments are one life loss | `move:ChooseToPay` `move:OrderForEach`
+- CR 101.4 Killing Wave: a payer's agreed payments are one life loss | `move:OrderForEach`
 - CR 101.4b Jungle Wayfinder's later seats know the earlier seats' answers | `board:stack`
 - CR 101.4b a later payer is told what the payers before it answered | `board:stack`
 - CR 101.4b a later seat knows what the seats before it answered for that land | `board:stack`
 - CR 109.5 the offer is every player, alice included, and not only her opponents | `move:RandomPlayer`
 - CR 110.5b whole card: Nature's Lore puts the Forest it finds onto the battlefield UNTAPPED | `move:Search` `move:Shuffle`
 - CR 113.6m / 602.1b Grim Reminder's return is offered from the graveyard during its controller's upkeep only | `board:hand-order` `board:mana-pool` `board:replacement`
-- CR 118.12 bob and carol each pay half their own life, so Temporal Extortion is countered | `move:ChooseToPay`
 - CR 118.12 bob pays 5 life, so Dash Hopes is countered and the Piker is not | `board:stack`
 - CR 118.12 nobody pays, so Dash Hopes stays on the stack | `board:stack`
-- CR 118.12a Cut the Tethers asks each Spirit's owner, and an unaffordable offer is not made | `move:ChooseToPay` `move:OrderForEach`
-- CR 118.12a Killing Wave asks each creature's controller, and a paid creature alone survives | `move:ChooseToPay` `move:OrderForEach`
-- CR 118.12a bob pays, so Nakaya Shade stays 1/1 | `move:ChooseToPay`
-- CR 118.12a carol pays, so Wild Might gives +1/+1 and not +5/+5 | `move:ChooseToPay`
-- CR 118.12a each land is its own offer, and any player's payment saves only that land | `move:ChooseToPay` `move:OrderForEach`
-- CR 118.12a nobody pays, so Nakaya Shade is 2/2 | `move:ChooseToPay`
-- CR 118.12a nobody pays, so Wild Might gives +5/+5 | `move:ChooseToPay`
+- CR 118.12a Cut the Tethers asks each Spirit's owner, and an unaffordable offer is not made | `move:OrderForEach`
+- CR 118.12a Killing Wave asks each creature's controller, and a paid creature alone survives | `move:OrderForEach`
+- CR 118.12a each land is its own offer, and any player's payment saves only that land | `move:OrderForEach`
 - CR 118.3 a seat who cannot pay the sacrifice is not offered it | `check:helper-lands` `check:helper-lives` `check:helper-wormsStands`
 - CR 201.2a whole card: Bifurcate aimed at the other creature finds the OTHER name | `move:Search` `move:Shuffle`
 - CR 201.2a whole card: Bifurcate finds the card sharing a name with the creature it targeted | `move:Search` `move:Shuffle`
@@ -3353,10 +3329,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 115.10a Day of Judgment still destroys Slippery Bogle: hexproof restricts targeting, not effects | `check:creature-count` `check:other-Face.name` `check:other-Game.faceOf` `check:zone-contents`
 - CR 115.2 clause (a) whole card: Raise Dead returns the targeted creature card to alice's hand | `check:hand-size` `check:other-S.countByName` `check:stack` `check:zone-contents`
 - CR 115.7d / 702.11b legality is the spell's controller's, so bob cannot aim alice's Growth at his hexproof Bogle | `check:legal-targets` `move:expect-rejected`
-- CR 115.7d / 702.21a Redirect's NEW target becomes a target, and ward fires | `move:ChooseToPay`
 - CR 115.7d / 702.21a an unchanged target already illegal may stay, and the new one draws ward | `check:stack`
 - CR 115.7d a new target that makes an unchanged target illegal is refused | `check:stack`
-- CR 115.7d a target Redirect leaves unchanged does not become a target again | `move:ChooseToPay`
 - CR 205.3m the two targets must hold a creature type in common | `move:expect-rejected`
 - CR 601.2b announcing 2 instead returns the mana value 2 card and leaves the 3 | `check:legal-targets`
 - CR 601.2c Bioshift's second slot cannot be a creature its first slot's controller does not control | `board:stack`
@@ -3503,7 +3477,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `TurnSpec`
 
-- CR 118.12 whole card: declining at alice's next upkeep loses her the game | `move:ChooseToPay`
+- CR 118.12 whole card: declining at alice's next upkeep loses her the game | `check:active-player` `check:game-result` `check:step`
 - CR 500.1 the control turn runs its steps and the end step trigger fires | `board:stack`
 - CR 500.11 whole card: Savor the Moment's extra turn skips its untap step | `board:turn-number`
 - CR 500.5a an until-end-of-combat effect expires though the end of combat step never ran | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool` `board:replacement`
@@ -3530,7 +3504,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 511.3 the control end of combat step runs, and the phase's end sweeps anyway | `check:card-types` `check:combat` `check:helper-began` `check:other-Turn.afterBlockersDeclared` `check:step`
 - CR 601.3 Mandate of Peace is castable only during a combat phase | `board:combat` `board:continuous-effect` `board:mana-pool`
 - CR 603.7a uncleaved, alice loses at the end step of the unpreventable extra turn | `check:game-result` `check:intermediate-state` `check:step`
-- CR 603.7b paying at alice's next upkeep spends the ability | `move:ChooseToPay`
 - CR 611.1 the until-end-of-turn prohibition outlives the phase it ended | `board:combat` `board:continuous-effect` `board:mana-pool`
 - CR 611.2a power-up abilities can't be activated during Kang's extra turn, and only then | `check:active-player` `check:other-Action.Engine.legalActions` `check:other-GameState.turnNumber` `check:stack`
 - CR 611.2a whole card: Chance for Glory's indestructible outlasts the turn | `check:active-player` `check:game-result` `check:keywords` `check:other-GameState.remaining` `check:other-S.phasesAfter` `check:priority` `check:step`

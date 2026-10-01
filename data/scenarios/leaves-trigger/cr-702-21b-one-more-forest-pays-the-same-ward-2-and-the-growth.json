@@ -1,0 +1,44 @@
+{
+  "description": "CR 702.21b one more Forest pays the same ward {2} and the Growth resolves",
+  "note": "Minthara has ward {X}, X being alice's experience counters, and gives her creatures +1/+0 per counter. alice holds one counter as bob's Giant Growth targets Minthara and two by the time ward resolves, Ezuri having seen the flashed-in Selfless Squire enter. The pair with the unpayable case differs only in bob's third Forest: here he pays {2} and the Growth resolves, so together they pin X at exactly two.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [{ "key": { "type": "Experience" }, "value": 1 }],
+        "battlefield": [
+          { "card": "Plains", "label": "plains-1" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Plains", "label": "plains-3" },
+          { "card": "Plains", "label": "plains-4" },
+          { "card": "Minthara, Merciless Soul", "label": "minthara" },
+          { "card": "Ezuri, Claw of Progress", "label": "ezuri" }
+        ],
+        "hand": [{ "card": "Selfless Squire", "label": "squire" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" }
+        ],
+        "hand": [{ "card": "Giant Growth", "label": "growth" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@growth", "targets": ["@minthara"], "mana": ["@forest-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Experience" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@squire", "mana": ["@plains-1", "@plains-2", "@plains-3", "@plains-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["@ezuri", "Selfless Squire"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@forest-2", "@forest-3"] } }, "source": "@minthara" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "PowerToughness": { "object": "@minthara", "power": 7, "toughness": 5 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Experience" }, "count": 2 } } }
+  ]
+}
