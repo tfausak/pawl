@@ -624,8 +624,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- CR 605.1a asks whether the ability could add mana to "a player's" pool, so a
     -- recipient the card names is carried rather than disqualifying: an ability
     -- that adds to somebody else is still a mana ability. The payment path
-    -- resolves that reference through Mana.recipientsOf; a SLOT-naming one like
-    -- this still names nobody there (#3081).
+    -- resolves that reference through Mana.recipientsOf, over the slots the
+    -- ability's own earlier effects bound (Pawl.ManaSpec's Valleymaker group).
     let named = ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor (Quantity.Literal 1) ManaRetention.Ordinary Nothing Nothing
     Spec.assertEqWith s "a named recipient does not disqualify" (ManaAbility.manaProduced (Effect.AddMana named)) (Just named)
     Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing Nothing))) Nothing
