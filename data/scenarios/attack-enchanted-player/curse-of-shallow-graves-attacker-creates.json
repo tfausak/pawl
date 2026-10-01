@@ -1,0 +1,27 @@
+{
+  "description": "CR 508.3e / 603.5 Curse of Shallow Graves: the attacking player is asked and creates the tapped Zombie",
+  "note": "Bob's Curse enchants carol and alice attacks her, so the Curse's controller, the enchanted player and the attacking player are three seats. Only alice is asked, and the Zombie is hers, tapped; an engine asking bob, or creating under the Curse's controller, fails here.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Curse of Shallow Graves", "label": "curse", "attached": "carol" }]
+      },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@attacker", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@curse", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Zombie Token", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "Zombie Token", "tapped": true } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Zombie Token", "count": 0 } } }
+  ]
+}

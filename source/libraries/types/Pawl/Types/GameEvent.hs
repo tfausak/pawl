@@ -133,13 +133,14 @@ data GameEvent
     -- declared as an attacker", carried because CR 702.83b scopes "alone" to a
     -- combat phase where this log is cleared per turn.
     AttackerDeclared AttackerDeclared.AttackerDeclared
-  | -- | CR 508.3b: a player, planeswalker or battle WAS ATTACKED, and by whom --
-    -- one event per DISTINCT target the CR 508.1 declaration named, appended by
-    -- Pawl.Engine.Combat.declareAttackers alone. AttackerDeclared's grouping
-    -- sibling: three creatures sent at one player are three of that event and one
-    -- of this, and Pawl.Engine.Event.matchesTrigger sees one event at a time so
-    -- the arity is built here. Carries CR 508.3b's target rather than CR 508.5's
-    -- defending player, and the attacking player beside it for CR 508.3e.
+  | -- | CR 508.3b / 508.3e: a player, planeswalker or battle WAS ATTACKED, and by
+    -- whom -- one event per DISTINCT (attacking player, target) pair the CR 508.1
+    -- declaration named, appended by Pawl.Engine.Combat.declareAttackers alone,
+    -- all in one event group. AttackerDeclared's grouping sibling: three
+    -- creatures sent at one player are three of that event and one of this.
+    -- Rule 508.3e's per-pair arity is the event's; rule 508.3b's per-target one
+    -- is the group's (Pawl.Engine.Event.Trigger.batchScoped). Carries CR
+    -- 508.3b's target rather than CR 508.5's defending player.
     BecameAttacked BecameAttacked.BecameAttacked
   | -- | CR 508.3d: a player DECLARED ATTACKERS -- ONE event per CR 508.1
     -- declaration, naming the attacking player, appended by

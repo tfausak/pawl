@@ -656,6 +656,23 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (poisonOf S.alice, poisonOf S.bob, S.lifeOf S.carol after)
     Spec.assertEqWith s "alice and bob each got a poison counter" (run sharedTurns) (1, 1, Just 16)
     Spec.assertEqWith s "without the option only alice attacked" (run id) (1, 0, Just 18)
+  -- CR 805.10b / 508.3b: the active team makes ONE combined attack, so carol is
+  -- attacked once however many teammates sent creatures at her.
+  --
+  -- Curse of Vitality, {2}{W} Enchantment -- Aura Curse: "Enchant player /
+  -- Whenever enchanted player is attacked, you gain 2 life. Each opponent
+  -- attacking that player does the same."
+  Spec.it s "CR 508.3b a player two teammates attack is attacked once" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    curse <- S.printingOf s registry "Curse of Vitality"
+    let run option =
+          let (aura, withCurse) = S.addPermanent curse S.dave (atCombat (option (twoTeams S.fourPlayerGame)))
+              (_, withAlice) = S.addPermanent piker S.alice (S.attachTo aura (Recipient.ToPlayer S.carol) withCurse)
+              (_, board) = S.addPermanent piker S.bob withAlice
+              after = S.runCombat (S.attackTo S.carol) board
+           in fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol, S.dave]
+    Spec.assertEqWith s "CR 508.3b one trigger: dave, alice and bob each gained 2" (run sharedTurns) [Just 22, Just 22, Just 16, Just 22]
+    Spec.assertEqWith s "without the option only alice attacked" (run id) [Just 22, Just 20, Just 18, Just 22]
   -- CR 805.10d: the defending team has one combined block, so dave's creature
   -- may block a creature attacking his teammate carol, which CR 802.4a forbids
   -- without the option.
