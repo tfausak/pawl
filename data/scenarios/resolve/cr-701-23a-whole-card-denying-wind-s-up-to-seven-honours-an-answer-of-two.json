@@ -1,0 +1,312 @@
+{
+  "description": "CR 701.23a whole card: Denying Wind's \"up to seven\" honours an answer of two",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-5",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-6",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-7",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-8",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-9",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Denying Wind",
+            "label": "denying-wind",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Ashnod's Altar"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          },
+          {
+            "card": "Forest",
+            "label": "forest"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-2"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-3"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-4"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-5"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-6"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-7"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$denying-wind",
+          "targets": [
+            "$carol"
+          ],
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4",
+            "$island-5",
+            "$island-6",
+            "$island-7",
+            "$island-8",
+            "$island-9"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Search",
+          "with": [
+            "$forest",
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
+            "$goblin-piker",
+            "$goblin-piker-2",
+            "$goblin-piker-3",
+            "$goblin-piker-4",
+            "$goblin-piker-5",
+            "$goblin-piker-6",
+            "$goblin-piker-7"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Denying Wind",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Denying Wind",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Library",
+        "card": "Forest",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Library",
+        "card": "Mountain",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-7",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-8",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-9",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "carol",
+        "zone": "Exile",
+        "is": [
+          "Forest",
+          "Mountain"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "carol",
+        "zone": "Library",
+        "is": [
+          "$goblin-piker",
+          "$goblin-piker-2",
+          "$goblin-piker-3",
+          "$goblin-piker-4",
+          "$goblin-piker-5",
+          "$goblin-piker-6",
+          "$goblin-piker-7"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Library",
+        "is": [
+          "Ashnod's Altar"
+        ]
+      }
+    }
+  ]
+}

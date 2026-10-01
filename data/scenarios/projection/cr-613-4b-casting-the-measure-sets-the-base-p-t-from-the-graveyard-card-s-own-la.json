@@ -1,0 +1,121 @@
+{
+  "description": "CR 613.4b casting the Measure sets the base P/T from the graveyard card's own layer-7b value",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Charnel Measure",
+            "label": "synthetic-charnel-measure",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Grist, the Hunger Tide"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$synthetic-charnel-measure",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Synthetic Charnel Measure",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Synthetic Charnel Measure",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$hill-giant",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Synthetic Charnel Measure",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Synthetic Charnel Measure",
+        "tapped": false
+      }
+    }
+  ]
+}

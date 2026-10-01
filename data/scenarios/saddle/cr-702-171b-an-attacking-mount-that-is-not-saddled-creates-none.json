@@ -1,0 +1,52 @@
+{
+  "description": "CR 702.171b an attacking Mount that is not saddled creates none",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bridled Bighorn",
+            "label": "bridled-bighorn",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "tapped": true,
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$bridled-bighorn"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Sheep Token",
+          "count": 0
+        }
+      }
+    }
+  ]
+}

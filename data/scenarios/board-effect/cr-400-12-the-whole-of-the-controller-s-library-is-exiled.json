@@ -1,0 +1,213 @@
+{
+  "description": "CR 400.12 the whole of the controller's library is exiled",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "hand-plains"
+          },
+          {
+            "card": "Leveler",
+            "label": "leveler",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Ogre Sentry"
+          },
+          {
+            "card": "Bird Maiden"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Angel of Finality"
+          },
+          {
+            "card": "Hill Giant"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$leveler",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            "$plains-5"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Leveler",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Leveler",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Bird Maiden",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Ogre Sentry",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-5",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Leveler",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Leveler",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Leveler",
+        "power": 10,
+        "toughness": 10
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": [
+          "Ogre Sentry",
+          "Bird Maiden",
+          "Goblin Piker"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Hand",
+        "is": [
+          "$hand-plains"
+        ]
+      }
+    }
+  ]
+}

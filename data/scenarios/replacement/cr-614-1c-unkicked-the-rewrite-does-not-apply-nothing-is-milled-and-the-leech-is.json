@@ -1,0 +1,182 @@
+{
+  "description": "CR 614.1c unkicked, the rewrite does not apply: nothing is milled and the Leech is a 1/1",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Monstrous War-Leech",
+            "label": "monstrous-war-leech",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Lightning Bolt"
+          }
+        ],
+        "library": [
+          {
+            "card": "Lairwatch Giant"
+          },
+          {
+            "card": "Lairwatch Giant"
+          },
+          {
+            "card": "Lairwatch Giant"
+          },
+          {
+            "card": "Lairwatch Giant"
+          },
+          {
+            "card": "Lairwatch Giant"
+          },
+          {
+            "card": "Lairwatch Giant"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseKicker",
+          "with": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$monstrous-war-leech",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$swamp-4",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Monstrous War-Leech",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Monstrous War-Leech",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-4",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Monstrous War-Leech",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Monstrous War-Leech",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Monstrous War-Leech",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": [
+          "Lightning Bolt"
+        ]
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Lairwatch Giant",
+        "count": 6
+      }
+    }
+  ]
+}

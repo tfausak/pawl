@@ -1,0 +1,61 @@
+{
+  "description": "CR 508.3a a bigger creature that stayed home is no companion",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Apprentice Sharpshooter",
+            "label": "apprentice-sharpshooter",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$apprentice-sharpshooter"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$apprentice-sharpshooter",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$apprentice-sharpshooter",
+          "power": 1,
+          "toughness": 4
+        }
+      }
+    }
+  ]
+}

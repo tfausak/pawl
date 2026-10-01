@@ -1,0 +1,203 @@
+{
+  "description": "CR 601.2b the payer announces a convoked spell's hybrid halves, both blue",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-2",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-3",
+            "ready": true
+          },
+          {
+            "card": "Palace Guard",
+            "ready": true
+          },
+          {
+            "card": "Armored Galleon",
+            "label": "armored-galleon",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Merrow Skyswimmer",
+            "label": "merrow-skyswimmer",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "AnnounceHybridHalf",
+          "with": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "AnnounceHybridHalf",
+          "with": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTaps",
+          "with": [
+            "$goblin-piker",
+            "$goblin-piker-2",
+            "$goblin-piker-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$merrow-skyswimmer",
+          "cost": [
+            {
+              "type": "OfType",
+              "value": {
+                "type": "Colored",
+                "value": {
+                  "type": "Blue"
+                }
+              }
+            }
+          ],
+          "costOrder": [
+            0,
+            1
+          ],
+          "mana": [
+            "$island"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Merrow Skyswimmer",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Merrow Skyswimmer",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$armored-galleon",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Merrow Skyswimmer",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Merrow Skyswimmer",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Merrow Skyswimmer",
+        "power": 2,
+        "toughness": 2
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Palace Guard",
+        "tapped": false
+      }
+    }
+  ]
+}

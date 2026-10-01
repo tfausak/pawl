@@ -1,0 +1,127 @@
+{
+  "description": "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Doubling Season",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Jace Beleren",
+            "label": "jace-beleren",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$jace-beleren",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "Jace Beleren",
+        "kind": {
+          "type": "Loyalty"
+        },
+        "count": 6
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Jace Beleren",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Jace Beleren",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Jace Beleren",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Jace Beleren",
+        "tapped": false
+      }
+    }
+  ]
+}

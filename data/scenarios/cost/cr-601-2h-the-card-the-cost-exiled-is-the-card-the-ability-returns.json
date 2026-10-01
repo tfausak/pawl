@@ -1,0 +1,90 @@
+{
+  "description": "CR 601.2h the card the cost exiled is the card the ability returns",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Synthetic Exiled Reliquary",
+            "label": "synthetic-exiled-reliquary",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$synthetic-exiled-reliquary",
+          "ability": 0,
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Synthetic Exiled Reliquary",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Synthetic Exiled Reliquary",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Synthetic Exiled Reliquary",
+        "tapped": false
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Battlefield",
+        "is": [
+          "$plains",
+          "Synthetic Exiled Reliquary"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "description": "CR 508.3c whole card: two Birds declared together scry ONCE",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Hermes, Overseer of Elpis",
+            "ready": true
+          },
+          {
+            "card": "Bird Maiden",
+            "label": "bird-maiden",
+            "ready": true
+          },
+          {
+            "card": "Augury Raven",
+            "label": "augury-raven",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          },
+          {
+            "card": "Forest"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Bird Maiden",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$bird-maiden",
+          "$augury-raven"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseScry",
+          "with": [
+            [
+              "$goblin-piker",
+              "$mountain"
+            ],
+            []
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$bird-maiden": "$bob",
+            "$augury-raven": "$bob"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Forest",
+          "Island",
+          "Plains",
+          "Swamp",
+          "$goblin-piker",
+          "$mountain"
+        ]
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$bird-maiden",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$augury-raven",
+        "tapped": true
+      }
+    }
+  ]
+}

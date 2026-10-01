@@ -1,0 +1,80 @@
+{
+  "description": "CR 601.2g Sapphire Medallion is cast off a lone Sol Ring",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Sol Ring",
+            "label": "sol-ring",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Sapphire Medallion",
+            "label": "sapphire-medallion",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$sapphire-medallion",
+          "mana": [
+            "$sol-ring"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Sapphire Medallion",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Sapphire Medallion",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$sol-ring",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Sapphire Medallion",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Sapphire Medallion",
+        "tapped": false
+      }
+    }
+  ]
+}

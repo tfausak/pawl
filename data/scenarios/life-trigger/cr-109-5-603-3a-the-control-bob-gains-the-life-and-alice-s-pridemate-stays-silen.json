@@ -1,0 +1,118 @@
+{
+  "description": "CR 109.5/603.3a the control: BOB gains the life, and alice's Pridemate stays silent",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Ajani's Pridemate",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Soul Warden",
+            "label": "soul-warden",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Soul Warden",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$soul-warden",
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "bob",
+        "life": 21
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 20.0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Soul Warden",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Soul Warden",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Soul Warden#2",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Soul Warden#2",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Soul Warden#2",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "Ajani's Pridemate",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

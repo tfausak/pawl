@@ -1,0 +1,96 @@
+{
+  "description": "CR 608.2d with two quest counters the removal is impossible, so nothing happens",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Overseer of Vault 76",
+            "label": "overseer-of-vault-76",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Named",
+                  "value": "quest"
+                },
+                "value": 2
+              }
+            ]
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Named",
+                  "value": "quest"
+                },
+                "value": 0
+              }
+            ]
+          },
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Named",
+                  "value": "quest"
+                },
+                "value": 4
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "final": [
+    {
+      "Counters": {
+        "object": "$hill-giant",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "$overseer-of-vault-76",
+        "kind": {
+          "type": "Named",
+          "value": "quest"
+        },
+        "count": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$forest",
+        "kind": {
+          "type": "Named",
+          "value": "quest"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

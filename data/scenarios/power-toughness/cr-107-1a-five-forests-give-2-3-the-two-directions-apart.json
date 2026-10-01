@@ -1,0 +1,149 @@
+{
+  "description": "CR 107.1a five Forests give +2/+3, the two directions apart",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Aspect of Wolf",
+            "label": "aspect-of-wolf",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$hill-giant",
+          "power": 3,
+          "toughness": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$aspect-of-wolf",
+          "targets": [
+            "$hill-giant"
+          ],
+          "mana": [
+            "$forest",
+            "$forest-2",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Aspect of Wolf",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Aspect of Wolf",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$hill-giant",
+        "power": 5,
+        "toughness": 6
+      }
+    },
+    {
+      "Damage": {
+        "object": "Aspect of Wolf",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Aspect of Wolf",
+        "tapped": false
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "Aspect of Wolf",
+        "is": "$hill-giant"
+      }
+    }
+  ]
+}

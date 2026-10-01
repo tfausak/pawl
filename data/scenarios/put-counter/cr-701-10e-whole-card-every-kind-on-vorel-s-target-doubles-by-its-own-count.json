@@ -1,0 +1,157 @@
+{
+  "description": "CR 701.10e whole card: every kind on Vorel's target doubles by its own count",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Vorel of the Hull Clade",
+            "label": "vorel-of-the-hull-clade",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "PlusOnePlusOne"
+                },
+                "value": 3
+              },
+              {
+                "key": {
+                  "type": "Keyword",
+                  "value": {
+                    "type": "Flying"
+                  }
+                },
+                "value": 2
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "PlusOnePlusOne"
+                },
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$vorel-of-the-hull-clade",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$forest",
+            "$island"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$vorel-of-the-hull-clade",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 8,
+        "toughness": 7
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 6
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker",
+        "kind": {
+          "type": "Keyword",
+          "value": {
+            "type": "Flying"
+          }
+        },
+        "count": 4
+      }
+    },
+    {
+      "Keywords": {
+        "object": "$goblin-piker",
+        "keyword": {
+          "type": "Flying"
+        },
+        "count": 4
+      }
+    },
+    {
+      "Counters": {
+        "object": "Goblin Piker#2",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    }
+  ]
+}

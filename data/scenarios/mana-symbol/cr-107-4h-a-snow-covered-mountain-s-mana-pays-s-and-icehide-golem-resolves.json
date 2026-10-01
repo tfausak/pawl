@@ -1,0 +1,87 @@
+{
+  "description": "CR 107.4h a Snow-Covered Mountain's mana pays {S}, and Icehide Golem resolves",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Snow-Covered Mountain",
+            "label": "snow-covered-mountain",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Icehide Golem",
+            "label": "icehide-golem",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$icehide-golem",
+          "mana": [
+            "$snow-covered-mountain"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Icehide Golem",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Icehide Golem",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$snow-covered-mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Icehide Golem",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Icehide Golem",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Icehide Golem",
+        "power": 2,
+        "toughness": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "description": "CR 306.5b / 107.3m Nissa enters with as many loyalty counters as the X she was cast for",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Nissa, Steward of Elements",
+            "label": "nissa-steward-of-elements",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$nissa-steward-of-elements",
+          "x": 5,
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "Nissa, Steward of Elements",
+        "kind": {
+          "type": "Loyalty"
+        },
+        "count": 5
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Nissa, Steward of Elements",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Nissa, Steward of Elements",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Nissa, Steward of Elements",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Nissa, Steward of Elements",
+        "tapped": false
+      }
+    }
+  ]
+}

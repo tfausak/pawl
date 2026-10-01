@@ -1,0 +1,126 @@
+{
+  "description": "CR 701.17 the +1 drains when a Zombie card is milled",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Liliana, Untouched by Death",
+            "label": "liliana-untouched-by-death",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 4
+              }
+            ]
+          }
+        ],
+        "library": [
+          {
+            "card": "Whipstitched Zombie"
+          },
+          {
+            "card": "Whipstitched Zombie"
+          },
+          {
+            "card": "Whipstitched Zombie"
+          },
+          {
+            "card": "Whipstitched Zombie"
+          },
+          {
+            "card": "Whipstitched Zombie"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$liliana-untouched-by-death",
+          "ability": 0,
+          "mana": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "bob",
+        "life": 18
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 22
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Whipstitched Zombie",
+        "count": 3
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Whipstitched Zombie",
+        "count": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$liliana-untouched-by-death",
+        "kind": {
+          "type": "Loyalty"
+        },
+        "count": 5
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": [
+          "Whipstitched Zombie#3",
+          "Whipstitched Zombie#4",
+          "Whipstitched Zombie#5"
+        ]
+      }
+    }
+  ]
+}

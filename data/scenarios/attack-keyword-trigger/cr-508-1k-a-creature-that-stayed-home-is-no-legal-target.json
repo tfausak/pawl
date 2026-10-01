@@ -1,0 +1,61 @@
+{
+  "description": "CR 508.1k a creature that stayed home is no legal target",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Blade Instructor",
+            "label": "blade-instructor",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$blade-instructor"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$blade-instructor",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Goblin Piker",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    }
+  ]
+}

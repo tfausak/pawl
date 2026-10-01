@@ -1,0 +1,119 @@
+{
+  "description": "CR 701.59a three one-drops total the mana value the cost asks for",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forensic Researcher",
+            "label": "forensic-researcher",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Lightning Bolt",
+            "label": "lightning-bolt"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "lightning-bolt-2"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "lightning-bolt-3"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCollectEvidence",
+          "with": [
+            "$lightning-bolt",
+            "$lightning-bolt-2",
+            "$lightning-bolt-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$forensic-researcher",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "costOrder": [
+            0,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forensic-researcher",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": [
+          "Lightning Bolt",
+          "Lightning Bolt#2",
+          "Lightning Bolt#3"
+        ]
+      }
+    }
+  ]
+}

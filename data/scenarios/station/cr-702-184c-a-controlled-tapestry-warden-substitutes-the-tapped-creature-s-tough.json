@@ -1,0 +1,93 @@
+{
+  "description": "CR 702.184c a controlled Tapestry Warden substitutes the tapped creature's toughness",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Lumen-Class Frigate",
+            "label": "lumen-class-frigate",
+            "ready": true
+          },
+          {
+            "card": "Tapestry Warden",
+            "label": "tapestry-warden",
+            "ready": true
+          },
+          {
+            "card": "Wall of Stone",
+            "label": "wall-of-stone",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTaps",
+          "with": [
+            "$wall-of-stone"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$lumen-class-frigate",
+          "ability": 0
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "$lumen-class-frigate",
+        "kind": {
+          "type": "Named",
+          "value": "charge"
+        },
+        "count": 8
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$tapestry-warden",
+        "power": 4,
+        "toughness": 5
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$wall-of-stone",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$wall-of-stone",
+        "power": 1,
+        "toughness": 9
+      }
+    }
+  ]
+}

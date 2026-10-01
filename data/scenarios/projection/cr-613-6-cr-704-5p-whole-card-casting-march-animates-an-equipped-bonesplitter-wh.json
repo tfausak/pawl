@@ -1,0 +1,168 @@
+{
+  "description": "CR 613.6 + CR 704.5p whole card: casting March animates an equipped Bonesplitter, which falls off",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Bonesplitter",
+            "label": "bonesplitter",
+            "ready": true,
+            "attached": "goblin-piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "March of the Machines",
+            "label": "march-of-the-machines",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$goblin-piker",
+          "power": 4,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$march-of-the-machines",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "March of the Machines",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "March of the Machines",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-4",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$bonesplitter",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "March of the Machines",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "March of the Machines",
+        "tapped": false
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Bonesplitter",
+        "count": 1
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "$bonesplitter",
+        "is": null
+      }
+    }
+  ]
+}

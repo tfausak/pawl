@@ -1,0 +1,103 @@
+{
+  "description": "CR 508.3c a declaration naming no Bird does not trigger it",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Hermes, Overseer of Elpis",
+            "label": "hermes-overseer-of-elpis",
+            "ready": true
+          },
+          {
+            "card": "Bird Maiden",
+            "ready": true
+          },
+          {
+            "card": "Augury Raven",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Forest"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Bird Maiden",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$hermes-overseer-of-elpis"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$hermes-overseer-of-elpis": "$bob"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$hermes-overseer-of-elpis",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Goblin Piker",
+          "Mountain",
+          "Forest",
+          "Island",
+          "Plains",
+          "Swamp"
+        ]
+      }
+    }
+  ]
+}
