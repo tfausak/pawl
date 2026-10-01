@@ -825,6 +825,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ChooseNumber _ -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
+  Effect.Unattach ref -> Effect.Unattach (rewriteObjectRef pairs ref)
   Effect.Detain ref -> Effect.Detain (rewriteObjectRef pairs ref)
   Effect.Goad ref -> Effect.Goad (rewriteObjectRef pairs ref)
   Effect.Pair ref -> Effect.Pair (rewriteObjectRef pairs ref)

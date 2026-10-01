@@ -2029,10 +2029,9 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
-  -- CR 702.151a states TWO abilities; only the attach one is minted, the
-  -- unattach half having no opcode to resolve into (#3849). One per instance,
-  -- equip's reading above.
-  Keyword.Reconfigure cost -> List.genericReplicate count (reconfigure cost)
+  -- CR 702.151a states TWO abilities, both minted per instance, equip's reading
+  -- above.
+  Keyword.Reconfigure cost -> concat (List.genericReplicate count [reconfigure cost, reconfigureOff cost])
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Prototype _ -> []
@@ -2515,10 +2514,6 @@ fortifyTarget = SlotName.MkSlotName (Text.pack "fortified")
 --
 -- CR 702.151b's "stops being a creature" is not here: it is a static ability,
 -- minted by mintedStaticAbilitiesOf below.
---
--- Not implemented: rule 702.151a's SECOND ability, "[Cost]: Unattach this
--- permanent. Activate only if this permanent is attached to a creature and only
--- as a sorcery", which has no effect opcode to resolve into (#3849).
 reconfigure :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 reconfigure cost =
   let slot =
@@ -2547,6 +2542,48 @@ reconfigure cost =
 -- The slot rule 702.151a's one target is chosen into, equipTarget's position.
 reconfigureTarget :: SlotName.SlotName
 reconfigureTarget = SlotName.MkSlotName (Text.pack "reconfigured")
+
+-- CR 702.151a's SECOND ability: "[Cost]: Unattach this permanent. Activate only
+-- if this permanent is attached to a creature and only as a sorcery." No target.
+-- Once it is unattached, CR 702.151b's suppression ends with it, `reconfigured`'s
+-- affected set re-asking Object.attachedTo, so the permanent is a creature again.
+--
+-- "Attached to a creature" is a count of the source among the battlefield's
+-- permanents attached to one, boast's spelling of a self-test below, so the
+-- host's creature-ness is read off the projection at activation (CR 602.5b).
+reconfigureOff :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+reconfigureOff cost =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = cost,
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Unattach (ObjectRef.EachMatching Filter.IsSource))))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
+      ActivatedAbility.minimumX = 0,
+      ActivatedAbility.restrictions =
+        [ ActivationRestriction.OnlyIf
+            ( Condition.Compares
+                ( Compares.MkCompares
+                    ( Quantity.Count
+                        ( Count.MkCount
+                            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                            (Filter.And [Filter.IsSource, Filter.AttachedTo (Filter.HasCardType CardType.Creature)])
+                            Aggregation.Members
+                        )
+                    )
+                    Comparison.AtLeast
+                    (Quantity.Literal 1)
+                )
+            ),
+          ActivationRestriction.SorcerySpeed
+        ],
+      ActivatedAbility.activator = Activator.Controller,
+      ActivatedAbility.condition = Nothing,
+      ActivatedAbility.name = Nothing,
+      -- Written by `mintedBy` at the roster, reconfigure's reason.
+      ActivatedAbility.keyword = Nothing
+    }
 
 -- CR 702.65a: "[Cost]: You may exchange this permanent with an Aura card in
 -- your hand." No timing restriction, the rule stating none, and no target: the

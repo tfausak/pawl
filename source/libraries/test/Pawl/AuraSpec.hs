@@ -342,6 +342,23 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
         Spec.assertEqWith s "CR 704.5p so nothing detaches it" (fmap Object.attachedTo (Game.lookupObject batteryId after)) (Just (Just (Recipient.ToCreature creature)))
         Spec.assertEqWith s "and the Piker is 3 power" (Projection.powerOf creature after) (Just 3)
         Spec.assertBool s (Projection.hasKeyword Keyword.Haste creature after) "with haste"
+  -- CR 702.151a's SECOND ability's restriction, "Activate only if this
+  -- permanent is attached to a creature": one board with the Battery on the
+  -- Piker and one with it loose, the same Mountain and the same sorcery-speed
+  -- window on both (CR 307.5). The unattach itself
+  -- is data/scenarios/unattach's reconfigure scenario.
+  Spec.it s "CR 702.151a Rabbit Battery's unattach ability is offered only while it is attached" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    battery <- S.printingOf s registry "Rabbit Battery"
+    let (creature, g1) = S.addPermanent piker S.alice (S.landsInPlay mountain 1)
+        (batteryId, loose) = S.addPermanent battery S.alice g1
+        attached = S.attach batteryId creature loose
+        offered g = case Projection.abilitiesOf batteryId g of
+          _ : off : _ -> Activatable.activatable S.alice batteryId off g {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+          _ -> False
+    Spec.assertBool s (offered attached) "attached to the Piker, it can be unattached"
+    Spec.assertBool s (not (offered loose)) "loose, it cannot"
   -- CR 301.5c's RESTRICTION, the arm the case above is the exception to. One
   -- board, one move, and the only difference is a Humility on the battlefield:
   -- CR 613.1f strips the Battery's reconfigure (it is a creature while

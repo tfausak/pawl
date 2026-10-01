@@ -1,0 +1,34 @@
+{
+  "description": "CR 701.3d Disarm unattaches both Equipment from the Piker, which Grafted Wargear's becomes-unattached trigger then sacrifices",
+  "note": "The Mammoth's own Bonesplitter is a second host's Equipment that must stay put. The Piker is read with the Wargear trigger still on the stack, so its 2/1 shows both Equipment came off before the sacrifice.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Grafted Wargear", "label": "wargear", "attached": "piker" },
+          { "card": "Bonesplitter", "label": "split", "attached": "piker" },
+          { "card": "War Mammoth", "label": "mammoth", "ready": true },
+          { "card": "Bonesplitter", "label": "other", "attached": "mammoth" },
+          { "card": "Island", "label": "island", "ready": true }
+        ],
+        "hand": [{ "card": "Disarm", "label": "disarm" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 7, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@disarm", "targets": ["@piker"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@mammoth", "power": 5, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bonesplitter", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Grafted Wargear", "count": 1 } } }
+  ]
+}
