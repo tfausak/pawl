@@ -1,0 +1,44 @@
+{
+  "description": "all three +1/+1 counters cross in one batch, and the rider counts them",
+  "note": "Black Panther, Wakandan King's Mine Vibranium moves all +1/+1 counters from a land onto a creature. Three counters, so a move of one and a move of the tally are different boards, and both ends are read; the land's shield counter is why it bears two kinds, so a batch that took everything would show. The rider gains that much life and draws, and alice's hand starts empty.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Mountain", "label": "land", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 3 }, { "key": { "type": "Shield" }, "value": 1 }] },
+          { "card": "Black Panther, Wakandan King", "label": "panther", "ready": true },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@land", "kind": { "type": "PlusOnePlusOne" }, "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@land", "kind": { "type": "Shield" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "Shield" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@panther", "targetsBySlot": { "land": ["@land"], "creature": ["@piker"] }, "mana": ["@forest-1", "@forest-2", "@forest-3", null] } } }
+  ],
+  "final": [
+    { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 3 } },
+    { "Counters": { "object": "@piker", "kind": { "type": "Shield" }, "count": 0 } },
+    { "Counters": { "object": "@land", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
+    { "Counters": { "object": "@land", "kind": { "type": "Shield" }, "count": 1 } },
+    { "Life": { "player": "alice", "life": 23 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 1 } }
+  ]
+}

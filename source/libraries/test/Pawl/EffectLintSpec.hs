@@ -50,6 +50,7 @@ import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
@@ -1490,9 +1491,14 @@ effectObjectRefs effect =
         Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
           RestrictedCreatures.Named ref -> read_ [ref]
           RestrictedCreatures.Matching _ -> []
-        Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> case attacker of
-          RestrictedCreatures.Named ref -> read_ [ref]
-          RestrictedCreatures.Matching _ -> []
+        Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker defender) ->
+          ( case attacker of
+              RestrictedCreatures.Named ref -> read_ [ref]
+              RestrictedCreatures.Matching _ -> []
+          )
+            <> case defender of
+              AttackTargetRef.Players _ -> []
+              AttackTargetRef.Permanents ref -> read_ [ref]
         Effect.CreateEmblem {} -> []
         Effect.BecomeMonarch {} -> []
         Effect.TakeTheInitiative {} -> []

@@ -1,0 +1,44 @@
+{
+  "description": "CR 702.43a whole card: the dead Hybrid moves all three of its counters",
+  "note": "Rule 702.43a's second ability counts the pile the dead permanent had, not its printed N. The Hybrid is seeded with three +1/+1 counters against its printed modular 2, so the Worker's four is one plus three, read off CR 608.2h's last known record: two would be the printed N and one a literal. The Worker carries a counter of its own, so a payload that overwrote rather than added would show, and so the 0/0 survives CR 704.5f. Murder does the killing, since a 0/0 body plus counters would make lethal damage differ per leg. The trigger's target prompt is it reaching the stack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Arcbound Hybrid", "label": "hybrid", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 3 }] },
+          { "card": "Arcbound Worker", "label": "worker", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 1 }] }
+        ],
+        "hand": [{ "card": "Murder", "label": "murder" }],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@hybrid", "kind": { "type": "PlusOnePlusOne" }, "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@worker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["@hybrid"], "mana": ["@swamp", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "modularRecipient": ["@worker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Arcbound Hybrid", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Arcbound Hybrid", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@worker", "kind": { "type": "PlusOnePlusOne" }, "count": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@worker", "power": 4, "toughness": 4 } } }
+  ]
+}

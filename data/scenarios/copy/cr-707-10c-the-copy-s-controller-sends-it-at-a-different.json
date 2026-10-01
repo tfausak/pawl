@@ -1,0 +1,39 @@
+{
+  "description": "CR 707.10c the copy's controller sends it at a different player",
+  "note": "CR 707.10c lets the copy's controller choose new legal targets. The board is the plain Twincast case's, differing only in the answer to the re-target prompt, so the life totals are that prompt's doing: carol takes the copy's 3 and bob only the original's.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "bolt" },
+          { "card": "Twincast", "label": "twincast" }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@bob"], "mana": ["@mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@twincast", "targets": ["Lightning Bolt"], "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@carol"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 17 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

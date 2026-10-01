@@ -1,0 +1,44 @@
+{
+  "description": "CR 707.2 a flashed-back spell that becomes a copy of a Bolt goes to the graveyard",
+  "note": "A Think Twice cast with flashback that Synthetic Mimicry turns into a copy of the Bolt no longer has flashback and acquires the Bolt's cast record, which paid no flashback cost, so it goes to the graveyard rather than into exile (CR 707.2, 702.34a). bob takes the Bolt's 3 and the copy's 3.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" },
+          { "card": "Island", "label": "island-5" }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "bolt" },
+          { "card": "Synthetic Mimicry", "label": "mimicry" }
+        ],
+        "graveyard": [{ "card": "Think Twice", "label": "think" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@bob"], "mana": ["@mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@think", "mana": ["@island-1", "@island-2", "@island-3", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mimicry", "targetsBySlot": { "subject": ["Think Twice"], "original": ["Lightning Bolt"] }, "mana": ["@island-4", "@island-5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Think Twice", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Lightning Bolt", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Synthetic Mimicry", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 14 } } }
+  ]
+}

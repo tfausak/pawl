@@ -24,6 +24,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -1770,7 +1771,7 @@ encore cost =
           RequireAttack.MkRequireAttack
             { RequireAttack.duration = Duration.UntilEndOfTurn,
               RequireAttack.attacker = RestrictedCreatures.Named (ObjectRef.InSlot encoreTokenSlot),
-              RequireAttack.defender = PlayerRef.InSlot encoreOpponentSlot
+              RequireAttack.defender = AttackTargetRef.Players (PlayerRef.InSlot encoreOpponentSlot)
             }
       loop =
         Effect.ForEach

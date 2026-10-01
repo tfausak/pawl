@@ -1,0 +1,45 @@
+{
+  "description": "CR 603.5 declining the may returns nothing",
+  "note": "The control for the whole-card soulshift case: the same board and the same Murder, and the trigger still reaches the stack and is targeted, but declining rule 702.46a's may leaves the Ancestor in alice's graveyard and her hand empty.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kami of Empty Graves", "label": "kami" },
+          { "card": "Swamp", "label": "swamp-1", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true }
+        ],
+        "hand": [{ "card": "Murder", "label": "murder" }],
+        "graveyard": [
+          { "card": "Goblin Piker" },
+          { "card": "Shimatsu the Bloodcloaked" },
+          { "card": "Disowned Ancestor", "label": "mine" }
+        ],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Disowned Ancestor", "label": "theirs" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["@kami"], "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "soulshifted": ["@mine"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Declines" } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Disowned Ancestor", "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Disowned Ancestor", "count": 1 } }
+  ]
+}

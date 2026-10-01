@@ -37,6 +37,7 @@ import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
@@ -774,11 +775,16 @@ effectObjectRefs effect = case effect of
   -- CR 509.1a's two sides, the creature required to block and what it blocks.
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> [blocker, attacker]
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> [ref]
-  -- One side only: what a creature attacks is a player (CR 508.1b), so the arm
-  -- beside this one is a PlayerRef. ForbidAttack's split below.
-  Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> case attacker of
-    RestrictedCreatures.Named ref -> [ref]
-    RestrictedCreatures.Matching _ -> []
+  -- Both sides, each only when a ref names it: the attacker's Matching arm is a
+  -- Filter, and a defender naming players is effectPlayerRefs'.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker defender) ->
+    ( case attacker of
+        RestrictedCreatures.Named ref -> [ref]
+        RestrictedCreatures.Matching _ -> []
+    )
+      <> case defender of
+        AttackTargetRef.Players _ -> []
+        AttackTargetRef.Permanents ref -> [ref]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
   -- ForbidBlock's one axis again, one rule away.
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> [ref]
@@ -983,7 +989,9 @@ effectPlayerRefs effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ _ playerEffect) -> PlayerEffect.playerRefsIn playerEffect
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
-  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ defender) -> defender : durationPlayerRefs duration
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ defender) -> case defender of
+    AttackTargetRef.Players ref -> ref : durationPlayerRefs duration
+    AttackTargetRef.Permanents _ -> durationPlayerRefs duration
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidActivation {} -> []
