@@ -1,0 +1,197 @@
+{
+  "description": "CR 109.5 a spell targeting another player leaves it tapped",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Dormant Gomazoa",
+            "tapped": true,
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "tapped": true,
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Island",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Giant Growth",
+            "ready": true
+          },
+          {
+            "card": "Ravenous Rats",
+            "ready": true
+          },
+          {
+            "card": "Fatigue",
+            "label": "fatigue",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$fatigue",
+          "targets": [
+            "$carol"
+          ],
+          "mana": [
+            "$island",
+            "$island-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Fatigue",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "$island",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "$island-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Fatigue"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "Dormant Gomazoa",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Fatigue",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

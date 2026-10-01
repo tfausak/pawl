@@ -1,0 +1,166 @@
+{
+  "description": "CR 601.2b reanimating and gaining life: both chosen modes resolve",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ojutai's Command",
+            "label": "ojutai-s-command",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ojutai-s-command",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "modes": [
+            0,
+            1
+          ],
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$plains"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 24
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Ojutai's Command",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Ojutai's Command",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Goblin Piker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Goblin Piker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Hand",
+        "is": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "description": "CR 609.3 a one-card library gives its one card to a count of two",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ancestral Memories",
+            "label": "ancestral-memories",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Bird Maiden"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ancestral-memories",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4",
+            "$island-5"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Ancestral Memories",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Bird Maiden",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Ancestral Memories",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Bird Maiden",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-5",
+        "tapped": true
+      }
+    }
+  ]
+}

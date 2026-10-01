@@ -1,0 +1,172 @@
+{
+  "description": "CR 109.5 an opponent's Tekuthal does not double your proliferate",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "PlusOnePlusOne"
+                },
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "hand": [
+          {
+            "card": "Steady Progress",
+            "label": "steady-progress",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 2
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Tekuthal, Inquiry Dominus",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$steady-progress",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseProliferate",
+          "with": [
+            [
+              "$goblin-piker"
+            ],
+            []
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "$goblin-piker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Island",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Steady Progress",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Steady Progress",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Island",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 4,
+        "toughness": 3
+      }
+    }
+  ]
+}

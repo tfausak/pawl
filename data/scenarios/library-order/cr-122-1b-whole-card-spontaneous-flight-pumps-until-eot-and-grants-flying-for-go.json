@@ -1,0 +1,192 @@
+{
+  "description": "CR 122.1b whole card: Spontaneous Flight pumps until EOT and grants flying for good",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Spontaneous Flight",
+            "label": "spontaneous-flight",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$goblin-piker",
+          "keyword": {
+            "type": "Flying"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$spontaneous-flight",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$goblin-piker",
+          "power": 4,
+          "toughness": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$goblin-piker",
+          "keyword": {
+            "type": "Flying"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "PowerToughness": {
+          "object": "$goblin-piker",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "Keywords": {
+          "object": "$goblin-piker",
+          "keyword": {
+            "type": "Flying"
+          },
+          "count": 1
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Spontaneous Flight",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Spontaneous Flight",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker",
+        "kind": {
+          "type": "Keyword",
+          "value": {
+            "type": "Flying"
+          }
+        },
+        "count": 1
+      }
+    }
+  ]
+}

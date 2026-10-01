@@ -1,0 +1,91 @@
+{
+  "description": "Kithkin Brinefarer's attack trigger perpetually pumps the Kithkin creature cards in alice's hand",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Kithkin Brinefarer",
+            "label": "kithkin-brinefarer",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Burrenton Forge-Tender",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kithkin-brinefarer"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$kithkin-brinefarer",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Burrenton Forge-Tender",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Goblin Piker",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$kithkin-brinefarer": "$bob"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+{
+  "description": "CR 601.2b choosing one of the two destroys only that mode's target",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Vandalize",
+            "label": "vandalize",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Bonesplitter",
+            "label": "bonesplitter",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$vandalize",
+          "targets": [
+            "$bonesplitter"
+          ],
+          "modes": [
+            0
+          ],
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4",
+            "$mountain-5"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Bonesplitter",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Forest",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Vandalize",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Vandalize",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Bonesplitter",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-5",
+        "tapped": true
+      }
+    }
+  ]
+}

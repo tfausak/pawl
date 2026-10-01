@@ -1,0 +1,125 @@
+{
+  "description": "CR 603.6c whole card: Unsummon returns alice's Piker and Justice grows",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Justice, Vance Astrovik",
+            "label": "justice-vance-astrovik",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Unsummon",
+            "label": "unsummon",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$justice-vance-astrovik",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$unsummon",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$island"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Unsummon",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Unsummon",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$justice-vance-astrovik",
+        "power": 3,
+        "toughness": 3
+      }
+    },
+    {
+      "Counters": {
+        "object": "$justice-vance-astrovik",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    }
+  ]
+}

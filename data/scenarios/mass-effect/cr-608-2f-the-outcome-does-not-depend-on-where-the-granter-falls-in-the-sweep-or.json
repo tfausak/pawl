@@ -1,0 +1,136 @@
+{
+  "description": "CR 608.2f the outcome does not depend on where the granter falls in the sweep order",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "The Walls of Ba Sing Se",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Day of Judgment",
+            "label": "day-of-judgment",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$day-of-judgment",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "The Walls of Ba Sing Se",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Day of Judgment",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Day of Judgment",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "The Walls of Ba Sing Se",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-4",
+        "tapped": true
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    }
+  ]
+}

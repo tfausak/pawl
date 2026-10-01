@@ -1,0 +1,168 @@
+{
+  "description": "CR 609.3 a group with no matching member sends every one of the four to the graveyard",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mulch",
+            "label": "mulch",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Bird Maiden"
+          },
+          {
+            "card": "Murder"
+          },
+          {
+            "card": "Bird Maiden"
+          },
+          {
+            "card": "Bird Maiden"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Murder"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$mulch",
+          "mana": [
+            "$forest",
+            "$forest-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Mulch",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Bird Maiden",
+        "count": 3
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Mulch",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Murder",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Bird Maiden",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Murder",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Mountain",
+          "Murder"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Hand",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": [
+          "Bird Maiden",
+          "Murder#2",
+          "Bird Maiden#2",
+          "Bird Maiden#3",
+          "Mulch"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+  "description": "CR 704.5c Ichor Rats' counter is carol's tenth, and she loses the game",
+  "note": "carol's loss is read through alice's defending players: with carol still in the game they are bob and carol, and with her gone bob alone; the result staying null shows alice and bob still playing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ichor Rats",
+            "label": "ichor-rats",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol",
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 9
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ichor-rats",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PlayerCounters": {
+          "player": "carol",
+          "kind": {
+            "type": "Poison"
+          },
+          "count": 10
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PlayerCounters": {
+          "player": "alice",
+          "kind": {
+            "type": "Poison"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Result",
+          "is": null
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Defenders": {
+          "players": [
+            "bob"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Ichor Rats",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Ichor Rats",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Ichor Rats",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Ichor Rats",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Ichor Rats",
+        "power": 2,
+        "toughness": 1
+      }
+    }
+  ]
+}

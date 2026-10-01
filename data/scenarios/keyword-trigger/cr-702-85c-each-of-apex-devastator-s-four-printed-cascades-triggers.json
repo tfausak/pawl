@@ -1,0 +1,462 @@
+{
+  "description": "CR 702.85c each of Apex Devastator's four printed cascades triggers",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-5",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-6",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-7",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-8",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Apex Devastator",
+            "label": "apex-devastator",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Hill Giant"
+          },
+          {
+            "card": "Russet Wolves"
+          },
+          {
+            "card": "Giant Spider"
+          },
+          {
+            "card": "Think Twice"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OrderTriggers",
+          "with": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$apex-devastator",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4",
+            "$mountain-5",
+            "$mountain-6",
+            "$mountain-7",
+            "$mountain-8",
+            "$forest",
+            "$forest-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Apex Devastator",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Giant Spider",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Hill Giant",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Russet Wolves",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Apex Devastator",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Giant Spider",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Hill Giant",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Russet Wolves",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-7",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-8",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Goblin Piker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Goblin Piker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Hill Giant",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Hill Giant",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Hill Giant",
+        "power": 3,
+        "toughness": 3
+      }
+    },
+    {
+      "Damage": {
+        "object": "Russet Wolves",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Russet Wolves",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Russet Wolves",
+        "power": 3,
+        "toughness": 3
+      }
+    },
+    {
+      "Damage": {
+        "object": "Giant Spider",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Giant Spider",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Giant Spider",
+        "power": 2,
+        "toughness": 4
+      }
+    },
+    {
+      "Damage": {
+        "object": "Apex Devastator",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Apex Devastator",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Apex Devastator",
+        "power": 10.0,
+        "toughness": 10.0
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Battlefield",
+        "is": [
+          "$mountain",
+          "$mountain-2",
+          "$mountain-3",
+          "$mountain-4",
+          "$mountain-5",
+          "$mountain-6",
+          "$mountain-7",
+          "$mountain-8",
+          "$forest",
+          "$forest-2",
+          "Goblin Piker",
+          "Hill Giant",
+          "Russet Wolves",
+          "Giant Spider",
+          "Apex Devastator"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Think Twice"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": []
+      }
+    }
+  ]
+}

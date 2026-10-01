@@ -1,0 +1,266 @@
+{
+  "description": "CR 119.7 a redistribution's lowered total is a life loss the row resizes",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bloodletter of Aclazotz",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-6",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-7",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-8",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Reverse the Sands",
+            "label": "reverse-the-sands",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 30
+      },
+      {
+        "name": "carol",
+        "life": 12
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseRedistribution",
+          "with": [
+            [
+              "alice",
+              "carol"
+            ],
+            [
+              "bob",
+              "alice"
+            ],
+            [
+              "carol",
+              "bob"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$reverse-the-sands",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            "$plains-5",
+            "$plains-6",
+            "$plains-7",
+            "$plains-8"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 10
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 12
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "carol",
+          "life": 30
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Reverse the Sands",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Reverse the Sands",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains-3",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains-4",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains-5",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains-6",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains-7",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$plains-8",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

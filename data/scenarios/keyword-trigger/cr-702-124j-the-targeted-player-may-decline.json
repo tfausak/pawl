@@ -1,0 +1,209 @@
+{
+  "description": "CR 702.124j the targeted player may decline",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Silvar, Devourer of the Free",
+            "label": "silvar-devourer-of-the-free",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Trynn, Champion of Freedom"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Trynn, Champion of Freedom"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Trynn, Champion of Freedom"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$silvar-devourer-of-the-free",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$mountain",
+            "$mountain-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "partnered",
+              [
+                [
+                  "Player",
+                  "carol"
+                ]
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseOptional",
+          "with": {
+            "type": "Declines"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Silvar, Devourer of the Free",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Silvar, Devourer of the Free",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Silvar, Devourer of the Free",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Silvar, Devourer of the Free",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Silvar, Devourer of the Free",
+        "power": 4,
+        "toughness": 2
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "carol",
+        "zone": "Hand",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "carol",
+        "zone": "Library",
+        "is": [
+          "Goblin Piker",
+          "Trynn, Champion of Freedom#3"
+        ]
+      }
+    }
+  ]
+}
