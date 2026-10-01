@@ -2857,6 +2857,26 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
         afterPaired = S.settleSba paired
     Spec.assertBool s (not (S.onBattlefield firstWard afterPaired) && not (S.onBattlefield secondWard afterPaired)) "CR 702.16n: each Ward's protection from white buries the other"
     Spec.assertBool s (S.onBattlefield firstWard afterAlone) "and a lone Ward stays on the creature it protects"
+  -- CR 607.2d's "the chosen color" read in the GRANTER's frame: Cho-Manno's
+  -- Blessing's choice, not the Piker's, which has none. A pair of boards
+  -- differing only in that choice, with a white and a black Aura beside the
+  -- white Blessing, so each choice buries exactly one of them and the white one
+  -- also needs CR 702.16n's "this Aura". The stamp stands in for the entry
+  -- choice, whose road Pawl.ColorSpec's Gauntlet of Power case proves.
+  Spec.it s "CR 702.16n whole cards: Cho-Manno's Blessing buries the Aura of the colour it chose, and spares itself" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    blessing <- S.printingOf s registry "Cho-Manno's Blessing"
+    pacifism <- S.printingOf s registry "Pacifism"
+    strength <- S.printingOf s registry "Unholy Strength"
+    let (host, base1) = S.addPermanent piker S.alice S.threePlayerGame
+        (blessingId, base2) = S.addPermanent blessing S.alice base1
+        (pacifismId, base3) = S.addPermanent pacifism S.alice (S.attach blessingId host base2)
+        (strengthId, base4) = S.addPermanent strength S.alice (S.attach pacifismId host base3)
+        wearing = S.attach strengthId host base4
+        chose color = S.settleSba (wearing {GameState.objects = Map.adjust (\o -> o {Object.chosenColor = Just color}) blessingId (GameState.objects wearing)})
+        standing gs = (S.onBattlefield blessingId gs, S.onBattlefield pacifismId gs, S.onBattlefield strengthId gs)
+    Spec.assertEqWith s "CR 607.2d / 704.5m: the Blessing that chose black buries Unholy Strength alone" (standing (chose Color.Black)) (True, True, False)
+    Spec.assertEqWith s "CR 702.16n: the one that chose white buries Pacifism and spares itself" (standing (chose Color.White)) (True, False, True)
   -- CR 702.16k's Aura sentence: "Such a permanent or player ... can't be
   -- enchanted by Auras that player controls." True-Name Nemesis, whose quality is
   -- Filter.OfChosenPlayer -- read by Pawl.Engine.AttachRestriction.barredBy
