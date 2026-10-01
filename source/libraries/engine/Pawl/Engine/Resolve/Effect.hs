@@ -111,6 +111,8 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
@@ -7859,9 +7861,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let attackers = case attackerRef of
               RestrictedCreatures.Named ref -> fmap RestrictedCreatures.Named (objectRefObjects legal resolving controller source gs ref)
               RestrictedCreatures.Matching f -> [RestrictedCreatures.Matching (Filter.bakeBound (Binding.playersIn legal) f)]
-            -- Through playerRefPlayers so the ref is read exactly as every other
-            -- opcode reads one, CR 608.2b's empty answer included.
-            defenders = playerRefPlayers legal controller gs defenderRef
+            -- Through playerRefPlayers and objectRefObjects so a ref is read
+            -- exactly as every other opcode reads one, CR 608.2b's empty answer
+            -- included. A permanent becomes the announcement CR 508.1b names it
+            -- by as of now -- a planeswalker (CR 306.6) or a battle (CR 310.5)
+            -- -- and anything else stores nothing. One no longer attackable at
+            -- the declaration is pruned there by membership
+            -- (Pawl.Engine.AttackRequirement's fromStored).
+            defenders = case defenderRef of
+              AttackTargetRef.Players ref -> fmap AttackTarget.OfPlayer (playerRefPlayers legal controller gs ref)
+              AttackTargetRef.Permanents ref -> Maybe.mapMaybe announcement (objectRefObjects legal resolving controller source gs ref)
+            announcement oid
+              | Projection.isPlaneswalkerOf oid gs = Just (AttackTarget.OfPlaneswalker oid)
+              | Projection.isBattleOf oid gs = Just (AttackTarget.OfBattle oid)
+              | otherwise = Nothing
             (ts, gs1) = Game.freshTimestamp gs
             stored = do
               attacker <- attackers

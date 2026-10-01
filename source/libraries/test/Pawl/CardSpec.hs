@@ -79,6 +79,7 @@ import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Behold as Behold
@@ -657,7 +658,8 @@ objectRefPositions =
         ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (PlayerRef.Relative PlayerRelation.You) (plantedRef "gv")), [plantedRef "gv"]),
         ("require-block", Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfTurn (plantedRef "rb-blocker") (plantedRef "rb-attacker")), [plantedRef "rb-blocker", plantedRef "rb-attacker"]),
         ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
-        ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (PlayerRef.Relative PlayerRelation.You)), [plantedRef "ra"]),
+        ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (AttackTargetRef.Players (PlayerRef.Relative PlayerRelation.You))), [plantedRef "ra"]),
+        ("require-attack-permanent", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "rp-attacker")) (AttackTargetRef.Permanents (plantedRef "rp-defender"))), [plantedRef "rp-attacker", plantedRef "rp-defender"]),
         ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
         ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
         ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
@@ -712,7 +714,7 @@ playerRefPositions =
         ("skip-next-phase", Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase (plantedPlayer "sn") PhaseSelector.CombatPhase), [plantedPlayer "sn"]),
         ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
         ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
-        ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
+        ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "ra")) (AttackTargetRef.Players (plantedPlayer "ra-defender"))), [plantedPlayer "ra-defender"]),
         ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (plantedPlayer "gv") (plantedRef "gv")), [plantedPlayer "gv"]),
         ("blight", Effect.Blight (Blight.MkBlight (plantedPlayer "bl") one Nothing), [plantedPlayer "bl"]),
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
@@ -5926,12 +5928,18 @@ effectFilters effect = case effect of
       RestrictedCreatures.Named ref -> frame SourceHostFramed (objectRefFilters ref)
       RestrictedCreatures.Matching f -> unframed [f]
   -- ForbidAttack's arm: the Matching class is read through a bare
-  -- Filter.contextFor at Pawl.Engine.AttackRequirement. The PlayerRef carries no
-  -- Filter.
-  Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker _) ->
-    frame Unframed (durationFilters duration) <> case attacker of
-      RestrictedCreatures.Named ref -> frame SourceHostFramed (objectRefFilters ref)
-      RestrictedCreatures.Matching f -> unframed [f]
+  -- Filter.contextFor at Pawl.Engine.AttackRequirement. A defender naming
+  -- players carries no Filter; one naming permanents is an ObjectRef like the
+  -- Named attacker.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker defender) ->
+    frame Unframed (durationFilters duration)
+      <> ( case attacker of
+             RestrictedCreatures.Named ref -> frame SourceHostFramed (objectRefFilters ref)
+             RestrictedCreatures.Matching f -> unframed [f]
+         )
+      <> case defender of
+        AttackTargetRef.Players _ -> []
+        AttackTargetRef.Permanents ref -> frame SourceHostFramed (objectRefFilters ref)
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []

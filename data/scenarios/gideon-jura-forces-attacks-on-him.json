@@ -1,0 +1,38 @@
+{
+  "description": "CR 508.1d / 611.2c whole cards: after Gideon Jura's +2, bob's creatures attack Gideon on his next turn, the Chariot cast afterwards too",
+  "note": "bob declines twice: CR 508.1d rejects the first decline and the repeat degrades to the declaration obeying the most requirements, so what the creatures attack is the engine's answer to 'attack Gideon Jura'. Goblin Chariot has haste and is cast after the ability resolved, so only a class re-read at the declaration reaches it.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Gideon Jura", "label": "gideon", "counters": [{ "key": { "type": "Loyalty" }, "value": 6 }] }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Mountain", "label": "m3" }
+        ],
+        "hand": [{ "card": "Goblin Chariot", "label": "chariot" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@gideon", "ability": 0, "targets": ["@bob"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "@gideon", "kind": { "type": "Loyalty" }, "count": 8 } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@chariot", "mana": ["@m1", "@m2", "@m3"] } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@gideon", "Goblin Chariot": "@gideon" } } } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Counters": { "object": "@gideon", "kind": { "type": "Loyalty" }, "count": 4 } } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

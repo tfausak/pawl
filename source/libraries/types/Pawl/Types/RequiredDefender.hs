@@ -5,8 +5,8 @@ module Pawl.Types.RequiredDefender where
 -- creatures attack enchanted creature's controller each combat if able".
 --
 -- Pawl.Types.ActiveAttackRequirement, the resolution-created sibling, states the
--- same axis as a bare PlayerId, because its producer TARGETS the player (CR
--- 115.1). A static ability has no target and no slot, so neither
+-- same axis as a Pawl.Types.AttackTarget, because its producer's ref is read
+-- once at resolution. A static ability has no resolution and no slot, so neither
 -- Pawl.Types.PlayerRef -- whose ControllerOf arm names a slot -- nor
 -- Pawl.Types.PlayerScope -- resolved against CR 109.5's "you", which is the
 -- Aura's controller and not the enchanted creature's -- can say this.

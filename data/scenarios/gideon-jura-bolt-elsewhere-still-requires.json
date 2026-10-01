@@ -1,0 +1,34 @@
+{
+  "description": "CR 508.1d whole cards: with Gideon Jura still on the battlefield, his +2 sends bob's Piker at him",
+  "note": "The control for gideon-jura-gone-requires-nothing, differing only in the Bolt's target. bob declines twice: CR 508.1d rejects the first decline and the repeat degrades to the declaration obeying the most requirements.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Gideon Jura", "label": "gideon", "counters": [{ "key": { "type": "Loyalty" }, "value": 1 }] }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Mountain", "label": "m1" }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@gideon", "ability": 0, "targets": ["@bob"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@alice"], "mana": ["@m1"] } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@gideon" } } } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 17 } } }
+  ]
+}
