@@ -1,0 +1,33 @@
+{
+  "description": "Dack's Duplicate copies a creature and gains haste and dethrone (CR 707.9a)",
+  "note": "The control: a Clone copying the same Goblin Piker, the copy without the exception, entering the same turn. Without haste CR 302.6 bars it, so no attacker is offered, the declaration is never asked, and nothing attacks: an engine offering the sick Clone would raise an unscheduled prompt. It takes no dethrone counter and is still the Piker's 2/1.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 15,
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [{ "card": "Clone", "label": "clone" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 2, "toughness": 1 } } }
+  ]
+}

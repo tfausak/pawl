@@ -1,0 +1,31 @@
+{
+  "description": "CR 616.1c the copy bucket outranks Kismet's, so no order is asked",
+  "note": "alice's entering Clone meets two entry replacements: its own copy choice (CR 616.1c) and bob's Kismet (CR 616.1e). The copy is alone in the highest non-empty bucket, so no ChooseReplacement is raised; an unscheduled one would fail the run. Both orders converge on the same board, so the Clone being the Piker's 2/1 and tapped only shows Kismet really was a second candidate.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Clone", "label": "clone" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Kismet" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["@island-1", "@island-2", "@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "Clone", "tapped": true } } }
+  ]
+}

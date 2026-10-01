@@ -40,6 +40,9 @@ data Move
     ChooseToPay Paying.Paying
   | -- | CR 612.1: the land or creature type a text-changing effect swaps.
     ChooseTypeSwap TypeSwap.TypeSwap
+  | -- | CR 707.5 / 614.12a: what an object entering as a copy copies, Nothing
+    -- declining the card's "may".
+    ChooseCopyTarget (Maybe Reference.Reference)
   | -- | CR 601.2c / 603.3d: the targets of each slot a prompt outside a cast
     -- or activation offers, which also answers its announcement of how many.
     ChooseTargets (Map.Map SlotName.SlotName (Seq.Seq Reference.Reference))
