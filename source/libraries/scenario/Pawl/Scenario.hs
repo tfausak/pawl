@@ -120,7 +120,7 @@ data Rehearsal = MkRehearsal
   { queues :: Map.Map When.When (Seq.Seq Timed.Timed),
     staged :: Staged.Staged,
     pending :: Maybe (When.When, Move.Move, Choices.Choices),
-    refused :: Maybe (When.When, Move.Move, Text.Text)
+    refusing :: Maybe (When.When, Move.Move, Text.Text)
   }
 
 type Run = State.StateT Rehearsal (Either Failure.ScenarioFailure)
@@ -170,13 +170,13 @@ rehearsalOf timeline board =
         { queues = Foldable.foldl' add Map.empty timeline,
           staged = board,
           pending = Nothing,
-          refused = Nothing
+          refusing = Nothing
         }
 
 -- | What a finished run still owes: choices its last action never used, and
 -- entries whose moment never came, told apart by whether any is a move.
 settle :: Rehearsal -> GameState.GameState -> Either Failure.ScenarioFailure ()
-settle rehearsal final = case (pending rehearsal, refused rehearsal) of
+settle rehearsal final = case (pending rehearsal, refusing rehearsal) of
   (Just (key, verb, choices), _)
     | choices /= Choices.none -> Left (Failure.MkUnusedActionChoices key verb choices)
   (_, Just (key, verb, _)) -> Left (Failure.MkUnrefusedMove key verb Nothing)
@@ -355,12 +355,12 @@ answerPrompt asked = do
     else do
       -- CR 733.1: a refused move is reversed, so the engine's next prompt is
       -- the one it answered, asked again.
-      refusal <- State.gets refused
+      refusal <- State.gets refusing
       case refusal of
         Just (key, verb, answered)
           | answered /= kind || decider /= Just (When.player key) || GameState.turnNumber gs /= When.turn key || GameState.phase gs /= When.phase key ->
               failWith (Failure.MkUnrefusedMove key verb (Just kind))
-        _ -> State.modify' (\rehearsal -> rehearsal {refused = Nothing})
+        _ -> State.modify' (\rehearsal -> rehearsal {refusing = Nothing})
       waiting <- State.gets pending
       case waiting of
         Just (key, verb, choices)
@@ -573,6 +573,7 @@ answerActionPrompt gs pid actions = do
         popAt key index
         State.modify' (\rehearsal -> rehearsal {pending = Just (key, verb, choicesOf verb)})
         pure chosen
+      (Nothing, Entry.Refuse _) -> pure Action.Pass
       (Nothing, Entry.Expect _) -> pure Action.Pass
 
 -- | The checks at the head of a moment's queue, evaluated and taken in order,
@@ -736,7 +737,7 @@ onEntry unscheduled key kind offers select match = do
       Entry.Refuse verb
         | Just action <- match verb -> do
             popAt key index
-            State.modify' (\rehearsal -> rehearsal {refused = Just (key, verb, kind)})
+            State.modify' (\rehearsal -> rehearsal {refusing = Just (key, verb, kind)})
             action
       entry -> failWith (Failure.MkUnexpectedPrompt key entry kind offers)
 
