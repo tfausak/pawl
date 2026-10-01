@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve.Slots as Slots
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -3086,7 +3087,7 @@ stateTriggers gs
       let live ab = liveCondition (TriggeredAbility.condition ab)
           liveCondition condition = case condition of
             TriggerCondition.StateIs cond ->
-              Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just ctrl) (Just oid)) gs oid cond
+              Condition.holds (Projection.fullView gs) (SourceContext.sourceContext gs (Just ctrl) oid) gs oid cond
             TriggerCondition.SelfEnters -> False
             -- CR 309.4c is an EVENT trigger too: the marker MOVING into the room
             -- is what fires it, not the marker sitting there.
