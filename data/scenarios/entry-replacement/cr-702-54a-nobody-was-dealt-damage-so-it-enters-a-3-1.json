@@ -1,0 +1,129 @@
+{
+  "description": "CR 702.54a nobody was dealt damage, so it enters a 3/1",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Bloodrage Vampire",
+            "label": "bloodrage-vampire",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ogre Sentry",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bloodrage-vampire",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Bloodrage Vampire",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Bloodrage Vampire",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Bloodrage Vampire",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Bloodrage Vampire",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Bloodrage Vampire",
+        "power": 3,
+        "toughness": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "Bloodrage Vampire",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

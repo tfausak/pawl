@@ -1,0 +1,120 @@
+{
+  "description": "CR 702.44a three mana of one colour are one counter",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Suntouched Myr",
+            "label": "suntouched-myr",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$suntouched-myr",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Suntouched Myr",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Suntouched Myr",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Suntouched Myr",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Suntouched Myr",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Suntouched Myr",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "Suntouched Myr",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    }
+  ]
+}
