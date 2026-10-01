@@ -699,10 +699,28 @@ chosenValueCounts admitted tag card =
 -- is filled: a static ability's affected set (Pawl.Engine.Projection.affectsWith),
 -- an ability's target slot (Pawl.Engine.Target.slotContext) and an activated
 -- ability's cost (Pawl.Engine.Cost's pools and
--- Pawl.Engine.Replacement.matchesPermanent). Everywhere else -- a trigger
+-- Pawl.Engine.Replacement.matchesPermanent) -- plus a static grant's bare
+-- protection quality (grantedChosenColors). Everywhere else -- a trigger
 -- condition, a resolution's filters, a CR 604.2 clause -- it is a silent False.
 hasChosenColorCounts :: Face.Face Card.Type.Card -> (Int, Int)
-hasChosenColorCounts = chosenValueCounts [AffectedSetFramed, InTargetSlot, ActivationCostFramed] hasChosenColorTag
+hasChosenColorCounts card =
+  let (framed, elsewhere) = chosenValueCounts [AffectedSetFramed, InTargetSlot, ActivationCostFramed] hasChosenColorTag card
+      granted = grantedChosenColors card
+   in (framed + granted, elsewhere - granted)
+
+-- CR 607.2d's "protection from the chosen color" granted by a STATIC ability:
+-- the one keyword position the colour is answered at, since
+-- Pawl.Engine.Keyword.grantedBy bakes the granter's choice into a BARE quality
+-- as Pawl.Engine.Projection applies the grant (Cho-Manno's Blessing). The atom
+-- buried in a quality, or granted by a resolution, stays an offence.
+grantedChosenColors :: Face.Face Card.Type.Card -> Int
+grantedChosenColors card =
+  length
+    [ ()
+    | ability <- Face.staticAbilities card,
+      Modification.GainKeyword (Keyword.Protection protection) <- NonEmpty.toList (StaticAbility.modifications ability),
+      Protection.quality protection == Filter.Type.HasChosenColor
+    ]
 
 -- CR 205.3's chosen subtype in the same positions, plus CR 106.6's restriction,
 -- which Pawl.Engine.Mana.admitsUnder answers off the mana unit (Pillar of
@@ -3156,6 +3174,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- so a framing that stopped marking one would redden.
     Monad.forM_
       [ ("Caged Sun", hasChosenColorCounts, "an affected set", (1, 0)),
+        ("Cho-Manno's Blessing", hasChosenColorCounts, "a static grant's protection quality", (1, 0)),
         ("Pentarch Paladin", hasChosenColorCounts, "an activated ability's target slot", (1, 0)),
         ("Obelisk of Urd", hasChosenSubtypeCounts, "an affected set", (1, 0)),
         ("Doom Cannon", hasChosenSubtypeCounts, "an activated ability's cost", (1, 0)),

@@ -201,10 +201,12 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
         -- keyword count twice. Keyword.grantedBy bakes the granter into CR
-        -- 702.16n's "this Aura";
-        -- data/scenarios/white-ward-second-copy-buries-both.json proves it.
+        -- 702.16n's "this Aura" and its entry choice into CR 607.2d's "the
+        -- chosen color"; Pawl.AuraSpec's White Ward and Cho-Manno's Blessing
+        -- cases prove them.
         Modification.GainKeyword k ->
-          pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src k) 1 (PC.keywords pc)}
+          let chosen = Game.lookupObject src gs >>= Object.chosenColor
+           in pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src chosen k) 1 (PC.keywords pc)}
         -- CR 613.1f layer 6 / CR 202.1a: the same grant, with the keyword's
         -- [cost] read off the RECEIVING object rather than written on the granter
         -- -- "the scavenge cost is equal to its mana cost".
