@@ -489,7 +489,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 725 an exiledUntilMonarch entry KEYED on the departing player's own object is dropped" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (onField, g1) = S.addPermanent piker S.bob S.threePlayerGame
-        exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField (MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = False})}
+        exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField (MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = Nothing})}
         gone = S.departs Departure.Type.Conceded S.bob exiled
     Spec.assertEqWith s "the entry keyed on bob's own (now-gone) object is dropped" (GameState.exiledUntilMonarch gone) Map.empty
 

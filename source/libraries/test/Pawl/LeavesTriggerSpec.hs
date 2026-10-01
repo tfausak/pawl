@@ -593,6 +593,20 @@ spiritMascotSpec s registry =
           Spec.assertEqWith s "one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne mascotId after) 1
           Spec.assertEqWith s "exactly one trigger reached the stack" (length (GameState.stack (S.runPure S.identityAnswer gone Engine.settleForPriority))) 1
           Spec.assertEqWith s "and both cards really did leave: alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+        -- CR 608.2f through a real effect: Rest in Peace ({1}{W} Enchantment,
+        -- "When this enchantment enters, exile all graveyards. / If a card or
+        -- token would be put into a graveyard from anywhere, exile it
+        -- instead."; Oracle checked against Scryfall 2026-10-01) exiles three
+        -- cards as one event, so the Mascot takes one counter, not three.
+        Spec.it s "CR 608.2f Rest in Peace exiling three cards from alice's graveyard puts ONE counter on the Mascot" $ do
+          (mascotId, _, _, gs) <- board S.alice
+          mountain <- S.printingOf s registry "Mountain"
+          restInPeace <- S.printingOf s registry "Rest in Peace"
+          let (_, withThird) = S.addGraveyardCard mountain S.alice gs
+              (_, entered) = S.entersWithTrigger restInPeace S.alice withThird
+              after = resolveWholeStack (S.runPure S.identityAnswer (resolveWholeStack (S.runPure S.identityAnswer entered Engine.settleForPriority)) Engine.settleForPriority)
+          Spec.assertEqWith s "CR 603.2c the printed 2/2 is a 3/3, not the 5/5 a per-card exile would leave" (Projection.powerOf mascotId after, Projection.toughnessOf mascotId after) (Just 3, Just 3)
+          Spec.assertEqWith s "and all three cards really did leave: alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
         -- "Your graveyard", one difference from the proving case: the two cards
         -- leave bob's graveyard instead, with the same Mascot watching.
         Spec.it s "CR 400.3 the same two cards leaving bob's graveyard put no counter on alice's Mascot" $ do
