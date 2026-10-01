@@ -1,0 +1,38 @@
+{
+  "description": "CR 603.2c The Raven's Warning draws once per player its flyers hit in one combat damage step",
+  "note": "Chapter II arms as the precombat main phase begins. One Bird Maiden attacks bob and the other carol, so one combat damage step holds two damaged players and the delayed trigger fires once for each: two cards drawn, where one trigger for the whole step would draw one.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "The Raven's Warning", "label": "raven", "ready": true, "counters": [{ "key": { "type": "Lore" }, "value": 1 }] },
+          { "card": "Bird Maiden", "label": "first", "ready": true },
+          { "card": "Bird Maiden", "label": "second", "ready": true }
+        ],
+        "library": [{ "card": "Plains" }, { "card": "Plains" }, { "card": "Plains" }]
+      },
+      {
+        "name": "bob",
+        "hand": [{ "card": "Island" }],
+        "library": [{ "card": "Island" }]
+      },
+      {
+        "name": "carol",
+        "hand": [{ "card": "Swamp" }],
+        "library": [{ "card": "Swamp" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@first", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@second", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@raven", "@raven"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 2 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 19 } } }
+  ]
+}

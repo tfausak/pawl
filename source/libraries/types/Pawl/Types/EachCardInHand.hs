@@ -19,8 +19,10 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- matched is read off what left the zone. pawl models CR 400.2 as a rules
 -- property -- which pools and slots may name a hidden zone -- rather than as
 -- information hiding in Pawl.Types.GameState, so what makes this arm legitimate
--- is that its producer PRINTS the reveal (CR 701.20a) that shows the hand first.
--- A card sweeping a hand it does not reveal would leak, and none is written.
+-- is that its producer PRINTS the reveal (CR 701.20a) that shows the hand first,
+-- or the look (CR 701.20e) that shows it to the card's controller (The Raven's
+-- Warning). A card sweeping a hand it neither reveals nor looks at would leak,
+-- and none is written.
 --
 -- The Filter is OPTIONAL, Pawl.Types.ObjectRef.EachCardExiledWithSource's
 -- reason: Pawl.Types.Filter has no tautological arm, so "reveals their hand" --

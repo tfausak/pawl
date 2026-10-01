@@ -216,18 +216,20 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
     maybe id Binding.setTriggerPlayer (Recipient.playerOf (DamageEvent.target ev)) (Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty))
   -- CR 603.2c's batch reading: the damagers' CONTROLLER, Norn's Decree's "that
   -- opponent", off the same `postEventView` the matcher read the Filter
-  -- through, so "whose was it" and "did it qualify" come from one sample. One
-  -- seat per member, and one per trigger: `batchPartition` below is what splits
-  -- the batch by it.
+  -- through, so "whose was it" and "did it qualify" come from one sample. And
+  -- the DAMAGED PLAYER under `triggerPlayer`, Feline Sovereign's "that player
+  -- controls". One seat each per member, and one each per trigger:
+  -- `batchPartition` below is what splits the batch by both.
   --
   -- Unconditional given a match: that matcher answers False for a damager with
-  -- no view, and a permanent's view always carries its controller.
+  -- no view or a recipient that is no player, and a permanent's view always
+  -- carries its controller.
   --
   -- The sample is a regression fence here: no board in the suite changes a
   -- damager's controller between the damage and the scan.
   (TriggerCondition.PermanentsDealCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     let damager = DamageEvent.source ev
-     in maybe id Binding.setDamagersController (Filter.controller =<< postEventView board gs damager) Map.empty
+     in maybe id Binding.setTriggerPlayer (Recipient.playerOf (DamageEvent.target ev)) (maybe id Binding.setDamagersController (Filter.controller =<< postEventView board gs damager) Map.empty)
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -1048,33 +1050,40 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- 603.7c's captured environment instead.
   _ -> Map.empty
 
--- CR 603.2c's second sentence inside one batch: the seat that splits a
+-- CR 603.2c's second sentence inside one batch: the seats that split a
 -- batch-scoped condition's group into several occurrences, read off the
--- bindings eventBindings stamped for one member. Norn's Decree's "one or more
--- creatures AN OPPONENT controls" is one occurrence per opponent whose creatures
--- connected, CR 726.2's "a player controls" grouped the same way by
--- Pawl.Engine.Initiative.inherentPending. Nothing for every other batch-scoped
--- condition, whose group is one occurrence whole.
+-- bindings eventBindings stamped for one member. Empty for every other
+-- batch-scoped condition, whose group is one occurrence whole.
 --
--- The controller for EVERY PermanentsDealCombatDamageToPlayer, since each
--- printing in data/cards/ names it -- "you control", "an opponent controls" --
--- and a "you" is one seat.
+-- For PermanentsDealCombatDamageToPlayer, the damagers' controller and the
+-- damaged player. The controller because each printing in data/cards/ names
+-- it -- "you control", "an opponent controls" -- and Norn's Decree's "one or
+-- more creatures AN OPPONENT controls" is one occurrence per opponent whose
+-- creatures connected, CR 726.2's "a player controls" grouped the same way by
+-- Pawl.Engine.Initiative.inherentPending. The damaged player because CR
+-- 506.2a and CR 508.1b let one CR 510.2 step damage several players, and "to
+-- a player" is one occurrence per player hit: Feline Sovereign's "that player
+-- controls" and The Raven's Warning's "that player's hand" name one seat.
+-- data/scenarios/card-trigger/cr-603-2c-feline-sovereign-triggers-once-per-player-its-cats-hit.json
+-- proves the split.
 --
 -- Not implemented: a batch naming no controller, one occurrence whoever's
 -- creatures connected -- Starscream, Power Hungry's "one or more creatures deal
 -- combat damage to you" (#4473).
-batchPartition :: TriggerCondition -> Map.Map SlotName.SlotName Binding -> Maybe PlayerId
+batchPartition :: TriggerCondition -> Map.Map SlotName.SlotName Binding -> Seq.Seq PlayerId
 batchPartition cond bindings = case cond of
-  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Map.lookup Binding.damagersController (Binding.playerSlots bindings)
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> seat Binding.damagersController <> seat Binding.triggerPlayer
   -- The branch that matched is the one that stamped, eventBindings' AnyOf arm's
   -- reading.
-  TriggerCondition.AnyOf conditions -> Maybe.listToMaybe (Maybe.mapMaybe (`batchPartition` bindings) conditions)
+  TriggerCondition.AnyOf conditions -> Maybe.fromMaybe Seq.empty (List.find (not . Seq.null) (fmap (`batchPartition` bindings) conditions))
   -- A wildcard where batchScoped is exhaustive: a batch condition splits only
   -- where an arm above says by what.
-  _ -> Nothing
+  _ -> Seq.empty
+  where
+    seat slot = maybe Seq.empty Seq.singleton (Map.lookup slot (Binding.playerSlots bindings))
 
 -- CR 603.2c's FIRST sentence, read back: a batch-scoped condition's trigger event
--- is the whole Pawl.Types.EventGroup (one `batchPartition` seat's share of it),
+-- is the whole Pawl.Types.EventGroup (one `batchPartition` key's share of it),
 -- so its bindings are the JOIN of what each member it matched contributes, in
 -- log order. Binding.amount ADDS across members -- "that many" counts the batch,
 -- not its first event -- and Binding.objects appends; every other field keeps
@@ -1336,11 +1345,12 @@ eventBindingSlots cond = case cond of
   -- card" reads -- the same slot the self-scoped arm above stamps. Guaranteed
   -- given a match: matchesTrigger admits only a player recipient here.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.fromList [Binding.combatDamager, Binding.eventAmount, Binding.triggerPlayer]
-  -- The damagers' CONTROLLER alone where the arm above binds three: the trigger
-  -- event is a whole CR 510.2 step split by that controller (CR 603.2c), so it is
-  -- the one seat every member of an occurrence shares. Norn's Decree's "that
-  -- opponent" is the reader.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.singleton Binding.damagersController
+  -- The damagers' CONTROLLER and the damaged player where the arm above binds
+  -- three: the trigger event is a whole CR 510.2 step split by both (CR
+  -- 603.2c), so they are the seats every member of an occurrence shares. Norn's
+  -- Decree's "that opponent" reads the first, Feline Sovereign's "that player"
+  -- the second.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.fromList [Binding.damagersController, Binding.triggerPlayer]
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.
