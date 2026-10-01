@@ -8,7 +8,6 @@ import qualified Pawl.Codec.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
-import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.CounterPlacement as CounterPlacement
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Codec.CreatureExploits as CreatureExploits
@@ -27,6 +26,7 @@ import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Codec.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.SpellCast as SpellCast
 import qualified Pawl.Codec.StepBegins as StepBegins
@@ -47,7 +47,6 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 codec :: Codec.Codec TriggerCondition.TriggerCondition
 codec =
   let filterCodec = Filter.codec Keyword.codec
-      counterKindCodec = CounterKind.codec Keyword.codec
    in Arm.tagged
         tagOf
         [ Arm.nullary "SelfEnters" TriggerCondition.SelfEnters,
@@ -132,8 +131,8 @@ codec =
           Arm.payload "PlayerLosesLife" PlayerRelation.codec TriggerCondition.PlayerLosesLife (\x -> case x of TriggerCondition.PlayerLosesLife y -> Just y; _ -> Nothing),
           Arm.payload "SelfCountersReached" SelfCountersReached.codec TriggerCondition.SelfCountersReached (\x -> case x of TriggerCondition.SelfCountersReached y -> Just y; _ -> Nothing),
           Arm.payload "SelfBecomesClassLevel" ClassLevel.codec TriggerCondition.SelfBecomesClassLevel (\x -> case x of TriggerCondition.SelfBecomesClassLevel y -> Just y; _ -> Nothing),
-          Arm.payload "SelfLastCounterRemoved" counterKindCodec TriggerCondition.SelfLastCounterRemoved (\x -> case x of TriggerCondition.SelfLastCounterRemoved y -> Just y; _ -> Nothing),
-          Arm.payload "SelfCountersRemoved" counterKindCodec TriggerCondition.SelfCountersRemoved (\x -> case x of TriggerCondition.SelfCountersRemoved y -> Just y; _ -> Nothing),
+          Arm.payload "SelfLastCounterRemoved" SelfCountersRemoved.codec TriggerCondition.SelfLastCounterRemoved (\x -> case x of TriggerCondition.SelfLastCounterRemoved y -> Just y; _ -> Nothing),
+          Arm.payload "SelfCountersRemoved" SelfCountersRemoved.codec TriggerCondition.SelfCountersRemoved (\x -> case x of TriggerCondition.SelfCountersRemoved y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsGetCounters" CounterPlacement.codec TriggerCondition.PermanentsGetCounters (\x -> case x of TriggerCondition.PermanentsGetCounters y -> Just y; _ -> Nothing),
           Arm.payload "PermanentGetsCounters" CounterPlacement.codec TriggerCondition.PermanentGetsCounters (\x -> case x of TriggerCondition.PermanentGetsCounters y -> Just y; _ -> Nothing),
           Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast (\x -> case x of TriggerCondition.SpellCast y -> Just y; _ -> Nothing),

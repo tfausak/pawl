@@ -1,57 +1,28 @@
 {
   "faces": [
     {
-      "characteristicPT": {
-        "type": "Count",
-        "value": {
-          "aggregation": {
-            "type": "Members"
-          },
-          "filter": {
-            "type": "And",
-            "value": [
-              {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Soldier"
-                }
-              },
-              {
-                "type": "ControlledBy",
-                "value": {
-                  "type": "You"
-                }
-              }
-            ]
-          },
-          "scope": {
-            "type": "InZone",
-            "value": {
-              "player": {
-                "type": "EachPlayer"
-              },
-              "zone": {
-                "type": "Battlefield"
-              }
-            }
-          }
-        }
-      },
       "keywords": [
+        {
+          "type": "Trample"
+        },
+        {
+          "type": "Vigilance"
+        },
         {
           "type": "Suspend",
           "value": {
             "cost": {
               "mana": [
                 {
-                  "type": "Variable"
+                  "type": "Generic",
+                  "value": 3
                 },
                 {
                   "type": "OfType",
                   "value": {
                     "type": "Colored",
                     "value": {
-                      "type": "White"
+                      "type": "Red"
                     }
                   }
                 },
@@ -67,8 +38,8 @@
               ]
             },
             "counters": {
-              "type": "Variable",
-              "value": 1
+              "type": "Literal",
+              "value": 4
             }
           }
         }
@@ -76,7 +47,16 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         },
         {
           "type": "OfType",
@@ -88,12 +68,71 @@
           }
         }
       ],
-      "name": "Benalish Commander",
+      "name": "Dinosaurs on a Spaceship",
       "power": {
-        "type": "Star"
+        "type": "Literal",
+        "value": 7
       },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Dinosaur"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": {
+                "power": {
+                  "type": "Literal",
+                  "value": 1
+                },
+                "toughness": {
+                  "type": "Literal",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Vigilance"
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Trample"
+              }
+            }
+          ]
+        }
+      ],
       "toughness": {
-        "type": "Star"
+        "type": "Literal",
+        "value": 7
       },
       "triggeredAbilities": [
         {
@@ -123,21 +162,32 @@
                                 "colorIndicator": [
                                   {
                                     "type": "White"
+                                  },
+                                  {
+                                    "type": "Red"
                                   }
                                 ],
-                                "name": "Soldier Token",
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  },
+                                  {
+                                    "type": "Haste"
+                                  }
+                                ],
+                                "name": "Dinosaur Token",
                                 "power": {
                                   "type": "Literal",
-                                  "value": 1
+                                  "value": 2
                                 },
                                 "toughness": {
                                   "type": "Literal",
-                                  "value": 1
+                                  "value": 2
                                 },
                                 "typeLine": {
                                   "subtypes": [
                                     {
-                                      "type": "Soldier"
+                                      "type": "Dinosaur"
                                     }
                                   ],
                                   "types": [
@@ -166,10 +216,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Human"
-          },
-          {
-            "type": "Soldier"
+            "type": "Dinosaur"
           }
         ],
         "types": [

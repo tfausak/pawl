@@ -5,15 +5,21 @@
         "type": "Count",
         "value": {
           "aggregation": {
-            "type": "Members"
+            "type": "Total",
+            "value": {
+              "type": "ObjectCounters",
+              "value": {
+                "type": "PlusOnePlusOne"
+              }
+            }
           },
           "filter": {
             "type": "And",
             "value": [
               {
-                "type": "HasSubtype",
+                "type": "HasCardType",
                 "value": {
-                  "type": "Soldier"
+                  "type": "Creature"
                 }
               },
               {
@@ -51,7 +57,7 @@
                   "value": {
                     "type": "Colored",
                     "value": {
-                      "type": "White"
+                      "type": "Green"
                     }
                   }
                 },
@@ -60,7 +66,7 @@
                   "value": {
                     "type": "Colored",
                     "value": {
-                      "type": "White"
+                      "type": "Green"
                     }
                   }
                 }
@@ -83,12 +89,12 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "White"
+              "type": "Green"
             }
           }
         }
       ],
-      "name": "Benalish Commander",
+      "name": "Fungal Behemoth",
       "power": {
         "type": "Star"
       },
@@ -115,49 +121,34 @@
                   {
                     "effects": [
                       {
-                        "type": "Create",
+                        "type": "PutCounters",
                         "value": {
-                          "card": {
-                            "faces": [
-                              {
-                                "colorIndicator": [
-                                  {
-                                    "type": "White"
-                                  }
-                                ],
-                                "name": "Soldier Token",
-                                "power": {
-                                  "type": "Literal",
-                                  "value": 1
-                                },
-                                "toughness": {
-                                  "type": "Literal",
-                                  "value": 1
-                                },
-                                "typeLine": {
-                                  "subtypes": [
-                                    {
-                                      "type": "Soldier"
-                                    }
-                                  ],
-                                  "types": [
-                                    {
-                                      "type": "Creature"
-                                    }
-                                  ]
-                                }
-                              }
-                            ]
+                          "kind": {
+                            "type": "PlusOnePlusOne"
                           },
                           "quantity": {
                             "type": "Literal",
                             "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
                           }
                         }
                       }
-                    ]
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
                   }
-                ]
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
               }
             ]
           }
@@ -166,10 +157,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Human"
-          },
-          {
-            "type": "Soldier"
+            "type": "Fungus"
           }
         ],
         "types": [

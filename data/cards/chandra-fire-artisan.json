@@ -155,7 +155,9 @@
           "condition": {
             "type": "SelfCountersRemoved",
             "value": {
-              "type": "Loyalty"
+              "kind": {
+                "type": "Loyalty"
+              }
             }
           },
           "modal": {

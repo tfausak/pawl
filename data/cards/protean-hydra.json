@@ -131,7 +131,9 @@
           "condition": {
             "type": "SelfCountersRemoved",
             "value": {
-              "type": "PlusOnePlusOne"
+              "kind": {
+                "type": "PlusOnePlusOne"
+              }
             }
           },
           "modal": {

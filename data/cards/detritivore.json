@@ -11,15 +11,18 @@
             "type": "And",
             "value": [
               {
-                "type": "HasSubtype",
+                "type": "HasCardType",
                 "value": {
-                  "type": "Soldier"
+                  "type": "Land"
                 }
               },
               {
-                "type": "ControlledBy",
+                "type": "Not",
                 "value": {
-                  "type": "You"
+                  "type": "HasSupertype",
+                  "value": {
+                    "type": "Basic"
+                  }
                 }
               }
             ]
@@ -28,10 +31,13 @@
             "type": "InZone",
             "value": {
               "player": {
-                "type": "EachPlayer"
+                "type": "Relative",
+                "value": {
+                  "type": "Opponent"
+                }
               },
               "zone": {
-                "type": "Battlefield"
+                "type": "Graveyard"
               }
             }
           }
@@ -47,20 +53,15 @@
                   "type": "Variable"
                 },
                 {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "White"
-                    }
-                  }
+                  "type": "Generic",
+                  "value": 3
                 },
                 {
                   "type": "OfType",
                   "value": {
                     "type": "Colored",
                     "value": {
-                      "type": "White"
+                      "type": "Red"
                     }
                   }
                 }
@@ -76,19 +77,28 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 2
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "White"
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
             }
           }
         }
       ],
-      "name": "Benalish Commander",
+      "name": "Detritivore",
       "power": {
         "type": "Star"
       },
@@ -115,49 +125,47 @@
                   {
                     "effects": [
                       {
-                        "type": "Create",
+                        "type": "Destroy",
                         "value": {
-                          "card": {
-                            "faces": [
-                              {
-                                "colorIndicator": [
-                                  {
-                                    "type": "White"
-                                  }
-                                ],
-                                "name": "Soldier Token",
-                                "power": {
-                                  "type": "Literal",
-                                  "value": 1
-                                },
-                                "toughness": {
-                                  "type": "Literal",
-                                  "value": 1
-                                },
-                                "typeLine": {
-                                  "subtypes": [
-                                    {
-                                      "type": "Soldier"
-                                    }
-                                  ],
-                                  "types": [
-                                    {
-                                      "type": "Creature"
-                                    }
-                                  ]
-                                }
-                              }
-                            ]
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "land"
                           },
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 1
+                          "regenerability": {
+                            "type": "Regenerable"
                           }
                         }
                       }
                     ]
                   }
-                ]
+                ],
+                "targetSlots": {
+                  "land": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Land"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Basic"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
+                    }
+                  }
+                }
               }
             ]
           }
@@ -166,10 +174,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Human"
-          },
-          {
-            "type": "Soldier"
+            "type": "Lhurgoyf"
           }
         ],
         "types": [

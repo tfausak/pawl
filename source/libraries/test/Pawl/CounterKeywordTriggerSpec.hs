@@ -70,6 +70,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -541,7 +542,7 @@ vanishingSpec s registry =
         -- and a mint that dropped one of the pair would repair it silently.
         Spec.it s "CR 702.63c each instance is its own three abilities" $ do
           let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)
-              emptied = TriggerCondition.SelfLastCounterRemoved CounterKind.Time
+              emptied = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Time Zone.Battlefield)
           Spec.assertEqWith
             s
             "vanishing 2 held twice mints four triggers, two of each kind"
@@ -638,7 +639,7 @@ numberlessVanishingSpec s registry =
         -- the absent number changes exactly one of the two lists.
         Spec.it s "CR 702.63b keeps both triggers and mints no entry rewrite" $ do
           let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)
-              emptied = TriggerCondition.SelfLastCounterRemoved CounterKind.Time
+              emptied = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Time Zone.Battlefield)
           Spec.assertEqWith
             s
             "both of rule 702.63a's triggers, numberless"

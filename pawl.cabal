@@ -1110,6 +1110,8 @@ library codec
     Pawl.Codec.SeatSpec
     Pawl.Codec.SelfCountersReached
     Pawl.Codec.SelfCountersReachedSpec
+    Pawl.Codec.SelfCountersRemoved
+    Pawl.Codec.SelfCountersRemovedSpec
     Pawl.Codec.SetBasePowerToughness
     Pawl.Codec.SetBasePowerToughnessSpec
     Pawl.Codec.SetClassLevel
@@ -2451,6 +2453,7 @@ library types
     Pawl.Types.SearchPlace
     Pawl.Types.Seat
     Pawl.Types.SelfCountersReached
+    Pawl.Types.SelfCountersRemoved
     Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetClassLevel
     Pawl.Types.SetHalfLocked
