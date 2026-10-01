@@ -5138,7 +5138,8 @@ mintedRemovalRestrictionsFor keyword =
 -- GRANTER's entry choice (Cho-Manno's Blessing), which the host's frame cannot
 -- read, so a bare Filter.HasChosenColor quality bakes it into Filter.HasColor,
 -- and into the empty Or -- protection from nothing -- where none was chosen.
--- Every printed grant states the quality as the bare atom.
+-- Pawl.FilterPositionLintSpec's grantedChosenColors admits the bare atom
+-- alone, so a card burying it is rejected rather than misread.
 grantedBy :: ObjectId -> Maybe Color.Color -> Keyword -> Keyword
 grantedBy granter chosen keyword = case keyword of
   Keyword.Protection protection ->
