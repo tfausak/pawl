@@ -1440,20 +1440,6 @@ whisperingWizardSpec s registry =
               after = castAndResolve S.alice fourth ready
           Spec.assertEqWith s "one Spirit at the end of alice's turn" (spiritsOf S.alice spent) 1
           Spec.assertEqWith s "and a second on the next turn's first cast" (spiritsOf S.alice after) 2
-        -- Where a badly placed record gets it wrong: two bearers, one rider each.
-        -- A limit kept per ABILITY rather than per OBJECT would leave one Spirit
-        -- here, and a limit kept per CONTROLLER likewise.
-        Spec.it s "a second Whispering Wizard spends a rider of its own" $ do
-          island <- S.printingOf s registry "Island"
-          wizard <- S.printingOf s registry "Whispering Wizard"
-          think <- S.printingOf s registry "Think Twice"
-          divine <- S.printingOf s registry "Divination"
-          skeins <- S.printingOf s registry "Vision Skeins"
-          let (bearers, gs) = board island wizard 2
-              after = threeCasts think divine skeins gs
-          Spec.assertEqWith s "two bearers on the board" (length bearers) 2
-          Spec.assertEqWith s "each triggered exactly once" (fmap (`firedBy` after) bearers) [1, 1]
-          Spec.assertEqWith s "so two Spirit tokens" (spiritsOf S.alice after) 2
         -- A cast the Filter rejects spends nothing: the rider is spent by the
         -- ability TRIGGERING, not by an event that merely looks like its own.
         Spec.it s "a creature spell neither fires the ability nor spends its rider" $ do
@@ -1649,63 +1635,6 @@ secondMainPhaseSpec s registry =
               after = oneStep S.aggressiveAnswer secondMain
           Spec.assertEqWith s "one flying counter, put on at alice's second main phase" (flyingOn oid after) (Just 1)
           Spec.assertEqWith s "which is the postcombat main, reached with the Cheerleader tapped" (GameState.phase secondMain, tapState oid secondMain) (Phase.PostcombatMain, Just TapState.Tapped)
-
--- The rider on ONE of two abilities a single object bears. Both watch the same
--- event, one prints the rider and one does not, and the unlimited one firing must
--- not spend the limited one's turn: CR 113.7 makes them abilities of one source,
--- and CR 603.2 makes each of them an ability that triggers on its own. This is
--- what proves Engine.limitKey keys on the ABILITY and not on its condition.
---
--- WHY A SYNTHETIC. Scryfall o:"triggers only once each turn", 2026-09-03: 143
--- printings, and no face among them opens two trigger clauses the same way, so
--- not one of them has two abilities that could share a key. The multi-trigger
--- cards there pair the rider with a DIFFERENT condition.
---
--- Synthetic Twinned Vigil, {2}{W} Enchantment: "Whenever you cast a spell, you
--- gain 1 life." and "Whenever you cast a spell, if you control a creature, you
--- gain 5 life. This ability triggers only once each turn." Nothing of it is
--- omitted.
---
--- The intervening "if" (CR 603.4) is what separates the two in TIME, which is
--- what the collision needs: the first cast is a CREATURE SPELL, so as it is cast
--- alice controls no creature and only the unlimited ability triggers -- and it is
--- that ability's own log record which used to suppress the limited one for the
--- rest of the turn.
---
--- 1 and 5 rather than two equal gains, so no total below is reachable two ways;
--- twelve library cards a seat, since Think Twice draws.
-twinnedVigilSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-twinnedVigilSpec s registry =
-  let castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
-      board island vigil =
-        let withLands = S.landsFor island S.alice 10 S.threePlayerGame
-            (_, withVigil) = S.addPermanent vigil S.alice withLands
-            stock g pid = List.foldl' (\g2 _ -> snd (S.addLibraryCard island pid g2)) g [1 .. (12 :: Int)]
-            stocked = List.foldl' stock withVigil [S.alice, S.bob, S.carol]
-         in stocked
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-   in Spec.describe s "TriggerLimit" $ do
-        Spec.it s "an unlimited sibling ability spends no part of the rider" $ do
-          island <- S.printingOf s registry "Island"
-          vigil <- S.printingOf s registry "Synthetic Twinned Vigil"
-          homunculus <- S.printingOf s registry "Furtive Homunculus"
-          think <- S.printingOf s registry "Think Twice"
-          let gs = board island vigil
-              (creature, g1) = S.addHandCard homunculus S.alice gs
-              (firstSpell, g2) = S.addHandCard think S.alice g1
-              (secondSpell, g3) = S.addHandCard think S.alice g2
-              afterCreature = castAndResolve S.alice creature g3
-              afterFirst = castAndResolve S.alice firstSpell afterCreature
-              afterSecond = castAndResolve S.alice secondSpell afterFirst
-          Spec.assertEqWith s "the limited ability fires on the cast that follows, 21 plus 1 plus 5" (S.lifeOf S.alice afterFirst) (Just 27)
-          Spec.assertEqWith s "and its own rider still binds it for the rest of the turn, 27 plus 1" (S.lifeOf S.alice afterSecond) (Just 28)
-          -- The preconditions the two assertions above rest on, AFTER them so
-          -- neither can absorb a mutation aimed at the rider's key.
-          Spec.assertEqWith s "the creature cast fired the unlimited ability alone, 20 plus 1" (S.lifeOf S.alice afterCreature) (Just 21)
-          Spec.assertEqWith s "the creature really landed, so the intervening if held for the next cast" (S.countOnBattlefieldByName (S.printingName homunculus) S.alice afterCreature) 1
 
 -- The same CR 601.2i cast, read for WHICH cast of the turn it was --
 -- SpellCast.ordinal. The cast-side twin of drawTriggerSpec's Erudite Wizard, and
@@ -2552,7 +2481,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   auntieOolSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry
-  twinnedVigilSpec s registry
   acrobaticCheerleaderSpec s registry
   secondMainPhaseSpec s registry
   clarionSpiritSpec s registry

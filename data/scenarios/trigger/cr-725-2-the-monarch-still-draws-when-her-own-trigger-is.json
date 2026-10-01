@@ -1,0 +1,29 @@
+{
+  "description": "CR 725.2 the monarch still draws when her own trigger is ordered last",
+  "note": "alice is the monarch (Palace Jailer crowned her; its exiled Goblin Piker sits in bob's exile) and has Khabál Ghoul, so her end step fires the Ghoul's trigger and CR 725.2's sourceless draw in one CR 603.3b choice. The draw is put on the stack first, so it resolves last: the order must relocate the inherent trigger, not lose it, and she draws her library's one card.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Palace Jailer", "label": "palace-jailer" },
+          { "card": "Khabál Ghoul", "label": "ghoul" }
+        ],
+        "library": [{ "card": "Goblin Piker" }]
+      },
+      {
+        "name": "bob",
+        "exile": [{ "card": "Goblin Piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PostcombatMain",
+    "monarch": "alice"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": { "OrderTriggers": [null, "@ghoul"] } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

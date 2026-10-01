@@ -40,6 +40,8 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.ChooseOptional OptionalDecision.Type.Exercises) " {\"ChooseOptional\":{\"type\":\"Exercises\"}} "
   Spec.it s "ChooseTargets is keyed by slot" $
     Common.assertCodec s Move.codec (Move.Type.ChooseTargets (Map.singleton (SlotName.Type.MkSlotName (Text.pack "target")) (Seq.singleton (ref "moon")))) " {\"ChooseTargets\":{\"target\":[\"@moon\"]}} "
+  Spec.it s "OrderTriggers, null for a sourceless trigger" $
+    Common.assertCodec s Move.codec (Move.Type.OrderTriggers (Seq.fromList [Just (ref "ghoul"), Nothing])) " {\"OrderTriggers\":[\"@ghoul\",null]} "
   Spec.it s "Concede" $
     Common.assertCodec s Move.codec Move.Type.Concede " \"Concede\" "
   Spec.it s "Pass" $

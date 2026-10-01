@@ -1,0 +1,35 @@
+{
+  "description": "conjure onto the battlefield enters as a permanent, seen by an enters trigger and an entry replacement",
+  "note": "Lam, Storm Crane Elder conjures Monastery Mentor onto the battlefield when alice casts Think Twice, the one conjure destination that is an entry rather than a bare arrival. Soul Warden seeing it enter is the event, bob's Kismet tapping it is CR 616.1's loop run over the arrival, and its projected 2/2 says CR 613 answers for it as a permanent. Kismet is bob's so it reaches the Mentor and nothing of alice's.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Lam, Storm Crane Elder", "label": "lam" },
+          { "card": "Soul Warden", "label": "warden" }
+        ],
+        "hand": [{ "card": "Think Twice", "label": "twice" }],
+        "library": [{ "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Kismet", "label": "kismet" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@twice", "mana": ["@island", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["@lam", "@lam"] } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Monastery Mentor", "count": 1 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "Monastery Mentor", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Life": { "player": "alice", "life": 21 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Tapped": { "object": "Monastery Mentor", "tapped": true } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Monastery Mentor", "count": 0 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Monastery Mentor", "count": 0 } } }
+  ]
+}

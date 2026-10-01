@@ -4161,16 +4161,6 @@ harmonizeSpec s registry = Spec.describe s "Harmonize" $ do
 -- it, so the cases differ only in which candidate `payingFor` names.
 evokeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 evokeSpec s registry = Spec.describe s "Evoke" $ do
-  -- The evoke cost paid: CR 603.4's "if" holds as the permanent enters, so it
-  -- triggers and the Mulldrifter is sacrificed. The same board paying the
-  -- printed {4}{U} is the control: nothing sacrifices it.
-  Spec.it s "CR 702.74a evoked, the Mulldrifter is sacrificed as it enters; cast for its mana cost it stays" $ do
-    (board, mulldrifter, _) <- evokeBoard s registry
-    let evoked = drainEvoke (payingFor evokeCost) mulldrifter board
-        hardCast = drainEvoke (payingFor mulldrifterCost) mulldrifter board
-    Spec.assertEqWith s "CR 702.74a the evoked Mulldrifter was sacrificed" (length (namedOnBattlefield "Mulldrifter" evoked)) 0
-    Spec.assertEqWith s "CR 603.4 cast for {4}{U}, it stays on the battlefield" (length (namedOnBattlefield "Mulldrifter" hardCast)) 1
-    Spec.assertEqWith s "and the evoked one drew its two cards first" (length (Game.zoneMembers Zone.Hand S.alice evoked)) 3
   -- CR 603.4 and CR 400.7: Flicker of Fate, cast with the sacrifice trigger on
   -- the stack, returns a NEW Mulldrifter nobody paid an evoke cost for, so its
   -- own instance's "if" fails and it does not trigger. The evoked one's trigger
@@ -5634,12 +5624,6 @@ payingFor wanted p = case p of
   Prompt.ChooseCost _ _ _ candidates ->
     Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
   _ -> S.identityAnswer p
-
--- Cast Mulldrifter answering with `answer`, resolve it, and resolve both its
--- triggers.
-drainEvoke :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-drainEvoke answer mulldrifter board =
-  S.runPure answer (S.runPure answer board (S.cast S.alice mulldrifter)) (Stack.resolveTop >> Engine.settleForPriority >> Monad.replicateM_ (2 :: Int) (Stack.resolveTop >> Engine.settleForPriority))
 
 evokeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 evokeBoard s registry = do

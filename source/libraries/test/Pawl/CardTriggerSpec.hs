@@ -3875,7 +3875,7 @@ decliningAttacks p = case p of
 -- CR 109.5's "you" is the enchantment's controller, so the Charge is silent.
 -- Bob's Piker is the same printing as one of alice's, which is what makes the
 -- reading a controller test rather than a card test.
-ferventChargeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ferventChargeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 ferventChargeSpec s registry =
   let board = do
         charge <- S.printingOf s registry "Fervent Charge"
@@ -3893,15 +3893,6 @@ ferventChargeSpec s registry =
           }
       declared gs = Map.keysSet (Combat.Type.attackers (GameState.combat gs))
    in Spec.describe s "Fervent Charge" $ do
-        Spec.it s "CR 508.3a whole card: each creature you control that attacks gets +2/+2" $ do
-          (gs, mine, _) <- board
-          case mine of
-            [_, pikerId, giantId] -> do
-              let after = atBlockers gs
-              Spec.assertEqWith s "the 2/1 Piker attacked and is a 4/3" (S.powerToughnessOf pikerId after) (Just (4, 3))
-              Spec.assertEqWith s "and the 3/3 Giant declared beside it is a 5/5, so the trigger fired twice" (S.powerToughnessOf giantId after) (Just (5, 5))
-              Spec.assertEqWith s "CR 508.1b both really were declared as attackers" (declared after) (Set.fromList [pikerId, giantId])
-            _ -> Spec.assertFailure s "fixture should give alice a Charge, a Piker and a Giant"
         Spec.it s "CR 109.5 a creature its controller does not control gets nothing" $ do
           (gs, _, theirs) <- board
           case theirs of

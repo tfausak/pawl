@@ -96,6 +96,8 @@ import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Timed as Timed
+import qualified Pawl.Types.TriggerEntry as TriggerEntry
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TypesAre as TypesAre
 import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
@@ -415,6 +417,14 @@ answerTopPrompt decider asked =
           offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
           onEntry unscheduled key kind offers (takeForSource gs key source) $ \verb -> case verb of
             Move.AssignDamage assignment -> Just (fmap Map.fromList (mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)))
+            _ -> Nothing
+        -- CR 603.3b: every entry named by its source, a repeated source taking
+        -- its entries in the order offered; the engine wants their positions.
+        Prompt.Type.OrderTriggers who _ entries -> do
+          key <- whenOf gs (Decider.unwrap who)
+          offers <- mapM (describeTriggerSource gs . TriggerEntry.source) entries
+          onEntry unscheduled key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            Move.OrderTriggers named -> Just (orderTriggers gs key verb offers entries (Foldable.toList named))
             _ -> Nothing
         -- A target prompt outside a cast or activation, a triggered ability's
         -- most often (CR 603.3d), keyed like ChooseOptional below.
@@ -826,6 +836,26 @@ resolveEither ref gs = do
 
 -- | The one offered recipient a reference names, whatever kind the offer
 -- calls it: a planeswalker is offered as one, a creature as another.
+-- | The positions of the offered entries in the order named: each name takes
+-- the first entry not yet taken whose source it is, and every entry is taken.
+orderTriggers :: GameState.GameState -> When.When -> Move.Move -> [Text.Text] -> [TriggerEntry.TriggerEntry] -> [Maybe Reference.Reference] -> Run [Natural]
+orderTriggers gs key verb offers entries named = do
+  wanted <- mapM (traverse (`resolveObject` gs)) named
+  let sourceOf entry = case TriggerEntry.source entry of
+        TriggerSource.OfObject oid -> Just oid
+        TriggerSource.Sourceless -> Nothing
+      pick taken source = List.find (\i -> notElem i taken && fmap sourceOf (Maybe.listToMaybe (drop i entries)) == Just source) [0 .. length entries - 1]
+      step acc source = acc >>= \taken -> (\i -> Just (taken <> [i])) =<< pick taken source
+  case List.foldl' step (Just []) wanted of
+    Just order
+      | length order == length entries -> pure (Maybe.mapMaybe Int.toNatural order)
+    _ -> failWith (Failure.MkActionNotOffered key verb offers)
+
+describeTriggerSource :: GameState.GameState -> TriggerSource.TriggerSource -> Run Text.Text
+describeTriggerSource gs source = case source of
+  TriggerSource.OfObject oid -> describeObject gs oid
+  TriggerSource.Sourceless -> pure (Text.pack "null")
+
 -- | A ChooseTargets entry's answer: every offered slot named, each with exactly
 -- the number of distinct offered recipients it takes.
 resolveSlots :: GameState.GameState -> When.When -> Move.Move -> Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient) -> Map.Map SlotName.SlotName (Seq.Seq Reference.Reference) -> Run (Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))

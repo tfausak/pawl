@@ -1,0 +1,32 @@
+{
+  "description": "CR 510.2 two simultaneous events are read one at a time, not summed",
+  "note": "Coalhauler Swine is blocked by a 2/1 and a 1/1, so CR 510.2 deals it two damage events at once and each of its two triggers reads its OWN event: each player loses 2 and then 1. Both wrong readings, the damage marked on the Swine (CR 120.3e has all 3 recorded before either resolves) and the batch's total, give 3 per firing and 6 in all. The 3 marked on the Swine is the precondition: both blockers' damage landed.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Coalhauler Swine", "label": "swine", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Prodigal Sorcerer", "label": "sorcerer", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@swine"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@swine"], "@sorcerer": ["@swine"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@swine", "do": { "AssignDamage": { "@piker": 2, "@sorcerer": 2 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@swine", "@swine"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "alice", "life": 17 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@swine", "damage": 3 } } }
+  ]
+}
