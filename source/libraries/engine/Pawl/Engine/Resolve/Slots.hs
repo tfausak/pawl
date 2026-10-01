@@ -1624,7 +1624,8 @@ entryRewriteReads rewrite = case rewrite of
   -- name no slot: a keyword may CARRY a Filter (CR 702.14c's landwalk), and that
   -- Filter is judged against the board rather than against a resolution's
   -- bindings -- the answer AsCopy's exceptions get above, whose CR 707.9a
-  -- keywords are not reported either.
+  -- keywords are not reported either. A quoted ability's slots are its own,
+  -- bound when IT resolves, CopyException.GainAbility's answer.
   EntryRewrite.EntersWith entersWith -> ([], foldMap (Map.elems . WithCounters.counters) (EntersWith.counters entersWith))
   EntryRewrite.UnderSourceControl -> ([], [])
   -- BOTH halves: the permanents the sacrifice may take, and CR 702.82a's
