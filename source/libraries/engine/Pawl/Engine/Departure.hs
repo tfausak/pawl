@@ -97,7 +97,7 @@ departTogether reason named = do
       leave why pid gs = gs {GameState.players = Map.adjust (lose why) pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)}
       -- CR 800.4a's first three clauses, in the rule's order.
       clauses pid = if continues then nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid else id
-  -- ONE event: CR 800.4a's departure is a single instant for every player in
+  -- ONE event: CR 800.4a's leaving is a single instant for every player in
   -- the set, and CR 725.4 crowns "at the same time as that player leaves", so the
   -- crowning shares the departure's event group and CR 610.3d returns the
   -- prisoners both free as one event. data/scenarios/simultaneous-moves'
