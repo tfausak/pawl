@@ -107,6 +107,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -134,6 +135,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -394,6 +396,115 @@ aimingBioshift giverId takerId p = case p of
   Prompt.ChooseMovedCounters _ _ _ _ offered -> offered
   _ -> S.identityAnswer p
 
+-- CR 607.2d: Pentarch Paladin's "{W}{W}, {T}: Destroy target permanent of the
+-- chosen color" is linked to its "As this creature enters, choose a color", so
+-- the slot reads the colour the Paladin chose (Oracle checked against Scryfall
+-- on 2026-10-01). The choice is stamped rather than cast for; the entry road
+-- that writes it is Painter's Servant's (Pawl.ColorSpec).
+--
+-- bob holds a red Goblin Piker and a green Llanowar Elves, alice the Paladin
+-- and two Plains, and the answerer PREFERS the Piker, falling back to whatever
+-- else was offered. So each board shows what the engine offered by which
+-- permanent dies.
+pentarchPaladinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+pentarchPaladinSpec s registry = Spec.describe s "Pentarch Paladin" $ do
+  let paladinBoard chosen = do
+        paladin <- S.printingOf s registry "Pentarch Paladin"
+        plains <- S.printingOf s registry "Plains"
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        murder <- S.printingOf s registry "Murder"
+        let (paladinId, g0) = S.addPermanent paladin S.alice (S.landsFor swamp S.bob 3 (S.landsFor plains S.alice 2 S.threePlayerGame))
+            (pikerId, g1) = S.addPermanent piker S.bob g0
+            (elvesId, g2) = S.addPermanent elves S.bob g1
+            (murderId, g3) = S.addHandCard murder S.bob g2
+            chose = g3 {GameState.objects = Map.adjust (\o -> o {Object.chosenColor = Just chosen}) paladinId (GameState.objects g3)}
+        case soleActivatedAbility paladin of
+          Nothing -> Spec.assertFailure s "Pentarch Paladin should declare one activated ability" >> pure Nothing
+          Just ability -> pure (Just (paladinId, pikerId, elvesId, murderId, S.runPure (aimAtCreature pikerId) chose (Activate.activateAbility S.alice paladinId ability)))
+      resolve gs = S.runPure S.identityAnswer gs Stack.resolveTop
+  -- A PAIR OF BOARDS differing only in the colour chosen: red reaches the Piker,
+  -- green does not, so the same preference kills the Elves instead.
+  Spec.it s "CR 607.2d the Paladin destroys only a permanent of the colour it chose" $ do
+    red <- paladinBoard Color.Red
+    green <- paladinBoard Color.Green
+    case (red, green) of
+      (Just (_, pikerId, elvesId, _, redActivated), Just (_, pikerId', elvesId', _, greenActivated)) -> do
+        let redResolved = resolve redActivated
+            greenResolved = resolve greenActivated
+        Spec.assertBool s (not (S.onBattlefield pikerId redResolved)) "having chosen red, the Paladin destroys the red Piker"
+        Spec.assertBool s (S.onBattlefield pikerId' greenResolved) "having chosen green, it cannot aim at the Piker"
+        Spec.assertBool s (not (S.onBattlefield elvesId' greenResolved)) "and destroys the green Elves instead"
+        Spec.assertBool s (S.onBattlefield elvesId redResolved) "while the red board left the Elves alone"
+      _ -> pure ()
+  -- CR 608.2b re-asks the slot at resolution, and CR 608.2h with CR 113.7a answer
+  -- "the chosen color" for a source that has left from its last known
+  -- information. bob Murders the Paladin in response; the ability still
+  -- resolves against the red Piker it aimed at.
+  Spec.it s "CR 608.2h the Paladin's ability still destroys its target after the Paladin dies in response" $ do
+    red <- paladinBoard Color.Red
+    case red of
+      Just (paladinId, pikerId, _, murderId, activated) -> do
+        let murdered = S.runPure (aimAtCreature paladinId) (activated {GameState.priority = Just S.bob}) (S.cast S.bob murderId Monad.>> Stack.resolveTop)
+            resolved = resolve murdered
+        Spec.assertBool s (not (S.onBattlefield pikerId resolved)) "the Piker is destroyed by the dead Paladin's ability"
+        Spec.assertBool s (not (S.onBattlefield paladinId murdered)) "because the Paladin had already left before it resolved"
+      Nothing -> pure ()
+  -- CR 707.10c with CR 113.7: a copy of the ability keeps the Paladin as its
+  -- source, so its new targets are judged against the colour the Paladin chose.
+  -- A second red Piker joins bob's side after the Paladin aims at the first, and
+  -- Lithoform Engine ({2}, {T}: "Copy target activated or triggered ability you
+  -- control. You may choose new targets for the copy.") copies the ability with
+  -- an answerer preferring the second.
+  Spec.it s "CR 707.10c a Lithoform Engine copy of the Paladin's ability can aim at another permanent of the chosen colour" $ do
+    red <- paladinBoard Color.Red
+    engine <- S.printingOf s registry "Lithoform Engine"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    case (red, Face.activatedAbilities (S.combinedFace engine)) of
+      (Just (_, firstId, _, _, activated), copying : _) -> do
+        let (secondId, g0) = S.addPermanent piker S.bob activated
+            (engineId, g1) = S.addPermanent engine S.alice (S.landsFor plains S.alice 2 g0)
+            copied = S.runPure S.identityAnswer (g1 {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice engineId copying)
+            retargeted = S.runPure (aimAtCreature secondId) copied Stack.resolveTop
+            copyResolved = resolve retargeted
+            bothResolved = resolve copyResolved
+        Spec.assertBool s (not (S.onBattlefield secondId copyResolved)) "the copy, re-aimed, destroys the second red Piker"
+        Spec.assertBool s (S.onBattlefield firstId copyResolved) "while the original has not resolved yet"
+        Spec.assertBool s (not (S.onBattlefield firstId bothResolved)) "and the original then destroys the first"
+      _ -> Spec.assertFailure s "the Paladin board and Lithoform Engine's copying ability"
+
+-- CR 607.2d one road over: From the Rubble's "At the beginning of your end step,
+-- return target creature card of the chosen type from your graveyard to the
+-- battlefield with a finality counter on it" is a TRIGGERED ability's slot,
+-- announced through Engine.placeBorne rather than Pawl.Engine.Activate (Oracle
+-- checked against Scryfall on 2026-10-01). The choice is stamped, as for the
+-- Paladin above; the entry road that writes a creature type is Obelisk of
+-- Urd's (Pawl.ProjectionSpec).
+--
+-- A PAIR OF BOARDS differing only in the type chosen, alice's graveyard holding
+-- a Goblin Piker and a Hill Giant, and the answerer preferring the Piker: each
+-- board shows what the engine offered by which card comes back.
+fromTheRubbleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+fromTheRubbleSpec s registry =
+  Spec.it s "CR 607.2d From the Rubble returns only a creature card of the type it chose" $ do
+    rubble <- S.printingOf s registry "From the Rubble"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (rubbleId, g0) = S.addPermanent rubble S.alice (Setup.emptyGame S.bothPlayers)
+        (pikerId, g1) = S.addGraveyardCard piker S.alice g0
+        (_, g2) = S.addGraveyardCard giant S.alice g1
+        endOfTurn chosen =
+          let chose = g2 {GameState.objects = Map.adjust (\o -> o {Object.chosenSubtype = Just chosen}) rubbleId (GameState.objects g2), GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]}
+              afterMain = S.runPure (aimAtCreature pikerId) chose Engine.runStep
+           in S.runPure (aimAtCreature pikerId) afterMain Engine.runStep
+        onBattlefield name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+        goblins = endOfTurn Subtype.Goblin
+        giants = endOfTurn Subtype.Giant
+    Spec.assertEqWith s "having chosen Goblin, the Piker comes back" (onBattlefield "Goblin Piker" goblins, onBattlefield "Hill Giant" goblins) (1, 0)
+    Spec.assertEqWith s "having chosen Giant, the Piker is not offered and the Giant comes back" (onBattlefield "Goblin Piker" giants, onBattlefield "Hill Giant" giants) (0, 1)
+
 -- CR 601.2c / 205.3m: Unbury's "return two target creature cards that share a
 -- creature type from your graveyard to your hand". Each slot names the other
 -- with SharesCreatureTypeWithBound, since the condition binds both targets alike
@@ -431,6 +542,8 @@ unburySpec s registry = Spec.describe s "Unbury" $ do
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   unburySpec s registry
+  pentarchPaladinSpec s registry
+  fromTheRubbleSpec s registry
   -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
   -- player can't be the target of spells or abilities.'" Doom Blade is "target
   -- nonblack creature" and the Mongoose is green, so its Filter admits the

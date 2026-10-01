@@ -1492,52 +1492,43 @@ data Context = MkContext
     aimingController :: Maybe (Maybe PlayerId.PlayerId),
     -- CR 105.2: the colour the SOURCE chose as it entered (CR 614.1c), for the one
     -- atom that asks whether a candidate wears it (HasChosenColor, Gauntlet of
-    -- Power). Supplied by the caller for slotNames' reason, and by ONE:
-    -- Pawl.Engine.Projection.affectsWith, the funnel every Affected question goes
-    -- through, at each of its four arms that match a filter. CR 607.2d links the
-    -- choosing ability to the affected clause beside it, so a static ability's own
-    -- affected set is the position the link is written in.
+    -- Power). CR 607.2d links the choosing ability to every ability printed
+    -- beside it that names "the chosen color", so the positions that fill it are
+    -- the ones such an ability's filter is matched in:
+    -- Pawl.Engine.Projection.affectsWith's affected set (read live), and, through
+    -- CR 608.2h's last known information, Pawl.Engine.Target.slotContext's target
+    -- slot (Pentarch Paladin) and the cost pools of Pawl.Engine.Cost and
+    -- Pawl.Engine.Replacement.matchesPermanent (Projection.withChoicesOf).
     --
     -- The SOURCE's, sourceChosenNames' direction rather than carrierChosenPlayer's:
-    -- the permanent whose static ability wrote the affected set is the permanent
-    -- that made the choice, and the candidate is what the filter is matched
-    -- against.
-    --
-    -- Read LIVE off the board, carrierChosenPlayer's posture: a permanent's static
-    -- ability is asked afresh every time, and Object.chosenColor is per-incarnation
-    -- (CR 707.6 does not copy it), so two Gauntlets naming two colours answer
-    -- differently on the one board.
+    -- the permanent whose ability asks is the permanent that made the choice, and
+    -- the candidate is what the filter is matched against. Object.chosenColor is
+    -- per-incarnation (CR 707.6 does not copy it), so two Gauntlets naming two
+    -- colours answer differently on the one board.
     --
     -- Nothing in contextFor below and so in contextWithSlots and
-    -- contextComparingPower too, so the atom is vacuously False in every position
-    -- but that one -- sourceAttachedTo's posture rather than slotControllers'.
+    -- contextComparingPower too, so the atom is vacuously False in every other
+    -- position. What keeps a card out of those is Pawl.FilterPositionLintSpec's
+    -- "CR 607.2d no card asks HasChosenColor or HasChosenSubtype outside an
+    -- admitted position".
     --
-    -- Not implemented: the lint that would keep a card from asking the atom in the
-    -- positions this is empty in, which sourcePower, slotNames, sourceAttachedTo,
-    -- sourceChosenNames and carrierChosenPlayer above each have (#3449).
+    -- Not implemented: filling it for a trigger condition, a resolution's own
+    -- filters and a CR 604.2 condition (#4571).
     sourceChosenColor :: Maybe Color.Color,
     -- CR 205.3: the subtype the SOURCE chose as it entered (CR 614.1c), for the
-    -- one atom that asks whether a candidate wears it (HasChosenSubtype). TWO
-    -- callers supply it, and they read it from different places, which is what
-    -- this field's two producers are about:
+    -- one atom that asks whether a candidate wears it (HasChosenSubtype). Filled
+    -- where sourceChosenColor above is, and read the same way (Obelisk of Urd,
+    -- From the Rubble, Doom Cannon).
     --
-    -- Pawl.Engine.Projection.affectsWith, through affectedContext, reads it LIVE
-    -- off the board, sourceChosenColor's posture one characteristic over -- CR
-    -- 607.2d links the choosing ability to the affected clause printed beside it
-    -- (Obelisk of Urd).
+    -- One more caller, which reads it from elsewhere: Pawl.Engine.Mana.admitsUnder
+    -- reads it off the MANA UNIT, because a CR 106.6 restriction is asked when the
+    -- source may be gone: CR 106.6a makes the restriction the ability's, so the
+    -- answer is the one baked in when the mana was produced
+    -- (Pawl.Types.ManaUnit.sourceChosenSubtype, Pillar of Origins). That caller
+    -- overrides whatever this field holds.
     --
-    -- Pawl.Engine.Mana.admitsUnder reads it off the MANA UNIT instead, because a
-    -- CR 106.6 restriction is asked when the source may be gone: CR 106.6a makes
-    -- the restriction the ability's, so the answer is the one baked in when the
-    -- mana was produced (Pawl.Types.ManaUnit.sourceChosenSubtype, Pillar of
-    -- Origins). That caller overrides whatever this field holds.
-    --
-    -- Nothing in contextFor below and so in contextWithSlots and
-    -- contextComparingPower too, so the atom is vacuously False in every position
-    -- but those two -- sourceChosenColor's posture.
-    --
-    -- Not implemented: the lint that would keep a card from asking the atom in the
-    -- positions this is empty in, which sourceChosenColor above shares (#3449).
+    -- Vacuously False everywhere else, sourceChosenColor's posture, and fenced by
+    -- the same lint's subtype twin.
     sourceChosenSubtype :: Maybe Subtype.Subtype
   }
   deriving (Eq, Ord, Show)
@@ -1573,10 +1564,10 @@ data Context = MkContext
 -- reads a protection quality in -- see carrierChosenPlayer above for the list and
 -- for the lint that keeps a card to them.
 --
--- CR 105.2's chosen-colour atom (Gauntlet of Power) is a further one a CARD may
--- write, and it reads the Nothing here in every position but the affected set CR
--- 607.2d links the choice to -- see sourceChosenColor above, and #3449 for the
--- lint that would keep a card to it.
+-- CR 105.2's chosen-colour atom (Gauntlet of Power) and CR 205.3's chosen-subtype
+-- atom (Obelisk of Urd) are two more a CARD may write, and they read the Nothing
+-- here in every position but the ones CR 607.2d links the choice to -- see
+-- sourceChosenColor above for the list and for the lint that keeps a card to them.
 --
 -- CR 110.2's same-controller atom (Bioshift) is the one whose unfilled read does
 -- NOT match nothing, so the paragraphs above are a finding per atom rather than

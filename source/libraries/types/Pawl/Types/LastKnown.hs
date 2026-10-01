@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
@@ -12,6 +13,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 -- | CR 608.2h: what an object WAS, filed under the id it had while it existed.
@@ -29,7 +31,7 @@ import qualified Pawl.Types.Zone as Zone
 -- has none -- and unlike the other two the projection actively CONSUMES them (CR
 -- 613.4c), so the record has to be taken beside it rather than out of it. Nor is
 -- the ATTACHMENT -- CR 109.3 names "what an Aura enchants" as an example of what
--- is not one. The COPIABLE values, the OWNER, the CHOSEN NAMES and PLAYER, the
+-- is not one. The COPIABLE values, the OWNER, the CHOSEN NAMES, PLAYER, COLOUR and SUBTYPE, the
 -- COMBAT STATUS, the PROTECTOR, the COSTS PAID and the CONTROL CLOCK sit beside
 -- them for the reasons their own fields give.
 --
@@ -130,6 +132,15 @@ data LastKnown = MkLastKnown
     -- (Pawl.EntryReplacementSpec). Not a characteristic, for `chosenNames`'
     -- reason.
     chosenPlayer :: !(Maybe PlayerId.PlayerId),
+    -- | CR 614.1c / 607.2d: the colour chosen for it as it entered -- the same
+    -- Object.chosenColor the live object carried. What CR 608.2h answers for an
+    -- ability of the object asking for "the chosen color" once the object has
+    -- left (Pentarch Paladin destroyed in response, Pawl.TargetSpec). Not a
+    -- characteristic, for `chosenNames`' reason.
+    chosenColor :: !(Maybe Color.Color),
+    -- | The subtype chosen for it as it entered, `chosenColor`'s sibling for
+    -- Object.chosenSubtype.
+    chosenSubtype :: !(Maybe Subtype.Subtype),
     -- | CR 508.1k: was it attacking as it left -- the same membership
     -- Pawl.Engine.Filter.View's `attacking` reports, through the one classifier
     -- Game.isAttacking, read off GameState.combat before the object ceased.

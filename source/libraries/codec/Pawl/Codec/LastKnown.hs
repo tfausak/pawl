@@ -5,6 +5,7 @@ module Pawl.Codec.LastKnown where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.ControlClock as ControlClock
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
@@ -12,6 +13,7 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Source as Source
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -31,6 +33,8 @@ codec = Fields.object $ do
   attached <- Fields.required "attached" (Common.set ObjectId.codec) LastKnown.attached
   chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
   chosenPlayer <- Fields.defaulted "chosenPlayer" Nothing (Common.maybe PlayerId.codec) LastKnown.chosenPlayer
+  chosenColor <- Fields.defaulted "chosenColor" Nothing (Common.maybe Color.codec) LastKnown.chosenColor
+  chosenSubtype <- Fields.defaulted "chosenSubtype" Nothing (Common.maybe Subtype.codec) LastKnown.chosenSubtype
   attacking <- Fields.required "attacking" Common.boolean LastKnown.attacking
   attackTarget <- Fields.required "attackTarget" (Common.maybe AttackTarget.codec) LastKnown.attackTarget
   blocking <- Fields.required "blocking" Common.boolean LastKnown.blocking
@@ -49,6 +53,8 @@ codec = Fields.object $ do
         LastKnown.attached = attached,
         LastKnown.chosenNames = chosenNames,
         LastKnown.chosenPlayer = chosenPlayer,
+        LastKnown.chosenColor = chosenColor,
+        LastKnown.chosenSubtype = chosenSubtype,
         LastKnown.attacking = attacking,
         LastKnown.attackTarget = attackTarget,
         LastKnown.blocking = blocking,

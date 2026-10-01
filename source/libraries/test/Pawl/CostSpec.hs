@@ -131,6 +131,41 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing Nothing
 
+-- CR 607.2d: Doom Cannon's "{3}, {T}, Sacrifice a creature of the chosen type:
+-- This artifact deals 3 damage to any target" is linked to its "As this artifact
+-- enters, choose a creature type", so the sacrifice pool reads the type the
+-- Cannon chose (Oracle checked against Scryfall on 2026-10-01). The choice is
+-- stamped rather than cast for; the entry road that writes it is Obelisk of
+-- Urd's (Pawl.ProjectionSpec).
+--
+-- A PAIR OF BOARDS differing only in the type chosen, each with a Goblin Piker
+-- and a Hill Giant beside the Cannon: whichever the choice names is the one
+-- creature offered, so CR 701.21a's prompt is elided and the one that goes is
+-- the one the rule picks. The 3 damage goes to bob.
+doomCannonSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+doomCannonSpec s registry =
+  Spec.it s "CR 607.2d Doom Cannon sacrifices only a creature of the type it chose" $ do
+    cannon <- S.printingOf s registry "Doom Cannon"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (cannonId, g0) = S.addPermanent cannon S.alice (S.landsFor plains S.alice 3 (Setup.emptyGame S.bothPlayers))
+        (pikerId, g1) = S.addPermanent piker S.alice g0
+        (giantId, g2) = S.addPermanent giant S.alice g1
+        aimAtBob p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just S.bob) . Recipient.playerOf) sets
+          _ -> S.identityAnswer p
+        fired chosen =
+          let chose = g2 {GameState.objects = Map.adjust (\o -> o {Object.chosenSubtype = Just chosen}) cannonId (GameState.objects g2)}
+           in S.runPure S.identityAnswer (S.runPure aimAtBob chose (Activate.activateAbility S.alice cannonId (theAbility cannon))) Stack.resolveTop
+        goblins = fired Subtype.Goblin
+        giants = fired Subtype.Giant
+    Spec.assertBool s (not (S.onBattlefield pikerId goblins)) "having chosen Goblin, the Cannon sacrifices the Piker"
+    Spec.assertBool s (S.onBattlefield giantId goblins) "and keeps the Giant"
+    Spec.assertBool s (not (S.onBattlefield giantId giants)) "having chosen Giant, it sacrifices the Giant"
+    Spec.assertBool s (S.onBattlefield pikerId giants) "and keeps the Piker"
+    Spec.assertEqWith s "the shot resolved at bob" (S.lifeOf S.bob goblins) (Just 17)
+
 doorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 doorSpec s registry =
   Spec.describe s "Door" $ do
@@ -3131,6 +3166,7 @@ flashSpec s registry = Spec.describe s "Flash" $ do
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
+  doomCannonSpec s registry
   jaradSpec s registry
   jaradDrainSpec s registry
   greedSpec s registry
