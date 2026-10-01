@@ -145,10 +145,12 @@ data Face card = MkFace
     -- the carve-out additionalCosts takes. A GRAVEYARD reader of rule
     -- 702.34a's flashback goes through the projection, so a granted one reaches
     -- the cost (Pawl.Engine.Cost.costsFor). So do the HAND readers of rule
-    -- 702.8a's flash (Pawl.Engine.Cast.instantSpeed, Teferi, Mage of Zhalfir's
-    -- grant) and of rule 702.62a's suspend and rule 702.170a's plot
-    -- (Pawl.Engine.Suspend.suspendOf, Pawl.Engine.Plot.plotCostsOf, Patriar's
-    -- Humiliation's perpetual removal).
+    -- 702.8a's flash (Pawl.Engine.Cast.instantSpeed: Teferi, Mage of Zhalfir's
+    -- grant, Patriar's Humiliation's perpetual removal) and of rule 702.62a's
+    -- suspend and rule 702.170a's plot (Pawl.Engine.Suspend.suspendOf,
+    -- Pawl.Engine.Plot.plotCostsOf). Pawl.Engine.Cast.castFacings reads rule
+    -- 702.37a's morph and rule 702.168a's disguise printed, less a layer-6
+    -- wipe.
     keywords :: Map.Map Keyword.Keyword Natural.Natural,
     -- | CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana
