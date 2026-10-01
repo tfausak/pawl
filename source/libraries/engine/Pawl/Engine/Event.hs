@@ -380,9 +380,8 @@ simultaneously body = do
 -- they already hold. A lone move is one order -- a melded permanent's two cards
 -- were arranged by CR 712.21a as they moved.
 --
--- After the fact rather than before each move, which observes nothing new:
--- nothing inside the bracket reads a library's order, and the owner learns no
--- more by waiting than the replacement choices already told them.
+-- After the fact rather than before each move, which no reader can tell apart:
+-- nothing inside the bracket reads a library's order.
 --
 -- Pawl.ZoneChangeSpec's Library of Leng and Wheel of Sun and Moon CR 401.4 cases
 -- prove it.
