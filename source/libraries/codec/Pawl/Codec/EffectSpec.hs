@@ -26,6 +26,7 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Blight as Blight
@@ -1978,8 +1979,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     Common.assertCodec
       s
       codec
-      (Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))) (PlayerRef.Relative PlayerRelation.You)))
-      " {\"type\":\"RequireAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
+      (Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))) (AttackTargetRef.Players (PlayerRef.Relative PlayerRelation.You))))
+      " {\"type\":\"RequireAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"defender\":{\"type\":\"Players\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}}} "
   Spec.it s "ForbidBlock" $
     Common.assertCodec
       s

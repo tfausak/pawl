@@ -1,5 +1,6 @@
 module Pawl.Types.ActiveAttackRequirement where
 
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -13,23 +14,23 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- you this turn if able".
 --
 -- Pawl.Types.AttackRequirement, the PRINTED carrier, states the same two axes,
--- its object as a Pawl.Types.RequiredDefender rather than a bare PlayerId for
--- the reason given below.
+-- its object as a Pawl.Types.RequiredDefender rather than an AttackTarget,
+-- because a static ability has no resolution to fix its object at.
 --
 -- The subject axis is Pawl.Types.ActiveAttackProhibition's: a Named id the
 -- resolution froze (Alluring Siren TARGETS its creature, CR 115.1), or a Matching
 -- class CR 611.2c keeps dynamic (Taunt's "creatures that player controls").
 --
--- The object is a PlayerId rather than a Pawl.Types.AttackTarget, and the
--- narrowing is the rule rather than a convenience: Alluring Siren's ruling is
--- that a creature able to attack either you or a planeswalker you control must
--- attack YOU, so "attacks you" is obeyed by exactly one of CR 508.1b's
--- announcements. Goad (CR 701.15b) wants the COMPLEMENT of a seat instead --
--- "a player other than the controller of the permanent that caused it to be
--- goaded" -- which this field still cannot say: it rides Object.goadedBy, whose
--- seats Pawl.Engine.AttackRequirement instantiates against CR 508.1b's list
--- directly. Rule 701.15a fixes goad's duration and CR 701.15d deduplicates its
--- goaders, neither of which a row here could state.
+-- The object is ONE of CR 508.1b's announcements, which is the rule: Alluring
+-- Siren's ruling is that a creature able to attack either you or a planeswalker
+-- you control must attack YOU, so "attacks you" is obeyed by exactly one
+-- announcement, and Gideon Jura's "attack Gideon Jura" by another. Goad (CR
+-- 701.15b) wants the COMPLEMENT of a seat instead -- "a player other than the
+-- controller of the permanent that caused it to be goaded" -- which this field
+-- cannot say: it rides Object.goadedBy, whose seats
+-- Pawl.Engine.AttackRequirement instantiates against CR 508.1b's list directly.
+-- Rule 701.15a fixes goad's duration and CR 701.15d deduplicates its goaders,
+-- neither of which a row here could state.
 --
 -- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a,
 -- 611.2b); Alluring Siren's "this turn" arms Expiry.AtCleanup.
@@ -51,8 +52,8 @@ data ActiveAttackRequirement = MkActiveAttackRequirement
     expiry :: Expiry.Expiry,
     -- | The creatures that must attack -- CR 508.1d's subject axis.
     attacker :: RestrictedCreatures.RestrictedCreatures ObjectId.ObjectId,
-    -- | The player it must attack -- CR 508.1d's object axis, read through CR
-    -- 508.1b's announcement.
-    defender :: PlayerId.PlayerId
+    -- | What it must attack -- CR 508.1d's object axis, as CR 508.1b's
+    -- announcement.
+    defender :: AttackTarget.AttackTarget
   }
   deriving (Eq, Ord, Show)

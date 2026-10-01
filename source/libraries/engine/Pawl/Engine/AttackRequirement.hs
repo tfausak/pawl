@@ -296,7 +296,10 @@ instances candidates targets gs =
       -- since left the battlefield, or that can no longer attack, is not among
       -- `candidates`, and a player who is not being attacked this combat is not
       -- among `targets` (Combat.declarableTargets walks
-      -- Defender.defendingPlayers). Liveness is not re-asked here and must not
+      -- Defender.defendingPlayers). So is a planeswalker that has left the
+      -- battlefield, stopped being one, or come under the attacker's control:
+      -- Gideon Jura's ruling that such a creature may attack anything or
+      -- nothing. Liveness is not re-asked here and must not
       -- be: Combat.attackableOpponents applied it once when CR 703.4h settled
       -- the designation, and a player who leaves AFTER that stays a defending
       -- player -- CR 800.4e drops the damage, not the attack.
@@ -306,7 +309,7 @@ instances candidates targets gs =
       -- resolves. A Matching class is read against the live board, CR 611.2c,
       -- as Pawl.Engine.CombatRestriction.storedSubjects reads a prohibition's.
       fromStored active =
-        let target = AttackTarget.OfPlayer (ActiveAttackRequirement.defender active)
+        let target = ActiveAttackRequirement.defender active
             context = Filter.contextFor (Game.teams gs) (Just (ActiveAttackRequirement.controller active)) (Just (ActiveAttackRequirement.source active))
             creatures = case ActiveAttackRequirement.attacker active of
               RestrictedCreatures.Named oid -> filter (== oid) candidates

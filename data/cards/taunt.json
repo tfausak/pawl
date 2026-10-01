@@ -41,9 +41,12 @@
                         }
                       },
                       "defender": {
-                        "type": "Relative",
+                        "type": "Players",
                         "value": {
-                          "type": "You"
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
                         }
                       },
                       "duration": {
