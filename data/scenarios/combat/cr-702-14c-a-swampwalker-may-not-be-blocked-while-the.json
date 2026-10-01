@@ -1,0 +1,40 @@
+{
+  "description": "CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp",
+  "note": "Bog Wraith has swampwalk and nothing else; bob controls a Swamp, so his Goblin Piker's block is refused and he declares none.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "attacker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "blocker",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "land"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@blocker": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": null}}}
+  ]
+}

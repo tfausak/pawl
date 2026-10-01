@@ -1664,6 +1664,8 @@ eventBindingSlots cond = case cond of
   -- sibling does: Chandra, Fire Artisan reads the number of counters that came
   -- off. The bearer needs no slot, CR 113.7a's source slot already naming it.
   TriggerCondition.SelfCountersRemoved _ -> Set.singleton Binding.eventAmount
+  -- One counter per trigger, so no "that many" to bind; no printing reads one.
+  TriggerCondition.SelfCounterRemoved _ -> Set.empty
   -- Nothing, PermanentsDie's answer and for its reason: the trigger event is a
   -- whole CR 704.3 / CR 608.2f batch, which may have put counters on several
   -- permanents, and one slot cannot name them all. Cloaked Cadet, the only

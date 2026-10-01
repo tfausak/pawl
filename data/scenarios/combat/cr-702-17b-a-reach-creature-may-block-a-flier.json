@@ -1,0 +1,35 @@
+{
+  "description": "CR 702.17b a reach creature may block a flier",
+  "note": "The falsifier for an implementation that asks whether the blocker has flying: Nimble Birdsticker has reach and not flying, and its block of Bird Maiden stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bird Maiden",
+            "label": "attacker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Nimble Birdsticker",
+            "label": "blocker",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@blocker": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": ["@blocker"]}}}
+  ]
+}

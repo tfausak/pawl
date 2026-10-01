@@ -1,0 +1,41 @@
+{
+  "description": "CR 702.16f Apostle of Purifying Light can't be blocked by a black creature, and can by a red one",
+  "note": "One board, two blockers differing only in colour: Cabal Evangel (black, no abilities) is refused, Goblin Piker (red, no abilities) then blocks. The Apostle is white, so matching the quality against the attacker would admit the Evangel.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Apostle of Purifying Light",
+            "label": "attacker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Cabal Evangel",
+            "label": "black",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "red",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@black": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@red": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": ["@red"]}}}
+  ]
+}

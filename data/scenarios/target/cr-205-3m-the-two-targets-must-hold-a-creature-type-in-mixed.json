@@ -1,0 +1,36 @@
+{
+  "description": "CR 205.3m the two targets must hold a creature type in common",
+  "note": "A Giant and a Goblin share nothing, so CR 601.2e reverses the announcement: Unbury goes back to alice's hand, the stack is empty and neither card returns. Unbury's second mode returns two target creature cards that share a creature type. alice's graveyard holds two Hill Giants, a Goblin Piker and a Woodland Changeling; every board is the same and the legs differ only in which pair is named.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" }
+        ],
+        "hand": [
+          { "card": "Unbury", "label": "unbury" }
+        ],
+        "graveyard": [
+          { "card": "Hill Giant", "label": "giant-a" },
+          { "card": "Hill Giant", "label": "giant-b" },
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Woodland Changeling", "label": "changeling" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@unbury", "modes": [1], "targetsBySlot": {"first": ["@giant-a"], "second": ["@piker"]}}} },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Unbury", "count": 1}} },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Hill Giant", "count": 0}} },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 0}} },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Woodland Changeling", "count": 0}} }
+  ]
+}

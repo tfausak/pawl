@@ -1,0 +1,30 @@
+{
+  "description": "CR 702.111b menace constrains the set blocking ITS attacker, not every attacker",
+  "note": "A plain Piker attacking beside the Brute still takes exactly one blocker. Fails against reading menace off the declaration as a whole rather than per attacker.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Boggart Brute", "label": "brute", "ready": true },
+          { "card": "Goblin Piker", "label": "plain", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@brute", "@plain"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@blocker": ["@brute"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@plain"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@plain", "blockers": ["@blocker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@brute", "blockers": null } } }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "description": "CR 509.1a a Palace Guard blocks every attacker, where a Brigade stops at two",
+  "note": "Palace Guard can block any number of creatures; Foriysian Brigade beside it is the control. Three attackers is where an unbounded arity parts from the largest counted one: the Guard takes all three, the Brigade only two. This board: bob's High Ground beside the Guard must leave \"any number\" alone rather than collapse it to a count.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "first", "ready": true},
+          {"card": "Goblin Piker", "label": "second", "ready": true},
+          {"card": "Goblin Piker", "label": "third", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Palace Guard", "label": "guard", "ready": true},
+          {"card": "Foriysian Brigade", "label": "brigade", "ready": true},
+          {"card": "High Ground", "label": "ground"}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@first", "@second", "@third"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@guard": ["@first", "@second", "@third"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@first", "blockers": ["@guard"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@second", "blockers": ["@guard"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@third", "blockers": ["@guard"]}}}
+  ]
+}

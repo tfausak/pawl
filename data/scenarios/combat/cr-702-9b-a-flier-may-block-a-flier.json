@@ -1,0 +1,35 @@
+{
+  "description": "CR 702.9b a flier may block a flier",
+  "note": "Bird Maiden blocks Bird Maiden.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bird Maiden",
+            "label": "attacker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Bird Maiden",
+            "label": "blocker",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@blocker": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": ["@blocker"]}}}
+  ]
+}

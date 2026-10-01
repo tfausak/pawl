@@ -1,0 +1,37 @@
+{
+  "description": "CR 301.5a the Legion counts neither another creature's Equipment nor its own Aura",
+  "note": "Each board is one attachment away from the one-Equipment board (Bonesplitter on the Legion): a second Equipment on the OTHER blocker, or an Aura on the Legion itself. Both leave the arity at two, so three is refused and two stands. This board: Vectis Gloves on bob's Piker.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "first", "ready": true},
+          {"card": "Goblin Piker", "label": "second", "ready": true},
+          {"card": "Goblin Piker", "label": "third", "ready": true},
+          {"card": "Goblin Piker", "label": "fourth", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Kemba's Legion", "label": "legion", "ready": true},
+          {"card": "Goblin Piker", "label": "plain", "ready": true},
+          {"card": "Bonesplitter", "label": "bonesplitter", "attached": "legion"},
+          {"card": "Vectis Gloves", "label": "gloves", "attached": "plain"}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@first", "@second", "@third", "@fourth"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@legion": ["@first", "@second", "@third"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@legion": ["@first", "@second"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@first", "blockers": ["@legion"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@second", "blockers": ["@legion"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@third", "blockers": null}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@fourth", "blockers": null}}}
+  ]
+}

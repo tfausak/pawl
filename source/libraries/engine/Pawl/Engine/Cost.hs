@@ -2621,8 +2621,8 @@ tapObject = Event.tap
 --
 -- The ZONE alone keys a Removal soundly even though a hand and a graveyard are
 -- per-player (CR 400.3, CR 108.4): every such claim below is on `pid`'s own copy.
--- A `*This` arm whose own guard fails answers an EMPTY pool rather than Nothing,
--- which keeps this in agreement with canPayComponent.
+-- A `*This` arm whose component `canPayComponent` refuses answers an EMPTY pool
+-- rather than Nothing.
 --
 -- Every pool is read against `slots`, canPayComponent's reading and for its
 -- reason: CR 601.2c's bindings where the caller has them, and the empty map
@@ -2642,68 +2642,33 @@ claimOf slots pid oid component gs =
                 Claim.Type.threshold = Just (Threshold.MkThreshold {Threshold.total = needed, Threshold.amounts = Map.fromList (fmap (\candidate -> (candidate, amountOf candidate)) candidates)})
               }
           )
-      itself condition = if condition then Set.singleton oid else Set.empty
-      -- canPayComponent's own guard for the two `*This` arms that read a zone
-      -- rather than control: CR 108.4 gives a card outside the battlefield no
-      -- controller, and CR 400.3 puts it in its OWNER's zone.
-      isOwnedIn zone = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> Object.zone obj == zone && Object.owner obj == pid
+      -- A `*This` arm's pool: the object itself where `canPayComponent` pays the
+      -- component, so the two agree by construction.
+      itself = if canPayComponent slots pid oid component gs then Set.singleton oid else Set.empty
    in case component of
         -- CR 701.21a: the permanents this player controls that match the criterion.
         CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
           claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs)) n
-        CostComponent.SacrificeThis ->
-          claim
-            (ClaimAxis.Removal Zone.Battlefield)
-            -- CR 101.2's prohibition, as canPayComponent reads it below; the two
-            -- answers have to agree.
-            ( itself
-                ( Set.member oid (GameState.battlefield gs)
-                    && Projection.controllerOf oid gs == Just pid
-                    && not (SacrificeRestriction.prohibited oid gs)
-                )
-            )
-            1
+        CostComponent.SacrificeThis -> claim (ClaimAxis.Removal Zone.Battlefield) itself 1
         -- The same battlefield pool SacrificeThis draws on -- a permanent returned to
-        -- hand is as gone from the battlefield as one sacrificed -- and WITHOUT CR
-        -- 101.2's prohibition, `canPayComponent`'s reading below and for its reason.
-        -- The two answers have to agree.
+        -- hand is as gone from the battlefield as one sacrificed.
         --
         -- A FENCE and not proven behaviour: Grinning Ignus is the one card printing
         -- this component, its cost states one component and a non-empty mana part, so
         -- `repeatsOf` settles at 1 before any axis matters. Keying it ClaimAxis.Tapping
         -- instead leaves the suite green.
-        CostComponent.ReturnThis ->
-          claim
-            (ClaimAxis.Removal Zone.Battlefield)
-            ( itself
-                ( Set.member oid (GameState.battlefield gs)
-                    && Projection.controllerOf oid gs == Just pid
-                )
-            )
-            1
+        CostComponent.ReturnThis -> claim (ClaimAxis.Removal Zone.Battlefield) itself 1
         -- The same battlefield pool the two arms above claim, and on the same axis: a
-        -- permanent exiled is as gone from the battlefield as one sacrificed. WITHOUT
-        -- CR 101.2's prohibition, ReturnThis' reading above and for its reason; the
-        -- two answers have to agree.
+        -- permanent exiled is as gone from the battlefield as one sacrificed.
         --
         -- A FENCE and not proven behaviour, ReturnThis' note above: every printing of
         -- this component in `data/cards/` -- Brittle Effigy, Hanged Executioner --
         -- states a non-empty mana part, so `repeatsOf` settles at 1 before any axis
         -- matters.
-        CostComponent.ExileThis ->
-          claim
-            (ClaimAxis.Removal Zone.Battlefield)
-            ( itself
-                ( Set.member oid (GameState.battlefield gs)
-                    && Projection.controllerOf oid gs == Just pid
-                )
-            )
-            1
+        CostComponent.ExileThis -> claim (ClaimAxis.Removal Zone.Battlefield) itself 1
         CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
           claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates slots pid oid criterion gs)) n
-        CostComponent.DiscardThis _ -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
+        CostComponent.DiscardThis _ -> claim (ClaimAxis.Removal Zone.Hand) itself 1
         -- The same hand pool the two arms above claim, and on the same axis: what the
         -- payment spends is a card leaving the hand, and the battlefield end adds a
         -- permanent rather than competing for one. A FENCE and not proven behaviour --
@@ -2735,7 +2700,7 @@ claimOf slots pid oid component gs =
         -- A pool of at most ONE, CR 404.2's order having picked it.
         CostComponent.ExileTopFromGraveyard criterion ->
           claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid criterion gs))) 1
-        CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
+        CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) itself 1
         -- CR 701.17a spends cards out of the paying player's own library, so the pool
         -- is that library and the count is how many the mill takes -- the ZONE keying a
         -- Removal soundly for the header's reason. What it buys is two mills of one
@@ -2745,17 +2710,7 @@ claimOf slots pid oid component gs =
           claim (ClaimAxis.Removal Zone.Library) (Set.fromList (Game.zoneMembers Zone.Library pid gs)) n
         -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
         -- claims, so it is the same axis, on a pool of one.
-        CostComponent.TapThis ->
-          claim
-            ClaimAxis.Tapping
-            -- canPayComponent's own guard for this component, read below; the two
-            -- answers have to agree.
-            ( itself
-                ( Set.member oid (GameState.battlefield gs)
-                    && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
-                )
-            )
-            1
+        CostComponent.TapThis -> claim ClaimAxis.Tapping itself 1
         -- Nothing: CR 107.6's {Q} spends TAPPED-ness, a third axis, and names the
         -- object the cost is on, so two such claims come from one cost carrying {Q}
         -- twice or from two mana abilities of one permanent that a board takes
@@ -3759,14 +3714,14 @@ canPayComponent slots pid oid component gs = case component of
   -- CR 701.21a: only a permanent, and only one this player controls -- and CR
   -- 101.2, only one no effect says can't be sacrificed. Read here and not left to
   -- the funnel, a cost announced as payable and then unpayable spending an
-  -- activation for nothing (CR 118.3). `claimOf` must agree.
+  -- activation for nothing (CR 118.3).
   CostComponent.SacrificeThis ->
     Set.member oid (GameState.battlefield gs)
       && Projection.controllerOf oid gs == Just pid
       && not (SacrificeRestriction.prohibited oid gs)
   -- CR 118.1 as a cost: only a permanent, and only one this player controls --
   -- SacrificeThis' two conjuncts above, read here rather than left to the funnel
-  -- for that arm's reason. `claimOf` must agree.
+  -- for that arm's reason.
   --
   -- WITHOUT CR 101.2's prohibition, deliberately: an effect saying a permanent
   -- can't be sacrificed says nothing about returning it to its owner's hand, and
@@ -3781,7 +3736,6 @@ canPayComponent slots pid oid component gs = case component of
   -- CR 406.2 as a cost: only a permanent, and only one this player controls --
   -- ReturnThis' two conjuncts above, and WITHOUT CR 101.2's prohibition for that
   -- arm's reason, an effect forbidding a sacrifice saying nothing about an exile.
-  -- `claimOf` must agree.
   CostComponent.ExileThis ->
     Set.member oid (GameState.battlefield gs)
       && Projection.controllerOf oid gs == Just pid
@@ -4377,8 +4331,9 @@ announceSubstitutionsReading slots substituting pid oid cost = case Cost.mana co
 -- (Pawl.Engine.ManaAbility.costMovesLibraryCard is the cost half), so nothing
 -- in it can make such a move. The components can -- MillCards is the one that
 -- does -- but CR 601.2h pays those in a SECOND pass (paidInSecondPass below),
--- and `payComponent`'s MillCards arm cannot refuse, so no failure can follow
--- one within this payment.
+-- and `payComponent` refuses a MillCards only short of cards, which the gate
+-- measured and the window cannot change, so no failure can follow one within
+-- this payment.
 --
 -- Rule 733.1's SHUFFLE and REVEAL clauses, which CR 605.1a does NOT exclude --
 -- Pawl.Engine.ManaAbility.movesLibraryCard answers False of Effect.Shuffle and
@@ -5715,33 +5670,38 @@ stampChosenPlayer oid pid =
     let stamp object = object {Object.chosenPlayer = Just pid}
      in gs {GameState.objects = Map.adjust stamp oid (GameState.objects gs)}
 
+-- CR 118.3 asked AGAIN as each component is paid, and not only at the gate: CR
+-- 601.2g's window activates mana abilities before any part is paid and CR 601.2h
+-- lets the payer order the parts, so either can spend what a later part needs --
+-- Brittle Effigy's ExileThis ahead of its own {T}, Cadaverous Bloom exiling the
+-- Trumpeting Carnosaur whose "discard this card" is still owed, an Aether Hub
+-- spending the energy "Pay X {E}" counts. That makes the ORDER
+-- unpayable rather than the cost, so `canPay` was right to allow it, and CR
+-- 601.2h refuses the payment whole: Unpaid rather than a funnel's silent no-op
+-- or floor, which `pay` turns into CR 733.1's reversal of the entire action.
+-- Refusing an order is not choosing one for the player. Nothing narrows the
+-- window's offer either: CR 605.3a lets a player activate any mana ability at a
+-- payment, and refusing the payment afterwards is the rules' own answer.
+--
+-- ONE guard ahead of every arm, so the gate and the payment ask one question.
+-- Pawl.CostSpec's Hanweir Battlements, Ashnod's Altar, Brittle Effigy and
+-- Trumpeting Carnosaur groups and Pawl.ActivateSpec's "CR 601.2h energy an
+-- Aether Hub spends mid-payment is not there for Pay X {E}" are the proofs.
 payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
-payComponent moment slots pid oid component = case component of
-  -- CR 118.3 asked AGAIN here and not only at the gate: CR 601.2h lets the payer
-  -- order the parts, so a part paid earlier in that order can have moved this
-  -- permanent off the battlefield -- Brittle Effigy's ExileThis, Mindslaver's
-  -- SacrificeThis -- leaving no permanent to tap. That makes the ORDER unpayable
-  -- rather than the cost, so `canPay` above was right to allow it, and CR 601.2h
-  -- refuses the payment whole: Unpaid rather than Event.tap's silent no-op, which
-  -- `pay` turns into the reversal of the entire announcement. Refusing an order is
-  -- not choosing one for the player, and re-asking would have to end in the engine
-  -- picking. Pawl.CostSpec's "CR 118.3 exiling the Effigy first leaves no
-  -- permanent to tap" is the proof.
-  --
-  -- `canPayComponent`'s own arm, so both halves of CR 107.5 are read once: the
-  -- other way a part paid earlier makes this one unpayable is the CR 605.3a mana
-  -- window, which offers this very permanent as a source and taps it. Nothing
-  -- narrows that offer -- CR 605.3a lets a player activate any mana ability at a
-  -- payment, and refusing the payment afterwards is the rules' own answer.
-  -- Pawl.CostSpec's "CR 107.5 tapping the source for mana loses its own {T}" is
-  -- the proof.
+payComponent moment slots pid oid component = do
+  gs <- State.get
+  if canPayComponent slots pid oid component gs
+    then payPayable moment slots pid oid component
+    else pure Payment.Unpaid
+
+-- `payComponent`'s arms, each reached only once CR 118.3 holds.
+payPayable :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
+payPayable moment slots pid oid component = case component of
+  -- CR 701.26a through tapObject; CR 107.5's "already tapped" is `payComponent`'s
+  -- guard.
   CostComponent.TapThis -> do
-    gs <- State.get
-    if canPayComponent slots pid oid component gs
-      then do
-        tapObject oid
-        pure bindsNothing
-      else pure Payment.Unpaid
+    tapObject oid
+    pure bindsNothing
   -- Through Pawl.Engine.Event.untap, the CR 701.26b funnel, exactly as TapThis
   -- above goes through Event.tap -- and rule 701.26b draws no such distinction
   -- between the two. A permanent with a stun counter therefore stays tapped and
@@ -5751,72 +5711,40 @@ payComponent moment slots pid oid component = case component of
   -- rather than a shortcut: CR 614.6 replaces the EVENT the paying produces, and
   -- CR 601.2h's "partial payments are not allowed" is about what the player
   -- performs, not about what the event turns into. That is a replaced event and
-  -- not an unpayable part, so it is the guard below that has to be able to tell
-  -- them apart -- CR 122.1d leaves the permanent on the battlefield and tapped,
+  -- not an unpayable part, so it is `payComponent`'s guard that has to be able
+  -- to tell them apart -- CR 122.1d leaves the permanent on the battlefield and tapped,
   -- which `canPayComponent` calls payable.
-  --
-  -- CR 118.3 asked AGAIN here, TapThis' reason above with CR 107.6 in place of
-  -- CR 107.5. Pawl.CostSpec's "CR 118.3 the Altar eats the Sentry before its own
-  -- {Q} is paid" is the proof.
   CostComponent.UntapThis -> do
-    gs <- State.get
-    if canPayComponent slots pid oid component gs
-      then do
-        Event.untap oid
-        pure bindsNothing
-      else pure Payment.Unpaid
+    Event.untap oid
+    pure bindsNothing
   -- Through Event.sacrifice, the CR 701.21 funnel, and never a direct zone poke:
   -- a cost payment is a game event, so dies-triggers, replacement effects and the
-  -- turn history all see it.
-  --
-  -- CR 118.3 asked AGAIN here, TapThis' reason above: an earlier part of the CR
-  -- 601.2h order, or a mana ability activated in the CR 605.3a window, can
-  -- already have moved this permanent, and the funnel would then do nothing
-  -- while this answered Paid. Pawl.CostSpec's "CR 118.3 the Altar eats the
-  -- Replica before its own sacrifice is paid" is the proof.
+  -- turn history all see it. `pid` is the player paying, who for "sacrifice
+  -- this" is its controller.
   CostComponent.SacrificeThis -> do
-    gs <- State.get
-    -- CR 701.21a's "a permanent they don't control" guard lives in the funnel as
-    -- well as in `canPayComponent`; `pid` is the player paying, who for
-    -- "sacrifice this" is its controller.
-    if canPayComponent slots pid oid component gs
-      then do
-        Event.sacrifice pid oid
-        pure bindsNothing
-      else pure Payment.Unpaid
+    Event.sacrifice pid oid
+    pure bindsNothing
   -- Through Event.changeZone, the CR 400.7 funnel, and never a direct zone poke,
   -- SacrificeThis' call above and for its reason. CR 400.3 is what makes the bare
   -- Zone.Hand right: an object that would go to a hand other than its owner's
   -- goes to its owner's, so the funnel already spells the printed "its owner's".
-  -- CR 118.3 asked again, SacrificeThis' reason above; Pawl.CostSpec's "CR 118.3
-  -- the Altar eats the Ignus before its own return is paid" is the proof.
   CostComponent.ReturnThis -> do
-    gs <- State.get
-    if canPayComponent slots pid oid component gs
-      then do
-        Event.changeZone oid Zone.Hand
-        pure bindsNothing
-      else pure Payment.Unpaid
-  -- CR 119.4: the payment is subtracted from the life total, shared with CR
-  -- 107.4f's Phyrexian symbol as the payability check above is -- and ASKED
-  -- AGAIN here, because not every component reached the gate: a component a
-  -- cost effect reads off the spell's targets (Filter.TargetsSource) joins at
-  -- CR 601.2f, after the castability gate and CR 601.2b's announcement ran
-  -- without it. An Unpaid is CR 601.2h's failed payment, which reverses the
-  -- casting; Pawl.CastSpec's Terror of the Peaks group is the proof.
+    Event.changeZone oid Zone.Hand
+    pure bindsNothing
+  -- CR 119.4: the payment is subtracted from the life total. Not every
+  -- component reached the gate: one a cost effect reads off the spell's targets
+  -- (Filter.TargetsSource) joins at CR 601.2f, after the castability gate ran
+  -- without it, so `payComponent`'s guard is the only CR 119.4 check it gets.
+  -- Pawl.CastSpec's Terror of the Peaks group is the proof.
   CostComponent.PayLife n -> do
-    gs <- State.get
-    if Event.canPayLife pid n gs
-      then do
-        Event.payLife pid n
-        pure bindsNothing
-      else pure Payment.Unpaid
+    Event.payLife pid n
+    pure bindsNothing
   -- PayLife's arm over the live half: `announce` fixes the component first, so
   -- only one joining after it (PayLife's caveat above) is measured here. A FENCE:
   -- no card in `data/cards/` adds a half-life cost that way.
   CostComponent.PayHalfLife rounding -> do
     gs <- State.get
-    payComponent moment slots pid oid (CostComponent.PayLife (halfLifeOf rounding pid gs))
+    payPayable moment slots pid oid (CostComponent.PayLife (halfLifeOf rounding pid gs))
   -- Unpayable, `canPayComponent`'s answer and for its reason. Unpaid rather than
   -- a guessed 0, which CR 601.2h turns into the reversal of the whole casting.
   CostComponent.PayLifeX -> pure Payment.Unpaid
@@ -6141,8 +6069,8 @@ payComponent moment slots pid oid component = case component of
         pure bindsNothing
       _ -> pure Payment.Unpaid
   -- CR 107.14: paying energy removes that many energy counters from the player.
-  -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
-  -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
+  -- Natural subtraction is PARTIAL, so `left` is guarded; `payComponent`'s guard
+  -- has already refused `have < n`, and this keeps the arm total anyway.
   CostComponent.PayEnergy n -> do
     spendEnergy pid n
     pure bindsNothing
@@ -6366,8 +6294,8 @@ payComponent moment slots pid oid component = case component of
   CostComponent.ChooseOpponent -> do
     gs <- State.get
     case Game.opponentsInReach pid gs of
-      -- CR 118.3 asked AGAIN here, TapThis' reason above: the last opponent may
-      -- have left (CR 104.2a) since the gate.
+      -- CR 118.3 over the opponents still in reach, which `payComponent`'s guard
+      -- does not narrow to.
       [] -> pure Payment.Unpaid
       -- CR 102.2: a two-player game leaves exactly one opponent, and one option
       -- is not a choice.
@@ -6431,12 +6359,8 @@ payComponent moment slots pid oid component = case component of
   -- made, not the permanent that left, which is why the binding is taken off what
   -- arrived; see that slot.
   CostComponent.ExileThis -> do
-    gs <- State.get
-    if canPayComponent slots pid oid component gs
-      then do
-        arrived <- Event.changeZoneReturning oid Zone.Exile
-        pure (bindExiled arrived)
-      else pure Payment.Unpaid
+    arrived <- Event.changeZoneReturning oid Zone.Exile
+    pure (bindExiled arrived)
   -- CR 406.2's move again, for CHOSEN cards: the payer picks which, so this is a
   -- prompt. Elided only when forced, Sacrifice's elision.
   --

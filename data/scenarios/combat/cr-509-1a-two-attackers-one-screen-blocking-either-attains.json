@@ -1,0 +1,30 @@
+{
+  "description": "CR 509.1a two attackers, one Screen: blocking EITHER attains the maximum",
+  "note": "Razorgrass Screen blocks each combat if able, not each attacker: two pairs are minted, but the Screen may block one attacker, so the maximum is one. Declining is refused and either single block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "first", "ready": true},
+          {"card": "Goblin Piker", "label": "second", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Razorgrass Screen", "label": "screen", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@first", "@second"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@screen": ["@first"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@first", "blockers": ["@screen"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@second", "blockers": null}}}
+  ]
+}

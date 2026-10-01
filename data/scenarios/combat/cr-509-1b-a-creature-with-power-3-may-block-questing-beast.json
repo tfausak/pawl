@@ -1,0 +1,27 @@
+{
+  "description": "CR 509.1b a creature with power 3 may block Questing Beast",
+  "note": "The pair to the Goblin Piker case on the same attacker: the 3/3 War Mammoth's block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Questing Beast", "label": "beast", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "War Mammoth", "label": "blocker", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@beast"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@blocker": ["@beast"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@beast", "blockers": ["@blocker"]}}}
+  ]
+}

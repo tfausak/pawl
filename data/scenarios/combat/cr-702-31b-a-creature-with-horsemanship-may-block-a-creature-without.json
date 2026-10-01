@@ -1,0 +1,35 @@
+{
+  "description": "CR 702.31b a creature WITH horsemanship may block a creature without horsemanship",
+  "note": "The falsifier separating horsemanship from shadow: a horseman blocks with or without, so bob's Shu Cavalry blocks alice's Goblin Piker.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "attacker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Shu Cavalry",
+            "label": "blocker",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@blocker": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": ["@blocker"]}}}
+  ]
+}

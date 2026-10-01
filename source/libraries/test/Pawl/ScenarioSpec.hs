@@ -444,6 +444,25 @@ spec s registry = Spec.describe s "Scenario" $ do
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the dangling qualifier was ignored"
 
+  -- CR 733.1: a refused move is one the engine reverses and asks for again, so
+  -- a legal declaration under `refuse` stands and fails the run.
+  Spec.it s "a refused move that stands fails, naming the prompt asked next" $ do
+    result <-
+      runJson
+        s
+        registry
+        ( "{\"description\":\"x\",\"board\":{\"seats\":[{\"name\":\"alice\",\"battlefield\":[{\"card\":\"Goblin Piker\",\"label\":\"attacker\",\"ready\":true}]},{\"name\":\"bob\",\"battlefield\":[{\"card\":\"Goblin Piker\",\"ready\":true}]}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"},"
+            <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\"@attacker\"]}},"
+            <> "{\"turn\":1,\"step\":\"DeclareBlockers\",\"player\":\"bob\",\"refuse\":{\"Block\":{}}}]}"
+        )
+    case result of
+      Left (ScenarioFailure.MkUnrefusedMove key verb next) -> do
+        Spec.assertEqWith s "the moment it answered" key (When.MkWhen 1 S.declareBlockers (S.seatLabel S.bob))
+        Spec.assertEqWith s "the move that stood" verb (Move.Block Map.empty)
+        Spec.assertBool s (next /= Just (Text.pack "DeclareBlockers")) "the declaration was asked again"
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "a declaration that stood passed as refused"
+
   -- The two ways a check can fail are never spelled alike: one that ran and
   -- read false, and one whose moment never came and so asserted nothing.
   Spec.it s "a check that reads false fails as a false check, naming what it saw" $ do

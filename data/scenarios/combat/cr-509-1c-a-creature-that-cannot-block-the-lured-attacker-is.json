@@ -1,0 +1,28 @@
+{
+  "description": "CR 509.1c a creature that CANNOT block the Lured attacker is not required to",
+  "note": "Lure's 'able to block': the Bird Maiden flies (CR 702.9b), so the ground Piker could block it under no declaration. No requirement instance exists, the maximum is zero, and declining stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Bird Maiden", "label": "attacker", "ready": true },
+          { "card": "Lure", "attached": "attacker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": null } } }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "description": "CR 509.1b menace and fear are cumulative: two blockers, and both must pass fear",
+  "note": "Aphotic Wisps gives the attacking Boggart Brute fear, standing in for the Haskell test's stored effect. It then needs two blockers, each black or an artifact: Typhoid Rats and Darksteel Myr stand, while Rats beside the red Piker, and Rats alone, are refused.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "library": [{"card": "Swamp"}],
+        "hand": [{"card": "Aphotic Wisps", "label": "wisps"}],
+        "battlefield": [
+          {"card": "Boggart Brute", "label": "brute", "ready": true},
+          {"card": "Swamp", "label": "swamp"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Typhoid Rats", "label": "rats", "ready": true},
+          {"card": "Darksteel Myr", "label": "myr", "ready": true},
+          {"card": "Goblin Piker", "label": "plain", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@brute"]}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Cast": {"object": "@wisps", "targets": ["@brute"], "mana": ["@swamp"]}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@rats": ["@brute"], "@plain": ["@brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@rats": ["@brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@rats": ["@brute"], "@myr": ["@brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@brute", "blockers": ["@rats", "@myr"]}}}
+  ]
+}
