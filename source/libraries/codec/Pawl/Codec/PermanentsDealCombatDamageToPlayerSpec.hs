@@ -18,8 +18,21 @@ spec s = Spec.describe s "Pawl.Codec.PermanentsDealCombatDamageToPlayer" $ do
       PermanentsDealCombatDamageToPlayer.codec
       ( PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer
           { PermanentsDealCombatDamageToPlayer.filter = Filter.ControlledBy PlayerRelation.Opponent,
-            PermanentsDealCombatDamageToPlayer.recipient = PlayerRelation.You
+            PermanentsDealCombatDamageToPlayer.recipient = PlayerRelation.You,
+            PermanentsDealCombatDamageToPlayer.oneOrMorePlayers = False
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"Opponent\"}},\"recipient\":{\"type\":\"You\"}} "
+  -- Forth Eorlingas!'s "to one or more players": the key appears only when set.
+  Spec.it s "MkPermanentsDealCombatDamageToPlayer, one or more players" $
+    Common.assertCodec
+      s
+      PermanentsDealCombatDamageToPlayer.codec
+      ( PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer
+          { PermanentsDealCombatDamageToPlayer.filter = Filter.ControlledBy PlayerRelation.You,
+            PermanentsDealCombatDamageToPlayer.recipient = PlayerRelation.AnyPlayer,
+            PermanentsDealCombatDamageToPlayer.oneOrMorePlayers = True
+          }
+      )
+      " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"oneOrMorePlayers\":true,\"recipient\":{\"type\":\"AnyPlayer\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PermanentsDealCombatDamageToPlayer.codec

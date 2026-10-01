@@ -1,0 +1,40 @@
+{
+  "description": "CR 702.165b a Clone of Streetwise Negotiator grants the static ability it copied",
+  "note": "The projection tripwire for backup's static half: the ability granted is the one the Clone copied (CR 702.165b), so a printed read answers \"Clone\" and grants nothing. The backed-up Piker is 3/2 and assigns combat damage equal to its toughness, so bob takes 2. The Haskell original read the projected damage amount; the unblocked attack is the same reading at gameplay level. The paired control file has the Clone copy a Jedit Ojanen.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true}
+        ],
+        "hand": [
+          {"card": "Clone", "label": "clone"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Streetwise Negotiator", "label": "model"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseCopyTarget": "$model"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseTargets": {"backupRecipient": ["$piker"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$piker", "power": 3, "toughness": 2}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$piker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
+    {"turn": 1, "step": "EndOfCombat", "player": "alice", "check": {"Life": {"player": "bob", "life": 18}}}
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "description": "CR 611.2a Mirrorweave's copy ends at cleanup, and the token copy taken under it does not",
+  "note": "Mirrorweave makes each other creature a copy of the Blind-Spot Giant until end of turn. During the turn the Piker is the Giant by name and 4/3; after cleanup (CR 514.2, 611.2a) it is its printed 2/1 again; and a Cackling Counterpart token copied while it stood keeps the Giant's values (CR 707.2b). The Clone, already a copy of the Piker, is the tripwire for the copy underneath: it is the Giant under Mirrorweave and the Piker again after, never the printed 0/0 that CR 704.5f would bury. Three distinct printed pairs, so no reading is a coincidence.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Blind-Spot Giant", "label": "giant" },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Mirrorweave", "label": "mirrorweave" },
+          { "card": "Cackling Counterpart", "label": "counterpart" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$mirrorweave", "targets": ["$giant"], "mana": ["Island#5", "Island#6", "Island#7", "Island#8", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$counterpart", "targets": ["$piker"], "mana": ["Island#9", "Island#10", "Island#11"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 4, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "$piker", "names": ["Blind-Spot Giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 4, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Goblin Piker#2", "power": 4, "toughness": 3 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "$piker", "power": 2, "toughness": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Names": { "object": "$piker", "names": ["Goblin Piker"] } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "Goblin Piker#2", "power": 4, "toughness": 3 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Names": { "object": "Goblin Piker#2", "names": ["Blind-Spot Giant"] } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 2, "toughness": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Goblin Piker"] } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 4, "toughness": 3 } } }
+  ]
+}

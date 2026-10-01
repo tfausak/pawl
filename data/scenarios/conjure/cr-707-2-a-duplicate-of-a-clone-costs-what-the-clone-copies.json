@@ -1,0 +1,44 @@
+{
+  "description": "CR 707.2 a duplicate of a Clone costs what the Clone copies",
+  "note": "CR 707.2 lists mana cost among the copiable values, so the duplicate Sinister Reflections conjures of alice's Clone of her Piker costs the Piker's {1}{R}, not the printed Clone's {3}{U}. After the Clone and Reflections are paid for, two Mountains are left: they pay {1}{R} and could not pay {3}{U}, so the cast standing is the castability the Haskell test asserted. It resolves into a second Goblin Piker beside the Clone.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Mountain", "ready": true },
+          { "card": "Mountain", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Sinister Reflections", "label": "reflections" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$reflections", "targets": ["Clone"], "mana": ["Island#5", "Island#6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone#2", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Clone#2", "mana": ["Mountain", "Mountain#2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone#2", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 3 } } }
+  ]
+}

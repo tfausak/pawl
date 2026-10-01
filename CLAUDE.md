@@ -127,7 +127,8 @@ to agents as written. What it doesn't say:
 
 - Mark the PR ready once the self-review's findings are pushed and the suite is
   green, report it, and stop. Don't wait for CI. Don't start the next unit ---
-  one unit at a time per checkout.
+  one unit at a time per checkout. A drain-loop implementer leaves it a draft
+  instead (`docs/agents/implementing.md`).
 
 - STAGE, then `hooky fix`. It acts on staged files only, runs every check
   `.hooky.kdl` wires up, and rewrites in place, so `git add` again afterwards.

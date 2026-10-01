@@ -976,14 +976,24 @@ affectsWith grants peers source oid a partial gs = case a of
 -- BOTH of CR 614.1c's chosen characteristics, filled the same way and by the same
 -- sentence of rule 607.2d: Gauntlet of Power reads the colour and Obelisk of Urd
 -- the creature type. Filling only one would leave the other's atom silently False
--- in this position, which is the one position either is written in outside a mana
--- restriction (Pawl.Engine.Mana.admitsUnder, which supplies the subtype off the
--- mana unit instead and so is unaffected by the read here).
+-- here. withChoicesOf below fills the same two for the other positions.
 affectedContext :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Filter.Context
 affectedContext source perspective gs =
   (Filter.contextFor (Game.teams gs) perspective (Just source))
     { Filter.sourceChosenColor = Game.lookupObject source gs >>= Object.chosenColor,
       Filter.sourceChosenSubtype = Game.lookupObject source gs >>= Object.chosenSubtype
+    }
+
+-- CR 607.2d: `context` with the entry choices (CR 614.1c) of `source`, the
+-- object whose own ability is asking -- a cost's criterion (Doom Cannon) and,
+-- by hand in Pawl.Engine.Target.slotContext, a target slot's filter. Read
+-- through CR 608.2h's last known information, the reading CR 113.7a gives an
+-- ability whose source has left.
+withChoicesOf :: ObjectId -> GameState -> Filter.Context -> Filter.Context
+withChoicesOf source gs context =
+  context
+    { Filter.sourceChosenColor = Game.chosenColorWithLastKnown source gs,
+      Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs
     }
 
 -- The characteristics view of an object: its CR 613 projection and its projected

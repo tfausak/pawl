@@ -45,13 +45,15 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   its `decision` is `Pays` or `Declines`, and paying takes a cast's choices,
   such as `mana`. `ChooseTypeSwap` answers a text change's swap (CR 612.1),
   `{ "from": { "type": "Island" }, "to": { "type": "Swamp" } }`, keyed
-  the same way. `ChooseTargets` names each slot's
-  targets, `{ "target": ["@moon"] }`, for a target prompt no cast or activation
+  the same way. `ChooseCopyTarget` names what an object entering as a copy
+  copies (CR 707.5), `"$bear"`, or `null` to decline its "may", keyed by
+  the entering object. `ChooseTargets` names each slot's
+  targets, `{ "target": ["$moon"] }`, for a target prompt no cast or activation
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`
   likewise announce their count for a slot that takes a variable number. A
   spell or ability with more than one target slot names them with
-  `targetsBySlot`, `{ "victim": ["@bear"], "gauge": ["@wall"] }`, in place
+  `targetsBySlot`, `{ "victim": ["$bear"], "gauge": ["$wall"] }`, in place
   of `targets`.
   `OrderTriggers` lists one player's simultaneous triggers by source, `null`
   for a sourceless one such as the monarch's draw, in the order they go on the

@@ -1,0 +1,38 @@
+{
+  "description": "CR 702.165b a Clone of the Archpriest grants what it copied",
+  "note": "The projection tripwire: nothing alice controls prints backup. Her Clone copies bob's Archpriest of Shadows, and the keyword and the deathtouch it hands over come off CR 707.2's copiable values (CR 702.165b). A read of the printed card answers \"Clone\" and grants nothing. The paired control file has the same Clone copy a Jedit Ojanen, which has no backup.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true}
+        ],
+        "hand": [
+          {"card": "Clone", "label": "clone"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Archpriest of Shadows", "label": "model"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseCopyTarget": "$model"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseTargets": {"backupRecipient": ["$piker"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$piker", "keyword": {"type": "Deathtouch"}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Counters": {"object": "$piker", "kind": {"type": "PlusOnePlusOne"}, "count": 1}}}
+  ]
+}

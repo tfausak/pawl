@@ -1,0 +1,38 @@
+{
+  "description": "CR 603.2c Feline Sovereign triggers once per player its Cats hit, each destroying an artifact that player controls",
+  "note": "Feline Sovereign attacks bob and Jedit Ojanen attacks carol, so one combat damage step holds two damaged players. Each trigger names its own player and may target only that player's artifact: the ChooseTargets entries fail the run if bob's trigger offers carol's Jade Statue or carol's offers bob's Sol Ring.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Feline Sovereign", "label": "sovereign", "ready": true },
+          { "card": "Jedit Ojanen", "label": "jedit", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Sol Ring", "label": "ring" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Jade Statue", "label": "statue" }]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$sovereign", "$jedit"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$sovereign", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$jedit", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$jedit", "power": 6, "toughness": 6 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["$sovereign", "$sovereign"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["$ring"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["$statue"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Sol Ring", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Graveyard", "card": "Jade Statue", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 14 } } }
+  ]
+}

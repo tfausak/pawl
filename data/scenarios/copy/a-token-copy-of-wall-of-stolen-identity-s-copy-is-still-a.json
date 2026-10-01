@@ -1,0 +1,57 @@
+{
+  "description": "a token copy of Wall of Stolen Identity's copy is still a Wall (CR 707.9b)",
+  "note": "CR 707.9b's arm that adds a subtype, read by a card that filters on it: Chaos Charm's first mode is \"destroy target Wall\", so the cast fails unless the token is a Wall. The copied creature is a Hill Giant: a 3/3 survives the charm's 1-damage mode, so destroyed means the Wall mode. The token, not the Wall copy, is the target: CR 707.2 copies the copiable values, so a subtype written into them travels to the token where a CR 613 layer-4 write would be left behind. A Clone copying the same Giant is the control, no Wall and still standing. The Wall's linked \"when you do\" tap trigger is not implemented (#3408) and nothing here turns on it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Hill Giant", "label": "giant"},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Mountain", "ready": true}
+        ],
+        "hand": [
+          {"card": "Clone", "label": "clone"},
+          {"card": "Wall of Stolen Identity", "label": "wall"},
+          {"card": "Cackling Counterpart", "label": "counterpart"},
+          {"card": "Chaos Charm", "label": "charm"}
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseCopyTarget": "$giant"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$wall", "mana": ["Island#5", "Island#6", "Island#7", "Island#8", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseCopyTarget": "$giant"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$counterpart", "targets": ["Wall of Stolen Identity"], "mana": ["Island#9", "Island#10", "Island#11", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Hill Giant", "count": 4}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Names": {"object": "Wall of Stolen Identity#2", "names": ["Hill Giant"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "Wall of Stolen Identity#2", "power": 3, "toughness": 3}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Subtypes": {"object": "Wall of Stolen Identity#2", "subtypes": ["Giant", "Wall"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Subtypes": {"object": "Wall of Stolen Identity", "subtypes": ["Giant", "Wall"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$charm", "modes": [0], "targets": ["Wall of Stolen Identity#2"], "mana": ["Mountain"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Hill Giant", "count": 3}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Subtypes": {"object": "Clone", "subtypes": ["Giant"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Clone", "count": 0}}}
+  ]
+}

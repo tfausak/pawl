@@ -1,0 +1,36 @@
+{
+  "description": "CR 702.165b a Clone of the Archpriest grants what it copied",
+  "note": "The control for the Archpriest file: the same Clone copying bob's Jedit Ojanen, a 5/5 with no backup, so no entry trigger asks for a target and the Piker gains no deathtouch.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true}
+        ],
+        "hand": [
+          {"card": "Clone", "label": "clone"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Jedit Ojanen", "label": "model"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseCopyTarget": "$model"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Names": {"object": "Clone", "names": ["Jedit Ojanen"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$piker", "keyword": {"type": "Deathtouch"}, "count": 0}}}
+  ]
+}

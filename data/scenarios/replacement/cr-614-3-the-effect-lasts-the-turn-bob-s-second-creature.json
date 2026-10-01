@@ -1,0 +1,53 @@
+{
+  "description": "CR 614.3 the effect lasts the turn: bob's SECOND creature comes over too",
+  "note": "Gather Specimens states no count, so it applies until the turn ends (CR 614.3): both Clones bob casts after it resolves enter under alice's control, and alice is asked each copy. A once-only effect would take the first and leave the second with bob. It is bob's turn so his Clone is cast at sorcery speed, with Gather Specimens cast in his upkeep; his one library card covers his draw step.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "a-island-1" },
+          { "card": "Island", "label": "a-island-2" },
+          { "card": "Island", "label": "a-island-3" },
+          { "card": "Island", "label": "a-island-4" },
+          { "card": "Island", "label": "a-island-5" },
+          { "card": "Island", "label": "a-island-6" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Gather Specimens", "label": "gather" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "b-island-1" },
+          { "card": "Island", "label": "b-island-2" },
+          { "card": "Island", "label": "b-island-3" },
+          { "card": "Island", "label": "b-island-4" },
+          { "card": "Island", "label": "b-island-5" },
+          { "card": "Island", "label": "b-island-6" },
+          { "card": "Island", "label": "b-island-7" },
+          { "card": "Island", "label": "b-island-8" }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone-1" },
+          { "card": "Clone", "label": "clone-2" }
+        ],
+        "library": [{ "card": "Island" }]
+      }
+    ],
+    "active": "bob",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Cast": { "object": "$gather", "mana": ["$a-island-1", "$a-island-2", "$a-island-3", "$a-island-4", "$a-island-5", "$a-island-6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$clone-1", "mana": ["$b-island-1", "$b-island-2", "$b-island-3", "$b-island-4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$clone-2", "mana": ["$b-island-5", "$b-island-6", "$b-island-7", "$b-island-8"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone#2", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

@@ -21,6 +21,7 @@ import qualified Pawl.Types.KeywordsAre as KeywordsAre.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.LifeIs as LifeIs.Type
 import qualified Pawl.Types.MonarchIs as MonarchIs.Type
+import qualified Pawl.Types.NamesAre as NamesAre.Type
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind.Type
 import qualified Pawl.Types.PlayerCountersAre as PlayerCountersAre.Type
 import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs.Type
@@ -58,6 +59,8 @@ spec s = Spec.describe s "Pawl.Codec.Check" $ do
     Common.assertCodec s Check.codec (Check.Type.PowerToughness (PowerToughnessIs.Type.MkPowerToughnessIs (labelled "bear") 3 3)) " {\"PowerToughness\":{\"object\":\"$bear\",\"power\":3,\"toughness\":3}} "
   Spec.it s "PlayerCounters" $
     Common.assertCodec s Check.codec (Check.Type.PlayerCounters (PlayerCountersAre.Type.MkPlayerCountersAre (Label.Type.MkLabel (Text.pack "bob")) PlayerCounterKind.Type.Energy 2)) " {\"PlayerCounters\":{\"player\":\"bob\",\"kind\":{\"type\":\"Energy\"},\"count\":2}} "
+  Spec.it s "Names" $
+    Common.assertCodec s Check.codec (Check.Type.Names (NamesAre.Type.MkNamesAre (labelled "clone") (Set.singleton (CardName.Type.MkCardName (Text.pack "Goblin Piker"))))) " {\"Names\":{\"object\":\"$clone\",\"names\":[\"Goblin Piker\"]}} "
   Spec.it s "Subtypes" $
     Common.assertCodec s Check.codec (Check.Type.Subtypes (SubtypesAre.Type.MkSubtypesAre (labelled "piker") (Set.singleton Subtype.Type.Goblin))) " {\"Subtypes\":{\"object\":\"$piker\",\"subtypes\":[\"Goblin\"]}} "
   Spec.it s "Keywords" $

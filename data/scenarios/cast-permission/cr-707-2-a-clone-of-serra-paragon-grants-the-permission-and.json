@@ -1,0 +1,47 @@
+{
+  "description": "CR 707.2 a Clone of Serra Paragon grants the permission and the rider",
+  "note": "The projection tripwire: alice's Serra Paragon is a Clone, and the printed Paragon is bob's. The graveyard cast and CR 611.3d's rider both come off the copiable values; a read of the printed card answers Clone and offers nothing. alice casts the Clone copying bob's Paragon, casts the Llanowar Elves from her graveyard under it, then Murders them: the rider exiles the card and gains her 2 life.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Murder", "label": "murder" }
+        ],
+        "graveyard": [{ "card": "Llanowar Elves" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Serra Paragon", "label": "paragon" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$paragon" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Serra Paragon"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Llanowar Elves", "mana": ["Forest", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Llanowar Elves", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$murder", "targets": ["Llanowar Elves"], "mana": ["Swamp", "Swamp#2", "Swamp#3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Llanowar Elves", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Llanowar Elves", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 22 } } }
+  ]
+}

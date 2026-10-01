@@ -1082,9 +1082,9 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a colourless candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches (chose Color.Black) (wearing []) Filter.Type.HasChosenColor)) "no colours"
 
-    -- This atom's vacuous direction, and the reason #3449's position lint is
-    -- owed: outside the affected set that fills the field this is False rather
-    -- than an error.
+    -- This atom's vacuous direction, and the reason Pawl.FilterPositionLintSpec's
+    -- CR 607.2d position lint exists: outside the positions that fill the field
+    -- this is False rather than an error.
     Spec.it s "a source that chose nothing is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.HasChosenColor)) "contextFor leaves it Nothing"
 

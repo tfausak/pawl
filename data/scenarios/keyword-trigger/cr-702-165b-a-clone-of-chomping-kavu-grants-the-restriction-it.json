@@ -1,0 +1,41 @@
+{
+  "description": "CR 702.165b a Clone of Chomping Kavu grants the restriction it copied",
+  "note": "The projection tripwire for backup's rule half: a Clone of bob's Chomping Kavu grants the Piker \"can't be blocked by creatures with power 2 or less\" it copied (CR 702.165b), where a printed read answers \"Clone\" and grants nothing. bob's Cabal Evangel block is refused. The paired control file is the board before the Clone, where the Evangel's block stands.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true}
+        ],
+        "hand": [
+          {"card": "Clone", "label": "clone"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Chomping Kavu", "label": "model"},
+          {"card": "Cabal Evangel", "label": "evangel"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseCopyTarget": "$model"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseTargets": {"backupRecipient": ["$piker"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$piker", "power": 3, "toughness": 2}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$piker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"$evangel": ["$piker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}}
+  ]
+}

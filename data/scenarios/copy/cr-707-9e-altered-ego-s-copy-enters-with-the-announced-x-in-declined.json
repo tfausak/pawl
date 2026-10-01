@@ -1,0 +1,33 @@
+{
+  "description": "CR 707.9e Altered Ego's copy enters with the announced X in +1/+1 counters, and declining the copy places none",
+  "note": "The control differs in one decision: the same spell, the same X = 2, the same board, with the copy declined. CR 707.9 makes the counters part of the copying process, so no copy is no counters, and the printed 0/0 is put into the graveyard by CR 704.5f, where two counters would have left a 2/2 standing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [{ "card": "Altered Ego", "label": "ego" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$ego", "x": 2, "mana": ["Forest", "Forest#2", "Forest#3", "Island", "Island#2", "Island#3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": null } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Altered Ego", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Altered Ego", "count": 1 } } }
+  ]
+}

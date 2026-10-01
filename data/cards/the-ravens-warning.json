@@ -41,6 +41,21 @@
                   {
                     "effects": [
                       {
+                        "type": "LookAt",
+                        "value": {
+                          "ref": {
+                            "type": "EachCardInHand",
+                            "value": {
+                              "hands": {
+                                "type": "InSlot",
+                                "value": "thatPlayer"
+                              }
+                            }
+                          },
+                          "slot": "lookedAt"
+                        }
+                      },
+                      {
                         "type": "Draw",
                         "value": {
                           "player": {

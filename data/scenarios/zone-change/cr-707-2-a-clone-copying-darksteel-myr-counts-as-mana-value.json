@@ -1,0 +1,52 @@
+{
+  "description": "CR 707.2 a Clone copying Darksteel Myr counts as mana value 3, not its own printed 4",
+  "note": "A copy's mana value is the copied object's (CR 707.2, 613.2a): Clone prints {3}{U}, Darksteel Myr {3}. The Myr is bob's, so the Clone is alone among the artifacts alice controls and One with the Machine draws its mana value. The library holds ten Pikers, so three in hand is three cards drawn, where the printed Clone would draw four.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" },
+          { "card": "Island", "label": "island-5" },
+          { "card": "Island", "label": "island-6" },
+          { "card": "Island", "label": "island-7" },
+          { "card": "Island", "label": "island-8" }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "One with the Machine", "label": "machine" }
+        ],
+        "library": [
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Darksteel Myr", "label": "myr" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["$island-1", "$island-2", "$island-3", "$island-4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$myr" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$machine", "mana": ["$island-5", "$island-6", "$island-7", "$island-8"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Goblin Piker", "count": 7 } } }
+  ]
+}

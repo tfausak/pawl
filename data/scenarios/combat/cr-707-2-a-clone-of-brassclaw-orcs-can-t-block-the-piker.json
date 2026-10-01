@@ -1,0 +1,41 @@
+{
+  "description": "CR 707.2 a Clone of Brassclaw Orcs can't block the Piker either",
+  "note": "The projection tripwire: bob's blocker is a Clone of Brassclaw Orcs, so the restriction on blocking power 2 or greater comes off CR 707.2's copiable values, not the printed card. bob casts the Clone on his turn copying the Orcs, which sit on alice's side and never attack, so the Clone is bob's only possible blocker. On alice's turn the Clone's block of the 2/1 Piker is refused and its block of the 1/1 Elves stands.",
+  "board": {
+    "seats": [
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [{ "card": "Clone", "label": "clone" }],
+        "library": [{ "card": "Island" }]
+      },
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Llanowar Elves", "label": "elves", "ready": true },
+          { "card": "Brassclaw Orcs", "label": "orcs", "ready": true }
+        ],
+        "library": [{ "card": "Forest" }]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseCopyTarget": "$orcs" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Names": { "object": "Clone", "names": ["Brassclaw Orcs"] } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$piker", "$elves"] } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "Clone": ["$piker"] } } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "Clone": ["$elves"] } } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$elves", "blockers": ["Clone"] } } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$piker", "blockers": null } } }
+  ]
+}

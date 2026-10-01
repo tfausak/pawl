@@ -1,0 +1,60 @@
+{
+  "description": "a duplicate of a Clone cast and resolved is the Piker",
+  "note": "The same duplicate across three zone changes, each a new object (CR 400.7): cast out of the hand, resolved onto the battlefield, destroyed into the graveyard. Its copiable values are the card's own, so every incarnation is the Piker; one that forgot them would resolve as a Clone choosing its copy afresh, with nothing left to copy, and die a 0/0. The first Day of Judgment kills the Piker and the original Clone before the duplicate is cast, the second kills the duplicate. Mountains pay the Piker's {1}{R}, so the cast cannot be what goes red.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Mountain", "ready": true },
+          { "card": "Mountain", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Sinister Reflections", "label": "reflections" },
+          { "card": "Day of Judgment", "label": "judgment" },
+          { "card": "Day of Judgment", "label": "judgment-2" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$reflections", "targets": ["Clone"], "mana": ["Island#5", "Island#6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$judgment", "mana": ["Plains", "Plains#2", "Plains#3", "Plains#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Clone", "mana": ["Mountain", "Mountain#2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone#2", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone#2", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$judgment-2", "mana": ["Plains#5", "Plains#6", "Plains#7", "Plains#8"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Clone", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Clone"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone#2", "names": ["Goblin Piker"] } } }
+  ]
+}
