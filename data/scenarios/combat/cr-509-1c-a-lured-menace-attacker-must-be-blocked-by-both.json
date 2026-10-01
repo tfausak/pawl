@@ -1,0 +1,31 @@
+{
+  "description": "CR 509.1c a Lured menace attacker must be blocked by BOTH creatures or by neither",
+  "note": "CR 509.1c's own worked example in the pool's cards: a Lured Boggart Brute (menace) into two Pikers. The maximization ranges over declarations menace already allows, so declining and a single block are refused and both blocking stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Boggart Brute", "label": "brute", "ready": true},
+          {"card": "Lure", "label": "lure", "attached": "brute"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "b1", "ready": true},
+          {"card": "Goblin Piker", "label": "b2", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@brute"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@b1": ["@brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@b1": ["@brute"], "@b2": ["@brute"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@brute", "blockers": ["@b1", "@b2"]}}}
+  ]
+}

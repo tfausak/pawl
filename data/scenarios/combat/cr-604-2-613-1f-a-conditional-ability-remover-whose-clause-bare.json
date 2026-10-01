@@ -1,0 +1,29 @@
+{
+  "description": "CR 604.2 / 613.1f a conditional ability-remover whose clause is FALSE removes nothing",
+  "note": "Ray of Frost removes abilities only while the enchanted creature is red; Palace Guard is white, so its permission to block any number stands. Humility is the control: an unconditional LoseAllAbilities on the same board does drop the permission, so a gate that turned the whole reader off fails.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "first", "ready": true },
+          { "card": "Goblin Piker", "label": "second", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Palace Guard", "label": "guard", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@guard": ["@first", "@second"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@first", "blockers": ["@guard"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@second", "blockers": ["@guard"] } } }
+  ]
+}

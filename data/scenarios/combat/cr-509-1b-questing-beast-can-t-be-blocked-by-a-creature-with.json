@@ -1,0 +1,28 @@
+{
+  "description": "CR 509.1b Questing Beast can't be blocked by a creature with power 2 or less",
+  "note": "Questing Beast can't be blocked by creatures with power 2 or less, a card-authored restriction. The 2/1 Goblin Piker's block is refused; the 3/3 War Mammoth's twin case stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Questing Beast", "label": "beast", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "blocker", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@beast"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@blocker": ["@beast"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@beast", "blockers": null}}}
+  ]
+}

@@ -91,6 +91,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:player-startingdeck`
 - `board:object-bindings`
 - `move:ChooseManaSource`: the `ChooseManaSource` prompt
+- `move:out-of-range-answer`: an answer outside what the prompt offers, which the engine clamps or ignores and the runner refuses up front
 - `move:CallCoin`: the `CallCoin` prompt
 - `board:dungeons`: dungeons
 - `board:daytime`
@@ -275,7 +276,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2f the reduction reaches only the equip that targets the Mauler | `board:stack`
 - CR 601.2f whole card: the first matching activation of your turn costs {2} less and the second does not | `check:helper-protected` `check:tapped-count`
 - CR 602.1a an opponent's activation destroys Aether Storm and the life comes out of the opponent | `check:on-battlefield`
-- CR 602.2 an X past the energy on hand is a no-op | `move:expect-rejected`
+- CR 602.2 an X past the energy on hand is a no-op | `move:out-of-range-answer`
 - CR 602.2 an ability with no timing rider is still offered during combat | `check:helper-isActivate` `check:offered-actions` `check:priority` `check:step`
 - CR 602.2 the gate offers an equip only a target-aware reduction can pay for | `move:ReverseManaAbilities`
 - CR 602.2a cycling from hand reveals the Mauler as the ability is announced | `check:events` `check:helper-revealed` `check:stack`
@@ -965,8 +966,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 104.3a the offer is the opponents still in the game, and never the controller | `move:RandomPlayer`
 - CR 109.5 a Ghostly Prison its own controller is attacking WITH taxes nothing | `check:combat` `check:helper-allUntapped`
 - CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block | `board:combat`
-- CR 305.7 an animated Palace Guard set to Mountain blocks only one attacker | `move:expect-rejected`
-- CR 305.7 an animated Prized Unicorn set to Mountain no longer forces a block | `move:expect-rejected`
 - CR 506.7b the window opens at the declaration and runs to the end of the combat phase | `check:offered-actions` `check:other-Turn.afterBlockersDeclared` `check:step`
 - CR 508.1 the rewound declaration is made again: two Pikers under a Ghostly Prison become one | `move:ReverseManaAbilities`
 - CR 508.1 the same board WITHOUT the Prison pays nothing | `check:combat` `check:helper-allUntapped`
@@ -984,7 +983,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 509.1 the same board WITHOUT the Aura pays nothing | `board:combat`
 - CR 509.1a / 802.4a whole card: Flash Foliage cannot name a creature attacking a planeswalker you control | `board:combat`
 - CR 509.1b a pair the hypothetical refuses moves nobody | `check:helper-blockersOf` `check:helper-tapStateOf` `check:other-Combat.blockersOf`
-- CR 509.1c a Prized Unicorn does not force a block an Oppressive Rays taxes | `move:expect-rejected`
+- CR 509.1c a Prized Unicorn does not force a block an Oppressive Rays taxes | `move:ChooseManaSource`
 - CR 509.1d a cost to block that is not mana sacrifices a land | `board:combat`
 - CR 509.1d the total is per CREATURE, not per pair: a Palace Guard blocking two owes {3} once | `board:combat`
 - CR 509.1d/509.1f blocking under an Oppressive Rays costs {3}, and the mana is paid | `board:combat`
@@ -1039,10 +1038,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 102.1 a player who has left the game is not a candidate | `check:other-Combat.attackableOpponents`
 - CR 122.1b two decayed counters, announced as X, stop both creatures blocking | `check:offered-actions` `move:expect-rejected`
 - CR 205.3m Secret Tunnel's two targets must share a creature type | `board:stack`
-- CR 301.5a Kemba's Legion's arity is the Equipment attached to IT | `move:expect-rejected`
-- CR 301.5a the Legion counts neither another creature's Equipment nor its own Aura | `move:expect-rejected`
 - CR 302.6 a creature that just changed control is summoning sick (no haste) | `check:controller` `check:other-Combat.canAttack`
-- CR 303.4m a Lure that is not attached to anything requires nothing | `move:expect-rejected`
 - CR 305.7 setting a suspected land's subtype spares the ability rule 701.60c granted | `board:stack`
 - CR 507.1 with no opponents left the action does not happen at all | `check:combat` `check:other-Combat.Type.defenders`
 - CR 508.1 every attacker attacks the CHOSEN defending player | `board:combat`
@@ -1050,102 +1046,38 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.1c aimed elsewhere, both of alice's twins attack | `board:attackprohibitions` `board:hand-order` `board:mana-pool`
 - CR 508.1c the creature Netter en-Dal named cannot attack, and its twin still does | `board:attackprohibitions` `board:hand-order` `board:mana-pool`
 - CR 509.1 only the defending player is asked to declare blockers | `board:combat`
-- CR 509.1 the same board WITHOUT the Lure lets the defender decline | `move:expect-rejected`
-- CR 509.1 the same board with a plain Wall lets the defender decline | `move:expect-rejected`
-- CR 509.1a High Ground gives the arity to the whole team | `move:expect-rejected`
-- CR 509.1a a Brigade blocks two attackers where a Piker blocks one | `move:expect-rejected`
 - CR 509.1a a Mountain is not a legal blocker, flier or no flier | `check:other-Combat.legalBlockers`
-- CR 509.1a a Palace Guard blocks every attacker, where a Brigade stops at two | `move:expect-rejected`
-- CR 509.1a a TAPPED creature is not able to block, so a Lure does not require it | `move:expect-rejected`
 - CR 509.1a a creature that is also a battle is not offered as a blocker either | `check:card-types` `check:on-battlefield` `check:other-Combat.legalBlockers` `check:other-Projection.isBattleOf` `check:other-Scenario.namedObjects`
 - CR 509.1a a ground creature is still a legal blocker while a flier attacks | `check:other-Combat.legalBlockers`
-- CR 509.1a two attackers, one Screen: blocking EITHER attains the maximum | `move:expect-rejected`
 - CR 509.1b Brassclaw Orcs can't block a creature with power 2, and can block one with power 1 | `check:helper-blocks`
-- CR 509.1b Questing Beast can't be blocked by a creature with power 2 or less | `move:expect-rejected`
 - CR 509.1b Spitfire Handler can't block a creature with greater power than its own | `check:helper-blocks`
 - CR 509.1b Wan Shi Tong's Spirit tokens can't block a non-Spirit, and can block a Spirit | `check:controller` `move:expect-rejected`
-- CR 509.1b a creature with power 3 may block Questing Beast | `move:expect-rejected`
 - CR 509.1b aimed elsewhere, both of bob's twins block | `board:blockprohibitions` `board:mana-pool`
 - CR 509.1b an enchanted creature can't block either, and the Piker beside it still can | `check:other-Combat.canBlock` `check:other-Combat.legalBlockers` `move:expect-rejected`
-- CR 509.1b menace and fear are cumulative: two blockers, and both must pass fear | `move:expect-rejected`
 - CR 509.1b the creature Zirda named cannot block, and its twin still does | `board:blockprohibitions` `board:mana-pool`
-- CR 509.1b the restrictions are checked against EACH attacker blocked | `move:expect-rejected`
-- CR 509.1c 'if able': an attacker the Screen cannot block requires nothing | `move:expect-rejected`
-- CR 509.1c a Gaea's Protector nobody is able to block requires nothing | `move:expect-rejected`
-- CR 509.1c a Lure and a Gaea's Protector attacking together compose | `move:expect-rejected`
-- CR 509.1c a Lure does not require a Pacifism'd creature to block | `move:expect-rejected`
-- CR 509.1c a Lured menace attacker must be blocked by BOTH creatures or by neither | `move:expect-rejected`
-- CR 509.1c a Lured menace attacker with only ONE creature to block it may go unblocked | `move:expect-rejected`
-- CR 509.1c a Prized Unicorn does not lure the OTHER attacker alongside it | `move:expect-rejected`
-- CR 509.1c a Razorgrass Screen must block, though nothing names an attacker | `move:expect-rejected`
-- CR 509.1c a creature that CANNOT block the Lured attacker is not required to | `move:expect-rejected`
 - CR 509.1c a required blocker the restriction covers may decline after all | `board:blockprohibitions` `board:mana-pool`
 - CR 509.1c a threshold blocking requirement bites only once the gate holds | `check:other-Combat.forcedBlockDeclaration` `move:expect-rejected`
-- CR 509.1c blocking the Lured attacker is legal | `move:expect-rejected`
-- CR 509.1c declining to block a Lured attacker is illegal | `move:expect-rejected`
-- CR 509.1c declining to block a Prized Unicorn is illegal | `move:expect-rejected`
-- CR 509.1c the SUBJECT axis: only the Screen is required, not everything bob controls | `move:expect-rejected`
-- CR 509.1c the gated requirement still names only the enchanted attacker | `move:expect-rejected`
-- CR 509.1c the maximum is over the creatures that CAN block, not all of them | `move:expect-rejected`
 - CR 509.1c two requirements on ONE pair count twice | `check:other-Combat.forcedBlockDeclaration` `move:expect-rejected`
-- CR 509.1c with two able creatures BOTH are required to block | `move:expect-rejected`
 - CR 514.2 the restriction ends at cleanup | `check:other-Combat.canBlock` `check:other-Expiry.dropAtCleanup` `check:other-GameState.blockProhibitions`
 - CR 514.2 the window closes at the end of the turn it named | `board:turn-number`
 - CR 601.2c announcing X as one leaves the second creature blocking | `check:offered-actions` `move:expect-rejected`
-- CR 604.2 / 613.1f a conditional ability-remover whose clause is FALSE removes nothing | `move:expect-rejected`
-- CR 604.2 Humility strips a Prized Unicorn's block requirement, so declining becomes legal | `move:expect-rejected`
-- CR 604.2 the Entourage's permission holds only while its controller is the monarch | `move:expect-rejected`
 - CR 611.2a and cannot attack once that turn has begun | `board:attackprohibitions`
 - CR 611.2a the restriction outlasts every other seat's turn and ends as alice's begins | `check:active-player` `check:other-GameState.attackProhibitions` `move:expect-rejected`
 - CR 611.2a the window names alice's next turn, so bob attacks with the creature on his | `board:attackprohibitions`
-- CR 611.2c whole cards: a creature that entered after the Escape resolved still can't attack alice | `move:expect-rejected`
 - CR 613.11 Tapestry Warden compares power and toughness after characteristic effects | `board:continuous-effect`
 - CR 613.1f Hammerheim takes BOTH landwalks and the Hag can be blocked | `board:combat`
-- CR 613.1f a flier that loses flying to Sky Tether may no longer block a flier | `move:expect-rejected`
 - CR 613.7 a Humility older than the suspect leaves rule 701.60c's ability in place | `board:stack`
 - CR 613.7 a Humility younger than the suspect removes it | `board:stack`
 - CR 702.10b a hasty creature and a sick one, in the same declaration | `check:helper-declaredAttackers`
-- CR 702.111b a declaration in which ONE creature blocks a menace attacker is illegal | `move:expect-rejected`
-- CR 702.111b menace constrains the set blocking ITS attacker, not every attacker | `move:expect-rejected`
-- CR 702.111b menace counts CREATURES blocking each attacker, not blocks | `move:expect-rejected`
-- CR 702.118b skulk bars a bigger blocker, admits an equal or smaller one | `move:expect-rejected`
-- CR 702.118b the powers compared are the PROJECTED ones | `move:expect-rejected`
 - CR 702.13b a COLOURLESS creature with intimidate may be blocked only by artifact creatures | `check:colors` `move:expect-rejected`
-- CR 702.13b a black creature may block a creature with intimidate | `move:expect-rejected`
-- CR 702.13b a green creature may not block a creature with intimidate | `move:expect-rejected`
-- CR 702.13b an ARTIFACT creature may block a creature with intimidate | `move:expect-rejected`
-- CR 702.13b intimidate restricts being blocked, never blocking | `move:expect-rejected`
 - CR 702.14c a nonbasic landwalker is blocked normally when every land is basic | `board:combat`
-- CR 702.14c a nonbasic landwalker walks on a nonbasic land | `move:expect-rejected`
 - CR 702.14c a snow swampwalker does NOT walk on a Snow-Covered Mountain | `board:combat`
 - CR 702.14c a snow swampwalker does NOT walk on an ordinary Swamp | `board:combat`
-- CR 702.14c a snow swampwalker walks on a Snow-Covered Swamp | `move:expect-rejected`
 - CR 702.14c a swampwalker is blocked normally when the defending player's land is an Island | `board:combat`
-- CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp | `move:expect-rejected`
 - CR 702.14c an artifact landwalker does NOT walk on a plain land | `board:combat`
-- CR 702.14c an artifact landwalker granted by Vectis Gloves walks on an artifact land | `move:expect-rejected`
-- CR 702.14c an unhacked Goblin Scouts mints MOUNTAINwalkers | `move:expect-rejected`
-- CR 702.14c an unhammered Stalker Hag walks over bob's Swamp and Forest | `move:expect-rejected`
-- CR 702.14c the land type read is the PROJECTED one, so an Urborg'd Island is a Swamp | `move:expect-rejected`
 - CR 702.14d swampwalk on the BLOCKER cancels nothing | `board:combat`
-- CR 702.16f Apostle of Purifying Light can't be blocked by a black creature, and can by a red one | `move:expect-rejected`
 - CR 702.16k True-Name Nemesis can't be blocked by the chosen player's creature, and can by another's | `board:object-chosenplayer`
-- CR 702.17b a reach creature may block a flier | `move:expect-rejected`
 - CR 702.19b a trampling Tapestry Warden spills the excess over its toughness | `board:continuous-effect`
-- CR 702.28b a creature WITH shadow may not block a creature without shadow | `move:expect-rejected`
-- CR 702.28b a creature with shadow may block a creature with shadow | `move:expect-rejected`
-- CR 702.28b a creature without shadow may not block a creature with shadow | `move:expect-rejected`
-- CR 702.31b a creature WITH horsemanship may block a creature without horsemanship | `move:expect-rejected`
-- CR 702.31b a creature with horsemanship may block a creature with horsemanship | `move:expect-rejected`
-- CR 702.31b a creature without horsemanship may not block a creature with horsemanship | `move:expect-rejected`
-- CR 702.36b a black creature may block a creature with fear | `move:expect-rejected`
-- CR 702.36b a devoid creature with a black mana cost may not block a creature with fear | `move:expect-rejected`
-- CR 702.36b a red creature may not block a creature with fear | `move:expect-rejected`
-- CR 702.36b an ARTIFACT creature may block a creature with fear | `move:expect-rejected`
-- CR 702.36b fear restricts being blocked, never blocking | `move:expect-rejected`
-- CR 702.9b a declaration in which a ground creature blocks a flier is illegal | `move:expect-rejected`
-- CR 702.9b a flier may block a flier | `move:expect-rejected`
-- CR 702.9b a flier may block a ground creature | `move:expect-rejected`
 - CR 707.2 a Clone of Brassclaw Orcs can't block the Piker either | `board:stack`
 - CR 723.1 a controlled active player's choice of defender routes to their controller | `board:control`
 - CR 802.3a the announcement, not the creature, is what the row refuses | `check:offered-actions` `check:other-GameState.attackProhibitions` `move:expect-rejected`
@@ -1245,7 +1177,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.10b a copied activated ability keeps its source, and the copy is not activated | `ref:stack-ability`
 - CR 707.10b a copy of a triggered ability still counts once the original has been countered | `board:stack`
 - CR 707.10b a copy of an activated ability still counts once the original has been countered | `board:stack`
-- CR 707.10c a card the copied X does not reach is not offered | `move:expect-rejected`
+- CR 707.10c a card the copied X does not reach is not offered | `check:legal-targets` `move:out-of-range-answer`
 - CR 707.10c a copied trigger's slot is baked, so the offer is a real choice | `board:stack`
 - CR 707.10c new targets are chosen for a copied activated ability | `ref:stack-ability`
 - CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one | `board:stack`
@@ -1543,7 +1475,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 113.7 the trigger reaches the artifact's ability and not the creature's, and the artifact is destroyed | `board:stack`
 - CR 113.7a the ability of an artifact sacrificed to activate it is still from an artifact source, and nothing is destroyed | `board:stack`
 - CR 114.2 an unevolved Ajani's emblem mints three Cat Tokens | `board:command`
-- CR 115.9b it counters a Bolt at alice's creature and cannot target one at bob's | `move:expect-rejected`
+- CR 115.9b it counters a Bolt at alice's creature and cannot target one at bob's | `check:offered-actions`
 - CR 118.12 a controller who cannot pay {3} is not asked, and is countered | `board:stack`
 - CR 118.12 a graveyard one card smaller demands one mana less | `board:stack`
 - CR 118.12 and bob is charged {2} once, on a board that could afford twice | `board:stack`
@@ -2425,8 +2357,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing | `check:helper-tappedFor` `check:other-Cost.manaActivations` `check:other-Mana.canPay` `check:other-Mana.manaTypesOf` `check:other-Object.chosenColor`
 - CR 607.2d a Coldsteel Heart that chose blue offers blue and nothing else | `board:controller` `board:hand-order` `board:mana-pool` `board:object-chosencolor`
 - CR 607.2d the colour is the player's, not the engine's | `move:ChooseColor` `move:ChooseReplacement`
-- CR 612.1 a swap naming the rider's own word moves which land it counts | `move:expect-rejected`
-- CR 612.1 a text change naming the count's word moves which permanents it counts | `move:expect-rejected`
+- CR 612.1 a swap naming the rider's own word moves which land it counts | `check:offered-actions`
+- CR 612.1 a text change naming the count's word moves which permanents it counts | `check:offered-actions`
 - CR 614.1c Hickory Woodlot enters tapped with two depletion counters | `move:ChooseReplacement`
 - Typhoid Rats is cast off one Swamp and resolves onto the battlefield | `check:creature-count` `check:stack` `check:tapped-count`
 - War Mammoth is cast off four Forests and resolves onto the battlefield | `check:creature-count` `check:stack` `check:tapped-count`
@@ -3265,7 +3197,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 115.7d / 702.11b legality is the spell's controller's, so bob cannot aim alice's Growth at his hexproof Bogle | `check:legal-targets` `move:expect-rejected`
 - CR 115.7d / 702.21a an unchanged target already illegal may stay, and the new one draws ward | `check:stack`
 - CR 115.7d a new target that makes an unchanged target illegal is refused | `check:stack`
-- CR 205.3m the two targets must hold a creature type in common | `move:expect-rejected`
 - CR 601.2b announcing 2 instead returns the mana value 2 card and leaves the 3 | `check:legal-targets`
 - CR 601.2c Bioshift's second slot cannot be a creature its first slot's controller does not control | `board:stack`
 - CR 601.2c Dwell on the Past cannot be aimed at more cards than one graveyard holds | `move:Shuffle`
@@ -3306,7 +3237,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 804.2 a creature taps to hand itself to a teammate | `check:legal-targets` `check:offered-actions`
 - CR 805.10b a teammate pays the toll on their own attacker | `move:ChooseManaSource`
 - CR 805.2 a departed active player's teammate declares the attack | `board:player-status`
-- CR 805.4c each player on the active team may play a land | `move:expect-rejected`
+- CR 805.4c each player on the active team may play a land | `check:offered-actions`
 - CR 805.5 a teammate who passed is asked again before the team passes | `check:priority`
 - CR 805.5b a departed active player's teammate receives priority | `board:player-status`
 - CR 805.8 controlling a player controls their team | `check:player-control`
@@ -3456,7 +3387,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 118.12 paying nothing declines the offer, so no power matches at all | `move:ChoosePaidEnergy`
 - CR 118.12 the creature whose power is the amount paid survives the sweep | `move:ChoosePaidEnergy`
 - CR 118.3 an answer above the payer's energy is capped at what they have | `move:ChoosePaidEnergy`
-- CR 601.2c X=1 announcing three targets destroys only one | `move:expect-rejected`
+- CR 601.2c X=1 announcing three targets destroys only one | `move:out-of-range-answer`
 - CR 601.2c any number of targets: four announced on a five-candidate board | `check:zone-contents`
 - CR 601.2c zero announced against an unbounded count: nothing is exiled and nobody is damaged | `check:zone-contents`
 - CR 601.2h whole card: Dawnhand Dissident's blight is paid as the ability is activated | `move:ChooseBlight`
