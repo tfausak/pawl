@@ -3155,16 +3155,16 @@ recipientInRange gs you recipient = case (Recipient.objectOf recipient, Recipien
 -- that stopped being a creature and became a planeswalker is redirected to as
 -- what it now is (CR 613.1d).
 --
--- Not implemented: the rule's last sentence, damage redirected to or from a
--- player who has left the game, outside a limited range -- where the CR 801.13a
--- filter below retires such a destination, a departed player being in nobody's
--- range (#3012).
+-- The rule's last sentence, a player destination who has left the game, is
+-- Game.stillPlaying. Its "from" half needs no guard: no damage is dealt to a
+-- departed player, so none is redirected away from one. Proven by
+-- Pawl.DamageReplacementSpec's "CR 614.9 the destination left the game".
 --
 -- CR 801.13a: a destination outside the redirecting effect's controller's
 -- range is no destination either, so that portion does nothing.
 redirectDestination :: GameState -> Maybe PlayerId -> Recipient.Recipient -> Maybe Recipient.Recipient
 redirectDestination gs controller dest = Monad.mfilter (withinRangeOf gs controller) $ case Recipient.objectOf dest of
-  Nothing -> Just dest
+  Nothing -> Monad.mfilter (maybe True (`elem` Game.stillPlaying gs) . Recipient.playerOf) (Just dest)
   Just oid -> liveDestination gs oid
 
 -- CR 801.13a: may a redirection controlled by this player send damage here?

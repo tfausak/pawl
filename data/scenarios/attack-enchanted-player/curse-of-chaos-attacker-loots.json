@@ -1,0 +1,31 @@
+{
+  "description": "CR 508.3e / 608.2c Curse of Chaos: the attacking player discards, and because they did, draws",
+  "note": "Bob's Curse enchants carol and alice attacks her. Alice accepts the may, discards her Island and draws the Mountain on top of her library; bob, the Curse's controller, keeps his hand and library. An engine that drew without the discard, or made bob loot, fails here.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }],
+        "hand": [{ "card": "Island" }],
+        "library": [{ "card": "Mountain" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Curse of Chaos", "label": "curse", "attached": "carol" }],
+        "hand": [{ "card": "Swamp" }],
+        "library": [{ "card": "Forest" }]
+      },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@attacker", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@curse", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Island", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Mountain", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Swamp", "count": 1 } } }
+  ]
+}

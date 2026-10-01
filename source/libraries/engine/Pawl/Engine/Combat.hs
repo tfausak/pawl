@@ -2190,15 +2190,17 @@ attemptAttackDeclaration perform pid rejected = do
                           pure (Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid d t declared (attackerOf oid))) h)
                      in List.foldl' record g attacking
                 )
-              -- CR 508.3b's arity, which is the declaration's rather than the
-              -- creature's: one event per DISTINCT target, so a player five
-              -- creatures were sent at was attacked once. A Set is what makes that
-              -- structural, and it orders the batch deterministically besides.
+              -- CR 508.3e's arity, which is the declaration's rather than the
+              -- creature's: one event per DISTINCT (attacking player, target)
+              -- pair, so a player five creatures were sent at was attacked once by
+              -- each attacking player. A Set is what makes that structural, and it
+              -- orders the batch deterministically besides. The attacking player
+              -- is the creature's controller: CR 805.10a makes each player on the
+              -- active team one.
               --
-              -- The attacking player rides every one of them, which is CR 508.3e's
-              -- first subject, and is the creature's controller: CR 805.10a makes
-              -- each player on the active team an attacking player, so the pair
-              -- (attacking player, target) is this batch's key.
+              -- One event group, since CR 805.10b's combined attack is one
+              -- declaration: CR 508.3b's "is attacked" collapses the group to one
+              -- trigger per target (Pawl.Engine.Event.Trigger.batchScoped).
               --
               -- After the per-creature batch above, since CR 508.2b puts every
               -- trigger from this declaration on the stack together and the order
@@ -2206,7 +2208,7 @@ attemptAttackDeclaration perform pid rejected = do
               State.modify'
                 ( \g ->
                     let attacked = Set.fromList (Maybe.mapMaybe (\oid -> fmap ((,) (attackerOf oid)) (Map.lookup oid recorded)) attacking)
-                     in List.foldl' (\h (p, t) -> Event.recordEvent (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked p t)) h) g (Set.toList attacked)
+                     in Event.simultaneouslyPure (\g1 -> List.foldl' (\h (p, t) -> Event.recordEvent (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked p t)) h) g1 (Set.toList attacked)) g
                 )
               -- CR 508.3d's arity, which is neither of the two above: the
               -- DECLARATION's, so one event however many creatures were named and

@@ -54,6 +54,7 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -2935,6 +2936,59 @@ caromSpec s registry = Spec.describe s "Carom (CR 614.9, CR 615.7)" $ do
     (_, _, _, ready, redirected) <- board
     Spec.assertEqWith s "Carom left the hand and a card arrived" (S.handSize S.alice redirected) (S.handSize S.alice ready)
 
+-- CR 614.9's redirection between two TARGETED players with a counted X, whose
+-- producer is Captain's Maneuver ({X}{R}{W} Instant: "The next X damage that
+-- would be dealt to target creature, planeswalker, or player this turn is dealt
+-- to another target creature, planeswalker, or player instead."; name, cost,
+-- type line and Oracle text checked against api.scryfall.com 2026-09-30).
+--
+-- Three seats, so bob can leave the game without ending it; carol's Piker is
+-- the source, so bob's leaving takes nothing of the board with him. alice casts
+-- it at X=2, from herself to bob.
+captainsManeuverSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+captainsManeuverSpec s registry = Spec.describe s "Captain's Maneuver (CR 614.9, CR 615.7)" $ do
+  let hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+      strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
+      board = do
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maneuver <- S.printingOf s registry "Captain's Maneuver"
+        let lands = S.landsFor plains S.alice 1 (S.landsFor mountain S.alice 3 S.threePlayerGame)
+            (attacker, g1) = S.addPermanent piker S.carol lands
+            (maneuverId, g2) = S.addHandCard maneuver S.alice g1
+            ready =
+              g2
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            redirected = S.runPure aimAliceToBobAtTwo ready (S.cast S.alice maneuverId Monad.>> Stack.resolveTop)
+        pure (attacker, redirected)
+  Spec.it s "CR 614.9 the next 2 of carol's 5 to alice is dealt to bob instead" $ do
+    (attacker, redirected) <- board
+    let after = strike attacker (Recipient.ToPlayer S.alice) 5 redirected
+    Spec.assertEqWith s "bob, the other target, takes the 2 that moved" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "alice takes the remaining 3" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "setup: one counted row of 2, from alice to bob" (countedRedirectRows redirected) [(2, Just (Recipient.ToPlayer S.alice), Recipient.ToPlayer S.bob, Nothing)]
+  -- The rule's last sentence under an UNLIMITED range, where CR 801.13a's
+  -- filter retires nobody: the effect does nothing, so the damage stays whole.
+  Spec.it s "CR 614.9 the destination left the game: all 5 stays on alice" $ do
+    (attacker, redirected) <- board
+    let gone = S.departs Departure.Type.Conceded S.bob redirected
+        after = strike attacker (Recipient.ToPlayer S.alice) 5 gone
+    Spec.assertEqWith s "alice takes the whole 5" (S.lifeOf S.alice after) (Just 15)
+    Spec.assertEqWith s "setup: the row survived bob's leaving, so the guard is what stopped it" (fmap (\(n, _, _, _) -> n) (countedRedirectRows gone)) [2]
+
+-- Captain's Maneuver at X=2, `from` at alice and `to` at bob, each filtered
+-- out of its offered set rather than built.
+aimAliceToBobAtTwo :: Prompt.Prompt r -> r
+aimAliceToBobAtTwo p = case p of
+  Prompt.ChooseX {} -> 2
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapWithKey (\slot (_, legal) -> Set.filter (== Recipient.ToPlayer (if slot == SlotName.MkSlotName (Text.pack "from") then S.alice else S.bob)) legal) sets
+  _ -> S.identityAnswer p
+
 -- CR 614.9's redirection over a DESCRIBED recipient side with CR 615.7's
 -- countdown and CR 609.7a's chosen source, whose producer is Harm's Way ({W}
 -- Instant: "The next 2 damage that a source of your choice would deal to you
@@ -3746,6 +3800,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   oraclesAttendantsSpec s registry
   caromSpec s registry
   harmsWaySpec s registry
+  captainsManeuverSpec s registry
   pariahSpec s registry
   lavaBurstSpec s registry
   queensBayPaladinSpec s registry
