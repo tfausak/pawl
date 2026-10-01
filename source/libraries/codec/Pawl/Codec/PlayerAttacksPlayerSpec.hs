@@ -3,6 +3,7 @@ module Pawl.Codec.PlayerAttacksPlayerSpec where
 import qualified Pawl.Codec.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AttackedPlayer as AttackedPlayer
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
@@ -17,8 +18,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerAttacksPlayer" $ do
       PlayerAttacksPlayer.codec
       ( PlayerAttacksPlayer.MkPlayerAttacksPlayer
           { PlayerAttacksPlayer.attacker = PlayerRelation.Opponent,
-            PlayerAttacksPlayer.attacked = PlayerRelation.You
+            PlayerAttacksPlayer.attacked = AttackedPlayer.Related PlayerRelation.You
           }
       )
-      " {\"attacker\":{\"type\":\"Opponent\"},\"attacked\":{\"type\":\"You\"}} "
+      " {\"attacker\":{\"type\":\"Opponent\"},\"attacked\":{\"type\":\"Related\",\"value\":{\"type\":\"You\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerAttacksPlayer.codec
