@@ -10531,11 +10531,19 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
       Nothing -> pure ()
       Just selection -> Monad.mapM_ (applyEffect source source controller bound bound) (Modal.modesEffects selection modal)
 
--- CR 405.6c: run the non-mana effects of a mana ability, once
--- Pawl.Engine.Cost.tapForManaWith has added the mana.
+-- CR 405.6c: run some non-mana effects of a mana ability, as
+-- Pawl.Engine.Cost.tapForManaWith reaches them in printed order.
 --
 -- CR 605.3b gives the ability no stack object, so the SOURCE stands in for the
 -- resolving one, performHandAction's posture.
+--
+-- CR 608.2c / 608.2d: what one effect binds, a later one reads -- Spectral
+-- Searchlight's "Choose a player. That player adds". The ability has no object
+-- to hold its slots, so they are threaded: each effect reads the slots handed in
+-- and the ones its predecessors bound, and the answer is all of them. What an
+-- effect binds lands on the SOURCE (it is the resolving id here), so each slot
+-- the effect defines (boundSlots) is cleared there first and read back after:
+-- a slot an earlier activation left behind is never mistaken for this one's.
 --
 -- Not implemented: an object of the ability's own to carry slots the bindings
 -- below do not. A slot read that misses them falls through to the source
@@ -10544,26 +10552,32 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
 -- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
 -- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
 -- data/cards/ reads (#3124).
-performManaAbilityEffects :: ObjectId -> PlayerId -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game ()
+performManaAbilityEffects :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game (Map.Map SlotName (Set Recipient))
 performManaAbilityEffects source controller =
   let manaAbilityBindings =
         Map.fromList
           [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
             (Binding.you, Set.singleton (Recipient.ToPlayer controller))
           ]
-   in Monad.mapM_
-        ( applyEffect
-            source
-            source
-            controller
+      holderBindings gs = case Game.lookupObject source gs of
+        Just obj -> Object.bindings obj
+        Nothing -> Map.findWithDefault Map.empty source (GameState.detachedBindings gs)
+      run bound effect = do
+        let defined = boundSlots effect
             -- CR 109.5's "you" is the player who activated the ability, and the
             -- reserved self slot is CR 113.7's source. Both are bound here rather
             -- than read off an object, because there is no ability object carrying
             -- them: Pawl.Engine.Activate.activateAbility stamps them for every
             -- ability that does go on the stack.
-            manaAbilityBindings
-            manaAbilityBindings
-        )
+            env = Map.union bound manaAbilityBindings
+        State.modify' $ \gs ->
+          (overHolderBindings source (`Map.withoutKeys` defined) gs)
+            { GameState.detachedBindings = Map.adjust (`Map.withoutKeys` defined) source (GameState.detachedBindings gs)
+            }
+        applyEffect source source controller env env effect
+        after <- State.get
+        pure (Map.union (Map.restrictKeys (Binding.targetsOf (holderBindings after)) defined) bound)
+   in Monad.foldM run
 
 -- Activate an ability inside throwDice's window and resolve it at once,
 -- answering whether it was paid for. The payment is Pawl.Engine.Activate's

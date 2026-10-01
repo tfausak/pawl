@@ -1,6 +1,7 @@
 module Pawl.Types.ManaAbilityPerformer where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Effect as Effect
@@ -10,6 +11,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | CR 405.6c: how the closed half runs the NON-MANA effects of a mana ability
 -- -- the ability's source, its controller, and the effects themselves. CR 605.3b
@@ -35,9 +38,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- own would have to be threaded through every caller of Pawl.Engine.Cost.pay for
 -- no gain.
 data ManaAbilityPerformer = MkManaAbilityPerformer
-  { -- | CR 405.6c: the ability's source, its controller, and the non-mana
-    -- effects to run.
-    effects :: ObjectId.ObjectId -> PlayerId.PlayerId -> [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)] -> Game.Game (),
+  { -- | CR 405.6c / 608.2c: the ability's source, its controller, the slots
+    -- its earlier clauses bound, and the non-mana effects to run; answers those
+    -- slots with the ones these effects bound added.
+    effects :: ObjectId.ObjectId -> PlayerId.PlayerId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)] -> Game.Game (Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)),
     -- | CR 605.4a: apply one triggered mana ability where it stands, without
     -- putting it on the stack. Pawl.Engine.Cost.tapForManaWith gathers and
     -- classifies (Pawl.Engine.ManaAbility.isTriggeredManaAbility); this runs the
