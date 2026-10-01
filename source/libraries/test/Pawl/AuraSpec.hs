@@ -1185,9 +1185,8 @@ replenishSpec s registry =
         -- completed move deletes the old id and mints a new one (CR 400.7), so an
         -- Aura that entered and was buried has NO object under its original id while
         -- one that never moved still does. The rule's TOKEN clause is asked in the
-        -- AuraToken group below, over Preston Garvey, Minuteman. Not implemented:
-        -- CR 303.4g's remaining branch, an Aura whose current zone is the STACK
-        -- (gap #1734).
+        -- AuraToken group below, over Preston Garvey, Minuteman, and its STACK
+        -- branch in Pawl.CopySpec, over Copy Enchantment copying Betrayal.
         Spec.it s "CR 303.4g an Aura with nothing to enchant never leaves the graveyard" $ do
           plains <- S.printingOf s registry "Plains"
           replenish <- S.printingOf s registry "Replenish"

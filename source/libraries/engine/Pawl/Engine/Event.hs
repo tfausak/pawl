@@ -121,6 +121,7 @@ import qualified Pawl.Types.EnteringTogether as EnteringTogether
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.EntryRefusal as EntryRefusal
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
@@ -1127,7 +1128,7 @@ conjureOntoBattlefield controller card copied count tapped = do
       ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue tapped))
       Monad.forM_ copied (\snapshot -> Monad.mapM_ (`markDuplicate` snapshot) ids)
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
-      entered <- Monad.filterM (\oid -> runEntry (siblingsOf oid) oid) ids
+      entered <- Monad.filterM (\oid -> Maybe.isNothing <$> runEntry (siblingsOf oid) oid) ids
       Monad.mapM_ unmake (filter (`List.notElem` entered) ids)
       settleMinted (GameState.nextTimestamp gs) entered
       pure (Seq.fromList entered)
@@ -4381,9 +4382,10 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- Moved event is recorded, so no trigger scan and no state-based action can see
 -- it.
 --
--- Answers whether the object entered: False is CR 614.1a's "instead" from an
--- EntryRewrite.SacrificeToEnter arm that could not be paid, the one EntryR arm
--- that answers `Nothing`. Each caller unmakes the entry.
+-- Answers Nothing when the object entered, and otherwise why it did not: CR
+-- 614.1a's "instead" from an EntryRewrite.SacrificeToEnter arm that could not be
+-- paid, the one EntryR arm that answers `Nothing`, or CR 303.4g from
+-- seatEnteringAura. Each caller unmakes the entry.
 --
 -- Always the LIVE board (`Nothing`), even when the zone change containing this
 -- entry belongs to a CR 608.2f batch: the entering object is not on the
@@ -4393,7 +4395,7 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- speaks only to the ORDER the two events' effects are chosen in, not to which
 -- board each collects from. That a contained event keeps its own footing is this
 -- engine's reading, resting on CR 614.12; no rule states it outright.
-runEntry :: Set ObjectId -> ObjectId -> Game Bool
+runEntry :: Set ObjectId -> ObjectId -> Game (Maybe EntryRefusal.EntryRefusal)
 runEntry given oid = do
   -- CR 608.2f / 614.12: inside one action (`together`), what an EARLIER call
   -- put onto the battlefield entered at the same moment as this object, so it
@@ -4417,10 +4419,48 @@ runEntry given oid = do
   beforeSubjects <- State.gets GameState.enteringSubjects
   State.modify' (\gs -> gs {GameState.enteringBeside = batch, GameState.enteringSubjects = Set.insert oid beforeSubjects})
   outcome <- applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid)
+  -- Inside the span, so the host sweep sees the subject and its siblings as
+  -- materialized but not entered, exactly as the loop's own arms do.
+  hosted <- if Maybe.isJust outcome then seatEnteringAura batch oid else pure True
   flushEnteringCounters oid
   designateProtector oid
   State.modify' (\gs -> gs {GameState.enteringBeside = before, GameState.enteringSubjects = beforeSubjects})
-  pure (Maybe.isJust outcome)
+  pure $ case outcome of
+    Nothing -> Just EntryRefusal.Unpaid
+    Just _ -> if hosted then Nothing else Just EntryRefusal.Unhosted
+
+-- CR 303.4f for an object that is an Aura only once its entry loop has run --
+-- Copy Enchantment entering as a copy of Unholy Strength (CR 707.5, 614.12a).
+-- changeZoneAttaching's gate asks the same question BEFORE the move, of an
+-- object that is already an Aura; this one asks it of whatever entered
+-- unattached and is an Aura now, so a seeded Aura and one that gate already
+-- seated are left alone. Read through the projection, which is where the copy
+-- the loop stamped lives.
+--
+-- Answers False for CR 303.4g, nothing legal to enchant; the caller unmakes the
+-- entry. MINUS `batch` and GameState.enteringSubjects for the EntersAttachedTo
+-- arm's reason: a permanent entering beside this one is not on the battlefield
+-- when the choice is made.
+--
+-- Not implemented: an Aura that enchants a PLAYER, which Attach.entryHostsFor
+-- never offers (#4542).
+seatEnteringAura :: Set ObjectId -> ObjectId -> Game Bool
+seatEnteringAura batch oid = do
+  gs <- State.get
+  let unattached = Maybe.isNothing (Game.lookupObject oid gs >>= Object.attachedTo)
+  case Projection.controllerOf oid gs of
+    Just controller | unattached && Set.member Subtype.Aura (Projection.subtypesOf oid gs) -> do
+      let entering h = Set.member h batch || Set.member h (GameState.enteringSubjects gs)
+          hosts = filter (not . entering) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid gs)
+      chosen <- Attach.chooseHost controller oid hosts
+      -- THE TAG the enchant slot produced, for changeZoneAttaching's reason:
+      -- Sba.stillLegalEnchant compares the (pool, tag) pair.
+      case chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs of
+        Nothing -> pure False
+        Just recipient -> do
+          State.modify' $ \g -> g {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Just recipient}) oid (GameState.objects g)}
+          pure True
+    _ -> pure True
 
 -- CR 614.12b: what each member of the batch not yet moved will have to
 -- sacrifice as it enters, and out of which permanents -- read off its own rows
@@ -6143,6 +6183,9 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- effects" is the whole restriction -- there is no card text to intersect
           -- it with, which is the difference from CR 303.4k's Attach.turnUpHosts.
           --
+          -- Not implemented: an Aura that enchants a PLAYER, which
+          -- Attach.entryHostsFor never offers (#4542).
+          --
           -- The Aura test is the PROJECTION's subtypes (CR 205.3 -- CR 303.4 speaks
           -- about characteristics) rather than the printed type line
           -- Pawl.Engine.Card.isAura reads, and the two now differ: Cloudform GRANTS
@@ -6170,11 +6213,12 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- effect names the host itself (EntryRiders.attachedTo) and a token with
           -- none is refused rather than minted.
           --
-          -- Not implemented: CR 303.4g's remaining branch, an Aura whose current
-          -- zone is the STACK, which that rule buries instead of leaving where it is
-          -- (gap #1734). No road in this pool reaches it: CR 303.4a makes a cast
-          -- Aura spell target, so Pawl.Engine.Stack's Aura branch always hands this
-          -- funnel a seed, and CR 608.2b counters the spell whose target has gone.
+          -- CR 303.4g's STACK branch never reaches this gate: CR 303.4a makes a
+          -- cast Aura spell target, so Pawl.Engine.Stack's Aura branch always
+          -- hands this funnel a seed. A permanent spell that becomes an Aura only
+          -- as it enters (Copy Enchantment, CR 707.5) is not an Aura on `gs` at
+          -- all; seatEnteringAura asks it after the entry loop has made the copy
+          -- choice, which CR 614.12a puts first.
           settledSeed <-
             if dest == Zone.Battlefield && entryFacing == Facing.FaceUp && Maybe.isNothing seed && Set.member Subtype.Aura (Projection.subtypesOf oid gs)
               then do
@@ -6436,40 +6480,58 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- same-batch siblings, empty for every door but changeZoneEnteringIn
               -- (CR 614.12a; see applyReplacementsIn for why 614.12a and not
               -- 614.13a).
-              Monad.when (dest == Zone.Battlefield) $ do
-                -- CR 122.6a: the counters the EFFECT says the object enters with --
-                -- undying's and persist's "with a +1/+1 counter on it". Into the
-                -- pending map before the entry loop, so the loop's own CR 616.1 pool
-                -- can scale them and flushEnteringCounters places what it settles on
-                -- -- exactly as the EntryRewrite.WithCounters arm inside the loop
-                -- does. Still inside the move and before the Moved event below, so
-                -- nothing outside the entry can see the permanent without them (the
-                -- tap state's reason, one field over).
-                --
-                -- Before the loop rather than during it, which no card observes: no
-                -- entry replacement in the pool reads a counter the entering object
-                -- already has, and the two are simultaneous in the rules anyway.
-                --
-                -- That claim is WIDER than it was. These counters used to be on the
-                -- object by the time the loop began; now they sit pending for the
-                -- loop's whole duration, so a row reading them would answer
-                -- differently at every iteration rather than only before the first.
-                -- Checked when the pending map landed: Filter.HasCounters and
-                -- Replacement.admitsEntry are two readers a row could reach a
-                -- counter through, and a filter naming power or toughness is a
-                -- third, via Projection.counterGathered (CR 614.12); none of the
-                -- three is fed by an entering permanent's own pending counters
-                -- today.
-                Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
-                entered <- runEntry batch newId
-                -- CR 614.1a: EntryRewrite.SacrificeToEnter's "if you don't, put it
-                -- into its owner's graveyard", the entry unmade as CR 712.13a's is
-                -- below. A card that was already in the graveyard stays there.
-                Monad.unless entered $ do
-                  State.put unentered
-                  State.modify' (\g -> g {GameState.refusedEntries = fmap (Set.insert oid) (GameState.refusedEntries g)})
-                  Monad.unless (fromZone == Zone.Graveyard) (Monad.void (changeZoneReturning oid Zone.Graveyard))
-              refused <- State.gets (Maybe.isNothing . Game.lookupObject newId)
+              refusal <-
+                if dest /= Zone.Battlefield
+                  then pure Nothing
+                  else do
+                    -- CR 122.6a: the counters the EFFECT says the object enters with --
+                    -- undying's and persist's "with a +1/+1 counter on it". Into the
+                    -- pending map before the entry loop, so the loop's own CR 616.1 pool
+                    -- can scale them and flushEnteringCounters places what it settles on
+                    -- -- exactly as the EntryRewrite.WithCounters arm inside the loop
+                    -- does. Still inside the move and before the Moved event below, so
+                    -- nothing outside the entry can see the permanent without them (the
+                    -- tap state's reason, one field over).
+                    --
+                    -- Before the loop rather than during it, which no card observes: no
+                    -- entry replacement in the pool reads a counter the entering object
+                    -- already has, and the two are simultaneous in the rules anyway.
+                    --
+                    -- That claim is WIDER than it was. These counters used to be on the
+                    -- object by the time the loop began; now they sit pending for the
+                    -- loop's whole duration, so a row reading them would answer
+                    -- differently at every iteration rather than only before the first.
+                    -- Checked when the pending map landed: Filter.HasCounters and
+                    -- Replacement.admitsEntry are two readers a row could reach a
+                    -- counter through, and a filter naming power or toughness is a
+                    -- third, via Projection.counterGathered (CR 614.12); none of the
+                    -- three is fed by an entering permanent's own pending counters
+                    -- today.
+                    Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
+                    refusal <- runEntry batch newId
+                    case refusal of
+                      Nothing -> pure ()
+                      -- CR 614.1a: EntryRewrite.SacrificeToEnter's "if you don't, put
+                      -- it into its owner's graveyard", the entry unmade as CR
+                      -- 712.13a's is below. A card that was already in the graveyard
+                      -- stays there.
+                      Just EntryRefusal.Unpaid -> do
+                        State.put unentered
+                        State.modify' (\g -> g {GameState.refusedEntries = fmap (Set.insert oid) (GameState.refusedEntries g)})
+                        Monad.unless (fromZone == Zone.Graveyard) (Monad.void (changeZoneReturning oid Zone.Graveyard))
+                      -- CR 303.4g: an Aura with nothing to enchant "remains in its
+                      -- current zone, unless that zone is the stack", which puts it
+                      -- into its owner's graveyard instead. Copy Enchantment that
+                      -- copied Betrayal with no creature to steal from;
+                      -- Pawl.CopySpec's pair proves both halves.
+                      Just EntryRefusal.Unhosted -> do
+                        State.put unentered
+                        Monad.when (fromZone == Zone.Stack) (Monad.void (changeZoneReturning oid Zone.Graveyard))
+                    pure refusal
+              -- Read off the refusal and not off whether `newId` still names an
+              -- object: the graveyard move above re-mints from the rolled-back
+              -- counter, so the card arriving there can carry that same id.
+              let refused = Maybe.isJust refusal
               -- CR 712.13a: a resolving double-faced spell that entered
               -- transformed onto an instant or sorcery back face "doesn't enter
               -- the battlefield, and is instead put into its owner's graveyard";
@@ -7746,13 +7808,15 @@ createTokens controller card copy n tapped entering attached = do
               -- `siblingsOf` then hands each entry loop.
               let siblingsOf oid = Set.delete oid (Set.fromList ids)
               Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
-              entered <- Monad.filterM (\oid -> runEntry (siblingsOf oid) oid) ids
+              entered <- Monad.filterM (\oid -> Maybe.isNothing <$> runEntry (siblingsOf oid) oid) ids
               Monad.mapM_ unmake (filter (`List.notElem` entered) ids)
               settleMinted (GameState.nextTimestamp unminted) entered
               pure entered
 
 -- CR 614.1a on the two roads that MINT onto the battlefield: an object whose
--- EntryRewrite.SacrificeToEnter went unpaid never entered, so it is removed.
+-- EntryRewrite.SacrificeToEnter went unpaid never entered, so it is removed --
+-- as is one that became an Aura with nothing to enchant, which CR 303.4g's last
+-- sentence says "isn't created".
 -- Not implemented: putting a refused token or conjured card into its owner's
 -- graveyard, which only a "put into a graveyard from anywhere" trigger could
 -- tell apart -- no card in data/cards/ creates or conjures a card carrying the

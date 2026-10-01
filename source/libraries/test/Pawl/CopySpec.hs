@@ -652,6 +652,74 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "a creature but no enchantment: nothing to ask" (asks withPiker) 0
     Spec.assertEqWith s "an enchantment beside it: one real decision" (asks withScales) 1
 
+  -- CR 303.4f / 614.12a: Copy Enchantment that copies an Aura has its host
+  -- chosen as it enters, after the copy choice -- the 2006-02-01 ruling's
+  -- "you choose what the Aura will enchant just before it enters". TWO legal
+  -- hosts, and the answer pinned to the SECOND, so an engine that took the first
+  -- candidate (or entered unattached for CR 704.5m to bury) fails the Mammoth's
+  -- P/T.
+  Spec.it s "CR 303.4f Copy Enchantment copying Unholy Strength enchants the creature its controller chooses" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    unholy <- S.printingOf s registry "Unholy Strength"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (pikerId, withPiker) = S.addPermanent piker S.alice gs0
+        (mammothId, withMammoth) = S.addPermanent mammoth S.alice withPiker
+        (unholyId, withUnholy) = S.addPermanent unholy S.alice withMammoth
+        board = S.attach unholyId pikerId withUnholy
+        (_, staged) = S.spellOnStack copyEnchantment S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseAttachment {} -> mammothId
+          _ -> copyNamed unholyId p
+        resolved = resolveAndSettle answer staged
+    Spec.assertEqWith s "the War Mammoth gets +2/+1" (S.powerToughnessOf mammothId resolved) (Just (5, 4))
+    Spec.assertEqWith s "and the Piker keeps only the original's +2/+1" (S.powerToughnessOf pikerId resolved) (Just (4, 2))
+    Spec.assertEqWith
+      s
+      "the copy is on the battlefield, attached to the Mammoth"
+      (fmap (\oid -> Game.lookupObject oid resolved >>= Object.attachedTo >>= Recipient.objectOf) (printedOnBattlefield "Copy Enchantment" resolved))
+      [Just mammothId]
+
+  -- CR 303.4g's stack branch, as a pair differing in ONE thing: whether bob
+  -- controls a creature. Bob's Betrayal ("enchant creature an opponent
+  -- controls") is on alice's Balemurk Leech, so a copy alice controls can
+  -- enchant only a creature of bob's. With none, the copy "is put into its
+  -- owner's graveyard instead of entering the battlefield": the Leech's
+  -- enchantment-enters trigger never fires and bob keeps his life. With one, the
+  -- copy enters attached to it and the Leech drains bob.
+  let betrayalBoard withBobCreature = do
+        leech <- S.printingOf s registry "Balemurk Leech"
+        betrayal <- S.printingOf s registry "Betrayal"
+        piker <- S.printingOf s registry "Goblin Piker"
+        copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (leechId, withLeech) = S.addPermanent leech S.alice gs0
+            (betrayalId, withBetrayal) = S.addPermanent betrayal S.bob withLeech
+            attached = S.attach betrayalId leechId withBetrayal
+            (bobPikerId, board) =
+              if withBobCreature
+                then let (pikerId, withPiker) = S.addPermanent piker S.bob attached in (Just pikerId, withPiker)
+                else (Nothing, attached)
+            (spellId, staged) = S.spellOnStack copyEnchantment S.alice board
+            once = resolveAndSettle (copyNamed betrayalId) staged
+            drained = if null (GameState.stack once) then once else resolveAndSettle (copyNamed betrayalId) once
+        pure (bobPikerId, spellId, staged, drained)
+  Spec.it s "CR 303.4g Copy Enchantment copying Betrayal with nothing to enchant goes to the graveyard without entering" $ do
+    (_, spellId, staged, after) <- betrayalBoard False
+    Spec.assertEqWith s "the Leech never saw an enchantment enter: bob keeps his life" (S.lifeOf S.bob after) (S.lifeOf S.bob staged)
+    Spec.assertEqWith s "Copy Enchantment is in alice's graveyard" (fmap (\oid -> fmap Face.name (Game.faceOf oid after)) (Game.zoneMembers Zone.Graveyard S.alice after)) [Just (CardName.MkCardName (Text.pack "Copy Enchantment"))]
+    Spec.assertEqWith s "and the spell is gone from the stack" (List.elem spellId (GameState.stack after)) False
+  Spec.it s "CR 303.4f the same board with a creature of bob's: the copy enters on it and the Leech drains" $ do
+    (bobPikerId, _, staged, after) <- betrayalBoard True
+    Spec.assertEqWith s "the Leech saw an enchantment enter: bob loses 1" (S.lifeOf S.bob after) (fmap (subtract 1) (S.lifeOf S.bob staged))
+    Spec.assertEqWith
+      s
+      "the copy enchants bob's Piker"
+      (fmap (\oid -> Game.lookupObject oid after >>= Object.attachedTo >>= Recipient.objectOf) (printedOnBattlefield "Copy Enchantment" after))
+      [bobPikerId]
+
   Spec.it s "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
