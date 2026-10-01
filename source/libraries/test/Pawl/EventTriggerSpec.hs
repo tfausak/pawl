@@ -85,7 +85,7 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
 -- every "an opponent" below is alice.
-discardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+discardTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 discardTriggerSpec s registry =
   Spec.describe s "DiscardTrigger" $ do
     -- "An OPPONENT discards", not "a player": the axis is load-bearing, and a

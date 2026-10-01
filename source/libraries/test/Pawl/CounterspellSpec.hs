@@ -472,7 +472,7 @@ rakshasasDisdainSpec s registry = Spec.describe s "RakshasasDisdain" $ do
 -- cannot cover {4}. A gate that left the symbol unsubstituted reads {0} (see
 -- Pawl.Engine.Cost's costGenericOf), which is payable for free -- so both cases
 -- would end with the Piker uncountered and nothing of bob's tapped.
-clashOfWillsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+clashOfWillsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 clashOfWillsSpec s registry = Spec.describe s "ClashOfWills" $ do
   Spec.it s "CR 107.3a the announced X is what the targeted spell's controller pays" $ do
     island <- S.printingOf s registry "Island"
