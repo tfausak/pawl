@@ -640,19 +640,19 @@ hasChosenNameCounts card =
    in (total True, total False)
 
 -- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
--- is filled, which two callers do: Pawl.Engine.Resolve.Slots.effectContext, which
--- all but one of a resolution's positions go through -- the search filter, the
--- mill tally and an ObjectRef's own Filter among them -- and
+-- is filled: by Pawl.Engine.SourceContext -- in Pawl.Engine.Resolve.Slots.effectContext,
+-- which all but one of a resolution's positions go through (the search filter,
+-- the mill tally and an ObjectRef's own Filter among them), a trigger condition,
+-- an affected set and a cost criterion -- and by
 -- Pawl.Engine.Replacement.candidateContext, where rule 702.16e's minted shield is
 -- the only filter written. Filter.contextFor, Filter.contextWithSlots,
 -- Filter.contextComparingPower and
 -- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
--- a target slot, an affected set, a static ability's CR 604.2 condition, a
--- triggered ability's CR 603.4 intervening "if", a printed player ability or a
--- cost criterion is a silent False rather than a rejected card. This is where
--- that is made loud -- the three condition positions through StandingHostFramed,
--- which #3320 split off SourceHostFramed precisely so this allowlist could
--- refuse them.
+-- a target slot, a static ability's CR 604.2 condition, a triggered ability's CR
+-- 603.4 intervening "if" or a printed player ability is a silent False rather
+-- than a rejected card. This is where that is made loud -- the three condition
+-- positions through StandingHostFramed, which #3320 split off SourceHostFramed
+-- precisely so this allowlist could refuse them.
 --
 -- The three positions hasChosenNameCounts admits are narrower than that, on
 -- purpose: see its own note. So a card rejected here is not necessarily one the

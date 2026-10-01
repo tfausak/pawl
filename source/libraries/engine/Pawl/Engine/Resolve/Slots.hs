@@ -3163,12 +3163,12 @@ resolvingBindings resolving gs = case Game.lookupObject resolving gs of
 -- (Pawl.Engine.Target.slotContext). A THUNK, as it is there: one projection per
 -- bound object, paid for only by a filter naming the atom.
 --
--- CR 201.4's CHOSEN names ride the same read, and this is their only filler on
--- the resolution side -- the search filter's and the mill tally's alike, which
--- each overlaid the field for themselves until Petra Sphinx wanted it at an
--- ObjectRef's own filter too, see #2992. Pawl.Engine.Replacement.candidateContext is
--- the one other filler, for a minted row. What holds a CARD to the positions
--- this fills is Pawl.CardSpec's framing lint, not this function.
+-- CR 607.2d's CHOSEN values -- CR 201.4's names, CR 105.2's colour and CR 205.3's
+-- creature type -- come from Pawl.Engine.SourceContext, and this is their only
+-- filler on the resolution side -- the search filter's and the mill tally's
+-- alike, which each overlaid the names for themselves until Petra Sphinx wanted
+-- them at an ObjectRef's own filter too, see #2992. What holds a CARD to the
+-- positions this fills is Pawl.FilterPositionLintSpec, not this function.
 effectContext :: GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Filter.Context
 effectContext gs controller source legal bindings =
   let objects = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf bindings)
