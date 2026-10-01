@@ -12,6 +12,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Earthbend as Earthbend
+import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.AbilityName as AbilityName
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
@@ -234,8 +235,9 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- stack (CR 113.6), and the graveyard reads go through the projection
 -- (Cost.costsFor, Cast.projectedKeywords).
 --
--- Not implemented: beyond the cast scan's triggered abilities, which go through
--- the projection, what is read while the object is on the STACK stays printed
+-- Not implemented: beyond the cast scan's triggered abilities and the
+-- cost-reducing keywords (Cost.selfReductions), which go through the
+-- projection, what is read while the object is on the STACK stays printed
 -- (#1859).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
@@ -3400,7 +3402,7 @@ bestowCosts keywords =
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
 -- CR 601.2f: the reductions a spell's own KEYWORDS apply to its own cost, in
--- ascending Set order -- the keyword-borne half of what Pawl.Types.CostReduction
+-- ascending keyword order -- the keyword-borne half of what Pawl.Types.CostReduction
 -- carries for a card that prints the sentence out (Thrasta, Tempest's Roar).
 -- Pawl.Engine.Cost.selfReductions folds these in beside Face.costReductions and
 -- evaluates each Quantity there, at CR 601.2f, which is what locks the count in.
@@ -3411,14 +3413,15 @@ bestowCosts keywords =
 -- {0}: CR 118.7a already keeps a generic reduction off the coloured component,
 -- and CR 601.2f's own {0} is the floor.
 --
--- CR 702.41b and CR 702.125c make every instance apply. This takes the DISTINCT
--- keywords (Face.keywordSet), so two affinities naming different qualities are
--- two members and a repeated identical instance collapses to one -- the
--- direction that leaves the spell dearer, and no printing carries a duplicate.
+-- CR 702.41b and CR 702.125c make every instance apply, so each keyword's
+-- reductions repeat once per instance the projection counts (PC.keywords): a
+-- Frogmite cast beside Mycosynth Golem has two affinities for artifacts, which
+-- Pawl.CostSpec's "CR 702.41b a printed and a granted affinity both apply"
+-- proves.
 --
 -- A wildcard rather than an exhaustive case, flashbackCosts' reason.
-selfCostReductionsOf :: Set Keyword -> [CostReduction.CostReduction]
-selfCostReductionsOf = concatMap selfCostReductionsFor . Set.toAscList
+selfCostReductionsOf :: Map Keyword Natural -> [CostReduction.CostReduction]
+selfCostReductionsOf = concatMap (\(keyword, n) -> concat (replicate (Natural.toIntSaturating n) (selfCostReductionsFor keyword))) . Map.toAscList
 
 -- CR 702.41a and CR 702.125a written out, each as the {1} and the count that
 -- rule states.

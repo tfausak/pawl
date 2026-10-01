@@ -1,0 +1,126 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Affinity",
+          "value": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Artifact"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 11
+        }
+      ],
+      "name": "Mycosynth Golem",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingOffBattlefield",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Library"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Hand"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Graveyard"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Exile"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Command"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Affinity",
+                "value": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 5
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Golem"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
