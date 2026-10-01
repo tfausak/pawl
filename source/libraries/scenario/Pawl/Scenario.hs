@@ -114,11 +114,13 @@ import qualified Pawl.Types.Zone as Zone
 
 -- | What a run carries between prompts: the entries not yet taken, keyed by
 -- their moment, the board's labels, and the cast or activation whose own
--- prompts are still being answered.
+-- prompts are still being answered, and a move answered to be refused, with
+-- the kind of prompt it answered.
 data Rehearsal = MkRehearsal
   { queues :: Map.Map When.When (Seq.Seq Timed.Timed),
     staged :: Staged.Staged,
-    pending :: Maybe (When.When, Move.Move, Choices.Choices)
+    pending :: Maybe (When.When, Move.Move, Choices.Choices),
+    refusing :: Maybe (When.When, Move.Move, Text.Text)
   }
 
 type Run = State.StateT Rehearsal (Either Failure.ScenarioFailure)
@@ -167,15 +169,17 @@ rehearsalOf timeline board =
    in MkRehearsal
         { queues = Foldable.foldl' add Map.empty timeline,
           staged = board,
-          pending = Nothing
+          pending = Nothing,
+          refusing = Nothing
         }
 
 -- | What a finished run still owes: choices its last action never used, and
 -- entries whose moment never came, told apart by whether any is a move.
 settle :: Rehearsal -> GameState.GameState -> Either Failure.ScenarioFailure ()
-settle rehearsal final = case pending rehearsal of
-  Just (key, verb, choices)
+settle rehearsal final = case (pending rehearsal, refusing rehearsal) of
+  (Just (key, verb, choices), _)
     | choices /= Choices.none -> Left (Failure.MkUnusedActionChoices key verb choices)
+  (_, Just (key, verb, _)) -> Left (Failure.MkUnrefusedMove key verb Nothing)
   _ ->
     let remaining = foldMap snd (Map.toAscList (queues rehearsal))
         turn = GameState.turnNumber final
@@ -349,6 +353,14 @@ answerPrompt asked = do
   if not (null (Asked.enclosing asked))
     then failWith (Failure.MkNestedGamePrompt (GameState.turnNumber gs) (GameState.phase gs) decider kind)
     else do
+      -- CR 733.1: a refused move is reversed, so the engine's next prompt is
+      -- the one it answered, asked again.
+      refusal <- State.gets refusing
+      case refusal of
+        Just (key, verb, answered)
+          | answered /= kind || decider /= Just (When.player key) || GameState.turnNumber gs /= When.turn key || GameState.phase gs /= When.phase key ->
+              failWith (Failure.MkUnrefusedMove key verb (Just kind))
+        _ -> State.modify' (\rehearsal -> rehearsal {refusing = Nothing})
       waiting <- State.gets pending
       case waiting of
         Just (key, verb, choices)
@@ -561,6 +573,7 @@ answerActionPrompt gs pid actions = do
         popAt key index
         State.modify' (\rehearsal -> rehearsal {pending = Just (key, verb, choicesOf verb)})
         pure chosen
+      (Nothing, Entry.Refuse _) -> pure Action.Pass
       (Nothing, Entry.Expect _) -> pure Action.Pass
 
 -- | The checks at the head of a moment's queue, evaluated and taken in order,
@@ -721,6 +734,11 @@ onEntry unscheduled key kind offers select match = do
         | Just action <- match verb -> do
             popAt key index
             action
+      Entry.Refuse verb
+        | Just action <- match verb -> do
+            popAt key index
+            State.modify' (\rehearsal -> rehearsal {refusing = Just (key, verb, kind)})
+            action
       entry -> failWith (Failure.MkUnexpectedPrompt key entry kind offers)
 
 -- Checks -----------------------------------------------------------------------
@@ -834,6 +852,7 @@ takeMove key = do
 isMove :: Timed.Timed -> Bool
 isMove timed = case Timed.entry timed of
   Entry.Do _ -> True
+  Entry.Refuse _ -> True
   Entry.Expect _ -> False
 
 -- | The first move at `key`, for a prompt with no source of its own, which a
@@ -1083,6 +1102,8 @@ render failure = case failure of
     renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " has no answer for the " <> kind <> Text.pack " prompt"
   Failure.MkUnusedActionChoices key verb choices ->
     renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " finished without using " <> Common.render (Codec.encode Codec.Choices.codec choices)
+  Failure.MkUnrefusedMove key verb next ->
+    renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " stood; " <> maybe (Text.pack "nothing was asked again") (\k -> Text.pack "the next prompt was " <> k) next
   Failure.MkUnreachedEntries turn step timed ->
     renderTimeds timed <> Text.pack " never came; the game stopped at " <> renderLocation turn step Nothing
   Failure.MkUnrunChecks turn step timed ->
@@ -1107,6 +1128,7 @@ renderMove = Common.render . Codec.encode Codec.Move.codec
 renderEntry :: Entry.Entry -> Text.Text
 renderEntry entry = case entry of
   Entry.Do verb -> renderMove verb
+  Entry.Refuse verb -> Text.pack "refused " <> renderMove verb
   Entry.Expect check -> Common.render (Codec.encode Codec.Check.codec check)
 
 renderTimeds :: Seq.Seq Timed.Timed -> Text.Text

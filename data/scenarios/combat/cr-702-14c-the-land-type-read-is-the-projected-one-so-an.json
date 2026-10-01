@@ -1,0 +1,44 @@
+{
+  "description": "CR 702.14c the land type read is the PROJECTED one, so an Urborg'd Island is a Swamp",
+  "note": "Urborg, Tomb of Yawgmoth makes every land a Swamp at CR 613 layer 4. Urborg is alice's, so bob's only land is an Island that printed no Swamp, and the Wraith still walks on it.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "attacker",
+            "ready": true
+          },
+          {
+            "card": "Urborg, Tomb of Yawgmoth",
+            "label": "urborg"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "blocker",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "land"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@blocker": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": null}}}
+  ]
+}

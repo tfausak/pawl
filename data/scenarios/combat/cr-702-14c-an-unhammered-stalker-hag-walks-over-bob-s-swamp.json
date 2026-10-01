@@ -1,0 +1,55 @@
+{
+  "description": "CR 702.14c an unhammered Stalker Hag walks over bob's Swamp and Forest",
+  "note": "The control for Hammerheim's family removal, with the ability never activated: Stalker Hag prints swampwalk and forestwalk, bob controls a Swamp and a Forest, so the Piker's block is refused. Concordant Crossroads grants the Hag haste, the keyword the removal must leave standing.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Stalker Hag",
+            "label": "hag",
+            "ready": true
+          },
+          {
+            "card": "Concordant Crossroads",
+            "label": "crossroads"
+          },
+          {
+            "card": "Hammerheim",
+            "label": "hammerheim"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "blocker",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp"
+          },
+          {
+            "card": "Forest",
+            "label": "forest"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@hag"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@blocker": ["@hag"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@hag", "blockers": null}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "@hag", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Swamp"}}}, "count": 1}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "@hag", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Forest"}}}, "count": 1}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Keywords": {"object": "@hag", "keyword": {"type": "Haste"}, "count": 1}}}
+  ]
+}

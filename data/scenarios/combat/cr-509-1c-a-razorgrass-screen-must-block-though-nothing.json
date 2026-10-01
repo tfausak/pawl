@@ -1,0 +1,28 @@
+{
+  "description": "CR 509.1c a Razorgrass Screen must block, though nothing names an attacker",
+  "note": "Razorgrass Screen blocks each combat if able, a requirement naming no attacker: it mints one pair per attacker it may block, so declining obeys zero and is refused, and the Screen's block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "attacker", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Razorgrass Screen", "label": "screen", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@attacker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@screen": ["@attacker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@attacker", "blockers": ["@screen"]}}}
+  ]
+}

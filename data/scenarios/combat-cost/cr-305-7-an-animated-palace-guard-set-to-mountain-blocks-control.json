@@ -1,0 +1,31 @@
+{
+  "description": "CR 305.7 an animated Palace Guard set to Mountain blocks only one attacker",
+  "note": "With neither card the Guard keeps its printed permission and blocks all three Pikers. Palace Guard can block any number of creatures, so three attacking Goblin Pikers separate its arity from CR 509.1a's one. Ashaya, Soul of the Wild under bob makes the Guard a Forest land; Blood Moon then sets it to Mountain, and CR 305.7 strips its rules text. Only the conjunction strips: with either card alone, or neither, the Guard still blocks all three. Ashaya carries a +1/+1 counter because Blood Moon strips its own characteristic-defining ability too, and as a 0/0 it would die (CR 704.5f) before combat; the Haskell original read legality off a board where state-based actions never ran.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "first", "ready": true },
+          { "card": "Goblin Piker", "label": "second", "ready": true },
+          { "card": "Goblin Piker", "label": "third", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Palace Guard", "label": "guard" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@first", "@second", "@third"]} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@guard": ["@first", "@second", "@third"]}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@first", "blockers": ["@guard"]}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@second", "blockers": ["@guard"]}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@third", "blockers": ["@guard"]}} }
+  ]
+}

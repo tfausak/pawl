@@ -1,0 +1,28 @@
+{
+  "description": "CR 509.1c declining to block a Prized Unicorn is illegal",
+  "note": "The second blocking requirement, and the first naming its own source (Filter.IsSource) rather than an attachment: no Aura anywhere. Declining is refused and blocking the Unicorn stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Prized Unicorn", "label": "unicorn", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@unicorn"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@unicorn"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@unicorn", "blockers": ["@blocker"] } } }
+  ]
+}

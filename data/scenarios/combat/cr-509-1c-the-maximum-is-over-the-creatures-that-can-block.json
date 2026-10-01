@@ -1,0 +1,31 @@
+{
+  "description": "CR 509.1c the maximum is over the creatures that CAN block, not all of them",
+  "note": "A Lured Bird Maiden attacks; the ground Piker may not block it (CR 702.9b) and the reach Birdsticker may. The maximum is one, attained only by the Birdsticker: declining obeys zero and the Piker's block is illegal whatever it would obey.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Bird Maiden", "label": "attacker", "ready": true },
+          { "card": "Lure", "attached": "attacker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "ground", "ready": true },
+          { "card": "Nimble Birdsticker", "label": "reacher", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@ground": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@reacher": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@reacher"] } } }
+  ]
+}

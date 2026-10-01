@@ -1,0 +1,32 @@
+{
+  "description": "CR 702.111b menace counts CREATURES blocking each attacker, not blocks",
+  "note": "Two menace attackers need two blockers each. The Brigade covering both alone is one creature apiece and refused; the Brigade plus a Piker on each Brute is two apiece and stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Boggart Brute", "label": "first", "ready": true },
+          { "card": "Boggart Brute", "label": "second", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Foriysian Brigade", "label": "brigade", "ready": true },
+          { "card": "Goblin Piker", "label": "x", "ready": true },
+          { "card": "Goblin Piker", "label": "y", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@brigade": ["@first", "@second"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@brigade": ["@first", "@second"], "@x": ["@first"], "@y": ["@second"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@first", "blockers": ["@brigade", "@x"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@second", "blockers": ["@brigade", "@y"] } } }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "description": "CR 305.7 an animated Prized Unicorn set to Mountain no longer forces a block",
+  "note": "With Ashaya alone declining to block is refused (CR 509.1c) and the forced block stands. Ashaya, Soul of the Wild under alice makes her Prized Unicorn a Forest land; Blood Moon then sets it to Mountain, and CR 305.7 strips its block requirement. This reaches the Unicorn's ability only through the layer-4 animation, so it reads the projection rather than base characteristics. Ashaya carries a +1/+1 counter because Blood Moon strips its own characteristic-defining ability too, and as a 0/0 it would die (CR 704.5f) before combat; the Haskell original read legality off a board where state-based actions never ran.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Prized Unicorn", "label": "unicorn", "ready": true },
+          { "card": "Ashaya, Soul of the Wild", "counters": [{"key": {"type": "PlusOnePlusOne"}, "value": 1}] }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@unicorn"]} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@blocker": ["@unicorn"]}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@unicorn", "blockers": ["@blocker"]}} }
+  ]
+}

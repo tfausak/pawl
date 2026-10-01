@@ -1,0 +1,27 @@
+{
+  "description": "CR 702.118b the powers compared are the PROJECTED ones",
+  "note": "The same Piker blocks the 2-power skulker at its printed 2 and is refused at 3 after a +1/+1 counter (CR 122.1a), so the gate reads CR 613's answer and not the printed box.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Furtive Homunculus", "label": "homunculus", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@homunculus"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@homunculus"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@homunculus", "blockers": ["@blocker"] } } }
+  ]
+}
