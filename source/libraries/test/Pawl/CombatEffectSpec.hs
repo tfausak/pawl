@@ -1063,14 +1063,6 @@ steal homebody victim p = case p of
   Prompt.DeclareBlockers {} -> Map.empty
   _ -> S.aggressiveAnswer p
 
--- Block with everything, cast whenever a cast is offered, aim every target at
--- `victim`. The blocker-side twin of `steal`.
-snatch :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-snatch victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
-  Prompt.ChooseAction {} -> S.castAnswer p
-  _ -> S.aggressiveAnswer p
-
 -- CR 506.4: "A permanent is removed from combat if it leaves the battlefield, if
 -- its controller changes, ..." -- and a creature so removed "stops being an
 -- attacking, blocking, blocked, and/or unblocked creature".
@@ -1130,39 +1122,6 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
         Spec.assertBool s (Map.member one attackers && Map.member two attackers) "both attackers are still attacking"
         Spec.assertEqWith s "so bob takes both hits" (S.lifeOf S.bob atEnd) (Just 16)
       _ -> Spec.assertFailure s "fixture should have three Pikers"
-  Spec.it s "CR 506.4 a stolen BLOCKER is removed from combat, and CR 509.1h leaves the attacker blocked" $ do
-    -- The blocker side of the same clause, and the interaction the
-    -- Combat.blockers shape exists for: Game.removeFromCombat drops the
-    -- blocker from the SET while the attacker's KEY survives, so the attacker
-    -- stays blocked and (CR 510.1c) assigns no combat damage at all.
-    --
-    -- The theft has to land after blocks are declared, so the declare
-    -- attackers step is played under an answerer that does not cast and only
-    -- the declare blockers step onwards sees `snatch`.
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    rayOfCommand <- S.printingOf s registry "Ray of Command"
-    let (gs0, mine, theirs) = S.combatBoardOf [piker] [piker]
-        addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent island S.alice g))
-        gs = snd (S.addHandCard rayOfCommand S.alice (addLands 4 gs0))
-    case (mine, theirs) of
-      (attacker : _, blocker : _) -> do
-        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
-            atEnd = runToEndOfCombat (snatch blocker) atBlockers
-            -- The control leg: the same board and the same blocks, with alice
-            -- never casting. Two 2/1 Pikers then trade and both die.
-            traded = runToEndOfCombat S.aggressiveAnswer atBlockers
-        Spec.assertEqWith s "the leg hands over at the declare blockers step, so `snatch` is what declares the blocks and then casts" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
-        -- The discriminating assertion, and first because it is the one the
-        -- unfixed engine fails: with the blocker still in the record the two
-        -- Pikers trade, and the ids below stop resolving at all.
-        Spec.assertBool s (S.onBattlefield attacker atEnd && S.onBattlefield blocker atEnd) "CR 510.1c: neither creature was dealt combat damage"
-        Spec.assertEqWith s "alice really did gain control of the blocker" (Projection.controllerOf blocker atEnd) (Just S.alice)
-        Spec.assertEqWith s "CR 506.4: it is blocking nothing" (Combat.blockersOf attacker atEnd) Set.empty
-        Spec.assertBool s (Combat.isBlocked attacker atEnd) "CR 509.1h: but the attacker remains blocked"
-        Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob atEnd) (Just 20)
-        Spec.assertBool s (not (S.onBattlefield attacker traded) && not (S.onBattlefield blocker traded)) "control leg: with no theft the two Pikers trade and both die"
-      _ -> Spec.assertFailure s "fixture did not build an attacker and a blocker"
 
 -- Labyrinth of Skophos' SECOND activated ability -- "{4}, {T}: Remove target
 -- attacking or blocking creature from combat" -- read off the JSON-loaded
@@ -1300,34 +1259,6 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
         Spec.assertBool s (Map.member attacker (Combat.Type.attackers (GameState.combat quiet))) "control leg: unactivated, the Piker is still attacking"
         Spec.assertEqWith s "and bob takes its 2" (S.lifeOf S.bob quiet) (Just 18)
       _ -> Spec.assertFailure s "fixture should give bob a Labyrinth with two abilities and alice one Piker"
-  Spec.it s "CR 509.1h a removed BLOCKER leaves the attacker blocked, so nothing is dealt combat damage" $ do
-    -- The blocker side of the same clause, and the interaction
-    -- Game.removeFromCombat's two-way edit of Combat.blockers exists for: the
-    -- blocker leaves the SET while the attacker's KEY survives, so the
-    -- attacker stays blocked and (CR 510.1c) assigns no combat damage at all.
-    --
-    -- alice holds the Labyrinth and aims it at her opponent's blocker, so the
-    -- removal has to land after blocks are declared: the declare attackers
-    -- step is played under an answerer that never activates, and only the
-    -- declare blockers step onwards sees `mazeAnswer`.
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
-    case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker] [piker]) of
-      (Just ability, (gs, [attacker], [blocker], mazeId)) -> do
-        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
-            atEnd = runToEndOfCombatWith (mazeAnswer mazeId ability blocker) atBlockers
-            -- The control leg: the same board and the same blocks, with the
-            -- ability never activated. Two 2/1 Pikers then trade.
-            traded = runToEndOfCombat S.aggressiveAnswer atBlockers
-        Spec.assertEqWith s "the leg hands over at the declare blockers step, so the blocks are declared before the activation" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
-        Spec.assertEqWith s "the ability really was activated" (tapStateOf mazeId atEnd) (Just TapState.Tapped)
-        Spec.assertBool s (S.onBattlefield attacker atEnd && S.onBattlefield blocker atEnd) "CR 510.1c: neither creature was dealt combat damage"
-        Spec.assertEqWith s "CR 506.4: the removed creature is blocking nothing" (Combat.blockersOf attacker atEnd) Set.empty
-        Spec.assertBool s (Combat.isBlocked attacker atEnd) "CR 509.1h: but the attacker remains blocked"
-        Spec.assertEqWith s "so bob takes nothing either" (S.lifeOf S.bob atEnd) (Just 20)
-        Spec.assertBool s (not (S.onBattlefield attacker traded) && not (S.onBattlefield blocker traded)) "control leg: unactivated, the two Pikers trade and both die"
-      _ -> Spec.assertFailure s "fixture should give alice a Labyrinth and an attacker, and bob a blocker"
   Spec.it s "CR 601.2c the card's filter admits the attacker and the blocker and rejects the creature that stayed home" $ do
     -- Or [IsAttacking, IsBlocking], and both halves are load-bearing: with
     -- IsAttacking alone the blocker would be rejected, and with no filter at
@@ -1401,35 +1332,8 @@ savePointAnswer pointId ability p = case p of
 -- The activation happens in the declare blockers step, which is inside the
 -- rider's window (Pawl.ActivateSpec's Save Point case is what pins the window
 -- itself).
-savePointSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+savePointSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 savePointSpec s registry = Spec.describe s "Save Point" $ do
-  Spec.it s "CR 506.4/109.2 whole card: Save Point removes EVERY creature from combat, so no combat damage is dealt" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    savePoint <- S.printingOf s registry "Save Point"
-    let (gs0, ours, theirs) = S.combatBoardOf [piker, piker] [piker]
-    case (savePointAbility savePoint, ours, theirs) of
-      (Just ability, [blocked, unblocked], [blocker]) -> do
-        let (pointId, staged) = S.addPermanent savePoint S.alice gs0
-            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer staged
-            atEnd = runToEndOfCombatWith (savePointAnswer pointId ability) atBlockers
-            idle = runToEndOfCombat S.aggressiveAnswer atBlockers
-            -- atBlockers is the declare blockers step BEFORE its turn-based
-            -- action, so the blocks the legs below run under are read one step
-            -- on, where nothing has died yet.
-            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer atBlockers
-        Spec.assertBool s (Set.member blocker (Combat.blockersOf blocked atDamage)) "the fixture really blocked the first Piker"
-        Spec.assertBool s (not (Combat.isBlocked unblocked atDamage)) "and left the second one unblocked"
-        Spec.assertBool s (not (S.onBattlefield pointId atEnd)) "the ability really was activated: Save Point sacrificed itself"
-        -- The sweep, at gameplay level. A reader that removed only the head of
-        -- the group would leave the UNBLOCKED Piker attacking and bob would take
-        -- its 2, which is the same 18 a no-op leaves.
-        Spec.assertEqWith s "CR 510.1a: bob takes nothing, so the unblocked Piker left combat too" (S.lifeOf S.bob atEnd) (Just 20)
-        Spec.assertEqWith s "CR 506.4: nothing is an attacking creature any more" (Combat.Type.attackers (GameState.combat atEnd)) Map.empty
-        Spec.assertEqWith s "CR 506.4: and the blocker is blocking nothing" (Combat.blockersOf blocked atEnd) Set.empty
-        Spec.assertBool s (all (`S.onBattlefield` atEnd) [blocked, unblocked, blocker]) "so the blocked pair never traded"
-        Spec.assertEqWith s "control leg: unactivated, bob takes the unblocked Piker's 2" (S.lifeOf S.bob idle) (Just 18)
-        Spec.assertBool s (not (S.onBattlefield blocked idle) && not (S.onBattlefield blocker idle)) "control leg: and the blocked pair trades"
-      _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Save Point, and bob a blocker"
   Spec.it s "CR 701.26b/500.8 the same activation untaps both attackers and adds a combat phase after this one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     savePoint <- S.printingOf s registry "Save Point"

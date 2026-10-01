@@ -1,0 +1,26 @@
+{
+  "description": "CR 702.14c a nonbasic landwalker is blocked normally when every land is basic",
+  "note": "Dryad Sophisticate has nonbasic landwalk; bob's only land is a basic Swamp, which the Not must reject, and his blocking Goblin Piker is a nonbasic permanent but no land, so a reader dropping either conjunct would refuse the block. The block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Dryad Sophisticate", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true },
+          { "card": "Swamp", "label": "land" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@blocker"] } } }
+  ]
+}

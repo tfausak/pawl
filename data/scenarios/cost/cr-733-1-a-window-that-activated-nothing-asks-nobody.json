@@ -1,0 +1,39 @@
+{
+  "description": "CR 733.1 a window that activated nothing asks nobody",
+  "note": "CR 733.1 lets a player reverse the mana abilities they activated while making an illegal play, so a payment that activated none leaves nothing to ask. bob agrees to pay Mana Leak's {3}, which his Ancient Tomb and Island could cover, then taps nothing. The payment fails and the Piker is countered. No reversal question is scheduled, so one being asked fails the run. bob casts the Piker himself off two Mountains, which stay tapped, so the untapped checks name the Tomb and the Island. Those are his only other mana sources, so both being untapped stands in for the Haskell test's empty mana pool.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" }
+        ],
+        "hand": [{ "card": "Mana Leak", "label": "leak" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Ancient Tomb", "label": "tomb" },
+          { "card": "Island", "label": "bob-island" }
+        ],
+        "hand": [{ "card": "Goblin Piker", "label": "piker" }]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@piker", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@leak", "targets": ["Goblin Piker"], "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": [null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@tomb", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@bob-island", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

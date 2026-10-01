@@ -29,6 +29,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -572,6 +573,20 @@ chosenPlayerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId
 chosenPlayerWithLastKnown oid gs = case lookupObject oid gs of
   Just obj -> Object.chosenPlayer obj
   Nothing -> LastKnown.chosenPlayer =<< Map.lookup oid (GameState.lastKnown gs)
+
+-- CR 614.1c / 607.2d's chosen colour, through CR 608.2h: the live object's
+-- Object.chosenColor, else the one it carried as it left
+-- (Pawl.Types.LastKnown.chosenColor).
+chosenColorWithLastKnown :: ObjectId -> GameState -> Maybe Color.Color
+chosenColorWithLastKnown oid gs = case lookupObject oid gs of
+  Just obj -> Object.chosenColor obj
+  Nothing -> LastKnown.chosenColor =<< Map.lookup oid (GameState.lastKnown gs)
+
+-- chosenColorWithLastKnown one choice over, for Object.chosenSubtype.
+chosenSubtypeWithLastKnown :: ObjectId -> GameState -> Maybe Subtype.Subtype
+chosenSubtypeWithLastKnown oid gs = case lookupObject oid gs of
+  Just obj -> Object.chosenSubtype obj
+  Nothing -> LastKnown.chosenSubtype =<< Map.lookup oid (GameState.lastKnown gs)
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.

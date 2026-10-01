@@ -838,6 +838,8 @@ library codec
     Pawl.Codec.MoveSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
+    Pawl.Codec.NamesAre
+    Pawl.Codec.NamesAreSpec
     Pawl.Codec.Object
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectIdSpec
@@ -2298,6 +2300,7 @@ library types
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer
     Pawl.Types.MutateSide
+    Pawl.Types.NamesAre
     Pawl.Types.Object
     Pawl.Types.ObjectId
     Pawl.Types.ObjectRef

@@ -1,0 +1,42 @@
+{
+  "description": "CR 616.1b an opponent's entering creature enters under YOUR control instead",
+  "note": "alice resolves Gather Specimens in bob's upkeep, then bob casts Clone. CR 616.1b's control rewrite is applied before CR 616.1c's copy choice, so the Clone is alice's when that choice is made and alice is the one asked (CR 109.5); a prompt to bob would fail the run. It copies alice's Piker and enters under her control. The control twin is the same board with Gather Specimens left in hand. It is bob's turn so his Clone is cast at sorcery speed, with Gather Specimens cast in his upkeep; his one library card covers his draw step.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "a-island-1" },
+          { "card": "Island", "label": "a-island-2" },
+          { "card": "Island", "label": "a-island-3" },
+          { "card": "Island", "label": "a-island-4" },
+          { "card": "Island", "label": "a-island-5" },
+          { "card": "Island", "label": "a-island-6" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Gather Specimens", "label": "gather" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "b-island-1" },
+          { "card": "Island", "label": "b-island-2" },
+          { "card": "Island", "label": "b-island-3" },
+          { "card": "Island", "label": "b-island-4" }
+        ],
+        "hand": [{ "card": "Clone", "label": "clone" }],
+        "library": [{ "card": "Island" }]
+      }
+    ],
+    "active": "bob",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Cast": { "object": "@gather", "mana": ["@a-island-1", "@a-island-2", "@a-island-3", "@a-island-4", "@a-island-5", "@a-island-6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@clone", "mana": ["@b-island-1", "@b-island-2", "@b-island-3", "@b-island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

@@ -2563,40 +2563,12 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew nothing" (S.handSize S.alice after) 0
     Spec.assertEqWith s "and her library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 10
-  -- CR 707.2 / 613.2a: a copy's mana value is the COPIED object's, because the
-  -- mana cost is one of the copiable values layer 1 replaces. The two numbers
-  -- cannot coincide here: Clone is printed {3}{U} (mana value 4) and Darksteel
-  -- Myr is printed {3} (mana value 3), so reading the printed card gives 4 and
-  -- reading the copy gives 3.
-  --
-  -- The Myr is BOB's, which is what leaves the Clone alone among "artifacts YOU
-  -- control" -- the maximum is then a single member and the assertion is about
-  -- that member's mana value and nothing else.
-  Spec.it s "CR 707.2 a Clone copying Darksteel Myr counts as mana value 3, not its own printed 4" $ do
-    island <- S.printingOf s registry "Island"
-    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-    clone <- S.printingOf s registry "Clone"
-    piker <- S.printingOf s registry "Goblin Piker"
-    oneWithTheMachine <- S.printingOf s registry "One with the Machine"
-    let base = S.landsInPlay island 4
-        (_, withMyr) = S.addPermanent darksteelMyr S.bob base
-        (_, staged) = S.spellOnStack clone S.alice withMyr
-        -- CR 614.12a: the copy choice happens inside the Clone's own entry, so
-        -- the answerer takes the one legal target -- bob's Myr is the only
-        -- creature on the battlefield.
-        entered = snd (Engine.runGamePure copyTheOnlyTarget staged (Stack.resolveTop >> Engine.settleForPriority))
-        -- CR 104.3c: ten cards is far more than the three this draws, so alice
-        -- cannot deck herself before the assertion.
-        withLib = stockLibrary piker S.alice 10 entered
-        (gs, spellId) = S.handOne oneWithTheMachine withLib
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "alice drew three, not four" (S.handSize S.alice after) 3
   -- CR 202.3b, second sentence: "If a permanent or spell is a copy of the back
   -- face of a nonmodal double-faced object (even if the card representing that
   -- copy is itself a double-faced card), the mana value of the copy is 0."
   --
-  -- The NUMBER is the whole of what this adds to the Darksteel Myr case above.
+  -- The NUMBER is the whole of what this adds to
+  -- cr-707-2-a-clone-copying-darksteel-myr-counts-as-mana-value.json.
   -- CR 707.2 already makes the Clone read the copied object's mana value rather
   -- than its own printed {3}{U}, and CR 712.8e already makes the copied object
   -- -- a transformed Thraben Gargoyle // Stonewing Antagonizer -- read its FRONT

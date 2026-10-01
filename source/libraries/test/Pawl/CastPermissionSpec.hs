@@ -572,14 +572,6 @@ counteringBoard island cancel stifle sorcerer victim permanents =
       (stifleId, gs) = S.addHandCard stifle S.bob withCancel
    in (victimId, srcId, cancelId, stifleId, permanentIds, gs)
 
--- Every target prompt answers with this object, and CR 603.5's "may" is always
--- exercised -- so a silence below is the rule and never a declined option.
-counteringAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-counteringAnswer oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
-  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  _ -> S.identityAnswer p
-
 -- Prodigal Sorcerer's "any target" is aimed at ALICE, so the effect that must
 -- not occur when the ability is countered is her own life total; Stifle's only
 -- legal target is the ability, which the default interpreter picks.
@@ -593,15 +585,6 @@ counteringAtAbility :: Prompt.Prompt r -> r
 counteringAtAbility p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
-
--- bob casts his Cancel at alice's spell and lets it resolve.
-cancelRun :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-cancelRun victimId cancelId gs =
-  let answer :: Prompt.Prompt r -> r
-      answer = counteringAnswer victimId
-      cast = S.runPure answer gs (S.cast S.bob cancelId)
-      resolved = S.runPure answer cast Stack.resolveTop
-   in S.runPure answer resolved Engine.settleForPriority
 
 -- alice activates her Sorcerer at herself, bob casts his Stifle at the ability,
 -- and the stack is emptied down to the spell underneath. The first component is
@@ -1359,30 +1342,6 @@ spiderPunkSpec s registry =
           [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
           ability : _ -> act (counteringBoard island cancel stifle sorcerer piker) punk piker ability
    in Spec.describe s "SpiderPunk" $ do
-        -- The CONTROL for the spell half. Without it every refusal below would
-        -- also be true of a board where the Cancel never resolved at all.
-        Spec.it s "CR 701.6a without Spider-Punk bob's Cancel counters alice's spell"
-          . withAbility
-          $ \board _ piker _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board []
-                after = cancelRun victimId cancelId gs
-            Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
-            Spec.assertEqWith s "the spell is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-            Spec.assertEqWith s "and never reached the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 0
-
-        -- The SPELL half. CR 611.1's third clause makes Spider-Punk's sentence
-        -- a rules-modifying continuous effect, and CR 101.2 makes its "can't"
-        -- win: the Cancel resolves, does nothing, and CR 608.2n puts it into
-        -- bob's graveyard while the spell it named stays on the stack.
-        Spec.it s "CR 701.6a / 613.11 with Spider-Punk the same Cancel counters nothing"
-          . withAbility
-          $ \board punk _ _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, punk)]
-                after = cancelRun victimId cancelId gs
-            Spec.assertEqWith s "alice's spell is still on the stack, alone" (GameState.stack after) [victimId]
-            Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-            Spec.assertEqWith s "and the spent Cancel is bob's only graveyard card" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-
         -- The CONTROL for the ability half, and CR 113.9's reason it needs its
         -- own: an ability on the stack is not a spell, so nothing the spell
         -- case proves carries over.
@@ -1412,34 +1371,6 @@ spiderPunkSpec s registry =
             Spec.assertEqWith s "and resolving it deals alice the 1 damage" (S.lifeOf S.alice after) (Just 19)
             Spec.assertEqWith s "leaving the Piker spell alone on the stack" (GameState.stack after) [victimId]
 
-        -- PlayerScope.EachPlayer, and the case that tells it from
-        -- PlayerScope.You: Spider-Punk's sentence has no possessive, so BOB's
-        -- copy protects ALICE's spell from bob's own Cancel.
-        Spec.it s "CR 109.5 EachPlayer: bob's own Spider-Punk protects alice's spell"
-          . withAbility
-          $ \board punk _ _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board [(S.bob, punk)]
-                after = cancelRun victimId cancelId gs
-            Spec.assertEqWith s "alice's spell is still on the stack" (GameState.stack after) [victimId]
-            Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-
-        -- CR 604.2: gathered live off the battlefield on every read, so
-        -- destroying Spider-Punk lifts the protection in the same turn with
-        -- nothing to unwind.
-        Spec.it s "CR 604.2 destroying Spider-Punk makes the spell counterable again"
-          . withAbility
-          $ \board punk _ _ -> do
-            let (victimId, _, cancelId, _, punkIds, gs) = board [(S.alice, punk)]
-                gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable punkIds)
-            Spec.assertBool s (PlayerEffect.cantBeCountered S.alice victimId gs) "protected while it stands"
-            Spec.assertEqWith s "so the same Cancel counters nothing while it stands" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
-            Spec.assertBool s (not (PlayerEffect.cantBeCountered S.alice victimId gone)) "not protected once it is gone"
-            -- The stack is the readout, not the graveyard's size: the destroyed
-            -- Spider-Punk is in that graveyard too, so a bare count could not
-            -- tell a countered spell from an uncountered one.
-            Spec.assertEqWith s "and the Cancel now counters, emptying the stack" (GameState.stack (cancelRun victimId cancelId gone)) []
-            Spec.assertEqWith s "leaving the spell beside the destroyed Spider-Punk" (length (Game.zoneMembers Zone.Graveyard S.alice (cancelRun victimId cancelId gone))) 2
-
         -- CR 113.6g's carrier is untouched, which is what keeps the two apart:
         -- Spider-Punk's OWN card says nothing about being countered, and the
         -- protection it hands out comes from the CR 613.11 axis alone.
@@ -1466,7 +1397,7 @@ spiderPunkSpec s registry =
 -- The whole group therefore turns on the same Cancel counting differently for a
 -- CREATURE spell and a NONCREATURE one on one board -- an assertion no
 -- unfiltered arm can pass.
-prowlingSerpopardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowlingSerpopardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 prowlingSerpopardSpec s registry =
   let withVictim name act = do
         island <- S.printingOf s registry "Island"
@@ -1479,57 +1410,6 @@ prowlingSerpopardSpec s registry =
           [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
           ability : _ -> act (counteringBoard island cancel stifle sorcerer victim) cat ability
    in Spec.describe s "ProwlingSerpopard" $ do
-        -- The CONTROL for the creature half.
-        Spec.it s "CR 701.6a without Prowling Serpopard bob's Cancel counters alice's creature spell"
-          . withVictim "Goblin Piker"
-          $ \board _ _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board []
-            Spec.assertEqWith s "the stack is empty" (GameState.stack (cancelRun victimId cancelId gs)) []
-
-        -- The clause the card is in the pool for, in the direction the filter
-        -- ADMITS: a creature spell alice controls matches CR 613.11's effect and
-        -- CR 101.2 makes its "can't" win.
-        Spec.it s "CR 701.6a / 613.11 with Prowling Serpopard alice's creature spell survives"
-          . withVictim "Goblin Piker"
-          $ \board cat _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, cat)]
-                after = cancelRun victimId cancelId gs
-            Spec.assertEqWith s "alice's creature spell is still on the stack, alone" (GameState.stack after) [victimId]
-            Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-
-        -- The CONTROL for the noncreature half, so the refusal below is a
-        -- statement about the FILTER rather than about a Cancel that never
-        -- resolved.
-        Spec.it s "CR 701.6a without Prowling Serpopard bob's Cancel counters alice's noncreature spell"
-          . withVictim "Lightning Bolt"
-          $ \board _ _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board []
-            Spec.assertEqWith s "the stack is empty" (GameState.stack (cancelRun victimId cancelId gs)) []
-
-        -- THE case #788 is about, and the one an unfiltered arm CANNOT pass:
-        -- the very same Serpopard, on the very same board, leaves alice's
-        -- noncreature spell counterable, because CR 613.11's effect names only
-        -- creature spells.
-        Spec.it s "CR 701.6a / 613.11 the same Serpopard leaves alice's noncreature spell counterable"
-          . withVictim "Lightning Bolt"
-          $ \board cat _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, cat)]
-                after = cancelRun victimId cancelId gs
-            Spec.assertEqWith s "the Cancel counters it, emptying the stack" (GameState.stack after) []
-            -- The stack is the readout and the graveyard only corroborates it:
-            -- alice's graveyard holds the countered spell and nothing else, so
-            -- the Serpopard on the battlefield is not being counted here.
-            Spec.assertEqWith s "leaving the countered spell in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-
-        -- PlayerScope.You, and the case that tells it from Spider-Punk's
-        -- EachPlayer: "creature spells YOU control", so BOB's copy protects
-        -- nothing of alice's.
-        Spec.it s "CR 109.5 You: bob's own Prowling Serpopard does not protect alice's creature spell"
-          . withVictim "Goblin Piker"
-          $ \board cat _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board [(S.bob, cat)]
-            Spec.assertEqWith s "the Cancel still counters, emptying the stack" (GameState.stack (cancelRun victimId cancelId gs)) []
-
         -- CR 113.9 / 701.6a's OTHER subject. An ability on the stack has no
         -- card behind it -- Game.faceOf answers Nothing for one -- so a Filter
         -- naming a CARD TYPE can never match it, and alice's Prodigal Sorcerer
@@ -1543,17 +1423,6 @@ prowlingSerpopardSpec s registry =
                 (placed, after) = abilityRun srcId ability stifleId gs
             Spec.assertEqWith s "the ability is gone, leaving only the creature spell" (GameState.stack placed) [victimId]
             Spec.assertEqWith s "alice took no damage, so it never resolved" (S.lifeOf S.alice after) (Just 20)
-
-        -- CR 113.6g, the card's FIRST sentence, on the carrier that is not the
-        -- player axis at all: a Prowling Serpopard SPELL is uncounterable with
-        -- NO Serpopard on the battlefield, which no CR 613.11 effect could
-        -- explain.
-        Spec.it s "CR 113.6g a Prowling Serpopard spell can't be countered with none on the battlefield"
-          . withVictim "Prowling Serpopard"
-          $ \board cat _ -> do
-            let (victimId, _, cancelId, _, _, gs) = board []
-            Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace cat)) Counterability.CantBeCountered
-            Spec.assertEqWith s "and the spell is still on the stack" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
 
 -- Jared Carthalion, True Heir {R}{G}{W} Legendary Creature -- Human Warrior 3/3
 -- (Commander Legends, 281): "When Jared Carthalion enters, target opponent
@@ -2245,7 +2114,7 @@ destroyedAndSettled oid gs =
 -- granting one, which the layer fold appends to the receiver's own (CR 613.1f,
 -- 113.7). Ornithopter is the historic permanent, cast from the graveyard and
 -- from the hand on the same board.
-eighthDoctorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+eighthDoctorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 eighthDoctorSpec s registry =
   let board doctor = do
         forest <- S.printingOf s registry "Forest"
@@ -2267,24 +2136,6 @@ eighthDoctorSpec s registry =
               Spec.assertEqWith s "while the one cast from the hand went to the graveyard" (namesIn Zone.Exile S.alice fromHand) []
               Spec.assertBool s (elem "Ornithopter" (namesIn Zone.Graveyard S.alice fromHand)) "and is in alice's graveyard"
             _ -> Spec.assertFailure s "expected both Ornithopters to resolve"
-
-        -- THE PROJECTION TRIPWIRE: a Clone of The Eighth Doctor grants the same
-        -- quoted ability, read off its copiable values rather than the printed
-        -- Clone.
-        Spec.it s "CR 707.2 a Clone of The Eighth Doctor grants the quoted replacement" $ do
-          doctor <- S.printingOf s registry "The Eighth Doctor"
-          clone <- S.printingOf s registry "Clone"
-          b0 <- board Nothing
-          let withBobs = snd (S.addPermanent doctor S.bob (pbState b0))
-              (_, staged) = S.spellOnStack clone S.alice withBobs
-              copying p = case p of
-                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
-                _ -> S.identityAnswer p
-              copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-              ready = copied {GameState.priority = Just S.alice, GameState.passed = Set.empty}
-          case castAndDestroyed (pbBuried b0) ready of
-            Just after -> Spec.assertEqWith s "the Ornithopter was exiled as it was destroyed" (namesIn Zone.Exile S.alice after) ["Ornithopter"]
-            Nothing -> Spec.assertFailure s "expected the Ornithopter to arrive under the Clone's permission"
 
 -- Serra Paragon {2}{W}{W} Creature -- Angel 3/4: "Flying / Once during each of
 -- your turns, you may play a land from your graveyard or cast a permanent spell
@@ -2419,29 +2270,6 @@ serraParagonSpec s registry =
               Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
               Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
             (arrived, _) -> Spec.assertFailure s ("expected one arrival and a Paragon, got " <> show arrived)
-
-        -- THE PROJECTION TRIPWIRE: alice's Serra Paragon is a Clone (CR 707.2),
-        -- and the printed Paragon on the board is bob's. The permission and the
-        -- rider both come off the copiable values; a read of the printed card
-        -- answers "Clone" and offers nothing.
-        Spec.it s "CR 707.2 a Clone of Serra Paragon grants the permission and the rider" $ do
-          b <- board "Llanowar Elves" "Forest" False
-          paragon <- S.printingOf s registry "Serra Paragon"
-          clone <- S.printingOf s registry "Clone"
-          let (_, withBobs) = S.addPermanent paragon S.bob (pbState b)
-              (_, staged) = S.spellOnStack clone S.alice withBobs
-              copying p = case p of
-                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
-                _ -> S.identityAnswer p
-              copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-              ready = copied {GameState.priority = Just S.alice, GameState.passed = Set.empty}
-              cast = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) ready Engine.priorityLoop
-          case arrivedBetween ready cast of
-            [permanent] -> do
-              let after = diesAndResolves permanent cast
-              Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
-              Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice ready))
-            arrived -> Spec.assertFailure s ("expected the Elves to arrive under the Clone's permission, got " <> show arrived)
 
         -- CR 702.138a: Loathsome Chimera {2}{G} escapes for {4}{G} and three
         -- other graveyard cards, a permission of its own. Paid for its escape

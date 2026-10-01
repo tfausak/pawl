@@ -1477,8 +1477,8 @@ dealCombatDamage = do
 -- ONE Pawl.Types.EventGroup for the whole wave's damage, which is CR 510.2 in
 -- as many words: "all combat damage that's been assigned is dealt
 -- simultaneously". CR 603.2c's batch conditions are what a board can read that
--- with -- TriggerCondition.PermanentsDealCombatDamageToPlayer fires once for the
--- step where its per-damager twin fires once per event, and Pawl.Engine.Event's
+-- with -- TriggerCondition.PermanentsDealCombatDamageToPlayer fires once per
+-- damaged player of the step where its per-damager twin fires once per event, and Pawl.Engine.Event's
 -- batchScoped is that fork. The life loss and counter removals processDamage
 -- records ride inside the bracket too: CR 120.3's results of the damage,
 -- simultaneous with it. Lifelink's gains do NOT: CR 702.15e makes each source's

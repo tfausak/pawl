@@ -1,0 +1,28 @@
+{
+  "description": "CR 603.3d/701.3a whole cards: Sigarda's Aid equips the Piker it can target and nothing at all when the only creature has shroud",
+  "note": "The shroud twin: alice's only creature is a Blurred Mongoose, a creature she controls that cannot be targeted (CR 702.18a). CR 603.3d removes the trigger from the stack, so no target or may is ever asked and the Bonesplitter enters unattached, the Mongoose staying a 2/1. Either prompt would fail this run unscheduled.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Sigarda's Aid" },
+          { "card": "Blurred Mongoose", "label": "mongoose" }
+        ],
+        "hand": [{ "card": "Bonesplitter", "label": "splitter" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@mongoose", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@splitter", "mana": ["@plains"] } } }
+  ],
+  "final": [
+    { "PowerToughness": { "object": "@mongoose", "power": 2, "toughness": 1 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bonesplitter", "count": 1 } }
+  ]
+}

@@ -55,7 +55,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -238,22 +237,6 @@ oneShotSpec s registry = Spec.describe s "OneShot" $ do
         aliceOnce = untapStep stolen
     Spec.assertBool s (Game.isTapped giantId aliceOnce) "still tapped after alice's first untap step"
     Spec.assertBool s (not (Game.isTapped giantId (untapStep aliceOnce))) "and untapped by her next"
-  -- The card's second sentence, on one board with and without the spell: cast in
-  -- the combat damage step at alice's own unblocked attacker.
-  Spec.it s "CR 615.1a whole card: Telekinesis at an attacking Hill Giant prevents the combat damage it would deal" $ do
-    island <- S.printingOf s registry "Island"
-    telekinesis <- S.printingOf s registry "Telekinesis"
-    giant <- S.printingOf s registry "Hill Giant"
-    let (g0, mine, _) = S.combatBoardOf [giant] []
-        (g1, spellId) = S.handOne telekinesis (S.landsFor island S.alice 2 g0)
-        -- handOne moves to a main phase; the combat board's step is put back.
-        atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer g1 {GameState.phase = GameState.phase g0}
-    case mine of
-      [giantId] -> do
-        let shielded = S.runPure (aimAtCreature giantId) atDamage (S.cast S.alice spellId >> Stack.resolveTop)
-        Spec.assertEqWith s "bob took none of the Giant's 3" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer shielded)) (Just 20)
-        Spec.assertEqWith s "and all 3 without Telekinesis" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer atDamage)) (Just 17)
-      _ -> Spec.assertFailure s "fixture should give alice one Hill Giant"
   -- CR 701.43b: the prohibition expires during the very untap step it applies in.
   -- The Piker is still tapped going into the second step -- nothing re-tapped it
   -- -- so a second step untapping it is the count having run out and not a

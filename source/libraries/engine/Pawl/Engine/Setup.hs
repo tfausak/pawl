@@ -1378,6 +1378,8 @@ applyCrossings finalSub parent =
                 (Game.attachments oid g)
                 (Object.chosenNames obj)
                 (Object.chosenPlayer obj)
+                (Object.chosenColor obj)
+                (Object.chosenSubtype obj)
                 -- CR 508.1k, the sibling read of the same record.
                 (Game.isAttacking oid g)
                 (Game.attackTargetOf oid g)

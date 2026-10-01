@@ -1,0 +1,38 @@
+{
+  "description": "CR 702.190b the sneaked Splinter arrives tapped and attacking whatever the Piker it returned was attacking",
+  "note": "Splinter, Hamato Yoshi cast for its sneak {B} in alice's declare blockers step returns the unblocked Piker, which was declared at bob's Jace, and enters tapped and attacking Jace. Nobody is asked where it attacks (CR 508.4): a prompt here would fail the run. Jace gives the Piker two things to attack, since a lone defending player would make the readings agree; the -bob file declares it at bob.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" }
+        ],
+        "hand": [{ "card": "Splinter, Hamato Yoshi", "label": "splinter" }],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Jace Beleren", "label": "jace", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@piker", "do": { "ChooseAttackTarget": "@jace" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@piker": "@jace" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@splinter", "mana": ["@swamp", null] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "Splinter, Hamato Yoshi": "@jace" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Splinter, Hamato Yoshi", "tapped": true } } }
+  ]
+}

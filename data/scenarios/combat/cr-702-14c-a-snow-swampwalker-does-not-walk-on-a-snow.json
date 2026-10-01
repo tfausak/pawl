@@ -1,0 +1,26 @@
+{
+  "description": "CR 702.14c a snow swampwalker does NOT walk on a Snow-Covered Mountain",
+  "note": "Legions of Lim-Dûl has snow swampwalk. bob's Snow-Covered Mountain is snow and no Swamp, so the subtype conjunct fails and the Piker's block stands; it closes an implementation that read only the supertype.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Legions of Lim-Dûl", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true },
+          { "card": "Snow-Covered Mountain", "label": "land" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@blocker"] } } }
+  ]
+}

@@ -1289,52 +1289,6 @@ permanentDiesSpec s registry =
           Spec.assertEqWith s "the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
           Spec.assertEqWith s "and alice has exactly one experience counter" (experienceOf S.alice after) 1
           Spec.assertEqWith s "bob has none" (experienceOf S.bob after) 0
-        -- CR 603.10a's own Example, played out: "Two creatures are on the
-        -- battlefield along with an artifact that has the ability 'Whenever a
-        -- creature dies, you gain 1 life.' Someone casts a spell that destroys
-        -- all artifacts, creatures, and enchantments. The artifact's ability
-        -- triggers twice, EVEN THOUGH THE ARTIFACT GOES TO ITS OWNER'S
-        -- GRAVEYARD AT THE SAME TIME AS THE CREATURES." Meren is that artifact
-        -- and the Piker is one of those creatures: CR 704.3 / CR 608.2f make
-        -- Day of Judgment's two deaths ONE event, so the look-back reads a board
-        -- on which Meren and the Piker were both still there.
-        --
-        -- BOTH ID ORDERS, which is the whole point rather than belt and braces:
-        -- the two boards differ in nothing a rule can see, so an engine that
-        -- answered by the order the ids were minted in would answer them
-        -- differently. The Meren-first board is the one that used to answer 0.
-        --
-        -- Exactly ONE counter, not two: Meren's own death is excluded by the
-        -- printed "another" (the falsifier below), so the count discriminates
-        -- between seeing her group-mate and seeing her whole group.
-        Spec.it s "CR 603.10a Meren sees the Piker that died alongside her, in either id order" $ do
-          plains <- S.printingOf s registry "Plains"
-          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
-          piker <- S.printingOf s registry "Goblin Piker"
-          dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-          let -- The two boards, differing only in which of the two creatures was
-              -- minted first and so which one Event.destroyIn reaches first.
-              board merenFirst =
-                let base = Setup.emptyGame S.bothPlayers
-                 in if merenFirst
-                      then snd (S.addPermanent piker S.alice (snd (S.addPermanent meren S.alice base)))
-                      else snd (S.addPermanent meren S.alice (snd (S.addPermanent piker S.alice base)))
-              run merenFirst =
-                let withLands = List.foldl' (\gs _ -> snd (S.addPermanent plains S.alice gs)) (board merenFirst) [1 :: Int .. 4]
-                    (withSpell, spell) = S.handOne dayOfJudgment withLands
-                    afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
-                    swept = S.runPure S.identityAnswer afterCast Stack.resolveTop
-                    settled = S.runPure S.identityAnswer swept Engine.settleForPriority
-                 in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
-              (merenFirstSettled, merenFirstAfter) = run True
-              (pikerFirstSettled, pikerFirstAfter) = run False
-              creaturesLeft gs = Set.size (Set.filter (`Projection.isCreatureOf` gs) (GameState.battlefield gs))
-          Spec.assertEqWith s "the sweep left no creatures either way" (fmap creaturesLeft [merenFirstSettled, pikerFirstSettled]) [0, 0]
-          Spec.assertEqWith s "one trigger reached the stack with Meren minted first" (length (GameState.stack merenFirstSettled)) 1
-          Spec.assertEqWith s "and one with the Piker minted first" (length (GameState.stack pikerFirstSettled)) 1
-          Spec.assertEqWith s "alice has exactly one experience counter with Meren minted first" (experienceOf S.alice merenFirstAfter) 1
-          Spec.assertEqWith s "and exactly one with the Piker minted first" (experienceOf S.alice pikerFirstAfter) 1
-          Spec.assertEqWith s "bob has none either way" (fmap (experienceOf S.bob) [merenFirstAfter, pikerFirstAfter]) [0, 0]
         -- The control that keeps the case above from being answered by simply
         -- admitting everything in the batch. Three groups, ONE batch: alice's
         -- Salt Road Skirmish destroys her own Meren (CR 701.8), then creates two
@@ -2856,7 +2810,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDealsDamageToCreature,
     TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
-    TriggerCondition.PermanentsDealCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer (Filter.Type.And []) PlayerRelation.AnyPlayer),
+    TriggerCondition.PermanentsDealCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer (Filter.Type.And []) PlayerRelation.AnyPlayer False),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.CreaturesDealtCombatDamageToInitiative,
     TriggerCondition.PlayerTookInitiative,

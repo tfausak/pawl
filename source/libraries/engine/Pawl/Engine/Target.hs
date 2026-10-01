@@ -481,16 +481,15 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- and a slot's own filter is judged against a candidate rather than
             -- against an aiming object -- so no atom here wants the aimer.
             Filter.aimingController = Nothing,
-            -- Nothing, for the reason one field up: CR 607.2d links the chosen
-            -- colour to the affected clause printed beside the choice, and a
-            -- target slot's filter is not one -- so HasChosenColor is vacuously
-            -- False here (#3449).
-            Filter.sourceChosenColor = Nothing,
-            -- Nothing, for the reason one field up: an affected set and a CR
-            -- 106.6 restriction are the two positions that carry a chosen subtype,
-            -- and a target slot is neither -- so HasChosenSubtype is vacuously
-            -- False here (#3449).
-            Filter.sourceChosenSubtype = Nothing
+            -- CR 607.2d links the source's "choose a color" to every ability
+            -- printed on it that names "the chosen color", a target slot's
+            -- filter included (Pentarch Paladin). Read through CR 608.2h's last
+            -- known information, since CR 608.2b re-asks the slot after the
+            -- source may have left (Pawl.TargetSpec's Pentarch Paladin group).
+            -- A THUNK, like its siblings.
+            Filter.sourceChosenColor = Game.chosenColorWithLastKnown source gs,
+            -- The field above's sibling for "the chosen type" (From the Rubble).
+            Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated

@@ -394,6 +394,7 @@ import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.MovedBetweenSpec
 import qualified Pawl.Codec.MovedKindsSpec
 import qualified Pawl.Codec.MovedSpec
+import qualified Pawl.Codec.NamesAreSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
 import qualified Pawl.Codec.ObjectSnapshotSpec
@@ -1365,6 +1366,7 @@ spec s registry = do
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SubtypesAreSpec.spec s
+  Pawl.Codec.NamesAreSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.SuspendCountersSpec.spec s
   Pawl.Codec.SuspendSpec.spec s
@@ -1442,6 +1444,10 @@ spec s registry = do
   Pawl.CopySpec.ivySpec s registry
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.zadaSpec s registry
+  Pawl.CopySpec.radiateSpec s registry
+  Pawl.CopySpec.radiatePerspectiveSpec s registry
+  Pawl.CopySpec.precursorGolemSpec s registry
+  Pawl.CopySpec.precursorGolemSeatSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry
   Pawl.CopySpec.flamerushRiderSpec s registry
   Pawl.CopySpec.castCopySpec s registry

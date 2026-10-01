@@ -1,0 +1,35 @@
+{
+  "description": "CR 725.2 a trampler that trades with its blocker still steals the crown",
+  "note": "CR 603.10: the crown steal looks back at the objects that existed immediately after the damage, and the CR 704.5g destruction of a trampler its blocker traded with comes later. alice's War Mammoth (3/3 trample) attacks bob, the monarch, and his Boggart Brute (3/2) blocks: the Mammoth assigns the Brute its lethal 2 and tramples 1 through, and the Brute kills it in the same step. Its dead controller still takes the crown. carol never joins. Checked in the postcombat main phase, which no step reaches with the steal still on the stack; the Haskell test's logged BecameMonarch event is the crown moving from bob to alice.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "monarch": "bob",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "War Mammoth", "label": "mammoth", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Boggart Brute", "label": "brute", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Monarch": { "player": "bob" } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@mammoth"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@mammoth", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@brute": ["@mammoth"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@mammoth", "do": { "AssignDamage": { "@brute": 2, "@bob": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Monarch": { "player": "alice" } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "War Mammoth", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Boggart Brute", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

@@ -2690,33 +2690,44 @@ stackTargetSlots obj oid gs =
 -- rule rather than a shortcut: every one of the copy's targets must be the same
 -- object, and one object cannot fill two instances of "target" in one slot.
 --
--- Legality is measured against the ORIGINAL, which is what "it could target"
--- names -- the copy does not exist yet -- and from the copying effect's
--- controller's seat, whose copy it will be. Rule 707.10c's own derivation, with
--- the same seed: the slots being written are dropped from the environment, so a
--- sibling read is not answered off the target it is about to replace.
-copyRetargets :: PlayerId -> ObjectId -> GameState -> [ObjectId] -> [(ObjectId, Map.Map SlotName (Set Recipient))]
-copyRetargets controller original gs candidates = Maybe.fromMaybe [] $ do
+-- Legality is measured against the ORIGINAL -- the copy does not exist yet --
+-- and from `perspective`'s seat, which each caller names. Rule 707.10c's own
+-- derivation, with the same seed: the slots being written are dropped from the
+-- environment, so a sibling read is not answered off the target it is about to
+-- replace.
+--
+-- A candidate is a player or an object (CR 115.1), matched against the offered
+-- recipients by referent, since the pool that offers a permanent tags it
+-- (Recipient.ToCreature) where the ref that named it did not.
+--
+-- Not implemented: an original that has left the stack, which CR 608.2h reads
+-- through last known information. Nothing is answered for it (#4568).
+copyRetargets :: PlayerId -> ObjectId -> GameState -> [Recipient] -> [(Recipient, Map.Map SlotName (Set Recipient))]
+copyRetargets perspective original gs candidates = Maybe.fromMaybe [] $ do
   obj <- Game.lookupObject original gs
   let slots = stackTargetSlots obj original gs
       current = targetsOnStack original gs
       seed = Map.withoutKeys (Object.bindings obj) (Map.keysSet slots)
-      fresh = Target.legalSets (Just controller) False seed original slots gs
-      takes oid slot = Set.filter ((== Just oid) . Recipient.objectOf) (Map.findWithDefault Set.empty slot fresh)
-      pick oid =
-        let chosen = Map.mapWithKey (\slot _ -> takes oid slot) current
+      fresh = Target.legalSets (Just perspective) False seed original slots gs
+      takes candidate slot = Set.filter (Recipient.sameReferent candidate) (Map.findWithDefault Set.empty slot fresh)
+      pick candidate =
+        let chosen = Map.mapWithKey (\slot _ -> takes candidate slot) current
          in if not (Map.null current)
               && and (Map.elems (Map.map ((== 1) . Set.size) current))
               && and (Map.elems (Map.map ((== 1) . Set.size) chosen))
-              && Target.jointlyCoherent (Just controller) seed original slots chosen gs
-              then Just (oid, chosen)
+              && Target.jointlyCoherent (Just perspective) seed original slots chosen gs
+              then Just (candidate, chosen)
               else Nothing
   pure (Maybe.mapMaybe pick candidates)
 
--- CR 707.10e: ONE copy, every one of whose targets is the object the effect
--- names. Answers the empty list where "the copy isn't created", so the copy does
--- not exist rather than existing and being countered for an illegal target (CR
--- 608.2b).
+-- CR 707.10e: ONE copy, every one of whose targets is the player or object the
+-- effect names. Answers the empty list where "the copy isn't created", so the
+-- copy does not exist rather than existing and being countered for an illegal
+-- target (CR 608.2b).
+--
+-- A PLAYER named here is a regression fence rather than a proven line: Zevlor,
+-- Elturel Exile is its producer (#4563), and Ivy, Gleeful Spellthief names an
+-- object.
 --
 -- A ref naming anything but exactly ONE object also answers the empty list: rule
 -- 707.10e specifies "a new target", singular, so a ref that swept several has
@@ -2726,11 +2737,15 @@ copyRetargets controller original gs candidates = Maybe.fromMaybe [] $ do
 --
 -- No prompt of any kind: rule 707.10d's order is a choice among several copies,
 -- and there is only ever one here.
-copyStatedTargets :: PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
-copyStatedTargets controller resolving source legal original newRef = do
+--
+-- TWO SEATS: the ref is the effect's text, read from `controller`, and rule
+-- 707.10e's "legal target" is the copy's, judged from `copier`, its controller.
+-- A REGRESSION FENCE: Ivy's copier is the effect's controller.
+copyStatedTargets :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
+copyStatedTargets controller copier resolving source legal original newRef = do
   gs <- State.get
-  pure $ case objectRefObjects legal resolving controller source gs newRef of
-    [new] -> fmap snd (copyRetargets controller original gs [new])
+  pure $ case objectRefRecipients legal resolving controller source gs newRef of
+    [new] -> fmap snd (copyRetargets copier original gs [new])
     _ -> []
 
 -- The objects an Effect.CopyStackObject names: objectRefObjects' live answer,
@@ -2769,21 +2784,39 @@ copyStackSubjects legal resolving controller source gs ref =
 -- CR 707.10d: the copies' targets, one map per candidate, in the order their
 -- controller chose. Answers the empty list where nothing is copied at all.
 --
--- The candidates are the card's own description ("each other creature you
--- control"), narrowed by the rule's "could target" -- copyRetargets above, whose
--- test rule 707.10e shares.
+-- The candidates are the card's own description, every ref's players and
+-- objects together (Radiate's "each other permanent or player"), narrowed by the
+-- rule's "could target" -- copyRetargets above, whose test rule 707.10e shares.
+--
+-- Less what the original already targets, which is the printed "OTHER": every
+-- hit for Scryfall o:"could target" (2026-10-01) that copies per candidate reads
+-- "for each other ...", and each gates on an original with a single target, so
+-- "other" is that target. A printing without the "other" would refute this.
+-- Precursor Golem's "each other Golem" is where that target is not the source.
 --
 -- The ORDER is the whole of what CR 707.10d leaves to a player, and
 -- Prompt.OrderForEach is the question; the rule states no primary key, so the
 -- one prompt covers the whole list rather than forEachOrder's APNAP groups.
 -- Elided for fewer than two, which is one order.
-copyForEachTargets :: PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
-copyForEachTargets controller resolving source legal original candidateRef = do
+--
+-- THREE SEATS. `controller` reads the effect's own text ("each other creature
+-- YOU control" is Zada's controller). `copier` controls the copies (CR 707.10),
+-- so orders them: Precursor Golem's ruling, "That player chooses the order". And
+-- "could target" is the ORIGINAL's, judged from ITS controller (CR 109.5):
+-- Ink-Treader Nephilim's ruling has a copy aimed where only the caster's "an
+-- opponent" reached, and countered for it on resolution (CR 608.2b).
+-- Pawl.CopySpec's Precursor Golem and Radiate groups prove all three.
+copyForEachTargets :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> NonEmpty.NonEmpty ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
+copyForEachTargets controller copier resolving source legal original candidateRefs = do
   gs <- State.get
-  let picks = copyRetargets controller original gs (objectRefObjects legal resolving controller source gs candidateRef)
+  let caster = fmap (\obj -> Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf original gs)) (Game.lookupObject original gs)
+      targeted = Foldable.fold (targetsOnStack original gs)
+      other candidate = not (any (Recipient.sameReferent candidate) targeted)
+      candidates = ListUtils.nubOrd (concatMap (filter other . objectRefRecipients legal resolving controller source gs) candidateRefs)
+      picks = foldMap (\seat -> copyRetargets seat original gs candidates) caster
   ordered <- case picks of
     _ : _ : _ -> do
-      answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor controller gs) controller resolving (fmap (Recipient.ToObject . fst) picks))
+      answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor copier gs) copier resolving (fmap fst picks))
       pure (Game.permute picks answer)
     _ -> pure picks
   pure (fmap snd ordered)
@@ -2876,7 +2909,14 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- own road seeds no target either (Pawl.Engine.Cast.castProposed). The
         -- second pass below is what relates one re-chosen slot to another.
         seed = Map.withoutKeys (Object.bindings copy) (Map.keysSet slots)
-        fresh = Target.legalSets (Just controller) False seed copyId slots gs
+        -- CR 113.7: what the slots are judged against is the ability's SOURCE
+        -- -- the object CR 113.7a's source reads (power, owner, CR 607.2d's
+        -- chosen colour) are asked of -- and a copied ability keeps its
+        -- original's source (Game.abilitySourceOf). A spell copy is its own
+        -- source. Pawl.TargetSpec's "a Lithoform Engine copy of the Paladin's
+        -- ability" is the proof.
+        aimer = Maybe.fromMaybe copyId (Game.abilitySourceOf copyId gs)
+        fresh = Target.legalSets (Just controller) False seed aimer slots gs
         -- CR 406.4: what this player may not name specifically is offered as
         -- the pile it sits in, exactly as at CR 601.2c. The targets already
         -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
@@ -2915,9 +2955,9 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- target already illegal stands, one legal before must stay legal.
         -- Pawl.TargetSpec's Bioshift cases prove both halves.
         let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
-            already = Target.jointlyIllegal (Just controller) seed copyId slots current gs
+            already = Target.jointlyIllegal (Just controller) seed aimer slots current gs
             caused slot refused = not (Set.isSubsetOf refused (Map.findWithDefault Set.empty slot already))
-            coherent = not (or (Map.mapWithKey caused (Target.jointlyIllegal (Just controller) seed copyId slots drawn gs)))
+            coherent = not (or (Map.mapWithKey caused (Target.jointlyIllegal (Just controller) seed aimer slots drawn gs)))
         Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && coherent) $ do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients (Map.filter (not . Set.null) drawn)) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
@@ -7083,8 +7123,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           plan <- case targets of
             CopyTargets.Copied -> pure [Map.empty]
             CopyTargets.ChosenByController -> pure [Map.empty]
-            CopyTargets.ForEach candidateRef -> copyForEachTargets controller resolving source legal original candidateRef
-            CopyTargets.Stated newRef -> copyStatedTargets controller resolving source legal original newRef
+            CopyTargets.ForEach candidateRefs -> copyForEachTargets controller copier resolving source legal original candidateRefs
+            CopyTargets.Stated newRef -> copyStatedTargets controller copier resolving source legal original newRef
           Monad.forM_ plan $ \retarget -> do
             gsNow <- State.get
             let (copyId, gs1) = Game.freshObjectId gsNow
@@ -10501,11 +10541,19 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
       Nothing -> pure ()
       Just selection -> Monad.mapM_ (applyEffect source source controller bound bound) (Modal.modesEffects selection modal)
 
--- CR 405.6c: run the non-mana effects of a mana ability, once
--- Pawl.Engine.Cost.tapForManaWith has added the mana.
+-- CR 405.6c: run some non-mana effects of a mana ability, as
+-- Pawl.Engine.Cost.tapForManaWith reaches them in printed order.
 --
 -- CR 605.3b gives the ability no stack object, so the SOURCE stands in for the
 -- resolving one, performHandAction's posture.
+--
+-- CR 608.2c / 608.2d: what one effect binds, a later one reads -- Spectral
+-- Searchlight's "Choose a player. That player adds". The ability has no object
+-- to hold its slots, so they are threaded: each effect reads the slots handed in
+-- and the ones its predecessors bound, and the answer is all of them. What an
+-- effect binds lands on the SOURCE (it is the resolving id here), so each slot
+-- the effect defines (boundSlots) is cleared there first and read back after:
+-- a slot an earlier activation left behind is never mistaken for this one's.
 --
 -- Not implemented: an object of the ability's own to carry slots the bindings
 -- below do not. A slot read that misses them falls through to the source
@@ -10514,26 +10562,32 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
 -- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
 -- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
 -- data/cards/ reads (#3124).
-performManaAbilityEffects :: ObjectId -> PlayerId -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game ()
+performManaAbilityEffects :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game (Map.Map SlotName (Set Recipient))
 performManaAbilityEffects source controller =
   let manaAbilityBindings =
         Map.fromList
           [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
             (Binding.you, Set.singleton (Recipient.ToPlayer controller))
           ]
-   in Monad.mapM_
-        ( applyEffect
-            source
-            source
-            controller
+      holderBindings gs = case Game.lookupObject source gs of
+        Just obj -> Object.bindings obj
+        Nothing -> Map.findWithDefault Map.empty source (GameState.detachedBindings gs)
+      run bound effect = do
+        let defined = boundSlots effect
             -- CR 109.5's "you" is the player who activated the ability, and the
             -- reserved self slot is CR 113.7's source. Both are bound here rather
             -- than read off an object, because there is no ability object carrying
             -- them: Pawl.Engine.Activate.activateAbility stamps them for every
             -- ability that does go on the stack.
-            manaAbilityBindings
-            manaAbilityBindings
-        )
+            env = Map.union bound manaAbilityBindings
+        State.modify' $ \gs ->
+          (overHolderBindings source (`Map.withoutKeys` defined) gs)
+            { GameState.detachedBindings = Map.adjust (`Map.withoutKeys` defined) source (GameState.detachedBindings gs)
+            }
+        applyEffect source source controller env env effect
+        after <- State.get
+        pure (Map.union (Map.restrictKeys (Binding.targetsOf (holderBindings after)) defined) bound)
+   in Monad.foldM run
 
 -- Activate an ability inside throwDice's window and resolve it at once,
 -- answering whether it was paid for. The payment is Pawl.Engine.Activate's

@@ -1,0 +1,83 @@
+{
+  "description": "CR 615.1a whole card: Telekinesis at an attacking Hill Giant prevents the combat damage it would deal",
+  "note": "CR 615.1a: Telekinesis' second sentence prevents all combat damage alice's own unblocked Hill Giant would deal, so bob takes none of its 3. The fixture casts it as the combat damage step begins; played for real, the last window before damage is the declare blockers step. The file without the spell is the pair.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "giant",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island1"
+          },
+          {
+            "card": "Island",
+            "label": "island2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Telekinesis",
+            "label": "telekinesis"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "@giant"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@telekinesis",
+          "targets": [
+            "@giant"
+          ],
+          "mana": [
+            "@island1",
+            "@island2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 20
+        }
+      }
+    }
+  ]
+}

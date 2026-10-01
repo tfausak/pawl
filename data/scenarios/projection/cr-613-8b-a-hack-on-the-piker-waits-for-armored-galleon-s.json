@@ -1,0 +1,40 @@
+{
+  "description": "CR 613.8b a Hack on the Piker waits for Armored Galleon's restriction",
+  "note": "CR 613.8b: a Magical Hack (Island to Swamp) on the Piker finds no Island in its own empty text, so it depends on Exchange of Words, which moves Armored Galleon's \"can't attack unless defending player controls an Island\" onto the Piker; the Hack applies after it, and the Piker's restriction asks for a Swamp. bob controls a Swamp, so the Piker may attack, and the Galleon, holding the Piker's empty text, attacks beside it. The Island board is the pair.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Armored Galleon", "label": "galleon", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" },
+          { "card": "Island", "label": "island3" },
+          { "card": "Island", "label": "island4" }
+        ],
+        "hand": [
+          { "card": "Magical Hack", "label": "hack" },
+          { "card": "Exchange of Words", "label": "exchange" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Swamp" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@piker"], "mana": ["@island1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@exchange", "mana": ["@island2", "@island3", "@island4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Exchange of Words", "do": { "ChooseTargets": { "creatures": ["@galleon", "@piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@galleon", "@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@galleon": "@bob", "@piker": "@bob" } } } }
+  ]
+}

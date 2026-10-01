@@ -1,0 +1,36 @@
+{
+  "description": "CR 506.4 a stolen BLOCKER is removed from combat, and CR 509.1h leaves the attacker blocked",
+  "note": "After blocks, alice casts Ray of Command on bob's blocking Piker. CR 506.4 drops it from the attacker's blocker set while the attacker stays blocked (CR 509.1h), so CR 510.1c gives it no combat damage to assign: neither Piker is dealt damage and bob takes nothing. The control file is the same board and blocks with no cast, where the Pikers trade.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" }
+        ],
+        "hand": [{ "card": "Ray of Command", "label": "ray" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "blocker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@ray", "targets": ["@blocker"], "mana": ["@i1", "@i2", "@i3", "@i4"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 2 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@attacker", "damage": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@blocker", "damage": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": [] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "description": "CR 508.1 every attacker attacks the CHOSEN defending player",
+  "note": "Three seats under CR 507.1's single defending player: alice chooses carol, deliberately not the first candidate, so a declaration that fell back to the head of the list would send both Pikers at bob.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "attackOption": null,
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "one", "ready": true },
+          { "card": "Goblin Piker", "label": "two", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bob piker", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "label": "carol piker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "ChooseDefender": "carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@one", "@two"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@one": "@carol", "@two": "@carol" } } } }
+  ]
+}

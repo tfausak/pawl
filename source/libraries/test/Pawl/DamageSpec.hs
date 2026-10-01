@@ -874,6 +874,9 @@ lastKnownRiderSpec s registry =
                     LastKnown.chosenNames = Set.empty,
                     -- CR 614.1c: nothing here chose a player.
                     LastKnown.chosenPlayer = Nothing,
+                    -- CR 614.1c: nor a colour or a subtype.
+                    LastKnown.chosenColor = Nothing,
+                    LastKnown.chosenSubtype = Nothing,
                     -- CR 508.1k / 509.1g: this board declares no combat at all.
                     LastKnown.attacking = False,
                     LastKnown.attackTarget = Nothing,
@@ -3019,48 +3022,14 @@ preyBoard s registry = do
 -- combat damage, and this module owns the damage funnel.
 fightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
-  -- CR 701.14b: "if one or both creatures instructed to fight are no longer on
-  -- the battlefield or are no longer creatures, NEITHER of them fights or deals
-  -- damage. If one or both creatures are illegal targets ... neither of them
-  -- fights or deals damage."
-  --
-  -- THE PAIR with the case above, differing in one thing: bob takes control of
-  -- the Piker (CR 108.4) after Prey Upon is on the stack, so the "mine" slot's
-  -- target is illegal -- no longer a creature alice controls -- while the Piker
-  -- itself is still on the battlefield and still a creature.
-  --
-  -- What this leg can and cannot separate. Prey Upon TARGETS both fighters, so CR
-  -- 608.2b removes the Piker from the slot map in BOTH roles, and 701.14b's first
-  -- sentence (gone from the battlefield, no longer a creature) is not
-  -- independently observable off this card -- an implementation that dropped
-  -- those two conjuncts would answer the same here. What it does separate is the
-  -- PAIR shape: an implementation that fell back to the remaining fighter leaves
-  -- the Giant fighting itself and marks 3 on it.
-  --
-  -- Prey Upon still has its other target, so CR 608.2b lets it resolve rather
-  -- than countering it -- the graveyard assertion is what pins that, and without
-  -- it this case would pass for a spell that never resolved at all.
-  Spec.it s "CR 701.14b one illegal target and NEITHER creature deals damage" $ do
-    (before, spell, mine, theirs) <- preyBoard s registry
-    let cast = S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell)
-        stolen = S.giveControl mine S.bob cast
-        after = S.settleSba (S.runPure S.identityAnswer stolen Stack.resolveTop)
-    Spec.assertEqWith s "CR 701.14b the Giant dealt nothing to the Piker" (S.damageOf mine after) (Just 0)
-    Spec.assertBool s (S.onBattlefield mine after) "CR 701.14b so the Piker lived"
-    -- The discriminator: an implementation that let the remaining fighter swing
-    -- anyway marks the Giant's own 3 on the Giant.
-    Spec.assertEqWith s "CR 701.14b and the Piker dealt nothing to the Giant" (S.damageOf theirs after) (Just 0)
-    -- CR 608.2b: it RESOLVED, and was not countered for want of targets.
-    Spec.assertEqWith s "the spell resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-    Spec.assertEqWith s "and left the stack" (length (GameState.stack after)) 0
-
   -- CR 701.14d: "the damage dealt when a creature fights ISN'T COMBAT DAMAGE."
   --
   -- Read through a Fog-shaped shield -- CR 615.1's prevention, scoped to
   -- DamageKind.Combat and to no recipient in particular -- so the rule is a
   -- board on which combat damage cannot land and the fight's damage does anyway.
-  -- THE PAIR with the first case, differing only in that shield: every number
-  -- below is the same one that case asserts.
+  -- THE PAIR with cr-701-14b-one-illegal-target-and-neither-creature-deals.json,
+  -- differing only in that shield: every number below is the same one it
+  -- asserts.
   Spec.it s "CR 701.14d fight damage is not combat damage, so a combat-only prevention misses it" $ do
     (base, spell, mine, theirs) <- preyBoard s registry
     let shield =

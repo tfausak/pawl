@@ -1,0 +1,47 @@
+{
+  "description": "CR 707.10 the Charlatan's copy is bob's, and bob chooses its new target",
+  "note": "Meletis Charlatan's 'the controller of target instant or sorcery spell copies it': alice activates, bob controls the copied Bolt and so the copy, and carol is where CR 707.10c lets him send it. Three seats keep the copy's controller and its new target apart. The re-target prompt goes to bob or the scenario fails, and bob sends the copy at carol: carol at 17 and bob at 20 is the copy being bob's. alice at 20 after the copy resolves is the copy resolving first; the final totals, with the Charlatan alive, stand in for the Haskell test's empty stack, since any further Bolt copy would have hit one of them.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Meletis Charlatan", "label": "charlatan", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Mountain", "label": "mountain" }],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@alice"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@charlatan", "targets": ["Lightning Bolt"], "mana": ["@island-1", "@island-2", "@island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@carol"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 17 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 17 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 17 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ],
+  "final": [
+    { "Life": { "player": "carol", "life": 17 } },
+    { "Life": { "player": "alice", "life": 17 } },
+    { "Life": { "player": "bob", "life": 20 } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Meletis Charlatan", "count": 1 } }
+  ]
+}

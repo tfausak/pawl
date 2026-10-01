@@ -44,7 +44,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   its `decision` is `Pays` or `Declines`, and paying takes a cast's choices,
   such as `mana`. `ChooseTypeSwap` answers a text change's swap (CR 612.1),
   `{ "from": { "type": "Island" }, "to": { "type": "Swamp" } }`, keyed
-  the same way. `ChooseTargets` names each slot's
+  the same way. `ChooseCopyTarget` names what an object entering as a copy
+  copies (CR 707.5), `"@bear"`, or `null` to decline its "may", keyed by
+  the entering object. `ChooseTargets` names each slot's
   targets, `{ "target": ["@moon"] }`, for a target prompt no cast or activation
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`
@@ -58,9 +60,11 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   An entry carrying `refuse` in place of `do` answers its prompt with a move
   the engine must reverse and ask for again (CR 733.1), such as an illegal
   block declaration; the move standing fails the scenario, and the prompt
-  asked again takes the next entry at that key.
-- **Checks.** `Life`, `Count` (cards of one name in one of a player's zones;
-  the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
+  asked again takes the next entry at that key. An illegal `do` is asked
+  again too, so turning a `refuse` into `do` proves nothing: a `refuse` is
+  proven by changing the board until the move is legal.
+- **Checks.** `Life`, `Count` (cards of one name in one of a player's zones,
+  `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),
   `Attackers` (every attacker and what it attacks), `Blockers` (an attacker's
   blockers, `null` when unblocked), `Defenders` (the defending players, in

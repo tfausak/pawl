@@ -58,7 +58,6 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expiry as Expiry
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -78,7 +77,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -459,24 +457,6 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- the next combat phase would inherit a stale defender.
     let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defenders = [S.carol]}}
     Spec.assertEqWith s "cleared at end of combat" (Combat.Type.defenders (GameState.combat (Combat.clearCombat busy))) []
-  Spec.it s "CR 508.1 every attacker attacks the CHOSEN defending player" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (board, mine, _, _) = S.threePlayerCombat [piker, piker] [piker] [piker]
-        -- carol, deliberately not the first candidate.
-        ready =
-          board
-            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat board) {Combat.Type.defenders = [S.carol]}
-            }
-        after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "both of alice's creatures attack" (length mine) 2
-    -- Discriminating: under the head-of-list behaviour this phase replaces,
-    -- every value here is OfPlayer bob, because bob is the first candidate.
-    Spec.assertEqWith
-      s
-      "and both attack carol"
-      (Combat.Type.attackers (GameState.combat after))
-      (Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer S.carol)) mine))
   Spec.it s "CR 508.1 with no defending player chosen, nothing attacks" $ do
     -- Discriminating against a declareAttackers that fell back to computing a
     -- defender when the field is Nothing -- which is the head-of-list
@@ -634,11 +614,6 @@ withToughnessBoost oid gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
--- CR 702.14c's "the defending player controls at least one land": bob's lands,
--- put onto an already-attacking board.
-withLands :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
-withLands = withPermanents S.bob
-
 -- Any printings at all onto `who`'s battlefield, on a board that already exists.
 -- S.addPermanent is any-printing rather than creature-only, which is how the CR
 -- 509.1a Mountain case below reaches a land.
@@ -692,65 +667,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (gs, a : _, [b, f1, f2]) ->
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (animate f2 (animate f1 gs)))) "CR 205.3m three creatures sharing only Forest: illegal"
       _ -> Spec.assertFailure s "fixture should give bob a Dryad Arbor and two Forests"
-  -- CR 601.2c / 205.3m on an ACTIVATED ability (CR 602.2b): Secret Tunnel's
-  -- "{4}, {T}: Two target creatures you control that share a creature type can't
-  -- be blocked this turn". alice has two Hill Giants and a Goblin Piker, four
-  -- Mountains, a Frogmite and the Tunnel; bob a Hill Giant to block with. The
-  -- cases name different pairs, or change a target between activation and
-  -- resolution, on the same board.
-  Spec.it s "CR 205.3m Secret Tunnel's two targets must share a creature type" $ do
-    tunnel <- S.printingOf s registry "Secret Tunnel"
-    giant <- S.printingOf s registry "Hill Giant"
-    piker <- S.printingOf s registry "Goblin Piker"
-    frogmite <- S.printingOf s registry "Frogmite"
-    mountain <- S.printingOf s registry "Mountain"
-    case (S.combatBoardOf [giant, giant, piker, frogmite] [giant], Face.activatedAbilities (S.combinedFace tunnel)) of
-      ((gs0, [giantA, giantB, pikerId, frogmiteId], [blocker]), [_, ability]) -> do
-        let (tunnelId, gs1) = S.addPermanent tunnel S.alice (S.landsFor mountain S.alice 4 gs0)
-            ready = gs1 {GameState.priority = Just S.alice}
-            aim :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-            aim firstId secondId p = case p of
-              Prompt.ChooseTargets _ _ _ asked ->
-                Map.mapWithKey
-                  ( \slot (_, offered) ->
-                      let wanted = if slot == SlotName.MkSlotName (Text.pack "first") then firstId else secondId
-                       in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
-                  )
-                  asked
-              _ -> S.identityAnswer p
-            -- Turn to Frog's layer-4 half (CR 205.1b / 613.1d), stored the way
-            -- withTrample stores its grant: the creature is a Frog and nothing else.
-            frog oid gs =
-              let (ts, gs') = Game.freshTimestamp gs
-                  eff = ContinuousEffect.MkContinuousEffect oid ts Expiry.AtCleanup (Modification.SetCreatureSubtype Subtype.Frog) (Affected.TheseObjects (Set.singleton oid))
-               in gs' {GameState.continuousEffects = eff : GameState.continuousEffects gs'}
-            activatedOn board a b = S.runPure (aim a b) board (Activate.activateAbility S.alice tunnelId ability)
-            activated = activatedOn ready
-            -- `before` changes the board before activation, `between` while the
-            -- ability waits on the stack (CR 608.2b re-checks at resolution).
-            declaredWith before between a b =
-              let resolved = S.runPure S.identityAnswer (between (activatedOn (before ready) a b)) Stack.resolveTop
-               in snd (Engine.runGamePure S.aggressiveAnswer resolved (Combat.declareAttackers S.manaPerformer S.alice))
-            declared = declaredWith id id
-            blockable board attacker = Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton attacker)) board
-            giants = declared giantA giantB
-            mixed = declared giantA pikerId
-            -- The FIRST target stops sharing a type: both targets are illegal
-            -- (the pair's condition binds each), so neither is affected.
-            frogged = declaredWith id (frog giantA) giantA giantB
-            -- A Frogged Giant and the Frogmite share Frog; the Giant then dies,
-            -- and the Frogmite still shares a type with the Giant as it last
-            -- existed (CR 608.2h), though the Giant CARD is no Frog.
-            departed = declaredWith (frog giantA) (\g -> S.runPure S.identityAnswer g (Event.changeZone giantA Zone.Graveyard)) giantA frogmiteId
-        -- THE GAMEPLAY-LEVEL ASSERTIONS first.
-        Spec.assertEqWith s "two Giants named: neither can be blocked, the Goblin can" (fmap (blockable giants) [giantA, giantB, pikerId]) [False, False, True]
-        Spec.assertEqWith s "a Giant and a Goblin named: every attacker can be blocked" (fmap (blockable mixed) [giantA, giantB, pikerId]) [True, True, True]
-        Spec.assertEqWith s "CR 608.2b the first Giant turned Frog in response: neither is unblockable" (fmap (blockable frogged) [giantA, giantB]) [True, True]
-        Spec.assertBool s (not (blockable departed frogmiteId)) "CR 608.2h the Frogmite shares Frog with the Giant as it last existed: unblockable"
-        -- CR 602.2b / 601.2e's reversal behind the second: nothing was paid.
-        Spec.assertEqWith s "the refused activation left the stack empty" (length (GameState.stack (activated giantA pikerId))) 0
-        Spec.assertEqWith s "and tapped nothing" (S.tappedCount S.alice (activated giantA pikerId)) 0
-      _ -> Spec.assertFailure s "fixture should give alice two Giants, a Goblin and a Frogmite, bob a Giant, and the Tunnel two abilities"
   -- CR 702.16k: "Such a permanent ... can't be blocked by creatures that player
   -- controls." True-Name Nemesis, whose quality is Filter.OfChosenPlayer -- the
   -- one quality that asks who an object BELONGS TO rather than what it looks
@@ -842,115 +758,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       "the skulker blocks a 3/3 and a 1/1 alike"
       (blocks hillGiant, blocks elves)
       (Just True, Just True)
-
-  Spec.it s "CR 702.14c a swampwalker is blocked normally when the defending player's land is an Island" $ do
-    -- THE FALSIFIER, and the reason
-    -- cr-702-14c-a-swampwalker-may-not-be-blocked-while-the.json cannot pass
-    -- vacuously: the same board with the wrong land. The declaration is legal AND the
-    -- block survives a real declare blockers step.
-    bogWraith <- S.printingOf s registry "Bog Wraith"
-    piker <- S.printingOf s registry "Goblin Piker"
-    island <- S.printingOf s registry "Island"
-    let (gs0, mine, theirs) = attacking [bogWraith] [piker]
-        gs = withLands [island] gs0
-    case (mine, theirs) of
-      (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
-      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
-  Spec.it s "CR 702.14c a snow swampwalker does NOT walk on an ordinary Swamp" $ do
-    -- THE DISCRIMINATOR for the supertype half. A plain Swamp satisfies the
-    -- subtype and not the supertype, so the conjunction must fail -- which is
-    -- exactly what the old bare-Subtype payload could not express, since it
-    -- would have seen a Swamp and stopped there.
-    legions <- S.printingOf s registry "Legions of Lim-Dûl"
-    piker <- S.printingOf s registry "Goblin Piker"
-    swamp <- S.printingOf s registry "Swamp"
-    let (gs0, mine, theirs) = attacking [legions] [piker]
-        gs = withLands [swamp] gs0
-    case (mine, theirs) of
-      (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
-      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
-  -- The OTHER conjunct of snow swampwalk. The pair above is satisfied by an
-  -- implementation that evaluated HasSupertype Snow alone and dropped
-  -- HasSubtype Swamp -- both its lands are Swamps, so the subtype never
-  -- discriminates. A Snow-Covered Mountain is snow and not a Swamp, which
-  -- closes that half.
-  Spec.it s "CR 702.14c a snow swampwalker does NOT walk on a Snow-Covered Mountain" $ do
-    legions <- S.printingOf s registry "Legions of Lim-Dûl"
-    piker <- S.printingOf s registry "Goblin Piker"
-    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
-    let (gs0, mine, theirs) = attacking [legions] [piker]
-        gs = withLands [snowMountain] gs0
-    case (mine, theirs) of
-      (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
-      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
-  Spec.it s "CR 702.14c a nonbasic landwalker is blocked normally when every land is basic" $ do
-    -- THE FALSIFIER for the negation, and the case that separates it from every
-    -- positive test: a basic Swamp is a land the criterion must REJECT. An
-    -- implementation that ignored the Not and matched any land would call this
-    -- illegal.
-    --
-    -- It falsifies the LAND-NESS conjunct too, which is the other half of the
-    -- design. landwalkAllowsGiven's candidate set is everything the defender
-    -- controls, not only their lands, and bob's blocking Goblin Piker is a
-    -- nonbasic permanent -- so a reader that left the CardType.Land test out
-    -- would match the Piker and call this illegal as well.
-    dryad <- S.printingOf s registry "Dryad Sophisticate"
-    piker <- S.printingOf s registry "Goblin Piker"
-    swamp <- S.printingOf s registry "Swamp"
-    let (gs0, mine, theirs) = attacking [dryad] [piker]
-        gs = withLands [swamp] gs0
-    case (mine, theirs) of
-      (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
-      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
-  Spec.it s "CR 702.14c an artifact landwalker does NOT walk on a plain land" $ do
-    -- The other discriminator: Seat of the Synod is an Artifact Land, and an
-    -- ordinary Swamp is not. An implementation that dropped the criterion and
-    -- matched any land would call this illegal.
-    piker <- S.printingOf s registry "Goblin Piker"
-    gloves <- S.printingOf s registry "Vectis Gloves"
-    swamp <- S.printingOf s registry "Swamp"
-    let (gs0, mine, theirs) = attacking [piker] [piker]
-    case (mine, theirs) of
-      (a : _, b : _) -> do
-        let (glovesId, board) = S.addPermanent gloves S.alice (withLands [swamp] gs0)
-            armed = S.attach glovesId a board
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) armed) "legal"
-        let after = S.runPure S.aggressiveAnswer armed (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
-      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
-  Spec.it s "CR 702.14d swampwalk on the BLOCKER cancels nothing" $ do
-    -- CR 702.14d's own example, in swamps: the defending player controls the
-    -- named land AND a creature with the same landwalk, and still may not
-    -- block. Fails against any implementation that compares the attacker's
-    -- landwalk with the blocker's -- which is how protection reads, and is
-    -- the wrong shape here.
-    bogWraith <- S.printingOf s registry "Bog Wraith"
-    swamp <- S.printingOf s registry "Swamp"
-    let (gs0, mine, theirs) = attacking [bogWraith] [bogWraith]
-        gs = withLands [swamp] gs0
-    case (mine, theirs) of
-      (a : _, b : _) -> do
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
-        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
-      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
 -- CR 612.1's word swap, cast for real: alice pays {U} out of her own Island and
 -- resolves a Magical Hack aimed at `target`, replacing `from` with `to`.
@@ -1082,73 +889,6 @@ withMenace oid gs =
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-
--- Hammerheim's "{T}: Target creature loses all landwalk abilities until end of
--- turn." (Oracle checked against Scryfall, 2026-09-02) activated at `victim` and
--- resolved. Its FIRST ability is "{T}: Add {R}.", so the removal is the second of
--- the two the projection hands out.
---
--- Projection.abilitiesOf rather than Activatable.abilitiesFor: CR 605.3b keeps a
--- mana ability off the activatable list, so the pair here is the printed pair.
-removingLandwalk :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
-removingLandwalk s hammerheimId victim board = case Projection.abilitiesOf hammerheimId board of
-  [_, remove] -> pure (S.runPure (namingTarget victim) board (Activate.activateAbility S.alice hammerheimId remove >> Stack.resolveTop))
-  abilities -> Spec.assertFailure s ("expected exactly two Hammerheim abilities, got " <> show (length abilities))
-
--- The board CR 702.14a's family removal is read on. Alice attacks with a Stalker
--- Hag ({B/G}{B/G}{B/G} Creature -- Hag 3/2, "Swampwalk, forestwalk", the pool's
--- only creature printing TWO landwalks) and controls Hammerheim plus a Concordant
--- Crossroads; bob defends with a Goblin Piker, a Swamp AND a Forest.
---
--- BOTH of bob's lands, which is what makes this a FAMILY case rather than a
--- second spelling of Modification.LoseKeyword: with only one of them down, taking
--- one written landwalk away would already free the block, and the board could not
--- tell a removal that reached one instance from one that reached the family.
---
--- The Crossroads is the sibling keyword. "All creatures have haste" is a static
--- ability, so CR 613.7a gives its effect the enchantment's own timestamp and CR
--- 613.7b gives the removal a later one: the grant is in place first, and a CR
--- 613.1f WIPE would take the Hag's haste with the landwalks where a family
--- removal must leave it standing. Haste and not an evasion
--- keyword deliberately: a granted flying would decide the block by itself and
--- mask the case.
---
--- `activated` is the only difference between the two boards.
-hammerheimBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
-hammerheimBoard s registry activated = do
-  stalkerHag <- S.printingOf s registry "Stalker Hag"
-  piker <- S.printingOf s registry "Goblin Piker"
-  swamp <- S.printingOf s registry "Swamp"
-  forest <- S.printingOf s registry "Forest"
-  crossroads <- S.printingOf s registry "Concordant Crossroads"
-  hammerheim <- S.printingOf s registry "Hammerheim"
-  let (gs0, ours, theirs) = attacking [stalkerHag] [piker]
-      (_, hasted) = S.addPermanent crossroads S.alice (withLands [swamp, forest] gs0)
-      (hammerheimId, placed) = S.addPermanent hammerheim S.alice hasted
-  case (ours, theirs) of
-    (hag : _, blocker : _) -> do
-      board <- if activated then removingLandwalk s hammerheimId hag placed else pure placed
-      pure (board, hag, blocker)
-    _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
--- CR 613.1f layer 6 scoped to CR 702.14a's GENERIC TERM: "loses all landwalk
--- abilities" reaches every written [type]walk at once, which no removal naming an
--- instance can do.
-landwalkFamilyRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-landwalkFamilyRemovalSpec s registry = Spec.describe s "LandwalkFamilyRemoval" $ do
-  Spec.it s "CR 613.1f Hammerheim takes BOTH landwalks and the Hag can be blocked" $ do
-    -- THE CASE. Bob's board never moves; the Hag's does. Both written landwalks
-    -- have to go for this declaration to be legal, since either one alone would
-    -- still find a land of its own on bob's side.
-    (board, hag, blocker) <- hammerheimBoard s registry True
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton hag)) board) "the block is legal once every landwalk is gone"
-    let after = S.runPure S.aggressiveAnswer board (Combat.declareBlockers S.manaPerformer)
-    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf hag after) (Set.singleton blocker)
-    -- THE FAMILY-NOT-WIPE half: CR 613.1f's removal is scoped to rule 702.14's
-    -- abilities, so haste -- a keyword of no family at all -- survives it.
-    Spec.assertBool s (Projection.hasKeyword Keyword.Haste hag board) "haste is no landwalk, so it survives"
-    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) hag board)) "swampwalk is gone"
-    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk (Filter.HasSubtype Subtype.Forest)) hag board)) "forestwalk is gone too"
 
 -- CR 509.1a: the defending player chooses ONE creature for each blocker to
 -- block, and an effect can raise that number. Foriysian Brigade {3}{W} 2/4,
@@ -1940,30 +1680,6 @@ cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
         Spec.assertBool s (not (blocks gs handler piker)) "the 1/1 Handler may not block the 2/1 Piker"
         Spec.assertBool s (blocks gs handler elves) "the Handler may block the 1/1 Elves"
       _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
-  -- THE PROJECTION TRIPWIRE: bob's blocker is a Clone of Brassclaw Orcs, so the
-  -- restriction comes off CR 707.2's copiable values, not the printed card.
-  Spec.it s "CR 707.2 a Clone of Brassclaw Orcs can't block the Piker either" $ do
-    orcs <- S.printingOf s registry "Brassclaw Orcs"
-    clone <- S.printingOf s registry "Clone"
-    piker <- S.printingOf s registry "Goblin Piker"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    let (gs0, mine, theirs) = S.combatBoardOf [piker, elves] [orcs]
-        (cloneId, staged) = S.spellOnStack clone S.bob gs0
-        copying :: Prompt.Prompt r -> r
-        copying p = case p of
-          Prompt.ChooseCopyTarget _ _ _ legal -> List.find (`elem` theirs) legal
-          _ -> S.identityAnswer p
-        resolved = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-        -- The printed Orcs leave, so the Clone is the only one that can block.
-        gs1 = S.runPure S.identityAnswer resolved (mapM_ (`Event.changeZone` Zone.Graveyard) theirs)
-        gs = snd (Engine.runGamePure S.aggressiveAnswer gs1 (Combat.declareAttackers S.manaPerformer S.alice))
-        cloneOnField = filter (\oid -> Projection.controllerOf oid gs == Just S.bob) (Set.toList (GameState.battlefield gs))
-    case (mine, cloneOnField) of
-      ([pikerId, elvesId], [copy]) -> do
-        Spec.assertBool s (not (blocks gs copy pikerId)) "the Clone may not block the 2/1 Piker"
-        Spec.assertBool s (blocks gs copy elvesId) "the Clone may block the 1/1 Elves"
-        Spec.assertBool s (Projection.hasName (CardName.MkCardName (Text.pack "Brassclaw Orcs")) copy gs) "and it is a copy of the Orcs"
-      _ -> Spec.assertFailure s ("expected bob to control only the Clone (" <> show cloneId <> ")")
   -- Wan Shi Tong, All-Knowing's Spirit tokens, "This token can't block or be
   -- blocked by non-Spirit creatures": the card's own library trigger makes them,
   -- and each half is proved against a Spirit (Dutiful Knowledge Seeker) and a
@@ -3330,7 +3046,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   hasteSpec s registry
   evasionSpec s registry
   textChangedLandwalkSpec s registry
-  landwalkFamilyRemovalSpec s registry
   menaceSpec s registry
   blockPermissionSpec s registry
   blockRequirementSpec s registry

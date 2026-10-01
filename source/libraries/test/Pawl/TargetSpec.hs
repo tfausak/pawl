@@ -107,6 +107,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -134,6 +135,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -394,6 +396,115 @@ aimingBioshift giverId takerId p = case p of
   Prompt.ChooseMovedCounters _ _ _ _ offered -> offered
   _ -> S.identityAnswer p
 
+-- CR 607.2d: Pentarch Paladin's "{W}{W}, {T}: Destroy target permanent of the
+-- chosen color" is linked to its "As this creature enters, choose a color", so
+-- the slot reads the colour the Paladin chose (Oracle checked against Scryfall
+-- on 2026-10-01). The choice is stamped rather than cast for; the entry road
+-- that writes it is Painter's Servant's (Pawl.ColorSpec).
+--
+-- bob holds a red Goblin Piker and a green Llanowar Elves, alice the Paladin
+-- and two Plains, and the answerer PREFERS the Piker, falling back to whatever
+-- else was offered. So each board shows what the engine offered by which
+-- permanent dies.
+pentarchPaladinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+pentarchPaladinSpec s registry = Spec.describe s "Pentarch Paladin" $ do
+  let paladinBoard chosen = do
+        paladin <- S.printingOf s registry "Pentarch Paladin"
+        plains <- S.printingOf s registry "Plains"
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        murder <- S.printingOf s registry "Murder"
+        let (paladinId, g0) = S.addPermanent paladin S.alice (S.landsFor swamp S.bob 3 (S.landsFor plains S.alice 2 S.threePlayerGame))
+            (pikerId, g1) = S.addPermanent piker S.bob g0
+            (elvesId, g2) = S.addPermanent elves S.bob g1
+            (murderId, g3) = S.addHandCard murder S.bob g2
+            chose = g3 {GameState.objects = Map.adjust (\o -> o {Object.chosenColor = Just chosen}) paladinId (GameState.objects g3)}
+        case soleActivatedAbility paladin of
+          Nothing -> Spec.assertFailure s "Pentarch Paladin should declare one activated ability" >> pure Nothing
+          Just ability -> pure (Just (paladinId, pikerId, elvesId, murderId, S.runPure (aimAtCreature pikerId) chose (Activate.activateAbility S.alice paladinId ability)))
+      resolve gs = S.runPure S.identityAnswer gs Stack.resolveTop
+  -- A PAIR OF BOARDS differing only in the colour chosen: red reaches the Piker,
+  -- green does not, so the same preference kills the Elves instead.
+  Spec.it s "CR 607.2d the Paladin destroys only a permanent of the colour it chose" $ do
+    red <- paladinBoard Color.Red
+    green <- paladinBoard Color.Green
+    case (red, green) of
+      (Just (_, pikerId, elvesId, _, redActivated), Just (_, pikerId', elvesId', _, greenActivated)) -> do
+        let redResolved = resolve redActivated
+            greenResolved = resolve greenActivated
+        Spec.assertBool s (not (S.onBattlefield pikerId redResolved)) "having chosen red, the Paladin destroys the red Piker"
+        Spec.assertBool s (S.onBattlefield pikerId' greenResolved) "having chosen green, it cannot aim at the Piker"
+        Spec.assertBool s (not (S.onBattlefield elvesId' greenResolved)) "and destroys the green Elves instead"
+        Spec.assertBool s (S.onBattlefield elvesId redResolved) "while the red board left the Elves alone"
+      _ -> pure ()
+  -- CR 608.2b re-asks the slot at resolution, and CR 608.2h with CR 113.7a answer
+  -- "the chosen color" for a source that has left from its last known
+  -- information. bob Murders the Paladin in response; the ability still
+  -- resolves against the red Piker it aimed at.
+  Spec.it s "CR 608.2h the Paladin's ability still destroys its target after the Paladin dies in response" $ do
+    red <- paladinBoard Color.Red
+    case red of
+      Just (paladinId, pikerId, _, murderId, activated) -> do
+        let murdered = S.runPure (aimAtCreature paladinId) (activated {GameState.priority = Just S.bob}) (S.cast S.bob murderId Monad.>> Stack.resolveTop)
+            resolved = resolve murdered
+        Spec.assertBool s (not (S.onBattlefield pikerId resolved)) "the Piker is destroyed by the dead Paladin's ability"
+        Spec.assertBool s (not (S.onBattlefield paladinId murdered)) "because the Paladin had already left before it resolved"
+      Nothing -> pure ()
+  -- CR 707.10c with CR 113.7: a copy of the ability keeps the Paladin as its
+  -- source, so its new targets are judged against the colour the Paladin chose.
+  -- A second red Piker joins bob's side after the Paladin aims at the first, and
+  -- Lithoform Engine ({2}, {T}: "Copy target activated or triggered ability you
+  -- control. You may choose new targets for the copy.") copies the ability with
+  -- an answerer preferring the second.
+  Spec.it s "CR 707.10c a Lithoform Engine copy of the Paladin's ability can aim at another permanent of the chosen colour" $ do
+    red <- paladinBoard Color.Red
+    engine <- S.printingOf s registry "Lithoform Engine"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    case (red, Face.activatedAbilities (S.combinedFace engine)) of
+      (Just (_, firstId, _, _, activated), copying : _) -> do
+        let (secondId, g0) = S.addPermanent piker S.bob activated
+            (engineId, g1) = S.addPermanent engine S.alice (S.landsFor plains S.alice 2 g0)
+            copied = S.runPure S.identityAnswer (g1 {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice engineId copying)
+            retargeted = S.runPure (aimAtCreature secondId) copied Stack.resolveTop
+            copyResolved = resolve retargeted
+            bothResolved = resolve copyResolved
+        Spec.assertBool s (not (S.onBattlefield secondId copyResolved)) "the copy, re-aimed, destroys the second red Piker"
+        Spec.assertBool s (S.onBattlefield firstId copyResolved) "while the original has not resolved yet"
+        Spec.assertBool s (not (S.onBattlefield firstId bothResolved)) "and the original then destroys the first"
+      _ -> Spec.assertFailure s "the Paladin board and Lithoform Engine's copying ability"
+
+-- CR 607.2d one road over: From the Rubble's "At the beginning of your end step,
+-- return target creature card of the chosen type from your graveyard to the
+-- battlefield with a finality counter on it" is a TRIGGERED ability's slot,
+-- announced through Engine.placeBorne rather than Pawl.Engine.Activate (Oracle
+-- checked against Scryfall on 2026-10-01). The choice is stamped, as for the
+-- Paladin above; the entry road that writes a creature type is Obelisk of
+-- Urd's (Pawl.ProjectionSpec).
+--
+-- A PAIR OF BOARDS differing only in the type chosen, alice's graveyard holding
+-- a Goblin Piker and a Hill Giant, and the answerer preferring the Piker: each
+-- board shows what the engine offered by which card comes back.
+fromTheRubbleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+fromTheRubbleSpec s registry =
+  Spec.it s "CR 607.2d From the Rubble returns only a creature card of the type it chose" $ do
+    rubble <- S.printingOf s registry "From the Rubble"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (rubbleId, g0) = S.addPermanent rubble S.alice (Setup.emptyGame S.bothPlayers)
+        (pikerId, g1) = S.addGraveyardCard piker S.alice g0
+        (_, g2) = S.addGraveyardCard giant S.alice g1
+        endOfTurn chosen =
+          let chose = g2 {GameState.objects = Map.adjust (\o -> o {Object.chosenSubtype = Just chosen}) rubbleId (GameState.objects g2), GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]}
+              afterMain = S.runPure (aimAtCreature pikerId) chose Engine.runStep
+           in S.runPure (aimAtCreature pikerId) afterMain Engine.runStep
+        onBattlefield name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+        goblins = endOfTurn Subtype.Goblin
+        giants = endOfTurn Subtype.Giant
+    Spec.assertEqWith s "having chosen Goblin, the Piker comes back" (onBattlefield "Goblin Piker" goblins, onBattlefield "Hill Giant" goblins) (1, 0)
+    Spec.assertEqWith s "having chosen Giant, the Piker is not offered and the Giant comes back" (onBattlefield "Goblin Piker" giants, onBattlefield "Hill Giant" giants) (0, 1)
+
 -- CR 601.2c / 205.3m: Unbury's "return two target creature cards that share a
 -- creature type from your graveyard to your hand". Each slot names the other
 -- with SharesCreatureTypeWithBound, since the condition binds both targets alike
@@ -431,6 +542,8 @@ unburySpec s registry = Spec.describe s "Unbury" $ do
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   unburySpec s registry
+  pentarchPaladinSpec s registry
+  fromTheRubbleSpec s registry
   -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
   -- player can't be the target of spells or abilities.'" Doom Blade is "target
   -- nonblack creature" and the Mongoose is green, so its Filter admits the
@@ -638,32 +751,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "both of bob's creatures are gone" (S.creaturesInPlay S.bob after) 0
     Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Blurred Mongoose") buried) "the Mongoose itself is in bob's graveyard"
     Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
-
-  -- CR 113.6: "Abilities of an instant or sorcery spell usually function only
-  -- while that object is on the stack. Abilities of all other objects usually
-  -- function only while that object is on the battlefield." Shroud is printed on
-  -- a CREATURE card, so a Blurred Mongoose SPELL has none and Cancel targets it
-  -- legally. It is CR 113.6g -- "an object's ability that states it can't be
-  -- countered ... functions on the stack" -- that then saves it, which is the
-  -- card's other half and a different rule.
-  Spec.it s "CR 113.6 Cancel legally targets the Blurred Mongoose spell, and CR 113.6g stops it countering" $ do
-    island <- S.printingOf s registry "Island"
-    cancel <- S.printingOf s registry "Cancel"
-    mongoose <- S.printingOf s registry "Blurred Mongoose"
-    let base = S.landsInPlay island 3
-        (spellId, onStack) = S.spellOnStack mongoose S.bob base
-        (gs, cancelId) = S.handOne cancel onStack
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    case soleTargetSlot (Face.spell (S.combinedFace cancel)) of
-      Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
-      Just theSlot ->
-        Spec.assertBool
-          s
-          (Set.member (Recipient.ToObject spellId) (Target.legalRecipients (Just S.alice) S.noSource theSlot gs))
-          "the Mongoose spell is a legal target on the stack"
-    Spec.assertBool s (elem spellId (GameState.stack resolved)) "and is still on the stack, uncountered"
-    Spec.assertEqWith s "Cancel resolved into alice's graveyard regardless" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
 
   -- CR 115.5: "A spell or ability on the stack is an illegal target for itself."
   -- Cancel's "counter target spell" draws from Pool.Spells with no Filter at
@@ -1369,34 +1456,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "and the Angelic Edict too, so neither refusal above is a spell that reaches nothing"
       _ -> Spec.assertFailure s "Murder and Angelic Edict should each declare a target slot"
 
-  -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
-  -- targets are still legal. ... If all its targets, for every instance of the
-  -- word 'target,' are now illegal, the spell or ability doesn't resolve." The
-  -- second of CR 115's two moments, and the controller axis has to be read at
-  -- both: a Goblin Piker that gains hexproof in response is out of an OPPONENT's
-  -- Doom Blade and still squarely in its own controller's.
-  --
-  -- Four resolutions off two boards that differ only in who controls the Piker,
-  -- so neither answer can be a Doom Blade that never worked. No card in this pool
-  -- GRANTS hexproof, so the grant is a stored layer-6 continuous effect
-  -- (S.withEffect), as the shroud case above does it.
-  Spec.it s "CR 608.2b gaining hexproof in response fizzles an opponent's Doom Blade but not its controller's" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    let castAt controller =
-          let (pikerId, board) = S.addPermanent piker controller (S.landsInPlay swamp 2)
-              (gs, dbId) = S.handOne doomBlade board
-           in (pikerId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId)))
-        resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
-        (theirPiker, atTheirs) = castAt S.bob
-        (myPiker, atMine) = castAt S.alice
-        hexproofed oid = S.withEffect oid (Modification.GainKeyword (Keyword.Hexproof Nothing))
-    Spec.assertEqWith s "untouched, bob's Piker dies" (S.creaturesInPlay S.bob (resolve atTheirs)) 0
-    Spec.assertEqWith s "hexproofed in response, it survives alice's Doom Blade" (S.creaturesInPlay S.bob (resolve (hexproofed theirPiker atTheirs))) 1
-    Spec.assertEqWith s "untouched, alice's own Piker dies" (S.creaturesInPlay S.alice (resolve atMine)) 0
-    Spec.assertEqWith s "and hexproof does not save it from its own controller (CR 702.11b)" (S.creaturesInPlay S.alice (resolve (hexproofed myPiker atMine))) 0
-
   -- CR 113.9, the whole rule, as two DISJOINT pools: "activated and triggered
   -- abilities on the stack aren't spells, and therefore can't be countered by
   -- anything that counters only spells. Activated and triggered abilities on
@@ -1618,32 +1677,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "that graveyard holds one card, the spent Raise Dead (CR 404.1)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
     Spec.assertEqWith s "and alice's hand holds one card, the Piker and not the spell" (S.handSize S.alice resolved) 1
 
-  -- CR 608.2b: "A target that's no longer in the zone it was in when it was
-  -- targeted is illegal. ... If all its targets ... are now illegal, the spell or
-  -- ability doesn't resolve. It's removed from the stack and, if it's a spell,
-  -- put into its owner's graveyard."
-  --
-  -- The response is Event.changeZone rather than a card, because no card in this
-  -- pool can be cast in response to a sorcery AND move a card out of a graveyard:
-  -- Rest in Peace is the only one that empties a graveyard, and it does it from
-  -- an enchantment's enters trigger -- CR 303.1 lets an enchantment be cast only
-  -- "during a main phase of their turn when the stack is empty", which is exactly
-  -- when Raise Dead is not on it. Both halves run off one board and one cast, so
-  -- the fizzle cannot be a Raise Dead that never worked.
-  Spec.it s "CR 608.2b Raise Dead fizzles when its target leaves the graveyard in response" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    raiseDead <- S.printingOf s registry "Raise Dead"
-    let (mineId, board) = S.addGraveyardCard piker S.alice (S.landsInPlay swamp 1)
-        (gs, rdId) = S.handOne raiseDead board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice rdId))
-        resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
-        returned = resolve cast
-        fizzled = resolve (S.runPure S.identityAnswer cast (Event.changeZone mineId Zone.Exile))
-    Spec.assertEqWith s "untouched, the Piker card comes back" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice returned) 1
-    Spec.assertEqWith s "exiled in response, nothing comes back" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice fizzled) 0
-    Spec.assertEqWith s "and Raise Dead is in alice's graveyard either way" (length (Game.zoneMembers Zone.Graveyard S.alice fizzled)) 1
-
   -- CR 400.1's OTHER half. Raise Dead above says "in your graveyard"; Withered
   -- Wretch's "{1}: Exile target card from a graveyard" names no player at all, so
   -- every player's copy of the zone is in the pool at once -- a SET of players
@@ -1717,35 +1750,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertEqWith s "aimed at bob's, HIS graveyard is the empty one" (length (Game.zoneMembers Zone.Graveyard S.bob theirs)) 0
         Spec.assertEqWith s "and the exiled card is his" (length (Game.zoneMembers Zone.Exile S.bob theirs)) 1
         Spec.assertEqWith s "with alice's graveyard untouched" (length (Game.zoneMembers Zone.Graveyard S.alice theirs)) 1
-      abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
-
-  -- CR 608.2b for an ABILITY rather than a spell, and against the opponent's
-  -- graveyard: "A target that's no longer in the zone it was in when it was
-  -- targeted is illegal. ... If all its targets ... are now illegal, the spell or
-  -- ability doesn't resolve."
-  --
-  -- The response moves the card to bob's HAND rather than exiling it, so the two
-  -- outcomes are told apart by the exile zone: a fizzle leaves it empty, and an
-  -- ability that resolved anyway would put something in it. Both halves run off
-  -- one activation, so the fizzle cannot be an activation that never worked.
-  Spec.it s "CR 608.2b Withered Wretch's activation fizzles when the card leaves the graveyard in response" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    wretch <- S.printingOf s registry "Withered Wretch"
-    let (wretchId, g1) = S.addPermanent wretch S.alice (S.landsInPlay swamp 1)
-        (theirsId, g2) = S.addGraveyardCard piker S.bob g1
-        board = g2 {GameState.priority = Just S.alice}
-    case Face.activatedAbilities (S.combinedFace wretch) of
-      [ability] -> do
-        let activated = S.runPure (aimAtCard theirsId) board (Activate.activateAbility S.alice wretchId ability)
-            resolve g = S.runPure (aimAtCard theirsId) g Stack.resolveTop
-            exiled = resolve activated
-            fizzled = resolve (S.runPure S.identityAnswer activated (Event.changeZone theirsId Zone.Hand))
-        Spec.assertEqWith s "the activation put one ability on the stack" (length (GameState.stack activated)) 1
-        Spec.assertEqWith s "untouched, bob's card is exiled" (length (Game.zoneMembers Zone.Exile S.bob exiled)) 1
-        Spec.assertEqWith s "taken to his hand in response, nothing is exiled at all" (length (Game.zoneMembers Zone.Exile S.bob fizzled)) 0
-        Spec.assertEqWith s "and the card is still in his hand" (length (Game.zoneMembers Zone.Hand S.bob fizzled)) 1
-        Spec.assertEqWith s "with the ability off the stack either way" (length (GameState.stack fizzled)) 0
       abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
 
   -- CR 115.2 clause (a)'s SECOND zone. Riftsweeper's "choose target face-up

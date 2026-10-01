@@ -132,6 +132,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -1301,7 +1302,7 @@ substitutionsOffering offersFor slots pid oid gs manaCost =
 substituteCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Keyword.Substitute -> GameState -> [ObjectId]
 substituteCandidates slots pid oid substitute gs = case substitute of
   Keyword.TapUntapped criterion -> tapCandidates slots pid oid criterion gs
-  Keyword.ExileFromGraveyard criterion -> exileCandidates slots pid criterion gs
+  Keyword.ExileFromGraveyard criterion -> exileCandidates slots pid oid criterion gs
 
 -- The component that SPENDS this many of a Keyword.Substitute's objects. Carrying
 -- the substitution as a component is what puts it on the same ClaimAxis as every
@@ -2239,7 +2240,7 @@ countersOn kind oid gs =
 -- something else under Maskwood Nexus (Pawl.CostSpec's Putrid Raptor pair).
 discardCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates slots pid oid criterion gs =
-  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
+  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> candidate /= oid && not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
@@ -2295,7 +2296,7 @@ revealFromHandCandidates = discardCandidates
 -- the battlefield half cannot read the criterion differently.
 beholdCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 beholdCandidates slots pid oid criterion gs =
-  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
+  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in revealFromHandCandidates slots pid oid criterion gs
@@ -2352,9 +2353,9 @@ beholdObjects slots pid oid n criterion = do
 -- which is the exclusion the callers asking BEFORE CR 601.2a's move need and the
 -- only one CR 601.2a states -- Loathsome Chimera is not among the cards its own
 -- escape cost can exile.
-exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-exileCandidates slots pid criterion gs =
-  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
+exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+exileCandidates slots pid oid criterion gs =
+  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
@@ -2375,11 +2376,11 @@ exileCandidates slots pid criterion gs =
 -- leave the ExileThis component nothing to exile.
 materialCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 materialCandidates slots pid oid criterion gs =
-  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
+  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = candidate /= oid && Filter.matches context (viewOf candidate) criterion
    in filter matches (List.sort (Projection.controls pid gs))
-        <> exileCandidates slots pid criterion gs
+        <> exileCandidates slots pid oid criterion gs
 
 -- The one card an ExileTopFromGraveyard component takes: the TOP matching card
 -- of this player's graveyard, or Nothing where it holds none.
@@ -2388,9 +2389,9 @@ materialCandidates slots pid oid criterion gs =
 -- top and Game.insertIntoZone appends, the opposite end from a library. No
 -- prompt, and that is CR 404.2 rather than an elision: a graveyard's order is not
 -- the player's to change, so "the top creature card" names exactly one.
-topExileCandidate :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Maybe ObjectId
-topExileCandidate slots pid criterion gs =
-  Maybe.listToMaybe (reverse (exileCandidates slots pid criterion gs))
+topExileCandidate :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Maybe ObjectId
+topExileCandidate slots pid oid criterion gs =
+  Maybe.listToMaybe (reverse (exileCandidates slots pid oid criterion gs))
 
 -- The cards this player may exile to collect evidence: their WHOLE graveyard,
 -- `exileCandidates` under rule 701.59a's absent criterion -- "any number of
@@ -2398,8 +2399,8 @@ topExileCandidate slots pid criterion gs =
 -- criterion rather than a stand-in for one. Game.beingCast's exclusion rides along
 -- from there, and is CR 601.2a for the offer paths that ask before the card
 -- moves.
-evidenceCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> GameState -> [ObjectId]
-evidenceCandidates slots pid = exileCandidates slots pid (Filter.Type.And [])
+evidenceCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> [ObjectId]
+evidenceCandidates slots pid oid = exileCandidates slots pid oid (Filter.Type.And [])
 
 -- CR 202.3's mana value of one card, read off its CR 613 projection --
 -- `tapPower`'s posture one zone over, and through the same projection
@@ -2433,10 +2434,16 @@ tapCandidates slots pid oid criterion gs =
       -- Pawl.Engine.Resolve.Slots.effectContext's reason -- the same road it fills
       -- sourceManaValue by -- and empty where the object is gone, which the atom
       -- already answers False for.
+      --
+      -- CR 607.2d, the source's entry choices (Projection.withChoicesOf), for
+      -- a criterion naming "the chosen type" -- matchesPermanent's reading.
       context =
-        (Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs))
-          { Filter.sourceColors = maybe Set.empty Filter.colors (Projection.viewWithLastKnownAnywhere gs oid)
-          }
+        Projection.withChoicesOf
+          oid
+          gs
+          (Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs))
+            { Filter.sourceColors = maybe Set.empty Filter.colors (Projection.viewWithLastKnownAnywhere gs oid)
+            }
       viewOf = Projection.viewsOf gs
       matches candidate =
         Filter.matches context (viewOf candidate) criterion
@@ -2687,7 +2694,7 @@ claimOf slots pid oid component gs =
         CostComponent.ExileCardFromHand criterion ->
           claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
         CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-          claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
+          claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid oid criterion gs)) n
         -- The same graveyard pool and the same axis, as ONE selection reaching the
         -- threshold rather than the component's number of cards: rule 701.59a's
         -- number is a THRESHOLD on total mana value, so which cards a payment
@@ -2695,11 +2702,11 @@ claimOf slots pid oid component gs =
         -- below and for its reason. A threshold of 0 is paid by the empty set and
         -- claims nothing.
         CostComponent.CollectEvidence n
-          | n > 0 -> reaching (ClaimAxis.Removal Zone.Graveyard) (toInteger n) (`evidenceValue` gs) (evidenceCandidates slots pid gs)
+          | n > 0 -> reaching (ClaimAxis.Removal Zone.Graveyard) (toInteger n) (`evidenceValue` gs) (evidenceCandidates slots pid oid gs)
           | otherwise -> Nothing
         -- A pool of at most ONE, CR 404.2's order having picked it.
         CostComponent.ExileTopFromGraveyard criterion ->
-          claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid criterion gs))) 1
+          claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid oid criterion gs))) 1
         CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) itself 1
         -- CR 701.17a spends cards out of the paying player's own library, so the pool
         -- is that library and the count is how many the mill takes -- the ZONE keying a
@@ -3210,7 +3217,7 @@ uncountedCeiling pid oid claims gs component = case component of
           ( alone
               (ClaimAxis.Removal Zone.Graveyard)
               threshold
-              (fmap (`evidenceValue` gs) (evidenceCandidates Map.empty pid gs))
+              (fmap (`evidenceValue` gs) (evidenceCandidates Map.empty pid oid gs))
           )
     | otherwise -> Nothing
   -- Counted by `objectCeiling`, on ClaimAxis.Tapping: the count is exact, so the
@@ -3857,7 +3864,7 @@ canPayComponent slots pid oid component gs = case component of
   -- rather than merely unpaid, which is what puts the additional cost INSIDE the
   -- total cost as CR 601.2f says. This component ALONE, Sacrifice's caveat.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-    Natural.length (exileCandidates slots pid criterion gs) >= n
+    Natural.length (exileCandidates slots pid oid criterion gs) >= n
   -- CR 118.3: the arm above over CR 702.167a's two pools at once, so that a craft
   -- ability is not OFFERED where the battlefield and the graveyard together hold
   -- too few materials. ">=" answers both readings of the count: an exact one is
@@ -3872,11 +3879,11 @@ canPayComponent slots pid oid component gs = case component of
   -- ">=" because rule 701.59a says "or greater", and a threshold of 0 is paid by the
   -- empty set with no special case.
   CostComponent.CollectEvidence n ->
-    sum (fmap (`evidenceValue` gs) (evidenceCandidates slots pid gs)) >= toInteger n
+    sum (fmap (`evidenceValue` gs) (evidenceCandidates slots pid oid gs)) >= toInteger n
   -- CR 118.3 again: payable only if the graveyard holds a matching card at all,
   -- since the top one is then determined.
   CostComponent.ExileTopFromGraveyard criterion ->
-    Maybe.isJust (topExileCandidate slots pid criterion gs)
+    Maybe.isJust (topExileCandidate slots pid oid criterion gs)
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters.
   CostComponent.PayEnergy n -> Game.energyOf pid gs >= n
@@ -5384,7 +5391,17 @@ tapForManaWith perform window inFlight refused activator oid = do
       case filter (\option -> permitted option && not (Mana.inFlightRoute (Set.union inFlight refused) oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure (False, [], everyRoute)
         first : rest -> do
-          chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
+          -- CR 106.3 / 608.2d: the activator picks the route and the mana for
+          -- their OWN pool (@Relative You@). A share under any other reference
+          -- is its recipient's to pick as it is added (`pickShare` below), so routes differing only
+          -- there are one choice here -- Spectral Searchlight's five colours
+          -- are one route until "that player" is known.
+          let ownPart option = option {ManaOption.yield = Map.filterWithKey (\ref _ -> ref == you) (ManaOption.yield option), ManaOption.steps = fmap (fmap (Map.filterWithKey (\ref _ -> ref == you))) (ManaOption.steps option)}
+              you = PlayerRef.Relative PlayerRelation.You
+          chosen <- case ListUtils.nubOrdOn ownPart (first : rest) of
+            route : routes -> chooseManaYield controller oid (route NonEmpty.:| routes) gs
+            [] -> pure first
+          let alike = filter (\option -> ownPart option == ownPart chosen) (first : rest)
           -- CR 601.2f, reached by CR 602.2b: what is paid is the TOTAL, and the
           -- gate above measured that same total through `capacity`. Off ONE
           -- gather (`manaActivationAdjustments`), so the offer and the payment
@@ -5426,12 +5443,12 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- leaves uncreated, and CR 608.2h's last-known information answers
               -- for a source the cost sacrificed.
               --
-              -- A clause that happens adds its share of the yield, then runs its
-              -- other effects -- CR 405.6c's "the mana is produced and the other
-              -- effect happens immediately", HERE, inside the window this
-              -- activation was made in. Ancient Tomb's 2 damage is charged before
-              -- the rest of the payment can spend the mana it just made
-              -- (Pawl.ManaSpec's Ancient Tomb group). The performer runs them;
+              -- A clause that happens adds its share of the yield, then runs the
+              -- other effects printed after it -- CR 405.6c's "the mana is
+              -- produced and the other effect happens immediately", HERE, inside
+              -- the window this activation was made in. Ancient Tomb's 2 damage
+              -- is charged before the rest of the payment can spend the mana it
+              -- just made (Pawl.ManaSpec's Ancient Tomb group). The performer runs them;
               -- Pawl.Engine.Resolve.Effect.performManaAbility is where the source
               -- stands in for the ability object.
               --
@@ -5456,25 +5473,50 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- Rhystic Cave's "unless any player pays {1}" is offered to the
               -- table by the performer, the source standing in for the ability
               -- object here too, and a clause whose gate says no adds no mana.
-              let happens clause = do
+              --
+              -- CR 608.2c / 608.2d inside a clause: the effects printed BEFORE its
+              -- first addition run first, and the slots they bind are what the
+              -- addition's recipient reads -- Valleymaker's "Choose a player.
+              -- That player adds {G}{G}{G}" (Pawl.ManaSpec's Valleymaker group).
+              -- The slots are threaded through the performer, CR 605.3b leaving
+              -- no ability object to hold them. A share under any reference but
+              -- @Relative You@ is then picked by each RECIPIENT among the routes
+              -- alike in the activator's own part: Spectral Searchlight's "any
+              -- color they choose" (Pawl.ManaSpec's Spectral Searchlight group).
+              let shareAt i ref option = Map.lookup ref . snd =<< Maybe.listToMaybe (drop i (ManaOption.steps option))
+                  pickShare i ref recipient mana = case ListUtils.nubOrdOn (shareAt i ref) alike of
+                    representative : more@(_ : _) | ref /= you -> do
+                      gsNow <- State.get
+                      picked <- chooseManaYield recipient oid (representative NonEmpty.:| more) gsNow
+                      pure (maybe (Mana.unitsOf mana) Mana.unitsOf (shareAt i ref picked))
+                    _ -> pure (Mana.unitsOf mana)
+                  happens clause = do
                     gsNow <- State.get
                     let context = Filter.contextFor (Game.teams gsNow) (Just controller) (Just oid)
                     pure (maybe True (Condition.holds (Projection.viewWithLastKnownAnywhere gsNow) context gsNow oid) (Clause.condition clause))
                   gated cIdx answers clause = case Clause.payGate clause of
                     Nothing -> pure (True, answers)
                     Just gate -> ManaAbilityPerformer.payGate perform oid controller cIdx gate answers
-                  step (answers, filled, made) (cIdx, (clause, share)) = do
+                  step (answers, bound, filled, made) (cIdx, (i, (clause, share))) = do
                     holds <- happens clause
                     (admitted, answers2) <- if holds then gated cIdx answers clause else pure (False, answers)
                     if not admitted
-                      then pure (answers2, filled, made)
+                      then pure (answers2, bound, filled, made)
                       else do
+                        let (leading, trailing) = List.break (Maybe.isJust . ManaAbility.manaProduced) (Foldable.toList (Clause.effects clause))
+                        bound1 <- ManaAbilityPerformer.effects perform oid controller bound leading
                         gsNow <- State.get
-                        let shares = concatMap (\(ref, mana) -> fmap (\recipient -> (recipient, Mana.unitsOf mana)) (Mana.recipientsOf controller gsNow ref)) (Map.toList share)
-                        State.put (List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) gsNow shares)
-                        ManaAbilityPerformer.effects perform oid controller (filter (Maybe.isNothing . ManaAbility.manaProduced) (Foldable.toList (Clause.effects clause)))
-                        pure (answers2, filled <> shares, made <> concatMap Mana.unitsOf (Map.elems share))
-              (_, shares, producedUnits) <- Monad.foldM step (Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (ManaOption.steps chosen))
+                        let chosenPlayers = Map.filter (not . Set.null) (fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) bound1)
+                        parts <- traverse (\(ref, mana) -> traverse (\recipient -> fmap ((,) recipient) (pickShare i ref recipient mana)) (Mana.recipientsOf controller chosenPlayers gsNow ref)) (Map.toList share)
+                        let shares = concat parts
+                            -- CR 106.12a's "produced", once per addition whoever's
+                            -- pool it reached: the first recipient's pick, or the
+                            -- offered share where it reached nobody.
+                            produced = concat (zipWith (\(_, mana) part -> maybe (Mana.unitsOf mana) snd (Maybe.listToMaybe part)) (Map.toList share) parts)
+                        State.modify' (\g -> List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) g shares)
+                        bound2 <- ManaAbilityPerformer.effects perform oid controller bound1 (filter (Maybe.isNothing . ManaAbility.manaProduced) trailing)
+                        pure (answers2, bound2, filled <> shares, made <> produced)
+              (_, _, shares, producedUnits) <- Monad.foldM step (Map.empty, Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (zip [0 :: Int ..] (ManaOption.steps chosen)))
               -- CR 605.1b's "mana being added to a player's mana pool", one event
               -- per player whose pool this activation filled, and CR 106.12a's
               -- "produced": what the clauses that happened added, whoever's pool.
@@ -5645,11 +5687,9 @@ payActivation perform inFlight pid oid cost = do
 -- FILTERED, NOT TRUSTED: honouring an option the source does not offer would
 -- mint mana out of nothing, or charge the wrong cost for it.
 --
--- Not implemented: CR 106.4's colour choice made by the RECIPIENT where the
--- addition names somebody other than the activator. `pid` here is the
--- controller, which CR 109.5 makes the chooser for every printing in
--- `data/cards/`: Yurlok of Scorch Thrash's three additions are each a fixed
--- type, so its `EachPlayer` recipients choose nothing (#3081).
+-- `pid` is whoever picks: the activator for the route and their own share, and
+-- the recipient for a share under any other reference (tapForManaWith's
+-- `pickShare`).
 chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty ManaOption.ManaOption -> GameState -> Game ManaOption.ManaOption
 chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
@@ -6376,7 +6416,7 @@ payPayable moment slots pid oid component = case component of
   -- follow.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> do
     gs <- State.get
-    let candidates = exileCandidates slots pid criterion gs
+    let candidates = exileCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length candidates <= n
@@ -6431,7 +6471,7 @@ payPayable moment slots pid oid component = case component of
   -- Inspector group is the proof.
   CostComponent.CollectEvidence n -> do
     gs <- State.get
-    let candidates = evidenceCandidates slots pid gs
+    let candidates = evidenceCandidates slots pid oid gs
         decider = Decide.deciderFor pid gs
     chosen <- Game.choose (Prompt.ChooseCollectEvidence decider pid oid candidates n)
     let collected = sum (fmap (`evidenceValue` gs) (Set.toAscList chosen))
@@ -6446,7 +6486,7 @@ payPayable moment slots pid oid component = case component of
   -- the graveyard holds no matching card, agreeing with canPayComponent above.
   CostComponent.ExileTopFromGraveyard criterion -> do
     gs <- State.get
-    case topExileCandidate slots pid criterion gs of
+    case topExileCandidate slots pid oid criterion gs of
       Nothing -> pure Payment.Unpaid
       Just candidate -> do
         Event.changeZone candidate Zone.Exile

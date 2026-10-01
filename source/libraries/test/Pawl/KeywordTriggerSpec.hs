@@ -1891,25 +1891,6 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
     Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
     Spec.assertEqWith s "ten lands paid the {8}{G}{G} and nothing paid the four free spells" (S.tappedCount S.alice after) 10
 
-  -- CR 707.2: the printed count is a copiable value, so a Clone of Apex
-  -- Devastator has four cascades of its own. Read through
-  -- Pawl.Engine.Projection.keywordsOf, which is where a copy and the card
-  -- underneath it part company -- Game.faceOf would answer Clone's own printed
-  -- face for the copy and the Devastator's for the original, and pass either way.
-  Spec.it s "CR 707.2 a Clone of Apex Devastator copies all four instances" $ do
-    apex <- S.printingOf s registry "Apex Devastator"
-    clone <- S.printingOf s registry "Clone"
-    let gs0 = Setup.emptyGame S.bothPlayers
-        (apexId, board) = S.addPermanent apex S.alice gs0
-        (_, staged) = S.spellOnStack clone S.alice board
-        resolved = S.runPure copyingTheDevastator staged (Stack.resolveTop >> Engine.settleForPriority)
-        isClone oid = fmap Face.name (Game.faceOf oid resolved) == Just (CardName.MkCardName (Text.pack "Clone"))
-    case filter isClone (Set.toList (GameState.battlefield resolved)) of
-      [cloneId] ->
-        Spec.assertEqWith s "the Clone projects four cascades" (Projection.keywordsOf cloneId resolved) (Map.singleton Keyword.Type.Cascade 4)
-      _ -> Spec.assertFailure s "expected exactly one Clone on the battlefield"
-    Spec.assertEqWith s "and the Devastator it copied still has its own four" (Projection.keywordsOf apexId resolved) (Map.singleton Keyword.Type.Cascade 4)
-
 -- CR 702.60a's ripple, cascade's neighbour on the stack roster: "When you cast
 -- this spell, you may reveal the top N cards of your library, or, if there are
 -- fewer than N cards in your library, you may reveal all the cards in your
@@ -2079,49 +2060,6 @@ stormSpec s registry = Spec.describe s "Storm" $ do
         after = resolveAll responded
     Spec.assertEqWith s "bob took two Bolts' 6, Grapeshot's 1 and TWO copies' 2" (S.lifeOf S.bob after) (Just 11)
     Spec.assertEqWith s "alice took bob's Bolt" (S.lifeOf S.alice after) (Just 17)
-
-  -- CR 608.2h's last known information, through CR 113.7a's "the ability exists
-  -- on the stack independently of its source": bob counters Grapeshot while its
-  -- storm trigger waits above it, and the trigger still copies the spell as it
-  -- last existed.
-  --
-  -- ONE spell before Grapeshot, so ONE copy: bob takes the Bolt's 3 and the
-  -- copy's 1 and nothing else, the original having been countered. Counting the
-  -- COUNTERSPELL -- cast after Grapeshot -- would make two copies and leave him at
-  -- 15, and copying nothing leaves him at 17.
-  Spec.it s "CR 608.2h a Grapeshot countered under its own storm trigger is still copied" $ do
-    grapeshot <- S.printingOf s registry "Grapeshot"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    cancel <- S.printingOf s registry "Cancel"
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    let lands = S.landsFor island S.bob 3 (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
-        (firstBolt, g1) = S.addHandCard bolt S.alice lands
-        (grapeshotId, g2) = S.addHandCard grapeshot S.alice g1
-        (cancelId, g3) = S.addHandCard cancel S.bob g2
-        board =
-          g3
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain
-            }
-        atBob gs action = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
-        -- The one spell cast before Grapeshot, resolved out of the way.
-        opened = atBob (atBob board {GameState.priority = Just S.alice} (S.cast S.alice firstBolt)) Stack.resolveTop
-        -- Grapeshot at bob, with its storm trigger settled onto the stack above it.
-        cast_ = atBob opened {GameState.priority = Just S.alice} (S.cast S.alice grapeshotId)
-        -- CR 400.7's incarnation: the spell carries an id the hand card did not.
-        onStack = Maybe.listToMaybe (Scenario.namedObjects (S.printingName grapeshot) cast_)
-        -- bob's Cancel, aimed at that id by FILTERING the offered set, so a pool
-        -- that stopped offering the spell counters nothing rather than quietly
-        -- finding something else.
-        countered = case onStack of
-          Nothing -> cast_
-          Just oid -> snd (Engine.runGamePure (pinObject oid) cast_ {GameState.priority = Just S.bob} (S.cast S.bob cancelId >> Engine.settleForPriority))
-        -- Cancel, the trigger, then the copy: down to an empty stack.
-        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (atBob gs Stack.resolveTop)
-        after = resolveAll countered
-    Spec.assertEqWith s "bob took the Bolt's 3 and ONE copy of the countered Grapeshot" (S.lifeOf S.bob after) (Just 16)
-    Spec.assertEqWith s "CR 701.6a the countered Grapeshot itself is in alice's graveyard" (length (filter (\oid -> S.soleFaceName oid after == S.printingName grapeshot) (Game.zoneMembers Zone.Graveyard S.alice after))) 1
 
 -- CR 702.56a's replicate: "As an additional cost to cast this spell, you may pay
 -- [cost] any number of times" and "When you cast this spell, if a replicate cost
@@ -2417,16 +2355,6 @@ pinTarget recipient p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
   _ -> S.identityAnswer p
 
--- pinTarget above, keyed on the OBJECT behind an offered recipient rather than on
--- the recipient itself: which recipient a pool offers for one object is the
--- pool's to spell, and a hand-built one of the same object is a different answer
--- CR 608.2b drops. FILTERING the offered set is what makes a pool that no longer
--- offers the object fail loudly instead.
-pinObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-pinObject oid p = case p of
-  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) asked
-  _ -> S.identityAnswer p
-
 -- alice casts the one spell her hand holds, takes CR 608.2g's offer, and rotates
 -- the batch the random-order channel asks about -- a rotation of three being
 -- neither the identity nor its own inverse, so an engine that never consulted the
@@ -2483,15 +2411,6 @@ cascadingIntoTheAdventure p = case p of
   Prompt.ChooseOfferedCastSpell _ _ options ->
     Maybe.fromMaybe (NonEmpty.head options) (List.find ((== CardName.MkCardName (Text.pack "Welcome Home")) . snd) (NonEmpty.toList options))
   _ -> cascading p
-
--- CR 614.12a's as-enters copy choice answered with the one legal source, which on
--- the Clone board is the Devastator. Pinned by NAME rather than searched, so a
--- mutation that drops the printed count cannot be repaired by the answerer
--- finding some other permanent.
-copyingTheDevastator :: Prompt.Prompt r -> r
-copyingTheDevastator p = case p of
-  Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
-  _ -> S.identityAnswer p
 
 isCast :: A.Action -> Bool
 isCast action = case action of
@@ -3307,13 +3226,6 @@ backupSpec s registry =
         Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter ((== Just victim) . Recipient.objectOf) rs) sets
         _ -> S.aggressiveAnswer p
       plusOnes oid gs = Map.findWithDefault 0 CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject oid gs))
-      -- The Clone's copy choice, then rule 702.165a's target: one answerer, since
-      -- the two prompts are of different shapes. The copy target is pinned by ID
-      -- so the Clone cannot repair the test by copying the Piker instead.
-      copying :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-      copying model victim p = case p of
-        Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== model) legal
-        _ -> targeting victim p
       -- The Archpriest ENTERS rather than being placed: rule 702.165a's ability
       -- is a CR 603.6a entry trigger, so a fixture that put the permanent there
       -- would prove nothing. CR 603.3 places what the entry triggered and the
@@ -3396,29 +3308,6 @@ backupSpec s registry =
               Spec.assertEqWith s "CR 702.165a the granted trigger returned the Hill Giant to the battlefield" (S.countOnBattlefieldByName giantName S.alice after) 1
               Spec.assertEqWith s "the Piker's three damage reached bob" (S.lifeOf S.bob after) (Just 17)
               Spec.assertEqWith s "and the Piker is still there to have dealt it" (S.countOnBattlefieldByName pikerName S.alice after) 1
-            _ -> Spec.assertFailure s "fixture should give alice a Piker"
-        -- THE PROJECTION TRIPWIRE. Nothing alice controls PRINTS backup: her
-        -- creature is a Clone, and the keyword and the abilities it hands over
-        -- come off CR 707.2's copiable values (CR 702.165b). A read of the
-        -- printed card anywhere on this road answers "Clone" and grants nothing.
-        Spec.it s "CR 702.165b a Clone of the Archpriest grants what it copied" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          jedit <- S.printingOf s registry "Jedit Ojanen"
-          archpriest <- S.printingOf s registry "Archpriest of Shadows"
-          clone <- S.printingOf s registry "Clone"
-          let cloneCopying printing = case S.combatBoardOf [piker] [printing] of
-                (gs0, [pikerId], [modelId]) ->
-                  let (_, staged) = S.spellOnStack clone S.alice gs0
-                   in Just (pikerId, S.runPure (copying modelId pikerId) staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop))
-                _ -> Nothing
-          case (cloneCopying archpriest, cloneCopying jedit) of
-            (Just (pikerId, copied), Just (otherPiker, vanilla)) -> do
-              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Deathtouch pikerId copied) "CR 702.165b the Clone's backup granted the copied card's deathtouch"
-              Spec.assertEqWith s "and its one +1/+1 counter" (plusOnes pikerId copied) 1
-              -- THE PAIR: the same Clone copying a card with no backup at all,
-              -- so a Piker that gained deathtouch here would have gained it from
-              -- something other than rule 702.165a.
-              Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Deathtouch otherPiker vanilla)) "where a Clone of the 5/5 grants nothing"
             _ -> Spec.assertFailure s "fixture should give alice a Piker"
         -- CR 702.165d, the source GONE: Murder kills the Archpriest with its
         -- trigger on the stack. The grant was fixed as the trigger was put there,
@@ -3512,26 +3401,6 @@ backupSpec s registry =
               Spec.assertEqWith s "where its power was 3" (Projection.powerOf pikerId backed) (Just 3)
               Spec.assertEqWith s "and its toughness 2" (Projection.toughnessOf pikerId backed) (Just 2)
             _ -> Spec.assertFailure s "fixture should give alice a Piker"
-        -- THE PROJECTION TRIPWIRE for the static half: the ability granted is
-        -- the one the Clone COPIED (CR 702.165b), so a printed read answers
-        -- "Clone" and grants nothing.
-        Spec.it s "CR 702.165b a Clone of Streetwise Negotiator grants the static ability it copied" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          jedit <- S.printingOf s registry "Jedit Ojanen"
-          negotiator <- S.printingOf s registry "Streetwise Negotiator"
-          clone <- S.printingOf s registry "Clone"
-          let cloneCopying printing = case S.combatBoardOf [piker] [printing] of
-                (gs0, [pikerId], [modelId]) ->
-                  let (_, staged) = S.spellOnStack clone S.alice gs0
-                   in Just (pikerId, S.runPure (copying modelId pikerId) staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop))
-                _ -> Nothing
-          case (cloneCopying negotiator, cloneCopying jedit) of
-            (Just (pikerId, copied), Just (otherPiker, vanilla)) -> do
-              Spec.assertEqWith s "CR 702.165b the Piker assigns its toughness of 2 as combat damage" (Projection.combatDamageAmountOf pikerId copied) (Just 2)
-              Spec.assertEqWith s "rather than its power of 3" (Projection.powerOf pikerId copied) (Just 3)
-              -- THE PAIR: a Clone of a card with no backup grants nothing.
-              Spec.assertBool s (not (PC.assignsCombatDamageWithToughness (Projection.project otherPiker vanilla))) "where a Clone of the 5/5 grants nothing"
-            _ -> Spec.assertFailure s "fixture should give alice a Piker"
         -- CR 613.1f in CR 613.7 timestamp order, as a pair differing only in
         -- which resolves first. A removal applied BEFORE the grant has nothing
         -- to remove yet, so the Piker has the ability; one applied after takes
@@ -3606,21 +3475,6 @@ backupSpec s registry =
               Spec.assertBool s (mayBlock evangelId pikerId selfBacked) "and aimed at the Kavu itself, the 2/2 may block the Piker"
               Spec.assertEqWith s "the self-aimed trigger put its counter on the Kavu" (plusOnes kavuId selfBacked) 1
             _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel and a Mammoth"
-        -- THE PROJECTION TRIPWIRE for the rule half: a Clone of the Kavu grants
-        -- the restriction it copied (CR 702.165b), where a printed read answers
-        -- "Clone" and grants nothing.
-        Spec.it s "CR 702.165b a Clone of Chomping Kavu grants the restriction it copied" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          evangel <- S.printingOf s registry "Cabal Evangel"
-          kavu <- S.printingOf s registry "Chomping Kavu"
-          clone <- S.printingOf s registry "Clone"
-          case S.combatBoardOf [piker] [kavu, evangel] of
-            (gs0, [pikerId], [kavuId, evangelId]) -> do
-              let (_, staged) = S.spellOnStack clone S.alice gs0
-                  copied = S.runPure (copying kavuId pikerId) staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
-              Spec.assertBool s (not (mayBlock evangelId pikerId copied)) "CR 702.165b the Piker can't be blocked by the 2/2"
-              Spec.assertBool s (mayBlock evangelId pikerId gs0) "where before the Clone the 2/2 could block it"
-            _ -> Spec.assertFailure s "fixture should give alice a Piker"
         -- CR 613.1f in CR 613.7 timestamp order, the static half's pair over a
         -- rule ability: a Turn to Frog before the grant leaves the Piker barring
         -- the Evangel, one after takes the restriction away. Either way the

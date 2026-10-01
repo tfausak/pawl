@@ -1030,7 +1030,7 @@ anafenzaAttackSpec s registry =
 -- themselves, so alice declaring leaves the "if" false whichever relation is
 -- read. What the boards do falsify is You -- bob declares on all three, and a
 -- You reading fires nothing at all.
-everWatchingThresholdSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+everWatchingThresholdSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 everWatchingThresholdSpec s registry =
   let -- Declares `attacker` alone and announces it at `target`, FILTERED out of
       -- what the engine offered rather than built, for seiferSpec's reason.
@@ -1081,35 +1081,11 @@ everWatchingThresholdSpec s registry =
              in pure (Just (jaceId, pikerId, stock (stock (stock (S.addCounter CounterKind.Loyalty 3 jaceId gs0)))))
           _ -> pure Nothing
    in Spec.describe s "Ever-Watching Threshold" $ do
-        -- The proving test: the declaration reached alice, so the clause is true
-        -- and the ability draws.
-        Spec.it s "CR 603.4 the clause holds when the declaring opponent attacked you" $ do
-          built <- fixture
-          case built of
-            Just (_, pikerId, gs) -> do
-              let after = atBlockers (answering pikerId (AttackTarget.OfPlayer S.alice)) (bobAttacking S.alice gs)
-              Spec.assertEqWith s "CR 121.1 alice drew the card" (S.handSize S.alice after) 1
-              Spec.assertEqWith s "CR 508.3d and one trigger fired for the one declaration" (fired after) 1
-              Spec.assertEqWith s "CR 508.1 and it was bob's Piker, declared at alice" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.alice)])
-            Nothing -> Spec.assertFailure s "fixture should give alice a Threshold and a Jace, and bob a Piker"
-        -- The second disjunct. CR 508.5 makes alice the defending player here
-        -- too, so only a clause reading the ANNOUNCED target can tell this board
-        -- from the one above -- and only one reading the planeswalker rather than
-        -- the player can tell it from the one below.
-        Spec.it s "CR 603.4 the clause holds when a planeswalker you control was attacked" $ do
-          built <- fixture
-          case built of
-            Just (jaceId, pikerId, gs) -> do
-              let after = atBlockers (answering pikerId (AttackTarget.OfPlaneswalker jaceId)) (bobAttacking S.alice gs)
-              Spec.assertEqWith s "CR 121.1 alice drew the card" (S.handSize S.alice after) 1
-              Spec.assertEqWith s "CR 508.3d and one trigger fired for the one declaration" (fired after) 1
-              Spec.assertEqWith s "CR 508.1b and the Piker really was declared at Jace" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlaneswalker jaceId)])
-            Nothing -> Spec.assertFailure s "fixture should give alice a Threshold and a Jace, and bob a Piker"
         -- The negative, and the same fixture: bob attacks the third seat, so
         -- neither disjunct holds. Rule 603.4's first sentence -- the ability
         -- "triggers only if" the clause is true -- is what makes `fired` 0 here
-        -- and 1 on both boards above, and rule 508.3d's condition is satisfied on
-        -- all three alike.
+        -- and 1 on the boards of the two cr-603-4-the-clause-holds-*.json
+        -- scenarios, and rule 508.3d's condition is satisfied on all three alike.
         Spec.it s "CR 603.4 the clause fails when the declaration went at a third player" $ do
           built <- fixture
           case built of
@@ -2012,20 +1988,6 @@ monarchTriggerSpec s registry =
       -- ExpirySpec's monarch group drives the same rule the same way.
       combatDamageTo monarch damager =
         S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)]
-      -- Attack bob with everything, block with everything, and divide a
-      -- trampler's damage the way CR 510.1c and CR 702.19b together require --
-      -- each blocker's own threshold first, the excess through to bob. The
-      -- thresholds the prompt offers ARE CR 510.1c's lethal amounts, so nothing
-      -- here restates a creature's toughness. Written out rather than left to
-      -- S.identityAnswer, which never names a player recipient and would put the
-      -- whole assignment on the blocker. Pawl.InitiativeSpec keeps its own copy,
-      -- Pawl.Support being too expensive a home for a two-case helper.
-      tramplingAtBob :: Prompt.Prompt r -> r
-      tramplingAtBob p = case p of
-        Prompt.AssignCombatDamage _ _ _ thresholds n ->
-          let toBlockers = Map.delete (Recipient.ToPlayer S.bob) thresholds
-           in Map.insert (Recipient.ToPlayer S.bob) (n - sum (Map.elems toBlockers)) toBlockers
-        _ -> S.attackTo S.bob p
    in Spec.describe s "MonarchTrigger" $ do
         -- The whole chain off one entry: CR 603.6a's entry trigger crowns alice,
         -- Effect.BecomeMonarch records CR 725.1's event, and the second ability
@@ -2182,43 +2144,6 @@ monarchTriggerSpec s registry =
           Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the hand-off recorded its crowning, naming her"
           Spec.assertEqWith s "CR 704.5a bob lost the game" (Game.stillPlaying after) [S.alice, S.carol]
           Spec.assertEqWith s "CR 104.2a two survivors, so the game is still going" (GameState.result after) Nothing
-          Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
-        -- CR 603.10, first sentence: the crown steal is checked against the
-        -- objects that exist IMMEDIATELY AFTER the damage, and the CR 704.5g
-        -- destruction that kills a trampler its blocker traded with is a LATER
-        -- event. Engine.performSettle runs that state-based action before the
-        -- trigger scan, so a live read of the damager found an id
-        -- Event.placeObject had already retired, and the crown never moved; see
-        -- #3132.
-        --
-        -- A REAL combat, not the group's hand-written damage event, because the
-        -- fixture that rewrites the log is exactly the fixture that cannot produce
-        -- this board: alice attacks bob with War Mammoth (3/3 trample) and bob
-        -- blocks with Boggart Brute (3/2), so the Mammoth assigns the Brute its
-        -- lethal 2 and tramples 1 through, and the Brute's 3 kills the Mammoth in
-        -- the same step. carol never joins.
-        Spec.it s "CR 725.2 a trampler that trades with its blocker still steals the crown" $ do
-          warMammoth <- S.printingOf s registry "War Mammoth"
-          boggartBrute <- S.printingOf s registry "Boggart Brute"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (base, mine, theirs, _) = S.threePlayerCombat [warMammoth] [boggartBrute] [piker]
-              staged =
-                base
-                  { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-                    GameState.combat = (GameState.combat base) {Combat.Type.defenders = [S.bob]}
-                  }
-              held = S.withMonarch S.bob staged
-              after = resolveAll tramplingAtBob (S.fightWith tramplingAtBob held)
-          Spec.assertEqWith s "bob wore the crown going in" (GameState.monarch held) (Just S.bob)
-          -- The board this case is about. Neither this nor the life total can tell
-          -- the two readings apart -- the Mammoth dies and bob loses 1 under both
-          -- -- so they pin the board rather than prove the rule.
-          Spec.assertEqWith s "CR 704.5g the Mammoth traded with the Brute, so both are off the battlefield" (fmap (\oid -> S.onBattlefield oid after) (mine <> theirs)) [False, False]
-          Spec.assertEqWith s "CR 702.19b and 1 point trampled through to bob" (S.lifeOf S.bob after) (Just 19)
-          -- The rule: alice's dead Mammoth still crowned her.
-          Spec.assertEqWith s "CR 725.2 alice is the monarch" (GameState.monarch after) (Just S.alice)
-          Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the crowning recorded its event, naming her"
-          Spec.assertEqWith s "carol, who never joined the combat, kept her creature" (S.creaturesInPlay S.carol after) 1
           Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
 
 -- CR 603.7: Ray of Command's THIRD sentence -- "When you lose control of the

@@ -1,0 +1,33 @@
+{
+  "description": "CR 509.1f partial payments are not allowed: two taxed blockers and one land sacrifice nothing",
+  "note": "Synthetic Blocking Tithe taxes each enchanted blocker one land sacrifice; CR 509.1d totals over the chosen creatures, so two taxed blockers owe two lands and one land cannot pay. The land sacrificed while the toll was being paid comes back with the rest of the declaration. The refused pair is re-asked (CR 509.1 preamble) and bob then declares nothing, so the Forest count is what reads the reversal.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true },
+          { "card": "Synthetic Blocking Tithe", "attached": "one" },
+          { "card": "Synthetic Blocking Tithe", "attached": "two" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "one", "ready": true },
+          { "card": "Goblin Piker", "label": "two", "ready": true },
+          { "card": "Forest", "label": "forest" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@one": ["@attacker"], "@two": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Forest", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": null } } }
+  ]
+}

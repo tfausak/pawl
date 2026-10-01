@@ -48,6 +48,10 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.ChooseTargets (Map.singleton (SlotName.Type.MkSlotName (Text.pack "target")) (Seq.singleton (ref "moon")))) " {\"ChooseTargets\":{\"target\":[\"@moon\"]}} "
   Spec.it s "OrderTriggers, null for a sourceless trigger" $
     Common.assertCodec s Move.codec (Move.Type.OrderTriggers (Seq.fromList [Just (ref "ghoul"), Nothing])) " {\"OrderTriggers\":[\"@ghoul\",null]} "
+  Spec.it s "ChooseCopyTarget" $
+    Common.assertCodec s Move.codec (Move.Type.ChooseCopyTarget (Just (ref "bear"))) " {\"ChooseCopyTarget\":\"@bear\"} "
+  Spec.it s "ChooseCopyTarget declined" $
+    Common.assertCodec s Move.codec (Move.Type.ChooseCopyTarget Nothing) " {\"ChooseCopyTarget\":null} "
   Spec.it s "ChooseTypeSwap" $
     Common.assertCodec s Move.codec (Move.Type.ChooseTypeSwap (TypeSwap.Type.MkTypeSwap Subtype.Type.Goblin Subtype.Type.Elf)) " {\"ChooseTypeSwap\":{\"from\":{\"type\":\"Goblin\"},\"to\":{\"type\":\"Elf\"}}} "
   Spec.it s "Concede" $

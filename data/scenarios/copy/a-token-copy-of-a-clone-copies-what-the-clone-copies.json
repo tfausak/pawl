@@ -1,0 +1,42 @@
+{
+  "description": "a token copy of a Clone copies what the Clone copies (CR 707.2)",
+  "note": "The proving test for the copiable stamp. The Counterpart's target is itself a copy, so its printed card (Clone, a 0/0 with an as-enters copy ability) and its copiable values (the Piker's) disagree, and CR 707.2's \"as modified by other copy effects\" says the token takes the latter. A token that fell back on the printed card would raise a copy prompt of its own, which no entry answers. The Piker is bob's, so alice's Clone is the Counterpart's only legal target.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true}
+        ],
+        "hand": [
+          {"card": "Clone", "label": "clone"},
+          {"card": "Cackling Counterpart", "label": "counterpart"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseCopyTarget": "@piker"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@counterpart", "targets": ["Clone"], "mana": ["Island#5", "Island#6", "Island#7"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 2}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Names": {"object": "Clone#2", "names": ["Goblin Piker"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "Clone#2", "power": 2, "toughness": 1}}}
+  ]
+}

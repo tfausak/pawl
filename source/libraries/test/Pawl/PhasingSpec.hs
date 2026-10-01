@@ -82,7 +82,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -321,12 +320,6 @@ borrowedBoard island piker ripple command =
       (second, board) = S.addHandCard ripple S.alice withFirst
    in (victim, bystander, borrow, first, second, board)
 
--- Is `oid` in CR 508.1's attacking-creatures record? Membership in Combat.attackers
--- is what Pawl.Engine.Projection reads for Filter.IsAttacking, so it is the same
--- question CR 506.4's "stops being an attacking creature" asks.
-isAttacking :: ObjectId.ObjectId -> GameState.GameState -> Bool
-isAttacking oid gs = Map.member oid (Combat.Type.attackers (GameState.combat gs))
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Phasing" $ do
   phaseOutSpec s registry
@@ -458,41 +451,6 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     Spec.assertEqWith s "CR 702.26a the Thief phases in at alice's untap step" (onBattlefield thief back) True
     Spec.assertEqWith s "and the Myr stays with bob" (Projection.controllerOf myr back) (Just S.bob)
     Spec.assertEqWith s "with nothing restored" (GameState.continuousEffects back) []
-  -- CR 506.4, restated as CR 702.26b's last sentence: "a permanent that phases out
-  -- is removed from combat." An effect is the only route to it -- CR 502.1's
-  -- action runs in the untap step, the turn's first, so nothing is ever in combat
-  -- when it fires -- and Reality Ripple is the one this group is built on.
-  --
-  -- alice phases out one of her OWN two attackers, so bob's life total counts the
-  -- clause: 2 instead of 4. The control is the same declaration with no Ripple
-  -- cast, which is what keeps "took no damage from it" from passing because the
-  -- board was never in combat at all.
-  --
-  -- The record assertion is the one that proves CR 506.4, and the life totals are
-  -- not: neutering Phasing.phaseOut's Game.removeFromCombat call leaves the record
-  -- assertion red and both life totals unchanged, Pawl.Engine.Damage having its own
-  -- liveness gate on the battlefield. So the damage here is CR 702.26b's doing and
-  -- the record is rule 506.4's.
-  Spec.it s "CR 506.4 an attacking creature that phases out mid-combat deals no combat damage" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    ripple <- S.printingOf s registry "Reality Ripple"
-    let (base, mine, _) = S.combatBoardOf [piker, piker] []
-        withMana = S.landsFor island S.alice 2 base
-        (spell, board) = S.addHandCard ripple S.alice withMana
-    case mine of
-      victim : _ -> do
-        let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-            rippled = S.settleSba (rippleAt victim spell declared)
-            damaged = S.runPure S.aggressiveAnswer rippled (Monad.void Damage.dealCombatDamage)
-            bothConnect = S.runPure S.aggressiveAnswer (S.settleSba declared) (Monad.void Damage.dealCombatDamage)
-        Spec.assertEqWith s "setup: both Pikers are attacking" (fmap (`isAttacking` declared) mine) [True, True]
-        Spec.assertEqWith s "the Ripple phased its target out" (Phasing.isPhasedOut victim rippled) True
-        Spec.assertEqWith s "and CR 506.4 took it out of the record" (isAttacking victim rippled) False
-        Spec.assertEqWith s "the other attacker is still in it" (fmap (`isAttacking` rippled) (drop 1 mine)) [True]
-        Spec.assertEqWith s "so bob takes 2 rather than 4" (S.lifeOf S.bob damaged) (Just 18)
-        Spec.assertEqWith s "which is the same board with no Ripple cast" (S.lifeOf S.bob bothConnect) (Just 16)
-      [] -> Spec.assertFailure s "the combat board should have given alice two attackers"
 
 indirectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 indirectSpec s registry = Spec.describe s "Indirect" $ do

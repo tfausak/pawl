@@ -1,0 +1,21 @@
+{
+  "description": "CR 800.4j/703.4i a departed active player is not asked to declare attackers",
+  "note": "alice concedes in her own main phase, so CR 800.4a takes her Piker with her and the declare attackers step has nothing to ask her about: no Attack is scheduled, so asking her would fail the run as an unscheduled prompt. The control file shows the same board, with alice still playing, is asked and attacks.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Concede" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": {} } } }
+  ]
+}
