@@ -1,0 +1,38 @@
+{
+  "description": "CR 601.2c X=2 announcing one target destroys only that one",
+  "note": "Pest Infestation destroys up to X target artifacts and/or enchantments and makes twice X Pests. bob holds three candidates, one more than X, so naming one at X=2 leaves the other two standing; a point range of exactly X would force a second target. The four Pests enter at once, so CR 613.7m's timestamp order is answered.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest1", "ready": true },
+          { "card": "Forest", "label": "forest2", "ready": true },
+          { "card": "Forest", "label": "forest3", "ready": true },
+          { "card": "Forest", "label": "forest4", "ready": true },
+          { "card": "Forest", "label": "forest5", "ready": true }
+        ],
+        "hand": [{ "card": "Pest Infestation", "label": "infestation" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Sol Ring", "label": "ring" },
+          { "card": "Ornithopter", "label": "thopter" },
+          { "card": "Glorious Anthem", "label": "anthem" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@infestation", "x": 2, "targets": ["@ring"], "mana": ["@forest1", "@forest2", "@forest3", "@forest4", "@forest5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Pest Token", "Pest Token#2", "Pest Token#3", "Pest Token#4"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Ornithopter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Glorious Anthem", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Sol Ring", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Pest Token", "count": 4 } } }
+  ]
+}

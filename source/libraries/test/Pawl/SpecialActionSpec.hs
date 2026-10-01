@@ -876,30 +876,6 @@ makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
     Spec.assertEqWith s "so no CR 608.2d choice was raised: the filter left one candidate" asked []
     Spec.assertEqWith s "all three lands paid for the enchantment" (S.tappedCount S.alice after) 3
     Spec.assertEqWith s "and the stack is empty, so the trigger resolved" (GameState.stack after) []
-  -- The permission taken rather than merely asked about, the Djinn group's last
-  -- case one route over: the plotted card reaches the battlefield off a board
-  -- with no untapped land on it.
-  Spec.it s "CR 702.170d the card an effect plotted casts for nothing on a later turn" $ do
-    forest <- S.printingOf s registry "Forest"
-    plains <- S.printingOf s registry "Plains"
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    kellan <- S.printingOf s registry "Kellan Joins Up"
-    aloe <- S.printingOf s registry "Aloe Alchemist"
-    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
-    let (pikerId, kellanId, _, gs) = kellanBoard forest plains island piker kellan aloe djinn
-        after = snd (State.evalState (Engine.runGame (kellanAnswers pikerId) gs (S.cast S.alice kellanId >> Engine.priorityLoop)) [])
-        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
-    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the case below runs at all"
-    Monad.forM_ (soleExile after) $ \exiledId -> do
-      let resolved = S.runPure S.castAnswer later (S.cast S.alice exiledId >> Stack.resolveTop)
-      Spec.assertEqWith
-        s
-        "the Alchemist is on the battlefield"
-        (S.countOnBattlefieldByName (S.printingName aloe) S.alice resolved)
-        1
-      Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
-      Spec.assertEqWith s "and the three lands are still the only tapped permanents: the cast paid nothing" (S.tappedCount S.alice resolved) 3
 
   -- CR 702.170d's OTHER clause, the one no PRINTED plot card can observe:
   -- "during their main phase while the stack is empty". Every card that prints

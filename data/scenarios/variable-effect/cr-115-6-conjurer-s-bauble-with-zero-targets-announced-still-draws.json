@@ -1,0 +1,35 @@
+{
+  "description": "CR 115.6 Conjurer's Bauble with zero targets announced still draws",
+  "note": "Conjurer's Bauble's \"up to one target card from your graveyard\" announced at zero: CR 602.2b routes the activation through CR 601.2c, and a spell or ability with no targets chosen is not removed under CR 608.2b, so the draw still happens. The sacrifice is a cost, paid either way, so the draw is the observer. The Piker stays in the graveyard beside the Bauble. The taken leg is its own file.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains" },
+          { "card": "Conjurer's Bauble", "label": "bauble" }
+        ],
+        "graveyard": [{ "card": "Goblin Piker", "label": "buried" }],
+        "library": [
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@bauble", "targets": [], "mana": [null], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Conjurer's Bauble", "count": 1 } } }
+  ]
+}

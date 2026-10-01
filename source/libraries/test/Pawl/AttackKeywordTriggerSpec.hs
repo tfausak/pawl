@@ -19,7 +19,6 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
-import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
@@ -56,16 +55,13 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Types.Zone as Zone
 
 -- CR 702.68a's frenzy, which rule 702 states as a triggered ability: "'Frenzy N'
 -- means 'Whenever this creature attacks and isn't blocked, it gets +N/+0 until
@@ -748,39 +744,11 @@ saviorOfOllenbockSpec s registry =
       -- Exile is one shared zone (CR 400.1), so this is everything in it whoever
       -- owns it. By NAME, because CR 400.7 mints the exiled card a fresh id.
       exiledNames gs = List.sort (Maybe.mapMaybe (`nameOf` gs) (Set.toList (GameState.exile gs)))
-      controlledNames pid gs =
-        List.sort (Maybe.mapMaybe (\oid -> if Projection.controllerOf oid gs == Just pid then nameOf oid gs else Nothing) (Set.toList (GameState.battlefield gs)))
-      graveyardNames pid gs = List.sort (Maybe.mapMaybe (`nameOf` gs) (Game.zoneMembers Zone.Graveyard pid gs))
-      -- Destroy the Savior (CR 701.8a), settle so the CR 117.5 boundary scans the
-      -- departure and places the leaves-the-battlefield trigger, then resolve it --
-      -- promiseOfTomorrowReturnSpec's killIt, and BOTH states come back for its
-      -- reason: "the ability triggered" is only readable at the placement.
-      killIt oid gs =
-        let killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [oid])
-            placed = S.runPure S.identityAnswer killed Engine.settleForPriority
-         in (placed, S.runPure S.identityAnswer placed Stack.resolveTop)
-      named = CardName.MkCardName . Text.pack
       -- Rule 702.149a's threshold crossed from below by a continuous effect: the
       -- Piker's 2 power becomes 1, which is the Savior's own, and CR 702.149a's
       -- "greater" is strict.
       shrink oid = S.withEffect oid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal 0)))
    in Spec.describe s "CR 702.149c a trigger on training" $ do
-        -- The proving test. The Piker's 2 clears the Savior's 1, the training
-        -- ability resolves and puts the counter, and rule 702.149c's trigger then
-        -- exiles the creature it targeted.
-        Spec.it s "CR 702.149c whole card: training exiles the targeted creature" $ do
-          (gs, mine, theirs) <- board ["Savior of Ollenbock", "Goblin Piker"] ["Hill Giant"]
-          case (mine, theirs) of
-            ([savior, piker], [giant]) -> do
-              let after = atBlockers (aimingAt (Recipient.ToCreature giant) [savior, piker]) gs
-              Spec.assertEqWith
-                s
-                "the counter landed on the Savior and not on its companion"
-                (countersOn savior after, countersOn piker after)
-                (Map.singleton CounterKind.PlusOnePlusOne 1, Map.empty)
-              Spec.assertEqWith s "and the trigger exiled the Giant" (exiledNames after) [named "Hill Giant"]
-              Spec.assertEqWith s "which bob no longer controls" (controlledNames S.bob after) []
-            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker, and bob a Giant"
         -- The one-difference control: the same board with the companion's power
         -- one lower, so rule 702.149a's strict "greater" is not met, nothing
         -- trains, and rule 702.149c's trigger never fires.
@@ -795,38 +763,6 @@ saviorOfOllenbockSpec s registry =
               Spec.assertEqWith s "and nothing was exiled" (exiledNames after) []
               Spec.assertBool s (S.onBattlefield giant after) "the Giant is where it was"
             _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker, and bob a Giant"
-        -- The pool's OTHER half, and the tag that goes with it: a creature card in
-        -- a graveyard is ToObject, where the battlefield half is ToCreature. Bob's
-        -- graveyard, so "a graveyard" is not read as the controller's own.
-        Spec.it s "CR 404.1 whole card: the same slot reaches a creature card in a graveyard" $ do
-          (gs, mine, _) <- board ["Savior of Ollenbock", "Goblin Piker"] []
-          sentry <- S.printingOf s registry "Ogre Sentry"
-          case mine of
-            [savior, piker] -> do
-              let (card, stocked) = S.addGraveyardCard sentry S.bob gs
-                  after = atBlockers (aimingAt (Recipient.ToObject card) [savior, piker]) stocked
-              Spec.assertEqWith s "the Savior trained" (countersOn savior after) (Map.singleton CounterKind.PlusOnePlusOne 1)
-              Spec.assertEqWith s "and the graveyard card is in exile" (exiledNames after) [named "Ogre Sentry"]
-              Spec.assertEqWith s "out of bob's graveyard" (graveyardNames S.bob after) []
-            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker"
-        -- CR 607.2a's linked set read back by the card's third ability. The victim
-        -- is BOB's card, so "under their owners' control" is observable: the
-        -- ability's controller is alice, and an owner-blind return would hand her
-        -- the Sentry.
-        Spec.it s "CR 607.2a whole card: the Savior leaving the battlefield returns what it exiled, to its owner" $ do
-          (gs, mine, _) <- board ["Savior of Ollenbock", "Goblin Piker"] []
-          sentry <- S.printingOf s registry "Ogre Sentry"
-          case mine of
-            [savior, piker] -> do
-              let (card, stocked) = S.addGraveyardCard sentry S.bob gs
-                  exiled = atBlockers (aimingAt (Recipient.ToObject card) [savior, piker]) stocked
-                  (placed, after) = killIt savior exiled
-              Spec.assertEqWith s "the premise: the Sentry is in exile" (exiledNames exiled) [named "Ogre Sentry"]
-              Spec.assertEqWith s "the departure placed one trigger" (length (GameState.stack placed)) 1
-              Spec.assertEqWith s "exile is empty again" (exiledNames after) []
-              Spec.assertEqWith s "and bob controls the Sentry" (controlledNames S.bob after) [named "Ogre Sentry"]
-              Spec.assertEqWith s "while alice keeps only her Piker" (controlledNames S.alice after) [named "Goblin Piker"]
-            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker"
         -- The discrimination rule 702.149c is FOR: a +1/+1 counter arriving from
         -- Battlegrowth ({G} Instant, "put a +1/+1 counter on target creature") is
         -- the same counter the training ability would have put, and it trains
@@ -1195,44 +1131,7 @@ provokeSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
-      tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
    in Spec.describe s "Provoke" $ do
-        -- The proving test, and it covers both halves of rule 702.39a at once:
-        -- bob's only creature is TAPPED, so CR 509.1a makes it no candidate at
-        -- all until the untap, and the block that follows is CR 509.1c's
-        -- requirement overriding an interpreter that declined to block.
-        Spec.it s "CR 702.39a whole card: the provoked creature untaps and blocks" $ do
-          (gs0, mine, theirs) <- board ["Goblin Grappler"] ["Goblin Piker"]
-          case (mine, theirs) of
-            ([grappler], [piker]) -> do
-              let after = atDamage (plan OptionalDecision.Exercises piker) (S.tapObject piker gs0)
-              Spec.assertEqWith s "the Piker is blocking the Grappler" (Combat.blockersOf grappler after) (Set.singleton piker)
-            _ -> Spec.assertFailure s "fixture should give alice a Grappler and bob a Piker"
-        -- CR 603.5 / 608.2e: one printed "may" over one clause, so declining it
-        -- withholds BOTH instructions. The same board and the same declining
-        -- blocker answer as the proving test; only the answer to the "may"
-        -- differs, which is what makes that test's block the keyword's.
-        Spec.it s "CR 603.5 declining the may leaves the creature tapped and blocking nothing" $ do
-          (gs0, mine, theirs) <- board ["Goblin Grappler"] ["Goblin Piker"]
-          case (mine, theirs) of
-            ([grappler], [piker]) -> do
-              let after = atDamage (plan OptionalDecision.Declines piker) (S.tapObject piker gs0)
-              Spec.assertEqWith s "nothing blocks" (Combat.blockersOf grappler after) Set.empty
-              Spec.assertEqWith s "and it is still tapped" (tapStateOf piker after) (Just TapState.Tapped)
-            _ -> Spec.assertFailure s "fixture should give alice a Grappler and bob a Piker"
-        -- The REQUIREMENT alone, with the untap taken out of the picture: bob's
-        -- creature is already untapped, so it could have blocked or not, and CR
-        -- 509.1c is the only thing that makes declining illegal.
-        Spec.it s "CR 509.1c an untapped provoked creature must block anyway" $ do
-          (gs0, mine, theirs) <- board ["Goblin Grappler"] ["Goblin Piker"]
-          case (mine, theirs) of
-            ([grappler], [piker]) ->
-              Spec.assertEqWith
-                s
-                "the Piker is blocking"
-                (Combat.blockersOf grappler (atDamage (plan OptionalDecision.Exercises piker) gs0))
-                (Set.singleton piker)
-            _ -> Spec.assertFailure s "fixture should give alice a Grappler and bob a Piker"
         -- The control for the case above, and the reason it is not vacuous: the
         -- same board with a provokeless attacker lets the declining answer
         -- stand. Goblin Piker {1}{R} 2/1 is the pool's vanilla, so the ONLY

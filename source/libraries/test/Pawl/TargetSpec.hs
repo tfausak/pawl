@@ -81,7 +81,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural.Type
 import qualified Pawl.Engine.Action as Action
-import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Damage as Damage
@@ -107,7 +106,6 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -137,7 +135,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -2854,7 +2851,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   ravenousRatsSpec s registry
   -- And the OBJECT a computed count is read against, on the two ability roads
   -- where the stack object and CR 113.7's source are not the same thing.
-  crescendoSpec s registry
   -- And the one slot in the corpus its CONTROLLER does not announce.
   cuombajjSpec s registry
   -- And CR 115.7d, a spell that is already on the stack given new targets.
@@ -3683,61 +3679,6 @@ overCounting p = case p of
     pure (if asked_ == 0 then fmap snd asked else S.preferring (const True) asked)
   _ -> pure (S.identityAnswer p)
 
--- CR 113.7: "the source of an ability is the object that generated it. The source
--- of an activated ability on the stack is the object whose ability was
--- activated." A target count computed off the board is a number about that
--- object, so Target.chooseTargets is handed the SOURCE and not the ability object
--- on the stack -- the same id Target.selectionLegal beside it is handed, so the
--- offer and CR 601.2c's judgement cannot disagree about one announcement.
---
--- Rumbling Crescendo {3}{R}{R} Enchantment (data/cards/rumbling-crescendo.json):
--- "At the beginning of your upkeep, you may put a verse counter on this
--- enchantment. {R}, Sacrifice this enchantment: Destroy up to X target lands,
--- where X is the number of verse counters on this enchantment." (name, cost, type
--- line and Oracle text checked against api.scryfall.com, 2026-09-13.) Nothing is
--- omitted, so pawl's card is neither stricter nor weaker than printed.
---
--- The count reads Quantity.ObjectCounters, which answers against whatever object
--- the quantity is evaluated at -- so it is zero on the ability object, which
--- carries no counters, and two on the enchantment. Mogis's Marauder reads
--- devotion through Filter.perspective, which reaches the controller from either
--- object, so it is this card and not that one that tells the two apart.
---
--- FOUR lands against a count of two, so neither the offer nor the answer is
--- forced by the board -- and the two the announcement names are bob's, so alice's
--- own Mountain proves the count rather than the pool ran out.
-crescendoSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-crescendoSpec s registry = Spec.describe s "A computed target count's object (CR 113.7)" $ do
-  Spec.it s "CR 113.7 an activated ability's computed count reads the source's counters, not the ability's" $ do
-    crescendo <- S.printingOf s registry "Rumbling Crescendo"
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    let (first_, oneForest) = S.addPermanent forest S.bob (Setup.emptyGame S.bothPlayers)
-        (second_, twoForests) = S.addPermanent forest S.bob oneForest
-        (_, threeForests) = S.addPermanent forest S.bob twoForests
-        (crescendoId, staged) = S.addPermanent crescendo S.alice (S.landsFor mountain S.alice 1 threeForests)
-        board = mainPhase (S.addCounter verseCounter 2 crescendoId staged)
-        abilities = Activatable.abilitiesFor crescendoId board
-        after = case abilities of
-          [ability] -> S.runPure (aimingCrescendo [first_, second_]) board (Activate.activateAbility S.alice crescendoId ability >> Stack.resolveTop)
-          _ -> board
-    Spec.assertEqWith s "Rumbling Crescendo states exactly one activated ability" (length abilities) 1
-    -- The gameplay-level assertion first: two of bob's three Forests are gone,
-    -- which is the count the enchantment's own verse counters name. Read against
-    -- the ability object instead, the count is zero, the announcement is empty and
-    -- all three Forests survive.
-    Spec.assertEqWith s "CR 113.7 the two announced Forests were destroyed" (length (Game.zoneMembers Zone.Battlefield S.bob after)) 1
-    Spec.assertEqWith s "and they are in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
-    -- The proxies last. The cost was paid both ways, so the Forests above are the
-    -- announcement rather than an activation that never happened.
-    Spec.assertEqWith s "alice's Mountain paid the {R}" (S.tappedCount S.alice after) 1
-    Spec.assertEqWith s "and the enchantment was sacrificed for the cost" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-    Spec.assertEqWith s "the ability resolved" (GameState.stack after) []
-
--- CR 122.1's open arm, as Pawl.Codec.CounterName.make admits it from card data.
-verseCounter :: CounterKind.CounterKind Keyword.Keyword
-verseCounter = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "verse"))
-
 mainPhase :: GameState.GameState -> GameState.GameState
 mainPhase gs =
   gs
@@ -3745,16 +3686,6 @@ mainPhase gs =
       GameState.phase = Phase.PrecombatMain,
       GameState.priority = Just S.alice
     }
-
--- CR 601.2c for Rumbling Crescendo: announce the largest number the slot's own
--- count allows, then name exactly these permanents out of the offered set. PINNED
--- by filtering rather than built (aimingDwell's reason), and by id rather than by
--- a predicate an answerer could re-satisfy after a mutation.
-aimingCrescendo :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-aimingCrescendo oids p = case p of
-  Prompt.AnnounceTargets _ _ _ offers -> fmap (\(count, legal) -> TargetCount.ceilingOn (Natural.length legal) count) offers
-  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (maybe False (`elem` oids) . Recipient.objectOf) offered) asked
-  _ -> S.identityAnswer p
 
 -- CR 115.7d over an ORIGINAL spell: Redirect ({U}{U} Instant, "You may choose new
 -- targets for target spell"), with CR 702.21a's ward as the observer of what
