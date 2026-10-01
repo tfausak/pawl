@@ -1,0 +1,54 @@
+{
+  "description": "CR 400.7a a spell that became no permanent carries no text change into its graveyard",
+  "note": "CR 400.7a carries an effect to the permanent a spell becomes, so a permanent spell that a CR 614.6 redirect sends elsewhere becomes no permanent and carries nothing (#2399). Synthetic Entry Interdiction sends the green Giant Spider spell to the graveyard after Artificial Evolution swapped Spider for Vampire on it. Queen's Bay Paladin's enters trigger returns up to one target Vampire card from the graveyard: a carried-over change would offer the Spider and cost alice 4 life, so no target prompt is scheduled and any would fail the run.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Island", "label": "island-1", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true },
+          { "card": "Island", "label": "island-3", "ready": true },
+          { "card": "Island", "label": "island-4", "ready": true },
+          { "card": "Swamp", "label": "swamp-1", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true },
+          { "card": "Swamp", "label": "swamp-4", "ready": true },
+          { "card": "Swamp", "label": "swamp-5", "ready": true },
+          { "card": "Swamp", "label": "swamp-6", "ready": true },
+          { "card": "Swamp", "label": "swamp-7", "ready": true },
+          { "card": "Synthetic Entry Interdiction", "label": "interdiction", "ready": true }
+        ],
+        "hand": [
+          { "card": "Giant Spider", "label": "spider" },
+          { "card": "Artificial Evolution", "label": "evolution" },
+          { "card": "Queen's Bay Paladin", "label": "paladin" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@spider", "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Giant Spider"], "mana": ["@island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Artificial Evolution", "do": { "ChooseTypeSwap": { "from": { "type": "Spider" }, "to": { "type": "Vampire" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@paladin", "mana": ["@swamp-1", "@swamp-2", "@swamp-3", "@swamp-4", "@swamp-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Giant Spider", "count": 0 } },
+    { "Life": { "player": "alice", "life": 20 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Giant Spider", "count": 1 } }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "description": "CR 612.1 whole cards: the rewritten gate decides a real declare attackers step",
+  "note": "Glacial Crasher can't attack unless there is a Mountain on the battlefield, and there is none. Magical Hack swaps Mountain for Island on it, so alice's own Island, the one that paid for the Hack, now lifts the gate: the 5/5 attacks an empty board and bob goes to 15. The control file is the same board unhacked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Glacial Crasher", "label": "crasher", "ready": true },
+          { "card": "Island", "label": "island" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@crasher"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Mountain" }, "to": { "type": "Island" } } }, "source": "Magical Hack" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@crasher"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } }
+  ]
+}

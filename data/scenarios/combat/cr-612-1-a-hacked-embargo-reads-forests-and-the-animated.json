@@ -1,0 +1,31 @@
+{
+  "description": "CR 612.1 a hacked Embargo reads FORESTS and the animated Swamp may attack",
+  "note": "Synthetic Wetland Embargo prints \"Swamps can't attack. Islands can't block.\"; Kormus Bell makes every Swamp a 1/1 creature, so a Swamp is a combat participant. A text change on the source must reach the subtype word in the affected set (CR 612.1, 508.1c, 509.1b). alice pays the Hack from her own Island, never animated, named so the animated Swamp is not tapped for it. Swamp -> Forest on the Embargo frees the animated Swamp, which is offered and attacks.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kormus Bell", "label": "bell", "ready": true },
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Synthetic Wetland Embargo", "label": "source", "ready": true }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": []
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@source"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Swamp" }, "to": { "type": "Forest" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@swamp"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@swamp": "@bob" } } } }
+  ]
+}

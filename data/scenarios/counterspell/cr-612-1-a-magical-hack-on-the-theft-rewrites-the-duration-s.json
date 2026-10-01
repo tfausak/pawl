@@ -1,0 +1,38 @@
+{
+  "description": "CR 612.1 a Magical Hack on the theft rewrites the duration's own word",
+  "note": "Synthetic Conditional Theft gains control of target creature for as long as you control a Swamp; alice controls three Islands and no Swamp, so the printed duration never starts and the theft does nothing (CR 611.2b). A Magical Hack resolved at the Theft spell first swaps Swamp for Island, and alice takes bob's Goblin Piker. Synthetic because every printed \"for as long as\" duration names its own source. alice's Blade Instructor makes the Theft's target a real choice. Both spells in the graveyard is the emptied stack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Blade Instructor" }
+        ],
+        "hand": [
+          { "card": "Synthetic Conditional Theft", "label": "theft" },
+          { "card": "Magical Hack", "label": "hack" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@theft", "targets": ["@piker"], "mana": ["@island-1", "@island-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["Synthetic Conditional Theft"], "mana": ["@island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Swamp" }, "to": { "type": "Island" } } }, "source": "Magical Hack" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Synthetic Conditional Theft", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Magical Hack", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

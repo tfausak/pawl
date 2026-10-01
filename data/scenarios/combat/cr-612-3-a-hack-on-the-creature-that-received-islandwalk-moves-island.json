@@ -1,0 +1,36 @@
+{
+  "description": "CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing",
+  "note": "Magical Hack swaps Island for Swamp on Tidal Warrior, which RECEIVED its islandwalk from Lord of Atlantis: CR 612.3 keeps a granted ability out of the swap's reach, so bob's Island still stops the block, rejected whole under CR 509.1b, and the Warrior is still 2/2. The Warrior is a non-vacuous target, its own text naming an Island; the answered swap is what shows the Hack resolved onto it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Tidal Warrior", "label": "warrior", "ready": true },
+          { "card": "Lord of Atlantis", "label": "lord", "ready": true },
+          { "card": "Island", "label": "island" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@warrior"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@warrior", "@lord"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@warrior"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@warrior", "blockers": null } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@warrior", "power": 2, "toughness": 2 } } }
+  ]
+}

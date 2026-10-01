@@ -1,0 +1,30 @@
+{
+  "description": "CR 509.1b a hacked Embargo's block half BINDS a Swamp the printed one left alone",
+  "note": "Synthetic Wetland Embargo prints \"Swamps can't attack. Islands can't block.\"; Kormus Bell makes every Swamp a 1/1 creature, so a Swamp is a combat participant. A text change on the source must reach the subtype word in the affected set (CR 612.1, 508.1c, 509.1b). alice pays the Hack from her own Island, never animated, named so the animated Swamp is not tapped for it. bob's only creature is a Swamp the Bell animates; the printed \"Islands can't block\" leaves it free, and Island -> Swamp binds it. alice's Goblin Piker, absent from the Haskell board, is there to be blocked, so canBlock becomes a real declaration. This is the printed control: the Hack stays in hand and bob's Swamp blocks.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kormus Bell", "label": "bell", "ready": true },
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Synthetic Wetland Embargo", "label": "source", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Swamp", "label": "bobs-swamp", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@bobs-swamp": ["@piker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@piker", "blockers": ["@bobs-swamp"] } } }
+  ]
+}
