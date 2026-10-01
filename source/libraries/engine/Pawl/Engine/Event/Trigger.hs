@@ -21,7 +21,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
-import Pawl.Engine.Event.Binding (batchBindings, batchPartition, eventBindings)
+import Pawl.Engine.Event.Binding (batchBindings, batchPartition, eventBindingsOver)
 import Pawl.Engine.Event.Match (matchesTriggerGiven, stepPlayers)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -157,6 +157,26 @@ battlefieldCandidates gs =
 -- group no sample names, `eventTriggers`' fallback and its reason.
 battlefieldAt :: EventGroup.EventGroup -> GameState -> Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics)
 battlefieldAt group gs = Map.findWithDefault (battlefieldCandidates gs) group (GameState.battlefieldWhenTriggered gs)
+
+-- CR 603.10: the board "immediately after" a permanent entered includes what its
+-- as-enters effects did, since they are part of the entry (CR 614.1c). So the
+-- CR 603.10 sample filed under the entry's event group is taken again now --
+-- a watcher Ixidron turned face down sees nothing enter. Pawl.FaceDownSpec's "CR
+-- 614.1c / 603.10 a watcher Ixidron turns face down does not see it enter" proves
+-- it. CR 613.7m's chosen stamps are part of the entry too, so
+-- Pawl.Engine.Restamp.settle resamples after it reassigns them. Only an existing
+-- sample is replaced; a group without one reads the live board anyway
+-- (`battlefieldAt`).
+resampleEntry :: ObjectId -> GameState -> GameState
+resampleEntry oid gs = case entryGroup oid gs of
+  Nothing -> gs
+  Just group -> gs {GameState.battlefieldWhenTriggered = Map.adjust (const (battlefieldCandidates gs)) group (GameState.battlefieldWhenTriggered gs)}
+
+-- The event group of the log entry that put `oid` onto the battlefield.
+entryGroup :: ObjectId -> GameState -> Maybe EventGroup.EventGroup
+entryGroup oid gs =
+  let entered logged = maybe False (\zc -> ZoneChange.object zc == oid && ZoneChange.to zc == Zone.Battlefield) (movedOf (LoggedEvent.event logged))
+   in fmap (LoggedEvent.group . Seq.index (GameState.events gs)) (Seq.findIndexR entered (GameState.events gs))
 
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
@@ -2179,7 +2199,7 @@ eventTriggers events gs =
             -- CR 400.7d: an ability of a permanent may read what costs were
             -- paid for the spell it was, so the bearer's record rides on every
             -- ability it triggers (Binding.paidCostRecord).
-            pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (Map.union (Binding.paidCostRecord bindings) (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event)) Nothing (Just event)
+            pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (Map.union (Binding.paidCostRecord bindings) (eventBindingsOver board gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event)) Nothing (Just event)
             -- CR 805.4d: one trigger per player whose step this is, each naming
             -- its own "that player", where the ability reads that player.
             pends (cond, ab) =
@@ -3435,7 +3455,7 @@ delayedPending grouped gs =
       occurrences entry
         | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = concatMap (ListUtils.nubOrdOn (partitionOf entry) . NonEmpty.toList) (eventGroups (matching entry))
         | otherwise = matching entry
-      memberSlots entry = eventBindings gs Nothing Map.empty (DelayedTrigger.source entry) (DelayedTrigger.controller entry) (TriggeredAbility.condition (DelayedTrigger.ability entry)) . LoggedEvent.event
+      memberSlots entry logged = eventBindingsOver (battlefieldAt (LoggedEvent.group logged) gs) gs Nothing Map.empty (DelayedTrigger.source entry) (DelayedTrigger.controller entry) (TriggeredAbility.condition (DelayedTrigger.ability entry)) (LoggedEvent.event logged)
       partitionOf entry = batchPartition (TriggeredAbility.condition (DelayedTrigger.ability entry)) . memberSlots entry
       -- Which entries CR 603.7b's second sentence actually ASKS, answered without
       -- asking: the CR 101.4c ordering below has to know before the first
@@ -3731,6 +3751,16 @@ neededLimit = 8
 -- Answers False -- the effects count -- wherever the question cannot be put: a
 -- delayed, reflexive or state trigger, which has no event scan to repeat, and
 -- a snapshot `resnapshot` cannot re-read.
+--
+-- The re-scan reads the live board, not the event's CR 603.10 sample, which
+-- holds projections and so cannot be re-projected without `gone`. The two
+-- differ only where a CR 704 action between the event and the scan changed a
+-- subject the match reads off the sample (Event.Binding.postEventView): an
+-- entrant or a combat damager. That matters only for a trigger inside a CR
+-- 801.16 loop, which no combat-damage trigger is (CR 508.1 attacks are
+-- declared, not mandatory actions); an enters loop reaches it only if a
+-- state-based action re-shapes each iteration's entrant, and
+-- Pawl.RangeOfInfluenceSpec's loops enter permanents none touches.
 --
 -- The CR 603.4 check is a regression fence rather than a proved behaviour:
 -- dropping it leaves Pawl.RangeOfInfluenceSpec green, no ability in its loop
