@@ -747,6 +747,7 @@ effectObjectRefs effect = case effect of
   Effect.ChooseNumber {} -> []
   Effect.Tap ref -> [ref]
   Effect.Untap ref -> [ref]
+  Effect.Unattach ref -> [ref]
   Effect.Detain ref -> [ref]
   Effect.Goad ref -> [ref]
   Effect.Pair ref -> [ref]
@@ -960,6 +961,7 @@ effectPlayerRefs effect = case effect of
   Effect.ChooseNumber {} -> []
   Effect.Tap {} -> []
   Effect.Untap {} -> []
+  Effect.Unattach {} -> []
   Effect.Detain {} -> []
   Effect.Goad {} -> []
   Effect.Pair {} -> []
@@ -1338,6 +1340,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ChooseNumber _ -> Map.empty
   Effect.Tap _ -> Map.empty
   Effect.Untap _ -> Map.empty
+  Effect.Unattach _ -> Map.empty
   Effect.Detain _ -> Map.empty
   Effect.Goad _ -> Map.empty
   Effect.Pair _ -> Map.empty
@@ -1984,6 +1987,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ChooseNumber _ -> True
   Effect.Tap _ -> True
   Effect.Untap _ -> True
+  Effect.Unattach _ -> True
   Effect.Detain _ -> True
   Effect.Goad _ -> True
   Effect.Pair _ -> True
@@ -2241,6 +2245,7 @@ readsX =
         Effect.ChooseNumber _ -> False
         Effect.Tap _ -> False
         Effect.Untap _ -> False
+        Effect.Unattach _ -> False
         Effect.Detain _ -> False
         Effect.Goad _ -> False
         Effect.Pair _ -> False
@@ -2494,6 +2499,7 @@ boundSlots effect = case effect of
   Effect.ChooseNumber (ChooseNumber.MkChooseNumber slot _) -> Set.singleton slot
   Effect.Tap _ -> Set.empty
   Effect.Untap _ -> Set.empty
+  Effect.Unattach _ -> Set.empty
   Effect.Detain _ -> Set.empty
   Effect.Goad _ -> Set.empty
   Effect.Pair _ -> Set.empty
@@ -2766,8 +2772,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- A CR 608.2d question, so this pure sweep answers nothing for it: the
   -- candidates are battlefieldMatching's, but WHICH of them the instruction names
   -- is the chooser's, and two gathers reach the Game monad to ask --
-  -- permanentsGathered, which Effect.Transform, Effect.Convert, Effect.AttachAll
-  -- and Effect.Untap share, and the Effect.MoveToZone gather. Under any other
+  -- permanentsGathered, which Effect.Transform, Effect.Convert, Effect.AttachAll,
+  -- Effect.Unattach and Effect.Untap share, and the Effect.MoveToZone gather. Under any other
   -- opcode this empty answer is an inert card-data error, which
   -- Pawl.EffectLintSpec's inertChoosers rejects at load time --
   -- ChosenCardInGraveyard's note below is the shape.

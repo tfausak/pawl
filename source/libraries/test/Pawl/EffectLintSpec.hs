@@ -344,6 +344,7 @@ ownQuantities effect = case effect of
   Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Unattach _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
   Effect.Pair _ -> []
@@ -1191,10 +1192,10 @@ data Asks
     -- arm falls through to the pure sweep.
     AsksDiscardArm
   | -- | Pawl.Engine.Resolve's permanentsGathered, shared by Effect.Transform,
-    -- Effect.Convert, Effect.AttachAll, Effect.Untap and Effect.Sacrifice. It asks
-    -- the any-number arm and nothing else: the four card-shaped chosen arms name
-    -- cards in a graveyard, a hand or a group, and these instructions act on
-    -- PERMANENTS.
+    -- Effect.Convert, Effect.AttachAll, Effect.Unattach, Effect.Untap and
+    -- Effect.Sacrifice. It asks the any-number arm and nothing else: the four
+    -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and
+    -- these instructions act on PERMANENTS.
     AsksTransformGather
   | -- | Pawl.Engine.Resolve's Effect.LookAt arm. It asks the hand chooser --
     -- Word of Command's "look at target opponent's hand and choose a card from
@@ -1458,6 +1459,7 @@ effectObjectRefs effect =
         Effect.ChooseNumber {} -> []
         Effect.Tap ref -> read_ [ref]
         Effect.Untap ref -> [(AsksTransformGather, ref)]
+        Effect.Unattach ref -> [(AsksTransformGather, ref)]
         Effect.Detain ref -> read_ [ref]
         Effect.Goad ref -> read_ [ref]
         Effect.Pair ref -> [(AsksChosenPermanent, ref)]

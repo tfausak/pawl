@@ -223,6 +223,7 @@ codec cardCodec abilityCodec =
           Arm.payload "ChooseNumber" ChooseNumber.codec Effect.ChooseNumber (\x -> case x of Effect.ChooseNumber y -> Just y; _ -> Nothing),
           Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),
           Arm.payload "Untap" ObjectRef.codec Effect.Untap (\x -> case x of Effect.Untap y -> Just y; _ -> Nothing),
+          Arm.payload "Unattach" ObjectRef.codec Effect.Unattach (\x -> case x of Effect.Unattach y -> Just y; _ -> Nothing),
           Arm.payload "Detain" ObjectRef.codec Effect.Detain (\x -> case x of Effect.Detain y -> Just y; _ -> Nothing),
           Arm.payload "Earthbend" Earthbend.codec Effect.Earthbend (\x -> case x of Effect.Earthbend y -> Just y; _ -> Nothing),
           Arm.payload "Airbend" ObjectRef.codec Effect.Airbend (\x -> case x of Effect.Airbend y -> Just y; _ -> Nothing),
@@ -389,6 +390,7 @@ tagOf x = case x of
   Effect.ChooseNumber {} -> "ChooseNumber"
   Effect.Tap {} -> "Tap"
   Effect.Untap {} -> "Untap"
+  Effect.Unattach {} -> "Unattach"
   Effect.Detain {} -> "Detain"
   Effect.Earthbend {} -> "Earthbend"
   Effect.Airbend {} -> "Airbend"
