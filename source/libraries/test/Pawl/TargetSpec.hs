@@ -400,7 +400,7 @@ aimingBioshift giverId takerId p = case p of
 -- (CR 608.2b re-checks each), and `second` adds Not (IsBound "first"). alice's graveyard
 -- holds two Hill Giants, a Goblin Piker and a Woodland Changeling; every board
 -- is the same, and the cases differ only in which pair is named.
-unburySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unburySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 unburySpec s registry = Spec.describe s "Unbury" $ do
   let fixture = do
         swamp <- S.printingOf s registry "Swamp"
@@ -415,11 +415,6 @@ unburySpec s registry = Spec.describe s "Unbury" $ do
             (changelingId, g4) = S.addObjectIn Zone.Graveyard changeling S.alice g3
             (board, spellId) = S.handOne unbury g4
         pure (unbury, board, spellId, giantA, giantB, pikerId, changelingId)
-      inHand oid gs = elem oid (Game.zoneMembers Zone.Hand S.alice gs)
-      -- A returned card is a new object in hand (CR 400.7), so the hand is
-      -- read by name.
-      handNames gs = List.sort (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs))
-      named = List.sort . fmap (CardName.MkCardName . Text.pack)
   -- The union posture: before either target is chosen, the second slot is
   -- offered every creature card, the Goblin included, and the joint check is
   -- what narrows it.
