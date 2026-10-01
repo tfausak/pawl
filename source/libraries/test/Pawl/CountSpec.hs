@@ -12,7 +12,6 @@ module Pawl.CountSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.CastRestrictionSpec as CastSpec
