@@ -1,0 +1,31 @@
+{
+  "description": "CR 728.1a the loss from radiation becomes a gain, and damage on the same board still takes life",
+  "note": "Strong, the Brutish Thespian turns life loss from radiation into a gain (CR 614.6). Two counters mill two Lightning Bolts over a Mountain, so 20 becomes 22; bob's Lightning Bolt then deals 3 under the same row, and damage is not radiation (CR 120.4c), so 22 becomes 19. Without the second loss the case would pass on a rewrite that never looked at the cause. The Haskell test applied the 3 damage directly from a Goblin Piker; bob's Bolt is the same noncombat 3.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [{ "key": { "type": "Rad" }, "value": 2 }],
+        "battlefield": [{ "card": "Strong, the Brutish Thespian" }],
+        "library": [
+          { "card": "Lightning Bolt" },
+          { "card": "Lightning Bolt" },
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Mountain", "label": "mountain" }],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 22 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@alice"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 19 } } }
+  ]
+}

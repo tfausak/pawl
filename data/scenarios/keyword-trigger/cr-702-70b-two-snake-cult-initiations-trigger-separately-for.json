@@ -1,0 +1,26 @@
+{
+  "description": "CR 702.70b two Snake Cult Initiations trigger separately for six poison",
+  "note": "Two Auras grant two instances of poisonous 3, and CR 702.70b makes each its own ability: two triggers and six counters. A projection that keeps keywords in a set collapses the second grant into the first and gives bob three.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Snake Cult Initiation", "label": "initiation-1", "attached": "piker" },
+          { "card": "Snake Cult Initiation", "label": "initiation-2", "attached": "piker" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@piker", "@piker"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 6 } } }
+  ]
+}

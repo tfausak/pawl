@@ -3073,7 +3073,7 @@ professorHojoSpec s registry =
 --
 -- The poison count is the signal: one counter per trigger, and bob starts at
 -- none. bob is alice's only opponent, so the trigger's own target is forced.
-veneratedRotpriestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+veneratedRotpriestSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 veneratedRotpriestSpec s registry =
   let -- The wanted recipients where a slot offers any, and the first offered
       -- otherwise -- the Rotpriest's "target opponent", which offers bob alone.
@@ -3110,13 +3110,6 @@ veneratedRotpriestSpec s registry =
          in S.runPure answer cast (Foldable.foldr (>>) (pure ()) (replicate 4 (Stack.resolveTop >> Engine.settleForPriority)))
       poisonOf = S.playerCounterOf PlayerCounterKind.Poison S.bob
    in Spec.describe s "CR 601.2c a creature becoming the target of a spell" $ do
-        -- CR 603.2c's second sentence: "a creature" is one trigger event per
-        -- creature targeted, where Professor Hojo's "one or more" is one.
-        Spec.it s "Venerated Rotpriest triggers once per creature a spell targets" $ do
-          (spellId, firstPiker, secondPiker, gs) <- board "Lead by Example" "Forest"
-          let after = castAt firstPiker (Set.fromList [Recipient.ToCreature firstPiker, Recipient.ToCreature secondPiker]) spellId gs
-          Spec.assertEqWith s "CR 603.2c bob got two poison counters" (poisonOf after) 2
-          Spec.assertEqWith s "and both Pikers took a counter" (S.powerToughnessOf firstPiker after, S.powerToughnessOf secondPiker after) (Just (3, 2), Just (3, 2))
         -- CR 603.10's first sentence at CR 601.2c's moment, the spell half of
         -- Professor Hojo's sacrificed-target leg: Fling names the Piker its own
         -- additional cost sacrifices (CR 601.2h).

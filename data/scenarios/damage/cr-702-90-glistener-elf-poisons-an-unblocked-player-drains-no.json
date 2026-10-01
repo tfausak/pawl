@@ -1,0 +1,23 @@
+{
+  "description": "CR 702.90 Glistener Elf poisons an unblocked player, drains no life",
+  "note": "CR 120.3b: infect damage to a player becomes poison counters instead of life loss. bob has no blocker, so the Elf's one damage reaches him; the poison lands on bob, not on alice, the source's controller.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Glistener Elf", "label": "elf", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@elf"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Poison" }, "count": 0 } } }
+  ]
+}
