@@ -1,0 +1,35 @@
+{
+  "description": "CR 508.1d whole cards: Gideon Jura destroyed before bob's combat leaves his +2 requiring nothing, so bob may decline to attack",
+  "note": "Gideon's ruling: a creature that can't attack Gideon because he has left the battlefield may attack anything or nothing. gideon-jura-bolt-elsewhere-still-requires is the control, differing only in the Bolt's target. One decline, accepted at once: a requirement still in force would reject it and raise an unscheduled prompt.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Gideon Jura", "label": "gideon", "counters": [{ "key": { "type": "Loyalty" }, "value": 1 }] }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Mountain", "label": "m1" }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@gideon", "ability": 0, "targets": ["@bob"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@bolt", "targets": ["@gideon"], "mana": ["@m1"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Gideon Jura", "count": 1 } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

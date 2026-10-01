@@ -87,8 +87,11 @@
                             }
                           },
                           "defender": {
-                            "type": "InSlot",
-                            "value": "opponent"
+                            "type": "Players",
+                            "value": {
+                              "type": "InSlot",
+                              "value": "opponent"
+                            }
                           },
                           "duration": {
                             "type": "UntilEndOfCombat"

@@ -32,10 +32,10 @@ data AttackRequirement = MkAttackRequirement
     -- combat if able"), which Pawl.Engine.AttackRequirement instantiates as one
     -- pair per announcement CR 508.1b admits, so any announcement obeys it.
     --
-    -- A Pawl.Types.RequiredDefender and not the PlayerId
-    -- Pawl.Types.ActiveAttackRequirement carries: that carrier's producer names
-    -- its player by TARGETING it, and a static ability has no target to read.
-    -- The type says why neither PlayerRef nor PlayerScope reaches the phrase.
+    -- A Pawl.Types.RequiredDefender and not the AttackTarget
+    -- Pawl.Types.ActiveAttackRequirement carries: that carrier's producer reads
+    -- its ref once at resolution, and a static ability has no resolution. The
+    -- type says why neither PlayerRef nor PlayerScope reaches the phrase.
     object :: Maybe RequiredDefender.RequiredDefender,
     -- | CR 508.1d's second shape -- "or that it attacks if some condition is
     -- met" -- read as CR 604.2's "as long as" clause. Otarian Juggernaut's

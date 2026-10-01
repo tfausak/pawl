@@ -548,7 +548,7 @@ data Effect card ability
     CantBeRegenerated CantBeRegenerated.CantBeRegenerated
   | -- | CR 508.1d / 613.11: install a stored attacking requirement for a
     -- duration (Alluring Siren), one instance per (attacker, defender) pair --
-    -- rule 508.1d's two axes being an object and a player.
+    -- rule 508.1d's two axes being a creature and what CR 508.1b lets it attack.
     RequireAttack RequireAttack.RequireAttack
   | -- | CR 509.1b / 613.11: install a stored blocking restriction for a duration
     -- (Zirda, the Dawnwaker). A rules modification (CR 613.11) rather than a

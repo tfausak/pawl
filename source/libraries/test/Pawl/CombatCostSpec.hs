@@ -2702,7 +2702,7 @@ randomPlayerSpec s registry = Spec.describe s "RandomPlayer" $ do
           s
           "the stored requirement names carol"
           (fmap ActiveAttackRequirement.defender (GameState.attackRequirements atCarol))
-          [S.carol]
+          [AttackTarget.OfPlayer S.carol]
         Spec.assertEqWith
           s
           "and the attacker is Ruhan"
