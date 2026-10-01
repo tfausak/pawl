@@ -133,7 +133,7 @@ codec resolve = Fields.object $ do
   nextEventGroup <- Fields.required "nextEventGroup" EventGroup.codec GameState.nextEventGroup
   eventGroupDepth <- Fields.defaulted "eventGroupDepth" 0 Common.natural GameState.eventGroupDepth
   enteringTogether <- Fields.defaulted "enteringTogether" Nothing (Common.maybe EnteringTogether.codec) GameState.enteringTogether
-  libraryArrivals <- Fields.defaulted "libraryArrivals" Seq.empty (Common.seq LibraryArrival.codec) GameState.libraryArrivals
+  libraryArrivals <- Fields.defaulted "libraryArrivals" Nothing (Common.maybe (Common.seq LibraryArrival.codec)) GameState.libraryArrivals
   payingOnResolution <- Fields.defaulted "payingOnResolution" False Common.boolean GameState.payingOnResolution
   lastKnown <- Fields.defaulted "lastKnown" Map.empty (Common.naturalMap ObjectId.codec LastKnown.codec) GameState.lastKnown
   stackArchive <- Fields.defaulted "stackArchive" Map.empty (Common.naturalMap ObjectId.codec Object.codec) GameState.stackArchive

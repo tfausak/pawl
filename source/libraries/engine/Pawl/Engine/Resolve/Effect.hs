@@ -10992,7 +10992,8 @@ applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
   -- Order-independent: Game.removeFromZones takes each mover out of the library
   -- by identity rather than by position.
   State.modify' (reorderLibrary pid kept)
-  Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard
+  -- One CR 401.4 scope, for a redirect into a library (Event.arrivingTogether).
+  Event.arrivingTogether (Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard)
 
 -- CR 701.29a: one player's fateseal -- decideScry's question over an opponent's
 -- library.

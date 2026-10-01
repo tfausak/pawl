@@ -186,6 +186,55 @@ wheelJudgmentBoard s registry reversing = do
       cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
   pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
 
+-- Wheel of Sun and Moon, alice's, enchanting bob, over a library of Plains,
+-- Island, Swamp, Mountain and Forest from the top, then a Goblin Piker; alice
+-- casts Tome Scour at bob, and the five milled cards go to the bottom of that
+-- same library one by one. Returns the resolved state.
+wheelScourBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m GameState.GameState
+wheelScourBoard s registry reversing = do
+  island <- S.printingOf s registry "Island"
+  wheel <- S.printingOf s registry "Wheel of Sun and Moon"
+  scour <- S.printingOf s registry "Tome Scour"
+  pile <- traverse (S.printingOf s registry) ["Goblin Piker", "Forest", "Mountain", "Swamp", "Island", "Plains"]
+  let base = S.landsInPlay island 1
+      (wheelId, withWheel) = S.addPermanent wheel S.alice base
+      enchanting = S.attachTo wheelId (Recipient.ToPlayer S.bob) withWheel
+      stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) enchanting pile
+      (gs, spellId) = S.handOne scour stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ArrangeLibraryArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        _ -> atBobAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
+-- Wheel of Sun and Moon enchanting alice, over her library of Plains, Island,
+-- Goblin Piker and Swamp from the top; she casts Curate and surveils both top
+-- cards into her graveyard, Plains first, so both go to the bottom; then she
+-- draws the Piker, and Curate itself follows them under (CR 608.2n). She
+-- reverses the arrangement she is offered when
+-- `reversing`. Returns the resolved state.
+wheelCurateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m GameState.GameState
+wheelCurateBoard s registry reversing = do
+  island <- S.printingOf s registry "Island"
+  wheel <- S.printingOf s registry "Wheel of Sun and Moon"
+  curate <- S.printingOf s registry "Curate"
+  pile <- traverse (S.printingOf s registry) ["Swamp", "Goblin Piker", "Island", "Plains"]
+  let base = S.landsInPlay island 2
+      (wheelId, withWheel) = S.addPermanent wheel S.alice base
+      enchanting = S.attachTo wheelId (Recipient.ToPlayer S.alice) withWheel
+      stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) enchanting pile
+      (gs, spellId) = S.handOne curate stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseSurveil _ _ looked -> (looked, [])
+        Prompt.ArrangeLibraryArrivals _ pid _ oids
+          | reversing && pid == S.alice -> reverse (zipWith const [0 ..] oids)
+          | otherwise -> zipWith const [0 ..] oids
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
 -- Three seats: alice controls Pulmonic Sliver; carol owns a Lymph Sliver bob
 -- controls, over a library of one Goblin Piker each for bob and carol. The
 -- Lymph Sliver is destroyed; bob answers the redirect as given and any other
@@ -897,6 +946,24 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let name = Just . CardName.MkCardName . Text.pack
     Spec.assertEqWith s "reversed: the Goblin Piker is on the bottom" (namesIn Zone.Library S.bob reversed) [name "Typhoid Rats", name "Ogre Sentry", name "Goblin Piker"]
     Spec.assertEqWith s "kept: the Ogre Sentry is on the bottom" (namesIn Zone.Library S.bob kept) [name "Typhoid Rats", name "Goblin Piker", name "Ogre Sentry"]
+  -- And through the mill funnel, which moves its cards one at a time outside
+  -- any event bracket: Tome Scour's five cards reach the bottom together all
+  -- the same (CR 701.17a, one instruction), so bob orders them.
+  Spec.it s "CR 401.4 bob orders the five cards Wheel of Sun and Moon puts under his library from Tome Scour" $ do
+    reversed <- wheelScourBoard s registry True
+    kept <- wheelScourBoard s registry False
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+    Spec.assertEqWith s "reversed: the Plains, milled first, is on the bottom" (namesIn Zone.Library S.bob reversed) (names ["Goblin Piker", "Forest", "Mountain", "Swamp", "Island", "Plains"])
+    Spec.assertEqWith s "kept: the Forest, milled last, is on the bottom" (namesIn Zone.Library S.bob kept) (names ["Goblin Piker", "Plains", "Island", "Swamp", "Mountain", "Forest"])
+  -- And through a surveil's graveyard half (CR 701.25a), the same one-by-one
+  -- road.
+  Spec.it s "CR 401.4 alice orders the two cards she surveils under her library with Wheel of Sun and Moon" $ do
+    reversed <- wheelCurateBoard s registry True
+    kept <- wheelCurateBoard s registry False
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+    Spec.assertEqWith s "reversed: the Plains, put first, is under the Island" (namesIn Zone.Library S.alice reversed) (names ["Swamp", "Island", "Plains", "Curate"])
+    Spec.assertEqWith s "kept: the Island, put last, is under the Plains" (namesIn Zone.Library S.alice kept) (names ["Swamp", "Plains", "Island", "Curate"])
+    Spec.assertEqWith s "and she drew the Goblin Piker" (namesIn Zone.Hand S.alice reversed) (names ["Goblin Piker"])
   -- CR 118.12: Tweeze's "You may discard a card. If you do, draw a card" makes
   -- the discard a cost paid on resolution, and Library of Leng's ruling: "you
   -- can't use the Library of Leng ability ... when you discard a card as a cost,

@@ -121,10 +121,10 @@ data GameState = MkGameState
     -- | CR 613.7m: the arrivals of the CR 608.2f action under way, ordered when
     -- it ends (Event.together). Nothing outside one.
     enteringTogether :: Maybe EnteringTogether.EnteringTogether,
-    -- | CR 401.4: the redirected library arrivals of the Event.simultaneously
-    -- bracket under way, arranged by their owners when it ends. Empty outside
+    -- | CR 401.4: the redirected library arrivals of the Event.arrivingTogether
+    -- scope under way, arranged by their owners when it ends. Nothing outside
     -- one.
-    libraryArrivals :: Seq.Seq LibraryArrival.LibraryArrival,
+    libraryArrivals :: Maybe (Seq.Seq LibraryArrival.LibraryArrival),
     -- | CR 118.12: the instructions running are the "[do something]" a later
     -- clause's "If [a player] does" reads, so a cost paid on resolution rather
     -- than an effect (Event.payingOnResolution). False outside one.

@@ -360,36 +360,50 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
 -- each source's gain an event of its own.
 --
--- The outermost bracket also settles CR 401.4 for the moves a replacement
--- redirected into a library inside it (arrangeLibraryArrivals), before the group
--- closes.
+-- The body is also one arrivingTogether scope, so CR 401.4 is settled before the
+-- group closes.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
-  result <- body
-  outermost <- State.gets ((== 1) . GameState.eventGroupDepth)
-  Monad.when outermost arrangeLibraryArrivals
+  result <- arrivingTogether body
   State.modify' closeEventGroup
   pure result
 
+-- CR 401.4's scope: the cards a replacement redirects into a library while
+-- `body` runs are put there "at the same time", and their owners arrange them as
+-- it ends (arrangeLibraryArrivals). `simultaneously` opens one; so do the
+-- one-at-a-time moves that are one instruction without being one event group --
+-- a mill (millFromReturningTaken) and a surveil's graveyard half. The OUTERMOST
+-- scope wins, `simultaneously`'s posture.
+arrivingTogether :: Game a -> Game a
+arrivingTogether body = do
+  open <- State.gets (Maybe.isJust . GameState.libraryArrivals)
+  if open
+    then body
+    else do
+      State.modify' (\g -> g {GameState.libraryArrivals = Just Seq.empty})
+      result <- body
+      arrangeLibraryArrivals
+      pure result
+
 -- CR 401.4: "if an effect puts two or more cards in a specific position in a
 -- library at the same time, the owner of those cards may arrange them in any
--- order". The redirected arrivals the bracket recorded (noteLibraryArrival),
+-- order". The redirected arrivals the scope recorded (noteLibraryArrival),
 -- grouped by owner and end; a group of two or more MOVES is asked of its owner
 -- with Prompt.ArrangeLibraryArrivals, and the cards are rewritten into the slots
 -- they already hold. A lone move is one order -- a melded permanent's two cards
 -- were arranged by CR 712.21a as they moved.
 --
 -- After the fact rather than before each move, which no reader can tell apart:
--- nothing inside the bracket reads a library's order.
+-- nothing inside the scope reads a library's order.
 --
 -- Pawl.ZoneChangeSpec's Library of Leng and Wheel of Sun and Moon CR 401.4 cases
 -- prove it.
 arrangeLibraryArrivals :: Game ()
 arrangeLibraryArrivals = do
-  pending <- State.gets GameState.libraryArrivals
+  pending <- State.gets (Maybe.fromMaybe Seq.empty . GameState.libraryArrivals)
+  State.modify' (\g -> g {GameState.libraryArrivals = Nothing})
   Monad.unless (Seq.null pending) $ do
-    State.modify' (\g -> g {GameState.libraryArrivals = Seq.empty})
     gs0 <- State.get
     let movesAt owner position = filter (\arrival -> LibraryArrival.owner arrival == owner && LibraryArrival.position arrival == position) (Foldable.toList pending)
     Monad.forM_ (Game.apnapOrder gs0) $ \owner -> Monad.forM_ [minBound .. maxBound] $ \position -> do
@@ -410,13 +424,12 @@ arrangeLibraryArrivals = do
               rewrite lib = List.foldl' (\acc (slot, oid) -> Seq.update slot oid acc) lib (zip slots arranged)
           State.modify' (\g -> g {GameState.library = Map.adjust rewrite owner (GameState.library g)})
 
--- CR 401.4's record: inside an Event.simultaneously bracket, note a move a
+-- CR 401.4's record: inside an arrivingTogether scope, note a move a
 -- replacement redirected to an end of `owner`'s library. Outside one the move is
 -- alone, and one move is one order.
 noteLibraryArrival :: PlayerId -> LibraryPosition.LibraryPosition -> Seq.Seq ObjectId -> GameState -> GameState
-noteLibraryArrival owner position cards gs
-  | GameState.eventGroupDepth gs == 0 = gs
-  | otherwise = gs {GameState.libraryArrivals = GameState.libraryArrivals gs Seq.|> LibraryArrival.MkLibraryArrival owner position cards}
+noteLibraryArrival owner position cards gs =
+  gs {GameState.libraryArrivals = fmap (Seq.|> LibraryArrival.MkLibraryArrival owner position cards) (GameState.libraryArrivals gs)}
 
 -- CR 613.7m over CR 608.2f's action: run `body` so that everything it puts onto
 -- the battlefield is one batch, settled by Restamp.settle once it ends rather
@@ -5606,7 +5619,9 @@ millFromReturningTaken pid n
           -- Pawl.Engine.Replacement.stocked) had already measured against the
           -- printed one.
           let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
-          arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
+          -- One CR 401.4 scope and not one event group: the moves stay
+          -- separately recorded, as before.
+          arrived <- arrivingTogether (fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards))
           pure (cards, arrived)
 
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
@@ -6484,7 +6499,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- is keyed by owner, and `pid` is the id placeObject was handed.
               Monad.when shuffling (shuffleLibrary pid)
               -- CR 401.4: a redirect INTO a library at a stated end, for the
-              -- bracket's owner to arrange (arrangeLibraryArrivals). A move
+              -- scope's owner to arrange (arrangeLibraryArrivals). A move
               -- headed for a library already had its order settled by its
               -- instruction (Pawl.Engine.Resolve.Effect.settleArrivals), and a
               -- shuffle leaves no position to arrange.
@@ -8491,6 +8506,8 @@ payingOnResolution body = do
 -- Why a resolving instruction's discard happens: ByEffect (CR 609.1), unless
 -- it is CR 118.12's cost (payingOnResolution) -- Library of Leng's ruling,
 -- "costs aren't effects". Pawl.ZoneChangeSpec's Tweeze case proves it.
+-- Pawl.Engine.Cost.counterCause still reads such a cost as an effect for
+-- counters (#4544).
 resolvingDiscardCause :: GameState -> DiscardCause.DiscardCause
 resolvingDiscardCause gs
   | GameState.payingOnResolution gs = DiscardCause.Ordinary
