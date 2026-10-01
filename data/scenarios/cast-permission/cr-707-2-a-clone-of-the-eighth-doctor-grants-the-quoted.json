@@ -1,0 +1,50 @@
+{
+  "description": "CR 707.2 a Clone of The Eighth Doctor grants the quoted replacement",
+  "note": "The projection tripwire: a Clone of bob's The Eighth Doctor grants the same graveyard cast and quoted leave-the-battlefield replacement, read off its copiable values rather than the printed Clone. alice casts the Clone copying the Doctor (its copied mill trigger resolves first), casts the Ornithopter from her graveyard under it, then Murders it: the granted replacement exiles it instead.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Murder", "label": "murder" }
+        ],
+        "graveyard": [{ "card": "Ornithopter" }],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "The Eighth Doctor", "label": "doctor" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@doctor" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone", "names": ["The Eighth Doctor"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Ornithopter", "mana": [null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ornithopter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["Ornithopter"], "mana": ["Swamp", "Swamp#2", "Swamp#3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Ornithopter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Ornithopter", "count": 0 } } }
+  ]
+}

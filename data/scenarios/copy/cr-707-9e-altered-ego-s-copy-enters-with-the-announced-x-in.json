@@ -1,0 +1,45 @@
+{
+  "description": "CR 707.9e Altered Ego's copy enters with the announced X in +1/+1 counters, and declining the copy places none",
+  "note": "Altered Ego is cast with X = 2, since CR 107.3m reads the X announced for the spell, and copies the Hill Giant: the Giant's 3/3 with two +1/+1 counters is 5/5, against Altered Ego's own printed 0/0. A Clone of the copy is the copiable-values tripwire (CR 707.2): counters are not copiable, so the Clone is the Giant's 3/3, not the 5/5 beside it. The declining leg is its own file.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [
+          { "card": "Altered Ego", "label": "ego" },
+          { "card": "Clone", "label": "clone" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@ego", "x": 2, "mana": ["Forest", "Forest#2", "Forest#3", "Island", "Island#2", "Island#3", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Altered Ego", "power": 5, "toughness": 5 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Altered Ego", "names": ["Hill Giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["Island#4", "Island#5", "Island#6", "Island#7"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "Altered Ego" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 3, "toughness": 3 } } }
+  ]
+}

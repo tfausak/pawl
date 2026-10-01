@@ -30,6 +30,7 @@ codec =
       Arm.payload "OrderTimestamps" (Common.seq Reference.codec) Move.OrderTimestamps (\x -> case x of Move.OrderTimestamps y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOptional" OptionalDecision.codec Move.ChooseOptional (\x -> case x of Move.ChooseOptional y -> Just y; _ -> Nothing),
       Arm.payload "ChooseToPay" Paying.codec Move.ChooseToPay (\x -> case x of Move.ChooseToPay y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseCopyTarget" (Common.maybe Reference.codec) Move.ChooseCopyTarget (\x -> case x of Move.ChooseCopyTarget y -> Just y; _ -> Nothing),
       Arm.payload "ChooseTypeSwap" TypeSwap.codec Move.ChooseTypeSwap (\x -> case x of Move.ChooseTypeSwap y -> Just y; _ -> Nothing),
       Arm.payload "ChooseTargets" (Common.textMap SlotName.unwrap (Right . SlotName.MkSlotName) (Common.seq Reference.codec)) Move.ChooseTargets (\x -> case x of Move.ChooseTargets y -> Just y; _ -> Nothing),
       Arm.payload "OrderTriggers" (Common.seq (Common.maybe Reference.codec)) Move.OrderTriggers (\x -> case x of Move.OrderTriggers y -> Just y; _ -> Nothing),
@@ -51,6 +52,7 @@ tagOf x = case x of
   Move.ChooseOptional {} -> "ChooseOptional"
   Move.ChooseToPay {} -> "ChooseToPay"
   Move.ChooseTypeSwap {} -> "ChooseTypeSwap"
+  Move.ChooseCopyTarget {} -> "ChooseCopyTarget"
   Move.ChooseTargets {} -> "ChooseTargets"
   Move.OrderTriggers {} -> "OrderTriggers"
   Move.Concede {} -> "Concede"

@@ -2810,7 +2810,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDealsDamageToCreature,
     TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
-    TriggerCondition.PermanentsDealCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer (Filter.Type.And []) PlayerRelation.AnyPlayer),
+    TriggerCondition.PermanentsDealCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.MkPermanentsDealCombatDamageToPlayer (Filter.Type.And []) PlayerRelation.AnyPlayer False),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.CreaturesDealtCombatDamageToInitiative,
     TriggerCondition.PlayerTookInitiative,

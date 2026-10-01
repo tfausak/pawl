@@ -913,9 +913,9 @@ batchScoped condition = case condition of
   -- simultaneously, Pawl.Engine.Damage.dealWave brackets the step as one
   -- Pawl.Types.EventGroup, and "one or more artifact creatures ... deal combat
   -- damage" (Pia Nalaar, Chief Mechanic) names that whole group as its trigger
-  -- event, which occurs once per damagers' controller (Event.Binding's
-  -- batchPartition) -- where the arm above is CR 603.2c's second sentence and
-  -- fires once per damager.
+  -- event, which occurs once per damagers' controller and damaged player
+  -- (Event.Binding's batchPartition) -- where the arm above is CR 603.2c's
+  -- second sentence and fires once per damager.
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> True
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   -- CR 726.2's own "one or more creatures a player controls deal combat
@@ -2229,9 +2229,10 @@ eventTriggers events gs =
             -- condition twice keeps both -- no equality on TriggeredAbility is
             -- needed and none is assumed.
             --
-            -- And by the seat `batchPartition` names, CR 603.2c's second sentence
-            -- inside the batch: Norn's Decree's damagers two opponents control are
-            -- two occurrences of one CR 510.2 step.
+            -- And by the seats `batchPartition` names, CR 603.2c's second
+            -- sentence inside the batch: Norn's Decree's damagers two opponents
+            -- control, and Feline Sovereign's Cats hitting two players, are two
+            -- occurrences of one CR 510.2 step.
             key (index, (cond, _)) trigger =
               if batchScoped cond
                 then Just (oid, index :: Natural, batchPartition cond (PendingTrigger.bindings trigger))
@@ -3468,11 +3469,13 @@ delayedPending grouped gs =
       -- contract), which is why every gatherer owes the predicate a consultation;
       -- see #2384.
       --
-      -- One per `batchPartition` seat within the group, eventTriggers' key's
-      -- reason: CR 603.2c's second sentence inside the batch. A regression
-      -- fence on this road: every delayed batch entry in data/cards/ (Forth
-      -- Eorlingas!, The Raven's Warning) watches creatures "you control", one
-      -- seat, and Pawl.TeamSpec's Norn's Decree case proves eventTriggers' key.
+      -- One per `batchPartition` key within the group, eventTriggers' key's
+      -- reason: CR 603.2c's second sentence inside the batch. The Raven's
+      -- Warning's flyers hitting two players are two occurrences, which
+      -- data/scenarios/event-trigger/cr-603-2c-the-ravens-warning-draws-once-per-player-its-flyers-hit.json
+      -- proves on this road. Forth Eorlingas!'s "to one or more players" is
+      -- one occurrence however many players its Knights hit, which
+      -- Pawl.LifeTriggerSpec's three-seat Forth Eorlingas! case proves.
       occurrences entry
         | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = concatMap (ListUtils.nubOrdOn (partitionOf entry) . NonEmpty.toList) (eventGroups (matching entry))
         | otherwise = matching entry
@@ -3512,8 +3515,8 @@ delayedPending grouped gs =
       --
       -- That second sentence turns on "its trigger event occurs MORE THAN ONCE",
       -- so a batch-scoped condition reaches it only when one group holds two of
-      -- `batchPartition`'s seats: `occurrences` has already left one event per
-      -- seat, so the block below is otherwise a singleton and the prompt is not
+      -- `batchPartition`'s keys: `occurrences` has already left one event per
+      -- key, so the block below is otherwise a singleton and the prompt is not
       -- raised. Asking would be a question the rule does not authorise.
       --
       -- Adjacency AND tag equality, which coincide by construction: `eventGroups`

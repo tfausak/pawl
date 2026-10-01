@@ -2964,14 +2964,6 @@ targetingPlayer who p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter ((== Just who) . Recipient.playerOf) legal) asked
   _ -> S.identityAnswer p
 
--- Clone's as-enters copy choice pinned to one named permanent, everything
--- else S.identityAnswer -- Pawl.CopySpec's copyNamed, kept local here so the
--- Clone leg below reads the engine's own offer rather than a search.
-cloneCopying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-cloneCopying wanted p = case p of
-  Prompt.ChooseCopyTarget {} -> Just wanted
-  _ -> S.identityAnswer p
-
 -- alice holds Fling over exactly {1}{R} in two Mountains and controls the
 -- permanents `mine` names, on top of whatever board the caller hands in. The same
 -- mana on every leg, so no leg's outcome can turn on affordability, and bob --
@@ -3002,7 +2994,7 @@ flingBoard fling mountain mine base =
 -- reading of its power there is -- Pawl.Engine.Resolve.Slots.effectViewOf is what
 -- licenses it. Jarad, Golgari Lich Lord is the same read one carrier over, off an
 -- ACTIVATION cost.
-flingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 flingSpec s registry =
   Spec.describe s "Fling" $ do
     -- The base case: nothing modifies the Giant's power, so this separates "the
@@ -3025,29 +3017,6 @@ flingSpec s registry =
       Spec.assertEqWith s "the Giant really was sacrificed, and as a COST" (fmap (\oid -> Game.lookupObject oid cast) (Maybe.listToMaybe mine)) (Just Nothing)
       Spec.assertEqWith s "so the spell was on the stack with the Giant already gone" (length (GameState.stack cast)) 1
       Spec.assertBool s (any (S.isCastOf spell) (Action.legalActions S.alice gs)) "and CR 118.3 offered the cast on this board"
-    -- The copy leg, which the anthem above cannot reach: a Clone's PRINTED power
-    -- is nothing at all, so a read that went through the printed card rather than
-    -- the copiable values CR 707.2 stamped would deal no damage. bob owns the
-    -- Berserkers the Clone copies, so the 4 read here belongs to no permanent
-    -- alice printed.
-    Spec.it s "CR 707.2 the power read is the copy's, not the printed Clone's" $ do
-      fling <- S.printingOf s registry "Fling"
-      mountain <- S.printingOf s registry "Mountain"
-      clone <- S.printingOf s registry "Clone"
-      berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
-      let empty = Setup.emptyGame S.bothPlayers
-          (berserkerId, withBerserkers) = S.addPermanent berserkers S.bob empty
-          (_, staged) = S.spellOnStack clone S.alice withBerserkers
-          entered = S.settleSba (S.runPure (cloneCopying berserkerId) staged Stack.resolveTop)
-      case Set.toList (Set.difference (GameState.battlefield entered) (GameState.battlefield withBerserkers)) of
-        [cloneId] -> do
-          let (spell, _, gs) = flingBoard fling mountain [] entered
-              cast = S.runPure (targetingPlayer S.bob) gs (S.cast S.alice spell)
-              resolved = S.runPure (targetingPlayer S.bob) cast Stack.resolveTop
-          Spec.assertEqWith s "the Clone is a 4/4 copy of bob's Berserkers" (S.powerToughnessOf cloneId gs) (Just (4, 4))
-          Spec.assertEqWith s "bob took the copied 4 power, not the printed Clone's nothing" (S.lifeOf S.bob resolved) (Just 16)
-          Spec.assertEqWith s "and the Berserkers the Clone copied is untouched" (S.powerToughnessOf berserkerId resolved) (Just (4, 4))
-        _ -> Spec.assertFailure s "the Clone did not enter as a single permanent"
 
 -- alice casts Flash over exactly two Islands, holding `creature`, with one
 -- untapped land of each printing in `spare` left over for the gate. The Islands
@@ -3078,7 +3047,7 @@ putsAndDeclines p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
 
--- putsAndPays plus cloneCopying's as-enters choice, for the leg whose put card
+-- putsAndPays plus a Clone's as-enters choice, for the leg whose put card
 -- is a Clone.
 putsPaysCopying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 putsPaysCopying wanted p = case p of

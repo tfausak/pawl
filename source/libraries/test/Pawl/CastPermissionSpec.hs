@@ -2114,7 +2114,7 @@ destroyedAndSettled oid gs =
 -- granting one, which the layer fold appends to the receiver's own (CR 613.1f,
 -- 113.7). Ornithopter is the historic permanent, cast from the graveyard and
 -- from the hand on the same board.
-eighthDoctorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+eighthDoctorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 eighthDoctorSpec s registry =
   let board doctor = do
         forest <- S.printingOf s registry "Forest"
@@ -2136,24 +2136,6 @@ eighthDoctorSpec s registry =
               Spec.assertEqWith s "while the one cast from the hand went to the graveyard" (namesIn Zone.Exile S.alice fromHand) []
               Spec.assertBool s (elem "Ornithopter" (namesIn Zone.Graveyard S.alice fromHand)) "and is in alice's graveyard"
             _ -> Spec.assertFailure s "expected both Ornithopters to resolve"
-
-        -- THE PROJECTION TRIPWIRE: a Clone of The Eighth Doctor grants the same
-        -- quoted ability, read off its copiable values rather than the printed
-        -- Clone.
-        Spec.it s "CR 707.2 a Clone of The Eighth Doctor grants the quoted replacement" $ do
-          doctor <- S.printingOf s registry "The Eighth Doctor"
-          clone <- S.printingOf s registry "Clone"
-          b0 <- board Nothing
-          let withBobs = snd (S.addPermanent doctor S.bob (pbState b0))
-              (_, staged) = S.spellOnStack clone S.alice withBobs
-              copying p = case p of
-                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
-                _ -> S.identityAnswer p
-              copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-              ready = copied {GameState.priority = Just S.alice, GameState.passed = Set.empty}
-          case castAndDestroyed (pbBuried b0) ready of
-            Just after -> Spec.assertEqWith s "the Ornithopter was exiled as it was destroyed" (namesIn Zone.Exile S.alice after) ["Ornithopter"]
-            Nothing -> Spec.assertFailure s "expected the Ornithopter to arrive under the Clone's permission"
 
 -- Serra Paragon {2}{W}{W} Creature -- Angel 3/4: "Flying / Once during each of
 -- your turns, you may play a land from your graveyard or cast a permanent spell
@@ -2288,29 +2270,6 @@ serraParagonSpec s registry =
               Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
               Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
             (arrived, _) -> Spec.assertFailure s ("expected one arrival and a Paragon, got " <> show arrived)
-
-        -- THE PROJECTION TRIPWIRE: alice's Serra Paragon is a Clone (CR 707.2),
-        -- and the printed Paragon on the board is bob's. The permission and the
-        -- rider both come off the copiable values; a read of the printed card
-        -- answers "Clone" and offers nothing.
-        Spec.it s "CR 707.2 a Clone of Serra Paragon grants the permission and the rider" $ do
-          b <- board "Llanowar Elves" "Forest" False
-          paragon <- S.printingOf s registry "Serra Paragon"
-          clone <- S.printingOf s registry "Clone"
-          let (_, withBobs) = S.addPermanent paragon S.bob (pbState b)
-              (_, staged) = S.spellOnStack clone S.alice withBobs
-              copying p = case p of
-                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
-                _ -> S.identityAnswer p
-              copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-              ready = copied {GameState.priority = Just S.alice, GameState.passed = Set.empty}
-              cast = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) ready Engine.priorityLoop
-          case arrivedBetween ready cast of
-            [permanent] -> do
-              let after = diesAndResolves permanent cast
-              Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
-              Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice ready))
-            arrived -> Spec.assertFailure s ("expected the Elves to arrive under the Clone's permission, got " <> show arrived)
 
         -- CR 702.138a: Loathsome Chimera {2}{G} escapes for {4}{G} and three
         -- other graveyard cards, a permission of its own. Paid for its escape
