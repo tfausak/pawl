@@ -607,43 +607,33 @@ The temptation is to make the DSL Turing complete so it can express them. **Resi
 
 Instead: allow a small set of hand-written, compiled-in cards alongside the loaded ones. Forge effectively does this. **Track the count as a metric.** Growing → your DSL has a real gap. Stable around 30–50 → that's just Magic being Magic.
 
-### Explicitly out of scope
+### Scope: four rings, worked in order
 
-Two different reasons. Worth separating, because the second list might get reversed on a whim someday and the first never will.
+Finish one ring before broadening to the next. Within a ring, rank work by **downstream leverage** (see silver border below): a capability that forces a decision paying off elsewhere comes before a leaf.
 
-**Impossible — no data, or no ground truth:**
+1. **Basic Magic** — the rules and features regular paper cards need.
+2. **Paper extras** — multiplayer and variants (Commander, Planechase, Archenemy, Two-Headed Giant), shortcuts (CR 732), dexterity, ante, and un-set mechanics (stickers, Contraptions).
+3. **Digital-only** — Alchemy: perpetual, seek, conjure, boons, covercast, intensity. The CR defines none of these, so there is no rules ground truth: derive behaviour from the cards' own text, their official rulings (Tenacious Pup's defines a one-time boon), and Arena's published descriptions, and say so where it lands.
+4. **Non-engine** — deck building and format legality, clients, tooling.
 
-- **Art-content matters** — cards caring about what is *depicted*. No dataset has this, and it's arguably subjective, so even manual annotation has no ground truth. (A vision model over card images is a plausible one-time batch job. It is not a milestone.)
+Ring-2 notes that still hold:
+
+- **Dexterity** — Chaos Orb, Falling Star, Chaos Confetti. One prompt constructor (`DexterityCheck :: PlayerId -> Prompt Bool`); the engine can't tell whether a human, an RNG, a bot or a hand flipping cardboard answers it, and the outcome lands in the `DecisionLog`, so replay and determinization keep working. A leaf.
+- **Contraptions** — two extra zones (Contraption deck, scrapyard), a battlefield subzone (three sprockets), a wrapping CRANK! counter, one turn-based action at upkeep. They share a substrate with **Attractions (rule 717)** — separate deck, junkyard, scheduled triggers, "roll to visit" — so Attractions bring Contraptions nearly free. Rule 701.45a notes Unstable cards and mechanics aren't in the rules; derive them from the cards, as for Alchemy. Steamflogger Boss's Contraption clause is a replacement effect that can never fire without them.
+
+**Out of scope — no data, or no ground truth:**
+
+- **Art-content matters** — cards caring about what is *depicted*. No dataset has this, and it's arguably subjective, so even manual annotation has no ground truth.
 - **Cards that track what people are/do/have/say** — the Unglued/Unhinged social cards
 - **People from outside the game** — Kindslaver, Subcontract
 
-**Possible but pointless — zero downstream leverage:**
+**Declined, with a known price — draft matters** (the Conspiracy cards). A draft is not a game and cannot be built on this engine: no zones, no stack, no priority. Cards that *affect the draft* (Cogwork Librarian, Agent of Acquisitions, Lore Seeker) need a second VM — its own closed half and opcode vocabulary — which is ring-4 work at the earliest. Cards that merely *note something during the draft and use it in the game* (Aether Searcher, Animus of Predation) need only a per-card annotation on decklist entries, the same discipline as `Printing` (§2.8).
 
-- **Dexterity** — Chaos Orb, Falling Star, Chaos Confetti. Costs exactly one prompt constructor (`DexterityCheck :: PlayerId -> Prompt Bool`); the engine can't tell whether the outside world answering it is a human QTE, an RNG, a bot, or a hand flipping cardboard, and the outcome lands in the `DecisionLog` like any other response, so replay and determinization keep working. Excluded on value, not capability.
-- **Ante** — the 9 cards referencing it
-- **Contraptions** — Steamflogger Boss and friends. Not hard: two extra zones (Contraption deck, scrapyard), a battlefield subzone (three sprockets), a wrapping CRANK! counter, one turn-based action at upkeep, optional triggers. XMage punts for the usual reason — zones are an enum and sprockets are a position their permanent model has no room for (§2.11 again).
+**Nothing needs banning.** Chaos Orb, Falling Star and Shahrazad are banned in every format WotC runs; format legality (MTGJSON's `legalities`) removes them through the same door as any other card. No engine flag.
 
-  **Caveat on leverage:** Contraptions share a substrate with **Attractions (rule 717)**, their black-border descendant — separate deck, separate graveyard (the junkyard, i.e. the scrapyard renamed), scheduled triggers, and a keyword action at 701.52 ("roll to visit"). Attractions are Commander-legal. Contraptions are Attractions with a deterministic scheduler instead of a d6. So: zero leverage *as Contraptions*, real leverage *as the substrate* — if 717 is ever in scope, Contraptions are nearly free.
+**Digital-only cards are in scope** (ring 3). Arena and Alchemy printings are real cards, and the formats that exclude them do it through `legalities`. A rule whose only producer is a digital-only card is reachable by a real printing, not a candidate for a synthetic one.
 
-  Note rule 701.45a defines Assemble and then states that Unstable cards and mechanics aren't included in the rules. WotC drew this scope boundary in the rulebook.
-
-  Steamflogger Boss itself is the only Commander-legal card touching Contraptions, and in a black-border pool its Contraption clause is a replacement effect that can never fire. **It is supported at M1 by doing nothing.**
-
-**Declined, with a known price — possible and genuinely valuable, but too expensive today:**
-
-- **Draft matters** — the Conspiracy cards.
-
-  A draft is *not* a game and cannot be built "on top of" this engine: no zones, no stack, no priority, no permanents, no SBAs. It shares nothing but the card database. It's a sibling, not a child, and a standalone draft engine is close to trivial — packs, seats, picks, a passing direction.
-
-  **The price is a second VM.** Cards like Cogwork Librarian, Agent of Acquisitions and Lore Seeker need their own closed half (pack passing, pick order, card pools) and their own opcode vocabulary (draft an extra card, reveal a pack, add a pack, take the whole pack). That's a second closed/open/DSL/cards stack. Declined on that basis — not because it's hard, and *not because it's impossible*.
-
-  **The half that matters is free anyway.** The category splits: cards that *affect the draft* need the second VM; cards that merely *note something during the draft and use it in the game* (Aether Searcher, Animus of Predation) need nothing but a per-card annotation on decklist entries. The engine reads a value and doesn't care that a draft put it there — a human could type it in. Same discipline as `Printing` (§2.8): don't collapse a field just because you can't currently populate it.
-
-**You don't need to ban any of this.** Chaos Orb, Falling Star and Shahrazad are already banned in every format WotC runs. Format legality is machinery you need anyway — MTGJSON ships `legalities` on the atomic model, and the deckbuilder needs it to know Black Lotus isn't Modern-legal. These fall out of the pool through the same door. No special case, no engine flag.
-
-**Digital-only cards are in scope.** Arena and Alchemy printings are real cards; there is no reason not to support them, and the formats that exclude them do it through `legalities`, the same door as everything above. So a rule whose only producer is a digital-only card is reachable by a real printing, not a candidate for a synthetic one.
-
-**Prefer card sources in this order: regular, Arena, playtest, un-set, synthetic.** All five are acceptable; Mystery Booster playtest cards (Slivdrazi Monstrosity and friends) are ordinary gate cards. The order ranks candidates when more than one card could prove a rule, rather than banning the tail. Synthetic stays the last resort, and if a better-ranked printing turns up for a rule a worse-ranked one already proves, swap it in. This is about which card proves a rule, not about which rules are worth doing: the leverage argument below picks *what* to implement and is untouched by it.
+**Prefer card sources in this order: regular, Arena, playtest, un-set, synthetic.** All five are acceptable; Mystery Booster playtest cards (Slivdrazi Monstrosity and friends) are ordinary gate cards. The order ranks candidates when more than one card could prove a rule, rather than banning the tail. Synthetic stays the last resort, and if a better-ranked printing turns up for a rule a worse-ranked one already proves, swap it in. This is about which card proves a rule, not about which rules are worth doing: the rings and the leverage criterion pick *what* to implement and are untouched by it.
 
 ### Silver border: canaries, not flexes
 
@@ -658,7 +648,7 @@ Sorting rule: **do the un-cards whose difficulty is shared with black border.**
 
 These aren't flexes — they're canaries wearing funny hats, and they're *sharper* than their black-border twins because un-sets are deliberately designed to attack the rules. A free adversarial test suite written by the people who wrote the rules.
 
-The criterion is **downstream leverage**, not border color — border color is only a proxy, and it breaks on dexterity (Chaos Orb and Falling Star are black border). Ask instead: *does implementing this force a decision that pays off elsewhere?* Little Girl forces the numeric tower and hands you Tarmogoyf. Chaos Orb forces one prompt constructor that nothing else will ever use. It's a leaf. Skip the leaves.
+The criterion is **downstream leverage**, not border color — border color is only a proxy, and it breaks on dexterity (Chaos Orb and Falling Star are black border). Ask instead: *does implementing this force a decision that pays off elsewhere?* Little Girl forces the numeric tower and hands you Tarmogoyf. Chaos Orb forces one prompt constructor that nothing else will ever use. It's a leaf: it waits behind its ring's leverage work.
 
 ### Reclaimed from XMage's list
 
