@@ -156,6 +156,9 @@ library codec
     Pawl.Codec.AnyNumberMatchingSpec
     Pawl.Codec.ArmDelayedTrigger
     Pawl.Codec.ArmDelayedTriggerSpec
+    Pawl.Codec.Arrival
+    Pawl.Codec.ArrivalEnd
+    Pawl.Codec.ArrivalSpec
     Pawl.Codec.AsCopy
     Pawl.Codec.AsCopySpec
     Pawl.Codec.AttachAll
@@ -697,8 +700,6 @@ library codec
     Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
     Pawl.Codec.LayoutSpec
-    Pawl.Codec.LibraryArrival
-    Pawl.Codec.LibraryArrivalSpec
     Pawl.Codec.LibraryDepth
     Pawl.Codec.LibraryDepthSpec
     Pawl.Codec.LibraryPlacement
@@ -1908,6 +1909,8 @@ library types
     Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction
     Pawl.Types.ArmDelayedTrigger
+    Pawl.Types.Arrival
+    Pawl.Types.ArrivalEnd
     Pawl.Types.AsCopy
     Pawl.Types.Asked
     Pawl.Types.AttachAll
@@ -2213,7 +2216,6 @@ library types
     Pawl.Types.Layer
     Pawl.Types.Layout
     Pawl.Types.LearnMode
-    Pawl.Types.LibraryArrival
     Pawl.Types.LibraryDepth
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition

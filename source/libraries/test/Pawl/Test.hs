@@ -61,6 +61,7 @@ import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.AnyNumberDiscardSpec
 import qualified Pawl.Codec.AnyNumberMatchingSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
+import qualified Pawl.Codec.ArrivalSpec
 import qualified Pawl.Codec.AsCopySpec
 import qualified Pawl.Codec.AttachAllSpec
 import qualified Pawl.Codec.AttachBoundSpec
@@ -324,7 +325,6 @@ import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LabelSpec
 import qualified Pawl.Codec.LastKnownSpec
 import qualified Pawl.Codec.LayoutSpec
-import qualified Pawl.Codec.LibraryArrivalSpec
 import qualified Pawl.Codec.LibraryDepthSpec
 import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
@@ -1125,7 +1125,7 @@ spec s registry = do
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LastKnownSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
-  Pawl.Codec.LibraryArrivalSpec.spec s
+  Pawl.Codec.ArrivalSpec.spec s
   Pawl.Codec.LibraryDepthSpec.spec s
   Pawl.Codec.LibraryPlacementSpec.spec s
   Pawl.Codec.LibraryPositionSpec.spec s

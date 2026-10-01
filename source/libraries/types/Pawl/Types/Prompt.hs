@@ -8,6 +8,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.ArrivalEnd as ArrivalEnd
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.Card as Card
@@ -525,15 +526,15 @@ data Prompt r where
   -- The Natural is how many cards stay above the upper option, which a Top
   -- answer picks: 0 for the top itself, 1 for "second from the top".
   ChooseLibraryEnd :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt LibraryPosition.LibraryPosition
-  -- | CR 401.4: the owner arranges two or more cards arriving at one end of a
-  -- library at once; the answer permutes the indices, reading from that end
-  -- inward.
-  ArrangeLibraryArrivals :: Decider.Decider -> PlayerId.PlayerId -> LibraryPosition.LibraryPosition -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
+  -- | CR 401.4 / 404.3: the owner arranges two or more cards arriving at once
+  -- at one end of a library or on top of a graveyard; the answer permutes the
+  -- indices, reading from that end inward.
+  ArrangeArrivals :: Decider.Decider -> PlayerId.PlayerId -> ArrivalEnd.ArrivalEnd -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | CR 401.4: the owner arranges two or more cards an effect puts back into
   -- their library at the positions those cards already occupy (Ponder); the
   -- answer permutes the indices, reading from the top of the library inward.
   --
-  -- No LibraryPosition, which is the difference from ArrangeLibraryArrivals
+  -- No ArrivalEnd, which is the difference from ArrangeArrivals
   -- above: nothing arrives, so there is no end for the effect to have stated.
   -- Asked at two or more cards, rule 401.4's own count being where one order
   -- stops being the only order.

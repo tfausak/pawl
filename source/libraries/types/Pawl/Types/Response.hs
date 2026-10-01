@@ -757,9 +757,10 @@ data Response
     ChoseCommandZoneOfferFirst OptionalDecision.OptionalDecision
   | -- | CR 401.2's answer: the end of their library an owner picked for one card.
     ChoseLibraryEnd LibraryPosition.LibraryPosition
-  | -- | CR 401.4's answer: the order an owner chose for the cards arriving at one
-    -- end of their library, as a permutation of the offered indices.
-    ArrangedLibraryArrivals [Natural.Natural]
+  | -- | CR 401.4 / 404.3's answer: the order an owner chose for the cards
+    -- arriving at one end of their library or on their graveyard, as a
+    -- permutation of the offered indices.
+    ArrangedArrivals [Natural.Natural]
   | -- | CR 401.4's answer for cards that never left: the order an owner chose
     -- for cards put back into their library, as a permutation of the offered
     -- indices.

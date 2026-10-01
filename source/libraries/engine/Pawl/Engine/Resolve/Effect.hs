@@ -108,6 +108,7 @@ import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.ArrivalEnd as ArrivalEnd
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
@@ -813,7 +814,8 @@ anyNumberMatchingBy chooser legal resolving controller source (AnyNumberMatching
 -- recorded for a trigger to read. The funnel's own answers come back for the
 -- binding below; a move that did not complete answers Nothing and is dropped.
 -- One event group across the seats, CR 101.4's "simultaneously", whose close
--- asks CR 401.4's arrangement of what a redirect put into a library. The cause
+-- asks CR 401.4's arrangement of what a redirect put into a library and CR
+-- 404.3's of what reached a graveyard. The cause
 -- is Event.resolvingDiscardCause's: a CR 118.12 cost is no effect.
 buryDiscards :: ObjectId -> Maybe SlotName -> [(PlayerId, [ObjectId])] -> Game ()
 buryDiscards resolving mDiscarded doomed = do
@@ -1042,7 +1044,7 @@ settleArrivals depthOf zone placement targets =
                 pure (Game.honourShuffle batch answer)
               _ -> do
                 gs <- State.get
-                answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+                answer <- Game.choose (Prompt.ArrangeArrivals (Decide.deciderFor owner gs) owner (ArrivalEnd.IntoLibrary position) batch)
                 pure (Game.permute batch answer)
             pure (fmap (\oid -> (oid, spot)) (reverse ordered))
           -- One card is one order, which is CR 401.4's own "two or more".
@@ -11002,14 +11004,17 @@ decideSurveil n pid = do
 -- One decided surveil's move. Half of it IS a zone change: the graveyard cards
 -- go through Event.changeZone in the order the answer named them, so the first
 -- named ends up deepest (CR 404.1), an order that is the player's rather than
--- the engine's (CR 404.3).
+-- the engine's (CR 404.3) -- so the scope does not ask for it again
+-- (Event.arrangedAlready).
 applySurveil :: (PlayerId, Maybe ([ObjectId], [ObjectId])) -> Game ()
 applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
   -- Order-independent: Game.removeFromZones takes each mover out of the library
   -- by identity rather than by position.
   State.modify' (reorderLibrary pid kept)
   -- One CR 401.4 scope, for a redirect into a library (Event.arrivingTogether).
-  Event.arrivingTogether (Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard)
+  Event.arrivingTogether $ do
+    arrived <- Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) toGraveyard
+    State.modify' (Event.arrangedAlready (Foldable.fold arrived))
 
 -- CR 701.29a: one player's fateseal -- decideScry's question over an opponent's
 -- library.

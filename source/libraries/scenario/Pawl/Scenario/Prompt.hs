@@ -114,7 +114,7 @@ deciderOf prompt = case prompt of
   Prompt.ReturnCommander decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCommandZoneOfferFirst decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLibraryEnd decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ArrangeLibraryArrivals decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ArrangeArrivals decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ArrangeLibraryCards decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseModes decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCopyTarget decider _ _ _ -> Just (Decider.unwrap decider)
@@ -276,7 +276,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.ReturnCommander {} -> "ReturnCommander"
   Prompt.ChooseCommandZoneOfferFirst {} -> "ChooseCommandZoneOfferFirst"
   Prompt.ChooseLibraryEnd {} -> "ChooseLibraryEnd"
-  Prompt.ArrangeLibraryArrivals {} -> "ArrangeLibraryArrivals"
+  Prompt.ArrangeArrivals {} -> "ArrangeArrivals"
   Prompt.ArrangeLibraryCards {} -> "ArrangeLibraryCards"
   Prompt.ChooseModes {} -> "ChooseModes"
   Prompt.ChooseCopyTarget {} -> "ChooseCopyTarget"

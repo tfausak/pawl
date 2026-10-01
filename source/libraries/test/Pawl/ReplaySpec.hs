@@ -1143,7 +1143,7 @@ combatReplaySpec s =
         Spec.it s "ArrangeLibraryCards round-trips, and does not decode as an arrival arrangement" $ do
           let p = Prompt.ArrangeLibraryCards decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9]
           Spec.assertEqWith s "an order round trips" (Replay.decode p (Replay.encode p [1, 0])) (Just [1, 0])
-          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ArrangedLibraryArrivals [1, 0])) Nothing
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ArrangedArrivals [1, 0])) Nothing
           Spec.assertEqWith
             s
             "a short transcript leaves the cards in the order they were looked at"

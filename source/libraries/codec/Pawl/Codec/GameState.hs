@@ -17,6 +17,7 @@ import qualified Pawl.Codec.ActiveCopy as ActiveCopy
 import qualified Pawl.Codec.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Codec.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
+import qualified Pawl.Codec.Arrival as Arrival
 import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
@@ -39,7 +40,6 @@ import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LastKnown as LastKnown
-import qualified Pawl.Codec.LibraryArrival as LibraryArrival
 import qualified Pawl.Codec.LoggedEvent as LoggedEvent
 import qualified Pawl.Codec.Mana as Mana
 import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
@@ -133,7 +133,7 @@ codec resolve = Fields.object $ do
   nextEventGroup <- Fields.required "nextEventGroup" EventGroup.codec GameState.nextEventGroup
   eventGroupDepth <- Fields.defaulted "eventGroupDepth" 0 Common.natural GameState.eventGroupDepth
   enteringTogether <- Fields.defaulted "enteringTogether" Nothing (Common.maybe EnteringTogether.codec) GameState.enteringTogether
-  libraryArrivals <- Fields.defaulted "libraryArrivals" Nothing (Common.maybe (Common.seq LibraryArrival.codec)) GameState.libraryArrivals
+  arrivals <- Fields.defaulted "arrivals" Nothing (Common.maybe (Common.seq Arrival.codec)) GameState.arrivals
   payingOnResolution <- Fields.defaulted "payingOnResolution" False Common.boolean GameState.payingOnResolution
   lastKnown <- Fields.defaulted "lastKnown" Map.empty (Common.naturalMap ObjectId.codec LastKnown.codec) GameState.lastKnown
   stackArchive <- Fields.defaulted "stackArchive" Map.empty (Common.naturalMap ObjectId.codec Object.codec) GameState.stackArchive
@@ -240,7 +240,7 @@ codec resolve = Fields.object $ do
         GameState.nextEventGroup = nextEventGroup,
         GameState.eventGroupDepth = eventGroupDepth,
         GameState.enteringTogether = enteringTogether,
-        GameState.libraryArrivals = libraryArrivals,
+        GameState.arrivals = arrivals,
         GameState.payingOnResolution = payingOnResolution,
         GameState.lastKnown = lastKnown,
         GameState.stackArchive = stackArchive,

@@ -37,6 +37,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ArrivalEnd as ArrivalEnd
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -127,7 +128,7 @@ lengBoard s registry decision = do
       after = snd (Engine.runGamePure (lengAnswer decision) cast Stack.resolveTop)
   pure (after, swamp, piker, miasma)
 
--- CR 401.4's owner, answering Prompt.ArrangeLibraryArrivals: bob reverses the
+-- CR 401.4's owner, answering Prompt.ArrangeArrivals: bob reverses the
 -- order he is offered when `reversing`, and keeps it otherwise; any other seat
 -- asked keeps it, so asking the wrong player leaves the move order.
 arrangedBy :: Bool -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [Natural]
@@ -155,7 +156,7 @@ lengMindRotBoard s registry reversing = do
       (gs, spellId) = S.handOne mindRot withHand
       answer :: Prompt.Prompt r -> r
       answer p = case p of
-        Prompt.ArrangeLibraryArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        Prompt.ArrangeArrivals _ pid _ oids -> arrangedBy reversing pid oids
         _ -> lengAnswer OptionalDecision.Exercises p
       cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
   pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
@@ -181,7 +182,7 @@ wheelJudgmentBoard s registry reversing = do
       (gs, spellId) = S.handOne judgment stocked
       answer :: Prompt.Prompt r -> r
       answer p = case p of
-        Prompt.ArrangeLibraryArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        Prompt.ArrangeArrivals _ pid _ oids -> arrangedBy reversing pid oids
         _ -> S.identityAnswer p
       cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
   pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
@@ -203,7 +204,7 @@ wheelScourBoard s registry reversing = do
       (gs, spellId) = S.handOne scour stocked
       answer :: Prompt.Prompt r -> r
       answer p = case p of
-        Prompt.ArrangeLibraryArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        Prompt.ArrangeArrivals _ pid _ oids -> arrangedBy reversing pid oids
         _ -> atBobAnswer p
       cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
   pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
@@ -228,9 +229,75 @@ wheelCurateBoard s registry reversing = do
       answer :: Prompt.Prompt r -> r
       answer p = case p of
         Prompt.ChooseSurveil _ _ looked -> (looked, [])
-        Prompt.ArrangeLibraryArrivals _ pid _ oids
+        Prompt.ArrangeArrivals _ pid _ oids
           | reversing && pid == S.alice -> reverse (zipWith const [0 ..] oids)
           | otherwise -> zipWith const [0 ..] oids
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
+-- bob controls Volrath's Shapeshifter over a library of Ogre Sentry, Plains,
+-- Island, Swamp and Mountain from the top, then a Goblin Piker; alice casts
+-- Tome Scour at him, so the Sentry is milled first and the Mountain last. bob
+-- reverses the graveyard arrangement he is offered when `reversing`. Returns
+-- the resolved state and the Shapeshifter.
+shapeshifterScourBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId)
+shapeshifterScourBoard s registry reversing = do
+  island <- S.printingOf s registry "Island"
+  shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+  scour <- S.printingOf s registry "Tome Scour"
+  pile <- traverse (S.printingOf s registry) ["Goblin Piker", "Mountain", "Swamp", "Island", "Plains", "Ogre Sentry"]
+  let base = S.landsInPlay island 1
+      (shifterId, withShifter) = S.addPermanent shapeshifter S.bob base
+      stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) withShifter pile
+      (gs, spellId) = S.handOne scour stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ArrangeArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        _ -> atBobAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop), shifterId)
+
+-- bob controls a Goblin Piker and an Ogre Sentry over a library holding the
+-- `reader` card, if any -- the one card in the game that can read a
+-- graveyard's order; alice casts Day of Judgment. bob reverses the graveyard
+-- arrangement he is offered when `reversing`. Returns the resolved state.
+judgmentBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe String -> Bool -> m GameState.GameState
+judgmentBoard s registry reader reversing = do
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  judgment <- S.printingOf s registry "Day of Judgment"
+  readers <- traverse (S.printingOf s registry) (Maybe.maybeToList reader)
+  let base = S.landsInPlay plains 4
+      (_, withPiker) = S.addPermanent piker S.bob base
+      (_, withSentry) = S.addPermanent sentry S.bob withPiker
+      stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) withSentry readers
+      (gs, spellId) = S.handOne judgment stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ArrangeArrivals _ pid _ oids -> arrangedBy reversing pid oids
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
+-- alice casts Curate over her library of Plains, Island, Goblin Piker and
+-- Volrath's Shapeshifter from the top -- the Shapeshifter making graveyard
+-- order something the game reads -- and surveils both top cards into her
+-- graveyard, Plains first. Any arrangement she is offered she reverses. Returns
+-- the resolved state.
+curateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+curateBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  curate <- S.printingOf s registry "Curate"
+  pile <- traverse (S.printingOf s registry) ["Volrath's Shapeshifter", "Goblin Piker", "Island", "Plains"]
+  let base = S.landsInPlay island 2
+      stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) base pile
+      (gs, spellId) = S.handOne curate stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseSurveil _ _ looked -> (looked, [])
+        Prompt.ArrangeArrivals _ _ _ oids -> reverse (zipWith const [0 ..] oids)
         _ -> S.identityAnswer p
       cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
   pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
@@ -964,6 +1031,46 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "reversed: the Plains, put first, is under the Island" (namesIn Zone.Library S.alice reversed) (names ["Swamp", "Island", "Plains", "Curate"])
     Spec.assertEqWith s "kept: the Island, put last, is under the Plains" (namesIn Zone.Library S.alice kept) (names ["Swamp", "Plains", "Island", "Curate"])
     Spec.assertEqWith s "and she drew the Goblin Piker" (namesIn Zone.Hand S.alice reversed) (names ["Goblin Piker"])
+  -- CR 404.3: "if an effect or rule puts two or more cards into the same
+  -- graveyard at the same time, the owner of those cards may arrange them in
+  -- any order", and CR 404.1 makes the top observable: Volrath's Shapeshifter
+  -- has the full text of the top card of bob's graveyard. Tome Scour mills
+  -- five at once (CR 701.17a), so bob, not alice who cast it, is asked; the
+  -- pair differs in his answer alone.
+  Spec.it s "CR 404.3 bob puts the milled Ogre Sentry on top of his graveyard, and Volrath's Shapeshifter becomes it" $ do
+    (reversed, shifterId) <- shapeshifterScourBoard s registry True
+    (kept, _) <- shapeshifterScourBoard s registry False
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+        sentry = Set.singleton (CardName.MkCardName (Text.pack "Ogre Sentry"))
+        shifter = Set.singleton (CardName.MkCardName (Text.pack "Volrath's Shapeshifter"))
+    Spec.assertEqWith s "reversed: the Shapeshifter is a 3/3 Ogre Sentry" (Projection.namesOf shifterId reversed, S.powerToughnessOf shifterId reversed) (sentry, Just (3, 3))
+    Spec.assertEqWith s "kept: the Mountain, milled last, is on top, and the Shapeshifter is its printed 0/1" (Projection.namesOf shifterId kept, S.powerToughnessOf shifterId kept) (shifter, Just (0, 1))
+    Spec.assertEqWith s "reversed: the Ogre Sentry is on top" (namesIn Zone.Graveyard S.bob reversed) (names ["Mountain", "Swamp", "Island", "Plains", "Ogre Sentry"])
+  -- The same rule through the destroy funnel: Day of Judgment's two victims
+  -- reach bob's graveyard at once, and bob orders them -- where the game can
+  -- tell the orders apart. A Volrath's Shapeshifter in his library reads the
+  -- top card; so does Circling Vultures' cost (CR 404.2's "the top creature
+  -- card"), and Ornate Imitations can conjure either. With none of them nothing
+  -- in the game reads a graveyard's order, so docs/design.md section 2.9 asks
+  -- nothing and his reversing answer is never given.
+  Spec.it s "CR 404.3 bob orders the two creatures Day of Judgment puts into his graveyard" $ do
+    reversed <- judgmentBoard s registry (Just "Volrath's Shapeshifter") True
+    kept <- judgmentBoard s registry (Just "Volrath's Shapeshifter") False
+    unread <- judgmentBoard s registry Nothing True
+    vultures <- judgmentBoard s registry (Just "Circling Vultures") True
+    imitations <- judgmentBoard s registry (Just "Ornate Imitations") True
+    Spec.assertEqWith s "reversed is kept, the other way up" (namesIn Zone.Graveyard S.bob reversed) (reverse (namesIn Zone.Graveyard S.bob kept))
+    Spec.assertEqWith s "with no reader of graveyard order, bob is not asked" (namesIn Zone.Graveyard S.bob unread) (namesIn Zone.Graveyard S.bob kept)
+    Spec.assertEqWith s "Circling Vultures' cost reads it, so bob is asked" (namesIn Zone.Graveyard S.bob vultures) (namesIn Zone.Graveyard S.bob reversed)
+    Spec.assertEqWith s "Ornate Imitations could conjure a reader, so bob is asked" (namesIn Zone.Graveyard S.bob imitations) (namesIn Zone.Graveyard S.bob reversed)
+    Spec.assertEqWith s "two cards" (length (namesIn Zone.Graveyard S.bob kept)) 2
+  -- A surveil's answer already orders the cards it puts into the graveyard
+  -- (CR 701.25a), so alice is not asked again: her reversing answerer leaves
+  -- the Plains, put first, under the Island, and Curate on top (CR 608.2n).
+  Spec.it s "CR 404.3 a surveil's graveyard cards are not arranged a second time" $ do
+    after <- curateBoard s registry
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+    Spec.assertEqWith s "the Plains, then the Island, then Curate" (namesIn Zone.Graveyard S.alice after) (names ["Plains", "Island", "Curate"])
   -- CR 118.12: Tweeze's "You may discard a card. If you do, draw a card" makes
   -- the discard a cost paid on resolution, and Library of Leng's ruling: "you
   -- can't use the Library of Leng ability ... when you discard a card as a cost,
@@ -1284,7 +1391,7 @@ libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
 
 -- Every question Aetherspouts raises: which object each owner was asked to place
 -- (CR 401.2), and which batch each owner was asked to arrange (CR 401.4).
-type SpoutsLog = ([(PlayerId.PlayerId, ObjectId.ObjectId)], [(PlayerId.PlayerId, LibraryPosition.LibraryPosition, [ObjectId.ObjectId])])
+type SpoutsLog = ([(PlayerId.PlayerId, ObjectId.ObjectId)], [(PlayerId.PlayerId, ArrivalEnd.ArrivalEnd, [ObjectId.ObjectId])])
 
 -- alice is mid-combat attacking with `mine` creatures she owns and `stolen`
 -- creatures BOB owns under her control, holds an Aetherspouts and the five
@@ -1332,7 +1439,7 @@ castSpouts end arrangement board spell =
         Prompt.ChooseLibraryEnd _ pid oid _ -> do
           State.modify (\(ends, arrs) -> (ends <> [(pid, oid)], arrs))
           pure (end pid)
-        Prompt.ArrangeLibraryArrivals _ pid position oids -> do
+        Prompt.ArrangeArrivals _ pid position oids -> do
           State.modify (\(ends, arrs) -> (ends, arrs <> [(pid, position, oids)]))
           pure arrangement
         _ -> pure (S.identityAnswer p)
@@ -1405,7 +1512,7 @@ aetherspoutsSpec s registry = Spec.describe s "Aetherspouts" $ do
         alices = namesIn Zone.Library S.alice after
     Spec.assertEqWith s "both attackers left the battlefield" (filter (`S.onBattlefield` after) ours) []
     Spec.assertEqWith s "alice was asked about each of her two creatures" (length ends) 2
-    Spec.assertEqWith s "and asked ONCE to arrange the pair, at the top of her library" arrangements [(S.alice, LibraryPosition.Top, ours)]
+    Spec.assertEqWith s "and asked ONCE to arrange the pair, at the top of her library" arrangements [(S.alice, ArrivalEnd.IntoLibrary LibraryPosition.Top, ours)]
     -- The answer names the cards from the chosen end inward, so the creature the
     -- sweep offered SECOND finishes on top.
     Spec.assertEqWith
@@ -1425,7 +1532,7 @@ aetherspoutsSpec s registry = Spec.describe s "Aetherspouts" $ do
     let (board, spell, ours, _) = spoutsBoard island spouts [piker, giant] []
         (after, (_, arrangements)) = castSpouts (const LibraryPosition.Bottom) [1, 0] board spell
         alices = namesIn Zone.Library S.alice after
-    Spec.assertEqWith s "asked once, at the bottom of her library" arrangements [(S.alice, LibraryPosition.Bottom, ours)]
+    Spec.assertEqWith s "asked once, at the bottom of her library" arrangements [(S.alice, ArrivalEnd.IntoLibrary LibraryPosition.Bottom, ours)]
     Spec.assertEqWith
       s
       "read from the bottom inward, the library is the order she gave"

@@ -292,7 +292,8 @@ astrotoriumBack oid gs = case fmap Object.source (lookupObject oid gs) of
 -- (Pawl.Engine.Engine), CR 401.4's library arrangement and CR 701.44d's per-seat
 -- "for each" groups (Pawl.Engine.Resolve), CR 601.2h's cost components and the
 -- combat tolls beside them (Pawl.Engine.Cost), and the arrangement of a melded
--- permanent's component cards (Pawl.Engine.Event). Not every ordering prompt:
+-- permanent's component cards and CR 401.4 / 404.3's arrivals
+-- (Pawl.Engine.Event). Not every ordering prompt:
 -- Prompt.OrderDamage spells this body out inline in
 -- Pawl.Engine.Replacement.askOne, and Prompt.Shuffle -- the sibling branch of the
 -- CR 401.4 site named above -- answers with object ids and goes through
@@ -419,6 +420,29 @@ zoneMembers zone pid gs =
 -- through, so the card a Condition tests is the card the effect then moves.
 topOfGraveyard :: PlayerId -> GameState -> Maybe ObjectId
 topOfGraveyard pid gs = Maybe.listToMaybe (reverse (zoneMembers Zone.Graveyard pid gs))
+
+-- docs/design.md section 2.9's question: does any printing this game knows read
+-- a graveyard's order? Where none does, every CR 404.3 arrangement is the same
+-- game, and Pawl.Engine.Event.arrangeArrivals asks none.
+--
+-- The readers are named by CONSTRUCTOR, found in each card's derived Show, so a
+-- token, a conjured card or a granted ability written inside a card is read with
+-- it: Pawl.Types.ObjectRef.TopOfGraveyard and Pawl.Types.Scope.TopOfGraveyard
+-- (Volrath's Shapeshifter, Soldevi Digger, Guiding Spirit), and
+-- Pawl.Types.CostComponent.ExileTopFromGraveyard (Circling Vultures). A new
+-- reader of graveyard order adds its constructor here. A conjure by reference
+-- (Pawl.Types.FromReference, Ornate Imitations) counts as one, since it can
+-- bring any reader into the game.
+--
+-- Not implemented: a reader whose text enters the game by a NAME the pool
+-- writes (Pawl.Types.CopyOriginal.Named, Effect.OfferNamedCopy) after a batch
+-- was put down unasked finds the engine's order rather than the owner's
+-- (#4557).
+readsGraveyardOrder :: GameState -> Bool
+readsGraveyardOrder gs =
+  let readers = ["TopOfGraveyard", "ExileTopFromGraveyard", "MkFromReference"]
+      namesOne printing = let shown = show (Printing.card printing) in any (`List.isInfixOf` shown) readers
+   in any namesOne (GameState.printings gs)
 
 -- CR 506.4: remove a permanent from combat. The one performer, shared by CR
 -- 701.19a regeneration (Pawl.Engine.Replacement), an effect that specifically
