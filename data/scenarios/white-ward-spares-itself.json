@@ -1,0 +1,26 @@
+{
+  "description": "CR 702.16n whole cards: White Ward stays on the creature it gives protection from white, and Pacifism on that creature is buried",
+  "note": "Pacifism is a second white Aura on the same creature, so the spare must name White Ward itself: an all-Auras or already-attached reading keeps Pacifism too.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Pacifism", "attached": "piker" }
+        ],
+        "hand": [{ "card": "White Ward", "label": "ward" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@ward", "targets": ["@piker"], "mana": ["@plains"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "White Ward", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Pacifism", "count": 1 } } }
+  ]
+}

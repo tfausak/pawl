@@ -200,9 +200,11 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
   let context = Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
-        -- keyword count twice.
+        -- keyword count twice. Keyword.grantedBy bakes the granter into CR
+        -- 702.16n's "this Aura";
+        -- data/scenarios/white-ward-second-copy-buries-both.json proves it.
         Modification.GainKeyword k ->
-          pc {PC.keywords = Map.insertWith (+) k 1 (PC.keywords pc)}
+          pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src k) 1 (PC.keywords pc)}
         -- CR 613.1f layer 6 / CR 202.1a: the same grant, with the keyword's
         -- [cost] read off the RECEIVING object rather than written on the granter
         -- -- "the scavenge cost is equal to its mana cost".

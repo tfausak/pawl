@@ -3326,7 +3326,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
   -- CR 702.16a's "[quality]", which every protection ability states, and CR
-  -- 702.16n's exception, which Spectra Ward alone states.
+  -- 702.16n's exception, which Spectra Ward and White Ward state.
   Keyword.Protection protection -> Protection.quality protection : Maybe.maybeToList (Protection.spares protection)
   Keyword.Reach -> []
   Keyword.Shroud -> []
