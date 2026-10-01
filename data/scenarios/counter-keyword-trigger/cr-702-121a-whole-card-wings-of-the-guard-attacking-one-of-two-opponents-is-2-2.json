@@ -1,0 +1,73 @@
+{
+  "description": "CR 702.121a whole card: Wings of the Guard attacking one of two opponents is 2/2",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Wings of the Guard",
+            "label": "wings-of-the-guard",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$wings-of-the-guard"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$wings-of-the-guard",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$wings-of-the-guard",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$wings-of-the-guard",
+        "power": 2,
+        "toughness": 2
+      }
+    }
+  ]
+}

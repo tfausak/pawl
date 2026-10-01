@@ -1,0 +1,84 @@
+{
+  "description": "CR 702.23a rampage 1 on the same board is half the bonus",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Horrible Hordes",
+            "label": "horrible-hordes",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          },
+          {
+            "card": "Icehide Golem",
+            "label": "icehide-golem",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$horrible-hordes"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$goblin-piker": [
+            "$horrible-hordes"
+          ],
+          "$hill-giant": [
+            "$horrible-hordes"
+          ],
+          "$icehide-golem": [
+            "$horrible-hordes"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$horrible-hordes",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$horrible-hordes",
+        "power": 4,
+        "toughness": 4
+      }
+    }
+  ]
+}

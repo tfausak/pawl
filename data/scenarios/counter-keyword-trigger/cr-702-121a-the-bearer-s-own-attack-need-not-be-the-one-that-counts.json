@@ -1,0 +1,107 @@
+{
+  "description": "CR 702.121a the bearer's own attack need not be the one that counts",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Wings of the Guard",
+            "label": "wings-of-the-guard",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Jace Beleren",
+            "label": "jace-beleren",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$wings-of-the-guard",
+          "$goblin-piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$wings-of-the-guard",
+      "do": {
+        "ChooseAttackTarget": "$jace-beleren"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$goblin-piker",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$wings-of-the-guard",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$wings-of-the-guard",
+        "power": 2,
+        "toughness": 2
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": true
+      }
+    }
+  ]
+}
