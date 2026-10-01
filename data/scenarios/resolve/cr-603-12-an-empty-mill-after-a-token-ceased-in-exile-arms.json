@@ -1,0 +1,41 @@
+{
+  "description": "CR 603.12 an empty mill after a token ceased in exile arms no reflexive",
+  "note": "Synthetic Communal Toll: \"When this enters, for each opponent, that player mills a card. When they do, you gain 1 life.\" Both opponents' libraries are empty, so nothing is milled and the reflexive must never arm. First Flicker of Fate exiles alice's Goblin Piker token, which CR 111.8 keeps from returning and CR 704.5d then ends, leaving the exile's bookkeeping behind; pruning it is not the mill happening. Life is read at the end step, so a reflexive that armed would have resolved by then. The Haskell original put the Toll onto the battlefield with its trigger pending; here it is cast.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Goblin Piker", "label": "piker", "token": true }
+        ],
+        "hand": [
+          { "card": "Flicker of Fate", "label": "flicker" },
+          { "card": "Synthetic Communal Toll", "label": "toll" }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@flicker", "targets": ["@piker"], "mana": ["@plains", "@plains-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@toll", "mana": ["@island", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Synthetic Communal Toll", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "description": "CR 608.2b whole card: Deadly Complication's dead mode is not asked about",
+  "note": "alice casts Person of Interest, whose enters trigger suspects it and makes a Detective, then Deadly Complication with both modes: destroy bob's Goblin Piker, and counter-then-may-unsuspect the Person. Her Lightning Bolt kills the Person in response, so mode 1's only target is gone but mode 0's lives: the spell does not fizzle (CR 608.2b) and mode 1's optional clause reads only the dead slot, so the may is never raised (an unscheduled ChooseOptional would fail the run). The Haskell original moved the Person with a bare zone change; the Bolt is a real card standing in for it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" },
+          { "card": "Mountain", "label": "mountain-4" },
+          { "card": "Mountain", "label": "mountain-5" },
+          { "card": "Mountain", "label": "mountain-6" }
+        ],
+        "hand": [
+          { "card": "Person of Interest", "label": "person-card" },
+          { "card": "Deadly Complication", "label": "complication" },
+          { "card": "Lightning Bolt", "label": "bolt" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@person-card", "mana": ["@mountain", "@mountain-2", "@mountain-3", "@mountain-4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Detective Token", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@complication", "modes": [0, 1], "targetsBySlot": { "creature": ["@piker"], "suspect": ["Person of Interest"] }, "mana": ["@swamp", "@swamp-2", "@mountain-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["Person of Interest"], "mana": ["@mountain-6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Person of Interest", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Deadly Complication", "count": 1 } } }
+  ]
+}

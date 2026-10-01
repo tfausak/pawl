@@ -1,0 +1,31 @@
+{
+  "description": "CR 111.6 a destroyed token is not a card put into a graveyard, so nothing returns",
+  "note": "Come Back Wrong at bob's token of Goblin Piker, the twin of the card case differing only in the victim being a token. A token is not a card, so \"if a creature card is put into a graveyard this way\" is false and nothing returns; CR 111.7 then leaves nothing in bob's graveyard either. The Piker is the only creature on the board, so no Piker on either side means no creature came back.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true }
+        ],
+        "hand": [{ "card": "Come Back Wrong", "label": "come-back-wrong" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker-token", "token": true, "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@come-back-wrong", "targets": ["@piker-token"], "mana": ["@swamp", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "description": "CR 701.36b a controller of no creature token creates nothing",
+  "note": "alice controls a nontoken Hill Giant and no creature token; bob controls an Ornithopter token. Wake the Reflections populates, and with no creature token of hers there is nothing to copy (CR 701.36b). The Haskell original counts alice's tokens; here every name on the board is counted instead, since any token populate made would copy one of them.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Hill Giant", "label": "giant" }
+        ],
+        "hand": [{ "card": "Wake the Reflections", "label": "wake" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Ornithopter", "label": "thopter", "token": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@wake", "mana": ["@plains", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Wake the Reflections", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ornithopter", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Plains", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Ornithopter", "count": 1 } } }
+  ]
+}

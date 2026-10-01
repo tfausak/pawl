@@ -1,0 +1,41 @@
+{
+  "description": "CR 701.53a the doubled counters are the transformed token's power and toughness",
+  "note": "Eyes of Gitaxias incubates 3 under alice's Vorinclex, Monstrous Raider, which doubles the counters to six (CR 122.6a). The token's {2} transforms it into a 0/0 Phyrexian (CR 701.53a, 111.10i), so the six counters are its power and toughness (CR 613.4c). Both seats hold five Islands so only the praetor differs from the -control board.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" },
+          { "card": "Island", "label": "i5" },
+          { "card": "Vorinclex, Monstrous Raider", "label": "vorinclex" }
+        ],
+        "hand": [{ "card": "Eyes of Gitaxias", "label": "eyes" }],
+        "library": [{ "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@eyes", "mana": ["@i1", "@i2", "@i3", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "Incubator Token", "mana": ["@i4", "@i5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Phyrexian Token", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Phyrexian Token", "power": 6, "toughness": 6 } } }
+  ]
+}

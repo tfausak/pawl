@@ -1,0 +1,54 @@
+{
+  "description": "CR 614.1c / 608.2h the reanimated Ixidron's power is read after its own sweep",
+  "note": "Too Greedily, Too Deep reanimates Ixidron, whose as-enters sweep (CR 614.1c) turns bob's three nontoken creatures face down; the token Jedit Ojanen is skipped. The second sentence then reads Ixidron's power after the sweep (CR 608.2h): 3, so the token keeps 3 damage, the three face-down 2/2s die (CR 704.5g) and then Ixidron as a 0/0 (CR 704.5f). bob orders the three face-down timestamps (CR 613.7m) as offered; nothing turns on the order. Were the sweep run after the resolution, Ixidron would deal 0.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "s1" },
+          { "card": "Swamp", "label": "s2" },
+          { "card": "Swamp", "label": "s3" },
+          { "card": "Swamp", "label": "s4" },
+          { "card": "Swamp", "label": "s5" },
+          { "card": "Swamp", "label": "s6" },
+          { "card": "Mountain", "label": "m1" }
+        ],
+        "hand": [{ "card": "Too Greedily, Too Deep", "label": "greedily" }],
+        "graveyard": [{ "card": "Ixidron", "label": "ixidron" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Russet Wolves", "label": "wolves" },
+          { "card": "Jedit Ojanen", "label": "jedit", "token": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Russet Wolves", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@greedily", "targets": ["@ixidron"], "mana": ["@m1", "@s1", "@s2", "@s3", "@s4", "@s5", "@s6"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "OrderTimestamps": ["@piker", "@giant", "@wolves"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@jedit", "damage": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Jedit Ojanen", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Russet Wolves", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Ixidron", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@s1", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@s2", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@s3", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@s4", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@s5", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@s6", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@m1", "tapped": true } } }
+  ]
+}
