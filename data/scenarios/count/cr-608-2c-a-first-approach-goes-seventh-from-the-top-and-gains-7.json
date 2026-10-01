@@ -1,0 +1,262 @@
+{
+  "description": "CR 608.2c a first Approach goes seventh from the top and gains 7",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-6",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-7",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Future Sight",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Approach of the Second Sun",
+            "label": "approach-of-the-second-sun",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$approach-of-the-second-sun",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            "$plains-5",
+            "$plains-6",
+            "$plains-7",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "alice",
+        "life": 27
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Approach of the Second Sun",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Approach of the Second Sun",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-7",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Result",
+        "is": null
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Plains#15",
+          "Plains#16",
+          "Plains#17",
+          "Plains#18",
+          "Plains#19",
+          "Plains#20",
+          "Approach of the Second Sun",
+          "Plains#21",
+          "Plains#22"
+        ]
+      }
+    }
+  ]
+}
