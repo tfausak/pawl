@@ -1,0 +1,300 @@
+{
+  "description": "CR 608.2g a refused offer leaves the card it named where the walk put it",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-5",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-6",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-7",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fevered Suspicion",
+            "label": "fevered-suspicion",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Think Twice"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Armored Galleon"
+          },
+          {
+            "card": "Think Twice"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseOfferedCastSpell",
+          "with": [
+            "Goblin Piker",
+            "Goblin Piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Declines"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$fevered-suspicion",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4",
+            "$mountain-5",
+            "$mountain-6",
+            "$mountain-7",
+            "$swamp"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Fevered Suspicion",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Mountain",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Library",
+        "card": "Armored Galleon",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Library",
+        "card": "Mountain",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-7",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Goblin Piker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Goblin Piker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Armored Galleon",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Exile",
+        "card": "Armored Galleon",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Exile",
+        "card": "Mountain",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Exile",
+        "card": "Think Twice",
+        "count": 0
+      }
+    }
+  ]
+}

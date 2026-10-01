@@ -1,0 +1,67 @@
+{
+  "description": "CR 305.3 flash does not let a land be played on another player's turn",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Teferi, Mage of Zhalfir",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Dryad Arbor",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "bob",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "Dryad Arbor",
+          "keyword": {
+            "type": "Flash"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Dryad Arbor",
+        "count": 0
+      }
+    }
+  ]
+}
