@@ -1,0 +1,32 @@
+{
+  "description": "CR 603.10 The Raven's Warning sees Venser's Sliver fly as it hit, though Pulmonic Sliver died in that combat",
+  "note": "Chapter II's delayed trigger asks whether the damager had flying immediately after the damage, before CR 704.3's pass buries the Pulmonic Sliver granting it. The Giant Spider (2/4 reach) finishes a Pulmonic Sliver already holding 1 damage; Alice declines its replacement so it dies. The control scenario attacks with Venser's Sliver alone and draws nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "The Raven's Warning", "label": "raven", "ready": true, "counters": [{ "key": { "type": "Lore" }, "value": 1 }] },
+          { "card": "Pulmonic Sliver", "label": "pulmonic", "ready": true, "damage": 1 },
+          { "card": "Venser's Sliver", "label": "venser", "ready": true }
+        ],
+        "library": [{ "card": "Plains" }, { "card": "Plains" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Giant Spider", "label": "spider", "ready": true }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@pulmonic", "@venser"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@spider": ["@pulmonic"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@pulmonic", "do": { "ChooseOptional": { "type": "Declines" } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Pulmonic Sliver", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } }
+  ]
+}

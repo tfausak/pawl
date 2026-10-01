@@ -1,0 +1,29 @@
+{
+  "description": "CR 603.10 The Raven's Warning ignores a Venser's Sliver that never had flying",
+  "note": "The control for the Pulmonic Sliver scenario beside it: the same chapter II, Venser's Sliver unblocked with no Sliver granting it flying, and no card drawn.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "The Raven's Warning", "label": "raven", "ready": true, "counters": [{ "key": { "type": "Lore" }, "value": 1 }] },
+          { "card": "Venser's Sliver", "label": "venser", "ready": true }
+        ],
+        "library": [{ "card": "Plains" }, { "card": "Plains" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Giant Spider", "label": "spider", "ready": true }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@venser"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 0 } } }
+  ]
+}

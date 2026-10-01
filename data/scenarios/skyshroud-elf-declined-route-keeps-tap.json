@@ -1,0 +1,28 @@
+{
+  "description": "CR 605.3a declining to pay Skyshroud Elf's {1} ability leaves its {T} ability on the window",
+  "note": "alice starts the Elf's {1}: Add {R} or {W} and declines its {1}, so that activation fails. The Elf's {T}: Add {G} is a different ability and must still be offered; with the Forest it pays the second Elf's {1}{G}, which the Forest alone cannot.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Skyshroud Elf", "label": "elf", "ready": true },
+          { "card": "Forest", "label": "forest" }
+        ],
+        "hand": [{ "card": "Skyshroud Elf", "label": "second" }]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@second", "mana": ["@elf", null, "@elf", "@forest"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Red" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Skyshroud Elf", "count": 2 } },
+    { "Tapped": { "object": "@forest", "tapped": true } }
+  ]
+}

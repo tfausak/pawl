@@ -1952,10 +1952,10 @@ chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2
     Spec.assertEqWith s "naming red" (run Color.Red) [ManaType.Colored Color.Red]
     Spec.assertEqWith s "naming green" (run Color.Green) [ManaType.Colored Color.Green]
 
-  -- No colour chosen yields NO mana rather than a fallback colour. Unreachable
-  -- through play -- CR 614.1c settles the choice as the permanent enters -- so a
-  -- fixture write is what puts a Coldsteel Heart in that state, and the point is
-  -- that the engine invents nothing when it finds one.
+  -- No colour chosen yields NO mana rather than a fallback colour (CR 106.5). A
+  -- fixture write puts a Coldsteel Heart in that state here; in play, a
+  -- permanent becoming a copy of one without entering (Mirrorweave, CR 707.2)
+  -- has made no choice. The point is that the engine invents nothing.
   Spec.it s "CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing" $ do
     coldsteel <- S.printingOf s registry "Coldsteel Heart"
     let (oid, gs) = S.addPermanent coldsteel S.alice (Setup.emptyGame S.bothPlayers)

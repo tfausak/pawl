@@ -197,7 +197,6 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
-import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
@@ -10048,19 +10047,7 @@ runEntryEffect pending = do
     (PendingEntryEffect.effects pending)
   State.modify' (\gs -> gs {GameState.enteringBeside = outer})
   Foldable.for_ announced $ \_ -> State.modify' (setX before)
-  State.modify' (resampleEntry oid)
-
--- CR 603.10: the board "immediately after" a permanent entered includes what its
--- as-enters effects did, since they are part of the entry (CR 614.1c). So the
--- CR 603.10 sample filed under the entry's event group is taken again now --
--- a watcher Ixidron turned face down sees nothing enter. Pawl.FaceDownSpec's "CR
--- 614.1c / 603.10 a watcher Ixidron turns face down does not see it enter" proves
--- it. Only an existing sample is replaced; a group without one reads the live
--- board anyway (Trigger.battlefieldAt).
-resampleEntry :: ObjectId -> GameState -> GameState
-resampleEntry oid gs = case entryGroup oid gs of
-  Nothing -> gs
-  Just group -> gs {GameState.battlefieldWhenTriggered = Map.adjust (const (Trigger.battlefieldCandidates gs)) group (GameState.battlefieldWhenTriggered gs)}
+  State.modify' (Trigger.resampleEntry oid)
 
 -- CR 614.12: the other permanents that entered in the same event as `oid` (CR
 -- 608.2f's group, which an Event.simultaneously bracket shares) -- not yet on the
@@ -10071,7 +10058,7 @@ resampleEntry oid gs = case entryGroup oid gs of
 -- "CR 614.12 a creature entering beside Ixidron enters face up" (one MoveToZone)
 -- and Pawl.TargetPerPlayerSpec's Sepulchral Primordial pair (a ForEach) prove it.
 enteredBeside :: ObjectId -> GameState -> Set ObjectId
-enteredBeside oid gs = case entryGroup oid gs of
+enteredBeside oid gs = case Trigger.entryGroup oid gs of
   Nothing -> Set.empty
   Just group ->
     Set.delete oid . Set.fromList $
@@ -10081,12 +10068,6 @@ enteredBeside oid gs = case entryGroup oid gs of
         Just zc <- [Trigger.movedOf (LoggedEvent.event logged)],
         ZoneChange.to zc == Zone.Battlefield
       ]
-
--- The event group of the log entry that put `oid` onto the battlefield.
-entryGroup :: ObjectId -> GameState -> Maybe EventGroup.EventGroup
-entryGroup oid gs =
-  let entered logged = maybe False (\zc -> ZoneChange.object zc == oid && ZoneChange.to zc == Zone.Battlefield) (Trigger.movedOf (LoggedEvent.event logged))
-   in fmap (LoggedEvent.group . Seq.index (GameState.events gs)) (Seq.findIndexR entered (GameState.events gs))
 
 -- CR 614.1a: run the effects a DamageRewrite.RunEffects rewrite put in a damage
 -- event's place -- Kill-Suit Cultist's destruction. Drains

@@ -434,9 +434,9 @@ noteLibraryArrival owner position cards gs
 -- minted as or after it entered.
 --
 -- Pawl.RestampSpec's Mirror Match and Ornate Imitations boards prove the order.
--- Holding back the entry events is a regression fence: a CR 603.6a match reads
--- the entrant live (Pawl.Engine.Event.Match), so recording them before the order
--- leaves the suite green.
+-- Holding back the entry events is a regression fence: Restamp.settle re-takes
+-- each entry's CR 603.10 sample under the chosen order, so recording them before
+-- the order leaves the suite green.
 -- CR 614.12b / 608.2f: run a one-member-at-a-time move of `members` onto the
 -- battlefield with every member not yet moved visible to the entry choices of
 -- the ones moved before it (GameState.enteringPending). `under` is the player
