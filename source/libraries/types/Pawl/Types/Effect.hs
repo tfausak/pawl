@@ -16,6 +16,7 @@ import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChooseNumber as ChooseNumber
+import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -643,6 +644,9 @@ data Effect card ability
     -- "choose a player at random"), so Prompt's RandomPlayer carries no Decider.
     -- Elided at one candidate.
     ChoosePlayerAtRandom ChoosePlayerAtRandom.ChoosePlayerAtRandom
+  | -- | CR 608.2d: the payload's chooser picks any number of matching permanents,
+    -- bound into its slot for a later effect of the same resolution to act on.
+    ChoosePermanents ChoosePermanents.ChoosePermanents
   | -- | CR 706.1: roll dice of the stated kind and number, and bind the result
     -- as an amount at the payload's slot for a later effect to read as
     -- Quantity.InSlot (Ancient Copper Dragon, Valiant Endeavor).

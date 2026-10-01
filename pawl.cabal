@@ -284,6 +284,8 @@ library codec
     Pawl.Codec.ChooseCardName
     Pawl.Codec.ChooseNumber
     Pawl.Codec.ChooseNumberSpec
+    Pawl.Codec.ChoosePermanents
+    Pawl.Codec.ChoosePermanentsSpec
     Pawl.Codec.ChoosePlayer
     Pawl.Codec.ChoosePlayerAtRandom
     Pawl.Codec.ChoosePlayerAtRandomSpec
@@ -1964,6 +1966,7 @@ library types
     Pawl.Types.ChooseBetween
     Pawl.Types.ChooseCardName
     Pawl.Types.ChooseNumber
+    Pawl.Types.ChoosePermanents
     Pawl.Types.ChoosePlayer
     Pawl.Types.ChoosePlayerAtRandom
     Pawl.Types.Chooser

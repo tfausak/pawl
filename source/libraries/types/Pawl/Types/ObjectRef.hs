@@ -158,11 +158,8 @@ data ObjectRef
   | -- | CR 608.2d / Tovolar, Dire Overlord, Teferi, Hero of Dominaria: any number
     -- of the permanents on the battlefield matching the payload's Filter, up to
     -- its ceiling where it has one, offered rather than swept, the empty answer
-    -- legal.
-    --
-    -- Not implemented: a chooser other than CR 608.2c's resolving controller,
-    -- which the arm below carries -- Oracle en-Vec's "target opponent chooses any
-    -- number of creatures they control" (#3023).
+    -- legal. Asked of CR 608.2c's resolving controller; another seat's pick is
+    -- Pawl.Types.Effect's ChoosePermanents, bound for the instruction to read.
     AnyNumberMatching AnyNumberMatching.AnyNumberMatching
   | -- | CR 608.2d / 701.42a / Hanweir Battlements, Wormfang Crab: exactly one of the
     -- permanents on the battlefield matching the payload's Filter, chosen as the

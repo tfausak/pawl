@@ -1,0 +1,37 @@
+{
+  "description": "CR 608.2i a Zubera dealt 4 damage before it died deals 3 to alice",
+  "note": "Burning-Eye Zubera's intervening if (\"if 4 or more damage was dealt to it this turn\") is read after CR 400.7 has deleted the object its damage was marked on, so the answer comes off the turn's history. Alice's Prodigal Sorcerer pings the Zubera and her Lightning Bolt kills it; the Bolt alone is lethal to the 3/3, so only the ping moves the total from 3 to 4. Bob's trigger aims its 3 at alice. The twin test pings the Hill Giant instead.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Prodigal Sorcerer", "label": "sorcerer", "ready": true },
+          { "card": "Mountain", "label": "mountain" }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Burning-Eye Zubera", "label": "zubera" },
+          { "card": "Hill Giant", "label": "giant" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@sorcerer", "targets": ["@zubera"], "mana": [null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@zubera", "damage": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@zubera"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@alice"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Burning-Eye Zubera", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 17 } } }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "description": "CR 122.6a an opponent's Vorinclex halves support's counters away",
+  "note": "Control: the Vorinclex board without the praetor puts one counter on each target.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest1", "ready": true },
+          { "card": "Forest", "label": "forest2", "ready": true },
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Wall of Stone", "label": "wall" }
+        ],
+        "hand": [{ "card": "Lead by Example", "label": "lead" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Typhoid Rats", "label": "rats" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lead", "targets": ["@piker", "@wall"], "mana": ["@forest1", "@forest2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@wall", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}

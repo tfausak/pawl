@@ -3061,17 +3061,6 @@ professorHojoSpec s registry =
         let cast = S.runPure (aiming wanted) (S.runPure (aiming wanted) gs (S.cast S.alice jugglerId)) Engine.settleForPriority
          in S.runPure (aiming wanted) cast drain
    in Spec.describe s "CR 601.2c creatures becoming the target of an activated ability" $ do
-        -- The positive every negative below rests on.
-        Spec.it s "CR 113.3b whole card: an ACTIVATED ability targeting a creature you control draws" $ do
-          (joragaId, firstPiker, _, _, _, gs, _) <- board
-          Spec.assertEqWith s "alice's hand starts at the Juggler alone" (S.handSize S.alice gs) 1
-          case activatedAt (Set.singleton (Recipient.ToCreature firstPiker)) joragaId gs of
-            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
-            Just after -> do
-              Spec.assertEqWith s "CR 601.2c the Hojo's trigger drew a card" (S.handSize S.alice after) 2
-              -- The control: the ability really resolved onto the Piker, so a
-              -- leg that drew nothing at all cannot pass for a leg that did.
-              Spec.assertEqWith s "and the counter landed on the targeted Piker" (S.powerToughnessOf firstPiker after) (Just (3, 2))
         -- CR 113.3c against the case above, and the whole of why
         -- Pawl.Types.StackObjectKind splits: the SAME board and the SAME Piker
         -- named, by an ability on the other side of rule 113.3.
@@ -3084,41 +3073,6 @@ professorHojoSpec s registry =
           -- named the Piker.
           Spec.assertEqWith s "the Juggler reached the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Rune-Brand Juggler")) S.alice after) 1
           Spec.assertEqWith s "and its trigger suspected the Piker it targeted" (fmap Object.designations (Game.lookupObject firstPiker after)) (Just (Set.singleton Designation.Suspected))
-        -- CR 603.2c's FIRST sentence: "one or more" names the whole rule 601.2c
-        -- announcement, so an activation that names two of alice's creatures is
-        -- one occurrence of the trigger event and not two.
-        --
-        -- SYNTHETIC TARGET SCRYER AND NOT THE HOJO, which is the whole of what
-        -- makes this leg say anything: Hojo's own "this ability triggers only
-        -- once each turn" would collapse a second firing by itself
-        -- (Engine.withinTurnLimit), so the printed card cannot tell CR 603.2c's
-        -- two sentences apart. The Scryer is Hojo's clause without the rider, and
-        -- no printing of this written form lacks it -- if one turns up it
-        -- replaces the synthetic (docs/design.md section 6).
-        --
-        -- What goes red here is Event.becameTarget's `simultaneously` bracket:
-        -- without it each recipient gets an EventGroup of its own,
-        -- Event.Trigger.oncePerBatch has nothing to collapse, and this reads
-        -- three.
-        Spec.it s "CR 603.2c one activation naming two of your creatures draws once" $ do
-          (joragaId, firstPiker, secondPiker, _, _, gs, _) <- boardBearing "Synthetic Target Scryer"
-          case activatedAt (Set.fromList [Recipient.ToCreature firstPiker, Recipient.ToCreature secondPiker]) joragaId gs of
-            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
-            Just after -> do
-              Spec.assertEqWith s "one card drawn, not two" (S.handSize S.alice after) 2
-              -- The control: BOTH really were targeted, which is what makes the
-              -- reading above a batch rather than a single target.
-              Spec.assertEqWith s "and both Pikers took a counter" (S.powerToughnessOf firstPiker after, S.powerToughnessOf secondPiker after) (Just (3, 2), Just (3, 2))
-        -- CR 109.2: "creatures you control" is a Filter over the targeted
-        -- permanent, and bob's Piker fails it. The same activation as the
-        -- positive leg, differing in NOTHING but whose creature was named.
-        Spec.it s "CR 109.2 an activated ability naming a creature you do not control draws nothing" $ do
-          (joragaId, _, _, bobsPiker, _, gs, _) <- board
-          case activatedAt (Set.singleton (Recipient.ToCreature bobsPiker)) joragaId gs of
-            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
-            Just after -> do
-              Spec.assertEqWith s "alice's hand is still the Juggler alone" (S.handSize S.alice after) 1
-              Spec.assertEqWith s "and the counter landed on bob's Piker" (S.powerToughnessOf bobsPiker after) (Just (3, 2))
         -- CR 603.10's first sentence at CR 601.2c's moment: the Juggler's
         -- ability names the suspected Piker and sacrifices that same Piker to
         -- pay (CR 601.2h), so the Piker is gone by the CR 117.5 gather. It was

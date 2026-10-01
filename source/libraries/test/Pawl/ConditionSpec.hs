@@ -714,7 +714,7 @@ damagingPlayer pid p = case p of
 -- kills the Zubera in both (CR 704.5g -- 3 is lethal to a 3/3 whether or not the
 -- ping came first), so the 3 damage alice takes cannot be the kill's doing; only
 -- the ping's one point moves the turn's total from 3 to 4.
-damageDealtToItSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+damageDealtToItSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageDealtToItSpec s registry =
   let run sorcerer zubera giant mountain bolt pingsZubera k =
         case Face.activatedAbilities (S.combinedFace sorcerer) of
@@ -732,22 +732,6 @@ damageDealtToItSpec s registry =
              in k zuberaId pinged killed onStack (S.runPure S.identityAnswer onStack Stack.resolveTop)
           [] -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability"
    in Spec.describe s "DamageDealtToThisTurn" $ do
-        -- THE PROVING TEST for #992. Nothing on the board can be asked how much
-        -- damage the Zubera took: CR 400.7 deleted the object its marks were on.
-        Spec.it s "CR 608.2i a Zubera dealt 4 damage before it died deals 3 to alice" $ do
-          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-          zubera <- S.printingOf s registry "Burning-Eye Zubera"
-          giant <- S.printingOf s registry "Hill Giant"
-          mountain <- S.printingOf s registry "Mountain"
-          bolt <- S.printingOf s registry "Lightning Bolt"
-          run sorcerer zubera giant mountain bolt True $ \zuberaId pinged killed onStack after -> do
-            Spec.assertEqWith s "alice took the Zubera's 3 damage, so CR 603.4's clause was true" (S.lifeOf S.alice after) (Just 17)
-            -- The preconditions, after the behaviour so none of them can absorb a
-            -- mutation of the atom.
-            Spec.assertEqWith s "off a Zubera the ping really had damaged first" (S.damageOf zuberaId pinged) (Just 1)
-            Spec.assertEqWith s "which really did die" (Set.member zuberaId (GameState.battlefield killed)) False
-            Spec.assertEqWith s "with its trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
-
         -- The negative's twin, one difference: the Sorcerer pings the Hill Giant
         -- instead, so the Zubera is dealt 3 this turn rather than 4.
         Spec.it s "CR 603.4 the same Zubera dealt only 3 deals nothing" $ do

@@ -1,0 +1,54 @@
+{
+  "description": "CR 611.2a the permission lasts through the controller's next turn, and the card is played on it",
+  "note": "Soulfire Eruption, cast at bob off nine Mountains, exiles the top card of alice's library, a Goblin Piker, and lets her play it until the end of her next turn. Turns 1 and 2 go by with nothing cast, so the Piker is cast on alice's next turn, turn 3, where an \"until your next turn\" duration would already be over. Both libraries are stocked so nobody decks out.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" },
+          { "card": "Mountain", "label": "mountain-4" },
+          { "card": "Mountain", "label": "mountain-5" },
+          { "card": "Mountain", "label": "mountain-6" },
+          { "card": "Mountain", "label": "mountain-7" },
+          { "card": "Mountain", "label": "mountain-8" },
+          { "card": "Mountain", "label": "mountain-9" }
+        ],
+        "hand": [{ "card": "Soulfire Eruption", "label": "soulfire" }],
+        "library": [
+          { "card": "Goblin Piker" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@soulfire", "targets": ["@bob"], "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5", "@mountain-6", "@mountain-7", "@mountain-8", "@mountain-9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "Goblin Piker", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

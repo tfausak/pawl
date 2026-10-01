@@ -1,0 +1,25 @@
+{
+  "description": "CR 603.5 declining the may leaves the creature tapped and blocking nothing",
+  "note": "One printed \"may\" over one clause, so declining it withholds both the untap and the block requirement. The same board and the same declining blocker as the proving test; only the answer to the may differs, which is what makes that test's block the keyword's.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Grappler", "label": "grappler", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "tapped": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@grappler"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "provoked": ["@piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseOptional": { "type": "Declines" } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@grappler", "blockers": null } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "@piker", "tapped": true } } }
+  ]
+}

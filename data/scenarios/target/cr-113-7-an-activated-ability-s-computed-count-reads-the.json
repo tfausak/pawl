@@ -1,0 +1,33 @@
+{
+  "description": "CR 113.7 an activated ability's computed count reads the source's counters, not the ability's",
+  "note": "Rumbling Crescendo's \"up to X target lands, where X is the number of verse counters on this enchantment\" with two verse counters: CR 113.7 makes the enchantment the ability's source, so the count is two, not the zero the ability object would read. Four lands against a count of two, so neither the offer nor the answer is forced, and alice's own Mountain proves the count rather than the pool ran out.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Rumbling Crescendo", "label": "crescendo", "counters": [{ "key": { "type": "Named", "value": "verse" }, "value": 2 }] }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@crescendo", "targets": ["@forest", "@forest-2"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Forest", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Forest", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@mountain", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Rumbling Crescendo", "count": 1 } } }
+  ]
+}

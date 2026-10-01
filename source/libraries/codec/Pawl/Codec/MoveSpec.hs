@@ -14,6 +14,7 @@ import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.Move as Move.Type
 import qualified Pawl.Types.OptionalDecision as OptionalDecision.Type
 import qualified Pawl.Types.Reference as Reference.Type
+import qualified Pawl.Types.SlotName as SlotName.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Move" $ do
@@ -37,6 +38,8 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.OrderTimestamps (Seq.fromList [ref "first", ref "second"])) " {\"OrderTimestamps\":[\"@first\",\"@second\"]} "
   Spec.it s "ChooseOptional" $
     Common.assertCodec s Move.codec (Move.Type.ChooseOptional OptionalDecision.Type.Exercises) " {\"ChooseOptional\":{\"type\":\"Exercises\"}} "
+  Spec.it s "ChooseTargets is keyed by slot" $
+    Common.assertCodec s Move.codec (Move.Type.ChooseTargets (Map.singleton (SlotName.Type.MkSlotName (Text.pack "target")) (Seq.singleton (ref "moon")))) " {\"ChooseTargets\":{\"target\":[\"@moon\"]}} "
   Spec.it s "Concede" $
     Common.assertCodec s Move.codec Move.Type.Concede " \"Concede\" "
   Spec.it s "Pass" $

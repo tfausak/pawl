@@ -46,7 +46,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `check:hand-size`: a player's hand size
 - `move:Search`: the `Search` prompt
 - `check:tapped-count`: how many permanents a player has tapped
-- `move:AnnounceTargets`: the `AnnounceTargets` prompt
 - `move:OrderTriggers`: the `OrderTriggers` prompt
 - `board:tokens`: tokens
 - `board:turn-number`: a turn other than the first
@@ -151,7 +150,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `move:ChooseLoopMembers`: the `ChooseLoopMembers` prompt
 - `move:ChooseCardInGraveyard`: the `ChooseCardInGraveyard` prompt
 - `move:ChooseOfferedCastSpell`: the `ChooseOfferedCastSpell` prompt
-- `move:ChooseTargets`: the `ChooseTargets` prompt
 - `move:ChooseColor`: the `ChooseColor` prompt
 - `move:ReferenceCards`: the `ReferenceCards` prompt
 - `board:player-status`: a player who has left the game
@@ -198,6 +196,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `check:intermediate-state`: an assertion on a state before the end of the run; split the scenario or check at that moment
 - `board:lands-played`: lands already played this turn
 - `board:events`: this turn's event history
+- `check:playable-from-exile`: an exiled card someone may play
+- `move:action-TurnFaceUp`: the turn-face-up special action
+- `check:names`: an object's names, or that it has none
+- `check:phasing`: whether a permanent is phased out, and how
 - `check:mana-types`: the mana types a permanent can produce
 - `check:block-requirements`: the block requirements in force
 - `check:sickness`: whether a creature is summoning sick
@@ -229,7 +231,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 101.1 the ChooseX bound is the greatest toughness among creatures you control | `move:ChooseBlight`
 - CR 101.1/601.2c whole card: Blighted Nightmare at X=3 returns the mana value 3 card and leaves the 4 | `move:ChooseBlight`
 - CR 107.3a/602.2b whole card: the Sphinx pays X energy and draws that many | `board:player-counters`
-- CR 113.6j an authored discard-this ability functions from the hand | `move:AnnounceTargets`
 - CR 113.7 the Aura itself does not have the ability it grants | `check:abilities` `check:helper-activationsOf` `check:offered-actions`
 - CR 113.8 a stolen creature's ability, activated by the new controller, resolves under them | `board:sickness`
 - CR 113.8 an activated ability resolves under whoever activated it, not a later controller | `board:stack`
@@ -314,7 +315,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.167a one or more materials: the payer exiles more than the minimum | `move:ChooseMaterials`
 - CR 702.193a whole card: Hulk powers up once, for {3}, and is refused the second time | `board:hand-order`
 - CR 702.29a whole card: cycling discards the Mauler and draws | `check:on-battlefield` `check:stack` `check:zone-contents`
-- CR 702.29c an authored discard-this cost is not a cycle | `move:AnnounceTargets`
 - CR 702.29e basic landcycling finds nothing in a library of nonbasics | `move:Search` `move:Shuffle`
 - CR 702.29e whole card: basic landcycling Ash Barrens fetches a Forest to hand | `move:Search` `move:Shuffle`
 - CR 702.49a ninjutsu is offered from the hand | `check:helper-activationsOf` `check:offered-actions`
@@ -352,22 +352,18 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `AttackKeywordTriggerSpec`
 
 - CR 120.3c whole card: that much is the damage the event carried | `board:stack`
-- CR 404.1 whole card: the same slot reaches a creature card in a graveyard | `move:AnnounceTargets`
-- CR 500.5a the stored requirement lasts exactly the combat phase | `check:block-requirements` `move:ChooseTargets`
+- CR 500.5a the stored requirement lasts exactly the combat phase | `check:block-requirements`
 - CR 508.1a a repeated id is still one attacker | `check:helper-atDamage`
 - CR 508.1k a creature that stayed home is no legal target | `check:helper-atDamage` `check:helper-plan`
 - CR 508.3a a bigger creature that stayed home is no companion | `check:helper-atBlockers` `check:helper-plan`
 - CR 509.1 the same board without provoke lets the defender decline | `check:helper-atDamage` `check:helper-plan` `check:other-Combat.blockersOf`
-- CR 509.1c an untapped provoked creature must block anyway | `move:ChooseTargets`
 - CR 509.1h losing every blocker does not earn the bonus | `check:on-battlefield`
 - CR 511.2 the delayed ability sacrifices it at end of combat | `board:tokens`
 - CR 603.2 two Squires make the lone attacker 5/5 | `move:OrderTriggers`
 - CR 603.2 whole card: the DAMAGED player discards, not the damager's controller | `move:ChooseDiscard`
-- CR 603.5 declining the may leaves the creature tapped and blocking nothing | `move:ChooseTargets`
-- CR 607.2a whole card: the Savior leaving the battlefield returns what it exiled, to its owner | `move:AnnounceTargets`
 - CR 608.2b a target that changes hands is no longer that player's | `board:stack`
 - CR 608.2b the second mentor's target is no longer legal | `move:OrderTriggers`
-- CR 608.2c whole card: only carol's Bad Moon is destroyed | `move:ChooseTargets`
+- CR 608.2c whole card: only carol's Bad Moon is destroyed | `check:legal-targets`
 - CR 702.100a a 0/1 entering ties both axes and evolves nothing | `check:helper-countersOn`
 - CR 702.100a an opponent's creature entering is not a trigger at all | `check:helper-countersOn` `check:helper-resolveAll` `check:stack`
 - CR 702.100b a +1/+1 counter from anything else is not an evolution | `check:helper-plusOnes` `check:helper-settle`
@@ -385,9 +381,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.149a the added combat phase counts only its own declaration | `move:OrderTriggers`
 - CR 702.149a whole card: attacking beside a bigger creature trains | `check:helper-countersOn` `check:helper-plan`
 - CR 702.149c a +1/+1 counter from another source is not training | `check:helper-countersOn` `check:helper-exiledNames` `check:on-battlefield` `check:stack`
-- CR 702.149c whole card: training exiles the targeted creature | `move:AnnounceTargets`
 - CR 702.181a three 1/1 red Warrior tokens enter tapped and attacking | `check:colors` `check:subtypes`
-- CR 702.39a whole card: the provoked creature untaps and blocks | `move:ChooseTargets`
 - CR 702.83a an opponent's Squire does not pump the attacker | `check:helper-atDamage` `check:helper-only`
 - CR 702.83a the bearer attacking alone pumps itself | `check:helper-atDamage`
 - CR 707.2 a Clone of the Patrol has myriad and mints a copy of the Patrol | `board:stack`
@@ -423,7 +417,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 303.4j whole cards: Crown of the Ages cannot move Setessan Training onto an opponent's creature | `board:controller` `board:mana-pool`
 - CR 400.7a hacking the Aura SPELL leaves the permanent counting Islands | `move:ChooseLandTypeSwap`
 - CR 603.3d/701.3a whole cards: Sigarda's Aid equips the Piker it can target and nothing at all when the only creature has shroud | `board:stack`
-- CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing | `check:attached-to` `check:stack` `move:ChooseTargets`
+- CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing | `check:attached-to` `check:stack`
 - CR 603.7a: a returned creature the Aura cannot enchant is still sacrificed | `check:controller` `check:helper-named`
 - CR 608.2b whole cards: killing the targeted creature in response fizzles the trigger, and its may is never asked | `board:stack`
 - CR 608.2c Battlefield Improvisation attaches the chosen Equipment only to an attacking target | `board:combat`
@@ -446,7 +440,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.3c moving an Aura to a different creature restamps it | `check:attached-to` `check:helper-attachedTo` `check:other-Object.timestamp`
 - CR 702.103e / 608.3b: a bestowed spell whose host died resolves as a 1/1 Satyr rather than being countered | `board:stack`
 - CR 702.103f: when its host dies the bestowed Aura stays, unattached, and is a 1/1 Satyr creature again | `board:stage-a-placement-cannot-be-attached-to-o5`
-- CR 702.16b/702.16d whole cards: the protected Piker is a legal target and still cannot be equipped | `check:attached-to` `check:keywords` `check:stack` `move:ChooseTargets`
+- CR 702.16b/702.16d whole cards: the protected Piker is a legal target and still cannot be equipped | `check:attached-to` `check:keywords` `check:stack`
 - CR 702.16c whole cards: Aura Graft will not move a black Aura onto a creature with protection from black | `check:attached-to` `check:colors` `check:helper-attachedTo` `check:keywords` `check:other-Protection.quality` `check:other-Protection.spares`
 - CR 702.16d whole card: a land that gains protection from artifacts sheds its Fortification | `board:mana-pool`
 - CR 702.16n whole cards: Spectra Ward stays on the creature it protects, and still keeps a black Aura off it | `check:attached-to` `check:colors` `check:helper-attachedTo` `check:on-battlefield`
@@ -796,8 +790,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.3 the ATTACKING player is not offered it in the same step | `check:offered-actions`
 - CR 601.3 the permitted cast resolves and untaps bob's creatures | `check:helper-tapStateOf` `check:tapped-count`
 - CR 601.3 the same pile casts the Doom Blade when she picks that instead | `board:exile-linked` `check:tapped-count` `move:ChooseOfferedCastSpell` `move:OfferedCast`
-- CR 701.6a a spell exiled off the stack was not countered, so a counter trigger stays silent | `move:ChooseManaSource` `move:ChooseTargets`
-- CR 701.6a exiling a spell is not countering it, so a spell that can't be countered is exiled anyway | `move:ChooseManaSource` `move:ChooseTargets`
+- CR 701.6a a spell exiled off the stack was not countered, so a counter trigger stays silent | `move:ChooseManaSource`
+- CR 701.6a exiling a spell is not countering it, so a spell that can't be countered is exiled anyway | `move:ChooseManaSource`
 
 ### `CastSpec`
 
@@ -844,7 +838,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 616.1e buyback taken before Rest in Peace puts the spell into its owner's hand | `move:ChooseBuyback` `move:ChooseReplacement`
 - CR 616.1e rebound taken before Rest in Peace still arms the upkeep cast | `move:ChooseReplacement` `move:OfferedCast`
 - CR 702.113b/601.2c/700.2a the printed cast is offered though no land exists to target | `check:offered-actions` `check:other-GameState.extraTurns` `check:other-Mana.yieldUnits` `check:other-ManaUnit.manaType`
-- CR 702.117a after alice's own Bolt the Salvo is cast for {1}{R}; after nobody's and after bob's, its {4}{R} is unpayable | `move:ChooseTargets`
+- CR 702.117a after alice's own Bolt the Salvo is cast for {1}{R}; after nobody's and after bob's, its {4}{R} is unpayable | `check:offered-actions` `move:expect-rejected`
 - CR 702.119a the emerge cost is reduced by the sacrificed creature's mana value | `check:helper-namedInGraveyard` `check:helper-namedOnBattlefield`
 - CR 702.119c an Ashnod's Altar that eats the chosen creature reverses the cast | `move:ChooseCost:unmatchable` `move:ChooseSacrifices` `move:ReverseManaAbilities`
 - CR 702.133a cast from the graveyard for {1}{R}{R} plus a discard, then exiled | `move:ChooseDiscard`
@@ -1217,15 +1211,14 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 604.2 Thrasta has hexproof the turn it enters, and loses it at the handoff | `check:keywords` `check:legal-targets` `check:on-battlefield` `check:other-S.soleFaceName` `check:other-S.spellOnStack` `check:other-S.spellTargetSlot`
 - CR 608.2h a blocking Guildsworn Prowler that dies draws nothing | `board:combat`
 - CR 608.2h an attacking Hill Giant that dies draws Garna a card | `board:combat`
-- CR 608.2i a Zubera dealt 4 damage before it died deals 3 to alice | `move:ChooseTargets`
 - CR 608.2i the entrant killed between the two checks still grows the Knight | `board:stack`
 - CR 608.2i the turn handoff resets the tally | `board:mana-pool` `board:turn-number`
 
 ### `ConjureSpec`
 
-- CR 400.7j Calim's Breath cannot exile the discarded Calim as one of the two others | `move:AnnounceTargets` `move:LookUpCard` `move:ReferenceCards`
-- CR 400.7j Calim's Breath does not return a Calim its discard put into exile | `move:AnnounceTargets` `move:ChooseToPay`
-- CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped | `move:AnnounceTargets` `move:ChooseToPay` `move:LookUpCard` `move:ReferenceCards`
+- CR 400.7j Calim's Breath cannot exile the discarded Calim as one of the two others | `move:LookUpCard` `move:ReferenceCards`
+- CR 400.7j Calim's Breath does not return a Calim its discard put into exile | `move:ChooseToPay`
+- CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped | `move:ChooseToPay` `move:LookUpCard` `move:ReferenceCards`
 - CR 603.4 and three life is one short, so nothing is conjured | `check:helper-moxPearl` `check:helper-namedIn` `check:other-GameState.triggeredThisGame` `check:step`
 - CR 603.4 conjure behind an intervening if: 4 life gained puts a castable Mox Pearl in hand | `board:stage-no-card-named-mox-pearl`
 - CR 702.140e a duplicate of a mutated Headless Skaab owes the Skaab's additional cost | `board:source-ofmerge`
@@ -1243,14 +1236,13 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.2/702.51a a duplicate of a Clone has the convoke of what the Clone copies | `board:stack`
 - CR 707.2/709.5b a duplicate of a copied Room is cast as a door | `board:stack`
 - CR 707.2/715.2b a duplicate of a Clone of Flaxen Intruder is cast as Welcome Home | `board:stack`
-- CR 715.3a a duplicate of Flaxen Intruder cast as Welcome Home costs Welcome Home's cost | `move:AnnounceTargets`
+- CR 715.3a a duplicate of Flaxen Intruder cast as Welcome Home costs Welcome Home's cost | `check:offered-actions` `move:expect-rejected`
 - CR 727.2/707.2 a duplicate of a Clone rebuilt out of a merge by a restart is the Piker again | `board:stack`
 - CR 730.2/730.3 a duplicate of a Clone that merged as the spell is the Cubwarden again | `board:stack`
 - CR 730.3/707.2 a duplicate of a Clone split out of a merge is the Piker again | `board:stack`
 - Gate to Seatower's seek puts the nonland card randomness named into the hand, leaving the library's order | `board:stage-no-card-named-gate-to-seatower`
 - Kari Zev's Ragavan attacks without being declared and goes home at the next end step | `board:stage-no-card-named-ragavan-nimble-pilferer`
 - a conjure from the file registry's reference never conjures a synthetic card | `move:LookUpCard` `move:RandomCard` `move:ReferenceCards`
-- a conjured duplicate of each targeted creature reaches the hand and outlives the original | `move:AnnounceTargets`
 - a duplicate of a Clone cast and resolved is the Piker | `board:stack`
 - a printed spellbook is offered whole, and the card randomness named is the one conjured | `move:RandomCard`
 - a printed spellbook picked by choice is offered whole, and the card its controller named is the one conjured | `move:ChooseConjuredCard`
@@ -1446,11 +1438,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.59a three one-drops total the mana value the cost asks for | `move:ChooseCollectEvidence`
 - CR 701.59b a graveyard totalling 2 cannot collect evidence 3 | `check:helper-collectsEvidenceFrom` `check:offered-actions` `check:zone-contents`
 - CR 701.59c Vitu-Ghazi Inspector's enters ability reads the evidence its spell collected | `move:ChooseCollectEvidence` `move:ChooseCost:unmatchable`
-- CR 701.67a a spell's additional waterbend {5} is paid by tapping five permanents | `move:AnnounceTargets` `move:ChooseTaps`
+- CR 701.67a a spell's additional waterbend {5} is paid by tapping five permanents | `move:ChooseTaps`
 - CR 701.67a alice waterbends {2} by tapping two Pikers, or discards with one | `move:ChooseDiscard` `move:ChooseToPay`
 - CR 701.67a bob pays ward--waterbend {4} by tapping four of his own permanents | `move:ChooseToPay`
 - CR 701.67a waterbend {4} is paid by tapping two artifacts and two creatures | `move:ChooseTaps`
-- CR 701.67b a spell's waterbend taps pay its own {5} and not the tax on top of it | `move:AnnounceTargets` `move:ChooseTaps`
+- CR 701.67b a spell's waterbend taps pay its own {5} and not the tax on top of it | `move:ChooseTaps`
 - CR 701.67b a waterbend cost's taps pay for its own generic mana and not for the tax on top of it | `move:ChooseTaps`
 - CR 702.125a two opponents take {2} off, and the total is what pays | `check:helper-namesIn` `check:offered-actions` `check:tapped-count`
 - CR 702.126a improvise pays {3} of a Foundry Assembler's {5} by tapping three artifacts | `check:tapped-count`
@@ -1482,7 +1474,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 102.1 at three seats the count is alice's two opponents | `check:subtypes`
 - CR 104.2b the second, cast from hand on a LATER turn, wins | `board:mana-pool` `board:turn-number`
-- CR 108.3 a resolved spell cast off an opponent's card was a spell you don't own | `move:ChooseTargets`
 - CR 108.3 a spell still on the stack is read off the object, not off a record | `board:exile-cast-permission` `board:stack`
 - CR 110.2 X counts the one seat with more lands than alice and the one with fewer | `move:Search` `move:Shuffle`
 - CR 110.2 a seat TIED with alice controls no more lands than she does | `move:Search` `move:Shuffle`
@@ -1550,7 +1541,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2h the count comes from the last known record, not from the board | `board:stack`
 - CR 611.2d the +1/+1 outlives the combat record it was computed from | `check:combat` `check:other-Combat.Type.declaredAttacked`
 - CR 701.37a a second monstrosity marks nothing, so nothing triggers | `board:mana-pool` `board:object-designations`
-- CR 701.37a a suspected Colossus is still not monstrous | `move:AnnounceTargets`
+- CR 701.37a a suspected Colossus is still not monstrous | `check:designations`
 - CR 701.37b a second monstrosity announcing 3 makes nothing and leaves the recorded X at 2 | `check:designations`
 - CR 701.37c monstrosity 2 makes TWO 2/2 Hydras | `check:designations`
 - CR 702.105a a tie for most life still triggers | `check:helper-atBlockers` `check:helper-attacking` `check:helper-lives`
@@ -1678,12 +1669,12 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.122c a creature whose crew ability was countered still crewed it | `move:ChooseExplore` `move:ChooseTapsForTotalPower`
 - CR 702.122c the attacking Schooner explores the creature that crewed it | `move:ChooseExplore` `move:ChooseTapsForTotalPower`
 - CR 702.122d a creature Revoke Privileges enchants is not offered to pay | `move:ChooseTapsForTotalPower`
-- CR 702.122e a second crew ability resolving in the same turn triggers again | `move:AnnounceTargets` `move:ChooseTapsForTotalPower`
+- CR 702.122e a second crew ability resolving in the same turn triggers again | `move:ChooseTapsForTotalPower`
 - CR 702.122e a second crewing this turn does not trigger it again | `move:ChooseTapsForTotalPower`
 - CR 702.122e crewed by exactly two creatures grants the ability | `move:ChooseTapsForTotalPower`
 - CR 702.122e crewed by one creature does not | `move:ChooseTapsForTotalPower`
 - CR 702.122e crewing a different Vehicle does not fire the Mech's trigger | `move:ChooseTapsForTotalPower`
-- CR 702.122e crewing the Mech animates the other Vehicle its trigger targeted | `move:AnnounceTargets` `move:ChooseTapsForTotalPower`
+- CR 702.122e crewing the Mech animates the other Vehicle its trigger targeted | `move:ChooseTapsForTotalPower`
 
 ### `DamageReplacementSpec`
 
@@ -1749,7 +1740,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.16e protection's prevention is not 'this way', and the same board's printed one is | `board:continuous-effect` `board:mana-pool`
 - CR 702.64a an event at the ceiling never happens | `check:events` `check:other-DamageEvent.amount`
 - a shield over a PLAYER runs CR 615.5's rider, scaled by the amount | `board:hand-order` `board:mana-pool` `board:replacement`
-- the +1 pumps up to one target creature and hands it three keywords | `move:AnnounceTargets`
+- the +1 pumps up to one target creature and hands it three keywords | `check:keywords`
 - the card draws as it resolves | `move:multi-slot-targets`
 - the combat-only shield leaves noncombat damage alone, rider and all (CR 608) | `check:helper-preventAllRows` `check:other-S.tokensOf`
 
@@ -2045,7 +2036,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `ExpirySpec`
 
-- Blighted Nightmare's perpetual +1/+1 applies in the graveyard and follows the card out | `move:AnnounceTargets`
+- Blighted Nightmare's perpetual +1/+1 applies in the graveyard and follows the card out | `check:legal-targets`
 - CR 205.1b whole card: the animated Statue is an Artifact Creature -- Golem | `check:subtypes`
 - CR 500.5 an end-of-combat retention effect expires BEFORE the pool empties | `board:combat` `board:mana-pool` `board:player-effect`
 - CR 500.5a / 611.2a whole card: the permission outlives bob's combat, and the card is played on alice's next turn | `check:active-player` `check:creature-count` `check:helper-permissionOn` `check:other-Game.cardOf` `check:other-GameState.turnNumber` `check:zone-contents`
@@ -2059,9 +2050,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 514.2 without the Bell the ending phase runs and does the same work | `board:turn-number`
 - CR 601.2f an opponent's instant costs {1} more, and alice's does not | `board:controller` `board:hand-order` `board:mana-pool`
 - CR 604.2 an ordinary static ability does NOT linger past its permanent | `check:keywords` `check:other-GameState.continuousEffects`
-- CR 611.2a / 514.2 it ends as that turn ends, and no later turn of theirs can play the card | `move:AnnounceTargets`
+- CR 611.2a / 514.2 it ends as that turn ends, and no later turn of theirs can play the card | `check:offered-actions` `move:expect-rejected`
 - CR 611.2a a pump ends with the turn though the ending phase was skipped | `board:turn-number`
-- CR 611.2a the permission lasts through the controller's next turn, and the card is played on it | `move:AnnounceTargets`
 - CR 611.2a whole card: the animation outlives Titania's Song and ends at cleanup | `check:abilities`
 - CR 611.2b chapter I grants hexproof for the same duration, and it ends with the Saga | `board:continuous-effect` `board:controller` `board:hand-order` `board:mana-pool`
 - CR 611.2b it ends when the crown moves to the ability's controller | `board:continuous-effect`
@@ -2080,8 +2070,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 109.5 alice's own face-down creature is not a legal target | `board:controller` `board:face-down`
 - CR 110.5 Break Open turns the opponent's face-down creature face up | `board:controller` `board:face-down`
 - CR 110.5 a face-up creature the opponent controls is not a legal target | `board:controller` `board:face-down`
-- CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once | `move:AnnounceTargets`
-- CR 601.2c the offer is every OTHER morph creature, and all three turn over | `move:AnnounceTargets`
+- CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once | `check:face-down` `check:names` `check:offered-actions` `move:action-TurnFaceUp` `move:cast-face`
+- CR 601.2c the offer is every OTHER morph creature, and all three turn over | `check:face-down` `check:prompt-offers` `move:action-TurnFaceUp` `move:cast-face`
 - CR 608.2d the engine does not pick, and CR 708.3 the manifested card's enters ability does not trigger | `move:ChooseCardFromAmong`
 - CR 613.4c turning one face up drops the Whisperer by two | `board:controller` `board:face-down`
 - CR 613.7f turning face down restamps the permanent after a removal that had wiped its grant | `board:object-designations`
@@ -2219,7 +2209,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.57a discover 5 exiles past the Tracker and the Mountain, stops at the Galleon and casts it free | `move:OfferedCast` `move:Shuffle`
 - CR 701.57a the discovered card goes to the hand when the offer is declined | `move:OfferedCast` `move:Shuffle`
 - CR 701.60a a spell ends the designation, and CR 701.60c's menace and can't-block end with it | `board:tokens`
-- CR 701.60b the cost takes the suspected creature, and the menace one is not a candidate | `move:AnnounceTargets`
+- CR 701.60b the cost takes the suspected creature, and the menace one is not a candidate | `check:designations` `check:keywords`
 
 ### `KeywordTriggerSpec`
 
@@ -2262,7 +2252,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.115a an empty library exiles nothing and loses nobody | `check:helper-namesIn`
 - CR 702.115a whole card: Culling Drone exiles the damaged player's top card | `check:helper-nameOfCard` `check:helper-namesIn` `check:keywords`
 - CR 702.124j the entry trigger searches the TARGET player's library | `move:Search` `move:Shuffle`
-- CR 702.124j the targeted player may decline | `check:hand-size` `move:ChooseTargets`
+- CR 702.124j the targeted player may decline | `check:hand-size`
 - CR 702.144a Incarnation Technique copied and demonstrated to bob resolves for bob; declined, for nobody | `move:ChooseOpponent`
 - CR 702.153a Light 'Em Up with its casualty paid deals its damage twice; unpaid, once | `move:ChooseKicker`
 - CR 702.153a a creature under casualty's power floor cannot pay it | `ready`
@@ -2301,12 +2291,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `LeavesTriggerSpec`
 
-- CR 109.2 an activated ability naming a creature you do not control draws nothing | `move:AnnounceTargets`
 - CR 109.5 a spell targeting another player leaves it tapped | `check:helper-optionalResponses` `check:helper-tapStateOf` `check:stack`
 - CR 109.5 an opponent's spell naming ANOTHER player fires nothing | `check:helper-payResponses` `check:stack`
 - CR 110.2a a stolen Young Wolf comes back under its OWNER's control | `check:controller` `check:helper-countersOn` `check:stack`
-- CR 113.3b whole card: an ACTIVATED ability targeting a creature you control draws | `move:AnnounceTargets`
-- CR 113.3c a TRIGGERED ability naming the same creature draws nothing | `move:AnnounceTargets`
+- CR 113.3c a TRIGGERED ability naming the same creature draws nothing | `check:designations`
 - CR 113.6k the same ability does not fire from a graveyard | `board:exiledwith` `board:haunting` `board:mana-pool`
 - CR 113.6m an ability whose delayed trigger returns it from the graveyard functions there | `board:controller` `board:delayed-trigger` `board:entered-with` `board:mana-pool`
 - CR 113.6m the same ability does not function from the battlefield | `board:controller` `board:entered-with` `board:graveyard` `board:mana-pool`
@@ -2326,7 +2314,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 603.2 whole card: Unsummon on bob's Piker makes bob discard | `board:hand-order` `board:objects-ids`
 - CR 603.2c Evacuation returns two Pikers and Justice triggers twice | `move:OrderTriggers`
 - CR 603.2c Retract returning two artifacts draws one card each for Tameshi and the Ledger, and grows Justice twice | `move:OrderTriggers`
-- CR 603.2c one activation naming two of your creatures draws once | `move:AnnounceTargets`
 - CR 603.4 with Bad Moon the Berserker died at power 3 and its trigger fires | `check:colors` `check:other-Face.power` `check:other-Face.toughness` `check:other-Game.faceOf` `check:stack` `check:subtypes`
 - CR 603.4 with no counter the same death draws nothing | `check:hand-size` `check:helper-countersOn` `check:on-battlefield` `check:stack`
 - CR 603.4 without Bad Moon it died at power 2 and does not trigger at all | `check:helper-tokensOf` `check:stack`
@@ -2352,7 +2339,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.46a whole card: the dead Kami returns the one Spirit card its N reaches | `move:multi-slot-targets`
 - CR 702.55a/608.2n the resolved sorcery is exiled haunting the targeted creature | `move:ChooseDiscard`
 - CR 702.55b only the creature the card haunts fires it | `move:multi-slot-targets`
-- CR 702.55b/702.55c the haunted creature dying fires the card's rider | `board:haunting` `check:hand-size` `check:stack` `move:ChooseTargets`
+- CR 702.55b/702.55c the haunted creature dying fires the card's rider | `board:haunting` `check:hand-size` `check:stack`
 - CR 702.55c whole card: the haunting card in exile sees the creature it haunts die | `move:multi-slot-targets`
 - CR 704.5g the control: an Ogre Sentry survives the same 2 damage, marked | `check:helper-markedOn` `check:helper-namesIn`
 - CR 730.3 a merged token put into a library still puts its Cubwarden card there, and the Seeker grows | `board:tokens`
@@ -2360,7 +2347,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - Professor Hojo sacrificed to the cost still triggers | `board:object-designations`
 - Professor Hojo sees a target its own cost sacrificed | `board:object-designations`
 - Venerated Rotpriest sees a target its spell's cost sacrificed | `move:ChooseSacrifices`
-- Venerated Rotpriest triggers once per creature a spell targets | `move:AnnounceTargets` `move:OrderTriggers`
+- Venerated Rotpriest triggers once per creature a spell targets | `move:OrderTriggers`
 - a card moved from a library into a library is not put into one | `check:other-Event.changeZone` `check:stack`
 - the Seeker's {3} ability puts bob's graveyard card into his library, and the Seeker grows | `check:active-player` `check:other-Activatable.abilitiesFor` `check:priority` `check:step` `check:zone-contents`
 
@@ -2775,8 +2762,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.26b a phased-out permanent is not a legal target | `check:legal-targets` `check:other-Recipient.objectOf` `check:other-S.spellTargetSlot`
 - CR 702.26f a for-as-long-as duration ends when its permanent phases out | `board:continuous-effect`
 - CR 702.26g the Aura phases in with its host, still attached | `check:helper-attachedHostOf` `check:helper-onBattlefield` `check:other-Phasing.isPhasedOut` `check:zone-contents`
-- CR 702.26h an object named AND dragged phases out indirectly | `move:AnnounceTargets`
-- CR 702.26i an Aura attached to a PLAYER phases in still attached | `move:AnnounceTargets`
+- CR 702.26h an object named AND dragged phases out indirectly | `check:attached-to` `check:phasing`
+- CR 702.26i an Aura attached to a PLAYER phases in still attached | `check:attached-to` `check:phasing`
 - CR 702.26j phasing an enchanted permanent out and back in does not re-trigger | `board:tokens`
 - CR 702.26j/702.26d neither transition emits an event | `check:events`
 - CR 702.26j/702.26i a phase-in detach is no unattachment | `board:mana-pool`
@@ -2829,7 +2816,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 115.2 a 'player or planeswalker' spell offers neither Goblin | `check:legal-targets` `check:other-Recipient.objectOf` `check:other-S.spellTargetSlot`
 - CR 115.4 an 'any target' spell offers the planeswalker alongside the players | `check:legal-targets` `check:other-Recipient.objectOf` `check:other-S.spellTargetSlot`
 - CR 118.12 declining the -2's sacrifice arms nothing and destroys nothing | `move:ChooseToPay`
-- CR 205.1b the -6 untaps two lands and makes them 5/5 Elemental creature lands with flying and haste | `move:AnnounceTargets`
+- CR 205.1b the -6 untaps two lands and makes them 5/5 Elemental creature lands with flying and haste | `check:keywords` `check:subtypes` `check:tapped-count`
 - CR 306.5b / 107.3m Nissa enters with as many loyalty counters as the X she was cast for | `check:on-battlefield`
 - CR 306.5b Jace Beleren enters with three loyalty counters | `check:on-battlefield`
 - CR 306.8 / 603.2 the three loyalty counters Lightning Bolt takes off Chandra deal three to bob | `board:controller` `board:mana-pool`
@@ -3298,7 +3285,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 709.5g locking a door takes its designation back away | `board:controller` `board:mana-pool` `board:object-unlockedhalves`
 - CR 709.5g locking each door takes both designations back away | `board:object-unlockedhalves`
 - CR 709.5i 'you' is the player who unlocked, not the Room's controller | `board:object-unlockedhalves`
-- CR 709.5i a Room that gains both designations at once fires once | `move:ChooseTargets`
+- CR 709.5i a Room that gains both designations at once fires once | `check:designations`
 
 ### `SacrificeRestrictionSpec`
 
@@ -3318,7 +3305,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `SagaSpec`
 
 - CR 101.2 a finished Saga that cannot be sacrificed is left where it stands | `board:sickness`
-- CR 704.5s entering on the final chapter still resolves it before the Saga is sacrificed | `move:AnnounceTargets` `move:ChooseReadAheadChapter`
+- CR 704.5s entering on the final chapter still resolves it before the Saga is sacrificed | `move:ChooseReadAheadChapter`
 - CR 714.2b that counter fires chapter I, which makes a 2/2 Knight with vigilance | `check:helper-knightToken` `check:keywords` `check:subtypes`
 - CR 714.3b / 702.155a chapter II is chosen, so the Saga enters on II and chapter I never triggers | `move:ChooseReadAheadChapter`
 
@@ -3379,7 +3366,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.170c an effect makes an exiled card plotted, stamp and event alike | `check:keywords` `check:offered-actions` `check:plotted`
 - CR 702.170d a plotted instant is castable only in its owner's main phase with the stack empty | `board:plotted` `board:stack` `check:offered-actions`
 - CR 702.170d casting it costs nothing | `board:plotted`
-- CR 702.170d the card an effect plotted casts for nothing on a later turn | `move:ChooseTargets`
 - CR 702.170d the plotted card is castable only by its owner, and only later | `move:action-Plot`
 - CR 702.170f plotting the top card exiles it from the library, and it is cast free later | `check:offered-actions` `check:plotted` `check:priority` `check:stack` `check:tapped-count` `check:zone-contents` `move:action-Plot`
 - CR 702.62 the card is exiled with a time counter, ticks down at the next upkeep, and is cast free | `move:OfferedCast` `move:action-Suspend`
@@ -3427,18 +3413,17 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `TargetPerPlayerSpec`
 
-- CR 601.2c Afterlife from the Loam takes one creature card from each player's graveyard as Zombies | `move:AnnounceTargets`
+- CR 601.2c Afterlife from the Loam takes one creature card from each player's graveyard as Zombies | `check:legal-targets` `check:subtypes` `move:multi-slot-targets`
 - CR 601.2c Blatant Thievery gains control of one permanent from each opponent | `move:multi-slot-targets`
 - CR 601.2c Blatant Thievery with carol controlling nothing still takes bob's Piker | `check:controller` `check:helper-resolve` `check:helper-steal` `check:offered-actions`
-- CR 601.2c Dismantling Wave destroys up to one artifact or enchantment of each opponent's | `move:AnnounceTargets`
-- CR 602.2b The Theorist, Jace Beleren's -2 returns each opponent's chosen artifact or creature | `move:AnnounceTargets`
+- CR 601.2c Dismantling Wave destroys up to one artifact or enchantment of each opponent's | `check:legal-targets` `move:multi-slot-targets`
+- CR 602.2b The Theorist, Jace Beleren's -2 returns each opponent's chosen artifact or creature | `check:legal-targets` `move:multi-slot-targets`
 - CR 608.2b Blatant Thievery does not take the Piker once carol controls it | `board:stack`
 
 ### `TargetSpec`
 
 - CR 113.3b Squelch's pool holds the activated ability alone where Stifle's holds both | `board:stack`
 - CR 113.6 Cancel legally targets the Blurred Mongoose spell, and CR 113.6g stops it countering | `board:stack`
-- CR 113.7 an activated ability's computed count reads the source's counters, not the ability's | `move:AnnounceTargets`
 - CR 113.9 Stifle's pool holds only the ability and Cancel's only the spell | `board:stack`
 - CR 115.1 the opponent alice named picks the second target, and alice picks only the first | `move:ChooseOpponent`
 - CR 115.10a Day of Judgment still destroys Blurred Mongoose: shroud restricts targeting, not effects | `check:creature-count` `check:other-Face.name` `check:other-Game.faceOf` `check:zone-contents`
@@ -3453,8 +3438,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 205.3m the two targets must hold a creature type in common | `move:multi-slot-targets`
 - CR 601.2b announcing 2 instead returns the mana value 2 card and leaves the 3 | `board:player-counters`
 - CR 601.2c Bioshift's second slot cannot be a creature its first slot's controller does not control | `board:stack`
-- CR 601.2c Dwell on the Past cannot be aimed at more cards than one graveyard holds | `move:AnnounceTargets` `move:Shuffle`
-- CR 601.2c Dwell on the Past's card slot is scoped to the player its other slot targets | `move:AnnounceTargets` `move:Shuffle`
+- CR 601.2c Dwell on the Past cannot be aimed at more cards than one graveyard holds | `move:Shuffle`
+- CR 601.2c Dwell on the Past's card slot is scoped to the player its other slot targets | `move:Shuffle`
 - CR 601.2c Fall of the Hammer's victim slot cannot be the creature its dealer slot names | `move:multi-slot-targets`
 - CR 601.2c the joint check re-derives a jointly judged slot against the announced X | `move:multi-slot-targets`
 - CR 601.2c the slot admits exactly the creature with a counter on it | `check:helper-abolisherOf` `check:legal-targets`
@@ -3464,17 +3449,17 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2c whole card: the bound is the X the caster announced | `check:tapped-count`
 - CR 601.2e an X no graveyard card is under reverses the whole cast | `check:tapped-count`
 - CR 602.2a/115.5 Adric's ability is not offered its own object among the abilities it may counter | `board:stack`
-- CR 603.2 whole card: the bound is the damage the event carried | `move:ChooseTargets`
+- CR 603.2 whole card: the bound is the damage the event carried | `check:legal-targets`
 - CR 608.2b Doom Blade fizzles when its target gains shroud in response | `board:stack`
 - CR 608.2b Raise Dead fizzles when its target leaves the graveyard in response | `board:stack`
 - CR 608.2b Withered Wretch's activation fizzles when the card leaves the graveyard in response | `board:stack`
-- CR 608.2b a repeated mode on an ABILITY re-checks each occurrence against its own binding | `move:AnnounceTargets` `move:Shuffle`
+- CR 608.2b a repeated mode on an ABILITY re-checks each occurrence against its own binding | `move:Shuffle`
 - CR 608.2b gaining hexproof in response fizzles an opponent's Doom Blade but not its controller's | `board:stack`
 - CR 608.2b one target leaving does not strand the other | `move:multi-slot-targets`
-- CR 700.2a a computed bound no announcement of its own gauge slot could reach makes the mode unchoosable | `move:AnnounceTargets`
-- CR 700.2d a repeated mode's computed bound measures its own occurrence's sibling slot | `move:AnnounceTargets`
+- CR 700.2a a computed bound no announcement of its own gauge slot could reach makes the mode unchoosable | `move:multi-slot-targets`
+- CR 700.2d a repeated mode's computed bound measures its own occurrence's sibling slot | `check:legal-targets` `check:stack` `move:expect-rejected` `move:multi-slot-targets`
 - CR 700.2d a repeated mode's filter reads its own occurrence's sibling slot, not the first's | `move:multi-slot-targets`
-- CR 700.2d a repeated mode's graveyard scope follows its own occurrence, not the first | `move:AnnounceTargets` `move:Shuffle`
+- CR 700.2d a repeated mode's graveyard scope follows its own occurrence, not the first | `move:Shuffle`
 - CR 701.24c Dwell on the Past shuffles the targeted player's library even when both targeted cards have left the graveyard | `board:stack`
 - CR 702.11b whole card: alice's Doom Blade destroys her own Slippery Bogle | `check:creature-count` `check:other-Face.name` `check:other-Game.faceOf` `check:stack` `check:zone-contents`
 - CR 702.16k a Saltfield Recluse stolen in response still weakens the Nemesis that chose the thief | `board:object-chosenplayer`
@@ -3523,8 +3508,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `TransformSpec`
 
-- CR 202.3 the bound moves with the life gained, not with the card | `check:legal-targets` `move:ChooseTargets`
-- CR 603.12 / 202.3 taking the may converts Ratchet and returns an in-range artifact tapped | `check:legal-targets` `check:subtypes` `move:ChooseTargets`
+- CR 202.3 the bound moves with the life gained, not with the card | `check:legal-targets`
+- CR 603.12 / 202.3 taking the may converts Ratchet and returns an in-range artifact tapped | `check:legal-targets` `check:subtypes`
 - CR 603.2 gaining no life offers nothing at all | `check:subtypes`
 - CR 603.4 the upkeep triggers read what each player cast last turn | `board:mana-pool` `board:replacement` `board:turn-number`
 - CR 603.5 / 603.12 declining the may converts nothing and returns nothing | `check:subtypes`
@@ -3669,38 +3654,25 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 107.14 paying nothing deals nothing and keeps the counters | `board:player-counters`
 - CR 107.14 the {E} its controller pays is the damage it deals | `board:player-counters`
-- CR 115.6 Conjurer's Bauble with zero targets announced still draws | `move:AnnounceTargets`
-- CR 115.6 Explosive Entry takes both slots | `move:AnnounceTargets`
-- CR 115.6 Explosive Entry takes one slot and declines the other | `move:AnnounceTargets`
-- CR 115.6 Rat Out aimed at a creature shrinks it and still makes the Rat | `move:AnnounceTargets`
-- CR 115.6 Rat Out with zero targets announced resolves, leaving the creature alone | `move:AnnounceTargets`
-- CR 115.6 X=2 announcing no targets destroys nothing and still makes the Pests | `move:AnnounceTargets`
-- CR 115.6 support 2 announcing no targets counters nobody | `move:AnnounceTargets`
+- CR 115.6 Explosive Entry takes both slots | `move:multi-slot-targets`
+- CR 115.6 Explosive Entry takes one slot and declines the other | `move:multi-slot-targets`
+- CR 115.6 Rat Out aimed at a creature shrinks it and still makes the Rat | `check:intermediate-state`
 - CR 118.12 paying nothing declines the offer, so no power matches at all | `board:player-counters`
 - CR 118.12 the creature whose power is the amount paid survives the sweep | `board:player-counters`
 - CR 118.3 an answer above the payer's energy is capped at what they have | `board:player-counters`
-- CR 122.6 Doubling Season doubles support's counter on each target | `move:AnnounceTargets`
-- CR 122.6a an opponent's Vorinclex halves support's counters away | `move:AnnounceTargets`
-- CR 601.2c Hearts on Fire pumps the two creatures it named, and only those | `move:AnnounceTargets`
-- CR 601.2c X=1 announcing three targets destroys only one | `move:AnnounceTargets`
-- CR 601.2c X=2 announcing one target destroys only that one | `move:AnnounceTargets`
-- CR 601.2c announcing one target pumps one creature | `move:AnnounceTargets`
-- CR 601.2c any number of targets: four announced on a five-candidate board | `move:AnnounceTargets`
-- CR 601.2c support 2 announcing one target counters only that one | `move:AnnounceTargets`
-- CR 601.2c zero announced against an unbounded count: nothing is exiled and nobody is damaged | `move:AnnounceTargets`
+- CR 601.2c X=1 announcing three targets destroys only one | `move:expect-rejected`
+- CR 601.2c any number of targets: four announced on a five-candidate board | `check:zone-contents`
+- CR 601.2c zero announced against an unbounded count: nothing is exiled and nobody is damaged | `check:zone-contents`
 - CR 601.2h whole card: Dawnhand Dissident's blight is paid as the ability is activated | `move:ChooseBlight`
 - CR 603.2c two counters on one creature at once is one trigger | `move:ChooseBlight`
-- CR 608.2b one of two targets leaving does not stop the other being pumped | `move:AnnounceTargets`
 - CR 608.2c two clauses of one resolution are two trigger events | `check:hand-size` `check:helper-minusCountersOn` `check:helper-placementGroups`
-- CR 608.2f each victim takes the mana value of the card exiled FOR IT, in APNAP order | `move:AnnounceTargets`
-- CR 609.3 a library that runs out mid-loop leaves the later members untouched | `move:AnnounceTargets`
+- CR 608.2f each victim takes the mana value of the card exiled FOR IT, in APNAP order | `check:playable-from-exile` `check:zone-contents`
 - CR 701.39a a creature that is not tied for least toughness cannot be chosen | `move:ChooseBolster`
 - CR 701.39a a lone creature at the least toughness raises no prompt | `move:ChooseBolster`
 - CR 701.39a bolster 3 counters the creature its controller chose | `move:ChooseBolster`
 - CR 701.39a bolster looks only at creatures its controller controls | `check:helper-plusCountersOn`
 - CR 701.39a the same tie answered the other way counters the other creature | `move:ChooseBolster`
-- CR 701.41a support 2 counters each of the two creatures it named | `move:AnnounceTargets`
-- CR 701.41a support on a permanent cannot choose that permanent | `move:AnnounceTargets`
+- CR 701.41a support on a permanent cannot choose that permanent | `check:legal-targets` `move:expect-rejected`
 - CR 701.47a a lone Army raises no prompt | `board:tokens`
 - CR 701.47a amass counters the Army its controller chose | `board:tokens`
 - CR 701.47a amass with no Army creates the 0/0 black Army token the rule prints | `check:colors` `check:helper-plusCountersOn` `check:subtypes`
@@ -3797,7 +3769,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.19a regeneration does not save a bounced creature | `board:replacement`
 - CR 701.20a Ad Nauseam loses life equal to the mana value of the card it put into hand | `move:ChooseRepeat`
 - CR 701.8 Murder destroys a normal creature into its owner's graveyard | `check:creature-count` `check:zone-contents`
-- CR 701.9 / 101.4 Tinybones Joins Up has every targeted player discard, in APNAP order | `move:AnnounceTargets` `move:ChooseDiscard`
+- CR 701.9 / 101.4 Tinybones Joins Up has every targeted player discard, in APNAP order | `move:ChooseDiscard`
 - CR 701.9 Mind Rot discards two chosen cards from a hand of three | `move:ChooseDiscard`
 - CR 701.9a Aether Rift returns the creature card it discarded when nobody pays | `check:hand-size` `check:helper-battlefieldNames` `check:helper-namesIn` `check:helper-payResponses` `check:stack`
 - CR 701.9a Dream Salvage draws as many cards as the target discarded this turn | `board:battlefield` `board:hand-order` `board:library-order` `board:objects-ids`

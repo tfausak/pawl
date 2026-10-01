@@ -122,6 +122,7 @@ import qualified Pawl.Codec.CheckSpec
 import qualified Pawl.Codec.ChoicesSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChooseNumberSpec
+import qualified Pawl.Codec.ChoosePermanentsSpec
 import qualified Pawl.Codec.ChoosePlayerAtRandomSpec
 import qualified Pawl.Codec.ChoosePlayerSpec
 import qualified Pawl.Codec.ChooserSpec
@@ -918,6 +919,7 @@ spec s registry = do
   Pawl.Codec.CharacteristicPTSpec.spec s
   Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooseNumberSpec.spec s
+  Pawl.Codec.ChoosePermanentsSpec.spec s
   Pawl.Codec.ChoosePlayerAtRandomSpec.spec s
   Pawl.Codec.ChoosePlayerSpec.spec s
   Pawl.Codec.ChooserSpec.spec s

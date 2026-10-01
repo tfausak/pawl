@@ -1,0 +1,26 @@
+{
+  "description": "CR 702.39a whole card: the provoked creature untaps and blocks",
+  "note": "Goblin Grappler has provoke and nothing else. Bob's only creature, a Goblin Piker, starts tapped, so CR 509.1a makes it no candidate until provoke untaps it, and bob declines to block, twice, since the engine rewinds an illegal declaration once and degrades a repeat to the forced one: the block that follows is CR 509.1c's requirement, never one bob asked for.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Grappler", "label": "grappler", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "tapped": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@grappler"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "provoked": ["@piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@grappler", "blockers": ["@piker"] } } }
+  ]
+}

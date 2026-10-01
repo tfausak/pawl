@@ -1,0 +1,31 @@
+{
+  "description": "CR 702.29c an authored discard-this cost is not a cycle",
+  "note": "Only a cycling ability's discard is a cycle. Faerie Macabre's discard-this cost is authored, so Prickly Marmoset (+2/+0 whenever you cycle), under the same seat that pays the cost, stays a 2/3; a cycle would make it 4/3. The Haskell test also asserted that only the Macabre's ability was on the stack; a cycling trigger would have resolved before the final read and pumped the Marmoset, so the 2/3 carries that leg. Both targeted cards in bob's graveyard are exiled, so the activation really happened.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Prickly Marmoset", "label": "marmoset" }],
+        "hand": [{ "card": "Faerie Macabre", "label": "macabre" }],
+        "graveyard": [{ "card": "Forest" }]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Barkhide Mauler", "label": "mauler" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@marmoset", "power": 2, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@macabre", "targets": ["@piker", "@mauler"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@marmoset", "power": 2, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Barkhide Mauler", "count": 1 } } }
+  ]
+}

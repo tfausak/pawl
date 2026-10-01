@@ -1742,7 +1742,7 @@ strandcatcherSpec s registry =
 -- with a second Renewed Faith in alice's OWN hand: a spell still on the stack has
 -- no CR 608.2h record filed under its id, so a fold that reads only records
 -- would answer Nothing for it and count a spell alice owns.
-ownershipLedgerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ownershipLedgerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 ownershipLedgerSpec s registry =
   let printings = do
         mountain <- S.printingOf s registry "Mountain"
@@ -1760,15 +1760,6 @@ ownershipLedgerSpec s registry =
               other -> Left (length other)
       owners gs = fmap (\oid -> fmap Object.owner (Game.lookupObject oid gs)) (GameState.stack gs)
    in Spec.describe s "Synthetic Ownership Ledger" $ do
-        Spec.it s "CR 108.3 a resolved spell cast off an opponent's card was a spell you don't own" $ do
-          (mountain, plains, daredevil, faith, ledger) <- printings
-          let cast = CastSpec.daredevilFaithCast mountain plains daredevil faith
-              after = S.runPure S.identityAnswer cast Stack.resolveTop
-          Spec.assertEqWith s "CR 108.3 one of the turn's two casts is bob's card, so alice gains 1 over the Faith's 6" (tallied ledger after) (Right (Just 27))
-          -- The proxies, after the behaviour: the Faith really resolved under
-          -- alice, and the log really holds the two casts the count folds.
-          Spec.assertEqWith s "setup: alice was at 26 from the Faith she cast" (S.lifeOf S.alice after) (Just 26)
-          Spec.assertEqWith s "setup: neither other seat gained anything" (S.lifeOf S.bob after, S.lifeOf S.carol after) (Just 20, Just 20)
         -- The other road, on the board that adds a SECOND Renewed Faith to alice's
         -- own hand: she casts bob's and lets it resolve, then casts hers and
         -- leaves it on the stack. A spell still on the stack has no CR 608.2h
