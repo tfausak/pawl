@@ -3752,6 +3752,16 @@ neededLimit = 8
 -- delayed, reflexive or state trigger, which has no event scan to repeat, and
 -- a snapshot `resnapshot` cannot re-read.
 --
+-- The re-scan reads the live board, not the event's CR 603.10 sample, which
+-- holds projections and so cannot be re-projected without `gone`. The two
+-- differ only where a CR 704 action between the event and the scan changed a
+-- subject the match reads off the sample (Event.Binding.postEventView): an
+-- entrant or a combat damager. That matters only for a trigger inside a CR
+-- 801.16 loop, which no combat-damage trigger is (CR 508.1 attacks are
+-- declared, not mandatory actions); an enters loop reaches it only if a
+-- state-based action re-shapes each iteration's entrant, and
+-- Pawl.RangeOfInfluenceSpec's loops enter permanents none touches.
+--
 -- The CR 603.4 check is a regression fence rather than a proved behaviour:
 -- dropping it leaves Pawl.RangeOfInfluenceSpec green, no ability in its loop
 -- having an "if".

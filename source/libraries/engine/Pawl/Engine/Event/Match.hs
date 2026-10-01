@@ -2527,7 +2527,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- The attacker's characteristics come from the game as it stands, which is CR
   -- 603.10's normal reading -- CR 508.1k has already made the creature attacking,
   -- and CR 508.2's triggers go on the stack before any player gets priority.
-  -- viewWithLastKnown for PermanentEnters' reason.
+  -- viewWithLastKnown, so an attacker already gone is still read as it was on
+  -- the battlefield (CR 608.2h).
   TriggerCondition.CreatureAttacksAlone f -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ count _)
       | count == 1 ->
@@ -4179,8 +4180,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- The blocker's characteristics come from the game as it stands, which is rule
   -- 509.3f's "at the point it becomes a blocking creature": CR 509.2a puts these
   -- triggers on the stack before any player gets priority, so nothing has had a
-  -- window to change them. viewWithLastKnown for PermanentEnters' reason -- a
-  -- blocker already gone (CR 608.2h) is still read as it was on the battlefield.
+  -- window to change them. viewWithLastKnown, so a blocker already gone (CR
+  -- 608.2h) is still read as it was on the battlefield.
   TriggerCondition.SelfBecomesBlockedBy f -> case event of
     GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker})
       | attacker == bearer ->
@@ -7427,11 +7428,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- The Filter is over CR 120.1's SOURCE of the damage that did not happen --
   -- Samite Ministration's "damage from a black or red source" -- and the bearer
   -- contributes only CR 109.5's "you" and the Filter.Context's source, exactly as
-  -- in the PermanentDealsCombatDamageToPlayer arm above. viewWithLastKnown for
-  -- that arm's reason: CR 608.2h's record is what still answers "was it black"
-  -- for a source that died to the very batch this prevented. A fence rather than
-  -- a tested branch, as it is there -- Samite Ministration's shield covers a
-  -- PLAYER, so nothing that reaches this arm kills the damage's source.
+  -- in the PermanentDealsCombatDamageToPlayer arm above. viewWithLastKnown:
+  -- CR 608.2h's record is what still answers "was it black" for a source that
+  -- died to the very batch this prevented. A fence rather than a tested branch:
+  -- Samite Ministration's shield covers a PLAYER, so nothing that reaches this
+  -- arm kills the damage's source.
   --
   -- Filter.IsSource is meaningless in THIS position where it is meaningful
   -- there: the context's source is the bearer, and the bearer is the object whose
@@ -9063,7 +9064,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- names and never the card's, so a Filter applied to the pre-turning object
   -- would decline every "a Dragon is turned face up" there is.
   --
-  -- viewWithLastKnown rather than viewOfObject for PermanentEnters' reason: a
+  -- viewWithLastKnown rather than viewOfObject: a
   -- permanent turned face up and gone again before the CR 117.5 boundary is still
   -- read as it was on the battlefield (CR 608.2h) instead of vanishing from the
   -- match. Nothing is a permanent that is gone AND filed no last known
