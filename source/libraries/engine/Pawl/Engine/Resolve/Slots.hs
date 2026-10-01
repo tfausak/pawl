@@ -118,6 +118,7 @@ import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import Pawl.Types.GameState (GameState)
@@ -789,6 +790,7 @@ effectObjectRefs effect = case effect of
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
   -- ForbidBlock's one axis again, one rule away.
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> [ref]
+  Effect.ForbidUntap (ForbidUntap.MkForbidUntap _ ref) -> [ref]
   -- One side only, and only when a ref names it: the Matching arm is a Filter
   -- (CR 611.2c's class), and what the attack is aimed at is a PlayerScope.
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
@@ -997,6 +999,7 @@ effectPlayerRefs effect = case effect of
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidActivation {} -> []
+  Effect.ForbidUntap {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.TakeTheInitiative {} -> []
@@ -1377,6 +1380,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ForbidBlock {} -> Map.empty
   Effect.ForbidAttack {} -> Map.empty
   Effect.ForbidActivation {} -> Map.empty
+  Effect.ForbidUntap {} -> Map.empty
   -- CR 508.1b's two sides are reported at the head when a ref names the
   -- creatures; a Matching class is a FILTER read, Search's, and the Duration is
   -- ModifyTarget's -- Taunt's "target player" is read by both and nothing else.
@@ -1758,6 +1762,9 @@ replacementRowEffects re = case re of
 entryRewriteEffects :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.RunEffects effects -> Foldable.toList effects
+  -- CR 707.9g's linked trigger is not run by the rewrite: it resolves as its own
+  -- ability, under the bindings Pawl.Engine.Event's AsCopy arm stamps on it, so
+  -- nothing it reads is the row's to capture.
   EntryRewrite.AsCopy _ -> []
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChoiceByCoinFlip _ -> []
@@ -2037,6 +2044,8 @@ ownSlotsAreExhaustive effect = case effect of
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- slotsOf reports the Duration and the class's Filter, ModifyTarget's and
   -- Search's readings.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationSlotsAreExhaustive duration
@@ -2279,6 +2288,7 @@ readsX =
         Effect.ForbidBlock {} -> False
         Effect.ForbidAttack {} -> False
         Effect.ForbidActivation {} -> False
+        Effect.ForbidUntap {} -> False
         Effect.RequireAttack {} -> False
         Effect.CreateEmblem {} -> False
         Effect.BecomeMonarch {} -> False
@@ -2534,6 +2544,7 @@ boundSlots effect = case effect of
   Effect.ForbidBlock {} -> Set.empty
   Effect.ForbidAttack {} -> Set.empty
   Effect.ForbidActivation {} -> Set.empty
+  Effect.ForbidUntap {} -> Set.empty
   Effect.RequireAttack {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty

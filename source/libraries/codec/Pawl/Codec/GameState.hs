@@ -17,6 +17,7 @@ import qualified Pawl.Codec.ActiveCopy as ActiveCopy
 import qualified Pawl.Codec.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Codec.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
+import qualified Pawl.Codec.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Codec.Arrival as Arrival
 import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Codec.Binding as Binding
@@ -162,6 +163,7 @@ codec resolve = Fields.object $ do
   blockProhibitions <- Fields.defaulted "blockProhibitions" [] (Common.list ActiveBlockProhibition.codec) GameState.blockProhibitions
   attackProhibitions <- Fields.defaulted "attackProhibitions" [] (Common.list ActiveAttackProhibition.codec) GameState.attackProhibitions
   activationProhibitions <- Fields.defaulted "activationProhibitions" [] (Common.list ActiveActivationProhibition.codec) GameState.activationProhibitions
+  untapProhibitions <- Fields.defaulted "untapProhibitions" [] (Common.list ActiveUntapProhibition.codec) GameState.untapProhibitions
   ignoredAbilities <- Fields.defaulted "ignoredAbilities" [] (Common.list IgnoredAbility.codec) GameState.ignoredAbilities
   turnOrder <- Fields.required "turnOrder" (Common.list PlayerId.codec) GameState.turnOrder
   activePlayer <- Fields.required "activePlayer" PlayerId.codec GameState.activePlayer
@@ -269,6 +271,7 @@ codec resolve = Fields.object $ do
         GameState.blockProhibitions = blockProhibitions,
         GameState.attackProhibitions = attackProhibitions,
         GameState.activationProhibitions = activationProhibitions,
+        GameState.untapProhibitions = untapProhibitions,
         GameState.ignoredAbilities = ignoredAbilities,
         GameState.turnOrder = turnOrder,
         GameState.activePlayer = activePlayer,

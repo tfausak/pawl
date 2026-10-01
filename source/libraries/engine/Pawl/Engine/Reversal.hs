@@ -98,6 +98,7 @@ withoutAnnouncement before entry closed = do
   blockProhibitions <- listOf GameState.blockProhibitions
   attackProhibitions <- listOf GameState.attackProhibitions
   activationProhibitions <- listOf GameState.activationProhibitions
+  untapProhibitions <- listOf GameState.untapProhibitions
   ignoredAbilities <- listOf GameState.ignoredAbilities
   turnOrder <- one GameState.turnOrder
   activePlayer <- one GameState.activePlayer
@@ -213,6 +214,7 @@ withoutAnnouncement before entry closed = do
         GameState.blockProhibitions = blockProhibitions,
         GameState.attackProhibitions = attackProhibitions,
         GameState.activationProhibitions = activationProhibitions,
+        GameState.untapProhibitions = untapProhibitions,
         GameState.ignoredAbilities = ignoredAbilities,
         GameState.turnOrder = turnOrder,
         GameState.activePlayer = activePlayer,

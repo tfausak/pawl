@@ -50,6 +50,7 @@ import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
@@ -560,6 +561,10 @@ data Effect card ability
     -- permanents the ref names, for a duration (Deadlock Trap). The printed form
     -- gathered live off a source is Pawl.Types.ActivationProhibition instead.
     ForbidActivation ForbidActivation.ForbidActivation
+  | -- | CR 502.3 / 613.11: install a stored untap prohibition over the
+    -- permanents the ref names, for a duration (Wall of Stolen Identity). The
+    -- printed form gathered live off a source is Pawl.Types.UntapRestriction.
+    ForbidUntap ForbidUntap.ForbidUntap
   | -- | CR 114.2: the resolving controller gets an emblem with the given
     -- abilities, put into the command zone. Targetless; the abilities ride a
     -- Card so the emblem reuses the whole ability pipeline.

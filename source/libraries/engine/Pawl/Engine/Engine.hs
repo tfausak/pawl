@@ -230,8 +230,10 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 -- takes the untap event once it happens (CR 614.6). That is Event.proposeUntap's
 -- job, one paragraph down.
 --
--- THREE carriers, subtracted together. The printed static one is re-derived live;
--- the other two are stored on the victim, and this is where each both applies and
+-- FOUR carriers, subtracted together. The printed static one is re-derived live,
+-- and a resolution's stored rows (GameState.untapProhibitions) are read beside it,
+-- both through UntapRestriction.doesNotUntap; the other two are stored on the
+-- victim, and this is where each both applies and
 -- ENDS, CR 701.43b putting the expiry in the untap step it bites in. They are two
 -- fields because they name different seats: Object.doesNotUntapFor says "its
 -- controller's next untap step[s]", so it is applied and counted down against

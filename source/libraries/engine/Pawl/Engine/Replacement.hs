@@ -54,10 +54,12 @@ import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.AsCopy as AsCopy
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CoinFlipRewrite as CoinFlipRewrite
 import Pawl.Types.ControllerRelation (ControllerRelation)
@@ -106,8 +108,12 @@ import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 import qualified Pawl.Types.MillCountR as MillCountR
 import qualified Pawl.Types.MillCountRewrite as MillCountRewrite
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import Pawl.Types.PhaseSelector (PhaseSelector)
@@ -150,6 +156,9 @@ import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -2751,17 +2760,18 @@ applyCopyException this own snapshot exception = case exception of
           PC.keywords = Map.filterWithKey (\keyword _ -> not (Projection.definesColorless (Set.singleton keyword))) (PC.keywords snapshot)
         }
 
--- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
--- permanents matching the rewrite's printed noun phrase, other than itself, minus
+-- CR 707.5 / 614.12a: the objects an entering copy may choose. Members of the
+-- rewrite's zone matching its printed noun phrase, other than itself, minus
 -- anything entering in the same batch (see the CR 614.12a note on
 -- Event.applyReplacementsIn for why the batch set, not 614.13a, is what excludes
 -- them).
 --
 -- The Filter comes off the card (Pawl.Types.AsCopy's `eligible`) rather than
 -- being hardcoded here (#1512): Clone writes "any creature" and Copy Enchantment
--- "any enchantment", and this function must not know which. The zone is the one
--- half that is NOT the card's to say -- "on the battlefield" is the domain the
--- walk below supplies.
+-- "any enchantment", and this function must not know which. The zone is the
+-- card's too (Pawl.Types.AsCopy's `zone`): the battlefield for Clone, and for
+-- Superior Spider-Man's "any creature card in a graveyard" every player's
+-- graveyard. Any other zone answers nothing.
 --
 -- Matched through each candidate's own CR 613 projection, revealableFromHand's
 -- reading, so a continuous effect that made a permanent an enchantment reaches
@@ -2769,15 +2779,40 @@ applyCopyException this own snapshot exception = case exception of
 -- entering object, so a filter naming "you" or "this" resolves against the
 -- player making the choice (CR 109.5); nothing printed today uses either, and
 -- supplying Nothing would silently answer False if one did.
-legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> GameState -> [ObjectId]
-legalCopyTargets batch filter_ self gs =
+legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> Zone.Zone -> ObjectId -> GameState -> [ObjectId]
+legalCopyTargets batch filter_ zone self gs =
   let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf self gs) (Just self)
       viewOf = Projection.viewsOf gs
       eligible oid =
         oid /= self
           && not (Set.member oid batch)
           && Filter.matches context (viewOf oid) filter_
-   in filter eligible (Set.toAscList (GameState.battlefield gs))
+      domain = case zone of
+        Zone.Battlefield -> Set.toAscList (GameState.battlefield gs)
+        Zone.Graveyard -> concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (GameState.turnOrder gs)
+        _ -> []
+   in filter eligible domain
+
+-- CR 707.9g / 603.11: the triggered ability linked to a CR 707.5 entry
+-- replacement ("When you do, ..."), as the reflexive entry Pawl.Engine.Event's
+-- AsCopy arm arms where a copy was made. TriggerCondition.Reflexive, enlist's
+-- posture for its own linked ability (Pawl.Engine.Keyword.enlistReflexive): the
+-- entry's existence is the "you do", and it fires at the next gather (CR 603.3),
+-- after the permanent has entered. Nothing for a row that links none.
+linkedCopyTrigger :: AsCopy.AsCopy ability (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
+linkedCopyTrigger asCopy
+  | Seq.null (AsCopy.whenYouDo asCopy) = Nothing
+  | otherwise =
+      Just
+        TriggeredAbility.MkTriggeredAbility
+          { TriggeredAbility.condition = TriggerCondition.Reflexive,
+            TriggeredAbility.modal =
+              Modal.MkModal
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (AsCopy.whenYouDo asCopy))) Map.empty))
+                (ModeSelection.ChooseExactly 1),
+            TriggeredAbility.intervening = Nothing,
+            TriggeredAbility.limit = TriggerLimit.Unlimited
+          }
 
 -- CR 614.1c / 701.20a: the cards a player may reveal from their hand to satisfy
 -- an "as this enters, you may reveal a [matching] card from your hand" ability

@@ -108,6 +108,7 @@ import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
@@ -370,6 +371,7 @@ ownQuantities effect = case effect of
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationQuantities duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationQuantities duration
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationQuantities duration
+  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) -> durationQuantities duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationQuantities duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
   Effect.CreateEmblem _ -> []
@@ -1490,6 +1492,7 @@ effectObjectRefs effect =
         Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
         Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
         Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> read_ [ref]
+        Effect.ForbidUntap (ForbidUntap.MkForbidUntap _ ref) -> read_ [ref]
         Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
           RestrictedCreatures.Named ref -> read_ [ref]
           RestrictedCreatures.Matching _ -> []

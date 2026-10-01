@@ -522,6 +522,14 @@ discardedCard = SlotName.MkSlotName (Text.pack "thatDiscardedCard")
 tappedPermanent :: SlotName
 tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 
+-- CR 707.9g: the object a CR 707.5 entry copied, bound for the triggered ability
+-- linked to that replacement -- Wall of Stolen Identity's "the copied
+-- creature". Stamped by Pawl.Engine.Event's AsCopy arm as it arms the ability.
+-- Not a target, so the same "no card's targetSlots may name it" sweep as
+-- tappedPermanent above.
+copiedObject :: SlotName
+copiedObject = SlotName.MkSlotName (Text.pack "thatCopiedObject")
+
 -- CR 601.2f again, for the OTHER tapping component: the permanents a
 -- CostComponent.TapForTotalPower payment tapped. Stamped by Pawl.Engine.Activate
 -- off the payment CR 601.2h makes, tappedPermanent's route exactly.

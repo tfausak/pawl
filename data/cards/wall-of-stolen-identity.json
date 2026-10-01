@@ -55,6 +55,72 @@
                         }
                       ]
                     }
+                  ],
+                  "whenYouDo": [
+                    {
+                      "type": "Tap",
+                      "value": {
+                        "type": "InSlot",
+                        "value": "thatCopiedObject"
+                      }
+                    },
+                    {
+                      "type": "ForbidUntap",
+                      "value": {
+                        "duration": {
+                          "type": "ForAsLongAs",
+                          "value": {
+                            "type": "Compares",
+                            "value": {
+                              "comparison": {
+                                "type": "Exactly"
+                              },
+                              "measured": {
+                                "type": "Count",
+                                "value": {
+                                  "aggregation": {
+                                    "type": "Members"
+                                  },
+                                  "filter": {
+                                    "type": "And",
+                                    "value": [
+                                      {
+                                        "type": "IsSource"
+                                      },
+                                      {
+                                        "type": "ControlledBy",
+                                        "value": {
+                                          "type": "You"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "scope": {
+                                    "type": "InZone",
+                                    "value": {
+                                      "player": {
+                                        "type": "EachPlayer"
+                                      },
+                                      "zone": {
+                                        "type": "Battlefield"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "threshold": {
+                                "type": "Literal",
+                                "value": 1
+                              }
+                            }
+                          }
+                        },
+                        "ref": {
+                          "type": "InSlot",
+                          "value": "thatCopiedObject"
+                        }
+                      }
+                    }
                   ]
                 }
               }

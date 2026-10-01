@@ -17,7 +17,7 @@
 -- the same spellbook shape with the other question asked of it, and a case
 -- beside it activates the seek one of its Gates prints; the ninth enters
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
--- take; the tenth to sixteenth cast a printed Sinister Reflections, whose
+-- take; the next run of cases cast a printed Sinister Reflections, whose
 -- conjure names an object already in the game rather than writing its card out;
 -- the next two begin alice's second main phase under a printed Pearl Collector,
 -- the one conjure in the corpus behind CR 603.4's intervening "if"; the next three
@@ -40,8 +40,9 @@
 -- 707.1's token, and the second points the conjure at a Clone, which is where
 -- the printed card under an object and its CR 707.2 copiable values disagree.
 -- The third carries that duplicate through three zone changes (CR 400.7), and
--- the fourth prices it off its copiable mana cost. The last three merge it with
--- a printed Cubwarden and split it back out (CR 730.3, CR 727.2).
+-- the fourth prices it off its copiable mana cost. Three read its abilities off
+-- the battlefield, in a graveyard and a hand (CR 113.6). The last three merge it
+-- with a printed Cubwarden and split it back out (CR 730.3, CR 727.2).
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -105,6 +106,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
@@ -735,6 +737,82 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "CR 702.143a the duplicate is among the cards alice may foretell"
           (elem duplicate (Foretell.foretellable S.alice (S.landsFor island S.alice 2 conjured)))
           True
+  -- CR 707.2 / 113.6b: the abilities a card has off the battlefield are its
+  -- copiable values' too. A Clone copying bob's Anger is duplicated and the
+  -- duplicate discarded, so alice's graveyard holds a card printed Clone whose
+  -- rules text is Anger's "as long as this card is in your graveyard and you
+  -- control a Mountain, creatures you control have haste". The pair differs only
+  -- in alice's Mountain; her Goblin Piker is the creature that reads it.
+  Spec.it s "CR 707.2/113.6b a duplicate of a Clone of Anger gives haste from the graveyard" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    anger <- S.printingOf s registry "Anger"
+    let (angerId, board) = S.addPermanent anger S.bob (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections angerId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) -> do
+        let (pikerId, withPiker) = S.addPermanent piker S.alice conjured
+            discarded = S.runPure S.identityAnswer withPiker (Event.discard DiscardCause.Ordinary S.alice duplicate)
+            hasty = Projection.hasKeyword Keyword.Haste pikerId
+        Spec.assertEqWith
+          s
+          "CR 113.6b the Piker has haste only beside a Mountain: (no Mountain, a Mountain)"
+          (hasty discarded, hasty (S.landsFor mountain S.alice 1 discarded))
+          (False, True)
+        Spec.assertEqWith s "the duplicate is the one card in alice's graveyard" (length (namedIn cloneName Zone.Graveyard discarded)) 1
+  -- CR 707.2 / 113.6k: the triggered side of the same read. A Clone copying
+  -- bob's Bloodghast is duplicated and the duplicate discarded, so alice's
+  -- graveyard holds a card printed Clone whose rules text is Bloodghast's
+  -- "Landfall -- whenever a land you control enters, you may return this card
+  -- from your graveyard to the battlefield". alice plays a Forest; the trigger
+  -- resolves and the duplicate returns, a second Clone printing on her
+  -- battlefield.
+  Spec.it s "CR 707.2/113.6k a duplicate of a Clone of Bloodghast returns on landfall" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    bloodghast <- S.printingOf s registry "Bloodghast"
+    let (ghastId, board) = S.addPermanent bloodghast S.bob (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections ghastId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) -> do
+        let discarded = S.runPure S.identityAnswer conjured (Event.discard DiscardCause.Ordinary S.alice duplicate)
+            (forestId, withForest) = S.addHandCard forest S.alice discarded
+            answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+              _ -> S.identityAnswer p
+            played = S.runPure answer withForest (Cast.playLand True S.alice forestId Nothing)
+            onStack = S.runPure answer played Engine.settleForPriority
+            resolved = S.runPure answer onStack (Stack.resolveTop >> Engine.settleForPriority)
+        Spec.assertEqWith
+          s
+          "CR 113.6k the duplicate returned: (Clone printings on alice's battlefield, in her graveyard)"
+          (length (clonesOnBattlefield resolved), length (namedIn cloneName Zone.Graveyard resolved))
+          (2, 0)
+        Spec.assertEqWith s "the landfall trigger reached the stack" (length (GameState.stack onStack)) 1
+  -- CR 707.2 / 702.35a: the hand's side. A Clone copying bob's Arrogant Wurm
+  -- (madness {2}{G}) is duplicated, so alice's hand holds a card printed Clone
+  -- with the Wurm's madness, and discarding it discards it into exile.
+  Spec.it s "CR 707.2/702.35a a duplicate of a Clone of Arrogant Wurm is discarded into exile" $ do
+    island <- S.printingOf s registry "Island"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    wurm <- S.printingOf s registry "Arrogant Wurm"
+    let (wurmId, board) = S.addPermanent wurm S.bob (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections wurmId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) -> do
+        let discarded = S.runPure S.identityAnswer conjured (Event.discard DiscardCause.Ordinary S.alice duplicate)
+        Spec.assertEqWith
+          s
+          "CR 702.35a the duplicate went to exile, not the graveyard: (in exile, in the graveyard)"
+          (length (namedIn cloneName Zone.Exile discarded), length (namedIn cloneName Zone.Graveyard discarded))
+          (1, 0)
   -- CR 702.140e: a mutated permanent has every component's abilities, and the
   -- Skaab's additional cost is one. Cubwarden mutates over alice's Headless
   -- Skaab and Sinister Reflections duplicates the merged creature, so the

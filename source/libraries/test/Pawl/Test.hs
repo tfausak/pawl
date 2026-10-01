@@ -46,6 +46,7 @@ import qualified Pawl.Codec.ActiveCopySpec
 import qualified Pawl.Codec.ActivePlayerEffectSpec
 import qualified Pawl.Codec.ActiveReplacementSpec
 import qualified Pawl.Codec.ActiveUnregeneratableSpec
+import qualified Pawl.Codec.ActiveUntapProhibitionSpec
 import qualified Pawl.Codec.AddActivationCostSpec
 import qualified Pawl.Codec.AddSpellCostSpec
 import qualified Pawl.Codec.AffectPlayersSpec
@@ -295,6 +296,7 @@ import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
 import qualified Pawl.Codec.ForbidBlockSpec
+import qualified Pawl.Codec.ForbidUntapSpec
 import qualified Pawl.Codec.ForetellCostSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.FromReferenceSpec
@@ -852,6 +854,7 @@ spec s registry = do
   Pawl.Codec.ActivePlayerEffectSpec.spec s
   Pawl.Codec.ActiveReplacementSpec.spec s
   Pawl.Codec.ActiveUnregeneratableSpec.spec s
+  Pawl.Codec.ActiveUntapProhibitionSpec.spec s
   Pawl.Codec.AddActivationCostSpec.spec s
   Pawl.Codec.AddSpellCostSpec.spec s
   Pawl.Codec.ActivateManaAbilitiesSpec.spec s
@@ -1105,6 +1108,7 @@ spec s registry = do
   Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidActivationSpec.spec s
   Pawl.Codec.ForbidBlockSpec.spec s
+  Pawl.Codec.ForbidUntapSpec.spec s
   Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.FromReferenceSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
