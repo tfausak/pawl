@@ -308,6 +308,11 @@ instantSpeed oid face gs = Card.isInstant face || flashOn oid face gs
 -- is:split o:flash on 2026-08-18 returned none, so nothing separates the two
 -- readings today.
 --
+-- The PRINTED limb is dropped once a layer-6 wipe is in force on the object
+-- (CR 613.1f); the projection is asked only of a face printing flash.
+-- Pawl.CastSpec's "CR 702.8a a Pouncing Cheetah that perpetually lost all
+-- abilities has no flash" proves it.
+--
 -- The PRINTED limb is unobservable on the land side and asked all the same:
 -- no printing puts flash on a land face, so Teferi's grant to Dryad Arbor is the
 -- only route there (an api.scryfall.com search for keyword:flash type:land on
@@ -316,7 +321,7 @@ instantSpeed oid face gs = Card.isInstant face || flashOn oid face gs
 -- would separate the limbs, and nothing in CR 305 or CR 702.8 forbids one.
 flashOn :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 flashOn oid face gs =
-  Keyword.hasFlash (Face.keywordSet face)
+  (Keyword.hasFlash (Face.keywordSet face) && not (PC.lostAllAbilities (Projection.project oid gs)))
     || Keyword.hasFlash (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at
@@ -1768,30 +1773,36 @@ couldBeginToCast pid oid name gs =
 -- and face down once per ability that allows it. castableSpells and
 -- castableWhileSearching both offer every one, so neither decides a card's
 -- facing for its player.
-castFacings :: Face.Face Card.Type.Card -> [Facing.Facing]
-castFacings face =
-  Facing.FaceUp
-    -- CR 702.37c names the allower for the face-down cast -- "turn it face
-    -- down and ANNOUNCE THAT YOU'RE USING A MORPH ABILITY" -- so the
-    -- facing this proposes carries FaceDownReason.Morphed, and CR 701.40b's
-    -- procedure is closed to the permanent it becomes.
-    : (if not (null (Keyword.morphCosts (Face.keywordSet face))) then [Facing.faceDown FaceDownReason.Morphed] else [])
-      -- CR 702.168b names its own allower the same way -- "turn the card face
-      -- down and ANNOUNCE THAT YOU ARE USING A DISGUISE ABILITY" -- and lists
-      -- ward {2} where rule 702.37c lists nothing, so this facing carries both
-      -- the reason and the list (CR 708.2).
-      --
-      -- A SECOND ENTRY and not a widened first: a card with both abilities
-      -- would offer two face-down casts, since the two objects differ (one has
-      -- ward {2}) and CR 702.168d's price for turning up is not CR 702.37e's.
-      -- Scryfall `keyword:morph keyword:disguise`, 2026-08-21, no hit -- a
-      -- printing with both would be the card that refutes it, and the rules
-      -- allow one (CR 701.58c and CR 701.58d put both procedures on one
-      -- permanent).
-      <> ( if Maybe.isJust (Keyword.disguiseCost (Face.keywordSet face))
-             then [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}]
-             else []
-         )
+--
+-- Both abilities are the face's printed keywords, dropped once a layer-6 wipe
+-- is in force on the object (CR 613.1f); the projection is asked only of a
+-- face printing one. Pawl.CastSpec's "CR 702.37a an Ainok Tracker that
+-- perpetually lost all abilities cannot be cast face down" proves it.
+castFacings :: ObjectId -> Face.Face Card.Type.Card -> GameState -> [Facing.Facing]
+castFacings oid face gs =
+  let has present = present && not (PC.lostAllAbilities (Projection.project oid gs))
+   in Facing.FaceUp
+        -- CR 702.37c names the allower for the face-down cast -- "turn it face
+        -- down and ANNOUNCE THAT YOU'RE USING A MORPH ABILITY" -- so the
+        -- facing this proposes carries FaceDownReason.Morphed, and CR 701.40b's
+        -- procedure is closed to the permanent it becomes.
+        : (if has (not (null (Keyword.morphCosts (Face.keywordSet face)))) then [Facing.faceDown FaceDownReason.Morphed] else [])
+          -- CR 702.168b names its own allower the same way -- "turn the card face
+          -- down and ANNOUNCE THAT YOU ARE USING A DISGUISE ABILITY" -- and lists
+          -- ward {2} where rule 702.37c lists nothing, so this facing carries both
+          -- the reason and the list (CR 708.2).
+          --
+          -- A SECOND ENTRY and not a widened first: a card with both abilities
+          -- would offer two face-down casts, since the two objects differ (one has
+          -- ward {2}) and CR 702.168d's price for turning up is not CR 702.37e's.
+          -- Scryfall `keyword:morph keyword:disguise`, 2026-08-21, no hit -- a
+          -- printing with both would be the card that refutes it, and the rules
+          -- allow one (CR 701.58c and CR 701.58d put both procedures on one
+          -- permanent).
+          <> ( if has (Maybe.isJust (Keyword.disguiseCost (Face.keywordSet face)))
+                 then [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}]
+                 else []
+             )
 
 -- Every cast this player may propose right now, in castZones' order, as the
 -- (object, half, facing) triples Action.Cast is built from. `castable` re-checks
@@ -1836,7 +1847,7 @@ castProposals :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing.
 castProposals pid gs =
   let proposals oid = do
         face <- Game.castableFacesOfId oid gs
-        facing <- castFacings face
+        facing <- castFacings oid face gs
         pure (oid, Face.name face, facing)
       -- CR 702.102a's third offer, beside the two halves and never instead of
       -- them: "if a player casts a split card with fuse FROM THEIR HAND, the
@@ -2015,7 +2026,7 @@ castableWhileSearching pid gs =
               && castableWhenOffered ManaSpending.AsProduced pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed
       proposals oid = do
         face <- Game.castableFacesOfId oid gs
-        facing <- castFacings face
+        facing <- castFacings oid face gs
         Monad.guard (allowed oid face facing)
         pure (oid, Face.name face, facing)
    in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
