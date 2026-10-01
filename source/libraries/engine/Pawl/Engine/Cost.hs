@@ -150,6 +150,7 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TappedForMana as TappedForMana
+import qualified Pawl.Types.Threshold as Threshold
 import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.Zone as Zone
@@ -2630,7 +2631,17 @@ tapObject = Event.tap
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 claimOf :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
 claimOf slots pid oid component gs =
-  let claim a p n = Just (Claim.Type.MkClaim {Claim.Type.axis = a, Claim.Type.pool = p, Claim.Type.count = n})
+  let claim a p n = Just (Claim.Type.MkClaim {Claim.Type.axis = a, Claim.Type.pool = p, Claim.Type.count = n, Claim.Type.threshold = Nothing})
+      -- One selection of `candidates` whose amounts reach `needed`.
+      reaching a needed amountOf candidates =
+        Just
+          ( Claim.Type.MkClaim
+              { Claim.Type.axis = a,
+                Claim.Type.pool = Set.fromList candidates,
+                Claim.Type.count = 1,
+                Claim.Type.threshold = Just (Threshold.MkThreshold {Threshold.total = needed, Threshold.amounts = Map.fromList (fmap (\candidate -> (candidate, amountOf candidate)) candidates)})
+              }
+          )
       itself condition = if condition then Set.singleton oid else Set.empty
       -- canPayComponent's own guard for the two `*This` arms that read a zone
       -- rather than control: CR 108.4 gives a card outside the battlefield no
@@ -2712,16 +2723,14 @@ claimOf slots pid oid component gs =
           claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
         CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
           claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
-        -- The same graveyard pool and the same axis, counting the FEWEST cards whose
-        -- mana values reach the threshold rather than the component's number: rule
-        -- 701.59a's number is a THRESHOLD on total mana value, so how many cards a
-        -- payment exiles is not settled until the payer picks them. TapForTotalPower's
-        -- arm below and for its reason, the fewest being a LOWER BOUND. A threshold of
-        -- 0 is paid by the empty set and claims nothing.
+        -- The same graveyard pool and the same axis, as ONE selection reaching the
+        -- threshold rather than the component's number of cards: rule 701.59a's
+        -- number is a THRESHOLD on total mana value, so which cards a payment
+        -- exiles is not settled until the payer picks them. TapForTotalPower's arm
+        -- below and for its reason. A threshold of 0 is paid by the empty set and
+        -- claims nothing.
         CostComponent.CollectEvidence n
-          | n > 0 ->
-              let candidates = evidenceCandidates slots pid gs
-               in claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList candidates) (max 1 (fewestReaching (toInteger n) (fmap (`evidenceValue` gs) candidates)))
+          | n > 0 -> reaching (ClaimAxis.Removal Zone.Graveyard) (toInteger n) (`evidenceValue` gs) (evidenceCandidates slots pid gs)
           | otherwise -> Nothing
         -- A pool of at most ONE, CR 404.2's order having picked it.
         CostComponent.ExileTopFromGraveyard criterion ->
@@ -2752,25 +2761,22 @@ claimOf slots pid oid component gs =
         -- twice or from two mana abilities of one permanent that a board takes
         -- together (Mana.sourceOptions). data/cards/ prints neither.
         CostComponent.UntapThis -> Nothing
-        -- The FEWEST candidates whose powers reach the threshold (`fewestReaching`),
-        -- and deliberately not the Natural: that number is a THRESHOLD on an
-        -- aggregate rather than a count of objects, so how many permanents a payment
-        -- taps is not settled until the payer picks them. No payment taps fewer, so
-        -- the count is a LOWER BOUND and can never over-refuse; a threshold of 0 is
-        -- paid by the empty set, taps nothing and claims nothing. Counting one
-        -- instead let a Springleaf Drum's creature also pay a total power of 3 that
-        -- needed all three (Pawl.ManaSpec's Synthetic Muster Dynamo). The same
-        -- division is still the wrong direction for `repeatsOf`, which is why
-        -- `uncountedCeiling` counts this component's repeats itself.
+        -- ONE selection of candidates whose powers reach the threshold, and
+        -- deliberately not the Natural as a count: that number is a THRESHOLD on an
+        -- aggregate rather than a count of objects, so which permanents a payment
+        -- taps is not settled until the payer picks them, and only some of them add
+        -- up (Pawl.Engine.Claim.assignable); a threshold of 0 is paid by the empty
+        -- set, taps nothing and claims nothing. Pawl.ManaSpec's Synthetic Muster
+        -- Dynamo beside a Heritage Druid is the board a count of objects got wrong.
+        -- Dividing the pool is still the wrong direction for `repeatsOf`, which is
+        -- why `uncountedCeiling` counts this component's repeats itself.
         --
         -- The pool is tapCandidates', TapPermanents' below: tapped candidates included,
         -- the same permissive reading and for its reason. CR 702.122a's own criterion
         -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
         -- untapped creatures exactly.
         CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
-          | threshold > 0 ->
-              let candidates = tapCandidates slots pid oid criterion gs
-               in claim ClaimAxis.Tapping (Set.fromList candidates) (max 1 (fewestReaching (toInteger threshold) (fmap (`tapPower` gs) candidates)))
+          | threshold > 0 -> reaching ClaimAxis.Tapping (toInteger threshold) (`tapPower` gs) (tapCandidates slots pid oid criterion gs)
           | otherwise -> Nothing
         -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
         -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
@@ -3049,12 +3055,11 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
               -- every activation still has to find that mana again. Both readers
               -- hand this function the same cost, so both get the same count.
               Activations.times = repeatsOf pid oid cost gs,
-              Activations.contendedTimes = contendedRepeatsOf pid oid cost gs,
               Activations.claims = claimsOf Map.empty pid oid (Cost.components cost) gs,
               Activations.life = lifeOwedBy pid gs (Cost.components cost),
               Activations.energy = energyOwedBy (Cost.components cost)
             }
-        else Activations.MkActivations {Activations.times = 0, Activations.contendedTimes = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
+        else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
 
 -- CR 601.2f's adjustments for a MANA ability's activation cost, gathered where
 -- CR 605.3b leaves no stack window for Pawl.Engine.Activate to gather them in.
@@ -3183,19 +3188,6 @@ repeatsOf pid oid cost gs =
           [] -> 1
           limits -> minimum limits
         _ -> 1
-
--- `repeatsOf` where another source or the paid cost contends for this cost's
--- claims (Activations.contendedTimes): at most 1 once the cost states a
--- threshold claim, which the counting check does not hold to the objects that
--- reach the threshold. Not implemented: an exact joint check for a contended
--- threshold claim, which would let it repeat there too (#4433).
-contendedRepeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
-contendedRepeatsOf pid oid cost gs =
-  let components = Cost.components cost
-      thresholds =
-        [() | CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n _) <- components, n > 0]
-          <> [() | CostComponent.CollectEvidence n <- components, n > 0]
-   in (if null thresholds then id else min 1) (repeatsOf pid oid cost gs)
 
 -- The ceiling ONE component imposes that `repeatsOf`'s four totals do not
 -- already carry, or Nothing where one of them does or where it spends nothing
@@ -3342,33 +3334,19 @@ uncountedCeiling pid oid claims gs component = case component of
         else 1
 
 -- How many DISJOINT selections of these amounts each reach `threshold`, every
--- one holding the fewest amounts any selection can (`fewestReaching`) -- the
--- repeats of a threshold cost whose claim `claimOf` states at that fewest.
--- Holding them to the fewest is what keeps Mana.payableResolutionsGiven's count
--- of objects exact: it scales that claim by the activations taken, and k of
--- these selections hold exactly k times it. An UNDERSTATEMENT where uneven amounts would allow
--- more selections of mixed sizes -- {3, 1, 1, 1} reach 3 twice, and this counts
--- once -- which is the header's safe direction.
+-- one holding the fewest amounts any selection can (Claim.fewestReaching) --
+-- the repeats of a threshold cost. An UNDERSTATEMENT where uneven amounts would
+-- allow more selections of mixed sizes -- {3, 1, 1, 1} reach 3 twice, and this
+-- counts once -- which is the header's safe direction.
 --
 -- EXACT otherwise, by search rather than greedily. Some best answer puts the
 -- largest amount in a selection, since it can replace any member of one, so
 -- the search takes it and tries every minimal completion.
 thresholdRepeats :: Integer -> [Integer] -> Natural
 thresholdRepeats threshold amounts =
-  let size = fewestReaching threshold amounts
+  let size = Claim.fewestReaching threshold amounts
       grouped = Map.toDescList (Map.fromListWith (+) [(amount, 1 :: Natural) | amount <- amounts, amount > 0])
    in if threshold <= 0 then 0 else selectionsOf threshold size grouped
-
--- The fewest of these amounts reaching `threshold` together: the largest first,
--- until they do. Every amount, where they never do.
-fewestReaching :: Integer -> [Integer] -> Natural
-fewestReaching threshold amounts =
-  let go reached picked = case picked of
-        [] -> 0
-        amount : rest
-          | reached >= threshold -> 0
-          | otherwise -> 1 + go (reached + amount) rest
-   in go 0 (List.sortBy (flip compare) (filter (> 0) amounts))
 
 -- `thresholdRepeats`' search over amounts grouped by value, largest first.
 selectionsOf :: Integer -> Natural -> [(Integer, Natural)] -> Natural

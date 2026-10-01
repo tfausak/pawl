@@ -2522,11 +2522,8 @@ musterDynamoSpec s registry = Spec.describe s "Synthetic Muster Dynamo" $ do
 
   -- Two Bloodbraid Elves (3/2) would be two activations alone, but Heritage
   -- Druid must tap three of its four Elves, a Bloodbraid among them, so the
-  -- Dynamo is one activation beside it: {G}{G}{G} and {C}. The counting check
-  -- cannot see WHICH creatures reach 3, so a contended Dynamo is held to one
-  -- activation (Activations.contendedTimes); at one it still overstates on
-  -- some boards (#4433). Eon Hub is {5} and Jade Statue {4}, both all generic
-  -- and neither targeting as it is cast.
+  -- Dynamo is one activation beside it: {G}{G}{G} and {C}. Eon Hub is {5} and
+  -- Jade Statue {4}, both all generic and neither targeting as it is cast.
   Spec.it s "CR 601.2g the Dynamo beside a Heritage Druid is one activation" $ do
     druid <- S.printingOf s registry "Heritage Druid"
     bloodbraid <- S.printingOf s registry "Bloodbraid Elf"
@@ -2539,6 +2536,41 @@ musterDynamoSpec s registry = Spec.describe s "Synthetic Muster Dynamo" $ do
            in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
     Spec.assertBool s (not (offered hub)) "no {5}: the Druid leaves one Bloodbraid, and the Dynamo one activation"
     Spec.assertBool s (offered statue) "and {4} is the Druid's {G}{G}{G} and one {C}"
+
+  -- One Bloodbraid, and the Dynamo's one activation has to be WHICH creatures:
+  -- the Druid taps all three Elves, the Bloodbraid among them, and leaves the
+  -- Piker's 2, short of 3. A count of objects puts the Dynamo's one on the
+  -- Piker and promised {4}. Phyrexian Altar is {3}, all generic and targeting
+  -- nothing as it is cast.
+  Spec.it s "CR 118.3 the Dynamo cannot reach 3 with the creature the Druid leaves" $ do
+    druid <- S.printingOf s registry "Heritage Druid"
+    bloodbraid <- S.printingOf s registry "Bloodbraid Elf"
+    altar <- S.printingOf s registry "Phyrexian Altar"
+    statue <- S.printingOf s registry "Jade Statue"
+    board <- musterDynamoBoard s registry [("Glistener Elf", 1), ("Goblin Piker", 1)]
+    let withElves = foldr (\p gs -> snd (S.addPermanent p S.alice gs)) board [druid, bloodbraid]
+        offered spell =
+          let (withSpell, oid) = S.handOne spell withElves
+           in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+    Spec.assertBool s (not (offered statue)) "no {4}: the Piker alone does not reach 3"
+    Spec.assertBool s (offered altar) "and {3} is the Druid's {G}{G}{G}"
+
+  -- The board above and one Sneaky Homunculus (1/1 Homunculus Illusion, no
+  -- mana ability): the Druid's three Elves leave the Piker's 2 and the
+  -- Homunculus' 1, and only that MIXED selection reaches 3.
+  Spec.it s "CR 118.3 the Dynamo reaches 3 with a Piker and a 1-power creature" $ do
+    druid <- S.printingOf s registry "Heritage Druid"
+    bloodbraid <- S.printingOf s registry "Bloodbraid Elf"
+    homunculus <- S.printingOf s registry "Sneaky Homunculus"
+    hub <- S.printingOf s registry "Eon Hub"
+    statue <- S.printingOf s registry "Jade Statue"
+    board <- musterDynamoBoard s registry [("Glistener Elf", 1), ("Goblin Piker", 1)]
+    let withElves = foldr (\p gs -> snd (S.addPermanent p S.alice gs)) board [druid, bloodbraid, homunculus]
+        offered spell =
+          let (withSpell, oid) = S.handOne spell withElves
+           in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+    Spec.assertBool s (offered statue) "{4} is the Druid's {G}{G}{G} and the Piker and Homunculus' {C}"
+    Spec.assertBool s (not (offered hub)) "and not {5}"
 
   -- The gameplay-level proof (design.md section 4). Sapphire Medallion is {2},
   -- all generic, and targets nothing, so the cast turns on the Dynamo being
@@ -2569,6 +2601,49 @@ musterDynamoBoard s registry fuel = do
   dynamo <- S.printingOf s registry "Synthetic Muster Dynamo"
   creatures <- traverse (\(name, n) -> fmap (replicate n) (S.printingOf s registry name)) fuel
   pure (alicePermanents (dynamo : concat creatures))
+
+-- Cryptex ({2} Artifact, "{T}, Collect evidence 3: Add one mana of any color.
+-- Put an unlock counter on this artifact.") beside two Islands, paying for
+-- Headless Skaab ({2}{U}, "As an additional cost to cast this spell, exile a
+-- creature card from your graveyard"); Oracle checked against Scryfall
+-- 2026-10-01. alice's graveyard holds Bloodbraid Elf (a creature card, mana
+-- value 4) and one noncreature card, and the boards differ only in that card:
+-- Lightning Bolt (mana value 1) or Acidic Soil (3). Beside the Bolt the
+-- Cryptex reaches 3 only with the Elf, which the Skaab's cost must exile --
+-- one card each, two cards, and a count of cards could not tell.
+cryptexSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+cryptexSpec s registry = Spec.describe s "Cryptex" $ do
+  Spec.it s "CR 118.3 Cryptex cannot collect the creature card Headless Skaab exiles" $ do
+    (short, shortSkaab, _) <- cryptexBoard s registry "Lightning Bolt"
+    (enough, skaab, soil) <- cryptexBoard s registry "Acidic Soil"
+    let offered oid gs = any (S.isCastOf oid) (Action.legalActions S.alice gs)
+        resolved = S.runPure (collectOnly soil) (S.runPure (collectOnly soil) enough (S.cast S.alice skaab)) Stack.resolveTop
+        countOf = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Headless Skaab")) S.alice
+    Spec.assertBool s (not (offered shortSkaab short)) "beside the Bolt the Elf pays one cost or the other, so the Skaab is not offered"
+    Spec.assertBool s (offered skaab enough) "beside the Soil the Cryptex collects it, so the Skaab is"
+    Spec.assertEqWith s "CR 605.3a and the Skaab resolved off the Cryptex's mana" (countOf resolved) 1
+
+-- That one card, wherever collect evidence asks: the default answer takes
+-- every candidate, the Elf the Skaab needs included. Test-local: the harness
+-- has no vocabulary for ChooseCollectEvidence.
+collectOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+collectOnly oid p = case p of
+  Prompt.ChooseCollectEvidence _ _ _ candidates _ -> Set.fromList (filter (== oid) candidates)
+  _ -> S.identityAnswer p
+
+-- Alice's Cryptex and two Islands, Bloodbraid Elf and the named card in her
+-- graveyard, and Headless Skaab in her hand. Answers the board, the Skaab and
+-- the named card.
+cryptexBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+cryptexBoard s registry other = do
+  cryptex <- S.printingOf s registry "Cryptex"
+  island <- S.printingOf s registry "Island"
+  bloodbraid <- S.printingOf s registry "Bloodbraid Elf"
+  card <- S.printingOf s registry other
+  skaab <- S.printingOf s registry "Headless Skaab"
+  let (otherId, graveyard) = S.addGraveyardCard card S.alice (snd (S.addGraveyardCard bloodbraid S.alice (alicePermanents [cryptex, island, island])))
+      (withSkaab, skaabId) = S.handOne skaab graveyard
+  pure (withSkaab, skaabId, otherId)
 
 -- The half #1128 gave up: WHICH mana each of a repeatable source's activations
 -- makes. Phyrexian Altar ({3} Artifact, "Sacrifice a creature: Add one mana of
@@ -4130,6 +4205,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   dynamoConduitSpec s registry
   witheringFontSpec s registry
   musterDynamoSpec s registry
+  cryptexSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
   pluralBoardSpec s registry

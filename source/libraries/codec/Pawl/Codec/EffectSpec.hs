@@ -1007,7 +1007,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Filter.And [])))
+      (Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Filter.And []) Seq.empty))
       " {\"type\":\"PreventNextDamageInstance\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"}}} "
   -- The same shield with a NARROWED chosen source written out, which is what
   -- proves the defaulted key decodes: CR 609.7a's choice held to a property.
@@ -1016,8 +1016,17 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Filter.HasCardType CardType.Creature)))
+      (Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Filter.HasCardType CardType.Creature) Seq.empty))
       " {\"type\":\"PreventNextDamageInstance\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"chosenSource\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- CR 615.5's additional effect on the same shield: Reverse Damage's "you gain
+  -- life equal to the damage prevented this way".
+  Spec.it s "PreventNextDamageInstance with a rider" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Filter.And []) (Seq.singleton (Effect.GainLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))))))))
+      " {\"type\":\"PreventNextDamageInstance\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"},\"riders\":[{\"type\":\"GainLife\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"InSlot\",\"value\":\"thatMuch\"}}}]}} "
   -- CR 608.2f: Soulfire Eruption's per-object body, the other nesting of an
   -- effect inside an effect -- a DealDamage reading the mana value of the card
   -- an earlier body instruction exiled for THIS member.
