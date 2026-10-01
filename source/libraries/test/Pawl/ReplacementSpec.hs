@@ -1697,6 +1697,14 @@ voltaicSurgeSpec s registry =
           Spec.assertEqWith s "setup: the row was installed though its clause was false" (length (GameState.replacements armed)) 1
         _ -> Spec.assertFailure s "fixture should hold two Firebolts"
 
+-- How many battlefield permanents `pid` CONTROLS are printed with this name. NOT
+-- S.countOnBattlefieldByName, which counts by OWNER (Game.zoneMembers filters the
+-- shared battlefield by Object.owner) -- the whole point of a CR 616.1b rewrite
+-- is that the owner and the controller have come apart.
+controlledNamed :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
+controlledNamed wanted pid gs =
+  length (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just wanted) (Projection.controls pid gs))
+
 -- alice controls six untapped Islands (Gather Specimens is {3}{U}{U}{U}) and one
 -- Goblin Piker for a Clone to copy; bob controls ten, enough for a Gather
 -- Specimens of his own plus a Clone at {3}{U}, or for two Clones, with no untap

@@ -2114,7 +2114,7 @@ destroyedAndSettled oid gs =
 -- granting one, which the layer fold appends to the receiver's own (CR 613.1f,
 -- 113.7). Ornithopter is the historic permanent, cast from the graveyard and
 -- from the hand on the same board.
-eighthDoctorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+eighthDoctorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 eighthDoctorSpec s registry =
   let board doctor = do
         forest <- S.printingOf s registry "Forest"

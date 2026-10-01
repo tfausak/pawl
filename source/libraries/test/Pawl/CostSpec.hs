@@ -2959,7 +2959,7 @@ flingBoard fling mountain mine base =
 -- reading of its power there is -- Pawl.Engine.Resolve.Slots.effectViewOf is what
 -- licenses it. Jarad, Golgari Lich Lord is the same read one carrier over, off an
 -- ACTIVATION cost.
-flingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 flingSpec s registry =
   Spec.describe s "Fling" $ do
     -- The base case: nothing modifies the Giant's power, so this separates "the

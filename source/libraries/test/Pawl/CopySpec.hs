@@ -167,7 +167,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
-import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
@@ -3308,7 +3307,7 @@ faceDownCopyBoard island arbiter clone piker cyber =
       (withSpell, spell) = S.handOne cyber killed
    in fmap (\cloneId -> (withSpell, spell, cloneId, one, two)) (cloneOnBattlefield killed)
 
-faceDownCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+faceDownCopySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- THE PROVING TEST for the thirteen rule-affecting families, read through
   -- Pawl.Engine.CombatRestriction off Projection.ruleAbilitiesOf.
