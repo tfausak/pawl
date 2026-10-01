@@ -1084,8 +1084,8 @@ everWatchingThresholdSpec s registry =
         -- The negative, and the same fixture: bob attacks the third seat, so
         -- neither disjunct holds. Rule 603.4's first sentence -- the ability
         -- "triggers only if" the clause is true -- is what makes `fired` 0 here
-        -- and 1 on both boards above, and rule 508.3d's condition is satisfied on
-        -- all three alike.
+        -- and 1 on the boards of the two cr-603-4-the-clause-holds-*.json
+        -- scenarios, and rule 508.3d's condition is satisfied on all three alike.
         Spec.it s "CR 603.4 the clause fails when the declaration went at a third player" $ do
           built <- fixture
           case built of

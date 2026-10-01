@@ -650,7 +650,8 @@ lastKnownAttackingSpec s registry =
         _ -> Spec.assertFailure s "combatBoardOf should place Garna and one Hill Giant"
    in Spec.describe s "LastKnownAttacking" $ do
 
-        -- The positive's twin, and the control it is read against: alice declines
+        -- The twin of cr-608-2h-an-attacking-hill-giant-that-dies-draws-garna-a.json,
+        -- and the control it is read against: alice declines
         -- the attack and the same kill takes bob's life instead of filling her hand.
         Spec.it s "CR 508.1k the same Giant that never attacked deals bob 1 instead" $ do
           garna <- S.printingOf s registry "Garna, Bloodfist of Keld"
