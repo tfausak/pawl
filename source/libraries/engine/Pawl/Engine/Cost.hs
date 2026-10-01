@@ -132,6 +132,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -5429,7 +5430,17 @@ tapForManaWith perform window inFlight refused activator oid = do
       case filter (\option -> permitted option && not (Mana.inFlightRoute (Set.union inFlight refused) oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure (False, [], everyRoute)
         first : rest -> do
-          chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
+          -- CR 106.3 / 608.2d: the activator picks the route and the mana for
+          -- their OWN pool. A share naming somebody else is that player's to
+          -- pick as it is added (`pickShare` below), so routes differing only
+          -- there are one choice here -- Spectral Searchlight's five colours
+          -- are one route until "that player" is known.
+          let ownPart option = option {ManaOption.yield = Map.filterWithKey (\ref _ -> ref == you) (ManaOption.yield option), ManaOption.steps = fmap (fmap (Map.filterWithKey (\ref _ -> ref == you))) (ManaOption.steps option)}
+              you = PlayerRef.Relative PlayerRelation.You
+          chosen <- case ListUtils.nubOrdOn ownPart (first : rest) of
+            route : routes -> chooseManaYield controller oid (route NonEmpty.:| routes) gs
+            [] -> pure first
+          let alike = filter (\option -> ownPart option == ownPart chosen) (first : rest)
           -- CR 601.2f, reached by CR 602.2b: what is paid is the TOTAL, and the
           -- gate above measured that same total through `capacity`. Off ONE
           -- gather (`manaActivationAdjustments`), so the offer and the payment
@@ -5471,8 +5482,8 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- leaves uncreated, and CR 608.2h's last-known information answers
               -- for a source the cost sacrificed.
               --
-              -- A clause that happens adds its share of the yield, then runs its
-              -- other effects -- CR 405.6c's "the mana is produced and the other
+              -- A clause that happens adds its share of the yield, then runs the
+              -- other effects printed after it -- CR 405.6c's "the mana is produced and the other
               -- effect happens immediately", HERE, inside the window this
               -- activation was made in. Ancient Tomb's 2 damage is charged before
               -- the rest of the payment can spend the mana it just made
@@ -5501,25 +5512,50 @@ tapForManaWith perform window inFlight refused activator oid = do
               -- Rhystic Cave's "unless any player pays {1}" is offered to the
               -- table by the performer, the source standing in for the ability
               -- object here too, and a clause whose gate says no adds no mana.
-              let happens clause = do
+              --
+              -- CR 608.2c / 608.2d inside a clause: the effects printed BEFORE its
+              -- first addition run first, and the slots they bind are what the
+              -- addition's recipient reads -- Valleymaker's "Choose a player.
+              -- That player adds {G}{G}{G}" (Pawl.ManaSpec's Valleymaker group).
+              -- The slots are threaded through the performer, CR 605.3b leaving
+              -- no ability object to hold them. A share for anybody but the
+              -- activator is then picked by its RECIPIENT among the routes alike
+              -- in the activator's own part: Spectral Searchlight's "any color
+              -- they choose" (Pawl.ManaSpec's Spectral Searchlight group).
+              let shareAt i ref option = Map.lookup ref . snd =<< Maybe.listToMaybe (drop i (ManaOption.steps option))
+                  pickShare i ref recipient mana = case ListUtils.nubOrdOn (shareAt i ref) alike of
+                    representative : more@(_ : _) | ref /= you -> do
+                      gsNow <- State.get
+                      picked <- chooseManaYield recipient oid (representative NonEmpty.:| more) gsNow
+                      pure (maybe (Mana.unitsOf mana) Mana.unitsOf (shareAt i ref picked))
+                    _ -> pure (Mana.unitsOf mana)
+                  happens clause = do
                     gsNow <- State.get
                     let context = Filter.contextFor (Game.teams gsNow) (Just controller) (Just oid)
                     pure (maybe True (Condition.holds (Projection.viewWithLastKnownAnywhere gsNow) context gsNow oid) (Clause.condition clause))
                   gated cIdx answers clause = case Clause.payGate clause of
                     Nothing -> pure (True, answers)
                     Just gate -> ManaAbilityPerformer.payGate perform oid controller cIdx gate answers
-                  step (answers, filled, made) (cIdx, (clause, share)) = do
+                  step (answers, bound, filled, made) (cIdx, (i, (clause, share))) = do
                     holds <- happens clause
                     (admitted, answers2) <- if holds then gated cIdx answers clause else pure (False, answers)
                     if not admitted
-                      then pure (answers2, filled, made)
+                      then pure (answers2, bound, filled, made)
                       else do
+                        let (leading, trailing) = List.break (Maybe.isJust . ManaAbility.manaProduced) (Foldable.toList (Clause.effects clause))
+                        bound1 <- ManaAbilityPerformer.effects perform oid controller bound leading
                         gsNow <- State.get
-                        let shares = concatMap (\(ref, mana) -> fmap (\recipient -> (recipient, Mana.unitsOf mana)) (Mana.recipientsOf controller gsNow ref)) (Map.toList share)
-                        State.put (List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) gsNow shares)
-                        ManaAbilityPerformer.effects perform oid controller (filter (Maybe.isNothing . ManaAbility.manaProduced) (Foldable.toList (Clause.effects clause)))
-                        pure (answers2, filled <> shares, made <> concatMap Mana.unitsOf (Map.elems share))
-              (_, shares, producedUnits) <- Monad.foldM step (Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (ManaOption.steps chosen))
+                        let chosenPlayers = Map.filter (not . Set.null) (fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) bound1)
+                        parts <- traverse (\(ref, mana) -> traverse (\recipient -> fmap ((,) recipient) (pickShare i ref recipient mana)) (Mana.recipientsOf controller chosenPlayers gsNow ref)) (Map.toList share)
+                        let shares = concat parts
+                            -- CR 106.12a's "produced", once per addition whoever's
+                            -- pool it reached: the first recipient's pick, or the
+                            -- offered share where it reached nobody.
+                            produced = concat (zipWith (\(_, mana) part -> maybe (Mana.unitsOf mana) snd (Maybe.listToMaybe part)) (Map.toList share) parts)
+                        State.modify' (\g -> List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) g shares)
+                        bound2 <- ManaAbilityPerformer.effects perform oid controller bound1 (filter (Maybe.isNothing . ManaAbility.manaProduced) trailing)
+                        pure (answers2, bound2, filled <> shares, made <> produced)
+              (_, _, shares, producedUnits) <- Monad.foldM step (Map.empty, Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (zip [0 :: Int ..] (ManaOption.steps chosen)))
               -- CR 605.1b's "mana being added to a player's mana pool", one event
               -- per player whose pool this activation filled, and CR 106.12a's
               -- "produced": what the clauses that happened added, whoever's pool.
@@ -5690,11 +5726,9 @@ payActivation perform inFlight pid oid cost = do
 -- FILTERED, NOT TRUSTED: honouring an option the source does not offer would
 -- mint mana out of nothing, or charge the wrong cost for it.
 --
--- Not implemented: CR 106.4's colour choice made by the RECIPIENT where the
--- addition names somebody other than the activator. `pid` here is the
--- controller, which CR 109.5 makes the chooser for every printing in
--- `data/cards/`: Yurlok of Scorch Thrash's three additions are each a fixed
--- type, so its `EachPlayer` recipients choose nothing (#3081).
+-- `pid` is whoever picks: the activator for the route and their own share, and
+-- the recipient for a share naming somebody else (tapForManaWith's
+-- `pickShare`).
 chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty ManaOption.ManaOption -> GameState -> Game ManaOption.ManaOption
 chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only

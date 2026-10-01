@@ -37,6 +37,7 @@ import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
@@ -87,6 +88,7 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -459,12 +461,25 @@ manaSuppliesGiven capacity pcs pid oid gs =
           -- Still a supply of NO units rather than no supply at all: the
           -- triple carries what the activation spends, and an empty yield is
           -- just a source that adds this player nothing.
-          Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
+          --
+          -- CR 608.2d: a recipient the route's own clauses CHOOSE names the
+          -- payer wherever the payer is among the players offered, since the
+          -- payer activates it and may choose themself -- Spectral
+          -- Searchlight's ruling, "You may choose yourself". Pawl.ManaSpec's
+          -- Spectral Searchlight group casts off that supply.
+          Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid (choosable option) gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
           -- a claim that such a route costs nothing.
           Maybe.fromMaybe (ManaCost.MkManaCost []) (Cost.mana (ManaOption.cost option))
         )
+      choosable option =
+        Map.fromList
+          [ (ChoosePlayer.slot choice, Set.singleton pid)
+          | (clause, _) <- ManaOption.steps option,
+            choice <- Maybe.mapMaybe ManaAbility.playerChoice (Foldable.toList (Clause.effects clause)),
+            List.elem pid (Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just pid) gs (ChoosePlayer.scope choice)))
+          ]
       options = manaOptionsOfGiven pcs oid gs
       -- Lazy, and forced only for a permanent mixing open and closed routes:
       -- manaSourcesGiven hands this nothing else pid does not control.
@@ -598,7 +613,7 @@ yieldUnits option = concatMap unitsOf (Map.elems (ManaOption.yield option))
 
 -- CR 106.4: which players one AddMana's recipient reference names, for a mana
 -- ability activated OFF THE STACK -- CR 605.3b's road, where the ability has no
--- object and nothing has been bound.
+-- object.
 --
 -- THE one resolver, read by both roads: Pawl.Engine.Cost.tapForManaWith adds
 -- each share to the players it names, and manaSuppliesGiven below keeps the
@@ -611,34 +626,34 @@ yieldUnits option = concatMap unitsOf (Map.elems (ManaOption.yield option))
 -- the ability's CONTROLLER (CR 109.5 / 110.2), which is what makes @Relative
 -- You@ the controller rather than the permanent's owner.
 --
+-- `chosen` is the players the activation's own clauses have bound so far (CR
+-- 608.2c / 608.2d): Spectral Searchlight's "Choose a player. That player adds"
+-- is an @InSlot@ over the slot its ChoosePlayer filled. The payment passes what
+-- the clauses before the addition bound; the supply model passes the payer for
+-- each slot the payer could choose themself into.
+--
 -- Unanswerable reads as NOBODY rather than as everybody: a reference this path
 -- cannot resolve puts its mana in no pool, which is the honest answer and loses
 -- nothing the rules give.
 --
--- Not implemented: a reference that names a BINDING SLOT -- EachPlayerExcept,
--- EachOpponentExcept, InSlot, EachInSlot, ControllerOfBound, OwnerOfBound,
--- ChosenPlayerOfBound, Attacking. CR 605.3b gives this
--- activation no object to have bound one, and the CR 601.2c announcement a mana
--- ability makes binds nothing (CR 605.1a), so every one of them names nobody
--- here. The injected view is Nothing for the same reason: the two arms that read
--- one need a bound slot first (#3081).
---
--- The context carries NO SOURCE, which is what makes that true of
--- EachPlayerExcept: Count.playersFor's arm reads "a slot naming nobody excludes
--- nobody" off a live source object and answers EVERY player, and a route
--- naming every player would put the excluded seat's share in
--- manaSuppliesGiven's count of the payer's supply -- the over-count that
--- function's own comment rules out. Unanswerable instead, which is this
--- function's stated posture for every other slot-naming arm. No source is also
--- the honest reading here rather than a lever: CR 605.3b's activation has no
--- ability object, so there are no bindings for an exclusion to have been
--- written against. Pawl.ManaSpec's "CR 605.3b an off-stack mana ability's
+-- The context carries NO SOURCE, so a reference reading a slot off the source
+-- object -- EachPlayerExcept, EachOpponentExcept -- names nobody here, and so do
+-- the ones naming an OBJECT slot (ControllerOfBound, OwnerOfBound,
+-- ChosenPlayerOfBound, Attacking), the injected view being Nothing. CR 605.1a
+-- leaves a mana ability no target to have bound one, and no printed mana
+-- ability's own clauses bind an object for its addition to read (MTGJSON dump
+-- of 2026-08-23, activated lines matching "player adds": Spectral Searchlight
+-- and Valleymaker are the off-stack ones, and both name a chosen player).
+-- EachPlayerExcept matters most: Count.playersFor's arm reads "a slot naming
+-- nobody excludes nobody" off a LIVE source and answers EVERY player, which
+-- would put the excluded seat's share in manaSuppliesGiven's count of the
+-- payer's supply. Pawl.ManaSpec's "CR 605.3b an off-stack mana ability's
 -- EachPlayerExcept names nobody" is the proof.
-recipientsOf :: PlayerId -> GameState -> PlayerRef.PlayerRef -> [PlayerId]
-recipientsOf controller gs ref =
+recipientsOf :: PlayerId -> Map.Map SlotName.SlotName (Set.Set PlayerId) -> GameState -> PlayerRef.PlayerRef -> [PlayerId]
+recipientsOf controller chosen gs ref =
   Maybe.fromMaybe
     []
-    (Count.playersFor (const Nothing) (Filter.contextFor (Game.teams gs) (Just controller) Nothing) gs ref)
+    (Count.playersFor (const Nothing) ((Filter.contextFor (Game.teams gs) (Just controller) Nothing) {Filter.slotPlayers = chosen}) gs ref)
 
 -- CR 607.2d's production-time capture, and THE one place it is decided: the
 -- subtype the source had chosen as it entered (CR 614.1c), baked onto every unit

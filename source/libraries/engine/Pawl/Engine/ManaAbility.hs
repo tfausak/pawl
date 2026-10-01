@@ -3,7 +3,8 @@
 -- asks one EFFECT whether it moves a card to or from a library and
 -- `costMovesLibraryCard` asks the same of one COST COMPONENT, and
 -- `isManaAbility` folds all three over a whole ABILITY and adds the no-target
--- and not-a-loyalty-ability clauses.
+-- and not-a-loyalty-ability clauses. `playerChoice` is CR 608.2d's question
+-- beside them, which the mana supply model asks of a mana ability's effects.
 --
 -- The ability-level half lives here rather than in Pawl.Engine.Mana because
 -- Pawl.Engine.Projection needs it -- CR 605.1a's exclusion is half of
@@ -29,6 +30,7 @@ import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.Cost as Cost
@@ -476,6 +478,182 @@ manaProduced effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.Repeat (Repeat.MkRepeat _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList (process <> ifHolds)))
+  Effect.Heal _ -> Nothing
+  Effect.ChooseNewTargets _ -> Nothing
+
+-- CR 608.2d: does this effect have its controller choose a player and bind the
+-- answer to a slot, and from which players? Read by Mana.manaSuppliesGiven,
+-- which has to know before a mana ability is activated whether "that player"
+-- could be the payer, and the activation's own choice is what decides it.
+--
+-- A CLASSIFICATION, `manaProduced`'s posture: every arm answers the one
+-- question in the type. Exhaustive deliberately, so a new opcode that binds a
+-- chosen player is not filed under "chooses nobody" without a diagnostic. A
+-- choice made at random (CR 701.9b) is no choice of the controller's, and one
+-- inside a loop body binds per iteration, so neither answers here.
+playerChoice :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe ChoosePlayer.ChoosePlayer
+playerChoice effect = case effect of
+  Effect.AddMana _ -> Nothing
+  Effect.Firebend _ -> Nothing
+  Effect.ActivateManaAbilities {} -> Nothing
+  Effect.MoveMana {} -> Nothing
+  Effect.DealDamage {} -> Nothing
+  Effect.Fight {} -> Nothing
+  Effect.ModifyTarget {} -> Nothing
+  Effect.ChangeText {} -> Nothing
+  Effect.Search {} -> Nothing
+  Effect.ExileAllGraveyards -> Nothing
+  Effect.Proliferate -> Nothing
+  Effect.Reroll -> Nothing
+  Effect.ChooseCardName _ -> Nothing
+  Effect.FromOutsideTheGame _ -> Nothing
+  Effect.ExileThisSpell -> Nothing
+  Effect.Bolster _ -> Nothing
+  Effect.Amass _ -> Nothing
+  Effect.Blight _ -> Nothing
+  Effect.Earthbend _ -> Nothing
+  Effect.Airbend _ -> Nothing
+  Effect.TemptWithTheRing -> Nothing
+  Effect.OpenAttraction -> Nothing
+  Effect.Planeswalk -> Nothing
+  Effect.Abandon -> Nothing
+  Effect.ClaimPrize -> Nothing
+  Effect.Forage -> Nothing
+  Effect.Populate -> Nothing
+  Effect.TimeTravel -> Nothing
+  Effect.Recruit -> Nothing
+  Effect.Learn -> Nothing
+  Effect.Cloak {} -> Nothing
+  Effect.Venture {} -> Nothing
+  Effect.ExileHandThenDraw -> Nothing
+  Effect.PlayerSacrifices {} -> Nothing
+  Effect.Vote {} -> Nothing
+  Effect.RestartGame _ -> Nothing
+  Effect.ControlPlayerNextTurn _ -> Nothing
+  Effect.ControlPlayerThisResolution _ -> Nothing
+  Effect.Destroy {} -> Nothing
+  Effect.Sacrifice _ -> Nothing
+  Effect.TurnFaceDown _ -> Nothing
+  Effect.TurnFaceUp _ -> Nothing
+  Effect.RemoveFromCombat _ -> Nothing
+  Effect.BecomesBlocked _ -> Nothing
+  Effect.SwitchBlockers _ -> Nothing
+  Effect.ExchangeBlocks _ -> Nothing
+  Effect.MoveToZone {} -> Nothing
+  Effect.Draw {} -> Nothing
+  Effect.Mill {} -> Nothing
+  Effect.Reveal {} -> Nothing
+  Effect.LookAt {} -> Nothing
+  Effect.ArrangeInLibrary {} -> Nothing
+  Effect.Scry {} -> Nothing
+  Effect.Surveil {} -> Nothing
+  Effect.Fateseal {} -> Nothing
+  Effect.Clash {} -> Nothing
+  Effect.Explore {} -> Nothing
+  Effect.Connive {} -> Nothing
+  Effect.Discard {} -> Nothing
+  Effect.LoseLife {} -> Nothing
+  Effect.GainLife {} -> Nothing
+  Effect.ExchangeLifeTotals _ -> Nothing
+  Effect.ExchangeValues _ -> Nothing
+  Effect.ExchangeZones _ -> Nothing
+  Effect.ExchangeWithCardInHand _ -> Nothing
+  Effect.SetLifeTotal {} -> Nothing
+  Effect.LoseGame {} -> Nothing
+  Effect.WinGame {} -> Nothing
+  Effect.DrawGame {} -> Nothing
+  Effect.RedistributeLifeTotals -> Nothing
+  Effect.IncreaseSpeed {} -> Nothing
+  Effect.DecreaseSpeed {} -> Nothing
+  Effect.Create {} -> Nothing
+  Effect.Conjure {} -> Nothing
+  Effect.CreateCopy {} -> Nothing
+  Effect.BecomeCopy {} -> Nothing
+  Effect.CopyStackObject {} -> Nothing
+  Effect.Replace {} -> Nothing
+  Effect.SkipNextPhase {} -> Nothing
+  Effect.PreventNextDamage {} -> Nothing
+  Effect.PreventAllDamage {} -> Nothing
+  Effect.PreventNextDamageInstance {} -> Nothing
+  Effect.RedirectDamage {} -> Nothing
+  Effect.Counter {} -> Nothing
+  Effect.PutCounters {} -> Nothing
+  Effect.PutCountersFrom {} -> Nothing
+  Effect.RemoveCounters {} -> Nothing
+  Effect.RemoveCountersAmong {} -> Nothing
+  Effect.MoveCounters {} -> Nothing
+  Effect.GainPlayerCounters {} -> Nothing
+  Effect.RemovePlayerCounters {} -> Nothing
+  Effect.PayAnyEnergy _ -> Nothing
+  Effect.ChooseNumber _ -> Nothing
+  Effect.Tap _ -> Nothing
+  Effect.Untap _ -> Nothing
+  Effect.Unattach _ -> Nothing
+  Effect.Detain _ -> Nothing
+  Effect.Goad _ -> Nothing
+  Effect.Pair _ -> Nothing
+  Effect.GrantLookAtExiled _ -> Nothing
+  Effect.MakePlotted _ -> Nothing
+  Effect.MakeForetold _ -> Nothing
+  Effect.MakeWarped _ -> Nothing
+  Effect.DoesNotUntapNext _ -> Nothing
+  Effect.Transform _ -> Nothing
+  Effect.Convert _ -> Nothing
+  Effect.Flip _ -> Nothing
+  Effect.Meld {} -> Nothing
+  Effect.PhaseOut _ -> Nothing
+  Effect.AddPhases _ -> Nothing
+  Effect.EndTurn -> Nothing
+  Effect.EndCombatPhase -> Nothing
+  Effect.GainControl {} -> Nothing
+  Effect.GiveControl _ -> Nothing
+  Effect.ExchangeControl _ -> Nothing
+  Effect.ArmDelayedTrigger {} -> Nothing
+  Effect.AffectPlayers {} -> Nothing
+  Effect.RequireBlock {} -> Nothing
+  Effect.CantBeRegenerated {} -> Nothing
+  Effect.ForbidBlock {} -> Nothing
+  Effect.ForbidAttack {} -> Nothing
+  Effect.ForbidActivation {} -> Nothing
+  Effect.RequireAttack {} -> Nothing
+  Effect.CreateEmblem {} -> Nothing
+  Effect.BecomeMonarch {} -> Nothing
+  Effect.TakeTheInitiative {} -> Nothing
+  Effect.Designate {} -> Nothing
+  Effect.SetClassLevel {} -> Nothing
+  Effect.Unsuspect _ -> Nothing
+  Effect.SetHalfLocked {} -> Nothing
+  Effect.Evolve _ -> Nothing
+  Effect.Mentor _ -> Nothing
+  Effect.Exploit -> Nothing
+  Effect.GiveGift -> Nothing
+  Effect.Train _ -> Nothing
+  Effect.ItBecomes _ -> Nothing
+  Effect.ExileUntilMonarch _ -> Nothing
+  Effect.ExileHaunting {} -> Nothing
+  Effect.Attach _ -> Nothing
+  Effect.AttachAsThoughCreature _ -> Nothing
+  Effect.AttachTarget {} -> Nothing
+  Effect.AttachTargetToEach {} -> Nothing
+  Effect.AttachBound {} -> Nothing
+  Effect.AttachAll {} -> Nothing
+  Effect.PlaySubgame _ -> Nothing
+  Effect.ChoosePlayer choice -> Just choice
+  Effect.ChoosePlayerAtRandom _ -> Nothing
+  Effect.ChoosePermanents _ -> Nothing
+  Effect.RollDie {} -> Nothing
+  Effect.FlipCoin {} -> Nothing
+  Effect.TakeExtraTurn {} -> Nothing
+  Effect.ShuffleIntoLibrary {} -> Nothing
+  Effect.Shuffle {} -> Nothing
+  Effect.OfferCast {} -> Nothing
+  Effect.OfferNamedCopy {} -> Nothing
+  Effect.OfferNotedCopy {} -> Nothing
+  Effect.GrantPlayFromExile {} -> Nothing
+  Effect.ForEach {} -> Nothing
+  Effect.ForEachNumber {} -> Nothing
+  Effect.Repeat {} -> Nothing
+  Effect.RepeatIf {} -> Nothing
   Effect.Heal _ -> Nothing
   Effect.ChooseNewTargets _ -> Nothing
 
