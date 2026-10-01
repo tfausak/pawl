@@ -3982,6 +3982,35 @@ exhalationSpec s registry =
       let (exhalation, gs) = exhalationBoard S.bothPlayers plains exhalationPrinting
       Spec.assertBool s (not (S.castable S.alice exhalation gs)) "the reduced {5}{W} is out of reach of five Plains"
       Spec.assertEqWith s "and it is not offered" (filter (S.isCastOf exhalation) (Action.legalActions S.alice gs)) []
+    -- CR 601.2a / 601.2f / 613.1f: the total is determined with the spell on the
+    -- stack, so an effect confined to the zone the card is cast FROM no longer
+    -- reaches the keyword that reduces it. Sublime Exhalation in alice's
+    -- graveyard, bob's Yixlid Jailer ("cards in graveyards lose all abilities")
+    -- entered first, alice's Lier, Disciple of the Drowned (flashback at its mana
+    -- cost) after it: the card has flashback and no undaunted where it lies, but
+    -- the spell has undaunted, so its {6}{W} flashback costs {5}{W} against one
+    -- opponent and six Plains pay it. Priced in the graveyard the gate would ask
+    -- {6}{W} and refuse.
+    Spec.it s "CR 601.2f undaunted the graveyard card lost applies to the spell" $ do
+      plains <- S.printingOf s registry "Plains"
+      exhalationPrinting <- S.printingOf s registry "Sublime Exhalation"
+      jailer <- S.printingOf s registry "Yixlid Jailer"
+      lier <- S.printingOf s registry "Lier, Disciple of the Drowned"
+      let base = S.landsFor plains S.alice 6 (Setup.emptyGame S.bothPlayers)
+          (_, withJailer) = S.addPermanent jailer S.bob base
+          (_, withLier) = S.addPermanent lier S.alice withJailer
+          (exhalation, gs1) = S.addGraveyardCard exhalationPrinting S.alice withLier
+          gs =
+            gs1
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice exhalation)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (S.castable S.alice exhalation gs) "the gate offers the {5}{W} flashback"
+      Spec.assertEqWith s "and all six Plains paid it" (S.tappedCount S.alice resolved) 6
+      Spec.assertEqWith s "and the flashed-back Exhalation was exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
 
 -- alice controls a Safehold Sentry and three Plains, all settled. `tapped` says
 -- whether the Sentry itself starts tapped -- which for a {Q} cost is the payable
