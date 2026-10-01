@@ -82,6 +82,13 @@ spec s registry = Spec.describe s "Scenario" $ do
     result <- Scenario.stage registry setup
     Spec.assertEqWith s "duplicate alias" result (Left (ScenarioFailure.MkDuplicateLabel (Label.MkLabel (Text.pack "same"))))
 
+  Spec.it s "CR 111.7 a token placed off the battlefield is rejected" $ do
+    let token = (S.permanent "Goblin Piker") {Placement.token = True}
+        alice = (S.playerSetup S.alice) {Seat.hand = Seq.singleton token}
+        setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+    result <- Scenario.stage registry setup
+    Spec.assertEqWith s "token in hand" result (Left (ScenarioFailure.MkTokenOffBattlefield (CardName.MkCardName (Text.pack "Goblin Piker"))))
+
   Spec.it s "unreached scheduled entries fail" $ do
     let setup = S.duel S.precombatMain [] []
         script = S.turn 1 [S.on S.precombatMain S.alice (S.attack [])]

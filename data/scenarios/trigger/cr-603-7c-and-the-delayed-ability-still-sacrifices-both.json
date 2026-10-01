@@ -1,0 +1,32 @@
+{
+  "description": "CR 603.7c and the delayed ability still sacrifices both",
+  "note": "Salt Road Skirmish's group of two Warriors is read by two opcodes in one resolution: \"they gain haste\" and the delayed \"sacrifice them\". The second must still find the group, since ModifyTarget consuming the slot would leave the delayed ability nothing to sacrifice. Bob's Rats is the only creature, so it is the Skirmish's target.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Swamp", "label": "swamp-4" }
+        ],
+        "hand": [{ "card": "Salt Road Skirmish", "label": "skirmish" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Typhoid Rats", "label": "rats" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@skirmish", "targets": ["@rats"], "mana": ["@swamp", "@swamp-2", "@swamp-3", "@swamp-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 2 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 0 } } }
+  ]
+}

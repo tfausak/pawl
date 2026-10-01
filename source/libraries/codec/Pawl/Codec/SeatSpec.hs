@@ -57,6 +57,7 @@ card name =
       Placement.Type.readiness = Readiness.Type.Sick,
       Placement.Type.damage = 0,
       Placement.Type.counters = Map.empty,
+      Placement.Type.token = False,
       Placement.Type.controller = Nothing,
       Placement.Type.attached = Nothing
     }

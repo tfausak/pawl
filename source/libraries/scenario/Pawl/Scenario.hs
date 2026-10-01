@@ -93,6 +93,7 @@ import qualified Pawl.Types.ScenarioFailure as Failure
 import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
@@ -288,6 +289,7 @@ placeAll registry zone owner placements board = case placements of
     found <- Registry.fetchCard registry (Placement.card placement)
     case found of
       Nothing -> pure (Left (Failure.MkUnknownCard (Placement.card placement)))
+      Just _ | Placement.token placement && zone /= Zone.Battlefield -> pure (Left (Failure.MkTokenOffBattlefield (Placement.card placement)))
       Just card -> do
         let (printingId, interned) = Game.intern (Printing.ofCard card) (Staged.state board)
             (oid, placed) = Setup.placeCard zone owner printingId interned
@@ -302,7 +304,8 @@ placeAll registry zone owner placements board = case placements of
                     Readiness.Ready -> Sickness.Settled controller,
                   -- Object.counterTimestamps stays empty: CR 613.7c then reads
                   -- every placed counter as old as its permanent.
-                  Object.counters = Placement.counters placement
+                  Object.counters = Placement.counters placement,
+                  Object.source = if Placement.token placement then Source.OfToken printingId else Object.source obj
                 }
             next =
               board
@@ -990,6 +993,7 @@ render failure = case failure of
   Failure.MkUnknownController label -> Label.unwrap label <> Text.pack " controls a placed card but has no seat"
   Failure.MkUnknownCard name -> Text.pack "no card named " <> CardName.unwrap name
   Failure.MkIllegalAttachment label -> Text.pack "a placement cannot be attached to " <> Label.unwrap label
+  Failure.MkTokenOffBattlefield name -> Text.pack "a token " <> CardName.unwrap name <> Text.pack " placed off the battlefield"
   Failure.MkUnknownMonarch label -> Label.unwrap label <> Text.pack " is the monarch but has no seat"
   Failure.MkUnknownObject ref known ->
     Codec.Reference.toText ref

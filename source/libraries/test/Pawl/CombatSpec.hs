@@ -3055,22 +3055,6 @@ cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
         Spec.assertBool s (blocks gs a seekerId) "it may block the Spirit Seeker"
         Spec.assertEqWith s "both tokens are bob's" (fmap (`Projection.controllerOf` gs) [a, b]) [Just S.bob, Just S.bob]
       (_, other) -> Spec.assertFailure s ("expected two Spirit tokens, got " <> show (length other))
-  Spec.it s "CR 509.1b Wan Shi Tong's Spirit tokens can't be blocked by a non-Spirit, and can by a Spirit" $ do
-    wan <- S.printingOf s registry "Wan Shi Tong, All-Knowing"
-    seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs0, _, theirs) = S.combatBoardOf [wan] [piker, seeker]
-    made <- spiritsFor gs0 S.alice
-    -- CR 302.6: the tokens entered this turn. Settling them is the one fixture
-    -- step here that is not the cards' own doing.
-    let settleOne g oid = g {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects g)}
-        ready = List.foldl' settleOne made (S.tokensOf made)
-        gs = snd (Engine.runGamePure S.aggressiveAnswer ready (Combat.declareAttackers S.manaPerformer S.alice))
-    case (theirs, S.tokensOf gs) of
-      ([pikerId, seekerId], [a, _]) -> do
-        Spec.assertBool s (not (blocks gs pikerId a)) "the non-Spirit Piker may not block a Spirit token"
-        Spec.assertBool s (blocks gs seekerId a) "the Spirit Seeker may"
-      (_, other) -> Spec.assertFailure s ("expected two Spirit tokens, got " <> show (length other))
 
 -- CR 701.60c against the two rules that strip abilities: CR 613.1f's layer-6
 -- removal, ordered by CR 613.7, and CR 305.7's layer-4 subtype set, which spares

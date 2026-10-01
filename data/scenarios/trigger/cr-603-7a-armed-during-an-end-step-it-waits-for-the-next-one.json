@@ -1,0 +1,32 @@
+{
+  "description": "CR 603.7a armed during an end step, it waits for the NEXT one",
+  "note": "Tidal Wave: \"Create a 5/5 blue Wall creature token with defender. Sacrifice it at the beginning of the next end step.\" Cast during alice's end step, its delayed ability is armed after that step began, so it cannot trigger on it (CR 603.7a): the Wall survives the step it was made in and goes at the next end step, bob's. The turn-2 main-phase check catches a wrong trigger that was still on the stack when the turn-1 check ran. Both seats hold a library card so turn 2's draw ends no one.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [{ "card": "Tidal Wave", "label": "tidal-wave" }],
+        "library": [{ "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "library": [{ "card": "Island" }]
+      }
+    ],
+    "active": "alice",
+    "step": "EndStep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": { "Cast": { "object": "@tidal-wave", "mana": ["@island", "@island-2", "@island-3"] } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wall Token", "count": 1 } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wall Token", "count": 1 } } },
+    { "turn": 2, "step": "EndStep", "player": "bob", "do": "Pass" },
+    { "turn": 2, "step": "EndStep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wall Token", "count": 0 } } }
+  ]
+}

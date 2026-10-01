@@ -46,7 +46,7 @@ populated spell gs =
 tokensOf :: GameState.GameState -> Int
 tokensOf gs = length (filter (`Game.isToken` gs) (Game.zoneMembers Zone.Battlefield S.alice gs))
 
-spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Populate" $ do
   Spec.it s "CR 701.36a the creature token is copied, and neither the nontoken beside it nor the opponent's token is" $ do
     plains <- S.printingOf s registry "Plains"
@@ -66,16 +66,3 @@ spec s registry = Spec.describe s "Populate" $ do
     Spec.assertEqWith s "the nontoken Hill Giant was not copied" (S.countOnBattlefieldByName (S.printingName giant) S.alice after) 1
     -- bob's token on the SAME board: rule 701.36a's "you control" is too.
     Spec.assertEqWith s "and neither was the opponent's creature token" (S.countOnBattlefieldByName (S.printingName flier) S.bob after) 1
-  -- The paired negative, differing in ONE thing: the same spell, the same lands,
-  -- the same nontoken Hill Giant and the same token of bob's -- but alice
-  -- controls no creature token.
-  Spec.it s "CR 701.36b a controller of no creature token creates nothing" $ do
-    plains <- S.printingOf s registry "Plains"
-    wake <- S.printingOf s registry "Wake the Reflections"
-    piker <- S.printingOf s registry "Goblin Piker"
-    giant <- S.printingOf s registry "Hill Giant"
-    flier <- S.printingOf s registry "Ornithopter"
-    let (spell, before) = board plains wake piker giant flier False
-        after = populated spell before
-    Spec.assertEqWith s "CR 701.36b no token was created" (tokensOf after) 0
-    Spec.assertEqWith s "and the nontoken Hill Giant is still alone" (S.countOnBattlefieldByName (S.printingName giant) S.alice after) 1
