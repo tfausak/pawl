@@ -25,6 +25,8 @@ data ScenarioFailure
   | -- | A placement attached to a label that names nothing on the board, or to
     -- something CR 301.5 / 303.4 forbid it from being attached to.
     MkIllegalAttachment Label.Label
+  | -- | A token placed off the battlefield, where CR 111.7 says it would not exist.
+    MkTokenOffBattlefield CardName.CardName
   | -- | The monarch names no seat.
     MkUnknownMonarch Label.Label
   | -- | The reference named no live object, with whether the board did label

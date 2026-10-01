@@ -26,10 +26,11 @@ spec s = Spec.describe s "Pawl.Codec.Placement" $ do
           Placement.Type.readiness = Readiness.Type.Ready,
           Placement.Type.damage = 1,
           Placement.Type.counters = Map.singleton CounterKind.Type.PlusOnePlusOne 2,
+          Placement.Type.token = True,
           Placement.Type.controller = Just (Label.Type.MkLabel (Text.pack "bob")),
           Placement.Type.attached = Just (Label.Type.MkLabel (Text.pack "bear"))
         }
-      " {\"card\":\"Goblin Piker\",\"label\":\"piker\",\"tapped\":true,\"ready\":true,\"damage\":1,\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":2}],\"controller\":\"bob\",\"attached\":\"bear\"} "
+      " {\"card\":\"Goblin Piker\",\"label\":\"piker\",\"tapped\":true,\"ready\":true,\"damage\":1,\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":2}],\"token\":true,\"controller\":\"bob\",\"attached\":\"bear\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Placement.codec
 
@@ -42,6 +43,7 @@ plain name =
       Placement.Type.readiness = Readiness.Type.Sick,
       Placement.Type.damage = 0,
       Placement.Type.counters = Map.empty,
+      Placement.Type.token = False,
       Placement.Type.controller = Nothing,
       Placement.Type.attached = Nothing
     }

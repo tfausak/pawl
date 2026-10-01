@@ -18,6 +18,8 @@ data Placement = MkPlacement
     readiness :: Readiness.Readiness,
     damage :: Natural,
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural,
+    -- | CR 111.1: a token rather than a card, so on the battlefield only (CR 111.7).
+    token :: Bool,
     -- | The seat controlling it, when not its owner.
     controller :: Maybe Label.Label,
     -- | CR 301.5 / 303.4: the labelled object or seat it is attached to.
