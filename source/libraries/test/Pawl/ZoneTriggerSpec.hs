@@ -140,6 +140,7 @@ import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -2541,11 +2542,11 @@ representativeEvents cond =
         TriggerCondition.SelfBecomesClassLevel n -> one (GameEvent.ClassLevelSet (ClassLevelChange.MkClassLevelChange departed (ClassLevel.MkClassLevel 1) n))
         -- CR 310.12b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
-        TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 1 0))
+        TriggerCondition.SelfLastCounterRemoved removal -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed (SelfCountersRemoved.kind removal) 1 0))
         -- Its any-amount mirror, on a pair that does NOT reach zero -- so an
         -- implementation that had cased on `after` would find no match here and the
         -- eventBindingSlots pin below would see nothing stamped.
-        TriggerCondition.SelfCountersRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 3 1))
+        TriggerCondition.SelfCountersRemoved removal -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed (SelfCountersRemoved.kind removal) 3 1))
         -- CR 603.2c's batch placement, on the same event the chapter arm above
         -- names and read the other way round: the id is the SUBJECT the Filter is
         -- applied to rather than the bearer. The Filter below is the trivial one,
@@ -2932,8 +2933,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 1),
     TriggerCondition.SelfBecomesClassLevel (ClassLevel.MkClassLevel 2),
-    TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
-    TriggerCondition.SelfCountersRemoved CounterKind.Loyalty,
+    TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Defense Zone.Battlefield),
+    TriggerCondition.SelfCountersRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Loyalty Zone.Battlefield),
     TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement CounterKind.MinusOneMinusOne (Filter.Type.And [])),
     TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement CounterKind.MinusOneMinusOne (Filter.Type.And [])),
     -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this

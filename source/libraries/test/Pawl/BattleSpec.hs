@@ -131,6 +131,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TeamId as TeamId
@@ -1283,7 +1284,7 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
       s
       "one ability, conditioned on the last defense counter"
       (fmap TriggeredAbility.condition (Battle.triggeredAbilitiesOf siege))
-      [TriggerCondition.SelfLastCounterRemoved CounterKind.Defense]
+      [TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Defense Zone.Battlefield)]
   Spec.it s "CR 310.12b a battle with no battle types does not" $ do
     -- Rule 310.12b says "Sieges", not "battles", and this is the falsifier for
     -- gating the mint on the card type instead: the same real projection with its

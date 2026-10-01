@@ -316,6 +316,7 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
@@ -4397,9 +4398,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind _) -> counterKindFilters kind
   TriggerCondition.SelfBecomesClassLevel _ -> []
   -- CR 310.12b names a counter kind alone, swept for the arm above's reason.
-  TriggerCondition.SelfLastCounterRemoved kind -> counterKindFilters kind
+  TriggerCondition.SelfLastCounterRemoved removal -> counterKindFilters (SelfCountersRemoved.kind removal)
   -- And so does its any-amount mirror.
-  TriggerCondition.SelfCountersRemoved kind -> counterKindFilters kind
+  TriggerCondition.SelfCountersRemoved removal -> counterKindFilters (SelfCountersRemoved.kind removal)
   -- CR 603.2c's batch placement carries one, over the permanents the counters
   -- landed on -- swept like PermanentsDie's, so a card's "one or more creatures"
   -- is not exempt from the corpus filter lints. And its KIND beside it, for the

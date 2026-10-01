@@ -182,6 +182,7 @@ import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
@@ -8329,7 +8330,8 @@ handTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 -- UNGATED BY CR 113.6, which is the whole reason it is its own function: rule
 -- 702.62a states the zone itself, so the exile scan takes this list without
 -- asking `functionsIn` -- where the same scan does ask it of the card's PRINTED
--- abilities, which state no zone.
+-- abilities, which function in exile only where their condition states it (CR
+-- 113.6b, Benalish Commander's "while it's exiled").
 --
 -- Suspend's pair is ordered as rule 702.62a prints them, which is also the
 -- order they fire in: the upkeep removal takes the last counter off, and the
@@ -8980,6 +8982,9 @@ suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters 
 -- exiled with no time counters at all has nothing to trigger, which is CR
 -- 702.62b read from the other side.
 --
+-- The condition states exile, rule 702.62a's zone. Unread in practice: the
+-- exile scan takes `exileTriggeredAbilitiesOf` without asking `functionsIn`.
+--
 -- ONE MANDATORY clause: the "you may" governs the PLAY alone, which is
 -- Prompt.OfferedCast's own question (CR 608.2g), miracle's argument. Marking the
 -- clause optional would raise a second prompt for one printed "may".
@@ -9024,7 +9029,7 @@ suspendLastCounter keyword =
               OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
+        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved {SelfCountersRemoved.kind = CounterKind.Time, SelfCountersRemoved.zone = Zone.Exile}),
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -9505,7 +9510,7 @@ vanishingLastCounter :: TriggeredAbility Card (GrantedAbility.GrantedAbility Car
 vanishingLastCounter =
   let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}
    in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
+        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved {SelfCountersRemoved.kind = CounterKind.Time, SelfCountersRemoved.zone = Zone.Battlefield}),
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))

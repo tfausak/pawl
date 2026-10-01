@@ -107,6 +107,7 @@ import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -7959,7 +7960,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- recorded only where something actually came off, so an event that removed
   -- nothing is not in the log to match. That invariant is the record's, stated on
   -- the constructor, exactly as CountersPut's "before < after" is.
-  TriggerCondition.SelfLastCounterRemoved wanted -> maybe False ((==) 0 . snd) (countersRemovedFrom bearer wanted event)
+  TriggerCondition.SelfLastCounterRemoved removal -> maybe False ((==) 0 . snd) (countersRemovedFrom bearer (SelfCountersRemoved.kind removal) event)
   -- "Whenever one or more [kind] counters are removed from this permanent"
   -- (Chandra, Fire Artisan): the arm above's any-amount mirror, dropping every
   -- read of the AFTER count. Three of four loyalty counters coming off matches
@@ -7967,7 +7968,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   --
   -- No "one or more" conjunct either, and for the arm above's reason: the record
   -- exists only where something came off.
-  TriggerCondition.SelfCountersRemoved wanted -> Maybe.isJust (countersRemovedFrom bearer wanted event)
+  --
+  -- Not implemented: "whenever A [kind] counter is removed" (Protean Hydra)
+  -- triggering once per counter the removal took off (#4553).
+  TriggerCondition.SelfCountersRemoved removal -> Maybe.isJust (countersRemovedFrom bearer (SelfCountersRemoved.kind removal) event)
   -- CR 603.2c's PER-PERMANENT placement (Wickersmith's Tools' "whenever one or
   -- more -1/-1 counters are put on A CREATURE"): counters of this kind landed on
   -- a permanent the Filter admits. One event at a time, so a batch that touched

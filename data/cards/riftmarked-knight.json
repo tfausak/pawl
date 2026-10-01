@@ -1,50 +1,30 @@
 {
   "faces": [
     {
-      "characteristicPT": {
-        "type": "Count",
-        "value": {
-          "aggregation": {
-            "type": "Members"
-          },
-          "filter": {
-            "type": "And",
-            "value": [
-              {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Soldier"
-                }
-              },
-              {
-                "type": "ControlledBy",
-                "value": {
-                  "type": "You"
-                }
-              }
-            ]
-          },
-          "scope": {
-            "type": "InZone",
-            "value": {
-              "player": {
-                "type": "EachPlayer"
-              },
-              "zone": {
-                "type": "Battlefield"
-              }
-            }
-          }
-        }
-      },
       "keywords": [
+        {
+          "type": "Protection",
+          "value": {
+            "quality": {
+              "type": "HasColor",
+              "value": {
+                "type": "Black"
+              }
+            },
+            "spares": null
+          }
+        },
+        {
+          "type": "Flanking"
+        },
         {
           "type": "Suspend",
           "value": {
             "cost": {
               "mana": [
                 {
-                  "type": "Variable"
+                  "type": "Generic",
+                  "value": 1
                 },
                 {
                   "type": "OfType",
@@ -67,8 +47,8 @@
               ]
             },
             "counters": {
-              "type": "Variable",
-              "value": 1
+              "type": "Literal",
+              "value": 3
             }
           }
         }
@@ -76,7 +56,16 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         },
         {
           "type": "OfType",
@@ -88,17 +77,19 @@
           }
         }
       ],
-      "name": "Benalish Commander",
+      "name": "Riftmarked Knight",
       "power": {
-        "type": "Star"
+        "type": "Literal",
+        "value": 2
       },
       "toughness": {
-        "type": "Star"
+        "type": "Literal",
+        "value": 2
       },
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfCountersRemoved",
+            "type": "SelfLastCounterRemoved",
             "value": {
               "kind": {
                 "type": "Time"
@@ -122,22 +113,42 @@
                               {
                                 "colorIndicator": [
                                   {
-                                    "type": "White"
+                                    "type": "Black"
                                   }
                                 ],
-                                "name": "Soldier Token",
+                                "keywords": [
+                                  {
+                                    "type": "Haste"
+                                  },
+                                  {
+                                    "type": "Protection",
+                                    "value": {
+                                      "quality": {
+                                        "type": "HasColor",
+                                        "value": {
+                                          "type": "White"
+                                        }
+                                      },
+                                      "spares": null
+                                    }
+                                  },
+                                  {
+                                    "type": "Flanking"
+                                  }
+                                ],
+                                "name": "Knight Token",
                                 "power": {
                                   "type": "Literal",
-                                  "value": 1
+                                  "value": 2
                                 },
                                 "toughness": {
                                   "type": "Literal",
-                                  "value": 1
+                                  "value": 2
                                 },
                                 "typeLine": {
                                   "subtypes": [
                                     {
-                                      "type": "Soldier"
+                                      "type": "Knight"
                                     }
                                   ],
                                   "types": [
@@ -169,7 +180,10 @@
             "type": "Human"
           },
           {
-            "type": "Soldier"
+            "type": "Knight"
+          },
+          {
+            "type": "Rebel"
           }
         ],
         "types": [
