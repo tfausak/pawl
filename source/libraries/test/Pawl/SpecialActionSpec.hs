@@ -1860,8 +1860,8 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
 
 -- CR 113.6b: "an ability that states which zones it functions in functions only
 -- from those zones". "While it's exiled" is such a statement, so a suspended
--- card's own counter-removal triggers fire from exile, where CR 702.62b keeps it,
--- as suspend's upkeep ability takes each counter off.
+-- card's own counter-removal triggers fire from exile, where CR 702.62a's
+-- special action put it, as suspend's upkeep ability takes each counter off.
 --
 -- Libraries are stocked so nobody decks while the countdown runs (CR 104.3c).
 whileExiled :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
