@@ -6,22 +6,24 @@
           "cost": {
             "components": [
               {
-                "type": "Sacrifice",
+                "type": "SacrificeX",
                 "value": {
-                  "count": 1,
-                  "whichPermanents": {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Frog"
-                    }
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Squirrel"
                   }
                 }
               }
             ],
             "mana": [
               {
-                "type": "Generic",
-                "value": 2
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Black"
+                  }
+                }
               }
             ]
           },
@@ -32,28 +34,56 @@
                   {
                     "effects": [
                       {
-                        "type": "PutCounters",
+                        "type": "ModifyTarget",
                         "value": {
-                          "kind": {
-                            "type": "PlusOnePlusOne"
+                          "duration": {
+                            "type": "UntilEndOfTurn"
                           },
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 1
+                          "modification": {
+                            "type": "ModifyPowerToughness",
+                            "value": {
+                              "power": {
+                                "type": "InSlot",
+                                "value": "X"
+                              },
+                              "toughness": {
+                                "type": "Negate",
+                                "value": {
+                                  "type": "InSlot",
+                                  "value": "X"
+                                }
+                              }
+                            }
                           },
                           "ref": {
-                            "type": "EachMatching",
-                            "value": {
-                              "type": "IsSource"
-                            }
+                            "type": "InSlot",
+                            "value": "target"
                           }
                         }
                       }
                     ]
                   }
-                ]
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
               }
             ]
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Landwalk",
+          "value": {
+            "type": "HasSubtype",
+            "value": {
+              "type": "Forest"
+            }
           }
         }
       ],
@@ -72,10 +102,10 @@
           }
         }
       ],
-      "name": "Quina, Qu Gourmet",
+      "name": "Chatterfang, Squirrel General",
       "power": {
         "type": "Literal",
-        "value": 2
+        "value": 3
       },
       "replacementEffects": [
         {
@@ -88,7 +118,7 @@
                 }
               },
               "plus": {
-                "type": "One",
+                "type": "ThatMany",
                 "value": {
                   "faces": [
                     {
@@ -97,7 +127,7 @@
                           "type": "Green"
                         }
                       ],
-                      "name": "Frog Token",
+                      "name": "Squirrel Token",
                       "power": {
                         "type": "Literal",
                         "value": 1
@@ -109,7 +139,7 @@
                       "typeLine": {
                         "subtypes": [
                           {
-                            "type": "Frog"
+                            "type": "Squirrel"
                           }
                         ],
                         "types": [
@@ -133,7 +163,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Qu"
+            "type": "Squirrel"
+          },
+          {
+            "type": "Warrior"
           }
         ],
         "supertypes": [

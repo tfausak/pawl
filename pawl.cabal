@@ -1188,6 +1188,7 @@ library codec
     Pawl.Codec.TimestampSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
+    Pawl.Codec.TokenPlus
     Pawl.Codec.TokenR
     Pawl.Codec.TokenRSpec
     Pawl.Codec.TopOfLibrary
@@ -2481,6 +2482,7 @@ library types
     Pawl.Types.TimeTravelChoice
     Pawl.Types.TokenLot
     Pawl.Types.TokenPattern
+    Pawl.Types.TokenPlus
     Pawl.Types.TokenR
     Pawl.Types.TopOfLibrary
     Pawl.Types.TopOfLibraryUntil
