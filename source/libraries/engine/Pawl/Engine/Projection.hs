@@ -779,8 +779,16 @@ ruleAbilitiesOf oid gs = maybe (copiableRuleAbilitiesOf oid gs) PC.ruleAbilities
 -- CR 116.2: ruleAbilitiesOf's shape for special actions. Pawl.ProjectionSpec's
 -- "CR 612.6 the Shapeshifter as Leonin Arbiter offers its {2}" proves the
 -- full-text read.
+--
+-- CR 613.1f: an object whose abilities a layer-6 wipe removed grants none, in
+-- any zone. The fold's flag is asked only when there is an action to take away,
+-- so an object granting none costs no projection. Pawl.SpecialActionSpec's "CR
+-- 613.1f a Circling Vultures that perpetually lost all abilities cannot be
+-- discarded" proves it.
 specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
-specialActionsOf oid gs = maybe (copiableSpecialActionsOf oid gs) PC.specialActions (fullTextOf oid gs)
+specialActionsOf oid gs = case maybe (copiableSpecialActionsOf oid gs) PC.specialActions (fullTextOf oid gs) of
+  [] -> []
+  actions -> if PC.lostAllAbilities (project oid gs) then [] else actions
 
 -- CR 612.1: the word swaps a reader outside the fold applies to what
 -- ruleAbilitiesOf, specialActionsOf or PlayerEffect.playerAbilitiesOf handed

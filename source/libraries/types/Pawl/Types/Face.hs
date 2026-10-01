@@ -616,12 +616,12 @@ data Face card = MkFace
     -- | CR 116.2: the special actions this face's printed text grants -- CR
     -- 116.2e's "you may discard this card any time you could cast an instant"
     -- (Circling Vultures). WHERE it is read from is the reader's question and
-    -- differs per row. CR 116.2e's is read directly from the card: the ability
-    -- functions in the HAND (CR 113.6), where
-    -- Pawl.Engine.Action.discardableCards takes the printed card
-    -- (#1859). CR 116.2d's is read off the copiable snapshot
-    -- (Pawl.Engine.Projection.specialActionsOf), since a permanent that is
-    -- a copy grants what it copied (CR 707.2a).
+    -- differs per row. Both rows are read through
+    -- Pawl.Engine.Projection.specialActionsOf: the copiable snapshot, since a
+    -- permanent that is a copy grants what it copied (CR 707.2a), and nothing
+    -- once a layer-6 wipe has removed the object's abilities (CR 613.1f). CR
+    -- 116.2e's functions in the HAND (CR 113.6), where
+    -- Pawl.Engine.Action.discardableCards asks it.
     --
     -- A LIST rather than a flag, matching every neighbouring permission field:
     -- nothing in CR 116.2 caps how many such lines a face may print, and
