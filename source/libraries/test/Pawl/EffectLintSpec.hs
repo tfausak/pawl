@@ -56,6 +56,7 @@ import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -394,6 +395,7 @@ ownQuantities effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> Foldable.toList atMost
   Effect.RollDie rollDie -> RollDie.count rollDie : Maybe.maybeToList (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
@@ -1511,6 +1513,7 @@ effectObjectRefs effect =
         Effect.PlaySubgame {} -> []
         Effect.ChoosePlayer {} -> []
         Effect.ChoosePlayerAtRandom {} -> []
+        Effect.ChoosePermanents {} -> []
         Effect.RollDie {} -> []
         Effect.FlipCoin {} -> []
         Effect.TakeExtraTurn {} -> []

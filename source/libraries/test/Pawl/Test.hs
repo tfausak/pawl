@@ -122,6 +122,7 @@ import qualified Pawl.Codec.CheckSpec
 import qualified Pawl.Codec.ChoicesSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChooseNumberSpec
+import qualified Pawl.Codec.ChoosePermanentsSpec
 import qualified Pawl.Codec.ChoosePlayerAtRandomSpec
 import qualified Pawl.Codec.ChoosePlayerSpec
 import qualified Pawl.Codec.ChooserSpec
@@ -166,6 +167,7 @@ import qualified Pawl.Codec.CostBasisSpec
 import qualified Pawl.Codec.CostChoiceSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostDirectionSpec
+import qualified Pawl.Codec.CostKeywordSpec
 import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
 import qualified Pawl.Codec.CostSpec
@@ -917,6 +919,7 @@ spec s registry = do
   Pawl.Codec.CharacteristicPTSpec.spec s
   Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooseNumberSpec.spec s
+  Pawl.Codec.ChoosePermanentsSpec.spec s
   Pawl.Codec.ChoosePlayerAtRandomSpec.spec s
   Pawl.Codec.ChoosePlayerSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
@@ -959,6 +962,7 @@ spec s registry = do
   Pawl.Codec.CostChoiceSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostDirectionSpec.spec s
+  Pawl.Codec.CostKeywordSpec.spec s
   Pawl.Codec.CostReductionSpec.spec s
   Pawl.Codec.CostScaleSpec.spec s
   Pawl.Codec.CostSpec.spec s

@@ -2796,7 +2796,7 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
 -- flashback ability is a LITERAL cost and nothing else. Lier, Disciple of the
 -- Drowned is the other producer of a graveyard card holding two -- its grant
 -- states rule 702.34a's cost as "equal to that card's mana cost"
--- (Modification.GainFlashbackAtManaCost), which lierSpec below proves, and which
+-- (Modification.GainKeywordAtManaCost), which lierSpec below proves, and which
 -- Archmage's Newt and Iroh, Grand Lotus each state for one class of card beside
 -- a literal cost for another.
 --
@@ -2956,7 +2956,7 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
 -- has flashback. The flashback cost is equal to that card's mana cost."
 --
 -- CR 702.34a's [cost] read off the RECEIVING card rather than written on the
--- granter, which is Modification.GainFlashbackAtManaCost's whole reason: the
+-- granter, which is Modification.GainKeywordAtManaCost's whole reason: the
 -- grant is card data and cannot name the mana cost of a card it has not met, so
 -- Pawl.Engine.Projection.applyModification materialises the keyword against the
 -- object it is applying to.
@@ -3088,8 +3088,8 @@ lierSpec s registry = Spec.describe s "Lier" $ do
 -- permanent, or card" -- and CR 400.7 is not in play, nothing here changing zone.
 --
 -- BOTH SLOTS name graveyard cards, where a permanent would read more naturally
--- as the original: Lier is the pool's only granter of
--- Modification.GainFlashbackAtManaCost and its static ability reaches instant and
+-- as the original: Lier is the pool's only static granter of a flashback
+-- priced at the card's own mana cost, and its static ability reaches instant and
 -- sorcery cards only (CR 702.34a), so a subject that copied a CREATURE would lose
 -- the grant and the board could show nothing at all. Opposite graveyards (CR
 -- 400.1) rather than an "another target card" restriction, since that is what

@@ -284,6 +284,8 @@ library codec
     Pawl.Codec.ChooseCardName
     Pawl.Codec.ChooseNumber
     Pawl.Codec.ChooseNumberSpec
+    Pawl.Codec.ChoosePermanents
+    Pawl.Codec.ChoosePermanentsSpec
     Pawl.Codec.ChoosePlayer
     Pawl.Codec.ChoosePlayerAtRandom
     Pawl.Codec.ChoosePlayerAtRandomSpec
@@ -376,6 +378,8 @@ library codec
     Pawl.Codec.CostComponentSpec
     Pawl.Codec.CostDirection
     Pawl.Codec.CostDirectionSpec
+    Pawl.Codec.CostKeyword
+    Pawl.Codec.CostKeywordSpec
     Pawl.Codec.CostReduction
     Pawl.Codec.CostReductionSpec
     Pawl.Codec.CostScale
@@ -1962,6 +1966,7 @@ library types
     Pawl.Types.ChooseBetween
     Pawl.Types.ChooseCardName
     Pawl.Types.ChooseNumber
+    Pawl.Types.ChoosePermanents
     Pawl.Types.ChoosePlayer
     Pawl.Types.ChoosePlayerAtRandom
     Pawl.Types.Chooser
@@ -2015,6 +2020,7 @@ library types
     Pawl.Types.CostChoice
     Pawl.Types.CostComponent
     Pawl.Types.CostDirection
+    Pawl.Types.CostKeyword
     Pawl.Types.CostReduction
     Pawl.Types.CostScale
     Pawl.Types.Count

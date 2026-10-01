@@ -53,6 +53,7 @@ import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
+import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -266,10 +267,10 @@ rewriteModification pairs m =
         -- is CR 612.3. Filter.rewriteKeyword since the word is inside a Filter; no
         -- family gate is restated there -- the word's use is its family.
         Modification.GainKeyword k -> Modification.GainKeyword (Filter.rewriteKeyword [(from, to)] k)
-        -- Carries no word: the keyword is rule 702.34a's and the cost is the
+        -- Carries no word: the keyword is rule 702's and the cost is the
         -- RECEIVER's mana cost, so neither half is text a pair could name --
         -- SetLandSubtypeToChosen's answer for the same reason.
-        Modification.GainFlashbackAtManaCost -> acc
+        Modification.GainKeywordAtManaCost _ -> acc
         -- CR 612.1 through the granted enchant's own Filter, which is text
         -- printed on the GRANTER (CR 612.3) exactly as the keyword above is.
         -- rewriteTargetSlot is the same descent a mode's target slots take.
@@ -932,6 +933,8 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.ChoosePlayer _ -> effect
   Effect.ChoosePlayerAtRandom _ -> effect
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents chooser (AnyNumberMatching.MkAnyNumberMatching f n) slot) ->
+    Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents chooser (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n)) slot)
   -- CR 706.1's number of sides is a numeral rather than a computed count; how
   -- many dice, and the modifier added to each result, are the Quantities,
   -- PutCounters' descent above. The slots no word rule 612 can swap.

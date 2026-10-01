@@ -1,17 +1,22 @@
 {
   "faces": [
     {
+      "keywords": [
+        {
+          "type": "Fear"
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 4
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Blue"
+              "type": "Black"
             }
           }
         },
@@ -20,29 +25,15 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Blue"
+              "type": "Black"
             }
           }
         }
       ],
-      "name": "Lier, Disciple of the Drowned",
-      "playerAbilities": [
-        {
-          "effect": {
-            "type": "CantBeCountered",
-            "value": {
-              "type": "And",
-              "value": []
-            }
-          },
-          "scope": {
-            "type": "EachPlayer"
-          }
-        }
-      ],
+      "name": "Wire Surgeons",
       "power": {
         "type": "Literal",
-        "value": 3
+        "value": 6
       },
       "staticAbilities": [
         {
@@ -64,21 +55,16 @@
                   }
                 },
                 {
-                  "type": "Or",
-                  "value": [
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Instant"
-                      }
-                    },
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Sorcery"
-                      }
-                    }
-                  ]
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
                 }
               ]
             }
@@ -87,7 +73,7 @@
             {
               "type": "GainKeywordAtManaCost",
               "value": {
-                "type": "Flashback"
+                "type": "Encore"
               }
             }
           ]
@@ -95,20 +81,15 @@
       ],
       "toughness": {
         "type": "Literal",
-        "value": 4
+        "value": 5
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Human"
+            "type": "Artificer"
           },
           {
-            "type": "Wizard"
-          }
-        ],
-        "supertypes": [
-          {
-            "type": "Legendary"
+            "type": "Human"
           }
         ],
         "types": [

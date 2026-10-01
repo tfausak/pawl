@@ -55,6 +55,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DealDamage as DealDamage
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -3622,6 +3623,84 @@ teferiUntapSpec s registry =
               Spec.assertEqWith s "the player was asked" (length asked) 1
             Nothing -> Spec.assertFailure s "Teferi prints a +1"
 
+-- Archfiend of Depravity {3}{B}{B} Creature -- Demon 5/4: "Flying / At the
+-- beginning of each opponent's end step, that player chooses up to two creatures
+-- they control, then sacrifices the rest." (Oracle text checked against
+-- api.scryfall.com 2026-09-30.) CR 608.2d's plural choice made by a seat other
+-- than the ability's controller: Effect.ChoosePermanents.
+--
+-- Three seats, so "that player" is not merely "an opponent": alice controls the
+-- Archfiend, it is bob's end step, and carol's three creatures are neither
+-- offered nor sacrificed. Bob has three, one more than the ceiling.
+archfiendOfDepravitySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+archfiendOfDepravitySpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      -- Records every ChooseAnyNumberOfPermanents as (decider, candidates,
+      -- ceiling) and answers with the first and third candidates.
+      answering :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ObjectId.ObjectId], Maybe Natural)] r
+      answering p = case p of
+        Prompt.ChooseAnyNumberOfPermanents decider _ _ candidates atMost -> do
+          State.modify (<> [(Decider.unwrap decider, candidates, atMost)])
+          pure (Set.fromList [c | (i, c) <- zip [0 :: Int ..] candidates, i /= 1])
+        _ -> pure (S.identityAnswer p)
+   in Spec.describe s "ArchfiendOfDepravity"
+        . Spec.it s "CR 608.2d that player chooses the two they keep and sacrifices the rest"
+        $ do
+          archfiend <- S.printingOf s registry "Archfiend of Depravity"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (archfiendId, g0) = S.addPermanent archfiend S.alice (Setup.emptyGame S.threePlayers)
+              addCreature (ids, g) pid = let (oid, g') = S.addPermanent piker pid g in (ids <> [oid], g')
+              (bobs, g1) = List.foldl' addCreature ([], g0) [S.bob, S.bob, S.bob]
+              (carols, g2) = List.foldl' addCreature ([], g1) [S.carol, S.carol, S.carol]
+              gs = g2 {GameState.phase = endStep, GameState.activePlayer = S.bob, GameState.turnNumber = 2}
+              began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.bob)) gs
+              settled = S.runPure S.identityAnswer began Engine.settleForPriority
+              (after, asked) = State.runState (fmap snd (Engine.runGame answering settled Engine.priorityLoop)) []
+          Spec.assertEqWith
+            s
+            "bob's first and third creatures, carol's three and the Archfiend are left; bob's second is sacrificed"
+            (fmap (`S.onBattlefield` after) (bobs <> carols <> [archfiendId]))
+            [True, False, True, True, True, True, True]
+          Spec.assertEqWith s "bob alone was asked, offered his three, at most two" asked [(S.bob, bobs, Just 2)]
+
+-- Covetous Elegy {4}{W}{B} Sorcery: "Each player chooses up to two creatures
+-- they control, then sacrifices the rest. Then you create a tapped Treasure token
+-- for each creature your opponents control." (Oracle text checked against
+-- api.scryfall.com 2026-09-30.) Effect.ChoosePermanents in an Effect.ForEach
+-- over the players, the loop's union of the picks then spared by one Sacrifice.
+--
+-- Three seats, each answering with every candidate but the second: alice's lone
+-- creature is kept, bob and carol each lose their second of three.
+covetousElegySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+covetousElegySpec s registry =
+  let answering :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ObjectId.ObjectId])] r
+      answering p = case p of
+        Prompt.ChooseAnyNumberOfPermanents decider _ _ candidates _ -> do
+          State.modify (<> [(Decider.unwrap decider, candidates)])
+          pure (Set.fromList [c | (i, c) <- zip [0 :: Int ..] candidates, i /= 1])
+        _ -> pure (S.identityAnswer p)
+      tappedTokens gs = length [t | t <- S.tokensOf gs, fmap Object.tapped (Game.lookupObject t gs) == Just TapState.Tapped]
+   in Spec.describe s "CovetousElegy"
+        . Spec.it s "CR 101.4 each player keeps the two they chose; alice gets a Treasure per opposing survivor"
+        $ do
+          elegy <- S.printingOf s registry "Covetous Elegy"
+          piker <- S.printingOf s registry "Goblin Piker"
+          plains <- S.printingOf s registry "Plains"
+          swamp <- S.printingOf s registry "Swamp"
+          let addCreature (ids, g) pid = let (oid, g') = S.addPermanent piker pid g in (ids <> [oid], g')
+              lands = S.landsFor swamp S.alice 3 (S.landsFor plains S.alice 3 S.threePlayerGame)
+              (alices, g0) = addCreature ([], lands) S.alice
+              (bobs, g1) = List.foldl' addCreature ([], g0) [S.bob, S.bob, S.bob]
+              (carols, g2) = List.foldl' addCreature ([], g1) [S.carol, S.carol, S.carol]
+              (withSpell, spell) = S.handOne elegy g2
+              gs = withSpell {GameState.priority = Just S.alice}
+              (after, asked) = State.runState (fmap snd (Engine.runGame answering gs (S.cast S.alice spell >> Stack.resolveTop))) []
+          Spec.assertEqWith
+            s
+            "survivors, then who was asked over what, then alice's tapped Treasures"
+            (fmap (`S.onBattlefield` after) (alices <> bobs <> carols), asked, tappedTokens after)
+            ([True, True, False, True, True, False, True], [(S.alice, alices), (S.bob, bobs), (S.carol, carols)], 4)
+
 -- Come Back Wrong {2}{B} Sorcery (DSK 86): "Destroy target creature. If a
 -- creature card is put into a graveyard this way, return it to the battlefield
 -- under your control. Sacrifice it at the beginning of your next end step."
@@ -4150,6 +4229,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   elvishPiperSpec s registry
   gloriousProtectorSpec s registry
   teferiUntapSpec s registry
+  archfiendOfDepravitySpec s registry
+  covetousElegySpec s registry
   banisherPriestSpec s registry
   levelerSpec s registry
   calderaBreakerSpec s registry

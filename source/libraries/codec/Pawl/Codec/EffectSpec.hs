@@ -21,6 +21,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
@@ -37,6 +38,7 @@ import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChooseNumber as ChooseNumber
+import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -2176,6 +2178,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ChoosePlayerAtRandom (ChoosePlayerAtRandom.MkChoosePlayerAtRandom PlayerScope.Opponents (SlotName.MkSlotName (Text.pack "opponent"))))
       " {\"type\":\"ChoosePlayerAtRandom\",\"value\":{\"scope\":{\"type\":\"Opponents\"},\"slot\":\"opponent\"}} "
+  Spec.it s "ChoosePermanents" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Creature) (Just (Quantity.Literal 2))) (SlotName.MkSlotName (Text.pack "chosen"))))
+      " {\"type\":\"ChoosePermanents\",\"value\":{\"chooser\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"permanents\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"atMost\":{\"type\":\"Literal\",\"value\":2}},\"slot\":\"chosen\"}} "
   Spec.it s "RollDie" $
     Common.assertJsonCodec
       s
