@@ -962,9 +962,8 @@ attackingCreatures = SlotName.MkSlotName (Text.pack "thoseAttackingCreatures")
 -- gathered.
 --
 -- "The attacking player" (Norn's Decree) and "that player" (Archnemesis) are the
--- printed phrases. Norn's Decree reads it under CR 508.3d; Archnemesis is not
--- writable yet (#2931), so data/cards/synthetic-reprisal-ledger.json exercises
--- the CR 508.3e half.
+-- printed phrases: Norn's Decree reads it under CR 508.3d, Archnemesis under
+-- CR 508.3e.
 --
 -- Distinct from `triggerPlayer`, and that is why it exists: under CR 508.3e both
 -- players are subjects at once, and that slot already carries the ATTACKED one

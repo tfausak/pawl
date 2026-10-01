@@ -6,6 +6,7 @@ import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
+import qualified Pawl.Types.AttackedPlayer as AttackedPlayer
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
@@ -344,13 +345,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.You PlayerRelation.AnyPlayer))
-      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"You\"},\"attacked\":{\"type\":\"AnyPlayer\"}}} "
+      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.You (AttackedPlayer.Related PlayerRelation.AnyPlayer)))
+      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"You\"},\"attacked\":{\"type\":\"Related\",\"value\":{\"type\":\"AnyPlayer\"}}}} "
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.Opponent PlayerRelation.You))
-      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"Opponent\"},\"attacked\":{\"type\":\"You\"}}} "
+      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.Opponent (AttackedPlayer.Related PlayerRelation.You)))
+      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"Opponent\"},\"attacked\":{\"type\":\"Related\",\"value\":{\"type\":\"You\"}}}} "
   -- CR 508.3b, nullary for the sibling above's reason and one of its own: the
   -- subject is whom the ability's own source is attached to.
   Spec.it s "AttachedPlayerIsAttacked" $

@@ -1,5 +1,6 @@
 module Pawl.Types.PlayerAttacksPlayer where
 
+import qualified Pawl.Types.AttackedPlayer as AttackedPlayer
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
 -- | CR 508.3e: which player's declaration fires the ability, and which player
@@ -11,6 +12,6 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 -- either order at every pattern site.
 data PlayerAttacksPlayer = MkPlayerAttacksPlayer
   { attacker :: PlayerRelation.PlayerRelation,
-    attacked :: PlayerRelation.PlayerRelation
+    attacked :: AttackedPlayer.AttackedPlayer
   }
   deriving (Eq, Ord, Show)
