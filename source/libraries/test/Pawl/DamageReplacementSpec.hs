@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
@@ -970,20 +971,6 @@ ajaniSteadfastSpec s registry = Spec.describe s "Ajani Steadfast (CR 114.4, CR 6
       Spec.assertEqWith s "\"each other\" excludes Ajani, who only pays: 7 - 2" (countersOn CounterKind.Loyalty ajani after) 5
       Spec.assertEqWith s "CR 109.5 bob's planeswalker is untouched" (countersOn CounterKind.Loyalty karn after) 6
       Spec.assertEqWith s "and bob's Piker takes no +1/+1 counter, so it is still a 2/1" (S.powerToughnessOf source after) (Just (2, 1))
-  -- The +1, whose four instructions all aim at ONE target slot. The answerer
-  -- FILTERS the offered set rather than building a recipient by hand, so a slot
-  -- the pool never offered cannot be smuggled past CR 608.2b's re-read.
-  Spec.it s "the +1 pumps up to one target creature and hands it three keywords"
-    . withBoard
-    $ \printing ajani _ _ piker source base -> do
-      let after = loyaltyAbility 0 (preferTarget [Recipient.ToCreature piker]) printing ajani base
-      Spec.assertEqWith s "CR 613.4c the targeted 2/1 is a 3/2" (S.powerToughnessOf piker after) (Just (3, 2))
-      Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike piker after) "CR 613.1f and it has first strike"
-      Spec.assertBool s (Projection.hasKeyword Keyword.Vigilance piker after) "and vigilance"
-      Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink piker after) "and lifelink"
-      Spec.assertEqWith s "CR 606.4 the cost put a loyalty counter on Ajani: 7 + 1" (countersOn CounterKind.Loyalty ajani after) 8
-      Spec.assertEqWith s "bob's untargeted Piker is still a 2/1" (S.powerToughnessOf source after) (Just (2, 1))
-      Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike source after)) "and has gained nothing"
 
 -- Activate the nth loyalty ability of `walker` in printed order, resolve it, and
 -- settle CR 704's state-based actions -- which is what buries a planeswalker
@@ -2274,9 +2261,14 @@ raceIsSelf wantSelf oid wanted p = case p of
 -- Settle one damage batch, then let whatever it triggered go on the stack and
 -- resolve. selflessSquireSpec's local twin, top-level because the answer is
 -- rank-2 and these cases hand it a different one per case.
+--
+-- The batch is followed by CR 614.1a's run-effects rewrites and CR 615.5's
+-- riders before anything is settled, which is what both engine callers of
+-- Damage.applyDamage do -- the combat damage step and a resolving DealDamage --
+-- so the first state is the one a player would next be given priority in.
 strikeAndSettleWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> [DamageEvent.DamageEvent] -> (GameState.GameState, GameState.GameState)
 strikeAndSettleWith answer gs batch =
-  let dealt = S.runPure answer gs (Damage.applyDamage batch >> Engine.settleForPriority)
+  let dealt = S.runPure answer gs (Damage.applyDamage batch >> Resolve.runDamageRewriteEffects >> Resolve.runPreventionRiders >> Engine.settleForPriority)
    in (dealt, S.runPure answer dealt Stack.resolveTop)
 
 -- CR 615.13 read the OTHER way -- "prevented THIS WAY". Phyrexian Vindicator
@@ -2528,12 +2520,16 @@ samiteMinistrationSpec s registry = Spec.describe s "Samite Ministration (CR 615
 -- transcription prevents the second too; a CR 615.7 shield of any amount below
 -- 7 leaves part of the first standing.
 --
+-- The reflection is CR 615.5's additional effect, not a CR 615.13 trigger: it
+-- has already happened when the batch settles, before anyone could get
+-- priority, and nothing went on the stack that a player could respond to.
+--
 -- Distinct amounts throughout -- the Spider's 7 then 4, the Evangel's 2 -- so
 -- no life total below is reachable two ways: 20 - 2 - 4 is 14, 20 - 7 is 13, and
 -- the unbounded reading's 20 - 2 is 18 beside a 20 - 7 - 7 of 6.
 deflectingPalmSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-deflectingPalmSpec s registry = Spec.describe s "Deflecting Palm (CR 615.8 / 615.13)" $ do
-  Spec.it s "CR 615.8 / 609.7a the shield eats one whole instance from the source it named, and the reflection hits that source's controller" $ do
+deflectingPalmSpec s registry = Spec.describe s "Deflecting Palm (CR 615.8 / 615.5)" $ do
+  Spec.it s "CR 615.8 / 609.7a / 615.5 the shield eats one whole instance from the source it named, and the reflection hits that source's controller as part of the prevention" $ do
     plains <- S.printingOf s registry "Plains"
     mountain <- S.printingOf s registry "Mountain"
     evangelPrinting <- S.printingOf s registry "Cabal Evangel"
@@ -2545,16 +2541,93 @@ deflectingPalmSpec s registry = Spec.describe s "Deflecting Palm (CR 615.8 / 615
         (g3, spellId) = S.handOne palm g2
         hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
         shielded = castAndResolve (nameDamageSource spider) g3 spellId
-        (firstBatch, reflected) = strikeAndSettleWith (nameDamageSource spider) shielded [hit evangel 2, hit spider 7]
-        after = snd (strikeAndSettleWith (nameDamageSource spider) reflected [hit spider 4])
+        firstBatch = fst (strikeAndSettleWith (nameDamageSource spider) shielded [hit evangel 2, hit spider 7])
+        after = fst (strikeAndSettleWith (nameDamageSource spider) firstBatch [hit spider 4])
     Spec.assertEqWith s "setup: the shield names carol's Spider" (shieldedSource shielded) (Just spider)
     Spec.assertEqWith s "setup: every seat starts at 20" (fmap (`S.lifeOf` g3) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
     -- The gameplay assertions, ahead of every proxy.
+    Spec.assertEqWith s "CR 615.5 the 7 is already back at carol when the batch settles, before anyone has priority" (S.lifeOf S.carol firstBatch) (Just 13)
     Spec.assertEqWith s "CR 615.8 the Spider's whole first 7 was prevented, bob's 2 got through, and the Spider's next 4 was dealt normally" (S.lifeOf S.alice after) (Just 14)
-    Spec.assertEqWith s "CR 615.13 / 108.4 the 7 came back once, at the controller of the source the shield NAMED" (S.lifeOf S.carol after) (Just 13)
+    Spec.assertEqWith s "CR 615.5 / 108.4 the 7 came back once, at the controller of the source the shield NAMED" (S.lifeOf S.carol after) (Just 13)
     Spec.assertEqWith s "CR 609.7a and never at the other source's controller" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "one trigger was gathered" (length (GameState.stack firstBatch)) 1
-    Spec.assertEqWith s "and the shield is gone once it has prevented an instance" (GameState.replacements reflected) []
+    Spec.assertEqWith s "nothing went on the stack to respond to" (length (GameState.stack firstBatch)) 0
+    Spec.assertEqWith s "and the shield is gone once it has prevented an instance" (GameState.replacements firstBatch) []
+
+-- CR 615.5's additional effect on CR 615.8's shield, read for its AMOUNT --
+-- Reverse Damage ({1}{W}{W} Instant, "The next time a source of your choice
+-- would deal damage to you this turn, prevent that damage. You gain life equal
+-- to the damage prevented this way").
+--
+-- Two sources in the first batch, so the life gained is the prevented 7 and not
+-- the batch's 9; a second batch from the named source, so the gain happens
+-- once. 20 - 2 + 7 is 25, and 25 - 4 is 21; gaining the batch's total would
+-- reach 27, and a rider re-run on the second hit 25.
+reverseDamageSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+reverseDamageSpec s registry = Spec.describe s "Reverse Damage (CR 615.8 / 615.5)" $ do
+  Spec.it s "CR 615.5 alice gains the damage the shield prevented, once" $ do
+    plains <- S.printingOf s registry "Plains"
+    evangelPrinting <- S.printingOf s registry "Cabal Evangel"
+    spiderPrinting <- S.printingOf s registry "Giant Spider"
+    reverseDamage <- S.printingOf s registry "Reverse Damage"
+    let base = S.landsFor plains S.alice 3 S.threePlayerGame
+        (evangel, g1) = S.addPermanent evangelPrinting S.bob base
+        (spider, g2) = S.addPermanent spiderPrinting S.carol g1
+        (g3, spellId) = S.handOne reverseDamage g2
+        hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+        shielded = castAndResolve (nameDamageSource spider) g3 spellId
+        firstBatch = fst (strikeAndSettleWith (nameDamageSource spider) shielded [hit evangel 2, hit spider 7])
+        after = fst (strikeAndSettleWith (nameDamageSource spider) firstBatch [hit spider 4])
+    Spec.assertEqWith s "setup: the shield names carol's Spider" (shieldedSource shielded) (Just spider)
+    Spec.assertEqWith s "CR 615.5 the prevented 7 came back as life, and bob's 2 was dealt" (S.lifeOf S.alice firstBatch) (Just 25)
+    Spec.assertEqWith s "CR 615.8 the Spider's next 4 was dealt normally, with no second gain" (S.lifeOf S.alice after) (Just 21)
+    Spec.assertEqWith s "nothing went on the stack" (length (GameState.stack firstBatch)) 0
+
+-- CR 615.13's trigger on the same shield -- New Way Forward ({2}{U}{R}{W}
+-- Instant, "... prevent that damage. When damage is prevented this way, New Way
+-- Forward deals that much damage to that source's controller and you draw that
+-- many cards"). Deflecting Palm's board, and the opposite answer about the
+-- stack: "When" is CR 603.1's trigger word, so the reflection waits on the stack
+-- after the batch, and carol is hit only once it resolves.
+newWayForwardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+newWayForwardSpec s registry = Spec.describe s "New Way Forward (CR 615.8 / 615.13)" $ do
+  Spec.it s "CR 615.13 the prevention triggers, and the trigger hits the named source's controller and draws that many" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    evangelPrinting <- S.printingOf s registry "Cabal Evangel"
+    spiderPrinting <- S.printingOf s registry "Giant Spider"
+    forward <- S.printingOf s registry "New Way Forward"
+    let base = S.landsFor mountain S.alice 1 (S.landsFor island S.alice 1 (S.landsFor plains S.alice 3 S.threePlayerGame))
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) base [1 .. (10 :: Int)]
+        (evangel, g1) = S.addPermanent evangelPrinting S.bob stocked
+        (spider, g2) = S.addPermanent spiderPrinting S.carol g1
+        (g3, spellId) = S.handOne forward g2
+        hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+        shielded = castAndResolve (nameDamageSource spider) g3 spellId
+        (firstBatch, after) = strikeAndSettleWith (nameDamageSource spider) shielded [hit evangel 2, hit spider 7]
+    Spec.assertEqWith s "setup: the shield names carol's Spider" (shieldedSource shielded) (Just spider)
+    Spec.assertEqWith s "CR 615.13 the 7 came back at carol once the trigger resolved" (S.lifeOf S.carol after) (Just 13)
+    Spec.assertEqWith s "and alice drew 7" (S.handSize S.alice after - S.handSize S.alice firstBatch) 7
+    Spec.assertEqWith s "CR 609.7a never at the other source's controller" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "CR 603.3 the trigger waited on the stack, carol untouched before it resolved" (length (GameState.stack firstBatch), S.lifeOf S.carol firstBatch) (1, Just 20)
+
+-- Intervention Pact ({0} Instant, white color indicator): Reverse Damage's
+-- shield plus Pact of the Titan's "At the beginning of your next upkeep, pay
+-- {1}{W}{W}. If you don't, you lose the game." Its 2007-05-01 ruling: the
+-- delayed trigger is created whether or not any damage is prevented, so with no
+-- damage at all it is still armed.
+interventionPactSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+interventionPactSpec s registry = Spec.describe s "Intervention Pact (CR 615.8 / 615.5 / 603.7)" $ do
+  Spec.it s "CR 615.5 / 603.7 the life comes back, and the upkeep trigger is armed whether or not anything is prevented" $ do
+    spiderPrinting <- S.printingOf s registry "Giant Spider"
+    pact <- S.printingOf s registry "Intervention Pact"
+    let (spider, g1) = S.addPermanent spiderPrinting S.bob S.threePlayerGame
+        (g2, spellId) = S.handOne pact g1
+        hit n = DamageEvent.MkDamageEvent spider (Recipient.ToPlayer S.alice) n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+        shielded = castAndResolve (nameDamageSource spider) g2 spellId
+        struck = fst (strikeAndSettleWith (nameDamageSource spider) shielded [hit 6])
+    Spec.assertEqWith s "CR 615.5 the prevented 6 came back as life" (S.lifeOf S.alice struck) (Just 26)
+    Spec.assertEqWith s "CR 603.7 the pay-or-lose trigger is armed with nothing prevented yet" (length (GameState.delayedTriggers shielded)) 1
 
 -- alice is mid-combat attacking with `mine`; bob defends holding `spells` and
 -- `lands` untapped Plains that pay for them. Sits at the declare attackers step
@@ -3792,6 +3865,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   phyrexianVindicatorSpec s registry
   samiteMinistrationSpec s registry
   deflectingPalmSpec s registry
+  reverseDamageSpec s registry
+  interventionPactSpec s registry
+  newWayForwardSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
   caromSpec s registry

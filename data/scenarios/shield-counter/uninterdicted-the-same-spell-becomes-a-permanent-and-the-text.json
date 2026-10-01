@@ -1,0 +1,52 @@
+{
+  "description": "uninterdicted, the same spell becomes a permanent and the text change rides across",
+  "note": "The control for the interdicted twin, and the positive half of CR 400.7a: without Synthetic Entry Interdiction the Giant Spider spell becomes a permanent, and Artificial Evolution's Spider-to-Vampire swap, made on the spell, rides across to it. CR 612.1 replaces the word, so the permanent is a Vampire and no longer a Spider. The boards differ only in the interdiction; Queen's Bay Paladin is still cast, and its trigger finds no Vampire card in the graveyard.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Island", "label": "island-1", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true },
+          { "card": "Island", "label": "island-3", "ready": true },
+          { "card": "Island", "label": "island-4", "ready": true },
+          { "card": "Swamp", "label": "swamp-1", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true },
+          { "card": "Swamp", "label": "swamp-4", "ready": true },
+          { "card": "Swamp", "label": "swamp-5", "ready": true },
+          { "card": "Swamp", "label": "swamp-6", "ready": true },
+          { "card": "Swamp", "label": "swamp-7", "ready": true }
+        ],
+        "hand": [
+          { "card": "Giant Spider", "label": "spider" },
+          { "card": "Artificial Evolution", "label": "evolution" },
+          { "card": "Queen's Bay Paladin", "label": "paladin" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@spider", "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Giant Spider"], "mana": ["@island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Artificial Evolution", "do": { "ChooseTypeSwap": { "from": { "type": "Spider" }, "to": { "type": "Vampire" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@paladin", "mana": ["@swamp-1", "@swamp-2", "@swamp-3", "@swamp-4", "@swamp-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Giant Spider", "count": 1 } },
+    { "Subtypes": { "object": "Giant Spider", "subtypes": ["Vampire"] } }
+  ]
+}

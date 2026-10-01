@@ -1,0 +1,32 @@
+{
+  "description": "CR 613.1f \"they gain haste\" reaches BOTH minted tokens",
+  "note": "Salt Road Skirmish's \"they gain haste\" reads the group of two Warriors its Create bound, through ObjectRef.InSlot. Before InSlot could see a group binding the sentence granted haste to nobody while the tokens still appeared and were still sacrificed, so only the keyword checks discriminate. Bob's Rats is the only creature, so it is the Skirmish's target.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Swamp", "label": "swamp-4" }
+        ],
+        "hand": [{ "card": "Salt Road Skirmish", "label": "skirmish" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Typhoid Rats", "label": "rats" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@skirmish", "targets": ["@rats"], "mana": ["@swamp", "@swamp-2", "@swamp-3", "@swamp-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "Warrior Token", "keyword": { "type": "Haste" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "Warrior Token#2", "keyword": { "type": "Haste" }, "count": 1 } } }
+  ]
+}

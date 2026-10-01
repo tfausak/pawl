@@ -1,0 +1,38 @@
+{
+  "description": "CR 612.2a whole card: an evolved Dragon Fodder mints Elves, name and all",
+  "note": "Dragon Fodder creates two 1/1 Goblin tokens; an Artificial Evolution resolved at the spell on the stack swaps Goblin for Elf. Both halves of CR 612.2a move: the tokens are Elves on the type line and, since CR 111.4 names a token for its subtypes, named Elf Token. Two Mountains and two Islands so the Fodder's generic cost cannot strand the Evolution's blue.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" }
+        ],
+        "hand": [
+          { "card": "Dragon Fodder", "label": "fodder" },
+          { "card": "Artificial Evolution", "label": "evolution" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fodder", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Dragon Fodder"], "mana": ["@island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Goblin" }, "to": { "type": "Elf" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Elf Token", "Elf Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elf Token", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Elf Token", "subtypes": ["Elf"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Elf Token#2", "subtypes": ["Elf"] } } }
+  ]
+}

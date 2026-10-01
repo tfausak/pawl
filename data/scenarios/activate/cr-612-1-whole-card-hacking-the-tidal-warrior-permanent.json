@@ -1,0 +1,43 @@
+{
+  "description": "CR 612.1 whole card: hacking the Tidal Warrior PERMANENT makes its target a Swamp",
+  "note": "Magical Hack swaps Island for Swamp on the Tidal Warrior PERMANENT after its spell resolved: CR 612.1 reaches its activated ability, printed in its text box, so \"target land becomes an Island\" makes the Forest a Swamp. CR 113.7a fixes an ability's text as it is put on the stack, so the rewrite reaches the ability where it is enumerated. alice taps the Warrior on her next turn, after summoning sickness wears off; two Islands pay the two {U}.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" }
+        ],
+        "hand": [
+          { "card": "Tidal Warrior", "label": "warrior" },
+          { "card": "Magical Hack", "label": "hack" }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@warrior", "mana": ["@island1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["Tidal Warrior"], "mana": ["@island2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "Tidal Warrior", "targets": ["@forest"], "mana": [null] } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "@forest", "subtypes": ["Swamp"] } } }
+  ]
+}

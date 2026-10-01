@@ -321,7 +321,7 @@ ownQuantities effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ _) -> durationQuantities duration
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _) -> durationQuantities duration
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _ _) -> durationQuantities duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> Maybe.maybeToList amount <> durationQuantities duration
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
     fmap (\(Power.MkPower quantity) -> quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
@@ -1429,7 +1429,7 @@ effectObjectRefs effect =
         Effect.SkipNextPhase {} -> []
         Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
         Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
-        Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _) -> read_ [ref]
+        Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _ _) -> read_ [ref]
         Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ srcRef _ _ destRef _) -> read_ (Maybe.maybeToList srcRef <> [destRef])
         -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
         -- this arm never reaches the Game monad, so an AnyNumberMatching ref written

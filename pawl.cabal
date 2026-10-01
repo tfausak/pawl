@@ -689,6 +689,8 @@ library codec
     Pawl.Codec.KeywordDesignatorSpec
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
+    Pawl.Codec.KeywordsAre
+    Pawl.Codec.KeywordsAreSpec
     Pawl.Codec.KeywordSpec
     Pawl.Codec.KeywordTally
     Pawl.Codec.Label
@@ -1108,6 +1110,8 @@ library codec
     Pawl.Codec.SeatSpec
     Pawl.Codec.SelfCountersReached
     Pawl.Codec.SelfCountersReachedSpec
+    Pawl.Codec.SelfCountersRemoved
+    Pawl.Codec.SelfCountersRemovedSpec
     Pawl.Codec.SetBasePowerToughness
     Pawl.Codec.SetBasePowerToughnessSpec
     Pawl.Codec.SetClassLevel
@@ -1157,6 +1161,8 @@ library codec
     Pawl.Codec.Subtype
     Pawl.Codec.SubtypeFamily
     Pawl.Codec.SubtypeFamilySpec
+    Pawl.Codec.SubtypesAre
+    Pawl.Codec.SubtypesAreSpec
     Pawl.Codec.SubtypeSpec
     Pawl.Codec.Supertype
     Pawl.Codec.SupertypeSpec
@@ -2206,6 +2212,7 @@ library types
     Pawl.Types.KeywordCount
     Pawl.Types.KeywordDesignator
     Pawl.Types.KeywordFamily
+    Pawl.Types.KeywordsAre
     Pawl.Types.KeywordTally
     Pawl.Types.KickerDecision
     Pawl.Types.Label
@@ -2446,6 +2453,7 @@ library types
     Pawl.Types.SearchPlace
     Pawl.Types.Seat
     Pawl.Types.SelfCountersReached
+    Pawl.Types.SelfCountersRemoved
     Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetClassLevel
     Pawl.Types.SetHalfLocked
@@ -2473,6 +2481,7 @@ library types
     Pawl.Types.StepBegins
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily
+    Pawl.Types.SubtypesAre
     Pawl.Types.Supertype
     Pawl.Types.Suspend
     Pawl.Types.SuspendCounters

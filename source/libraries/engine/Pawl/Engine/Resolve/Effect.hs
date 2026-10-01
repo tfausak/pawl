@@ -1633,6 +1633,23 @@ offerCastOnce context named caster optionality verb retake offer = do
         CastObligation.Mandatory -> mayDo oid name cast
         CastObligation.Optional -> mayDo oid name cast
 
+-- CR 615.5: a shield's additional effect, baked with the installing
+-- resolution's chosen targets, CR 109.5's "you" and CR 113.7's source, the
+-- environment the rider runs in long after that resolution is gone. Nothing for
+-- a shield with no rider.
+preventionRider :: Map.Map SlotName (Set Recipient) -> PlayerId -> ObjectId -> Seq.Seq (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Maybe PreventionRider.PreventionRider
+preventionRider chosen controller source riderEffects =
+  if Seq.null riderEffects
+    then Nothing
+    else
+      Just
+        PreventionRider.MkPreventionRider
+          { PreventionRider.effects = riderEffects,
+            PreventionRider.targets = chosen,
+            PreventionRider.controller = controller,
+            PreventionRider.source = source
+          }
+
 -- CR 615.3: install one floating damage row, for a duration. Shared by
 -- Effect.PreventNextDamage, Effect.PreventAllDamage,
 -- Effect.PreventNextDamageInstance and Effect.RedirectDamage, which differ only
@@ -7363,18 +7380,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         rows = if described then [Nothing] else fmap Just recipients
         -- CR 615.5: the additional effect, BAKED onto the row with this
         -- resolution's chosen targets and CR 109.5's "you".
-        rider =
-          if Seq.null riderEffects
-            then Nothing
-            else
-              Just
-                PreventionRider.MkPreventionRider
-                  { PreventionRider.effects = riderEffects,
-                    PreventionRider.targets = chosen,
-                    PreventionRider.controller = controller,
-                    -- CR 113.7's source: the rider needs an id to run against.
-                    PreventionRider.source = source
-                  }
+        rider = preventionRider chosen controller source riderEffects
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       -- An unevaluable quantity is a no-op, DealDamage's posture.
       Nothing -> pure ()
@@ -7434,18 +7440,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         rows = if Maybe.isJust whatRecipient || Maybe.isNothing ref then [Nothing] else fmap Just recipients
         -- CR 615.5's additional effect. With no amount to count down, "this way"
         -- is what THIS application prevented, which Prevention.amounts carries.
-        rider =
-          if Seq.null riderEffects
-            then Nothing
-            else
-              Just
-                PreventionRider.MkPreventionRider
-                  { PreventionRider.effects = riderEffects,
-                    PreventionRider.targets = chosen,
-                    PreventionRider.controller = controller,
-                    -- CR 113.7's source: the rider needs an id to run against.
-                    PreventionRider.source = source
-                  }
+        rider = preventionRider chosen controller source riderEffects
     -- Which SIDE of the damage event the ref's objects sit on, and which
     -- question the source half of the row answers.
     case direction of
@@ -7495,7 +7490,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- every source would be.
             (Just _, Nothing) -> pure ()
             _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll Uses.Unlimited rider printedSource (whatRecipient, Nothing)) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration ref sourceFilter) -> do
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration ref sourceFilter riderEffects) -> do
     -- CR 615.8: install a shield that prevents ONE instance of damage from the
     -- chosen source. The rewrite is PreventAll -- "regardless of how much damage
     -- that is", which is the whole event and never CR 615.7's arithmetic -- and
@@ -7515,6 +7510,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let context = effectContext gs controller source legal (slotBindings resolving gs)
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
+        -- CR 615.5's additional effect, run as part of the prevention rather
+        -- than put on the stack: Reverse Damage's life, Deflecting Palm's damage
+        -- back.
+        rider = preventionRider chosen controller source riderEffects
     -- No recipient is CR 608.2b's gone target, so there is nothing to shield and
     -- CR 609.7a's choice -- a choice existing only to be baked into a row -- is
     -- not raised either. The sibling shields' posture.
@@ -7527,7 +7526,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- installed -- stricter than printed rather than weaker, which a row
         -- watching every source would be.
         Nothing -> pure ()
-        Just _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration Nothing DamageRewrite.PreventAll Uses.Once Nothing (Filter.Type.And []) (Nothing, Nothing)) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
+        Just _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration Nothing DamageRewrite.PreventAll Uses.Once rider (Filter.Type.And []) (Nothing, Nothing)) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount srcRef whatRecipient whoRecipient destRef sourceFilter) -> do
     -- CR 614.9: install a floating redirection effect. BOTH sides are baked here,
     -- both being known only at resolution: the source side into
@@ -9999,6 +9998,12 @@ runPreventionRiders = do
 -- recipient may be a PLAYER. Restored rather than cleared, so this cannot clobber
 -- an outer amount.
 --
+-- CR 120.1's source of the prevented damage -- Deflecting Palm's "that source"
+-- -- is bound under the reserved Binding.preventedDamageSource beside the
+-- rider's own slots: an object, so unlike the amount it has somewhere to be
+-- bound. Not implemented: an application covering several sources binds one
+-- of them (#2287).
+--
 -- `resolving` and `source` are both the rider's own source (CR 113.7). Every slot
 -- the rider names is treated as a LEGAL target, CR 608.2b having been applied
 -- when the installing spell resolved.
@@ -10006,7 +10011,7 @@ runPreventionRider :: Prevention.Prevention -> Game ()
 runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \rider -> do
   was <- State.gets GameState.ambientAmounts
   State.modify' (\gs -> gs {GameState.ambientAmounts = Map.insert Binding.eventAmount (sum (Prevention.amounts prevention)) was})
-  let targets = PreventionRider.targets rider
+  let targets = Map.insert Binding.preventedDamageSource (Set.singleton (Recipient.ToObject (Prevention.source prevention))) (PreventionRider.targets rider)
       src = PreventionRider.source rider
   Foldable.traverse_
     (applyEffect src src (PreventionRider.controller rider) targets targets)

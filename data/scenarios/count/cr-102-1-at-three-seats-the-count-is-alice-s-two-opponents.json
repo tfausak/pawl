@@ -1,0 +1,37 @@
+{
+  "description": "CR 102.1 at three seats the count is alice's two opponents",
+  "note": "Tyranid Invasion creates one 3/3 Tyranid Warrior token per opponent. At three seats with nobody departed, alice's opponents still playing number 2, so two tokens enter; bob and carol have empty boards, so every token is the spell's. The spell in the graveyard is the emptied stack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "f1" },
+          { "card": "Forest", "label": "f2" },
+          { "card": "Forest", "label": "f3" },
+          { "card": "Forest", "label": "f4" }
+        ],
+        "hand": [{ "card": "Tyranid Invasion", "label": "invasion" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@invasion", "mana": ["@f1", "@f2", "@f3", "@f4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Tyranid Warrior Token", "Tyranid Warrior Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Tyranid Warrior Token", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Tyranid Invasion", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Tyranid Warrior Token", "subtypes": ["Tyranid", "Warrior"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Tyranid Warrior Token#2", "subtypes": ["Tyranid", "Warrior"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Tyranid Warrior Token", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Tyranid Warrior Token#2", "power": 3, "toughness": 3 } } }
+  ]
+}

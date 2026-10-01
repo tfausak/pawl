@@ -1,0 +1,36 @@
+{
+  "description": "CR 602.2a whole card: Forsworn Paladin's target gains deathtouch when a Treasure's mana paid for the ability, and not when Swamps did",
+  "note": "The control for the -spending file: the same board, with the pump paid by three Swamps while the Treasure the first ability made sits untapped. The unconditional +2/+0 still makes bob's Piker 4/1, but it gains no deathtouch, and the Treasure survives.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forsworn Paladin", "label": "paladin", "ready": true },
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Swamp", "label": "swamp-4" },
+          { "card": "Swamp", "label": "swamp-5" },
+          { "card": "Swamp", "label": "swamp-6" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "victim" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@paladin", "ability": 0, "mana": ["@swamp-1", "@swamp-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@paladin", "ability": 1, "targets": ["@victim"], "mana": ["@swamp-3", "@swamp-4", "@swamp-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@victim", "keyword": { "type": "Deathtouch" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@victim", "power": 4, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 1 } } }
+  ]
+}

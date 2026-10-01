@@ -1,0 +1,197 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Protection",
+          "value": {
+            "quality": {
+              "type": "HasColor",
+              "value": {
+                "type": "Black"
+              }
+            },
+            "spares": null
+          }
+        },
+        {
+          "type": "Flanking"
+        },
+        {
+          "type": "Suspend",
+          "value": {
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 1
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "White"
+                    }
+                  }
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "White"
+                    }
+                  }
+                }
+              ]
+            },
+            "counters": {
+              "type": "Literal",
+              "value": 3
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Riftmarked Knight",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfLastCounterRemoved",
+            "value": {
+              "kind": {
+                "type": "Time"
+              },
+              "zone": {
+                "type": "Exile"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "Black"
+                                  }
+                                ],
+                                "keywords": [
+                                  {
+                                    "type": "Haste"
+                                  },
+                                  {
+                                    "type": "Protection",
+                                    "value": {
+                                      "quality": {
+                                        "type": "HasColor",
+                                        "value": {
+                                          "type": "White"
+                                        }
+                                      },
+                                      "spares": null
+                                    }
+                                  },
+                                  {
+                                    "type": "Flanking"
+                                  }
+                                ],
+                                "name": "Knight Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Knight"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Knight"
+          },
+          {
+            "type": "Rebel"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

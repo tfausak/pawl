@@ -1,0 +1,29 @@
+{
+  "description": "CR 205.1b whole card: the animated Statue is an Artifact Creature -- Golem",
+  "note": "Jade Statue's printed type line is a bare Artifact, so layer 4's set-creature-type has nothing to replace: the case CR 205.1b still speaks to is retention. Artifact is a prior card type and survives, so the projection is an Artifact Creature -- Golem rather than a Creature -- Golem. Activated at the beginning of combat, the first step it may be.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Jade Statue", "label": "statue", "ready": true },
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "@statue", "types": ["Artifact"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@statue", "subtypes": [] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Activate": { "object": "@statue", "mana": ["@mountain-1", "@mountain-2"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "@statue", "types": ["Artifact", "Creature"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@statue", "subtypes": ["Golem"] } } }
+  ]
+}

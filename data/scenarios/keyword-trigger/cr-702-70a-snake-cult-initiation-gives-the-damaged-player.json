@@ -1,0 +1,27 @@
+{
+  "description": "CR 702.70a Snake Cult Initiation gives the damaged player three poison",
+  "note": "The proving test for poisonous: the enchanted Piker connects, so bob gets three poison and, since poisonous is not infect (CR 702.90b), loses the two life as well. alice, who controls the ability, gets none.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Snake Cult Initiation", "label": "initiation", "attached": "piker" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Poisonous", "value": 3 }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 3 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Poison" }, "count": 0 } } }
+  ]
+}

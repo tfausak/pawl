@@ -1,0 +1,54 @@
+{
+  "description": "CR 612.1 a hacked Goblin Scouts mints SWAMPwalkers instead",
+  "note": "Goblin Scouts makes three 1/1 Goblin Scout tokens with mountainwalk; Magical Hack resolved at the sorcery on the stack swaps Mountain for Swamp, and CR 612.2a carries the swap into the tokens the spell defines. The word is in the keyword alone, so the tokens stay Goblin Scouts named Goblin Scout Token. On bob's Mountain the Piker's block is now legal and sticks. alice's own Island pays the Hack, since CR 702.14c reads only the defending player's lands. The three tokens' CR 613.7m timestamp order is alice's to name and immaterial here. They attack on alice's next turn once settled. The -swamp file shows bob's Swamp now stops the block.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Mountain", "label": "m3" },
+          { "card": "Mountain", "label": "m4" },
+          { "card": "Mountain", "label": "m5" },
+          { "card": "Island", "label": "island" }
+        ],
+        "hand": [
+          { "card": "Goblin Scouts", "label": "scouts" },
+          { "card": "Magical Hack", "label": "hack" }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Mountain", "label": "land" }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@scouts", "mana": ["@m1", "@m2", "@m3", "@m4", "@m5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["Goblin Scouts"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Mountain" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Scout Token", "Goblin Scout Token#2", "Goblin Scout Token#3"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Scout Token", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Goblin Scout Token", "subtypes": ["Goblin", "Scout"] } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["Goblin Scout Token", "Goblin Scout Token#2", "Goblin Scout Token#3"] } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["Goblin Scout Token"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "Goblin Scout Token", "blockers": ["@piker"] } } }
+  ]
+}

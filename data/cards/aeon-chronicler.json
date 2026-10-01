@@ -1,0 +1,148 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Members"
+          },
+          "filter": {
+            "type": "And",
+            "value": []
+          },
+          "scope": {
+            "type": "InZone",
+            "value": {
+              "player": {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              "zone": {
+                "type": "Hand"
+              }
+            }
+          }
+        }
+      },
+      "keywords": [
+        {
+          "type": "Suspend",
+          "value": {
+            "cost": {
+              "mana": [
+                {
+                  "type": "Variable"
+                },
+                {
+                  "type": "Generic",
+                  "value": 3
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Blue"
+                    }
+                  }
+                }
+              ]
+            },
+            "counters": {
+              "type": "Variable",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Aeon Chronicler",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfCountersRemoved",
+            "value": {
+              "kind": {
+                "type": "Time"
+              },
+              "zone": {
+                "type": "Exile"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Avatar"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

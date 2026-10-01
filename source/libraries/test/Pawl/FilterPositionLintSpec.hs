@@ -138,6 +138,7 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -2125,8 +2126,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ("Effect.PutCountersFrom' kind", holds (effectFilters (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom slot (Just kind) anywhere)))),
             ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),
             ("CR 714.2b's threshold", holds (triggerConditionFilters (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind 2)))),
-            ("CR 310.12b's last removal", holds (triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved kind))),
-            ("its any-amount mirror", holds (triggerConditionFilters (TriggerCondition.SelfCountersRemoved kind))),
+            ("CR 310.12b's last removal", holds (triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved kind Zone.Battlefield)))),
+            ("its any-amount mirror", holds (triggerConditionFilters (TriggerCondition.SelfCountersRemoved (SelfCountersRemoved.MkSelfCountersRemoved kind Zone.Battlefield)))),
             ("CR 603.2c's per-permanent placement", holds (triggerConditionFilters (TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
             ("CR 603.2c's batch placement", holds (triggerConditionFilters (TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
             ("CR 614.1's scaling pattern", holds (replacementEffectFilters (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything ControllerRelation.Yours (Filter.Type.HasCardType CardType.Creature) Nothing) (Scaling.AddMore 1))))),
@@ -2169,7 +2170,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       ( counterKindFilters plain,
         effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters plain one slot Nothing)),
         quantityFilters (Quantity.Type.ObjectCounters plain),
-        triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved plain)
+        triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved plain Zone.Battlefield))
       )
       ([], [], [], [])
     -- The same pair over the three number-shaped roads: a plain kind inside the

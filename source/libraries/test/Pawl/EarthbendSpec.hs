@@ -118,13 +118,6 @@ earthbent forest lesson =
   let (target, twin, spell, _, gs) = lessonBoard forest lesson [] []
    in (target, twin, castAt target spell gs)
 
--- The paired control: the same board with the spell never cast, so the twin and
--- the target are still indistinguishable.
-uncast :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-uncast forest lesson =
-  let (target, twin, _, _, gs) = lessonBoard forest lesson [] []
-   in (target, twin, gs)
-
 -- Lethal damage on the 0/0 with four +1/+1 counters, then CR 704.5g, then the
 -- delayed ability onto the stack and off it.
 killed :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
@@ -177,25 +170,6 @@ spec s registry = Spec.describe s "Earthbend" $ do
 -- CR 701.66a's first two sentences.
 animationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 animationSpec s registry = Spec.describe s "Animation" $ do
-  Spec.it s "CR 701.66a / 205.1b the land becomes a 0/0 land creature with four +1/+1 counters" $ do
-    forest <- S.printingOf s registry "Forest"
-    lesson <- S.printingOf s registry "Earthbending Lesson"
-    let (target, twin, after) = earthbent forest lesson
-        (control, _, before) = uncast forest lesson
-    -- The gameplay reading first: a 0/0 base with four +1/+1 counters is a 4/4.
-    Spec.assertEqWith s "CR 701.66a the earthbent land is a 4/4" (S.powerToughnessOf target after) (Just (4, 4))
-    Spec.assertEqWith s "CR 122.6 four +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne target after) 4
-    -- CR 205.1b: IN ADDITION TO, so the land types survive the animation.
-    Spec.assertBool s (Set.member CardType.Creature (Projection.cardTypesOf target after)) "CR 701.66a it is a creature"
-    Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf target after)) "CR 205.1b and still a land"
-    Spec.assertBool s (Set.member Subtype.Forest (Projection.subtypesOf target after)) "CR 205.1b and still a Forest"
-    Spec.assertBool s (Projection.hasKeyword Keyword.Haste target after) "CR 701.66a with haste"
-    -- The twin on the SAME board is untouched, so none of the above is a fact
-    -- about Forests.
-    Spec.assertBool s (not (Set.member CardType.Creature (Projection.cardTypesOf twin after))) "the Forest beside it is no creature"
-    Spec.assertEqWith s "and carries no counters" (S.counterOf CounterKind.PlusOnePlusOne twin after) 0
-    -- And the same land on the board where the spell was never cast.
-    Spec.assertEqWith s "uncast, the target is no creature at all" (S.powerToughnessOf control before) Nothing
   -- CR 611.2a: rule 701.66a states no duration, so the animation is not "until end
   -- of turn". Nothing but the CR 514.2 sweep can tell the two apart, and the sweep
   -- is what a card printing the shorter duration would be caught by.

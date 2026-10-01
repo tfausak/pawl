@@ -84,6 +84,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -340,7 +341,7 @@ siegeDefeat =
               OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
+        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved {SelfCountersRemoved.kind = CounterKind.Defense, SelfCountersRemoved.zone = Zone.Battlefield}),
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [exile, offer]))) Map.empty))

@@ -9,7 +9,6 @@ import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.CreatureExploits as CreatureExploits
@@ -28,6 +27,7 @@ import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StepBegins as StepBegins
@@ -405,11 +405,11 @@ data TriggerCondition
     SelfBecomesClassLevel ClassLevel.ClassLevel
   | -- | CR 310.12b generalized over the counter kind: "when the last [kind]
     -- counter is removed from this permanent".
-    SelfLastCounterRemoved (CounterKind.CounterKind Keyword.Keyword)
+    SelfLastCounterRemoved SelfCountersRemoved.SelfCountersRemoved
   | -- | "Whenever one or more [kind] counters are removed from this permanent"
     -- (Chandra, Fire Artisan) -- the arm above with no reading of the after
     -- count.
-    SelfCountersRemoved (CounterKind.CounterKind Keyword.Keyword)
+    SelfCountersRemoved SelfCountersRemoved.SelfCountersRemoved
   | -- | CR 603.2c's batch reading of a CR 122.6 placement: "whenever one or more
     -- [kind] counters are put on one or more [permanents]", once for the batch.
     PermanentsGetCounters CounterPlacement.CounterPlacement

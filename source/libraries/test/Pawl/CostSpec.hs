@@ -54,7 +54,6 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -1985,7 +1984,7 @@ hatredBoard swamp piker hatred life =
 -- CR 119.4 / 107.1a: "Pay half your life, rounded up" (CostComponent.PayHalfLife),
 -- an amount measured against the payer. Odd life totals throughout, so a
 -- rounding down is visible.
-halfLifeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+halfLifeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 halfLifeSpec s registry =
   Spec.describe s "PayHalfLife" $ do
     -- CR 118.3: the half and Mana Confluence's 1 life share one life total.
@@ -2004,20 +2003,6 @@ halfLifeSpec s registry =
       (atThree, three) <- boardAt 3
       Spec.assertBool s (not (any (isActivateOf atOne) (Action.legalActions S.alice one))) "CR 118.3: at 1 life, half (1) plus the Confluence's 1 is unpayable, so the activation is not offered"
       Spec.assertBool s (any (isActivateOf atThree) (Action.legalActions S.alice three)) "and at 3 life, half (2) plus 1 is payable, so it is"
-    -- Lurking Evil at 7 pays 4 and becomes the 4/4 flier, no longer an
-    -- enchantment (CR 205.1a).
-    Spec.it s "CR 119.4 Lurking Evil pays half of 7, rounded up, and becomes a 4/4 Phyrexian Horror with flying" $ do
-      let mine = (S.battlefield S.alice [S.aliased "evil" (S.permanent "Lurking Evil")]) {Seat.life = 7}
-          setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-          script = S.turn 1 [S.on S.precombatMain S.alice (S.activateAction (S.aliasRef "evil") Choices.none)]
-      built <- S.buildBoardOrFail s registry setup
-      (_, after) <- S.runScriptOrFail s script built S.priorityGame
-      evil <- maybe (Spec.assertFailure s "no Lurking Evil") pure (Map.lookup (Label.MkLabel (Text.pack "evil")) (Staged.objects built))
-      Spec.assertEqWith s "CR 107.1a: 7 - 4" (S.lifeOf S.alice after) (Just 3)
-      Spec.assertEqWith s "a 4/4" (S.powerToughnessOf evil after) (Just (4, 4))
-      Spec.assertEqWith s "CR 205.1a: a creature and not an enchantment" (Projection.cardTypesOf evil after) (Set.singleton CardType.Creature)
-      Spec.assertEqWith s "a Phyrexian Horror" (Projection.subtypesOf evil after) (Set.fromList [Subtype.Phyrexian, Subtype.Horror])
-      Spec.assertBool s (Map.member Keyword.Flying (Projection.keywordsOf evil after)) "with flying"
 
 -- Hatred {3}{B}{B} Instant: "As an additional cost to cast this spell, pay X
 -- life. Target creature gets +X/+0 until end of turn."

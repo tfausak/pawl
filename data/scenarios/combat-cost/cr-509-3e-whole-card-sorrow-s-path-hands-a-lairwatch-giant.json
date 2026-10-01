@@ -1,0 +1,39 @@
+{
+  "description": "CR 509.3e whole card: Sorrow's Path hands a Lairwatch Giant two attackers and it gains first strike",
+  "note": "Lairwatch Giant can block an additional creature and gains first strike whenever it blocks two or more. The lone Giant is declared against one Hill Giant and the other against two; Sorrow's Path's exchange removes both from combat and hands the lone one the other's two, so per the Path's ruling it blocks anew and gains first strike, while the other blocks its one. Tapping the Path deals alice 2, so the attackers have 3 toughness. The -control file declares the same blocks and never activates the Path.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Sorrow's Path", "label": "path" },
+          { "card": "Hill Giant", "label": "one", "ready": true },
+          { "card": "Hill Giant", "label": "two", "ready": true },
+          { "card": "Hill Giant", "label": "three", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Lairwatch Giant", "label": "lone" },
+          { "card": "Lairwatch Giant", "label": "pair" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@one", "@two", "@three"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@lone": ["@one"], "@pair": ["@two", "@three"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@path", "targetsBySlot": { "first": ["@lone"], "second": ["@pair"] } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@lone", "keyword": { "type": "FirstStrike" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@two", "blockers": ["@lone"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@three", "blockers": ["@lone"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@one", "blockers": ["@pair"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Life": { "player": "alice", "life": 18 } } }
+  ]
+}

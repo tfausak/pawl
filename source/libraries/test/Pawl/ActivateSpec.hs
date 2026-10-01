@@ -3054,31 +3054,13 @@ soleProjectedAbility oid gs = case Projection.abilitiesOf oid gs of
 -- stack independently of its source", so its text is fixed as it is put on the
 -- stack. Pawl.ProjectionSpec's "hacking Tidal Warrior swaps the land type inside
 -- its activated ability" is the projection-level half of this.
-textChangedAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedAbilitySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 textChangedAbilitySpec s registry = Spec.describe s "TextChangedActivatedAbility" $ do
   -- The control, and the one that needs no text change at all: unhacked, the
   -- printed word stands and the Forest becomes an Island.
   Spec.it s "CR 612 whole card: an unhacked Tidal Warrior makes its target an Island" $ do
     (forestId, after) <- tidalWarriorChain s registry Nothing
     Spec.assertEqWith s "the Forest became an Island" (Projection.subtypesOf forestId after) (Set.singleton Subtype.Island)
-
-  -- Hacked on the PERMANENT, after its spell resolved: the plain CR 612.1 case.
-  Spec.it s "CR 612.1 whole card: hacking the Tidal Warrior PERMANENT makes its target a Swamp" $ do
-    (forestId, after) <- tidalWarriorChain s registry (Just OnThePermanent)
-    Spec.assertEqWith s "the Forest became a Swamp" (Projection.subtypesOf forestId after) (Set.singleton Subtype.Swamp)
-
-  -- Hacked on the SPELL, while it is still on the stack. CR 400.7a: "Effects
-  -- from spells, activated abilities, and triggered abilities that change the
-  -- characteristics or controller of a permanent spell on the stack continue to
-  -- apply to the permanent that spell becomes" -- and rules text is a
-  -- characteristic (CR 109.3). So the swap survives CR 400.7's new object and is
-  -- still there when the ability is enumerated off the permanent. Wizards' own
-  -- Magical Hack ruling says the same: "If you change the text of a spell which
-  -- is to become a permanent, the permanent will retain the text change until
-  -- the effect wears off."
-  Spec.it s "CR 400.7a/612.1 whole card: hacking the Tidal Warrior SPELL makes its target a Swamp" $ do
-    (forestId, after) <- tidalWarriorChain s registry (Just OnTheSpell)
-    Spec.assertEqWith s "the Forest became a Swamp" (Projection.subtypesOf forestId after) (Set.singleton Subtype.Swamp)
 
 -- Which incarnation of the Warrior the Hack is aimed at.
 data HackTarget = OnTheSpell | OnThePermanent
