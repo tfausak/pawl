@@ -970,20 +970,6 @@ ajaniSteadfastSpec s registry = Spec.describe s "Ajani Steadfast (CR 114.4, CR 6
       Spec.assertEqWith s "\"each other\" excludes Ajani, who only pays: 7 - 2" (countersOn CounterKind.Loyalty ajani after) 5
       Spec.assertEqWith s "CR 109.5 bob's planeswalker is untouched" (countersOn CounterKind.Loyalty karn after) 6
       Spec.assertEqWith s "and bob's Piker takes no +1/+1 counter, so it is still a 2/1" (S.powerToughnessOf source after) (Just (2, 1))
-  -- The +1, whose four instructions all aim at ONE target slot. The answerer
-  -- FILTERS the offered set rather than building a recipient by hand, so a slot
-  -- the pool never offered cannot be smuggled past CR 608.2b's re-read.
-  Spec.it s "the +1 pumps up to one target creature and hands it three keywords"
-    . withBoard
-    $ \printing ajani _ _ piker source base -> do
-      let after = loyaltyAbility 0 (preferTarget [Recipient.ToCreature piker]) printing ajani base
-      Spec.assertEqWith s "CR 613.4c the targeted 2/1 is a 3/2" (S.powerToughnessOf piker after) (Just (3, 2))
-      Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike piker after) "CR 613.1f and it has first strike"
-      Spec.assertBool s (Projection.hasKeyword Keyword.Vigilance piker after) "and vigilance"
-      Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink piker after) "and lifelink"
-      Spec.assertEqWith s "CR 606.4 the cost put a loyalty counter on Ajani: 7 + 1" (countersOn CounterKind.Loyalty ajani after) 8
-      Spec.assertEqWith s "bob's untargeted Piker is still a 2/1" (S.powerToughnessOf source after) (Just (2, 1))
-      Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike source after)) "and has gained nothing"
 
 -- Activate the nth loyalty ability of `walker` in printed order, resolve it, and
 -- settle CR 704's state-based actions -- which is what buries a planeswalker

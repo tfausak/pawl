@@ -1,0 +1,43 @@
+{
+  "description": "CR 701.28e / 603.12 an ignored convert arms no reflexive",
+  "note": "Ratchet, Field Medic attacks beside Child of Night, both lifelink, and CR 702.15e records a gain per source, so two instances of the front face's trigger go on the stack together. The first converts Ratchet and its reflexive returns the Weathervane tapped; the second's convert is ignored (CR 701.28e), Ratchet having converted since that instance was put on the stack, so CR 603.12's \"when you do\" never fires and no second target prompt is scheduled. Two in-range artifacts, since 4 life gained puts the Jade Statue in range of a reflexive that must not exist.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Ratchet, Field Medic", "label": "ratchet", "ready": true },
+          { "card": "Child of Night", "label": "child", "ready": true }
+        ],
+        "graveyard": [
+          { "card": "Arcum's Weathervane", "label": "weathervane" },
+          { "card": "Jade Statue", "label": "statue" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@ratchet", "@child"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@ratchet", "@ratchet"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["@weathervane"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Jade Statue", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Jade Statue", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Tapped": { "object": "@statue", "tapped": false } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Arcum's Weathervane", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Arcum's Weathervane", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Tapped": { "object": "Arcum's Weathervane", "tapped": true } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ratchet, Rescue Racer", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ratchet, Field Medic", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@ratchet", "power": 1, "toughness": 4 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Subtypes": { "object": "@ratchet", "subtypes": ["Vehicle"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Types": { "object": "@ratchet", "types": ["Artifact", "Creature"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 24 } } }
+  ]
+}

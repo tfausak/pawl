@@ -1805,49 +1805,6 @@ charmAt oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> r == Recipient.ToCreature oid || r == Recipient.ToObject oid) candidates) sets
   _ -> S.identityAnswer p
 
--- CR 612.2a's third carrier, and the one whose word is the RULEBOOK's: alice
--- controls a Ministrant of Obligation ({2}{W} Creature -- Human Cleric 2/1 whose
--- whole text box is "Afterlife 2", checked against Scryfall), optionally has an
--- Artificial Evolution resolved at it, and then Murder kills it so the afterlife
--- trigger fires and resolves. Returns the Ministrant's id, the state in which it
--- was still alive, the tokens and the final state.
---
--- Three Swamps and an Island: the Murder is {1}{B}{B} and the Evolution {U}, and
--- the generic half may be paid from either without stranding the Evolution.
---
--- The MIDDLE state is returned beside the last one, with the Ministrant's id: it
--- is the only place the Evolution's effect on the Ministrant itself can be read,
--- since CR 400.7 has spent that id by the time the tokens exist. A negative case
--- needs it to tell "the swap missed the token" from "the swap never resolved".
-ministrantChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId], GameState.GameState)
-ministrantChain s registry swap = do
-  swamp <- S.printingOf s registry "Swamp"
-  island <- S.printingOf s registry "Island"
-  ministrant <- S.printingOf s registry "Ministrant of Obligation"
-  murder <- S.printingOf s registry "Murder"
-  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
-  let g1 = snd (S.addPermanent island S.alice (S.landsInPlay swamp 3))
-      (ministrantId, g2) = S.addPermanent ministrant S.alice g1
-      (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
-      (murderId, g4) = S.addHandCard murder S.alice g3
-      evolved = case swap of
-        Nothing -> g4
-        Just (from, to) ->
-          S.runPure (evolveAt ministrantId from to) g4 $ do
-            S.cast S.alice evolutionId
-            Stack.resolveTop
-      -- The Murder's target is named rather than left to the fallback, since its
-      -- Pool.Creatures slot wants a Recipient.ToCreature where evolveAt above
-      -- answers with the Evolution's Recipient.ToObject.
-      killed = S.runPure (aimAtCreature ministrantId) evolved $ do
-        S.cast S.alice murderId
-        Stack.resolveTop
-      -- CR 603.3: the dies trigger goes on the stack the next time a player would
-      -- receive priority, and resolving it is what mints the tokens.
-      settled = S.runPure S.identityAnswer killed Engine.settleForPriority
-      after = S.runPure S.identityAnswer settled Stack.resolveTop
-  pure (ministrantId, evolved, S.tokensOf after, after)
-
 -- CR 612.3's half of the same mint: alice controls `host`, optionally resolves an
 -- Artificial Evolution at it, then resolves an Afterlife Insurance ({1}{W/B}
 -- Instant -- "Creatures you control gain afterlife 1 until end of turn. Draw a
@@ -2142,12 +2099,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     (wraithId, after) <- turnToFrogChain s registry Nothing
     Spec.assertEqWith s "Creature -- Frog" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Frog)
 
-  -- And the point: the Evolution's word swap reaches the resolving spell's
-  -- SetCreatureSubtype, so the Wraith becomes an Elf and never a Frog.
-  Spec.it s "CR 612.2 whole card: Artificial Evolution on the Turn to Frog spell makes an Elf instead" $ do
-    (wraithId, after) <- turnToFrogChain s registry (Just (Subtype.Frog, Subtype.Elf))
-    Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Elf)
-
   -- CR 613.7 on the STACK: two Evolutions at the Turn to Frog spell, Frog ->
   -- Elf and then Elf -> Goblin. The spell's Frog is an Elf and then a Goblin,
   -- so the Wraith becomes a Goblin; a reader looking each word up once in the
@@ -2218,30 +2169,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
         forbidden = State.execState (Engine.runGame (recordingForbidden wraithId) evolved Stack.resolveTop) Set.empty
     Spec.assertEqWith s "the evolved Evolution forbids Frog, not Wall" forbidden (Set.singleton Subtype.Frog)
 
-  -- CR 612.2a, the SPELL half: "most spells and abilities that create creature
-  -- tokens use creature types to define both the creature types and the names of
-  -- the tokens. A text-changing effect that affects such a spell ... can change
-  -- these words because they're being used as creature types, even though
-  -- they're also being used as names." Dragon Fodder {1}{R} ("Create two 1/1 red
-  -- Goblin creature tokens") is the spell; the Evolution is resolved at it on the
-  -- stack.
-  --
-  -- The control first, so the pair cannot pass vacuously on a chain that never
-  -- minted anything.
-  Spec.it s "CR 111.4 an unevolved Dragon Fodder still mints two Goblins named Goblin Token" $ do
-    (tokens, after) <- dragonFodderChain s registry Nothing
-    Spec.assertEqWith s "two tokens" (length tokens) 2
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Goblin" (Projection.subtypesOf oid after) (Set.singleton Subtype.Goblin)) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Goblin Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Token")))) tokens
-
-  -- And the point. BOTH halves of CR 612.2a: the type line, and the name those
-  -- same words define.
-  Spec.it s "CR 612.2a whole card: an evolved Dragon Fodder mints Elves, name and all" $ do
-    (tokens, after) <- dragonFodderChain s registry (Just (Subtype.Goblin, Subtype.Elf))
-    Spec.assertEqWith s "two tokens" (length tokens) 2
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Elf Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Token")))) tokens
-
   -- CR 612.2a's OTHER half: "or an object with such an ability". Bitterblossom
   -- {1}{B} Kindred Enchantment -- Faerie ("At the beginning of your upkeep, you
   -- lose 1 life and create a 1/1 black Faerie Rogue creature token with flying",
@@ -2287,12 +2214,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     mapM_ (\oid -> Spec.assertEqWith s "named Bearer of the Wilds" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Bearer of the Wilds")))) tokens
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Bear" (Projection.subtypesOf oid after) (Set.singleton Subtype.Bear)) tokens
 
-  Spec.it s "CR 612.2 an evolved Ursine Rite's token turns Elf but keeps its name" $ do
-    (tokens, after) <- syntheticTokenChain s registry "Synthetic Ursine Rite" (Just (Subtype.Bear, Subtype.Elf))
-    Spec.assertEqWith s "one token" (length tokens) 1
-    mapM_ (\oid -> Spec.assertEqWith s "still named Bearer of the Wilds" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Bearer of the Wilds")))) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
-
   -- CR 205.3m's one two-word creature type, which is why the boundary test cannot
   -- be a whitespace tokenizer: Synthetic Temporal Summons ({1}{U} Sorcery, "Create
   -- a 2/2 blue Time Lord creature token") mints CR 111.4's "Time Lord Token", and
@@ -2303,45 +2224,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "one token" (length tokens) 1
     mapM_ (\oid -> Spec.assertEqWith s "named Time Lord Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Time Lord Token")))) tokens
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Time Lord" (Projection.subtypesOf oid after) (Set.singleton Subtype.TimeLord)) tokens
-
-  Spec.it s "CR 612.2a an evolved Temporal Summons replaces both words at once" $ do
-    (tokens, after) <- syntheticTokenChain s registry "Synthetic Temporal Summons" (Just (Subtype.TimeLord, Subtype.Elf))
-    Spec.assertEqWith s "one token" (length tokens) 1
-    mapM_ (\oid -> Spec.assertEqWith s "named Elf Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Token")))) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
-
-  -- CR 612.2a's third carrier: an ability rule 702 MINTS. "Afterlife 2" is all
-  -- Ministrant of Obligation prints; CR 702.135a is where the word Spirit is
-  -- written ("'Afterlife N' means 'When this permanent is put into a graveyard
-  -- from the battlefield, create N 1/1 white and black Spirit creature tokens
-  -- with flying'"), so the ability the Evolution rewrites does not exist until the
-  -- mint runs -- after the CR 613 fold. What the layer fold leaves behind is the
-  -- pair, and Projection.mintedTriggeredAbilitiesOf applies it at the mint.
-  --
-  -- The control first, so the pair below cannot pass on a chain that killed
-  -- nothing.
-  Spec.it s "CR 702.135a an unevolved Ministrant of Obligation leaves two Spirit Tokens" $ do
-    (ministrantId, alive, tokens, after) <- ministrantChain s registry Nothing
-    Spec.assertEqWith s "Human Cleric while it lived" (Projection.subtypesOf ministrantId alive) (Set.fromList [Subtype.Human, Subtype.Cleric])
-    Spec.assertEqWith s "two tokens" (length tokens) 2
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Spirit" (Projection.subtypesOf oid after) (Set.singleton Subtype.Spirit)) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Spirit Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Spirit Token")))) tokens
-
-  -- And the point. The Ministrant is a Human Cleric 2/1 and its tokens are 1/1
-  -- Spirits, so no assertion here can be satisfied by the parent's own type line;
-  -- Elf is on neither.
-  Spec.it s "CR 612.2a whole card: an evolved Ministrant of Obligation leaves Elves" $ do
-    (ministrantId, alive, tokens, after) <- ministrantChain s registry (Just (Subtype.Spirit, Subtype.Elf))
-    -- The Ministrant prints no Spirit, so its own type line is untouched: what
-    -- the Evolution reached is rule 702.135a's word alone.
-    Spec.assertEqWith s "Human Cleric still, while it lived" (Projection.subtypesOf ministrantId alive) (Set.fromList [Subtype.Human, Subtype.Cleric])
-    Spec.assertEqWith s "two tokens" (length tokens) 2
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Elf Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Token")))) tokens
-    -- Everything else rule 702.135a states is untouched, so what moved is the one
-    -- word and not the mint.
-    mapM_ (\oid -> Spec.assertEqWith s "still 1/1" (Projection.powerOf oid after, Projection.toughnessOf oid after) (Just (1 :: Integer), Just (1 :: Integer))) tokens
-    mapM_ (\oid -> Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid after) "and still flying") tokens
 
   -- CR 612.3's boundary on the same mint: "any abilities that are granted to an
   -- object can't be modified by text-changing effects that affect that object".
@@ -2357,18 +2239,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "named Spirit Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Spirit Token")]]
     Spec.assertBool s (Projection.hasKeyword (Keyword.Afterlife 1) pikerId alive) "the grant reached the Piker"
     Spec.assertEqWith s "Goblin Warrior while it lived" (Projection.subtypesOf pikerId alive) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
-
-  -- And the point. The swap reaches the Piker's projection -- its subtypeWordChanges
-  -- carry the pair -- and reaches nothing rule 702.135a mints for a keyword the
-  -- Insurance granted afterwards.
-  Spec.it s "CR 612.3 an evolved Goblin Piker's GRANTED afterlife still mints a Spirit Token" $ do
-    (pikerId, alive, tokens, after) <- insuredChain s registry "Goblin Piker" (Just (Subtype.Spirit, Subtype.Elf))
-    Spec.assertEqWith s "one Creature -- Spirit" (tokenSubtypes tokens after) [[Subtype.Spirit]]
-    Spec.assertEqWith s "named Spirit Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Spirit Token")]]
-    Spec.assertBool s (Projection.hasKeyword (Keyword.Afterlife 1) pikerId alive) "the grant reached the Piker"
-    -- The Piker prints no Spirit, so its own type line is untouched either way:
-    -- what the Evolution had to reach was rule 702.135a's word alone.
-    Spec.assertEqWith s "Goblin Warrior still, while it lived" (Projection.subtypesOf pikerId alive) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
 
   -- CR 702.135b -- "if a permanent has multiple instances of afterlife, each
   -- triggers separately" -- is what makes this per INSTANCE and not per object. A
@@ -2444,49 +2314,9 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "3/1 plus 2/2" (S.powerToughnessOf soldierId after) (Just (5, 3))
     Spec.assertEqWith s "and the Goblin beside it is untouched" (S.powerToughnessOf gobId after) (Just (2, 1))
 
-  -- The falsifier for a word-blind rewrite, on the same board with one word
-  -- changed: Human is printed on the Ministrant and nowhere in rule 702.135a, so
-  -- an Evolution naming it moves the Ministrant's own type line and leaves the
-  -- Spirits alone.
-  Spec.it s "CR 612.2 an Evolution naming Human leaves the Spirits Spirits" $ do
-    (ministrantId, alive, tokens, after) <- ministrantChain s registry (Just (Subtype.Human, Subtype.Elf))
-    -- The Evolution DID resolve and DID land on the Ministrant: without this the
-    -- assertions below would pass for a spell that never took effect.
-    Spec.assertEqWith s "Elf Cleric while it lived" (Projection.subtypesOf ministrantId alive) (Set.fromList [Subtype.Elf, Subtype.Cleric])
-    Spec.assertEqWith s "two tokens" (length tokens) 2
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Spirit" (Projection.subtypesOf oid after) (Set.singleton Subtype.Spirit)) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Spirit Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Spirit Token")))) tokens
-
-  -- The BOUNDARY the cases above sit on, and the falsifier for reading them
-  -- as "a text change rewrites names": CR 612.2's closing sentence -- "an effect
-  -- that changes a color word or a subtype can't change a card name, even if
-  -- that name contains a word or a series of letters that is the same as a Magic
-  -- color word, basic land type, or creature type". Goblin Piker is Creature --
-  -- Goblin Warrior and is NAMED "Goblin Piker", so it is the pool's one card
-  -- where the coincidence is real. CR 612.2a's exception does not reach it --
-  -- the Piker defines no token -- so the Evolution must make it an Elf Warrior
-  -- still named Goblin Piker.
-  --
-  -- What this pins is the SCOPE of the exception: the swap reaches an object's
-  -- name only through the card a Create defines, never through the projection of
-  -- the object it is aimed at. Projection.rewriteCard's own gate -- the word must
-  -- be a subtype of the card whose name it is rewriting -- has no card in this
-  -- pool that makes it observable, since every token here is named after exactly
-  -- its own subtypes (CR 111.4).
-  Spec.it s "CR 612.2 an evolved Goblin Piker is an Elf Warrior still NAMED Goblin Piker" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    artificialEvolution <- S.printingOf s registry "Artificial Evolution"
-    let (pikerId, g1) = S.addPermanent piker S.alice (S.landsInPlay island 1)
-        (evolutionId, g2) = S.addHandCard artificialEvolution S.alice g1
-        after = S.runPure (evolveAt pikerId Subtype.Goblin Subtype.Elf) g2 $ do
-          S.cast S.alice evolutionId
-          Stack.resolveTop
-    Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf pikerId after) (Set.fromList [Subtype.Elf, Subtype.Warrior])
-    Spec.assertEqWith s "and the name is untouched" (Projection.namesOf pikerId after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")))
-
-  -- The control for the pair below, and what rules out "the ability never
-  -- resolved": with no Evolution the printed word stands, so the Spider-Punk --
+  -- The control for
+  -- data/scenarios/counterspell/cr-612-2-an-evolved-coulson-counters-the-goblin-and-not-the.json,
+  -- and what rules out "the ability never resolved": with no Evolution the printed word stands, so the Spider-Punk --
   -- and only it -- takes the counter.
   Spec.it s "CR 612 an unevolved Coulson counters the Hero and not the Goblin" $ do
     (punkId, pikerId, after) <- coulsonChain s registry Nothing
@@ -2503,8 +2333,9 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
   -- The chain aims the Strike at a player; Pool.PlayersAndPlaneswalkers is the
   -- slot's own pool, and Pawl.PlaneswalkerSpec proves the planeswalker half.
   --
-  -- The control first, so the pair cannot pass on a chain that never resolved the
-  -- Strike.
+  -- The control for
+  -- data/scenarios/counterspell/cr-612-1-an-evolved-goblin-war-strike-counts-elves-instead.json,
+  -- so the pair cannot pass on a chain that never resolved the Strike.
   Spec.it s "CR 120.1 an unevolved Goblin War Strike counts Goblins" $ do
     after <- goblinWarStrikeChain s registry Nothing
     Spec.assertEqWith s "bob took 2, one per Goblin alice controls" (S.lifeOf S.bob after) (Just 18)
@@ -2524,36 +2355,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     -- reading a board where nothing happened.
     Spec.assertEqWith s "the victim was a Vampire Demon while it lived" (Projection.subtypesOf victimId alive) (Set.fromList [Subtype.Vampire, Subtype.Demon])
     Spec.assertEqWith s "and the Clavileño's own type line prints no Demon" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Cleric])
-
-  -- And the point. The swap reaches the token defined inside the quoted ability,
-  -- name and type line alike (CR 612.2a), and the rest of that token is untouched.
-  Spec.it s "CR 612.1 an evolved Clavileño's granted ability mints a Vampire Elf Token" $ do
-    (clavilenoId, victimId, alive, tokens, after) <- clavilenoChain s registry (Just (Subtype.Demon, Subtype.Elf))
-    Spec.assertEqWith s "one Creature -- Vampire Elf" (tokenSubtypes tokens after) [[Subtype.Elf, Subtype.Vampire]]
-    Spec.assertEqWith s "named Vampire Elf Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Vampire Elf Token")]]
-    -- Only the word moved: the token is the printed 4/3 with flying still.
-    mapM_ (\oid -> Spec.assertEqWith s "still 4/3" (Projection.powerOf oid after, Projection.toughnessOf oid after) (Just (4 :: Integer), Just (3 :: Integer))) tokens
-    mapM_ (\oid -> Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid after) "and still flying") tokens
-    -- The layer-4 half of the same ability took the swap too, by a sibling arm of
-    -- rewriteModification -- so it cannot be what the token assertions read.
-    Spec.assertEqWith s "the victim was a Vampire Elf while it lived" (Projection.subtypesOf victimId alive) (Set.fromList [Subtype.Vampire, Subtype.Elf])
-    Spec.assertEqWith s "and the Clavileño is a Vampire Cleric still" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Cleric])
-
-  -- The falsifier for a word-blind rewrite, on the same board with one word
-  -- changed: Cleric is printed on the Clavileño's type line and nowhere in the
-  -- ability, so an Evolution naming it moves that one word and leaves the quoted
-  -- ability's Demon standing. Vampire would not serve -- it is the trigger's own
-  -- target filter, and swapping it leaves the trigger with no legal target when it
-  -- goes on the stack (CR 603.3d), which is a different reason for a Demon to
-  -- survive.
-  Spec.it s "CR 612.2 an Evolution naming Cleric leaves the token's Demon a Demon" $ do
-    (clavilenoId, victimId, alive, tokens, after) <- clavilenoChain s registry (Just (Subtype.Cleric, Subtype.Zombie))
-    Spec.assertEqWith s "one Creature -- Vampire Demon still" (tokenSubtypes tokens after) [[Subtype.Demon, Subtype.Vampire]]
-    Spec.assertEqWith s "named Vampire Demon Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Vampire Demon Token")]]
-    Spec.assertEqWith s "the victim was a Vampire Demon while it lived" (Projection.subtypesOf victimId alive) (Set.fromList [Subtype.Vampire, Subtype.Demon])
-    -- The Evolution DID resolve and DID land on the Clavileño, so the assertions
-    -- above are not reading a board where the swap never happened.
-    Spec.assertEqWith s "and the Clavileño itself is a Vampire Zombie" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Zombie])
 
   -- CR 612.1 reaching a FLOATING replacement effect (CR 614.3), which no case
   -- above installs: the other chains here rewrite what the resolution itself

@@ -1,0 +1,27 @@
+{
+  "description": "CR 613 Humility strips poisonous along with everything else",
+  "note": "The poisonous trigger is derived from the post-layer keywords, so bob's Humility, later than the Aura, takes it away in layer 6 with no arm of its own. A mint reading the printed keywords or the Aura's static ability would still poison bob. The Piker is a 1/1 under Humility, so bob loses one life and gets no poison.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Snake Cult Initiation", "label": "initiation", "attached": "piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Humility" }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Poisonous", "value": 3 }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } }
+  ]
+}

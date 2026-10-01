@@ -239,35 +239,6 @@ rippleDuel =
     S.alice
     S.beginningOfCombat
 
--- CR 722.3d's board: the proving board with Russet Wolves as a SECOND creature
--- for the Twincast copy to be aimed at, and Twincast itself in alice's hand. Five
--- Islands where Jump's {U} and Twincast's {U}{U} come to three, so neither cast
--- can fail for mana.
---
--- The Wolves is vanilla and never attacks, so "the Wolves is flying" means the
--- copy of the prepare spell resolved and nothing else.
-twincastDuel :: Board.Board
-twincastDuel =
-  S.board
-    ( ( S.battlefield
-          S.alice
-          [ S.settled "aviator" "Encouraging Aviator",
-            S.settled "piker" "Goblin Piker",
-            S.settled "wolves" "Russet Wolves",
-            S.permanent "Island",
-            S.permanent "Island",
-            S.permanent "Island",
-            S.permanent "Island",
-            S.permanent "Island"
-          ]
-      )
-        { Seat.hand = Seq.fromList [S.aliased "twincast" (S.cardSetup "Twincast")]
-        }
-        NonEmpty.:| [S.battlefield S.bob []]
-    )
-    S.alice
-    S.beginningOfCombat
-
 -- The exile copy minted FOR this permanent, by id. Keyed to the permanent rather
 -- than to a count, so a board carrying two prepared permanents can name either.
 copyFor :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
@@ -275,19 +246,6 @@ copyFor permanentId gs =
   filter
     (\oid -> case Game.lookupObject oid gs of Nothing -> False; Just obj -> Object.preparedCopyOf obj == Just permanentId)
     (prepareCopies gs)
-
--- Pin one recipient by FILTERING the offered set, never by building one (#222):
--- CR 608.2b re-reads what was chosen, and a hand-built recipient naming the same
--- object is a different one that the re-read drops with no error. Pawl.CopySpec's
--- `pinTarget` is the same answerer, and reaches CR 707.10c's re-target prompt as
--- well as a cast's own.
-pinRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
-pinRecipient recipient p = case p of
-  Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter (== recipient) . snd) asked
-  _ -> S.identityAnswer p
-
-topOfStack :: GameState.GameState -> Maybe ObjectId.ObjectId
-topOfStack = Maybe.listToMaybe . GameState.stack
 
 -- CR 502's untap step, run for `pid`: Pawl.PhasingSpec's helper of the same name
 -- and shape, since CR 702.26a's phase-in is a turn-based action of that step and
@@ -520,41 +478,3 @@ spec s registry = Spec.describe s "Preparation" $ do
         -- copy minted on the phase-in was cast and did what Jump says.
         Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId resolved) "CR 722.3c: the copy minted on phasing in gives the Piker flying"
       other -> Spec.assertFailure s ("expected exactly one copy for the returning Aviator, got " <> show (length other))
-  -- CR 722.3d: "if a prepare spell is copied, the copy is also a prepare spell."
-  -- Twincast copies the cast Jump, CR 707.10c lets the copy be re-aimed, and the
-  -- copy resolves as Jump does -- which is the whole of what a prepare spell IS
-  -- in pawl, its alternative characteristics having become the exiled copy's
-  -- normal ones (CR 722.3c). Rule 722.3d's second sentence has no observer: no
-  -- card in data/cards/ refers to a spell cast as a prepare spell, so nothing can
-  -- tell a copy that is one from a copy that is not.
-  --
-  -- The Wolves and the Piker are two creatures so the copy and the original can
-  -- be told apart: the copy resolves first, aimed at the Wolves, while the
-  -- original is still on the stack aimed at the Piker.
-  Spec.it s "CR 722.3d Twincast copies the cast Jump and the copy is a Jump of its own" $ do
-    built <- S.buildBoardOrFail s registry twincastDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    pikerId <- aliasOrFail s built "piker"
-    wolvesId <- aliasOrFail s built "wolves"
-    twincastId <- aliasOrFail s built "twincast"
-    (_, attacked) <- S.runScriptOrFail s attackScript built S.combatGame
-    case copyFor aviatorId attacked of
-      [copyId] -> do
-        let castJump = S.runPure (pinRecipient (Recipient.ToCreature pikerId)) attacked (Cast.castSpell S.manaPerformer S.alice copyId jumpName Facing.FaceUp)
-        case topOfStack castJump of
-          Nothing -> Spec.assertFailure s "the cast copy did not reach the stack"
-          Just jumpSpell -> do
-            let castTwincast = S.runPure (pinRecipient (Recipient.ToObject jumpSpell)) castJump (S.cast S.alice twincastId)
-                -- Twincast resolves, and CR 707.10c's prompt aims its copy at the
-                -- Wolves instead.
-                copied = S.runPure (pinRecipient (Recipient.ToCreature wolvesId)) castTwincast (Stack.resolveTop *> Engine.settleForPriority)
-                copyResolved = S.runPure S.identityAnswer copied (Stack.resolveTop *> Engine.settleForPriority)
-            -- THE gameplay assertion, first so no proxy can absorb a mutation:
-            -- the COPY resolved as a Jump of its own, at its own target, while
-            -- the original is still on the stack aimed at the Piker.
-            Spec.assertEqWith s "CR 722.3d: the copy of the prepare spell gives the Wolves flying, and only the Wolves" (Projection.hasKeyword Keyword.Flying wolvesId copyResolved, Projection.hasKeyword Keyword.Flying pikerId copyResolved) (True, False)
-            -- And the original is intact: resolving it too gives the Piker
-            -- flying, so the copy did not consume it.
-            let bothResolved = S.runPure S.identityAnswer copyResolved (Stack.resolveTop *> Engine.settleForPriority)
-            Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId bothResolved) "CR 707.10: the original Jump still resolves at the Piker"
-      other -> Spec.assertFailure s ("expected exactly one copy for the Aviator, got " <> show (length other))

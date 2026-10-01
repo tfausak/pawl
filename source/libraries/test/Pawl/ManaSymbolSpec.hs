@@ -25,7 +25,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
 import Pawl.ManaSourceSpec (dawnBoards, oneSymbol, payable, plainGreen, plainOf, plainRed, poolOf, retainedGreen)
-import Pawl.ManaSpec (atLife, avoidsSource, castOffBoard, poolSize, poolTypes, poolUnits, prefersColor, prefersSource, resolvedCreature, theAbility)
+import Pawl.ManaSpec (atLife, castOffBoard, poolSize, poolTypes, poolUnits, prefersColor, prefersSource, resolvedCreature, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -2239,47 +2239,11 @@ heraldSpentCount = length . heraldSpent
 -- Binding.thisAbility, which Pawl.Engine.Activate stamps: the clause is gated
 -- against the SOURCE (Resolve.gateHolds), and the source is the Paladin rather
 -- than the ability whose payment the printed sentence asks about.
-forswornPaladinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forswornPaladinSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 forswornPaladinSpec s registry = Spec.describe s "ForswornPaladin" $ do
-  -- ONE board, run twice with answerers that differ in a single choice: whether
-  -- the Treasure is tapped for one of the {2}{B} or spared and a fourth Swamp
-  -- tapped instead. Same seats, same Treasure sitting on the battlefield, same
-  -- target, same life total, same everything else -- so a creature that gains
-  -- deathtouch on one run and not the other did so because of where the mana came
-  -- from.
-  --
-  -- The two behavioural assertions come first and both can differ: an engine that
-  -- records nothing for an activation leaves the first run without deathtouch, and
-  -- one that tags every mana leaves the second with it.
-  Spec.it s "CR 602.2a whole card: Forsworn Paladin's target gains deathtouch when a Treasure's mana paid for the ability, and not when Swamps did" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    paladin <- S.printingOf s registry "Forsworn Paladin"
-    piker <- S.printingOf s registry "Goblin Piker"
-    case Face.activatedAbilities (S.combinedFace paladin) of
-      makeTreasure : pump : _ -> do
-        let (paladinId, g1) = S.addPermanent paladin S.alice (S.landsInPlay swamp 6)
-            (victim, g2) = S.addPermanent piker S.bob g1
-            armed = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice paladinId makeTreasure *> Stack.resolveTop)
-            treasure = treasureIn armed
-            act = Activate.activateAbility S.alice paladinId pump *> Stack.resolveTop
-            spending = S.runPure (aimedAtSpending victim treasure) armed act
-            sparing = S.runPure (aimedAtSparing victim treasure) armed act
-        Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch victim spending) "the Treasure's mana paid the activation, so the Piker gains deathtouch"
-        Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch victim sparing)) "and on the same board with the Treasure spared, which differs in nothing else, it does not"
-        -- The supporting checks, after the behaviour. The pump carries no
-        -- condition at all, so it is insensitive to the record by construction and
-        -- says only that both runs resolved the ability against the same target.
-        Spec.assertEqWith s "setup: both runs ran the unconditional clause, so the 2/1 Piker is 4/1 on each" (S.powerToughnessOf victim spending, S.powerToughnessOf victim sparing) (Just (4, 1), Just (4, 1))
-        -- And that the Treasure was really there to be chosen, so the second run's
-        -- "no deathtouch" is the answer and not an empty offer.
-        Spec.assertBool s (Set.member treasure (GameState.battlefield armed)) "setup: the first ability really made a Treasure, so both answerers were offered it"
-        Spec.assertBool s (not (Set.member treasure (GameState.battlefield spending))) "setup: the run that spent it sacrificed it, and the run that spared it did not"
-        Spec.assertBool s (Set.member treasure (GameState.battlefield sparing)) "setup: the Treasure survives the run that spared it"
-      _ -> Spec.assertFailure s "Forsworn Paladin should print two activated abilities"
-
   -- The record itself, off the ABILITY OBJECT rather than off the permanent --
-  -- which the case above reads only through its consequence. The Paladin is the
-  -- control: it was never cast on this board, so an activation that recorded
+  -- which data/scenarios/mana-symbol/cr-602-2a-*.json read only through its
+  -- consequence. The Paladin is the control: it was never cast on this board, so an activation that recorded
   -- against its source would show up here as a non-empty record.
   Spec.it s "CR 400.7d an activation's record goes on the ability object, not on its source" $ do
     swamp <- S.printingOf s registry "Swamp"
@@ -2315,12 +2279,6 @@ aimedAtSpending :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> 
 aimedAtSpending victim wanted p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just victim) sets
   _ -> prefersSource wanted p
-
--- aimedAtSpending's twin, differing in the mana source alone.
-aimedAtSparing :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAtSparing victim unwanted p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just victim) sets
-  _ -> avoidsSource unwanted p
 
 -- The Treasure token on the battlefield, or a placeholder id that reads as
 -- nothing -- bergStriderOn's shape, so a board where the first ability never

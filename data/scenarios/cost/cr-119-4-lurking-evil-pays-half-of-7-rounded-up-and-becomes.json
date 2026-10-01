@@ -1,0 +1,27 @@
+{
+  "description": "CR 119.4 Lurking Evil pays half of 7, rounded up, and becomes a 4/4 Phyrexian Horror with flying",
+  "note": "Lurking Evil's \"Pay half your life, rounded up\" at an odd 7 life pays 4 (CR 107.1a), where rounding down would leave 4. It becomes a 4/4 Phyrexian Horror creature with flying, and no longer an enchantment (CR 205.1a).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 7,
+        "battlefield": [{ "card": "Lurking Evil", "label": "evil" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@evil" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@evil", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Types": { "object": "@evil", "types": ["Creature"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "@evil", "subtypes": ["Phyrexian", "Horror"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@evil", "keyword": { "type": "Flying" }, "count": 1 } } }
+  ]
+}

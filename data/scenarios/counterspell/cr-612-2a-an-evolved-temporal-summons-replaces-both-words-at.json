@@ -1,0 +1,38 @@
+{
+  "description": "CR 612.2a an evolved Temporal Summons replaces both words at once",
+  "note": "Synthetic Temporal Summons creates a 2/2 Time Lord token, CR 205.3m's one two-word creature type, named Time Lord Token (CR 111.4). An Artificial Evolution at the spell swapping Time Lord for Elf must match both words as one, so the token is an Elf named Elf Token. Synthetic because no printing creates a Time Lord token.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [
+          { "card": "Synthetic Temporal Summons", "label": "summons" },
+          { "card": "Artificial Evolution", "label": "evolution" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@summons", "mana": ["@forest-1", "@island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Synthetic Temporal Summons"], "mana": ["@island-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "TimeLord" }, "to": { "type": "Elf" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elf Token", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Time Lord Token", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Elf Token", "subtypes": ["Elf"] } } }
+  ]
+}

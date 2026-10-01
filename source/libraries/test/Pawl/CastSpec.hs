@@ -5062,7 +5062,7 @@ bargainSpec s registry = Spec.describe s "Bargain" $ do
 -- own, so the choice of whom to tap is a real one. Alice taps JEDIT and not the
 -- Giant, which is what makes the tap readable: the spell's own target is
 -- untouched either way.
-teamworkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+teamworkSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 teamworkSpec s registry = Spec.describe s "Teamwork" $ do
   -- THE PROVING TEST.
   Spec.it s "CR 702.194a Team Tactics cast using teamwork also grants trample; without it, double strike alone" $ do
@@ -5080,22 +5080,6 @@ teamworkSpec s registry = Spec.describe s "Teamwork" $ do
     Spec.assertEqWith s "CR 702.194b cast using teamwork, the Giant has double strike and trample" (reading (after 1)) (True, True)
     Spec.assertEqWith s "CR 608.2c without it, double strike alone" (reading (after 0)) (True, False)
     Spec.assertEqWith s "CR 702.194a Jedit paid the cost and the Giant did not; without teamwork, neither is tapped" ((tappedOf jeditId (after 1), tappedOf giantId (after 1)), (tappedOf jeditId (after 0), tappedOf giantId (after 0))) ((Just True, Just False), (Just False, Just False))
-
-  -- The floor rule 702.194a states, on the same board with both creatures tapped
-  -- before the cast: CR 601.2f then has no untapped creature to reach, the total
-  -- power available is 0, and the cost is unpayable however alice answers. The
-  -- mana is the same two Mountains that pay for the successful casting above.
-  Spec.it s "CR 702.194a with no untapped creature, teamwork cannot be paid" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    tactics <- S.printingOf s registry "Team Tactics"
-    giant <- S.printingOf s registry "Hill Giant"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    let (giantId, withGiant) = S.addPermanent giant S.alice (S.landsInPlay mountain 2)
-        (jeditId, withJedit) = S.addPermanent jedit S.alice withGiant
-        (tacticsId, withTactics) = S.addHandCard tactics S.alice withJedit
-        board = S.tapObject jeditId (S.tapObject giantId (aliceOnTurn withTactics))
-        after = castResolved (teamworkingWith jeditId 1 giantId) tacticsId board
-    Spec.assertEqWith s "CR 608.2c the Giant has double strike and no trample" (Projection.hasKeyword Keyword.DoubleStrike giantId after, Projection.hasKeyword Keyword.Trample giantId after) (True, False)
 
 -- CR 702.175a on Coruscation Mage {1}{R} 2/2 Creature -- Otter Wizard, "Offspring
 -- {2} / Whenever you cast a noncreature spell, this creature deals 1 damage to
