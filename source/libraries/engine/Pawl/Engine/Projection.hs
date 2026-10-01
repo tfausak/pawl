@@ -24,7 +24,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -1905,10 +1905,8 @@ alwaysFunctioning _ _ _ = True
 --
 -- Each arm reads the SAME list its walk in gatherGiven does, which is the whole
 -- of what makes this precondition sound. On the battlefield that is the copiable
--- list (CR 707.2a); everywhere else it is the face, and for the one copy that
--- reaches another zone the two are already the same value -- a copy of a spell
--- carries Source.OfSpellCopy, so Game.faceOfObject resolves to the copied
--- printing's face.
+-- list (CR 707.2a); everywhere else it is abilityFaceOf's, the face with any copy
+-- stamp laid over it.
 anyConditional :: GameState -> Bool
 anyConditional gs =
   let -- A printed read here would leave a copy's "as long as" clause answered by
@@ -1917,13 +1915,13 @@ anyConditional gs =
       -- clause is still gated once the original is exiled" proves.
       -- The granted list too, which permanentParts gathers beside the copiable one.
       conditionalPermanent oid = any carriesCondition (staticAbilitiesOf oid gs <> fmap snd (grantedStaticAbilitiesOf oid gs))
-      conditional oid = case Game.faceOf oid gs of
+      conditional oid = case abilityFaceOfId oid gs of
         Nothing -> False
         Just face -> any carriesCondition (Face.staticAbilities face)
       conditionalStating zone oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj | not (mayStateZone gs zone obj) -> False
-        Just obj -> case Game.faceOfObject gs obj of
+        Just obj -> case abilityFaceOf oid obj gs of
           Nothing -> False
           Just face -> any (\sa -> carriesCondition sa && statesZone zone sa) (Face.staticAbilities face)
    in any conditionalPermanent (Set.toList (GameState.battlefield gs))
@@ -2069,7 +2067,7 @@ gatherGiven stripped functioning seed gs =
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
       fromCommandZone commandId = case Game.lookupObject commandId gs of
         Nothing -> []
-        Just commandObj -> case Game.faceOfObject gs commandObj of
+        Just commandObj -> case abilityFaceOf commandId commandObj gs of
           Nothing -> []
           Just face ->
             -- TWO of CR 113.6's exceptions meet in this zone, and `keeps` is the
@@ -2107,7 +2105,7 @@ gatherGiven stripped functioning seed gs =
       inCommand = concatMap fromCommandZone (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
-        Just spellObj -> case Game.faceOfObject gs spellObj of
+        Just spellObj -> case abilityFaceOf spellId spellObj gs of
           Nothing -> []
           Just face ->
             -- CR 604.2's second limb and CR 113.6: an instant's or sorcery's
@@ -2119,9 +2117,9 @@ gatherGiven stripped functioning seed gs =
             -- 113.6c clause names every zone but the battlefield, so a Grist
             -- SPELL is a creature spell -- and an instant's are dropped where it
             -- names some other zone (Viral Spawning). The other exceptions that
-            -- reach the stack (CR 113.6d/e/g) are asked elsewhere, off the
-            -- printed face. CR 613.7a: the effect shares the stack object's
-            -- timestamp. Never stripped, for the emblem branch's reason.
+            -- reach the stack (CR 113.6d/e/g) are asked elsewhere. CR 613.7a:
+            -- the effect shares the stack object's timestamp. Never stripped,
+            -- for the emblem branch's reason.
             let isSpellStatic = not (Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face))))
                 keeps sa =
                   if Set.null (StaticAbility.functionsFrom sa)
@@ -2131,18 +2129,18 @@ gatherGiven stripped functioning seed gs =
       spells = concatMap fromSpell (GameState.stack gs)
       fromGraveyardCard cardId = case Game.lookupObject cardId gs of
         Nothing -> []
-        Just cardObj -> case Game.faceOfObject gs cardObj of
+        Just cardObj -> case abilityFaceOf cardId cardObj gs of
           Nothing -> []
           Just face ->
             -- CR 113.6f: an ability that restricts or modifies which zones its
             -- object can be cast from functions everywhere -- Viral Spawning's
             -- granted flashback (rule 702.34a) is one. WHICH abilities qualify
             -- is asked of rule 702 through Keyword.permissionsFor, a
-            -- classification rather than an identity. The PRINTED type line
-            -- answers rule 702.34a's instant-or-sorcery clause, since reading it
-            -- off the projection this walk is building would be circular. CR
-            -- 613.7a: the effect shares the card's own timestamp. Never
-            -- stripped, for the emblem and spell branches' reason.
+            -- classification rather than an identity. The ability face's COPIABLE
+            -- type line answers rule 702.34a's instant-or-sorcery clause, since
+            -- reading it off the projection this walk is building would be
+            -- circular. CR 613.7a: the effect shares the card's own timestamp.
+            -- Never stripped, for the emblem and spell branches' reason.
             --
             -- CR 113.6b takes precedence where an ability states its zones,
             -- CR 113.6f's classification decides where it does not, and the two
@@ -2194,7 +2192,7 @@ gatherGiven stripped functioning seed gs =
         Nothing -> []
         Just cardObj | Object.exiledFaceDown cardObj -> []
         Just cardObj | not (mayStateZone gs zone cardObj) -> []
-        Just cardObj -> case Game.faceOfObject gs cardObj of
+        Just cardObj -> case abilityFaceOf cardId cardObj gs of
           Nothing -> []
           Just face ->
             concatMap (uncurry (gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False))) (filter (\(_, sa) -> statesZone zone sa) (zip [0 :: Natural ..] (Face.staticAbilities face)))
@@ -2333,13 +2331,15 @@ statesZone zone = Set.member zone . StaticAbility.functionsFrom
 -- library and exile on every projection, so that difference is the walk; see
 -- #1935.
 --
--- A FACE-DOWN object is the one case it cannot narrow, and it does not try: CR
+-- A FACE-DOWN object is one case it cannot narrow, and it does not try: CR
 -- 708.2's substituted face comes from the ability that turned the object down
 -- rather than from its card, so this answers True and leaves the work to the
--- exact test in gatherGiven.
+-- exact test in gatherGiven. An object carrying a COPY STAMP is the other: its
+-- abilities are the stamp's (abilityFaceOf), which no printed face bounds.
 mayStateZone :: GameState -> Zone.Zone -> Object.Object -> Bool
 mayStateZone gs zone obj = case Object.facing obj of
   Facing.FaceDown _ -> True
+  Facing.FaceUp | Maybe.isJust (Game.copyStampOf obj) -> True
   Facing.FaceUp -> case Game.cardOfSource gs (Just (Object.source obj)) of
     Nothing -> False
     Just card -> any (any (statesZone zone) . Face.staticAbilities) (Card.Type.faces card)
@@ -3110,9 +3110,9 @@ castGrantGathered gs =
 -- REGRESSION FENCE: CR 400.7 gives a card or creature that comes back a new id
 -- the row never named, so no test can tell either read from its absence.
 --
--- The keyword is read off the card's PRINTED face, not its projection, which
--- this gather is part of. The two differ only under an effect that changes the
--- abilities of a card in exile.
+-- The keyword is read off the card's ability face (abilityFaceOf), not its
+-- projection, which this gather is part of. The two differ only under an effect
+-- that changes the abilities of a card in exile.
 encodedGathered :: GameState -> [Gathered]
 encodedGathered gs =
   let fromRow (card, creature) = case Game.lookupObject card gs of
@@ -3120,7 +3120,7 @@ encodedGathered gs =
           | Set.member card (GameState.exile gs),
             Set.member creature (GameState.battlefield gs),
             not (Object.exiledFaceDown cardObj),
-            maybe False (Map.member Keyword.Type.Cipher . Face.keywords) (Game.faceOfObject gs cardObj) ->
+            maybe False (Map.member Keyword.Type.Cipher . Face.keywords) (abilityFaceOf card cardObj gs) ->
               [ MkGathered
                   { gEffect = Nothing,
                     gSource = card,
@@ -4808,8 +4808,8 @@ replacementsOfGiven pcs zone oid gs =
 --
 -- Its own function rather than a local of replacementsOf, because CR 604.2 gates
 -- a row wherever the row functions: replacementsAffecting's off-battlefield
--- walks ask it of the printed face, where replacementsOf asks it of the
--- projection.
+-- walks ask it of the ability face (abilityFaceOf), where replacementsOf asks
+-- it of the projection.
 printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement card ability effect -> Bool
 printedRowLives oid gs pr = case PrintedReplacement.condition pr of
   Nothing -> True
@@ -4832,11 +4832,12 @@ statesZoneOfRow zone = Set.member zone . PrintedReplacement.functionsFrom
 
 -- mayStateZone's twin for printed replacement rows, and cheap for its reason: a
 -- fold over the base card's faces against building the face the object shows.
--- A superset, on that function's argument, and a face-down object is the one case
--- it does not narrow.
+-- A superset, on that function's argument, and it narrows neither a face-down
+-- object nor a stamped one, for that function's reasons.
 mayStateZoneOfRow :: GameState -> Zone.Zone -> Object.Object -> Bool
 mayStateZoneOfRow gs zone obj = case Object.facing obj of
   Facing.FaceDown _ -> True
+  Facing.FaceUp | Maybe.isJust (Game.copyStampOf obj) -> True
   Facing.FaceUp -> case Game.cardOfSource gs (Just (Object.source obj)) of
     Nothing -> False
     Just card -> any (any (statesZoneOfRow zone) . Face.replacementEffects) (Card.Type.faces card)
@@ -5212,7 +5213,7 @@ replacementsAffecting gs =
       -- that states the command zone functions from there" proves both halves,
       -- one board apiece.
       (inCommand, statingCommand) = List.partition (\oid -> Vanguard.functionsFromCommandZone oid gs) (Set.toList (GameState.command gs))
-      commandZoneHas oid = case Game.faceOf oid gs of
+      commandZoneHas oid = case abilityFaceOfId oid gs of
         Nothing -> False
         Just face -> not (null (Face.replacementEffects face))
       -- CR 113.6b's stated set, in the zones CR 113.6 gives no default that
@@ -5225,10 +5226,10 @@ replacementsAffecting gs =
       -- of them for everything rule 113.6p does not name, which is the split
       -- above.
       --
-      -- The PRINTED face, which is how every off-battlefield arm of gatherGiven
-      -- reads one, rather than the projection the two walks above take: `project`
-      -- is what the short-circuit beneath exists to skip. CR 604.2's clause still
-      -- gates each row.
+      -- The ability face (abilityFaceOf), which is how every off-battlefield arm
+      -- of gatherGiven reads one, rather than the projection the two walks above
+      -- take: `project` is what the short-circuit beneath exists to skip. CR
+      -- 604.2's clause still gates each row.
       --
       -- MINTED rows are deliberately absent from THIS arm: CR 122.1's counters do
       -- not survive the trip off the battlefield (CR 122.2), and every other
@@ -5245,7 +5246,7 @@ replacementsAffecting gs =
         Nothing -> []
         Just obj | Object.exiledFaceDown obj -> []
         Just obj | not (mayStateZoneOfRow gs zone obj) -> []
-        Just obj -> case Game.faceOfObject gs obj of
+        Just obj -> case abilityFaceOf oid obj gs of
           Nothing -> []
           Just face ->
             fmap
@@ -5256,12 +5257,12 @@ replacementsAffecting gs =
       -- sorcery's abilities while the object is on the stack, and CR 113.6b's
       -- stated set overrides that in both directions. gatherGiven's fromSpell is
       -- the same pair on a static ability, down to reading the card TYPES off the
-      -- printed face -- a classification rather than an identity -- and this arm
+      -- ability face -- a classification rather than an identity -- and this arm
       -- takes no mayStateZoneOfRow prefilter for the same reason it takes the
       -- default: an unstated row belongs here, and the stack is short.
       fromSpellRow oid = case Game.lookupObject oid gs of
         Nothing -> []
-        Just obj -> case Game.faceOfObject gs obj of
+        Just obj -> case abilityFaceOf oid obj gs of
           Nothing -> []
           Just face ->
             let isSpellStatic = not (Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face))))
@@ -5303,21 +5304,21 @@ replacementsAffecting gs =
       -- a graveyard dredge" prove the two directions.
       --
       -- Gated so the walk does not project every card in every graveyard: a
-      -- card is projected only when its printed face has such a keyword or when
-      -- some grantor writes one (`graveyardGrantInForce`).
+      -- card is projected only when mintsOffBattlefield lets it: its ability face
+      -- has such a keyword, or some grantor writes one (`graveyardGrantInForce`).
       --
       -- No mayStateZoneOfRow prefilter beside it, `mintedInHand`'s posture: a
       -- MINTED row is not printed in a face's list, so there is no
       -- functions-from set on it to consult -- rule 702.52a states the zone
       -- itself, and this walk is the zone.
-      mintedInGraveyard oid = case Game.faceOf oid gs of
+      mintedInGraveyard oid = case abilityFaceOfId oid gs of
         Nothing -> []
         Just face
-          | null (Keyword.graveyardReplacementsOf (Face.keywordSet face)) && not graveyardGrantInForce -> []
+          | not (mintsOffBattlefield Keyword.graveyardReplacementsOf graveyardGrantInForce face) -> []
           | otherwise -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.graveyardReplacementsOf (Map.keysSet (keywordsOf oid gs)))
       -- Does anything grant a keyword that mints a graveyard row? A thunk: only
-      -- a graveyard card printing no such keyword forces it.
-      graveyardGrantInForce = keywordGrantInForce (not . null . Keyword.graveyardReplacementsOf . Set.singleton) gs
+      -- a graveyard card whose ability face has no such keyword forces it.
+      graveyardGrantInForce = mintingGrantInForce Keyword.graveyardReplacementsOf gs
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
@@ -5328,7 +5329,7 @@ replacementsAffecting gs =
           <> concatMap (statedFrom Zone.Exile) (Set.toList (GameState.exile gs))
           <> concatMap (statedFrom Zone.Command) statingCommand
       -- The short-circuit guards the two walks that PROJECT, and nothing else:
-      -- `stated` reads printed faces, behind mayStateZoneOfRow everywhere but the
+      -- `stated` reads ability faces, behind mayStateZoneOfRow everywhere but the
       -- stack, so it costs what gatherGiven's stating walks cost and answers []
       -- on a board with no such row without any of the reads baseHas makes.
       onBoard =
@@ -5341,26 +5342,43 @@ replacementsAffecting gs =
 -- minted from (Keyword.handReplacementsOf) -- the projection's, since CR 613.1
 -- names no zone, so an effect granting or removing madness there is seen.
 --
--- Projected when the printed face has madness, so an effect removing it is
--- seen, or when some grantor writes madness (`keywordGrantInForce`), so one
--- granting it is. A card printing none on a board granting none skips the
--- projection and answers empty, the projection's set differing there only in
--- keywords that mint nothing in a hand.
+-- Projected when the ability face (abilityFaceOf) has madness, so an effect
+-- removing it is seen, or when some grantor writes madness
+-- (`keywordGrantInForce`), so one granting it is. A card whose ability face has
+-- none on a board granting none skips the projection and answers empty, the
+-- projection's set differing there only in keywords that mint nothing in a
+-- hand.
 handMintingKeywordsOf :: ObjectId -> GameState -> Set Keyword
 handMintingKeywordsOf oid gs = handMintingKeywordsGiven (madnessGrantInForce gs) oid gs
 
 -- `handMintingKeywordsOf` with `madnessGrantInForce`'s answer handed in, for a
 -- walk over every hand that asks it once.
 handMintingKeywordsGiven :: Bool -> ObjectId -> GameState -> Set Keyword
-handMintingKeywordsGiven granted oid gs = case Game.faceOf oid gs of
+handMintingKeywordsGiven granted oid gs = case abilityFaceOfId oid gs of
   Nothing -> Set.empty
   Just face
-    | null (Keyword.handReplacementsOf (Face.keywordSet face)) && not granted -> Set.empty
+    | not (mintsOffBattlefield Keyword.handReplacementsOf granted face) -> Set.empty
     | otherwise -> Map.keysSet (keywordsOf oid gs)
 
 -- Does anything grant madness (`keywordGrantInForce`)?
 madnessGrantInForce :: GameState -> Bool
-madnessGrantInForce = keywordGrantInForce (not . null . Keyword.handReplacementsOf . Set.singleton)
+madnessGrantInForce = mintingGrantInForce Keyword.handReplacementsOf
+
+-- CR 113.6 / 613.1: the gate every off-battlefield read of KEYWORD-MINTED
+-- abilities takes before it projects a card -- does the card's ability face
+-- (abilityFaceOf) hold a keyword the roster `mints` answers for, or is a grant
+-- of one in force (`granted`, mintingGrantInForce's answer)? A card failing both
+-- has no such keyword in its projection either, so the projection is skipped.
+-- Madness in a hand, dredge in a graveyard, and Pawl.Engine.Event.Trigger's
+-- recover, haunt and suspend.
+mintsOffBattlefield :: (Set Keyword -> [a]) -> Bool -> Face.Face card -> Bool
+mintsOffBattlefield mints granted face = granted || not (null (mints (Face.keywordSet face)))
+
+-- Does anything grant a keyword the roster `mints` answers for
+-- (`keywordGrantInForce`)? mintsOffBattlefield's second disjunct, asked once
+-- per walk.
+mintingGrantInForce :: (Set Keyword -> [a]) -> GameState -> Bool
+mintingGrantInForce mints = keywordGrantInForce (not . null . mints . Set.singleton)
 
 -- Does anything write a modification handing out a keyword satisfying `p`? A
 -- battlefield permanent's static ability, a stored effect (`storedWrites`) or
@@ -5419,13 +5437,13 @@ storedWrites p gs = any (any p . grantedDefiningParts . ContinuousEffect.modific
 elsewhereGrants :: (Modification -> Bool) -> GameState -> Bool
 elsewhereGrants p gs =
   let writes sa = any p (StaticAbility.modifications sa)
-      grants zone oid = case Game.faceOf oid gs of
+      grants zone oid = case abilityFaceOfId oid gs of
         Nothing -> False
         Just face -> any (\sa -> functionsFromZone zone sa && writes sa) (Face.staticAbilities face)
       grantsStating zone oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj | not (mayStateZone gs zone obj) -> False
-        Just obj -> case Game.faceOfObject gs obj of
+        Just obj -> case abilityFaceOf oid obj gs of
           Nothing -> False
           Just face -> any (\sa -> statesZone zone sa && writes sa) (Face.staticAbilities face)
    in any (grants Zone.Command) (Set.toList (GameState.command gs))

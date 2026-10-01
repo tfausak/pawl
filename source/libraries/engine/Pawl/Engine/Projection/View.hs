@@ -1007,18 +1007,19 @@ copiableCharacteristicsTurned oid gs = copiableCharacteristicsFaceUp oid (Game.w
 -- this object's own unlocked designations instead (copiableCharacteristics
 -- above).
 --
--- THE accessor all seven of those readers share -- the record above,
--- staticAbilitiesOf and copiableSpecialActionsOf below, Pawl.Engine.Projection's
--- copiableReplacementsOf, anyCopiableKeyword and copiableMintsType, and
+-- THE accessor all eight of those readers share -- the record above,
+-- staticAbilitiesOf, abilityFaceOf and copiableSpecialActionsOf below,
+-- Pawl.Engine.Projection's copiableReplacementsOf, anyCopiableKeyword and
+-- copiableMintsType, and
 -- Pawl.Engine.PlayerEffect's playerAbilitiesOf -- so that no two of them can
--- answer differently about one object. Four of the seven are disjuncts of ONE
+-- answer differently about one object. Four of the eight are disjuncts of ONE
 -- predicate (Pawl.Engine.Projection.replacementsAffecting's baseHas), which is
 -- what makes a per-reader fork a bug waiting rather than a style question: that
 -- predicate's
 -- False SKIPS the projection, so a reader left behind hides a copy's ability
 -- rather than reporting it.
 --
--- Two of those seven have a producer over a copied door -- copiableReplacementsOf
+-- Two of those eight have a producer over a copied door -- copiableReplacementsOf
 -- (Torture Pit, proved by Pawl.RoomSpec's "CR 707.2a a copy of a Room gathers the
 -- replacement effect behind the door IT unlocked") and playerAbilitiesOf
 -- (Steaming Sauna). anyCopiableKeyword, copiableMintsType and
@@ -1029,7 +1030,7 @@ copiableCharacteristicsTurned oid gs = copiableCharacteristicsFaceUp oid (Game.w
 -- left behind again.
 --
 -- FACE DOWN answers Nothing before either of those questions is asked, so all
--- seven readers fall through to the printed read and Game.faceOf hands them
+-- eight readers fall through to the printed read and Game.faceOf hands them
 -- Card.faceDownFace. CR 613.2b orders layer 1b after layer 1a, so CR 708.2's
 -- listed characteristics replace what a copy effect stamped rather than losing to
 -- it -- Game.halvesOf's and Game.prepareSpellOf's fork, one field over, and here
@@ -1115,6 +1116,50 @@ spellFaceOf oid gs =
   let copiable = copiableCharacteristics oid gs
       typeLine = TypeLine.MkTypeLine (PC.supertypes copiable) (PC.cardTypes copiable) (PC.subtypes copiable)
    in fmap (\face -> face {Face.spell = PC.spell copiable, Face.typeLine = typeLine}) (Game.faceOf oid gs)
+
+-- CR 707.2 / 113.6: the face an object OFF the battlefield has its abilities read
+-- from -- Game.faceOfObject with its copiable values' abilities, keywords and type
+-- line (copiableSnapshotOf) laid over it. The ONE read every reader of "which
+-- abilities does this card have where it is" takes: Pawl.Engine.Projection's zone
+-- gatherers and their prefilters, and Pawl.Engine.Event.Trigger's zone
+-- candidates. So a conjured duplicate of a Clone copying Anger has Anger's
+-- abilities in a graveyard, as the projection says it does. Pawl.ConjureSpec's
+-- "a duplicate of a Clone of" Anger, Bloodghast and Arrogant Wurm cases prove the
+-- static, the triggered and the keyword-minted side.
+--
+-- PROJECTION-FREE, staticAbilitiesOf's reason: the gatherers run while the
+-- projection is being built. Only the fields an ability read asks are laid over;
+-- the delayed-ability declarations stay the printing's, card data rather than a
+-- characteristic (Game.delayedAbilitiesOf).
+--
+-- Walked per card in every hand and library on every projection behind
+-- Pawl.Engine.Projection.mayStateZone, so an object carrying no stamp on a board
+-- storing no copy effect skips copiableSnapshotOf's lookups.
+abilityFaceOf :: ObjectId -> Object.Object -> GameState -> Maybe (Face.Face Card.Type.Card)
+abilityFaceOf oid obj gs =
+  let stamped =
+        if Maybe.isNothing (Game.copyStampOf obj) && not (Object.flipped obj) && null (GameState.copyEffects gs)
+          then Nothing
+          else copiableSnapshotOf oid gs
+      overlay face pc =
+        face
+          { Face.typeLine = TypeLine.MkTypeLine (PC.supertypes pc) (PC.cardTypes pc) (PC.subtypes pc),
+            Face.keywords = PC.keywords pc,
+            Face.staticAbilities = PC.staticAbilities pc,
+            Face.playerAbilities = PC.playerAbilities pc,
+            Face.specialActions = PC.specialActions pc,
+            Face.activatedAbilities = PC.activatedAbilities pc,
+            Face.replacementEffects = PC.replacementEffects pc,
+            Face.triggeredAbilities = PC.triggeredAbilities pc,
+            Face.enchant = PC.enchant pc,
+            Face.castingPermissions = PC.castingPermissions pc,
+            Face.spell = PC.spell pc
+          }
+   in fmap (\face -> maybe face (overlay face) stamped) (Game.faceOfObject gs obj)
+
+-- `abilityFaceOf` for a caller that holds only the id.
+abilityFaceOfId :: ObjectId -> GameState -> Maybe (Face.Face Card.Type.Card)
+abilityFaceOfId oid gs = Game.lookupObject oid gs >>= \obj -> abilityFaceOf oid obj gs
 
 -- CR 612.5: the object whose copiable rules text `oid` carries -- `oid` itself
 -- unless a stored ExchangeTextBoxes effect moved another's text box onto it.
