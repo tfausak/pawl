@@ -1029,14 +1029,36 @@ selfReductions targets pid oid gs =
    in Maybe.mapMaybe scaled (filter applies (selfSentences pid oid gs))
 
 -- The sentences selfReductions reads, printed, granted and keyword alike. The
--- granted and keyword ones are projected off `asSpell`'s board.
+-- granted and keyword ones are `asSpellProjected`'s, so the keywords are
+-- `spellKeywords`' reading.
 selfSentences :: PlayerId -> ObjectId -> GameState -> [CostReduction.CostReduction]
 selfSentences pid oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
   (Just obj, Just card, Just printedFace) ->
     let face = Game.castingFaceOf obj card printedFace
-        projected = Projection.project oid (asSpell pid oid gs)
+        projected = asSpellProjected pid oid gs
      in Face.costReductions face <> PC.grantedCostReductions projected <> Keyword.selfCostReductionsOf (PC.keywords projected)
   _ -> []
+
+-- CR 601.2a / 613.1f: the keywords of the spell `pid` is casting, printed and
+-- granted alike, with how many instances of each -- the one reader for what the
+-- spell has once it is on the stack: its cost reductions (affinity, undaunted),
+-- its additional costs (kicker, casualty, buyback, entwine, escalate), its mana
+-- substitutes (convoke, delve, improvise) and assist. Pawl.CostSpec's Mycosynth
+-- Golem and Chief Engineer groups and Pawl.KeywordTriggerSpec's "CR 702.153a a
+-- granted casualty copies Lightning Bolt" prove a grant reaching it.
+--
+-- What the CARD has where it lies, before the move -- the keywords that permit
+-- the cast from that zone (Cast.projectedKeywords) -- is a different question,
+-- asked of the proposal board. Not implemented: candidateCostsGiven asks that
+-- board for every alternative cost, including those whose keyword functions
+-- on the stack (prowl, blitz), so one granted to spells you cast is not offered
+-- (#4585).
+spellKeywords :: PlayerId -> ObjectId -> GameState -> Map.Map Keyword.Type.Keyword Natural
+spellKeywords pid oid gs = PC.keywords (asSpellProjected pid oid gs)
+
+-- The spell's projection off `asSpell`'s board.
+asSpellProjected :: PlayerId -> ObjectId -> GameState -> PC.ProjectedCharacteristics
+asSpellProjected pid oid gs = Projection.project oid (asSpell pid oid gs)
 
 -- CR 601.2a / 601.2f: a card whose cast is being proposed (Game.beingCast) is
 -- still in its old zone on a gate's board, but its total is determined with it
@@ -1224,9 +1246,8 @@ totalManas adjustments =
 -- unsatisfiable set -- but an enumeration bound: a {8} cost beside two creatures
 -- offers three entries rather than nine.
 --
--- The keywords are read off the object's own face rather than through the
--- projection (#1859, #4522): this is the half Cast.asProposed stamped, under
--- any copy stamp's keywords (Game.castingKeywordsOf, CR 707.2).
+-- The keywords are `spellKeywords`', so a granted convoke (Chief Engineer)
+-- substitutes as a printed one does.
 --
 -- The OFFERS come in two provenances and this function holds only the keywords'.
 -- CR 701.67a's waterbend is the other, and it rides the COST (CostComponent.Waterbend)
@@ -1235,7 +1256,7 @@ totalManas adjustments =
 -- generic amount where a keyword's offer is capped only by the symbol.
 manaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
 manaSubstitutions components slots pid oid gs =
-  let keywords = Game.castingKeywordsOf oid gs
+  let keywords = Map.keysSet (spellKeywords pid oid gs)
    in substitutionsOffering (\symbol -> fmap (\substitute -> (substitute, Nothing)) (Keyword.manaSubstitutesFor symbol keywords) <> waterbendOffers components symbol) slots pid oid gs
 
 -- CR 701.67a's half of the offer alone, which is what every payment but a
@@ -5249,25 +5270,24 @@ genericOf symbol = case symbol of
 -- HERE, ahead of the caster's, which is the order rule 702.132a states. The
 -- window comes back beside the player, since CR 733.1 lets the helper keep
 -- what they activated in it if the cast is reversed (`reverseIllegal`).
-offerAssist :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe (PlayerId, ManaWindow.ManaWindow))
-offerAssist perform keywords subject pid sid cost
-  | not (Set.member Keyword.Type.Assist keywords) = pure Nothing
-  | genericMana cost == 0 = pure Nothing
-  | otherwise = do
-      gs <- State.get
-      case NonEmpty.nonEmpty (filter (/= pid) (Game.stillPlaying gs)) of
-        Nothing -> pure Nothing
-        Just candidates -> do
-          answer <- Game.choose (Prompt.ChooseAssistant (Decide.deciderFor pid gs) pid sid candidates)
-          let chosen = case answer of
-                Just helper | List.elem helper (NonEmpty.toList candidates) -> Just helper
-                _ -> Nothing
-          Monad.forM
-            chosen
-            ( \helper -> do
-                (_, _, window) <- payManaWindow perform Set.empty Nothing subject ManaSpending.AsProduced helper (\mc -> pure (mc, [])) (ManaCost.MkManaCost [])
-                pure (helper, window)
-            )
+offerAssist :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe (PlayerId, ManaWindow.ManaWindow))
+offerAssist perform subject pid sid cost = do
+  gs <- State.get
+  if genericMana cost == 0 || not (Map.member Keyword.Type.Assist (spellKeywords pid sid gs))
+    then pure Nothing
+    else case NonEmpty.nonEmpty (filter (/= pid) (Game.stillPlaying gs)) of
+      Nothing -> pure Nothing
+      Just candidates -> do
+        answer <- Game.choose (Prompt.ChooseAssistant (Decide.deciderFor pid gs) pid sid candidates)
+        let chosen = case answer of
+              Just helper | List.elem helper (NonEmpty.toList candidates) -> Just helper
+              _ -> Nothing
+        Monad.forM
+          chosen
+          ( \helper -> do
+              (_, _, window) <- payManaWindow perform Set.empty Nothing subject ManaSpending.AsProduced helper (\mc -> pure (mc, [])) (ManaCost.MkManaCost [])
+              pure (helper, window)
+          )
 
 -- CR 702.132a at the castability gate: a totalled mana cost less the generic
 -- mana the best-placed other player could pay of it. CR 601.2 lets a player
@@ -5280,9 +5300,9 @@ offerAssist perform keywords subject pid sid cost
 -- pays from their own pool and the mana abilities of what they control, so
 -- neither payment can spend what the other's needs, and paying more of the
 -- generic only makes the caster's residual easier.
-assistable :: Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
-assistable keywords subject pid oid gs manaCost
-  | not (Set.member Keyword.Type.Assist keywords) = manaCost
+assistable :: PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
+assistable subject pid oid gs manaCost
+  | not (Map.member Keyword.Type.Assist (spellKeywords pid oid gs)) = manaCost
   | otherwise =
       let generic = sum (fmap genericOf (ManaCost.unwrap manaCost))
           pays helper n = canPaySomeCompletion Map.empty subject ManaSpending.AsProduced helper oid pure (\mc -> [(mc, [])]) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) gs
