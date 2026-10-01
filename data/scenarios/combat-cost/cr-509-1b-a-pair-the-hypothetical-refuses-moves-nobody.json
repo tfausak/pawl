@@ -1,0 +1,149 @@
+{
+  "description": "CR 509.1b a pair the hypothetical refuses moves nobody",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bird Maiden",
+            "label": "bird-maiden",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Cabal Evangel",
+            "label": "cabal-evangel",
+            "ready": true
+          },
+          {
+            "card": "Giant Spider",
+            "label": "giant-spider",
+            "ready": true
+          },
+          {
+            "card": "General Jarkeld",
+            "label": "general-jarkeld",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$bird-maiden",
+          "$goblin-piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$cabal-evangel": [
+            "$goblin-piker"
+          ],
+          "$giant-spider": [
+            "$bird-maiden"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$general-jarkeld",
+          "targets": [
+            "$bird-maiden",
+            "$goblin-piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "check": {
+        "Blockers": {
+          "attacker": "$bird-maiden",
+          "blockers": [
+            "$giant-spider"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "check": {
+        "Blockers": {
+          "attacker": "$goblin-piker",
+          "blockers": [
+            "$cabal-evangel"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$bird-maiden",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$general-jarkeld",
+        "tapped": true
+      }
+    }
+  ]
+}

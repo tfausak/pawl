@@ -1,0 +1,132 @@
+{
+  "description": "CR 509.3e an Inquisitors already blocked by a black creature does not trigger again on the switch",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Serra Inquisitors",
+            "label": "serra-inquisitors",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "bog-wraith",
+            "ready": true
+          },
+          {
+            "card": "Bog Wraith",
+            "label": "bog-wraith-2",
+            "ready": true
+          },
+          {
+            "card": "General Jarkeld",
+            "label": "general-jarkeld",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$serra-inquisitors",
+          "$hill-giant"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$bog-wraith": [
+            "$serra-inquisitors"
+          ],
+          "$bog-wraith-2": [
+            "$hill-giant"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$general-jarkeld",
+          "targets": [
+            "$serra-inquisitors",
+            "$hill-giant"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "check": {
+        "Blockers": {
+          "attacker": "$serra-inquisitors",
+          "blockers": [
+            "$bog-wraith-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$serra-inquisitors",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$serra-inquisitors",
+        "power": 5,
+        "toughness": 3
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$hill-giant",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$general-jarkeld",
+        "tapped": true
+      }
+    }
+  ]
+}
