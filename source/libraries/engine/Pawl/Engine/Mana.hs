@@ -456,10 +456,9 @@ manaSuppliesGiven capacity pcs pid oid gs =
           -- and is one: CR 109.4a and CR 113.8 make the player activating a
           -- mana ability its controller, whoever controls the permanent.
           --
-          -- Still a supply of NO units rather than no supply at all: dropping
-          -- the triple would take the source off payableResolutionsGiven's
-          -- `sequenceA` and with it every board, where an empty one is just a
-          -- source that adds this player nothing.
+          -- Still a supply of NO units rather than no supply at all: the
+          -- triple carries what the activation spends, and an empty yield is
+          -- just a source that adds this player nothing.
           Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
@@ -1858,12 +1857,13 @@ canPayCommitting subject capacity spending pid committed committedEnergy claimed
 canPayCommittingGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
 canPayCommittingGiven subject capacity spending sources pcs pid committed committedEnergy claimed cost gs = not (null (payableResolutionsGiven subject capacity spending sources pcs pid committed committedEnergy claimed cost gs))
 
--- One source's contribution to the supply side, as the OPTIONS it offers: one
--- option per group of yields (see the collapse below), and each option is that
+-- One source's contribution to the supply side, as the OPTIONS each of its
+-- GROUPS of mana abilities offers (see the collapse below): each option is that
 -- group -- read as one supply per mana it adds -- repeated as many times as it is
 -- taken, paired with what those activations SPEND: the claims they make on objects
 -- (Pawl.Types.ClaimAxis), and the life and energy they pay (manaSuppliesGiven).
--- payableResolutions picks exactly ONE option per source.
+-- payableResolutions picks exactly ONE option per group, so a board can take
+-- several of one source's abilities (CR 605.3a).
 --
 -- How many times is enumerated, 0 up to the ceiling, for an option that SPENDS
 -- something a board is measured against -- a CONTENDED claim on objects, or CR
@@ -1876,7 +1876,7 @@ canPayCommittingGiven subject capacity spending sources pcs pid committed commit
 -- sacrifice between them, and whose is the player's to choose; a Treasonous Ogre
 -- activated fewer times than it could be is the life half of the same thing.
 --
--- `contended` is the CALLER's answer to "do this source's claims meet any other
+-- `contends` is the CALLER's answer to "do this group's claims meet any other
 -- group's?", which is a fact about the whole board and not about this source
 -- (payableResolutionsGiven builds it). Where they meet nothing, declining an
 -- activation frees an object no other claim wants, so the maximum is never worth
@@ -1923,16 +1923,22 @@ canPayCommittingGiven subject capacity spending sources pcs pid committed commit
 -- yields) makes the options it always did; only a repeatable group of m >= 2
 -- alternatives grows, from m options for k activations to C(k + m - 1, m - 1).
 --
--- Two GROUPS are still never mixed, since a source offers one option: two
--- abilities of one source that differ in what an activation costs are never both
--- taken on one board. Not implemented; Skyshroud Elf's "{T}: Add {G}" paying its
--- own "{1}: Add {R} or {W}" is the card that needs it. Understating supply only
--- ever refuses a cast that was payable (#4385).
+-- Two GROUPS are not mixed into one option but each offers its own, so a board
+-- takes both: Skyshroud Elf's "{T}: Add {G}" sits at an earlier position than
+-- its "{1}: Add {R} or {W}" and pays it (payableResolutionsGiven's
+-- `orderings`). Two groups of one source drawing on one object -- a filter
+-- land's two {T} routes -- contend like any two sources' claims, so each is
+-- taken 0 up to its ceiling and Claim.satisfiable refuses the board taking both.
+-- A resource no claim carries (CR 107.6's {Q}, counters on the source) is
+-- capped per group alone. data/cards/, scanned 2026-09-30 for a card with two
+-- mana abilities whose costs both hold such a component, has none; a permanent
+-- with two "Remove a counter from this: Add ..." abilities and no {T} would be
+-- the first.
 --
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
 -- makes them all facts about that one source.
--- ONE option a source offers a board: the mana it would add, the mana its own
+-- ONE option a group offers a board: the mana it would add, the mana its own
 -- activations would eat (CR 602.2b), and what those activations spend besides.
 --
 -- The demands and the supplies are ONE record because they are one fact -- k
@@ -1947,8 +1953,8 @@ data SourceOption = MkSourceOption
   }
   deriving (Eq, Ord, Show)
 
-sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> Bool -> [(Activations.Activations, Mana, ManaCost)] -> [SourceOption]
-sourceOptions clauses admitting contended supplies =
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ([Claim] -> Bool) -> [(Activations.Activations, Mana, ManaCost)] -> [[SourceOption]]
+sourceOptions clauses admitting contends supplies =
   let -- Grouped by what ONE activation costs, which is what lets k activations of
       -- the group take k alternatives independently.
       groups =
@@ -1978,6 +1984,7 @@ sourceOptions clauses admitting contended supplies =
         let claims = Activations.claims activations
             life = Activations.life activations
             energy = Activations.energy activations
+            contended = contends claims
             alternatives = alternativesOf yields
             eats = not (null (ManaCost.unwrap manaCost))
             -- A mana-EATING option is always worth taking fewer times, for the same
@@ -2022,7 +2029,11 @@ sourceOptions clauses admitting contended supplies =
                     supplyAdmits = admits
                   }
             ]
-   in ListUtils.nubOrd (concatMap optionsFor groups)
+      -- Taking a group no times is always a way to fill a pool, so a group the
+      -- enumeration leaves empty offers that rather than ending every board. A
+      -- FENCE: `resolutions` answers at least one way to pay every cost.
+      none = MkSourceOption {optionSupplies = [], optionDemands = [], optionClaims = [], optionLife = 0, optionEnergy = 0}
+   in fmap (\group -> case ListUtils.nubOrd (optionsFor group) of [] -> [none]; some -> some) groups
 
 -- Every multiset of `k` elements drawn from `xs`, each once, as a list in `xs`'
 -- order: C(k + m - 1, m - 1) of them for m elements.
@@ -2045,13 +2056,14 @@ multisets k xs = case (k, xs) of
 --
 -- So it is an assignment question, and it is answered exactly. Model each
 -- available mana as a SUPPLY carrying the set of types it could be and the
--- production-time tags it would carry (CR 106.3). A source is a CHOICE among such
--- supplies, one option per way its activations could fill a pool: k activations
--- at one cost taking k of the yields it buys, each on its own (sourceOptions).
+-- production-time tags it would carry (CR 106.3). Each group of a source's mana
+-- abilities is a CHOICE among such supplies, one option per way its activations
+-- could fill a pool: k activations at one cost taking k of the yields it buys,
+-- each on its own (sourceOptions).
 -- Each typed symbol of the cost is a DEMAND, which `serves` matches against a
 -- supply; generic symbols demand a count and nothing more.
 --
--- A BOARD is the pool plus one option taken from every source -- the mana the
+-- A BOARD is the pool plus one option taken from every group -- the mana the
 -- player would actually have in front of them after tapping everything -- and it
 -- is a board only if the activations it took are JOINTLY payable alongside
 -- `claimed`, since two of them, or one of them and the cost being paid, may claim
@@ -2082,9 +2094,9 @@ multisets k xs = case (k, xs) of
 -- ({T}: Add {C}{C}) a Forest as well, so the union read it as able to make two
 -- mana one of which is green.
 --
--- The SEARCH over boards is the product of the sources' options, exponential in
--- the number of sources offering more than one -- the reason sourceOptions'
--- collapse matters. After it, a source offers more than one option only if it has
+-- The SEARCH over boards is the product of the groups' options, exponential in
+-- the number of groups offering more than one -- the reason sourceOptions'
+-- collapse matters. After it, a group offers more than one option only if it has
 -- yields the collapse keeps apart -- one adding more than one mana: a multi-mana
 -- ability on a permanent some effect has ALSO given a basic land type (Palladium
 -- Myr under Ashaya), or Cadaverous Bloom's {B}{B} and {G}{G}, whose repeats take
@@ -2133,18 +2145,12 @@ payableResolutions subject capacity spending pid committed committedEnergy claim
 -- permanent in one enumeration, and so one more per-permanent O(N) walk when it
 -- is taken here (#1073).
 --
--- IT MUST BE `supplyCapacity capacity`'s OWN LIST, which is what
+-- IT MUST HOLD every source `supplyCapacity capacity` admits, which is what
 -- Pawl.Engine.Cost.supplyManaSourcesGiven builds. Nothing in the type says so,
 -- and the two plain wrappers above are what a caller with no list of its own
 -- uses. A source listed here whose every route the supply capacity refuses
--- contributes an EMPTY option list, and `sequenceA options` below turns one of
--- those into no board at all -- the whole player's mana unpayable. The offer
--- list (Cost.activationManaSourcesGiven) is what would do it: it admits a
--- permanent whose only mana route holds mana in its own cost, and one whose only
--- mana route CR 601.2a's move puts out of reach (Cost.stackedManaActivations).
--- Pawl.ManaSpec's "CR 106.4 the Ignus's own yield is no supply for the {R} its
--- activation eats" is what holds the pairing: unstacking the source list alone
--- reddens its second assertion, a Mountain no longer paying a {1}.
+-- contributes no group and so nothing, which is why a wider list is harmless
+-- and a narrower one understates.
 --
 -- The SAME board manaSources is judged against serves the per-source yields
 -- too, rather than a fresh projection per source on top of the sweep (#200);
@@ -2198,19 +2204,23 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       clauses = PlayerEffect.spendManaAsThough pid gs
       pooled = fmap (rewriteSupply clauses . supplyOf admitting) (unitsOf (Game.poolOf pid gs))
       suppliesPer = fmap (\oid -> manaSuppliesGiven capacity pcs pid oid gs) sources
-      activationsOf (activations, _, _) = Activations.claims activations
-      -- WHICH sources are worth taking fewer times: the ones whose claims meet
-      -- another source's, or the cost's own. Asked GROUPWISE, one group per
-      -- source plus `claimed`, so a source's own claims meeting each other is
-      -- not contention -- Cost.repeatsOf has already measured that, and it is
-      -- what `times` is.
-      contested = Claim.contested (claimed : fmap (concatMap activationsOf) suppliesPer)
+      -- WHICH groups are worth taking fewer times: the ones whose claims meet
+      -- another group's, this source's included, or the cost's own. Asked
+      -- GROUPWISE, one entry per sourceOptions group plus `claimed`, so one
+      -- group's own claims meeting each other is not contention --
+      -- Cost.repeatsOf has already measured that, and it is what `times` is.
+      groupClaimsOf supplies = fmap (Activations.claims . fst) (ListUtils.nubOrd (fmap (\(activations, _, manaCost) -> (activations, manaCost)) supplies))
+      contested = Claim.contested (claimed : concatMap groupClaimsOf suppliesPer)
       energyHeld = Game.energyOf pid gs
       -- Each option paired with the SOURCE it came from, which is what says
       -- whose activation cost its demands are: CR 602.2b's subject for the
       -- position that option occupies below.
-      options = zipWith (\oid supplies -> fmap ((,) oid) (sourceOptions clauses admitting (Claim.contends contested (concatMap activationsOf supplies)) supplies)) sources suppliesPer
-      -- One option taken from each source, appended to the pool: `sequenceA` over
+      -- One ENTRY per group rather than per source: CR 605.3c bars the
+      -- ABILITY, so one payment may activate several of a permanent's. Skyshroud
+      -- Elf's {G} pays its own {1} (data/scenarios'
+      -- skyshroud-elf-green-buys-red is the proof).
+      options = concat (zipWith (\oid supplies -> fmap (fmap ((,) oid)) (sourceOptions clauses admitting (Claim.contends contested) supplies)) sources suppliesPer)
+      -- One option taken from each group, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board
       -- carries the LIFE its activations pay, which its CR 119.4 clause below is
@@ -2264,7 +2274,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
             sum (fmap (optionLife . snd) taken)
           )
       -- Whether there is a walk for the relaxation below to save: one option per
-      -- source, and at most one of them eating mana, is one board.
+      -- group, and at most one of them eating mana, is one board.
       searching = not (all (null . drop 1) options) || length (filter (not . all (null . optionDemands . snd)) options) > 1
       -- CR 119.4's floor, asked of every board: the player effects walked once.
       affordable = Event.lifePayable pid gs
@@ -2309,7 +2319,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
                     && Natural.length supplies >= Natural.length wanted_
                     && all hallHolds (List.subsequences (Set.toList (Set.fromList wanted_)))
             -- CR 118.3 asked of a RELAXATION first, which no board beats: each
-            -- source takes whichever option serves the clause at hand best, with
+            -- group takes whichever option serves the clause at hand best, with
             -- only CR 119.4's one life total holding them together and every
             -- claim ignored. `best` is that choice for one clause -- a knapsack
             -- over the life the options pay -- and Nothing when no choice at all

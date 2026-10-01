@@ -1,0 +1,25 @@
+{
+  "description": "CR 605.3c a lone Skyshroud Elf's own {G} pays its {1}, so Kird Ape is castable",
+  "note": "The Elf is the only source, so the {R} exists only if its {T}: Add {G} feeds its {1}: Add {R} or {W}. CR 118.3's gate must combine two mana abilities of one permanent to offer the cast at all.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Skyshroud Elf", "label": "elf", "ready": true }],
+        "hand": [{ "card": "Kird Ape", "label": "ape" }]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@ape", "mana": ["@elf", "@elf", null], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Red" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Kird Ape", "count": 1 } },
+    { "Tapped": { "object": "@elf", "tapped": true } }
+  ]
+}

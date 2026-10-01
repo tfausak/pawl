@@ -5012,11 +5012,10 @@ orderSensitive component = case component of
 -- re-offering an untapped source that just refused to pay would ask the same
 -- question forever. What reaches it is a payment REFUSED and not one that was
 -- never payable, CR 118.3's gate keeping an unpayable option off the offer.
---
--- Not implemented: `refused` by ROUTE. A permanent whose chosen route failed
--- loses its OTHER mana abilities on this window too, where CR 605.3a goes on
--- offering them; `tapForManaWith` answers a Bool and cannot name the route that
--- refused (#3753).
+-- Keyed by ROUTE, the (permanent, ability) pair Mana.InFlight uses, since CR
+-- 605.3a goes on offering a permanent's other mana abilities: declining Skyshroud
+-- Elf's {1} leaves its {T} on the window (data/scenarios'
+-- skyshroud-elf-declined-route-keeps-tap is the proof).
 --
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for, and every road
 -- into this function now runs `announce` first: a cast, an activation, a CR
@@ -5107,20 +5106,24 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             -- payer, and CR 113.8 makes the payer the controller of every mana
             -- ability activated here, so the capacity's own `pid` is this one.
             windowCapacity = midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))
-            offered = Mana.manaSourcesGiven inFlight windowCapacity (Projection.controlGrants gs) pcs pid gs
-        case filter (`Set.notMember` refused) offered of
+            --
+            -- The routes this window saw REFUSED join the in-flight ones for the
+            -- offer alone: a permanent stays on while some other route of it is
+            -- open, and `refused` is not handed down to a nested window.
+            offered = Mana.manaSourcesGiven (Set.union inFlight refused) windowCapacity (Projection.controlGrants gs) pcs pid gs
+        case offered of
           [] -> settle activated
           candidate : rest -> do
             answer <- chooseSource covered pid (Interchangeable.representatives pcs gs (candidate NonEmpty.:| rest)) gs
             case answer of
               Nothing -> settle activated
               Just oid -> do
-                (produced, kept) <- tapForManaWith perform midPayment inFlight pid oid
+                (produced, kept, failed) <- tapForManaWith perform midPayment inFlight refused pid oid
                 -- An activation that FAILED reversed itself already (payActivation
                 -- below), so it is not one of rule 733.1's to offer back -- but
                 -- the sources its own nested window activated and the payer KEPT
                 -- are, since their activations stand in this window.
-                window (if produced then refused else Set.insert oid refused) (if produced then oid : activated else reverse kept <> activated)
+                window (Set.union failed refused) (if produced then oid : activated else reverse kept <> activated)
       -- CR 601.2h: the window is closed, so the cost is paid out of what is there
       -- -- and simply is not paid when the player floated too little.
       --
@@ -5386,7 +5389,7 @@ payAssist helper subject sid cost = case Cost.mana cost of
 -- `pid` is the player activating it (CR 602.1a), who need not control the
 -- permanent where the route says any player may (CR 602.1b).
 tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game Bool
-tapForMana perform pid oid = fmap fst (tapForManaWith perform id Set.empty pid oid)
+tapForMana perform pid oid = fmap (\(produced, _, _) -> produced) (tapForManaWith perform id Set.empty Set.empty pid oid)
 
 -- The same activation carrying the abilities already mid-activation (CR
 -- 605.3c), which is payManaExcept's one narrowing: the route CHOSEN here joins
@@ -5399,11 +5402,19 @@ tapForMana perform pid oid = fmap fst (tapForManaWith perform id Set.empty pid o
 --
 -- `window` narrows the capacity to the window the activation is made in:
 -- `midPayment` inside a payment, the identity at priority (`tapForMana`).
-tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> PlayerId -> ObjectId -> Game (Bool, [ObjectId])
-tapForManaWith perform window inFlight activator oid = do
+--
+-- `refused` is payManaWindow's routes already declined on this window, kept off
+-- the choice here as on the offer there; the answer's third part is the route
+-- this activation adds to them, empty when it paid.
+tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> Mana.InFlight -> PlayerId -> ObjectId -> Game (Bool, [ObjectId], Mana.InFlight)
+tapForManaWith perform window inFlight refused activator oid = do
   gs <- State.get
+  -- Every route of this permanent, which is what a source with no route left to
+  -- choose answers as refused: the offer and the filter below agree, so this
+  -- only keeps payManaWindow's loop finite should they ever not.
+  let everyRoute = Set.fromList (fmap (\option -> (oid, ManaOption.ability option)) (Mana.manaOptionsOf oid gs))
   case Game.lookupObject oid gs of
-    Nothing -> pure (False, [])
+    Nothing -> pure (False, [], everyRoute)
     Just _ -> do
       -- CR 109.4a/113.8: the mana ability's controller is the player
       -- activating it -- the permanent's controller, or anyone at all for a
@@ -5421,8 +5432,8 @@ tapForManaWith perform window inFlight activator oid = do
           -- offers, rather than one per option: `manaActivations` would take its
           -- own, and that walk is the shape #1073 was about.
           capacity = window (manaActivationsGiven (PlayerEffect.applying controller gs))
-      case filter (\option -> permitted option && not (Mana.inFlightRoute inFlight oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
-        [] -> pure (False, [])
+      case filter (\option -> permitted option && not (Mana.inFlightRoute (Set.union inFlight refused) oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+        [] -> pure (False, [], everyRoute)
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
           -- CR 601.2f, reached by CR 602.2b: what is paid is the TOTAL, and the
@@ -5453,7 +5464,7 @@ tapForManaWith perform window inFlight activator oid = do
           announced <- announceReductions controller oid gs announcedCost gathered
           (outcome, kept) <- payActivation perform (Set.insert (oid, ManaOption.ability chosen) inFlight) controller oid (totalWith announced announcedCost)
           case outcome of
-            Payment.Unpaid -> pure (False, kept)
+            Payment.Unpaid -> pure (False, kept, Set.singleton (oid, ManaOption.ability chosen))
             -- CR 605.3b: a mana ability's cost binds nothing this path could
             -- read, so the payment's own slots are dropped here. The ability
             -- itself has no object either -- see `perform` below.
@@ -5569,7 +5580,7 @@ tapForManaWith perform window inFlight activator oid = do
                   -- CR 106.4 sent it to.
                   manaAbilityResolved = GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = oid, ManaAbilityResolved.amount = Natural.length producedUnits})
               applyManaTriggers perform (tappedForMana <> manaAdded <> [manaAbilityResolved])
-              pure (True, [])
+              pure (True, [], Set.empty)
 
 -- CR 605.4a: record the events one activated mana ability wrote -- CR 106.12a's
 -- tap for mana, CR 605.1b's mana being added and CR 605.3b's own resolution --
