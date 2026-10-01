@@ -1,0 +1,154 @@
+{
+  "description": "CR 601.3b the offered cast resolves and the creature enters on the opponent's turn",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Vedalken Orrery"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$goblin-piker",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "bob"
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Goblin Piker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Goblin Piker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker",
+        "power": 2,
+        "toughness": 1
+      }
+    }
+  ]
+}

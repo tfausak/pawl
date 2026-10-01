@@ -1,0 +1,184 @@
+{
+  "description": "CR 601.3b / 718.3b Yeva lets Rust Goliath begin prototyped on the opponent's turn",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-5",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Yeva, Nature's Herald",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Rust Goliath",
+            "label": "rust-goliath",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $rust-goliath",
+            "ActivateManaAbility (MkObjectId {unwrap = 0})",
+            "ActivateManaAbility (MkObjectId {unwrap = 1})",
+            "ActivateManaAbility (MkObjectId {unwrap = 2})",
+            "ActivateManaAbility (MkObjectId {unwrap = 3})",
+            "ActivateManaAbility (MkObjectId {unwrap = 4})",
+            "ActivateManaAbility (MkObjectId {unwrap = 5})",
+            "ActivateManaAbility (MkObjectId {unwrap = 6})",
+            "ActivateManaAbility (MkObjectId {unwrap = 7})",
+            "ActivateManaAbility (MkObjectId {unwrap = 8})"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$rust-goliath",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            "$forest-5",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Rust Goliath",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Rust Goliath",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-5",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Rust Goliath",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Rust Goliath",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Rust Goliath",
+        "power": 3,
+        "toughness": 5
+      }
+    }
+  ]
+}

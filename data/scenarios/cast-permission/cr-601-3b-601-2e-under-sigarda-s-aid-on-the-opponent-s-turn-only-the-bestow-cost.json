@@ -1,0 +1,151 @@
+{
+  "description": "CR 601.3b / 601.2e under Sigarda's Aid on the opponent's turn only the bestow cost is announced",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Sigarda's Aid",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Nyxborn Rollicker",
+            "label": "nyxborn-rollicker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$nyxborn-rollicker",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Nyxborn Rollicker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Nyxborn Rollicker",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Damage": {
+        "object": "Nyxborn Rollicker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Nyxborn Rollicker",
+        "tapped": false
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "Nyxborn Rollicker",
+        "is": "$goblin-piker"
+      }
+    }
+  ]
+}
