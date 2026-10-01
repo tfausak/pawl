@@ -102,6 +102,7 @@ import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
+import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -718,6 +719,7 @@ playerRefPositions =
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
         ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
+        ("choose-permanents", Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents (plantedPlayer "cp") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) (SlotName.MkSlotName (Text.pack "cp"))), [plantedPlayer "cp"]),
         ("discard-any-number", Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard (plantedPlayer "da") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) Nothing)), [plantedPlayer "da"]),
         ("player-sacrifices", Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (plantedPlayer "ps") (Filter.Type.And []) one), [plantedPlayer "ps"]),
         ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
@@ -1396,6 +1398,7 @@ ownCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> foldMap quantityCounts atMost
   -- CR 706.2's modifier and CR 706.1's count are Quantities, so their Counts
   -- are reachable here.
   Effect.RollDie rollDie -> quantityCounts (RollDie.count rollDie) <> foldMap quantityCounts (RollDie.modifier rollDie)
@@ -1847,6 +1850,7 @@ effectNestedEffects effect = case effect of
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
   Effect.ChoosePlayerAtRandom {} -> []
+  Effect.ChoosePermanents {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ArmDelayedTrigger {} -> []
@@ -2380,6 +2384,7 @@ effectReplacements effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
+  Effect.ChoosePermanents _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
@@ -2866,6 +2871,7 @@ effectMintedFaces effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
+  Effect.ChoosePermanents _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
@@ -5955,6 +5961,7 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching f atMost) _) -> unframed [f] <> frame Unframed (foldMap quantityFilters atMost)
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
   Effect.RollDie rollDie -> frame Unframed (quantityFilters (RollDie.count rollDie) <> foldMap quantityFilters (RollDie.modifier rollDie))
   -- CR 705.1's number of coins is a Quantity, so its filters are reachable here.

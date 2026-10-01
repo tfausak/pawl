@@ -46,6 +46,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChooseNumber as ChooseNumber
+import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Chooser as Chooser
@@ -804,6 +805,7 @@ effectObjectRefs effect = case effect of
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
   Effect.ChoosePlayerAtRandom {} -> []
+  Effect.ChoosePermanents {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1003,6 +1005,8 @@ effectPlayerRefs effect = case effect of
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
   Effect.ChoosePlayerAtRandom {} -> []
+  -- The seat that picks -- Archfiend of Depravity's "that player".
+  Effect.ChoosePermanents choice -> [ChoosePermanents.chooser choice]
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1409,6 +1413,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
   Effect.ChoosePlayer _ -> Map.empty
   Effect.ChoosePlayerAtRandom _ -> Map.empty
+  -- The slot is a DEFINITION; the reads are the ceiling's and the Filter's, and
+  -- the chooser is a PlayerRef, reported at the head with every other one.
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) _) ->
+    joinTwo (maybe Map.empty quantitySlots atMost) (filterSlotsOf filter_)
   -- A DEFINITION for the result slot (boundSlots below), but CR 706.2's modifier
   -- is a READ: the instruction's own Quantity may name a slot an earlier effect
   -- of this same resolution bound, CR 608.2c following the list in written order.
@@ -2044,6 +2052,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- PlaySubgame's answer: a definition reads no slot.
   Effect.ChoosePlayer _ -> True
   Effect.ChoosePlayerAtRandom _ -> True
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> all Quantity.slotsAreExhaustive atMost
   Effect.RollDie rollDie -> Quantity.slotsAreExhaustive (RollDie.count rollDie) && all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
@@ -2275,6 +2284,7 @@ readsX =
         Effect.PlaySubgame _ -> False
         Effect.ChoosePlayer _ -> False
         Effect.ChoosePlayerAtRandom _ -> False
+        Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> any Quantity.readsX atMost
         -- CR 706.2's modifier and CR 706.1's count are ordinary Quantities, so
         -- either may be the X the caster announced (CR 601.2b; Neverwinter
         -- Hydra's "roll X dice").
@@ -2323,6 +2333,8 @@ boundSlots effect = case effect of
   -- CR 608.2d: the player this effect chose.
   Effect.ChoosePlayer choice -> Set.singleton (ChoosePlayer.slot choice)
   Effect.ChoosePlayerAtRandom choice -> Set.singleton (ChoosePlayerAtRandom.slot choice)
+  -- CR 608.2d: the permanents this effect's chooser picked.
+  Effect.ChoosePermanents choice -> Set.singleton (ChoosePermanents.slot choice)
   -- CR 706.4: the result the roller used, and, where the card reads it, the
   -- other result of the same instruction, for a later effect of this resolution
   -- to read as Quantity.InSlot.

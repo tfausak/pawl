@@ -1,0 +1,221 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Covetous Elegy",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ForEach",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "ChoosePermanents",
+                          "value": {
+                            "chooser": {
+                              "type": "InSlot",
+                              "value": "player"
+                            },
+                            "permanents": {
+                              "atMost": {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
+                                  },
+                                  {
+                                    "type": "ControlledByBound",
+                                    "value": "player"
+                                  }
+                                ]
+                              }
+                            },
+                            "slot": "chosen"
+                          }
+                        }
+                      ],
+                      "ref": {
+                        "type": "EachPlayer"
+                      },
+                      "slot": "player"
+                    }
+                  },
+                  {
+                    "type": "Sacrifice",
+                    "value": {
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "Not",
+                              "value": {
+                                "type": "IsBound",
+                                "value": "chosen"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "sacrificer": {
+                        "type": "PermanentController"
+                      }
+                    }
+                  },
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "activatedAbilities": [
+                              {
+                                "cost": {
+                                  "components": [
+                                    {
+                                      "type": "TapThis"
+                                    },
+                                    {
+                                      "type": "SacrificeThis"
+                                    }
+                                  ],
+                                  "mana": []
+                                },
+                                "modal": {
+                                  "modes": [
+                                    {
+                                      "clauses": [
+                                        {
+                                          "effects": [
+                                            {
+                                              "type": "AddMana",
+                                              "value": {
+                                                "production": {
+                                                  "type": "AnyColor"
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            ],
+                            "name": "Treasure Token",
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Treasure"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Artifact"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Members"
+                          },
+                          "filter": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "Opponent"
+                                }
+                              }
+                            ]
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": {
+                              "player": {
+                                "type": "EachPlayer"
+                              },
+                              "zone": {
+                                "type": "Battlefield"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "riders": {
+                        "tapped": {
+                          "type": "Tapped"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
