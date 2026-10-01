@@ -1,0 +1,193 @@
+{
+  "description": "CR 702.156a X is 5, so it enters a 6/7 and draws",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-6",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-7",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Jacked Rabbit",
+            "label": "jacked-rabbit",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$jacked-rabbit",
+          "x": 5,
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            "$plains-5",
+            "$plains-6",
+            "$plains-7"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Jacked Rabbit",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Jacked Rabbit",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Plains",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Plains",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-7",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Jacked Rabbit",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Jacked Rabbit",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Jacked Rabbit",
+        "power": 6,
+        "toughness": 7
+      }
+    },
+    {
+      "Counters": {
+        "object": "Jacked Rabbit",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 5
+      }
+    }
+  ]
+}

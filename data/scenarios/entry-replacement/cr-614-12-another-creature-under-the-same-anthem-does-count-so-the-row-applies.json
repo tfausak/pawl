@@ -1,0 +1,128 @@
+{
+  "description": "CR 614.12 another creature under the same Anthem does count, so the row applies",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Glorious Anthem",
+            "ready": true
+          },
+          {
+            "card": "Jedit Ojanen",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Frontier Mastodon",
+            "label": "frontier-mastodon",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$frontier-mastodon",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Frontier Mastodon",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Frontier Mastodon",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Frontier Mastodon",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Frontier Mastodon",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Frontier Mastodon",
+        "power": 5,
+        "toughness": 4
+      }
+    },
+    {
+      "Counters": {
+        "object": "Frontier Mastodon",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    }
+  ]
+}
