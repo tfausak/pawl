@@ -1,0 +1,21 @@
+{
+  "description": "CR 603.2 Longtusk Cub gains two energy when it connects",
+  "note": "The Cub attacks an empty board, so its combat damage reaches bob and its trigger gives alice {E}{E}. alice starts with no energy, so the count is exactly what the trigger gave.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Longtusk Cub", "label": "cub", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@cub"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Energy" }, "count": 2 } } }
+  ]
+}

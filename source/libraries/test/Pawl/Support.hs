@@ -206,6 +206,7 @@ playerSetup pid =
   Seat.MkSeat
     { Seat.name = seatLabel pid,
       Seat.life = 20,
+      Seat.counters = Map.empty,
       Seat.battlefield = Seq.empty,
       Seat.hand = Seq.empty,
       Seat.graveyard = Seq.empty,

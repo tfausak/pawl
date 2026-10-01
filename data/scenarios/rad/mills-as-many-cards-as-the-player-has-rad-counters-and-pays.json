@@ -1,0 +1,32 @@
+{
+  "description": "mills as many cards as the player has rad counters, and pays for each nonland one",
+  "note": "Three rad counters mill three cards, two nonland and one land, with a fourth card the mill must not reach. Every number differs -- 3 milled, 2 paid for, 1 counter left, 1 card spared -- so no two can be swapped unnoticed.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [{ "key": { "type": "Rad" }, "value": 3 }],
+        "library": [
+          { "card": "Lightning Bolt" },
+          { "card": "Mountain" },
+          { "card": "Lightning Bolt" },
+          { "card": "Lightning Bolt" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Lightning Bolt", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Mountain", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Lightning Bolt", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Mountain", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 18 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Rad" }, "count": 1 } } }
+  ]
+}

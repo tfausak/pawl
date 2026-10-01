@@ -1,0 +1,32 @@
+{
+  "description": "CR 613.1d a milled card a continuous effect made a land costs no life and no counter",
+  "note": "CR 728.1 asks \"nonland card\" of each milled card's own projection, not its printed face. Synthetic Fossil Warren's layer-4 type change (CR 613.1d, CR 205.1b) makes the Goblin Pikers in alice's library land cards, so her two rad counters mill both and pay for neither: 20 life, two counters left. The Mountain under them is spared. The graveyard is the same size either way; what changes is what the tally counted.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [{ "key": { "type": "Rad" }, "value": 2 }],
+        "battlefield": [{ "card": "Synthetic Fossil Warren", "label": "warren" }],
+        "library": [
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Rad" }, "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Mountain", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Mountain", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Library", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

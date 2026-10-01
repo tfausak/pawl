@@ -7,8 +7,9 @@ list-bin pawl` needs `pawl_datadir=data` from the repository root). `pawl
 schema scenario` prints the schema. A test moved from a Haskell spec goes in a
 subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
 
-- **Board.** `seats` in turn order, each with a `name`, `life` (default 20)
-  and `battlefield`, `hand`, `graveyard`, `library` and `exile` placements (a
+- **Board.** `seats` in turn order, each with a `name`, `life` (default 20),
+  player `counters` (`[{ "key": { "type": "Energy" }, "value": 3 }]`) and
+  `battlefield`, `hand`, `graveyard`, `library` and `exile` placements (a
   library top card first; an exiled card face up and linked to nothing). A
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
   302.6), `damage`, `counters`, a `controller` and the label of the object or
@@ -49,8 +50,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   one kind on an object), `Types` (an object's card types, all of them),
   `Attackers` (every attacker and what it attacks), `Blockers` (an attacker's
   blockers, `null` when unblocked), `Defenders` (the defending players, in
-  order), `Monarch` (`null` for nobody) and `PowerToughness` (an object's
-  projected `power` and `toughness`). Assert combat at `EndOfCombat` or
+  order), `Monarch` (`null` for nobody), `PowerToughness` (an object's
+  projected `power` and `toughness`) and `PlayerCounters` (how many of one
+  `kind` a `player` has). Assert combat at `EndOfCombat` or
   earlier: it is cleared as that step ends.
 - **Final.** The run plays whole steps until the timeline is spent, the game
   ends, or the turn passes the last one named; `final` checks that state.

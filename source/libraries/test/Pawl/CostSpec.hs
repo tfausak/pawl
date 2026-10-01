@@ -1732,11 +1732,6 @@ longtuskCubSpec s registry =
       Spec.assertBool s (not (Activatable.activatable S.alice cubId ability withOne)) "unpayable at one"
       Spec.assertEqWith s "energy spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice activated) 0
       Spec.assertEqWith s "Cub grew a +1/+1 counter" (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject cubId resolved)) (Just 1)
-    Spec.it s "CR 603.2 Longtusk Cub gains two energy when it connects" $ do
-      longtuskCub <- S.printingOf s registry "Longtusk Cub"
-      let (gs, _, _) = S.combatBoardOf [longtuskCub] []
-          after = S.runCombat S.aggressiveAnswer gs
-      Spec.assertEqWith s "alice gained two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
 
 -- Jarad, Golgari Lich Lord {B}{B}{G}{G} Legendary Creature -- Zombie Elf 2/2,
 -- "Sacrifice a Swamp and a Forest: Return this card from your graveyard to your
