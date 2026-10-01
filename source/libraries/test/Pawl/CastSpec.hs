@@ -5822,8 +5822,8 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
     Spec.assertBool s (elem (S.printingName gorger) (namesIn Zone.Graveyard resolved)) "setup: the Gorger was in the graveyard before triggers were placed"
   -- Asylum Visitor prints madness {1}{B} and the Gorger grants one at its mana
   -- cost {1}{B}: which of the two exiles it is a choice between indistinguishable
-  -- answers, so ONE trigger goes on the stack above the Reunion (#4443 is the
-  -- case where the costs differ).
+  -- answers, so ONE trigger goes on the stack above the Reunion. Bloodmad
+  -- Vampire's case below is the one where the costs differ.
   Spec.it s "CR 702.35a Asylum Visitor under the Gorger has one madness trigger" $ do
     mountain <- S.printingOf s registry "Mountain"
     swamp <- S.printingOf s registry "Swamp"
@@ -5834,6 +5834,30 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
         discarded = S.runPure madnessAnswer ready (S.cast S.alice reunionId)
         placed = S.runPure madnessAnswer discarded Engine.placePendingTriggers
     Spec.assertEqWith s "CR 702.35a the Reunion and one madness trigger are on the stack" (length (GameState.stack placed)) 2
+  -- CR 616.1 / 702.35a: Bloodmad Vampire prints madness {1}{R} and the Gorger
+  -- grants one at its mana cost {2}{R}; its owner chooses which exiles it, and
+  -- only that one triggers. Three Mountains are left after the Reunion, so the
+  -- {1}{R} cast leaves one untapped and the {2}{R} cast none.
+  Spec.it s "CR 616.1 Bloodmad Vampire under the Gorger casts for the madness cost chosen" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vampire <- S.printingOf s registry "Bloodmad Vampire"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    gorger <- S.printingOf s registry "Falkenrath Gorger"
+    let base = aliceOnTurn (S.landsInPlay mountain 5)
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) base [1 :: Int .. 4]
+        handed = snd (S.addHandCard mountain S.alice (snd (S.addHandCard vampire S.alice stocked)))
+        (reunionId, ready) = S.addHandCard reunion S.alice (snd (S.addPermanent gorger S.alice handed))
+        red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        cheap = ManaCost.MkManaCost [ManaSymbol.Generic 1, red]
+        dear = ManaCost.MkManaCost [ManaSymbol.Generic 2, red]
+        placed = S.runPure (bloodmadAnswer cheap) (S.runPure (bloodmadAnswer cheap) ready (S.cast S.alice reunionId)) Engine.placePendingTriggers
+        untapped gs = length (filter (\oid -> S.soleFaceName oid gs == S.printingName mountain && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped) (Game.zoneMembers Zone.Battlefield S.alice gs))
+        outcome want =
+          let after = gorgerRunWith (bloodmadAnswer want) (reunionId, ready)
+           in (S.countOnBattlefieldByName (S.printingName vampire) S.alice after, untapped after)
+    Spec.assertEqWith s "CR 616.1 choosing {1}{R} casts the Vampire with one Mountain to spare" (outcome cheap) (1, 1)
+    Spec.assertEqWith s "CR 616.1 choosing {2}{R} on the same board casts it with none to spare" (outcome dear) (1, 0)
+    Spec.assertEqWith s "CR 702.35a only the chosen madness ability triggers: the Reunion and one trigger" (length (GameState.stack placed)) 2
 
 -- alice on her turn with two Mountains and three Swamps untapped, Bloodrage
 -- Vampire {2}{B} and a Mountain in hand beside Cathartic Reunion, and Falkenrath
@@ -5859,11 +5883,22 @@ gorgerTweezeAnswer gorgerId vampireId p = case p of
 -- Cast the Reunion, place whatever triggered, and resolve twice: rule 702.35a's
 -- trigger and the Vampire it cast, or else the Reunion and then nothing.
 gorgerRun :: (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
-gorgerRun (reunionId, ready) =
-  let discarded = S.runPure madnessAnswer ready (S.cast S.alice reunionId)
-      placed = S.runPure madnessAnswer discarded Engine.placePendingTriggers
-      first = S.runPure madnessAnswer placed Stack.resolveTop
-   in S.runPure madnessAnswer first Stack.resolveTop
+gorgerRun = gorgerRunWith madnessAnswer
+
+-- `gorgerRun` under another answerer.
+gorgerRunWith :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+gorgerRunWith answer (reunionId, ready) =
+  let discarded = S.runPure answer ready (S.cast S.alice reunionId)
+      placed = S.runPure answer discarded Engine.placePendingTriggers
+      first = S.runPure answer placed Stack.resolveTop
+   in S.runPure answer first Stack.resolveTop
+
+-- `madnessAnswer`, choosing the madness ability that settles to `want` (CR
+-- 616.1) by its value rather than by its place in the offer.
+bloodmadAnswer :: ManaCost.ManaCost -> Prompt.Prompt r -> r
+bloodmadAnswer want p = case p of
+  Prompt.ChooseCost _ _ _ candidates -> Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just want) . Cost.Type.mana) candidates)
+  _ -> madnessAnswer p
 
 -- Takes rule 702.35a's offered cast and answers everything else as S.identityAnswer
 -- does, which is what the declining case reuses unchanged.

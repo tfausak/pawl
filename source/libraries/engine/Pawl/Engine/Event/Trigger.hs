@@ -1909,18 +1909,19 @@ eventTriggers events gs =
       exileGrantInForce = Projection.mintingGrantInForce Keyword.exileTriggeredAbilitiesOf gs
       inExile = Map.fromList (Maybe.mapMaybe exileCandidate (Set.toAscList (GameState.exile gs)))
       -- CR 702.35a's SECOND ability, for the card its first ability exiled:
-      -- minted off the madness abilities the discard RECORDED
+      -- minted off the madness ability the discard RECORDED as applied
       -- (Discarded.madness), `spellCast`'s event scope, and not off the exiled
       -- card's keywords now. The trigger fires on the discard (CR 603.2), so a
       -- madness Falkenrath Gorger granted still triggers after the Gorger has
       -- left -- state-based actions run before triggers are gathered (CR
       -- 117.5). The controller is the OWNER, `inExile`'s reason; the mana cost
-      -- is the exiled card's projected one.
+      -- is the exiled card's projected one. Pawl.CastSpec's "CR 702.35a the
+      -- Gorger dying before the trigger is gathered still casts the Vampire"
+      -- proves the grant case.
       exiledForMadness event = case event of
-        GameEvent.Discarded (Discarded.MkDiscarded _ oid _ madness)
-          | not (Set.null madness),
-            Just obj <- Game.lookupObject oid gs ->
-              Map.singleton oid (Object.owner obj, fmap whole (Keyword.madnessTriggersOf (PC.manaCost (Projection.project oid gs)) madness))
+        GameEvent.Discarded (Discarded.MkDiscarded _ oid _ (Just payload))
+          | Just obj <- Game.lookupObject oid gs ->
+              Map.singleton oid (Object.owner obj, [whole (Keyword.madnessCast (PC.manaCost (Projection.project oid gs)) payload)])
         _ -> Map.empty
       -- CR 113.6k's other zone: the spell that just became cast, offered from the
       -- STACK, where CR 601.2a leaves it. Desolation Twin's "when you cast this

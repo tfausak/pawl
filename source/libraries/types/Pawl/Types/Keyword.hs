@@ -888,7 +888,7 @@ data Keyword
     -- discard of this card with an exile
     -- (Pawl.Engine.Keyword.handReplacementsOf); the triggered one then offers
     -- its owner the cast for [cost], or the graveyard
-    -- (Pawl.Engine.Keyword.exileTriggeredAbilitiesOf).
+    -- (Pawl.Engine.Keyword.madnessCast).
     Madness (MadnessCost.MadnessCost Keyword)
   | -- | 702.88a: a spell cast from its controller's hand is exiled as it
     -- resolves instead of going to the graveyard, and a delayed triggered
