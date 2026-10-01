@@ -2558,6 +2558,23 @@ musterDynamoSpec s registry = Spec.describe s "Synthetic Muster Dynamo" $ do
     Spec.assertBool s (not (offered statue)) "no {4}: the Piker alone does not reach 3"
     Spec.assertBool s (offered altar) "and {3} is the Druid's {G}{G}{G}"
 
+  -- The board above and one Sneaky Homunculus (1/1 Homunculus Illusion, no
+  -- mana ability): the Druid's three Elves leave the Piker's 2 and the
+  -- Homunculus' 1, and only that MIXED selection reaches 3.
+  Spec.it s "CR 118.3 the Dynamo reaches 3 with a Piker and a 1-power creature" $ do
+    druid <- S.printingOf s registry "Heritage Druid"
+    bloodbraid <- S.printingOf s registry "Bloodbraid Elf"
+    homunculus <- S.printingOf s registry "Sneaky Homunculus"
+    hub <- S.printingOf s registry "Eon Hub"
+    statue <- S.printingOf s registry "Jade Statue"
+    board <- musterDynamoBoard s registry [("Glistener Elf", 1), ("Goblin Piker", 1)]
+    let withElves = foldr (\p gs -> snd (S.addPermanent p S.alice gs)) board [druid, bloodbraid, homunculus]
+        offered spell =
+          let (withSpell, oid) = S.handOne spell withElves
+           in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+    Spec.assertBool s (offered statue) "{4} is the Druid's {G}{G}{G} and the Piker and Homunculus' {C}"
+    Spec.assertBool s (not (offered hub)) "and not {5}"
+
   -- The gameplay-level proof (design.md section 4). Sapphire Medallion is {2},
   -- all generic, and targets nothing, so the cast turns on the Dynamo being
   -- activated twice. The boards differ in one Elf.
