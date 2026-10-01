@@ -1,0 +1,133 @@
+{
+  "description": "CR 122.1e the -2 counters alice's creatures and every OTHER planeswalker she controls",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 9,
+        "battlefield": [
+          {
+            "card": "Ajani Steadfast",
+            "label": "ajani-steadfast",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 7
+              }
+            ]
+          },
+          {
+            "card": "Jace Beleren",
+            "label": "jace-beleren",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 8
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 7,
+        "battlefield": [
+          {
+            "card": "Karn Liberated",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 6
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$ajani-steadfast",
+          "ability": 1
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "$ajani-steadfast",
+        "kind": {
+          "type": "Loyalty"
+        },
+        "count": 5
+      }
+    },
+    {
+      "Counters": {
+        "object": "$jace-beleren",
+        "kind": {
+          "type": "Loyalty"
+        },
+        "count": 9
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "Karn Liberated",
+        "kind": {
+          "type": "Loyalty"
+        },
+        "count": 6
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker#2",
+        "power": 2,
+        "toughness": 1
+      }
+    }
+  ]
+}
