@@ -16,6 +16,12 @@ data Board = MkBoard
     monarch :: Maybe Label.Label,
     -- | CR 806.2b: the attack option the game uses; Nothing is CR 507.1's
     -- choice among every opponent.
-    attackOption :: Maybe AttackOption.AttackOption
+    attackOption :: Maybe AttackOption.AttackOption,
+    -- | CR 903.12a: whether the game is Brawl.
+    brawl :: Bool,
+    -- | CR 805.1: whether each team takes its turns together.
+    sharedTeamTurns :: Bool,
+    -- | CR 804.2: whether each creature can be deployed to a teammate.
+    deployCreatures :: Bool
   }
   deriving (Eq, Ord, Show)

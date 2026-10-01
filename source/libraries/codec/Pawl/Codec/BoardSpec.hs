@@ -25,7 +25,10 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
           Board.Type.phase = Phase.Type.Combat CombatStep.Type.DeclareAttackers,
           Board.Type.monarch = Nothing,
-          Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers
+          Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
+          Board.Type.brawl = False,
+          Board.Type.sharedTeamTurns = False,
+          Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"} "
   Spec.it s "a monarch" $
@@ -37,7 +40,10 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
           Board.Type.phase = Phase.Type.PrecombatMain,
           Board.Type.monarch = Just (Label.Type.MkLabel (Text.pack "bob")),
-          Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers
+          Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
+          Board.Type.brawl = False,
+          Board.Type.sharedTeamTurns = False,
+          Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"monarch\":\"bob\"} "
   Spec.it s "an attack option, and none" $ do
@@ -49,7 +55,10 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
           Board.Type.phase = Phase.Type.PrecombatMain,
           Board.Type.monarch = Nothing,
-          Board.Type.attackOption = Just AttackOption.Type.Leftward
+          Board.Type.attackOption = Just AttackOption.Type.Leftward,
+          Board.Type.brawl = False,
+          Board.Type.sharedTeamTurns = False,
+          Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"attackOption\":\"Leftward\"} "
     Common.assertCodec
@@ -60,9 +69,27 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
           Board.Type.phase = Phase.Type.PrecombatMain,
           Board.Type.monarch = Nothing,
-          Board.Type.attackOption = Nothing
+          Board.Type.attackOption = Nothing,
+          Board.Type.brawl = False,
+          Board.Type.sharedTeamTurns = False,
+          Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"attackOption\":null} "
+  Spec.it s "game-wide options" $
+    Common.assertCodec
+      s
+      Board.codec
+      Board.Type.MkBoard
+        { Board.Type.seats = seat "alice" NonEmpty.:| [seat "bob"],
+          Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
+          Board.Type.phase = Phase.Type.PrecombatMain,
+          Board.Type.monarch = Nothing,
+          Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
+          Board.Type.brawl = True,
+          Board.Type.sharedTeamTurns = True,
+          Board.Type.deployCreatures = True
+        }
+      " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"brawl\":true,\"sharedTeamTurns\":true,\"deployCreatures\":true} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Board.codec
 
@@ -72,6 +99,9 @@ seat name =
     { Seat.Type.name = Label.Type.MkLabel (Text.pack name),
       Seat.Type.life = 20,
       Seat.Type.counters = Map.empty,
+      Seat.Type.team = Nothing,
+      Seat.Type.range = Nothing,
+      Seat.Type.emperor = False,
       Seat.Type.battlefield = Seq.empty,
       Seat.Type.hand = Seq.empty,
       Seat.Type.graveyard = Seq.empty,

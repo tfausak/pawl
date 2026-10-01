@@ -6,6 +6,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.TeamId as TeamId
 
 -- | One player on a scenario's board. Each zone lists its cards in creation
 -- order, which is what numbers a card-name reference.
@@ -14,6 +15,12 @@ data Seat = MkSeat
     life :: Integer,
     -- | CR 122.1: the player's counters, by kind.
     counters :: Map.Map PlayerCounterKind.PlayerCounterKind Natural,
+    -- | CR 808.1: the player's team, if the game is played between teams.
+    team :: Maybe TeamId.TeamId,
+    -- | CR 801.2a: the player's range of influence; Nothing is unlimited.
+    range :: Maybe Natural,
+    -- | CR 809.2: whether the player is their team's emperor.
+    emperor :: Bool,
     battlefield :: Seq.Seq Placement.Placement,
     hand :: Seq.Seq Placement.Placement,
     graveyard :: Seq.Seq Placement.Placement,

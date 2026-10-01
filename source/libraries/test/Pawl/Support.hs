@@ -208,6 +208,9 @@ playerSetup pid =
     { Seat.name = seatLabel pid,
       Seat.life = 20,
       Seat.counters = Map.empty,
+      Seat.team = Nothing,
+      Seat.range = Nothing,
+      Seat.emperor = False,
       Seat.battlefield = Seq.empty,
       Seat.hand = Seq.empty,
       Seat.graveyard = Seq.empty,
@@ -236,7 +239,10 @@ board seats active step =
               Board.active = seatLabel active,
               Board.phase = step,
               Board.monarch = Nothing,
-              Board.attackOption = Just AttackOption.MultiplePlayers
+              Board.attackOption = Just AttackOption.MultiplePlayers,
+              Board.brawl = False,
+              Board.sharedTeamTurns = False,
+              Board.deployCreatures = False
             }
         else error "S.board: seats must be listed alice, bob, carol, dave"
 
@@ -1818,6 +1824,8 @@ withEvents events gs =
       GameState.nextEventGroup = EventGroup.MkEventGroup (Natural.length events),
       GameState.eventGroupDepth = 0,
       GameState.enteringTogether = Nothing,
+      GameState.libraryArrivals = Nothing,
+      GameState.payingOnResolution = False,
       GameState.scannedThrough = 0,
       GameState.damageScannedThrough = 0,
       -- Rewriting the log rewrites the groups, so any sample Event.recordEvent
@@ -2090,6 +2098,8 @@ oneMountainState mountain ph =
           GameState.nextEventGroup = EventGroup.first,
           GameState.eventGroupDepth = 0,
           GameState.enteringTogether = Nothing,
+          GameState.libraryArrivals = Nothing,
+          GameState.payingOnResolution = False,
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.battlefieldWhenTriggered = Map.empty,

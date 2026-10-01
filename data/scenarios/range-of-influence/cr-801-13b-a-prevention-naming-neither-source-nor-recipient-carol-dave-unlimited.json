@@ -1,0 +1,33 @@
+{
+  "description": "CR 801.13b a prevention naming neither source nor recipient needs both in range",
+  "note": "Fog names neither source nor recipient, so it prevents only damage whose source and recipient are both in alice's range. alice casts it on the attacker's turn, once the attack is declared, in place of the Haskell test's staged combat on her own turn: its \"this turn\" is the same either way. The control for the carol-dave file: at an unlimited range Fog prevents the 2 carol's Goblin Piker would deal dave.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Forest", "label": "land" }],
+        "hand": [{ "card": "Fog", "label": "spell" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bobs-piker", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "label": "carols-piker", "ready": true }]
+      },
+      {
+        "name": "dave"
+      }
+    ],
+    "active": "carol",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "do": { "Attack": ["@carols-piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "@carols-piker", "do": { "ChooseAttackTarget": "@dave" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "check": { "Attackers": { "attackers": { "@carols-piker": "@dave" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@spell", "mana": ["@land"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "carol", "check": { "Life": { "player": "dave", "life": 20 } } }
+  ]
+}

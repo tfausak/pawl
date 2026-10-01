@@ -1,0 +1,48 @@
+{
+  "description": "CR 809.3c a player can attack only an opponent seated immediately next to them",
+  "note": "Pawl.Engine.Emperor.setUp spelled out: alice, bob and carol are team 1 with bob its emperor, dave, erin and frank team 2 with erin its emperor; emperors at range 2 and generals at 1 (CR 809.3a), creatures deployable (CR 809.3b) and the Adjacent attack option (CR 809.3c). bob, an emperor, sits between his own generals, so his Goblin Piker can attack nobody though dave and frank are in his range; the -unrestricted file is the control.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "range": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "range": 2,
+        "emperor": true,
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "team": 1,
+        "range": 1
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "range": 1
+      },
+      {
+        "name": "erin",
+        "team": 2,
+        "range": 2,
+        "emperor": true
+      },
+      {
+        "name": "frank",
+        "team": 2,
+        "range": 1
+      }
+    ],
+    "active": "bob",
+    "step": "BeginningOfCombat",
+    "attackOption": "Adjacent",
+    "deployCreatures": true
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": {} } } }
+  ]
+}

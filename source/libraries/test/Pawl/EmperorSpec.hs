@@ -11,8 +11,6 @@ module Pawl.EmperorSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Emperor as Emperor
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -21,10 +19,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.Combat as Combat.Type
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -64,31 +59,6 @@ spec s registry = Spec.describe s "Emperor" $ do
       "CR 809.6a"
       (Emperor.ranges byTeam seconds eight)
       (Map.fromList (zip eight [1, 3, 2, 1, 1, 3, 2, 1]))
-
-  -- CR 809.3c: bob, an emperor, attacks with a Goblin Piker. Both his
-  -- neighbours are his own generals, so he can attack nobody, though dave and
-  -- frank are within his range of 2. Once carol has left and the next turn has
-  -- begun, dave is seated next to him.
-  Spec.it s "CR 809.3c a player can attack only an opponent seated immediately next to them" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_, placed) = S.addPermanent piker S.bob emperorGame
-        board = placed {GameState.activePlayer = S.bob, GameState.phase = Phase.Combat CombatStep.BeginningOfCombat}
-        attacked target gs =
-          let settled = S.runPure (S.attackTo target) gs (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-           in Map.elems (Combat.Type.attackers (GameState.combat (S.runPure (S.attackTo target) settled (Combat.declareAttackers S.manaPerformer S.bob))))
-        -- CR 801.2c: a seat emptied on an earlier turn has closed up.
-        nextTurn gs = gs {GameState.departedThisTurn = Set.empty}
-        carolGone = S.departs Departure.Type.Conceded S.carol board
-        generalsGone = nextTurn (S.departs Departure.Type.Conceded S.alice carolGone)
-    Spec.assertEqWith s "CR 809.3c bob attacks nobody between his own generals" (attacked S.dave board) []
-    Spec.assertEqWith s "CR 801.2c nor on the turn carol leaves" (attacked S.dave carolGone) []
-    Spec.assertEqWith s "CR 809.3c dave, next to bob once the seats close, is attacked" (attacked S.dave (nextTurn carolGone)) [AttackTarget.OfPlayer S.dave]
-    -- CR 507.1 between two neighbours: the answer decides.
-    Spec.assertEqWith s "CR 507.1 bob attacks frank when he chooses frank" (attacked frank generalsGone) [AttackTarget.OfPlayer frank]
-    Spec.assertEqWith s "CR 507.1 and dave when he chooses dave" (attacked S.dave generalsGone) [AttackTarget.OfPlayer S.dave]
-    -- The paired board with CR 507.1's unrestricted option: dave, in bob's
-    -- range, is attackable, so the first case is the option and not the range.
-    Spec.assertEqWith s "CR 801.3 without CR 809.3c bob attacks dave" (attacked S.dave (S.attackOption Nothing board)) [AttackTarget.OfPlayer S.dave]
 
   -- CR 809.5b / 104.2c: erin, an emperor, is at 0 life. Her team loses with her
   -- and bob's team, the last one playing, wins. The paired board puts frank, a

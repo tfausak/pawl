@@ -1,0 +1,47 @@
+{
+  "description": "CR 805.10c raid reads the teammate's own attack",
+  "note": "CR 805.10c / 207.2c: raid asks whether YOU attacked, and a teammate's attack is not yours. Bob casts Mardu Skullhunter after combat (\"Raid -- When this creature enters, if you attacked this turn, target opponent discards a card.\"); the legs differ only in whose Piker attacked. Bob attacked, so his raid makes carol discard her one card.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "alices", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "bobs", "ready": true },
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" }
+        ],
+        "hand": [{ "card": "Mardu Skullhunter", "label": "skullhunter" }]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "hand": [{ "card": "Island" }]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "hand": [{ "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@bobs"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@bobs" },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": { "Cast": { "object": "@skullhunter", "mana": ["@swamp-1", "@swamp-2"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@carol"] } }, "source": "Mardu Skullhunter" },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Mardu Skullhunter", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Count": { "player": "carol", "zone": "Hand", "card": "Island", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "check": { "Count": { "player": "dave", "zone": "Hand", "card": "Island", "count": 1 } } }
+  ]
+}

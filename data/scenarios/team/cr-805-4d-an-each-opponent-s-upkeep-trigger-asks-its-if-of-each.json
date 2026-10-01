@@ -1,0 +1,70 @@
+{
+  "description": "CR 805.4d an each-opponent's-upkeep trigger asks its if of each active opponent",
+  "note": "Ebony Owl Netsuke: \"At the beginning of each opponent's upkeep, if that player has seven or more cards in hand, this artifact deals 4 damage to that player.\" Under shared team turns its trigger fires once per active opponent and asks its intervening if of each in turn (CR 805.4d / 603.4). Only bob holds seven, so a single trigger naming alice would do nothing. The control drops the option, and bob's upkeep has not come.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "hand": [
+          { "card": "Island" },
+          { "card": "Island" }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "hand": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [{ "card": "Ebony Owl Netsuke", "label": "owl" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Untap",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    { "turn": 1, "step": "DrawStep", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "DrawStep", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } }
+  ]
+}
