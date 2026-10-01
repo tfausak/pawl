@@ -332,7 +332,7 @@ resolveSpellWith runSubgame oid = do
                             if taken
                               then payGateAdmits oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) answers limb
                               else pure (False, answers)
-                          Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects limb)))
+                          Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects limb))))
                           pure (answers2, recordTaken admitted limbIdx ran)
                   -- CR 608.2e's clause is the unit all four gates cover, so each
                   -- is asked once per clause. The fold carries this mode
@@ -404,7 +404,7 @@ resolveSpellWith runSubgame oid = do
                                         answers
                                         clause
                                 else pure (False, answers)
-                            Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause)))
+                            Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause))))
                             pure (answers2, picked2, recordTaken admitted cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
@@ -807,7 +807,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                       taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
                       (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) answers limb else pure (False, answers)
-                      Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects limb)))
+                      Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects limb))))
                       pure (answers2, recordTaken admitted limbIdx ran)
                in -- CR 608.2e's clause is what each gate covers. Run only when
                   -- `fizzles` is False.
@@ -867,7 +867,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                             -- CR 118.12: then the cost paid on resolution, against the
                             -- START-of-resolution slots.
                             (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
-                            Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
+                            Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause))))
                             pure (answers2, picked2, recordTaken admitted cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
@@ -918,6 +918,20 @@ ifTakenHolds ran clause = case Clause.ifTaken clause of
   Nothing -> True
   Just (IfTaken.AnyTaken names) -> any (`Set.member` ran) names
   Just (IfTaken.NoneTaken names) -> not (any (`Set.member` ran) names)
+
+-- CR 118.12: a clause some clause of its mode names with "If [a player] does"
+-- or "doesn't" (Clause.ifTaken) is that sentence's "[do something]" -- "a cost,
+-- paid when the spell or ability resolves" -- so its instructions run under
+-- Event.payingOnResolution. Library of Leng's ruling is what observes it:
+-- Tweeze's "you may discard a card. If you do, draw a card" discards as a cost,
+-- and "costs aren't effects".
+asCostWhenNamed :: [(ClauseIndex, Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))] -> ClauseIndex -> Game a -> Game a
+asCostWhenNamed indexed cIdx body =
+  let names clause = case Clause.ifTaken clause of
+        Nothing -> []
+        Just (IfTaken.AnyTaken named) -> Foldable.toList named
+        Just (IfTaken.NoneTaken named) -> Foldable.toList named
+   in if any (elem cIdx . names . snd) indexed then Event.payingOnResolution body else body
 
 -- The other end of the same fold: a clause's ordinal is recorded exactly when
 -- its instructions ran, which is what CR 608.2c's "If you do" asks about. One

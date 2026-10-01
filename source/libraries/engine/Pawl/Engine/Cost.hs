@@ -6543,6 +6543,11 @@ payComponent moment slots pid oid component = case component of
 -- on rather than 2X; see #1647. Vorinclex, Monstrous Raider's row names a player
 -- instead and still applies, which is the pair that says the answer is about the
 -- CAUSE and not about counters-during-costs.
+--
+-- Not implemented: the reading Event.resolvingDiscardCause takes for a discard,
+-- that a CR 118.12 cost paid on resolution is no effect; this arm and
+-- Effect.Blight's cause call it one, so Doubling Season doubles Grub, Notorious
+-- Auntie's blight (#4544).
 counterCause :: PaymentMoment.PaymentMoment -> PlayerId -> CounterCause.CounterCause
 counterCause moment pid = case moment of
   PaymentMoment.OutsideResolution -> CounterCause.ByPayment pid
