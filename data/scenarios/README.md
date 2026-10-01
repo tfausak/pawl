@@ -47,7 +47,13 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `{ "from": { "type": "Island" }, "to": { "type": "Swamp" } }`, keyed
   the same way. `ChooseCopyTarget` names what an object entering as a copy
   copies (CR 707.5), `"$bear"`, or `null` to decline its "may", keyed by
-  the entering object. `ChooseTargets` names each slot's
+  the entering object. `Answer` answers any prompt no move above covers, by
+  its kind, `{ "prompt": "ChooseDiscard", "with": ["$card"] }`: an object is
+  a reference, a player a seat label, a map an array of `[key, value]` pairs,
+  and a recipient or attack target `["Player", "$bob"]`. It is keyed by the
+  prompt's decider, or the active player for a prompt nobody decides (a
+  shuffle, a die), and answers a prompt raised in the middle of a cast without
+  ending it. `ChooseTargets` names each slot's
   targets, `{ "target": ["$moon"] }`, for a target prompt no cast or activation
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`
