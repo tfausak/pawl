@@ -291,6 +291,10 @@ to agents as written. What it doesn't say:
     `copiableCharacteristics`, and `Pawl.Engine.Count`'s `viewOfSnapshot`.
     Filling one compiles clean and the rest silently answer the old value.
 
+    A DELETED TEST's orphaned helpers compile clean too: the spec modules under
+    `source/libraries/test/` carry no export list, so `-Wunused-top-binds`
+    never fires there. Grep every top-level helper the deleted block called.
+
     WIDENING AN EXISTING FUNCTION'S RESULT has no tripwire at all: no type
     changes, so `-Werror` is silent and a mutation proves only that the test is
     sensitive to your line, never that you found the other readers. Grep the

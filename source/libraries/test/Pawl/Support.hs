@@ -178,6 +178,7 @@ objectSetup name =
       Placement.readiness = Readiness.Sick,
       Placement.damage = 0,
       Placement.counters = Map.empty,
+      Placement.token = False,
       Placement.controller = Nothing,
       Placement.attached = Nothing
     }

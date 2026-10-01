@@ -1,0 +1,30 @@
+{
+  "description": "CR 111.8 Flicker of Fate cannot bring back a token it exiled",
+  "note": "Flicker of Fate's return clause names the object its first clause exiled, which opens the one within-resolution window where CR 111.8 bars a token that left the battlefield from coming back. The card twin returns a Goblin Piker card; here the victim is a token of the same card, so nothing coming back is the rule refusing the move, and CR 111.7 leaves no token waiting in exile or anywhere else.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Plains", "label": "plains-2" }
+        ],
+        "hand": [{ "card": "Flicker of Fate", "label": "flicker" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "victim", "token": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@flicker", "targets": ["@victim"], "mana": ["@plains", "@plains-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "description": "CR 509.1b Wan Shi Tong's Spirit tokens can't be blocked by a non-Spirit, and can by a Spirit",
+  "note": "Wan Shi Tong's library trigger makes the two Spirit tokens, \"can't block or be blocked by non-Spirit creatures\": Oust puts alice's Llanowar Elves into her library to fire it, and the tokens attack on her next turn once settled; the two tokens' CR 613.7m timestamp order is alice's to name and immaterial here. bob first declares his non-Spirit Goblin Piker blocking a token; CR 509.1b rejects that declaration whole and asks again, and his Spirit Dutiful Knowledge Seeker's block is accepted.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Wan Shi Tong, All-Knowing", "label": "wan", "ready": true },
+          { "card": "Plains", "label": "plains", "ready": true },
+          { "card": "Llanowar Elves", "label": "elves", "ready": true }
+        ],
+        "hand": [{ "card": "Oust", "label": "oust" }],
+        "library": [{ "card": "Forest" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Dutiful Knowledge Seeker", "label": "seeker", "ready": true }
+        ],
+        "library": [{ "card": "Forest" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@oust", "targets": ["@elves"], "mana": ["@plains", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Spirit Token", "Spirit Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Spirit Token", "count": 2 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@wan", "Spirit Token", "Spirit Token#2"] } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["Spirit Token"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@seeker": ["Spirit Token"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "Spirit Token", "blockers": ["@seeker"] } } }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "description": "CR 206.3b each listed nontoken permanent is sacrificed by its own controller",
+  "note": "Golgothian Sylex sweeps the Antiquities names, each sacrificed by its own controller. carol's Yotian Soldier is not alice's to sacrifice, and bob's Vengeful Tracker names each sacrificing seat in life: alice for two artifacts, carol for one. bob's Mishra's Workshop carries an indestructible counter and is a land, so a destruction or an artifacts-only reading leaves it. carol's Ornithopter token shares a listed name, so only the nontoken conjunct spares it. alice's Goblin Piker and bob's Tracker are not on the list. The Sylex lists itself. The three Tracker triggers are bob's to order; any order gives the same lives.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains", "ready": true },
+          { "card": "Plains", "label": "plains-2", "ready": true },
+          { "card": "Golgothian Sylex", "label": "sylex", "ready": true },
+          { "card": "Ornithopter", "label": "ornithopter" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Vengeful Tracker", "label": "tracker" },
+          { "card": "Mishra's Workshop", "label": "workshop", "counters": [{ "key": { "type": "Keyword", "value": { "type": "Indestructible" } }, "value": 1 }] }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Yotian Soldier", "label": "soldier" },
+          { "card": "Ornithopter", "label": "ornithopter-token", "token": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@workshop", "kind": { "type": "Keyword", "value": { "type": "Indestructible" } }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@sylex", "mana": ["@plains", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "OrderTriggers": ["@tracker", "@tracker", "@tracker"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Yotian Soldier", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Mishra's Workshop", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ornithopter", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Golgothian Sylex", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Ornithopter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Vengeful Tracker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 16 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } }
+  ]
+}

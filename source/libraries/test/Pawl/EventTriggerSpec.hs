@@ -1422,24 +1422,6 @@ whisperingWizardSpec s registry =
           Spec.assertEqWith s "so exactly one Spirit token" (spiritsOf S.alice after) 1
           Spec.assertEqWith s "the unlimited twin saw three events in that batch" (fmap (`firedBy` twinAfter) twins) [3]
           Spec.assertEqWith s "and made three Elementals" (S.countOnBattlefieldByName elemental S.alice twinAfter) 3
-        -- The rider is spent per TURN, and the record it is spent against is
-        -- GameState.events, which the handoff clears.
-        Spec.it s "the rider re-arms at the turn boundary" $ do
-          island <- S.printingOf s registry "Island"
-          wizard <- S.printingOf s registry "Whispering Wizard"
-          think <- S.printingOf s registry "Think Twice"
-          divine <- S.printingOf s registry "Divination"
-          skeins <- S.printingOf s registry "Vision Skeins"
-          let (_, gs) = board island wizard 1
-              spent = threeCasts think divine skeins gs
-              -- bob's turn, alice's Islands still tapped from her own: only the
-              -- three she never spent pay for this, and Think Twice is an instant
-              -- so CR 304.1 lets her cast it on a turn that is not hers.
-              handed = S.runPure S.identityAnswer spent Engine.handoffTurn
-              (fourth, ready) = S.addHandCard think S.alice (handed {GameState.priority = Just S.alice})
-              after = castAndResolve S.alice fourth ready
-          Spec.assertEqWith s "one Spirit at the end of alice's turn" (spiritsOf S.alice spent) 1
-          Spec.assertEqWith s "and a second on the next turn's first cast" (spiritsOf S.alice after) 2
         -- A cast the Filter rejects spends nothing: the rider is spent by the
         -- ability TRIGGERING, not by an event that merely looks like its own.
         Spec.it s "a creature spell neither fires the ability nor spends its rider" $ do

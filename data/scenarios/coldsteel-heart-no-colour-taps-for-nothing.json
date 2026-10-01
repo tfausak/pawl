@@ -1,0 +1,28 @@
+{
+  "description": "CR 106.5 a Coldsteel Heart with no colour chosen may still be tapped for mana, and adds none",
+  "note": "Placed with no colour chosen, the state a Mirrorweave copy is in (CR 707.2). Its {T} ability is activated mid-payment: the Heart taps and adds nothing, and the Forest pays the {G}.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Coldsteel Heart", "label": "heart" },
+          { "card": "Forest", "label": "forest" }
+        ],
+        "hand": [{ "card": "Llanowar Elves", "label": "elves" }]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@elves", "mana": ["@heart", "@forest"] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Llanowar Elves", "count": 1 } },
+    { "Tapped": { "object": "@heart", "tapped": true } }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "description": "CR 603.8 each other listed nontoken permanent is sacrificed by its own controller",
+  "note": "City in a Bottle's state trigger sweeps other Arabian Nights names, each sacrificed by its controller. The Bottle lists itself, so `other` is all that keeps it. carol's Kird Ape token shares bob's Ape's listed name, so only the nontoken conjunct spares it. alice's Goblin Piker is not on the list.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "City in a Bottle", "label": "bottle" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Kird Ape", "label": "ape" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Kird Ape", "label": "ape-token", "token": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Kird Ape", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Kird Ape", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Kird Ape", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "City in a Bottle", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

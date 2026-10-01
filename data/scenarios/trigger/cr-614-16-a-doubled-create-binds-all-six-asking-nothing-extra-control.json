@@ -1,0 +1,30 @@
+{
+  "description": "CR 614.16 a doubled Create binds all six, asking nothing extra",
+  "note": "The control: the same cast without Doubling Season makes three Humans and asks exactly what the doubled cast asks, so the doubling adds no question.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" }
+        ],
+        "hand": [{ "card": "Thatcher Revolt", "label": "revolt" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@revolt", "mana": ["@mountain", "@mountain-2", "@mountain-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Human Token", "Human Token#2", "Human Token#3"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Human Token", "count": 3 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Human Token", "count": 0 } } }
+  ]
+}

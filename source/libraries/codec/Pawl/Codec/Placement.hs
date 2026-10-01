@@ -24,6 +24,7 @@ codec = Fields.object $ do
   readiness <- Fields.defaulted "ready" Readiness.Type.Sick Readiness.codec Placement.readiness
   damage <- Fields.defaulted "damage" 0 Common.natural Placement.damage
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) Placement.counters
+  token <- Fields.defaulted "token" False Common.boolean Placement.token
   controller <- Fields.defaulted "controller" Nothing (Common.maybe Label.codec) Placement.controller
   attached <- Fields.defaulted "attached" Nothing (Common.maybe Label.codec) Placement.attached
   pure
@@ -34,6 +35,7 @@ codec = Fields.object $ do
         Placement.readiness = readiness,
         Placement.damage = damage,
         Placement.counters = counters,
+        Placement.token = token,
         Placement.controller = controller,
         Placement.attached = attached
       }
