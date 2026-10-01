@@ -49,6 +49,9 @@ data ScenarioFailure
   | MkAmbiguousAction When.When Move.Move [Text.Text]
   | MkUnexpectedActionChoice When.When Move.Move Text.Text
   | MkUnusedActionChoices When.When Move.Move Choices.Choices
+  | -- | A move the timeline said the engine would refuse, which stood: the
+    -- prompt asked next (Nothing when none was), not the one it answered.
+    MkUnrefusedMove When.When Move.Move (Maybe Text.Text)
   | -- | Entries whose moment never came, at least one of them a move, and the
     -- turn and step the run stopped at.
     MkUnreachedEntries Natural Phase.Phase (Seq.Seq Timed.Timed)
