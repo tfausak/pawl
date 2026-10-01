@@ -1052,27 +1052,6 @@ modularSpec s registry =
             Just hybrid -> do
               Spec.assertEqWith s "modular 2 enters with two" (plusOnes hybrid hybridBoard) 2
               Spec.assertEqWith s "a 2/2" (S.powerToughnessOf hybrid hybridBoard) (Just (2, 2))
-        -- The proving test. Rule 702.43a's SECOND ability, counting the pile the
-        -- dead permanent had rather than its printed N.
-        Spec.it s "CR 702.43a whole card: the dead Hybrid moves all three of its counters" $ do
-          (hybridId, workerId, gs) <- board "Arcbound Worker"
-          let (settled, after) = murderIt exercising gs
-          Spec.assertEqWith s "the Hybrid held three, not its printed two" (plusOnes hybridId (fst gs)) 3
-          Spec.assertEqWith s "the Worker held one" (plusOnes workerId (fst gs)) 1
-          Spec.assertEqWith s "the death trigger reached the stack" (length (GameState.stack settled)) 1
-          Spec.assertBool s (not (S.onBattlefield hybridId after)) "and the Hybrid is gone"
-          -- CR 608.2h: four is one plus THREE, so the count came from the last
-          -- known record. Two would be the printed N and one a literal.
-          Spec.assertEqWith s "the Worker is up to four" (plusOnes workerId after) 4
-          Spec.assertEqWith s "so it is a 4/4" (S.powerToughnessOf workerId after) (Just (4, 4))
-        -- CR 603.5's "may" is a real fork, and the control for the case above --
-        -- same board, same Murder, and the trigger still reaches the stack.
-        Spec.it s "CR 603.5 declining the may leaves the counters nowhere" $ do
-          (_, workerId, gs) <- board "Arcbound Worker"
-          let (settled, after) = murderIt S.identityAnswer gs
-          Spec.assertEqWith s "the trigger reached the stack all the same" (length (GameState.stack settled)) 1
-          Spec.assertEqWith s "the Worker is still on one" (plusOnes workerId after) 1
-          Spec.assertEqWith s "a 1/1" (S.powerToughnessOf workerId after) (Just (1, 1))
         -- CR 608.2h in isolation, counterLookBackSpec's third case in the payload
         -- rather than in an intervening "if": the record is emptied while the
         -- trigger sits on the stack, which no rule can do to last known

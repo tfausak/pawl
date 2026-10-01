@@ -1,0 +1,48 @@
+{
+  "description": "CR 707.2 a spell that becomes a copy of a Bolt resolves as the Bolt, at the Bolt's target",
+  "note": "CR 707.1/707.2: a spell on the stack becomes a copy of another. alice casts Lightning Bolt at bob, then Think Twice, then Synthetic Mimicry turning the Think Twice into a copy of the Bolt. bob at 14 needs both halves of CR 707.2, the copied text and the Bolt's target, since the Think Twice chose none of its own; missing either leaves him at 17. No Island in alice's hand is the printed \"draw a card\" never resolving; her library is stocked so that draw would be a card rather than CR 704.5b. All three spells in her graveyard is the stack emptied.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "bolt" },
+          { "card": "Think Twice", "label": "think-twice" },
+          { "card": "Synthetic Mimicry", "label": "mimicry" }
+        ],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@bob"], "mana": ["@mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@think-twice", "mana": ["@island", "@island-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mimicry", "targetsBySlot": { "subject": ["Think Twice"], "original": ["Lightning Bolt"] }, "mana": ["@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 14 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Lightning Bolt", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Think Twice", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Synthetic Mimicry", "count": 1 } } }
+  ]
+}

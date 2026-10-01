@@ -1,0 +1,53 @@
+{
+  "description": "CR 702.69a Ominous Harvest copies itself once per permanent that died, and not for the Bolts in the graveyard",
+  "note": "Alice Bolts two of bob's Hill Giants before casting Ominous Harvest: two permanents reached a graveyard from the battlefield, while the two Bolts reached one from the stack, which rule 702.69a does not count. Two copies, so bob draws three and loses three; counting every card put into a graveyard makes it five, and no trigger at all makes it one. Bob's library holds five Giants so CR 104.3c never bites, and the Giants he draws are his whole hand.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-1", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "first-bolt" },
+          { "card": "Lightning Bolt", "label": "second-bolt" },
+          { "card": "Ominous Harvest", "label": "harvest" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "first-giant" },
+          { "card": "Hill Giant", "label": "second-giant" }
+        ],
+        "library": [
+          { "card": "Hill Giant" },
+          { "card": "Hill Giant" },
+          { "card": "Hill Giant" },
+          { "card": "Hill Giant" },
+          { "card": "Hill Giant" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@first-bolt", "targets": ["@first-giant"], "mana": ["@mountain-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@second-bolt", "targets": ["@second-giant"], "mana": ["@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@harvest", "targets": ["@bob"], "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@bob"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["@bob"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "bob", "life": 17 } },
+    { "Count": { "player": "bob", "zone": "Hand", "card": "Hill Giant", "count": 3 } }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "description": "CR 115.6 Explosive Entry takes one slot and declines the other",
+  "note": "Explosive Entry's two \"up to one\" slots are independent: the artifact slot is announced and the creature slot announced at zero, so bob's Bonesplitter is destroyed and his Piker gets no counter.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain1" },
+          { "card": "Mountain", "label": "mountain2" }
+        ],
+        "hand": [{ "card": "Explosive Entry", "label": "entry" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Bonesplitter", "label": "bonesplitter" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@entry", "targetsBySlot": { "artifact": ["@bonesplitter"], "creature": [] }, "mana": ["@mountain1", "@mountain2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Bonesplitter", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } }
+  ]
+}

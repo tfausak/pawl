@@ -1,0 +1,36 @@
+{
+  "description": "CR 509.1b a creature that can no longer block is refused by the Path's hypothetical",
+  "note": "The control for the Blind-Spot Giant case: the same board with the Bolt never cast, so bob's Hill Giant lives, the Blind-Spot Giant could still block, and the Path exchanges the pair.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Sorrow's Path", "label": "path" },
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Hill Giant", "label": "one", "ready": true },
+          { "card": "Hill Giant", "label": "two", "ready": true }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Blind-Spot Giant", "label": "spot" },
+          { "card": "Bog Wraith", "label": "wraith" },
+          { "card": "Hill Giant", "label": "enabler" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@one", "@two"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@spot": ["@one"], "@wraith": ["@two"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@path", "targetsBySlot": { "first": ["@spot"], "second": ["@wraith"] }, "mana": [null] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@one", "blockers": ["@wraith"] } } }
+  ]
+}

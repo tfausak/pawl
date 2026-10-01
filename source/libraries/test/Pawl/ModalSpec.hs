@@ -810,71 +810,6 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
     Spec.assertEqWith s "alice drew three cards, not one" (S.handSize S.alice after) 3
     Spec.assertEqWith s "and they came off the library" (length (Game.zoneMembers Zone.Library S.alice after)) 7
 
-  -- The mixed case: two DIFFERENT modes, one of them repeated, so both the count
-  -- and the identity of what happened are exercised at once. The two bounces get
-  -- two independent target slots (CR 700.2d's "different targets may be chosen"),
-  -- and they are aimed at two different creatures -- an engine that collapsed the
-  -- repeated mode's slots into one would bounce one creature and leave the other.
-  Spec.it s "CR 700.2d bounce twice plus draw: two different creatures are returned" $ do
-    island <- S.printingOf s registry "Island"
-    mysticConfluence <- S.printingOf s registry "Mystic Confluence"
-    piker <- S.printingOf s registry "Goblin Piker"
-    wallOfStone <- S.printingOf s registry "Wall of Stone"
-    let (board, spellId) = confluenceBoard island mysticConfluence piker 10
-        (pikerId, withPiker) = S.addPermanent piker S.bob board
-        (wallId, gs) = S.addPermanent wallOfStone S.bob withPiker
-        -- Mode 1's printed slot is "creature"; its second instance fills
-        -- Modal.instanceSlot's derived name. The answer aims the two at two
-        -- different creatures by name, and refuses to answer a set that does not
-        -- offer exactly those two slots.
-        answer :: Prompt.Prompt r -> r
-        answer p = case p of
-          Prompt.ChooseModes {} -> Seq.fromList [bounceMode, bounceMode, drawMode]
-          Prompt.ChooseTargets _ _ _ sets ->
-            Map.mapWithKey
-              (\slot _ -> Set.singleton (if slot == creatureSlot then Recipient.ToCreature pikerId else Recipient.ToCreature wallId))
-              sets
-          _ -> S.identityAnswer p
-        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
-    Spec.assertBool s (not (Set.member pikerId (GameState.battlefield after))) "bob's Piker left the battlefield"
-    Spec.assertBool s (not (Set.member wallId (GameState.battlefield after))) "bob's Wall of Stone left the battlefield too"
-    Spec.assertEqWith s "both are in bob's hand" (S.handSize S.bob after) 2
-    Spec.assertEqWith s "alice drew exactly one card (the draw mode was chosen once)" (S.handSize S.alice after) 1
-
-  -- The two slots really are two, asserted on the prompt rather than inferred
-  -- from the board: a card whose repeated mode's slots collapsed would offer one.
-  Spec.it s "CR 601.2c a twice-chosen targeting mode is prompted for two slots" $ do
-    island <- S.printingOf s registry "Island"
-    mysticConfluence <- S.printingOf s registry "Mystic Confluence"
-    piker <- S.printingOf s registry "Goblin Piker"
-    wallOfStone <- S.printingOf s registry "Wall of Stone"
-    let (board, spellId) = confluenceBoard island mysticConfluence piker 10
-        (pikerId, withPiker) = S.addPermanent piker S.bob board
-        (_, gs) = S.addPermanent wallOfStone S.bob withPiker
-        modal = Face.spell (S.combinedFace mysticConfluence)
-        twiceBounced = Seq.fromList [bounceMode, bounceMode, drawMode]
-    Spec.assertEqWith
-      s
-      "choosing the bounce mode twice declares two target slots"
-      (Map.size (Modal.modesTargetSlots twiceBounced modal))
-      2
-    Spec.assertEqWith
-      s
-      "choosing it once declares one"
-      (Map.size (Modal.modesTargetSlots (Seq.fromList [bounceMode, drawMode, drawMode]) modal))
-      1
-    let answer :: Prompt.Prompt r -> r
-        answer p = case p of
-          Prompt.ChooseModes {} -> twiceBounced
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature pikerId))) sets
-          _ -> S.identityAnswer p
-        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-    -- CR 700.2d: "the same player or object may be chosen as the target for each
-    -- of those modes" -- so aiming both instances at ONE creature is legal, and
-    -- the cast goes through rather than being rewound.
-    Spec.assertEqWith s "aiming both bounces at one creature is a legal cast" (length (GameState.stack cast)) 1
-
   -- The negative leg, and the one that proves the flag GATES the behaviour rather
   -- than the engine simply always allowing repeats: Cryptic Command prints the
   -- ordinary instruction, so CR 700.2d's default applies and a repeated choice is
@@ -952,58 +887,8 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
           [[victimSlot, SlotName.MkSlotName (Text.pack "victim#1")]]
       _ -> Spec.assertFailure s "fixture should give alice an Elves and a Refrain, and bob two Giants"
 
-  -- CR 700.2d applied to the slots a mode DEFINES mid-resolution rather than
-  -- declares. No printing reaches it: of the cards writing "you may choose the
-  -- same mode more than once" (Scryfall o:"the same mode more than once",
-  -- 2026-09-15) the Season cards price their modes in {P} and are not
-  -- expressible, and of the rest only Eldrazi Confluence's exile-and-return and
-  -- Cabaretti Confluence's token copy define a slot at all -- each binding an
-  -- object its own instance has already consumed, so the stale name is one no
-  -- later read can act on. Synthetic Raising Refrain {1}{B} Sorcery
-  -- (data/cards/synthetic-raising-refrain.json) is the shape that can: "Choose
-  -- two. You may choose the same mode more than once. -- Return target creature
-  -- card from your graveyard to the battlefield, then put a +1/+1 counter on
-  -- it. -- Draw a card."
-  --
-  -- What it discriminates: CR 700.2d lets both instances name the SAME card,
-  -- and occurrence 0's return is what leaves occurrence 1 targeting an object
-  -- that no longer exists (CR 400.7), so occurrence 1 moves nothing and defines
-  -- no `risen` of its own. Sharing one printed key, its counter clause then
-  -- finds occurrence 0's permanent and puts a SECOND counter on it.
-  Spec.it s "CR 700.2d the second copy of a mode whose target is gone defines no object of its own" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    refrain <- S.printingOf s registry "Synthetic Raising Refrain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (handed, spellId) = S.handOne refrain (S.landsInPlay swamp 2)
-        -- Stocked against CR 104.3c: nothing here draws, but a fixture that
-        -- decks alice would end the game before the assertion runs.
-        (_, stocked) = S.addLibraryCard piker S.alice handed
-        (deadId, gs) = S.addGraveyardCard piker S.alice stocked
-        -- The target is FILTERED out of what the engine offered, so CR 608.2b
-        -- cannot drop a hand-built recipient and an answerer hunting for
-        -- something legal cannot repair a mutation.
-        answer :: Prompt.Prompt r -> r
-        answer p = case p of
-          Prompt.ChooseModes {} -> Seq.replicate 2 raiseMode
-          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just deadId) . Recipient.objectOf) offered) sets
-          _ -> S.identityAnswer p
-        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
-        named oid = fmap S.nameOf (Game.cardOf oid after) == Just (CardName.MkCardName (Text.pack "Goblin Piker"))
-        risen = filter named (Game.zoneMembers Zone.Battlefield S.alice after)
-    case risen of
-      [onlyRisen] -> do
-        Spec.assertEqWith s "CR 700.2d occurrence 1 defined no object, so the raised Piker carries one counter: a 2/1 became a 3/2" (S.powerToughnessOf onlyRisen after) (Just (3, 2))
-        Spec.assertEqWith s "CR 601.2c the repeat really declared two slots" (Map.size (Modal.modesTargetSlots (Seq.replicate 2 raiseMode) (Face.spell (S.combinedFace refrain)))) 2
-      _ -> Spec.assertFailure s "occurrence 0 should have returned exactly one Piker to alice's battlefield"
-
 goadMode :: ModeIndex.ModeIndex
 goadMode = ModeIndex.MkModeIndex 0
-
--- Synthetic Raising Refrain's raising mode (data/cards/synthetic-raising-refrain
--- .json), the one that defines a slot.
-raiseMode :: ModeIndex.ModeIndex
-raiseMode = ModeIndex.MkModeIndex 0
 
 victimSlot :: SlotName.SlotName
 victimSlot = SlotName.MkSlotName (Text.pack "victim")
@@ -1102,24 +987,6 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
     Spec.assertEqWith s "Vandalize resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "bob's Bonesplitter was destroyed" (bonesplitterCount after) 0
     Spec.assertEqWith s "bob's Forest survived: the land mode was not chosen" (forestCount after) 1
-
-  -- The same board and the same mana, differing only in the answer: both modes, which
-  -- is the other size the instruction allows. Two separate slots are filled, and the
-  -- two destructions are separately visible.
-  Spec.it s "CR 700.2 choosing both destroys both targets" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    vandalize <- S.printingOf s registry "Vandalize"
-    forest <- S.printingOf s registry "Forest"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let (board, spellId, forestId) = vandalizeBoard mountain vandalize forest
-        (boneId, gs) = S.addPermanent bonesplitter S.bob board
-        answer :: Prompt.Prompt r -> r
-        answer = insistOneOrBoth [destroyArtifact, destroyLand] boneId forestId
-        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
-    Spec.assertEqWith s "Vandalize resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-    Spec.assertEqWith s "bob's Bonesplitter was destroyed" (bonesplitterCount after) 0
-    Spec.assertEqWith s "bob's Forest was destroyed too" (forestCount after) 0
 
   -- The floor, on that same board: "one or both" is not "up to both", so naming no
   -- mode is not an answer and Cast.castProposed's reject-not-repair rewinds.

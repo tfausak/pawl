@@ -1,0 +1,37 @@
+{
+  "description": "CR 700.2a a computed bound no announcement of its own gauge slot could reach makes the mode unchoosable",
+  "note": "The control for the Wall of Stone case: bob's creature is a Goblin Piker (mana value 2), which only the full two-Wall announcement of the gauge affords. The destroy mode is offered and chosen beside the draw mode, so the Piker dies and one Swamp is drawn.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" },
+          { "card": "Swamp", "label": "swamp3" },
+          { "card": "Wall of Stone", "label": "wall-a" },
+          { "card": "Wall of Stone", "label": "wall-b" },
+          { "card": "Wall of Stone", "label": "wall-c" }
+        ],
+        "hand": [{ "card": "Synthetic Measured Refrain", "label": "refrain" }],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "victim" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@refrain", "modes": [0, 1], "targetsBySlot": { "gauge": ["@wall-a", "@wall-b"], "victim": ["@victim"] }, "mana": ["@swamp1", "@swamp2", "@swamp3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Swamp", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Synthetic Measured Refrain", "count": 0 } } }
+  ]
+}

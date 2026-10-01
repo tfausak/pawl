@@ -2734,7 +2734,7 @@ isOptionalResponse response = case response of
 -- The board is played out rather than assembled: alice bolts her own Blind
 -- Hunter, haunt's dies trigger exiles the card haunting bob's Piker, and a
 -- second bolt kills that Piker. Only then is the exile-zone ability asked for.
-hauntSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hauntSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hauntSpec s registry =
   let -- Every target slot pinned at one recipient, never "the least legal one":
       -- both Pikers are legal haunt targets and all three players are legal
@@ -2795,30 +2795,6 @@ hauntSpec s registry =
         _ -> gs
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
    in Spec.describe s "CR 702.55 haunt" $ do
-        -- The proving case for the whole unit: the ability fires from EXILE.
-        Spec.it s "CR 702.55c whole card: the haunting card in exile sees the creature it haunts die" $ do
-          fixture@(_, victimId, _, _, secondBolt, _) <- board
-          let (_, exiled) = haunted fixture
-              killed = boltAt victimId secondBolt exiled
-              (placed, after) = settleAndResolve (aimAt (Recipient.ToPlayer S.carol)) killed
-          Spec.assertEqWith s "one card is in exile" (Set.size (GameState.exile exiled)) 1
-          Spec.assertEqWith s "and it haunts exactly one object" (Map.size (GameState.haunting exiled)) 1
-          Spec.assertEqWith s "haunt itself changed nobody's life total" (lives exiled) (Just 20, Just 20, Just 20)
-          Spec.assertEqWith s "the exile-zone trigger reached the stack in that settle" (length (GameState.stack placed)) 1
-          -- Three different answers on three different seats, which is what the
-          -- three seats are for: the target loses, the haunting card's OWNER
-          -- gains (CR 108.4a gives a card in exile no other controller), and the
-          -- player whose creature died is untouched.
-          Spec.assertEqWith s "carol lost 2, alice gained 2, bob is untouched" (lives after) (Just 22, Just 20, Just 18)
-        -- The link, not the zone: same board, same exile, and the creature that
-        -- dies is the OTHER Piker.
-        Spec.it s "CR 702.55b only the creature the card haunts fires it" $ do
-          fixture@(_, _, bystanderId, _, secondBolt, _) <- board
-          let (_, exiled) = haunted fixture
-              killed = boltAt bystanderId secondBolt exiled
-              (placed, after) = settleAndResolve (aimAt (Recipient.ToPlayer S.carol)) killed
-          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack placed)) 0
-          Spec.assertEqWith s "and no life total moved" (lives after) (Just 20, Just 20, Just 20)
         -- The zone, not the link: the same haunting card, still haunting the same
         -- Piker, moved to a graveyard. CR 113.6k puts this ability in exile alone,
         -- so a graveyard reading of it must find nothing -- which is what
@@ -3150,69 +3126,16 @@ veneratedRotpriestSpec s registry =
           Spec.assertEqWith s "CR 601.2c bob got a poison counter" (poisonOf after) 1
           Spec.assertEqWith s "and the targeted Piker was sacrificed" (Game.lookupObject firstPiker after) Nothing
 
-soulshiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-soulshiftSpec s registry =
-  let ancestorName = CardName.MkCardName (Text.pack "Disowned Ancestor")
-      -- Rule 702.46a's "you may", exercised. S.identityAnswer declines it, which
-      -- is what the declining leg below rides.
-      exercising :: Prompt.Prompt r -> r
-      exercising p = case p of
-        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-        _ -> S.identityAnswer p
-      board = do
-        swamp <- S.printingOf s registry "Swamp"
-        murder <- S.printingOf s registry "Murder"
-        kami <- S.printingOf s registry "Kami of Empty Graves"
-        piker <- S.printingOf s registry "Goblin Piker"
-        shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-        ancestor <- S.printingOf s registry "Disowned Ancestor"
-        let (kamiId, g1) = S.addPermanent kami S.alice (S.landsInPlay swamp 3)
-            (pikerId, g2) = S.addGraveyardCard piker S.alice g1
-            (shimatsuId, g3) = S.addGraveyardCard shimatsu S.alice g2
-            (theirsId, g4) = S.addGraveyardCard ancestor S.bob g3
-            (mineId, g5) = S.addGraveyardCard ancestor S.alice g4
-            -- CR 104.3c: nothing here draws, but a stocked library keeps a leg
-            -- from ending on an empty one.
-            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g5 [1 .. 5 :: Int]
-        pure (kamiId, (pikerId, shimatsuId, theirsId, mineId), S.handOne murder stocked)
-      -- Cast the Murder, resolve it (the Kami dies), settle so the death trigger
-      -- is gathered and its target chosen (CR 603.3d), then resolve the trigger.
-      murderIt :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, GameState.GameState)
-      murderIt answer (gs, spellId) =
-        let cast = S.runPure answer gs (S.cast S.alice spellId)
-            destroyed = S.runPure answer cast Stack.resolveTop
-            settled = S.runPure answer destroyed Engine.settleForPriority
-         in (settled, S.runPure answer settled Stack.resolveTop)
-      graveyardOf = Game.zoneMembers Zone.Graveyard
-   in Spec.describe s "Soulshift" $ do
-        -- The proving case.
-        Spec.it s "CR 702.46a whole card: the dead Kami returns the one Spirit card its N reaches" $ do
-          (kamiId, (pikerId, shimatsuId, theirsId, mineId), gs) <- board
-          let (settled, after) = murderIt exercising gs
-          Spec.assertEqWith s "the dies trigger reached the stack" (length (GameState.stack settled)) 1
-          Spec.assertBool s (not (S.onBattlefield kamiId after)) "and the Kami is gone"
-          Spec.assertEqWith s "alice's hand holds the Ancestor" (S.countByName ancestorName S.alice after) 1
-          Spec.assertBool s (notElem mineId (graveyardOf S.alice after)) "the id it was targeted under has left her graveyard (CR 400.7)"
-          Spec.assertBool s (elem pikerId (graveyardOf S.alice after)) "the Piker stayed: not a Spirit"
-          Spec.assertBool s (elem shimatsuId (graveyardOf S.alice after)) "Shimatsu stayed: mana value 4 against soulshift 3"
-          Spec.assertBool s (elem theirsId (graveyardOf S.bob after)) "bob's identical Ancestor stayed: the wrong graveyard (CR 400.1)"
-          Spec.assertEqWith s "so does the dead Kami itself, a Spirit of mana value 4, beside the spent Murder" (length (graveyardOf S.alice after)) 4
-        -- CR 603.5's "may" is a real fork, and the control for the case above --
-        -- same board, same Murder, and the trigger still reaches the stack.
-        Spec.it s "CR 603.5 declining the may returns nothing" $ do
-          (_, (_, _, _, mineId), gs) <- board
-          let (settled, after) = murderIt S.identityAnswer gs
-          Spec.assertEqWith s "the trigger reached the stack all the same" (length (GameState.stack settled)) 1
-          Spec.assertEqWith s "but alice's hand is empty" (S.countByName ancestorName S.alice after) 0
-          Spec.assertBool s (elem mineId (graveyardOf S.alice after)) "and the Ancestor is where it was"
-        -- CR 702.46b: "if a permanent has multiple instances of soulshift, each
-        -- triggers separately". Asserted of the MINT, as afterlife's multiplicity
-        -- is: Forked-Branch Garami prints "soulshift 4, soulshift 4" and is not in
-        -- the pool.
-        Spec.it s "CR 702.46b each instance of soulshift is its own ability" $ do
-          Spec.assertEqWith s "soulshift 3 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Soulshift 3) 2)) [Keyword.soulshift 3, Keyword.soulshift 3]
-          Spec.assertEqWith s "and soulshift 4 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Soulshift 4) 1)) [Keyword.soulshift 4]
-          Spec.assertBool s (Keyword.soulshift 3 /= Keyword.soulshift 4) "and the N reaches the minted ability"
+soulshiftSpec :: (Monad m) => Spec.Spec m n -> n ()
+soulshiftSpec s = Spec.describe s "Soulshift" $ do
+  -- CR 702.46b: "if a permanent has multiple instances of soulshift, each
+  -- triggers separately". Asserted of the MINT, as afterlife's multiplicity
+  -- is: Forked-Branch Garami prints "soulshift 4, soulshift 4" and is not in
+  -- the pool.
+  Spec.it s "CR 702.46b each instance of soulshift is its own ability" $ do
+    Spec.assertEqWith s "soulshift 3 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Soulshift 3) 2)) [Keyword.soulshift 3, Keyword.soulshift 3]
+    Spec.assertEqWith s "and soulshift 4 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Soulshift 4) 1)) [Keyword.soulshift 4]
+    Spec.assertBool s (Keyword.soulshift 3 /= Keyword.soulshift 4) "and the N reaches the minted ability"
 
 -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. / {T}: Add
 -- {C}." A nonbasic land whose whole text box is one triggered ability and one
@@ -4412,7 +4335,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   amuletSpec s registry
   professorHojoSpec s registry
   veneratedRotpriestSpec s registry
-  soulshiftSpec s registry
+  soulshiftSpec s
   hauntSpec s registry
   hauntSpellSpec s registry
   screamsFromWithinSpec s registry

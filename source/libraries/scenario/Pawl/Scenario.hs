@@ -325,7 +325,7 @@ answerPrompt asked = do
       waiting <- State.gets pending
       case waiting of
         Just (key, verb, choices)
-          | subChoiceFor key prompt decider -> answerActionChoice key verb choices asked
+          | subChoiceFor key prompt decider choices -> answerActionChoice key verb choices asked
           -- Any other prompt means the action has finished. A choice it never
           -- asked for is a scenario error, reported here rather than at the
           -- next prompt that happens to want an answer.
@@ -337,11 +337,13 @@ answerPrompt asked = do
 
 -- | Whether a prompt is one a cast or activation asks its own decider between
 -- the ChooseAction that began it and its completion (CR 601.2b-h, CR 602.2b).
-subChoiceFor :: When.When -> Prompt.Type.Prompt r -> Maybe Label.Label -> Bool
-subChoiceFor key prompt decider =
+-- A target prompt is only while the move still holds targets: once they are
+-- spent, the next one is a triggered ability's (CR 603.3d).
+subChoiceFor :: When.When -> Prompt.Type.Prompt r -> Maybe Label.Label -> Choices.Choices -> Bool
+subChoiceFor key prompt decider choices =
   decider == Just (When.player key) && case prompt of
-    Prompt.Type.ChooseTargets {} -> True
-    Prompt.Type.AnnounceTargets {} -> True
+    Prompt.Type.ChooseTargets {} -> holdsTargets
+    Prompt.Type.AnnounceTargets {} -> holdsTargets
     Prompt.Type.ChooseModes {} -> True
     Prompt.Type.ChooseX {} -> True
     Prompt.Type.ChooseCost {} -> True
@@ -350,6 +352,8 @@ subChoiceFor key prompt decider =
     Prompt.Type.ChooseExtraManaSource {} -> True
     Prompt.Type.ChooseManaYield {} -> True
     _ -> False
+  where
+    holdsTargets = Maybe.isJust (Choices.targets choices) || not (Map.null (Choices.targetsBySlot choices))
 
 answerTopPrompt :: Maybe Label.Label -> Asked.Asked r -> Run r
 answerTopPrompt decider asked =

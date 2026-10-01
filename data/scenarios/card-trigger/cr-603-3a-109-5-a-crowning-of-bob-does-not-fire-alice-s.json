@@ -1,0 +1,43 @@
+{
+  "description": "CR 603.3a/109.5 a crowning of bob does not fire alice's Custodi Lich",
+  "note": "The Lich's \"whenever you become the monarch\" is read against its controller, so a crowning of somebody else is silence. Denethor, Stone Seer is the pool's one way to crown a chosen player: its two slots send the crown to bob and the 3 damage to carol the player, so nothing dies to damage and a creature count that moved can only be a sacrifice. The Lich is already on the battlefield, so Denethor's is the only crowning; a wrongly fired edict would raise an unscheduled target prompt and fail the run. Carol taking the 3 shows the ability resolved in full.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" },
+          { "card": "Mountain", "label": "mountain-4" },
+          { "card": "Custodi Lich", "label": "lich" },
+          { "card": "Denethor, Stone Seer", "label": "denethor", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker" },
+          { "card": "Bird Maiden" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Bog Wraith" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": null } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@denethor", "targetsBySlot": { "player": ["@bob"], "damage": ["@carol"] }, "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4"], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Monarch": { "player": "bob" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Custodi Lich", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Bird Maiden", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Bog Wraith", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 17 } } }
+  ]
+}

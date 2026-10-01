@@ -1,0 +1,44 @@
+{
+  "description": "a land bearing no counter of the named kind moves nothing and pays no rider",
+  "note": "The same board differing in one thing: the land bears only its shield counter. CR 122.5's second impossibility, and the rider's if one or more read against the zero the move binds, so no life and no card.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true },
+          { "card": "Mountain", "label": "land", "ready": true, "counters": [{ "key": { "type": "Shield" }, "value": 1 }] },
+          { "card": "Black Panther, Wakandan King", "label": "panther", "ready": true },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@land", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@land", "kind": { "type": "Shield" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "Shield" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@panther", "targetsBySlot": { "land": ["@land"], "creature": ["@piker"] }, "mana": ["@forest-1", "@forest-2", "@forest-3", null] } } }
+  ],
+  "final": [
+    { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
+    { "Counters": { "object": "@piker", "kind": { "type": "Shield" }, "count": 0 } },
+    { "Counters": { "object": "@land", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } },
+    { "Counters": { "object": "@land", "kind": { "type": "Shield" }, "count": 1 } },
+    { "Life": { "player": "alice", "life": 20 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 0 } }
+  ]
+}
