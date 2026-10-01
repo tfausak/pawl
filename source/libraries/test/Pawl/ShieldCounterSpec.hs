@@ -3,7 +3,7 @@
 
 -- Pawl.Engine.Replacement over shield counters (CR 122.1c) and the remaining
 -- printed replacements after them: Dragonstorm Globe, Tidewalker, a redirected
--- permanent spell, Hurr Jackal, Queen Allenal, Quina. Split out of
+-- permanent spell, Hurr Jackal, Queen Allenal, Chatterfang, Quina. Split out of
 -- Pawl.ReplacementSpec, which keeps the machinery.
 module Pawl.ShieldCounterSpec where
 
@@ -954,9 +954,47 @@ queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.
         Spec.assertEqWith s "and every one of them tapped (CR 110.5b)" (length (filter tapped soldiers)) 3
       _ -> Spec.assertFailure s "fixture should give alice a Hero and a Queen"
 
+-- Chatterfang, Squirrel General (Oracle text checked against Scryfall
+-- 2026-09-30): "If one or more tokens would be created under your control, those
+-- tokens plus that many 1/1 green Squirrel creature tokens are created
+-- instead." Queen Allenal's append sized by the event (TokenPlus.ThatMany).
+--
+-- Dragon Fodder's two Goblins are the creation. Against Doubling Season the
+-- two orders agree -- (2 + 2) * 2 and 2 * 2 + 4 -- where a one-token append
+-- would answer two Squirrels and one.
+chatterfangSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chatterfangSpec s registry = Spec.describe s "Chatterfang, Squirrel General (CR 614.1a)" $ do
+  let board mountain chatterfang = S.addPermanent chatterfang S.alice (S.landsInPlay mountain 2)
+      squirrelName = CardName.MkCardName (Text.pack "Squirrel Token")
+      goblinName = CardName.MkCardName (Text.pack "Goblin Token")
+  Spec.it s "CR 614.1a two Goblins would be created, so two Goblins plus two Squirrels are" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    chatterfang <- S.printingOf s registry "Chatterfang, Squirrel General"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
+    let (_, g1) = board mountain chatterfang
+        (g2, spellId) = S.handOne dragonFodder g1
+        after = castAndResolve S.identityAnswer g2 spellId
+    Spec.assertEqWith s "one Squirrel per token created" (S.countOnBattlefieldByName squirrelName S.alice after) 2
+    Spec.assertEqWith s "and the two Goblins" (S.countOnBattlefieldByName goblinName S.alice after) 2
+  Spec.it s "CR 616.1 racing Doubling Season: four Squirrels in either order" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    chatterfang <- S.printingOf s registry "Chatterfang, Squirrel General"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
+    let (chatterfangId, g1) = board mountain chatterfang
+        (seasonId, g2) = S.addPermanent doublingSeason S.alice g1
+        (g3, spellId) = S.handOne dragonFodder g2
+        chatterfangFirst = castAndResolve (raceAnswer chatterfangId chatterfangId) g3 spellId
+        seasonFirst = castAndResolve (raceAnswer seasonId chatterfangId) g3 spellId
+    Spec.assertEqWith s "Chatterfang then Season: (2 Goblins + 2 Squirrels) * 2" (S.countOnBattlefieldByName squirrelName S.alice chatterfangFirst) 4
+    Spec.assertEqWith s "Season then Chatterfang: 2 Goblins * 2, plus that many Squirrels" (S.countOnBattlefieldByName squirrelName S.alice seasonFirst) 4
+    Spec.assertEqWith s "and four Goblins one way" (S.countOnBattlefieldByName goblinName S.alice chatterfangFirst) 4
+    Spec.assertEqWith s "and four the other" (S.countOnBattlefieldByName goblinName S.alice seasonFirst) 4
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   queenAllenalSpec s registry
+  chatterfangSpec s registry
   shieldCounterSpec s registry
   dragonstormGlobeSpec s registry
   tidewalkerSpec s registry

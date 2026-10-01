@@ -1460,6 +1460,7 @@ substituteXInComponent x component = case component of
   CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.RemoveCounters {} -> component
   CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents x (WhichCounters.OfKind CounterKind.PlusOnePlusOne) criterion CounterSpread.FromAmong)
+  CostComponent.SacrificeX criterion -> CostComponent.Sacrifice (Sacrifice.MkSacrifice x criterion)
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
   CostComponent.Forage -> component
@@ -1537,6 +1538,7 @@ componentHasVariable component = case component of
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> True
+  CostComponent.SacrificeX _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> True
@@ -1643,6 +1645,9 @@ componentDemandGrowsWithX component = case component of
   -- CR 118.3 measures the announced count against the +1\/+1 counters the
   -- criterion admits between them, so a big enough X refuses.
   CostComponent.RemovePlusOneCountersX _ -> True
+  -- CR 701.21a: one permanent per sacrifice, so an X past the matching
+  -- permanents the payer controls refuses.
+  CostComponent.SacrificeX _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.Forage -> False
@@ -1952,6 +1957,7 @@ loyaltyAmountOf component = case component of
   -- ability, and this is a +1\/+1 counter.
   CostComponent.RemoveCounters {} -> Nothing
   CostComponent.RemovePlusOneCountersX _ -> Nothing
+  CostComponent.SacrificeX _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
@@ -2088,6 +2094,7 @@ zoneOfComponent component = case component of
   -- ANOTHER permanent, which CR 113.6m does not ask about either way.
   CostComponent.RemoveCounters {} -> Nothing
   CostComponent.RemovePlusOneCountersX _ -> Nothing
+  CostComponent.SacrificeX _ -> Nothing
   -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
   -- out of any zone.
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
@@ -2180,6 +2187,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> False
+  CostComponent.SacrificeX _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -2815,6 +2823,7 @@ claimOf slots pid oid component gs =
         -- the Blight arm below's shape.
         CostComponent.RemoveCounters {} -> Nothing
         CostComponent.RemovePlusOneCountersX _ -> Nothing
+        CostComponent.SacrificeX _ -> Nothing
         CostComponent.PutPlusOneCountersOnThis _ -> Nothing
         -- Nothing, though this one DOES pick an object out of a pool: CR 701.68a takes
         -- nothing out of a zone. Two blights in one cost may choose the same creature,
@@ -3279,6 +3288,7 @@ uncountedCeiling pid oid claims gs component = case component of
   CostComponent.RemoveCounters {} -> Just 1
   -- Zero, PayLifeX's answer above and for its reason.
   CostComponent.RemovePlusOneCountersX _ -> Just 0
+  CostComponent.SacrificeX _ -> Just 0
   -- Nothing: this component PUTS counters on, so it spends nothing that runs
   -- out, and repeating it is bounded by whatever else the cost spends. Blight's
   -- arm below and for its reason; a FENCE, no mana ability in `data/cards/`
@@ -3619,6 +3629,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.RemoveCountersFromThis _ -> 0
   CostComponent.RemoveCounters {} -> 0
   CostComponent.RemovePlusOneCountersX _ -> 0
+  CostComponent.SacrificeX _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
@@ -3671,6 +3682,7 @@ energyOwedByComponent component = case component of
   CostComponent.RemoveCountersFromThis _ -> 0
   CostComponent.RemoveCounters {} -> 0
   CostComponent.RemovePlusOneCountersX _ -> 0
+  CostComponent.SacrificeX _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
@@ -3713,6 +3725,7 @@ countersOwedByComponent component = case component of
   -- `oid`'s counters has nothing to learn from it.
   CostComponent.RemoveCounters {} -> []
   CostComponent.RemovePlusOneCountersX _ -> []
+  CostComponent.SacrificeX _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayHalfLife _ -> []
@@ -3815,6 +3828,7 @@ canPayComponent slots pid oid component gs = case component of
   CostComponent.PayEnergyX -> False
   -- CR 601.2b again, PayEnergyX's arm above and for its reason.
   CostComponent.RemovePlusOneCountersX _ -> False
+  CostComponent.SacrificeX _ -> False
   -- CR 701.21a: this player must control at least `n` matching permanents. This
   -- component ALONE, PayLife's caveat -- two Sacrifice components of one cost can
   -- each find the same permanent here, and `jointlyPayable` asks them together.
@@ -4085,6 +4099,7 @@ criteriaOf component = case component of
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
   CostComponent.RemoveCounters remove -> [CountersFromPermanents.whichPermanent remove]
   CostComponent.RemovePlusOneCountersX criterion -> [criterion]
+  CostComponent.SacrificeX criterion -> [criterion]
   -- No criterion: rule 701.59a describes the cards by a TOTAL and by nothing else,
   -- so this belongs with the amount-carrying arms below.
   CostComponent.CollectEvidence _ -> []
@@ -4815,6 +4830,7 @@ paidInSecondPass component = case component of
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> False
+  CostComponent.SacrificeX _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -4952,6 +4968,7 @@ orderSensitive component = case component of
   -- True, the substituted component's answer; unreachable before the
   -- announcement substitutes it.
   CostComponent.RemovePlusOneCountersX _ -> True
+  CostComponent.SacrificeX _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.Blight _ -> True
@@ -5820,6 +5837,7 @@ payComponent moment slots pid oid component = case component of
   CostComponent.PayEnergyX -> pure Payment.Unpaid
   -- Unpayable, PayEnergyX's arm above and for its reason.
   CostComponent.RemovePlusOneCountersX _ -> pure Payment.Unpaid
+  CostComponent.SacrificeX _ -> pure Payment.Unpaid
   -- CR 701.17a: the top `n` cards of the PAYING player's own library (CR 400.3),
   -- moved to their graveyard. `canPayComponent` above has already refused a cost
   -- milling more than the library holds (CR 701.17b); a MillCountR row resizing
@@ -5838,7 +5856,8 @@ payComponent moment slots pid oid component = case component of
     Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
     pure bindsNothing
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
-  -- prompt. Elided only when forced -- exactly as many candidates as the count.
+  -- prompt. Elided only when forced -- exactly as many candidates as the count,
+  -- or a count of 0, which a SacrificeX announced at 0 leaves.
   -- Three payable Mountains and a count of two IS asked: they differ in tap
   -- state, counters and attached auras.
   --
@@ -5854,8 +5873,8 @@ payComponent moment slots pid oid component = case component of
     let candidates = Replacement.sacrificeCandidates slots pid (Just oid) criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
-      if Natural.length candidates <= n
-        then pure (Set.fromList candidates)
+      if n == 0 || Natural.length candidates <= n
+        then pure (Set.fromList (List.genericTake n candidates))
         else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n Seq.empty)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do

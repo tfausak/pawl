@@ -87,36 +87,39 @@
                 }
               },
               "plus": {
-                "faces": [
-                  {
-                    "colorIndicator": [
-                      {
-                        "type": "White"
-                      }
-                    ],
-                    "name": "Soldier Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "typeLine": {
-                      "subtypes": [
+                "type": "One",
+                "value": {
+                  "faces": [
+                    {
+                      "colorIndicator": [
                         {
-                          "type": "Soldier"
+                          "type": "White"
                         }
                       ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
+                      "name": "Soldier Token",
+                      "power": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "toughness": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "typeLine": {
+                        "subtypes": [
+                          {
+                            "type": "Soldier"
+                          }
+                        ],
+                        "types": [
+                          {
+                            "type": "Creature"
+                          }
+                        ]
+                      }
                     }
-                  }
-                ]
+                  ]
+                }
               }
             }
           }

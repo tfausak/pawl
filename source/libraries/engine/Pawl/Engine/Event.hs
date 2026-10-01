@@ -218,6 +218,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TokenLot as TokenLot
+import qualified Pawl.Types.TokenPlus as TokenPlus
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
@@ -4160,12 +4161,19 @@ apply batch candidate event =
     -- created instead" appends a lot to the SAME event -- scaled first, then
     -- appended, so a row applied after this one (CR 616.1) scales the Soldier
     -- too, and the creating effect's riders reach it (Queen Allenal's ruling).
-    -- Pawl.ReplacementSpec's Queen Allenal group is the proof, both orders.
+    -- Pawl.ShieldCounterSpec's Queen Allenal and Chatterfang groups are the
+    -- proof, both orders.
     (ReplacementEffect.TokenR (TokenR.MkTokenR _ scaling plus), ProposedEvent.WouldCreateTokens pid lots) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       let scaleLot factor lot = lot {TokenLot.count = Replacement.scale factor (TokenLot.count lot)}
           scaled = maybe lots (\factor -> fmap (scaleLot factor) lots) scaling
-          appended = maybe scaled (\card -> scaled Seq.|> TokenLot.MkTokenLot {TokenLot.card = card, TokenLot.copy = Nothing, TokenLot.count = 1}) plus
+          lotOf card n = TokenLot.MkTokenLot {TokenLot.card = card, TokenLot.copy = Nothing, TokenLot.count = n}
+          appended = case plus of
+            Nothing -> scaled
+            Just (TokenPlus.One card) -> scaled Seq.|> lotOf card 1
+            -- Chatterfang's "that many": every token the event would create as
+            -- this row applies, its own scaling included.
+            Just (TokenPlus.ThatMany card) -> scaled Seq.|> lotOf card (sum (fmap TokenLot.count scaled))
       pure (Just (ProposedEvent.WouldCreateTokens pid appended))
     -- Unreachable: `applies` admits TokenR only against WouldCreateTokens.
     (ReplacementEffect.TokenR {}, _) -> pure (Just event)
