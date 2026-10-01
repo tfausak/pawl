@@ -1,0 +1,25 @@
+{
+  "description": "CR 603.3b/702.91a resolving battle cry first leaves the Soldiers unpumped",
+  "note": "The same board, the opposite order: battle cry resolves while the Hero is the only attacker, finds no other attacking creature, and the Soldiers arrive afterwards at their printed 1/1, so bob takes 3 + 1 + 1.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Hero of Bladehold", "label": "hero", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@hero", "@hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Soldier Token", "Soldier Token#2"] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Soldier Token", "power": 1, "toughness": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Soldier Token#2", "power": 1, "toughness": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } }
+  ]
+}

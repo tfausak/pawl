@@ -1,0 +1,30 @@
+{
+  "description": "CR 508.3a whole card: each creature you control that attacks gets +2/+2",
+  "note": "Fervent Charge reads CR 508.3a once per declared attacker. Two attackers with different printed pairs, Goblin Piker 2/1 and Hill Giant 3/3, so a condition firing once per declaration (CR 508.3d) leaves one of them unpumped. bob's Piker is the fixture the CR 109.5 negative shares; it does not block here, and blocking would move no power or toughness before damage.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Fervent Charge", "label": "charge" },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bob-piker", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker", "@giant"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@charge", "@charge"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 3 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 5, "toughness": 5 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@piker": "@bob", "@giant": "@bob" } } } }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "description": "CR 702.149a the added combat phase counts only its own declaration",
+  "note": "Two combat phases in one turn, which makes the combat record the right source for training and the turn's event log the wrong one: a log-fold would find Aurelia in the second declaration she is not part of and train the Apprentice Sharpshooter twice. Aurelia's 3 power clears the Sharpshooter's 1 in the first phase, and her trigger untaps the team and adds the second phase, where the Sharpshooter attacks alone. The second Attack entry is the proof that the second declaration ran.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Apprentice Sharpshooter", "label": "sharpshooter", "ready": true },
+          { "card": "Aurelia, the Warleader", "label": "aurelia", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@sharpshooter", "@aurelia"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@sharpshooter", "@aurelia"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@sharpshooter", "power": 2, "toughness": 5 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@sharpshooter"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@sharpshooter", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}

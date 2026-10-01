@@ -1,0 +1,33 @@
+{
+  "description": "CR 508.3a/508.5 whole card: each creature attacking you costs its controller 1 life",
+  "note": "Three seats, and load-bearing: at two, the defending player, \"an opponent\" and the attacker's controller collapse. Two of alice's Goblin Pikers attack bob, who holds Marchesa's Decree, so it fires once per attacker (CR 508.3a) and alice, the creatures' controller, loses 2 while bob and carol lose nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Goblin Piker", "label": "piker-2", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Marchesa's Decree", "label": "decree" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker", "@piker-2"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@piker", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@piker-2", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "OrderTriggers": ["@decree", "@decree"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Life": { "player": "alice", "life": 18 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } }
+  ]
+}

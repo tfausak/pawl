@@ -1,0 +1,37 @@
+{
+  "description": "CR 119.9 one lifelink attacker connecting is one life gain event",
+  "note": "One lifelink source connecting is one life gain event under either reading, so this is the floor beside the two-source case. Synthetic Communal Vigil draws once per gain and Ajani's Pridemate takes a counter per gain, so one Plains drawn and one counter is one event. The Pridemate attacks too and adds two to bob's loss.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Child of Night", "label": "child", "ready": true },
+          { "card": "Synthetic Communal Vigil", "label": "vigil" },
+          { "card": "Ajani's Pridemate", "label": "pridemate", "ready": true }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" },
+          { "card": "Plains" },
+          { "card": "Plains" },
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@child", "@pridemate"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTriggers": ["@vigil", "@pridemate"] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 22 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "@pridemate", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}
