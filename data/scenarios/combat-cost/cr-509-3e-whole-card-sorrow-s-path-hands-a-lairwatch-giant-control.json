@@ -1,0 +1,31 @@
+{
+  "description": "CR 509.3e whole card: Sorrow's Path hands a Lairwatch Giant two attackers and it gains first strike",
+  "note": "The control for the Path-exchange case: the same board and the same declared blocks, with the Path never activated. The lone Lairwatch Giant blocks one attacker, so it never gains first strike.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Sorrow's Path", "label": "path" },
+          { "card": "Hill Giant", "label": "one", "ready": true },
+          { "card": "Hill Giant", "label": "two", "ready": true },
+          { "card": "Hill Giant", "label": "three", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Lairwatch Giant", "label": "lone" },
+          { "card": "Lairwatch Giant", "label": "pair" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@one", "@two", "@three"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@lone": ["@one"], "@pair": ["@two", "@three"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@lone", "keyword": { "type": "FirstStrike" }, "count": 0 } } }
+  ]
+}

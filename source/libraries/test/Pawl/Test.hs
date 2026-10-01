@@ -321,6 +321,7 @@ import qualified Pawl.Codec.KeywordCountSpec
 import qualified Pawl.Codec.KeywordDesignatorSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
+import qualified Pawl.Codec.KeywordsAreSpec
 import qualified Pawl.Codec.LabelSpec
 import qualified Pawl.Codec.LastKnownSpec
 import qualified Pawl.Codec.LayoutSpec
@@ -552,6 +553,7 @@ import qualified Pawl.Codec.StepBeganSpec
 import qualified Pawl.Codec.StepBeginsSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
+import qualified Pawl.Codec.SubtypesAreSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.SuspendCountersSpec
 import qualified Pawl.Codec.SuspendSpec
@@ -1124,6 +1126,7 @@ spec s registry = do
   Pawl.Codec.KeywordCountSpec.spec s
   Pawl.Codec.KeywordFamilySpec.spec s
   Pawl.Codec.KeywordSpec.spec s
+  Pawl.Codec.KeywordsAreSpec.spec s
   Pawl.Codec.LastKnownSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
   Pawl.Codec.LibraryArrivalSpec.spec s
@@ -1361,6 +1364,7 @@ spec s registry = do
   Pawl.Codec.StepBeginsSpec.spec s
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
+  Pawl.Codec.SubtypesAreSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.SuspendCountersSpec.spec s
   Pawl.Codec.SuspendSpec.spec s

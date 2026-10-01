@@ -1,0 +1,29 @@
+{
+  "description": "CR 702.194a with no untapped creature, teamwork cannot be paid",
+  "note": "Team Tactics' Teamwork 1 taps creatures with total power 1 or more as it is cast. With the Hill Giant and Jedit Ojanen both tapped, CR 601.2f has no untapped creature to reach, the power available is 0, and the cost is unpayable, so the Giant gets double strike and no trample. The same two Mountains pay as in the successful casting.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Hill Giant", "label": "giant", "tapped": true, "ready": true },
+          { "card": "Jedit Ojanen", "label": "jedit", "tapped": true, "ready": true }
+        ],
+        "hand": [{ "card": "Team Tactics", "label": "tactics" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@tactics", "targets": ["@giant"], "mana": ["@m1", "@m2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@giant", "keyword": { "type": "DoubleStrike" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "@giant", "keyword": { "type": "Trample" }, "count": 0 } } }
+  ]
+}

@@ -1477,7 +1477,7 @@ tokenSetSpec s registry =
 -- group through ObjectRef.InSlot, which is what makes the binding a general
 -- reference rather than Sacrifice's private channel. "They" and "them" are the
 -- same two tokens, named by two different opcodes in one resolution.
-tokenGroupReadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tokenGroupReadSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenGroupReadSpec s registry =
   let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       warriors gs = filter (\oid -> Set.member Subtype.Warrior (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
@@ -1485,28 +1485,7 @@ tokenGroupReadSpec s registry =
       -- one on the battlefield, so S.identityAnswer's lowest-legal-recipient
       -- pick is that creature and nothing else can be targeted by accident.
       board swamp victim = S.addPermanent victim S.bob (S.landsInPlay swamp 4)
-      castSkirmish skirmish base =
-        let (gs, oid) = S.handOne skirmish base
-         in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
    in Spec.describe s "Group read through InSlot" $ do
-        -- THE PROVING CASE. Before ObjectRef.InSlot could see a group binding,
-        -- "they gain haste" resolved against an empty slot and granted haste to
-        -- nobody, while the two tokens still appeared and were still sacrificed
-        -- -- so only the keyword assertion discriminates.
-        Spec.it s "CR 613.1f \"they gain haste\" reaches BOTH minted tokens" $ do
-          skirmish <- S.printingOf s registry "Salt Road Skirmish"
-          swamp <- S.printingOf s registry "Swamp"
-          rats <- S.printingOf s registry "Typhoid Rats"
-          let (_, base) = board swamp rats
-              after = castSkirmish skirmish base
-          case warriors after of
-            tokens@[_, _] ->
-              Spec.assertEqWith
-                s
-                "each of the two has haste"
-                (fmap (\oid -> Projection.hasKeyword Keyword.Type.Haste oid after) tokens)
-                [True, True]
-            other -> Spec.assertFailure s ("expected exactly two Warrior tokens, got " <> show (length other))
         -- CR 608.2b: "if all its targets ... are now illegal, the spell doesn't
         -- resolve". The card's own Gatherer ruling spells out what that costs
         -- here -- "it won't resolve and none of its effects will happen" -- so

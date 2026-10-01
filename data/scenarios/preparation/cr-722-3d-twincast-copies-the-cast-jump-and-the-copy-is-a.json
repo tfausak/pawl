@@ -1,0 +1,40 @@
+{
+  "description": "CR 722.3d Twincast copies the cast Jump and the copy is a Jump of its own",
+  "note": "The Aviator attacks and becomes prepared, minting Jump's copy into exile; alice casts it at the Piker and Twincasts it, re-aiming the copy at the Wolves under CR 707.10c. The copy resolves first, so the Wolves fly while the Piker, whose Jump is still on the stack, does not; then the original resolves and the Piker flies too, so the copy did not consume it. The Wolves never attack and gain flying by no other road.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Encouraging Aviator", "label": "aviator", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Russet Wolves", "label": "wolves", "ready": true },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" },
+          { "card": "Island", "label": "island-5" }
+        ],
+        "hand": [{ "card": "Twincast", "label": "twincast" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@aviator"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "Jump#2", "targets": ["@piker"], "mana": ["@island-1", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@twincast", "targets": ["Jump#2"], "mana": ["@island-2", "@island-3", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@wolves"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@wolves", "keyword": { "type": "Flying" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Flying" }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Keywords": { "object": "@piker", "keyword": { "type": "Flying" }, "count": 1 } } }
+  ]
+}

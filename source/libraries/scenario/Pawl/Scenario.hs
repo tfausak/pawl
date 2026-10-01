@@ -71,6 +71,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.KeywordsAre as KeywordsAre
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.Mana as Mana.Type
@@ -99,6 +100,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Staged as Staged
+import qualified Pawl.Types.SubtypesAre as SubtypesAre
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Teams as Teams
@@ -795,6 +797,16 @@ observe gs check = case check of
     pid <- resolvePlayer label
     let actual = fmap (Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
     pure (if actual == Just count then Nothing else Just (Text.pack (maybe "no such player" show actual)))
+  -- The projected subtypes (CR 613.1d), never the printed card's.
+  Check.Subtypes (SubtypesAre.MkSubtypesAre ref subtypes) -> do
+    oid <- resolveObject ref gs
+    let actual = Projection.subtypesOf oid gs
+    pure (if actual == subtypes then Nothing else Just (Text.pack (show (Set.toList actual))))
+  -- The projected keywords (CR 613.1f), counted by instance.
+  Check.Keywords (KeywordsAre.MkKeywordsAre ref keyword count) -> do
+    oid <- resolveObject ref gs
+    let actual = Map.findWithDefault 0 keyword (Projection.keywordsOf oid gs)
+    pure (if actual == count then Nothing else Just (Text.pack (show actual)))
   Check.Monarch (MonarchIs.MkMonarchIs expected) -> do
     actual <- traverse labelOf (GameState.monarch gs)
     pure (if actual == expected then Nothing else Just (maybe (Text.pack "nobody") Label.unwrap actual))

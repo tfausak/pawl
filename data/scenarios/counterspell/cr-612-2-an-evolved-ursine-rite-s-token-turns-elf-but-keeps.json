@@ -1,0 +1,38 @@
+{
+  "description": "CR 612.2 an evolved Ursine Rite's token turns Elf but keeps its name",
+  "note": "Synthetic Ursine Rite creates a 2/2 Bear token named Bearer of the Wilds, so Bear sits inside Bearer, where it is not used as a creature type (CR 612.2). An Artificial Evolution at the spell swapping Bear for Elf makes the token an Elf still named Bearer of the Wilds. Synthetic because no printed token's card-authored name holds one of its own subtypes inside a longer word.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [
+          { "card": "Synthetic Ursine Rite", "label": "rite" },
+          { "card": "Artificial Evolution", "label": "evolution" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@rite", "mana": ["@forest-1", "@forest-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Synthetic Ursine Rite"], "mana": ["@island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Bear" }, "to": { "type": "Elf" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Bearer of the Wilds", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elfer of the Wilds", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Bearer of the Wilds", "subtypes": ["Elf"] } } }
+  ]
+}

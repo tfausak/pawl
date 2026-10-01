@@ -1,0 +1,44 @@
+{
+  "description": "CR 612.2 an Evolution naming Cleric leaves the token's Demon a Demon",
+  "note": "The falsifier for a word-blind rewrite, on the evolved Clavileño board with one word changed: Cleric is printed on the Clavileño's type line and nowhere in its ability, so an Artificial Evolution swapping Cleric for Zombie moves that one word and leaves the quoted ability's Demon standing. The Clavileño being a Vampire Zombie shows the Evolution resolved and landed on it. Vampire would not serve: it is the trigger's own target filter, and swapping it leaves the trigger no legal target (CR 603.3d).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Clavileño, First of the Blessed", "label": "clavileno", "ready": true },
+          { "card": "Bloodrage Vampire", "label": "victim", "ready": true },
+          { "card": "Island", "label": "island" },
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" }
+        ],
+        "hand": [
+          { "card": "Artificial Evolution", "label": "evolution" },
+          { "card": "Murder", "label": "murder" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["@clavileno"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Cleric" }, "to": { "type": "Zombie" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@clavileno", "@victim"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@victim"] } }, "source": "@clavileno" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Subtypes": { "object": "@victim", "subtypes": ["Vampire", "Demon"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Subtypes": { "object": "@clavileno", "subtypes": ["Vampire", "Zombie"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["@victim"], "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Vampire Demon Token", "count": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Subtypes": { "object": "Vampire Demon Token", "subtypes": ["Vampire", "Demon"] } } }
+  ]
+}
