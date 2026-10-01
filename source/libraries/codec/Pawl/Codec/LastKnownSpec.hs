@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -20,6 +21,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 -- | The bare projection an all-default value writes, reused as the `copiable`
@@ -47,6 +49,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attached = Set.singleton (ObjectId.MkObjectId 9),
           LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")),
           LastKnown.chosenPlayer = Just (PlayerId.MkPlayerId 3),
+          LastKnown.chosenColor = Just Color.Green,
+          LastKnown.chosenSubtype = Just Subtype.Goblin,
           LastKnown.attacking = False,
           LastKnown.attackTarget = Nothing,
           LastKnown.blocking = True,
@@ -62,7 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attached\":[9]"
-          <> ",\"chosenNames\":[\"Goblin Piker\"],\"chosenPlayer\":3,\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
+          <> ",\"chosenNames\":[\"Goblin Piker\"],\"chosenPlayer\":3,\"chosenColor\":{\"type\":\"Green\"},\"chosenSubtype\":{\"type\":\"Goblin\"},\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]"
           <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]"
           <> ",\"zone\":{\"type\":\"Battlefield\"}} "
@@ -84,6 +88,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attached = Set.empty,
           LastKnown.chosenNames = Set.empty,
           LastKnown.chosenPlayer = Nothing,
+          LastKnown.chosenColor = Nothing,
+          LastKnown.chosenSubtype = Nothing,
           LastKnown.attacking = True,
           LastKnown.attackTarget = Just (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           LastKnown.blocking = False,

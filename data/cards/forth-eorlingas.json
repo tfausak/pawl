@@ -23,6 +23,7 @@
                   }
                 ]
               },
+              "oneOrMorePlayers": true,
               "recipient": {
                 "type": "AnyPlayer"
               }

@@ -1,0 +1,48 @@
+{
+  "description": "Dack's Duplicate copies a creature and gains haste and dethrone (CR 707.9a)",
+  "note": "CR 707.9a's exception that makes the copy GAIN abilities. Dack's Duplicate and a Clone both enter this turn as copies of bob's Goblin Piker, so both are summoning sick. The Duplicate is still the Piker by name, subtypes and 2/1 (CR 707.2), and attacks bob, who has the most life: without haste (CR 702.10b) it could not be declared, and dethrone (CR 702.105a) grows it to 3/2. The Clone, the copy without the exception, sits out, still 2/1; the control file proves it is never offered as an attacker.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 15,
+        "battlefield": [
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Mountain", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Dack's Duplicate", "label": "duplicate" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@duplicate", "mana": ["Island#5", "Island#6", "Island#7", "Mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Dack's Duplicate", "names": ["Goblin Piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Dack's Duplicate", "subtypes": ["Goblin", "Warrior"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Dack's Duplicate", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["Dack's Duplicate"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "Dack's Duplicate", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "Dack's Duplicate": "@bob" } } } }
+  ]
+}

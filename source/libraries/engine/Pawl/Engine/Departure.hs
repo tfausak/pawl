@@ -289,6 +289,8 @@ objectsLeaveWith pid gs =
                 (Game.attachments oid gs)
                 (Object.chosenNames obj)
                 (Object.chosenPlayer obj)
+                (Object.chosenColor obj)
+                (Object.chosenSubtype obj)
                 -- CR 508.1k, the sibling read of the same record.
                 (Game.isAttacking oid gs)
                 (Game.attackTargetOf oid gs)

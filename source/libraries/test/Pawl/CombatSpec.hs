@@ -1680,30 +1680,6 @@ cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
         Spec.assertBool s (not (blocks gs handler piker)) "the 1/1 Handler may not block the 2/1 Piker"
         Spec.assertBool s (blocks gs handler elves) "the Handler may block the 1/1 Elves"
       _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
-  -- THE PROJECTION TRIPWIRE: bob's blocker is a Clone of Brassclaw Orcs, so the
-  -- restriction comes off CR 707.2's copiable values, not the printed card.
-  Spec.it s "CR 707.2 a Clone of Brassclaw Orcs can't block the Piker either" $ do
-    orcs <- S.printingOf s registry "Brassclaw Orcs"
-    clone <- S.printingOf s registry "Clone"
-    piker <- S.printingOf s registry "Goblin Piker"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    let (gs0, mine, theirs) = S.combatBoardOf [piker, elves] [orcs]
-        (cloneId, staged) = S.spellOnStack clone S.bob gs0
-        copying :: Prompt.Prompt r -> r
-        copying p = case p of
-          Prompt.ChooseCopyTarget _ _ _ legal -> List.find (`elem` theirs) legal
-          _ -> S.identityAnswer p
-        resolved = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-        -- The printed Orcs leave, so the Clone is the only one that can block.
-        gs1 = S.runPure S.identityAnswer resolved (mapM_ (`Event.changeZone` Zone.Graveyard) theirs)
-        gs = snd (Engine.runGamePure S.aggressiveAnswer gs1 (Combat.declareAttackers S.manaPerformer S.alice))
-        cloneOnField = filter (\oid -> Projection.controllerOf oid gs == Just S.bob) (Set.toList (GameState.battlefield gs))
-    case (mine, cloneOnField) of
-      ([pikerId, elvesId], [copy]) -> do
-        Spec.assertBool s (not (blocks gs copy pikerId)) "the Clone may not block the 2/1 Piker"
-        Spec.assertBool s (blocks gs copy elvesId) "the Clone may block the 1/1 Elves"
-        Spec.assertBool s (Projection.hasName (CardName.MkCardName (Text.pack "Brassclaw Orcs")) copy gs) "and it is a copy of the Orcs"
-      _ -> Spec.assertFailure s ("expected bob to control only the Clone (" <> show cloneId <> ")")
   -- Wan Shi Tong, All-Knowing's Spirit tokens, "This token can't block or be
   -- blocked by non-Spirit creatures": the card's own library trigger makes them,
   -- and each half is proved against a Spirit (Dutiful Knowledge Seeker) and a

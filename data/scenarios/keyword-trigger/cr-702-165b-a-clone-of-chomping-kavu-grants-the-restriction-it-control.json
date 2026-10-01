@@ -1,0 +1,35 @@
+{
+  "description": "CR 702.165b a Clone of Chomping Kavu grants the restriction it copied",
+  "note": "The control for the Kavu file: the same board with no Clone cast, where bob's 2/2 Cabal Evangel may block the Piker.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true}
+        ],
+        "hand": [
+          {"card": "Clone", "label": "clone"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Chomping Kavu", "label": "model"},
+          {"card": "Cabal Evangel", "label": "evangel"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@piker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@evangel": ["@piker"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@piker", "blockers": ["@evangel"]}}}
+  ]
+}

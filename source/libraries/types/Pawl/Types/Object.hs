@@ -213,7 +213,7 @@ data Object = MkObject
     -- basic land type (Convincing Mirage) or a creature type (Pillar of Origins),
     -- ONE field because no printing makes both choices. Read by
     -- Modification.SetLandSubtypeToChosen and by Filter.HasChosenSubtype off the
-    -- effect's SOURCE, the second through the value
+    -- effect's SOURCE -- in a CR 106.6 restriction through the value
     -- Pawl.Engine.Mana.sourceChosenSubtypeOf bakes onto a mana unit at production.
     -- A sibling of chosenColor rather than one generalized
     -- choice map, whose sum-typed value every reader would have to re-narrow. Not

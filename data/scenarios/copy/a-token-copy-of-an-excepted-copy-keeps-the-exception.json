@@ -1,0 +1,56 @@
+{
+  "description": "a token copy of an excepted copy keeps the exception (CR 707.9b)",
+  "note": "The proving test for where the exception lands: in the copy's own copiable values (CR 707.9b), not in a CR 613 layer over them. A token copy of the Quicksilver Gargantuan reads the copiable values (CR 707.2), so it is a Tarmogoyf at 7/7 that ignores the graveyards. Layered on the object instead, the token would copy the Goyf's CDA and read 1/2, then 2/3; fallen back on its printed card it would be 7/7 but named Quicksilver Gargantuan. The Goyf is bob's, so the Gargantuan is the Counterpart's only legal target. The Haskell original added a Goblin Piker to bob's graveyard; here alice Bolts bob's Piker, the same new card type in a graveyard.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Island", "ready": true},
+          {"card": "Mountain", "ready": true}
+        ],
+        "hand": [
+          {"card": "Quicksilver Gargantuan", "label": "gargantuan"},
+          {"card": "Cackling Counterpart", "label": "counterpart"},
+          {"card": "Lightning Bolt", "label": "bolt"}
+        ],
+        "graveyard": [
+          {"card": "Lightning Bolt"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Tarmogoyf", "label": "goyf"},
+          {"card": "Goblin Piker", "label": "piker"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@gargantuan", "mana": ["Island", "Island#2", "Island#3", "Island#4", "Island#5", "Island#6", "Island#7", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseCopyTarget": "@goyf"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@counterpart", "targets": ["Quicksilver Gargantuan"], "mana": ["Island#8", "Island#9", "Island#10", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Names": {"object": "Quicksilver Gargantuan#2", "names": ["Tarmogoyf"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "Quicksilver Gargantuan#2", "power": 7, "toughness": 7}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "@goyf", "power": 1, "toughness": 2}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@bolt", "targets": ["@piker"], "mana": ["Mountain"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "@goyf", "power": 2, "toughness": 3}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "Quicksilver Gargantuan#2", "power": 7, "toughness": 7}}}
+  ]
+}
