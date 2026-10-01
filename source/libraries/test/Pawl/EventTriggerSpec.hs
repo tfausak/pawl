@@ -843,8 +843,7 @@ controllerAtTriggerSpec s registry =
 -- (#487), so `Exercises` below draws AND discards.
 counterTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterTriggerSpec s registry =
-  let
-      -- Targets the spell already on the stack, and takes rule 603.5's "may".
+  let -- Targets the spell already on the stack, and takes rule 603.5's "may".
       answerWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       answerWith victimId p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets

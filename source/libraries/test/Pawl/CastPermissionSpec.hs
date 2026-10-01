@@ -1342,8 +1342,6 @@ spiderPunkSpec s registry =
           [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
           ability : _ -> act (counteringBoard island cancel stifle sorcerer piker) punk piker ability
    in Spec.describe s "SpiderPunk" $ do
-
-
         -- The CONTROL for the ability half, and CR 113.9's reason it needs its
         -- own: an ability on the stack is not a spell, so nothing the spell
         -- case proves carries over.
@@ -1372,8 +1370,6 @@ spiderPunkSpec s registry =
             Spec.assertEqWith s "the spent Stifle is bob's only graveyard card" (length (Game.zoneMembers Zone.Graveyard S.bob placed)) 1
             Spec.assertEqWith s "and resolving it deals alice the 1 damage" (S.lifeOf S.alice after) (Just 19)
             Spec.assertEqWith s "leaving the Piker spell alone on the stack" (GameState.stack after) [victimId]
-
-
 
         -- CR 113.6g's carrier is untouched, which is what keeps the two apart:
         -- Spider-Punk's OWN card says nothing about being countered, and the
@@ -1414,11 +1410,6 @@ prowlingSerpopardSpec s registry =
           [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
           ability : _ -> act (counteringBoard island cancel stifle sorcerer victim) cat ability
    in Spec.describe s "ProwlingSerpopard" $ do
-
-
-
-
-
         -- CR 113.9 / 701.6a's OTHER subject. An ability on the stack has no
         -- card behind it -- Game.faceOf answers Nothing for one -- so a Filter
         -- naming a CARD TYPE can never match it, and alice's Prodigal Sorcerer
@@ -1432,7 +1423,6 @@ prowlingSerpopardSpec s registry =
                 (placed, after) = abilityRun srcId ability stifleId gs
             Spec.assertEqWith s "the ability is gone, leaving only the creature spell" (GameState.stack placed) [victimId]
             Spec.assertEqWith s "alice took no damage, so it never resolved" (S.lifeOf S.alice after) (Just 20)
-
 
 -- Jared Carthalion, True Heir {R}{G}{W} Legendary Creature -- Human Warrior 3/3
 -- (Commander Legends, 281): "When Jared Carthalion enters, target opponent

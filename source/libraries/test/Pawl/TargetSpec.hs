@@ -639,7 +639,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Blurred Mongoose") buried) "the Mongoose itself is in bob's graveyard"
     Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
 
-
   -- CR 115.5: "A spell or ability on the stack is an illegal target for itself."
   -- Cancel's "counter target spell" draws from Pool.Spells with no Filter at
   -- all, so the rule is the ONLY thing that can exclude the Cancel itself --
@@ -1344,7 +1343,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "and the Angelic Edict too, so neither refusal above is a spell that reaches nothing"
       _ -> Spec.assertFailure s "Murder and Angelic Edict should each declare a target slot"
 
-
   -- CR 113.9, the whole rule, as two DISJOINT pools: "activated and triggered
   -- abilities on the stack aren't spells, and therefore can't be countered by
   -- anything that counters only spells. Activated and triggered abilities on
@@ -1566,7 +1564,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "that graveyard holds one card, the spent Raise Dead (CR 404.1)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
     Spec.assertEqWith s "and alice's hand holds one card, the Piker and not the spell" (S.handSize S.alice resolved) 1
 
-
   -- CR 400.1's OTHER half. Raise Dead above says "in your graveyard"; Withered
   -- Wretch's "{1}: Exile target card from a graveyard" names no player at all, so
   -- every player's copy of the zone is in the pool at once -- a SET of players
@@ -1641,7 +1638,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertEqWith s "and the exiled card is his" (length (Game.zoneMembers Zone.Exile S.bob theirs)) 1
         Spec.assertEqWith s "with alice's graveyard untouched" (length (Game.zoneMembers Zone.Graveyard S.alice theirs)) 1
       abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
-
 
   -- CR 115.2 clause (a)'s SECOND zone. Riftsweeper's "choose target face-up
   -- exiled card" names exile, which CR 400.2 lists among the public zones

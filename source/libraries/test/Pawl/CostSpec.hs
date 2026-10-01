@@ -6167,7 +6167,6 @@ reversalSpec s registry = Spec.describe s "Reversal" $ do
     Spec.assertEqWith s "CR 118.12a the Piker is countered either way" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
     Spec.assertEqWith s "and the same one question was raised" asked 1
 
-
 -- pid's library, top to bottom, as a plain list -- read directly off
 -- GameState.library rather than through a zone helper, so the assertion below
 -- is about the ORDER and not just the membership.

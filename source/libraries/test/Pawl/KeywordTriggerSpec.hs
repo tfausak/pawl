@@ -2080,7 +2080,6 @@ stormSpec s registry = Spec.describe s "Storm" $ do
     Spec.assertEqWith s "bob took two Bolts' 6, Grapeshot's 1 and TWO copies' 2" (S.lifeOf S.bob after) (Just 11)
     Spec.assertEqWith s "alice took bob's Bolt" (S.lifeOf S.alice after) (Just 17)
 
-
 -- CR 702.56a's replicate: "As an additional cost to cast this spell, you may pay
 -- [cost] any number of times" and "When you cast this spell, if a replicate cost
 -- was paid for it, copy it for each time its replicate cost was paid."

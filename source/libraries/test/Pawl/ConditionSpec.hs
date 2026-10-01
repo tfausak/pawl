@@ -385,7 +385,6 @@ interveningRecheckSpec s registry =
             Spec.assertEqWith s "off exactly one trigger" (length (GameState.stack raised)) 1
             Spec.assertEqWith s "and the entrant was still there" (length (skeletonsOn skeleton raised)) 1
 
-
         -- The negative, one difference from the case above: the Skeleton starts in
         -- alice's HAND, so the same {1}{B} casts it and it enters from the STACK.
         -- Killed the same way, so "no counter" cannot be the kill's doing.

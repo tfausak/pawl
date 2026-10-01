@@ -504,7 +504,6 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertEqWith s "alice drew a card (mode 3)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
     Spec.assertEqWith s "bob's Piker is tapped (mode 2)" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Tapped)
 
-
   -- Two chosen modes whose effects touch the same board: the bounce (mode 1)
   -- runs first (CR 608.2c), so "tap all creatures your opponents control" sweeps
   -- what is left. Not a test OF that order -- tapping the Piker and then bouncing
@@ -549,7 +548,6 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertEqWith s "alice's hand is empty: no card was drawn" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
     Spec.assertEqWith s "Cryptic Command is in alice's graveyard, unresolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
-
 
 -- Ojutai's Command's four modes, in printed order (CR 700.2 /
 -- data/cards/ojutais-command.json), under "Choose two --":

@@ -3019,7 +3019,6 @@ preyBoard s registry = do
 -- combat damage, and this module owns the damage funnel.
 fightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
-
   -- CR 701.14d: "the damage dealt when a creature fights ISN'T COMBAT DAMAGE."
   --
   -- Read through a Fog-shaped shield -- CR 615.1's prevention, scoped to
