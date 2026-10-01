@@ -1,0 +1,35 @@
+{
+  "description": "CR 707.9g Superior Spider-Man copies a creature card in bob's graveyard and exiles that card",
+  "note": "CR 707.5 over a graveyard: the only creature on the battlefield is alice's own Llanowar Elves, and the card offered is the Hill Giant in bob's graveyard, so the copy's domain is the graveyard and every player's alike. The linked \"when you do\" exiles the copied card: the gameplay check is that bob's graveyard is empty afterwards. Spider-Man is then a Hill Giant named Superior Spider-Man, 4/4 by its exception rather than the Giant's 3/3, and a Spider Human Hero in addition to Giant.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Llanowar Elves", "label": "elves" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" }
+        ],
+        "hand": [{ "card": "Superior Spider-Man", "label": "spider" }]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Hill Giant", "label": "giant" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$spider", "mana": ["$island-1", "$island-2", "$swamp-1", "$swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Hill Giant", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Names": { "object": "Superior Spider-Man", "names": ["Superior Spider-Man"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Superior Spider-Man", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Subtypes": { "object": "Superior Spider-Man", "subtypes": ["Giant", "Hero", "Human", "Spider"] } } }
+  ]
+}

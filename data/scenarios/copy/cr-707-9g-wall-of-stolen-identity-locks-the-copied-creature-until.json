@@ -1,0 +1,45 @@
+{
+  "description": "CR 707.9g Wall of Stolen Identity locks the copied creature until alice stops controlling the Wall",
+  "note": "The Wall copies bob's Hill Giant and its linked \"when you do\" trigger taps the Giant: tapped on turn 1 means the trigger was armed and resolved. Bob's untap step on turn 2 leaves it tapped, the stored CR 502.3 prohibition. Bob then takes the Wall with Act of Treason, so CR 611.2b's \"for as long as you control this creature\" ends, and does not begin again when control returns at cleanup: bob's untap step on turn 4 untaps the Giant. The board without Act of Treason is the control, where the Giant is still tapped on turn 4.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ],
+        "hand": [{ "card": "Wall of Stolen Identity", "label": "wall" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" }
+        ],
+        "hand": [{ "card": "Act of Treason", "label": "treason" }],
+        "library": [{ "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$wall", "mana": ["$island-1", "$island-2", "$island-3", "$island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$treason", "targets": ["Wall of Stolen Identity"], "mana": ["$mountain-1", "$mountain-2", "$mountain-3"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 2 } } },
+    { "turn": 4, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$giant", "tapped": false } } }
+  ]
+}

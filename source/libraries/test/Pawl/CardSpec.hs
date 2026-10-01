@@ -192,6 +192,7 @@ import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
@@ -665,6 +666,7 @@ objectRefPositions =
         ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
         ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
         ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
+        ("forbid-untap", Effect.ForbidUntap (ForbidUntap.MkForbidUntap Duration.UntilEndOfTurn (plantedRef "fu")), [plantedRef "fu"]),
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False Nothing), [plantedRef "oc"]),
@@ -1377,6 +1379,7 @@ ownCounts effect = case effect of
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationCounts duration
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationCounts duration
+  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration _) -> durationCounts duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationCounts duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
@@ -1869,6 +1872,7 @@ effectNestedEffects effect = case effect of
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidActivation {} -> []
+  Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
@@ -2146,6 +2150,9 @@ replacementPrintedEffects replacement = replacementEffectRiders replacement <> r
 replacementRewriteEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects effects)) -> Foldable.toList effects
+  -- CR 707.9g's linked trigger runs these when a copy is made, so a card
+  -- authored them on this row.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy asCopy)) -> Foldable.toList (AsCopy.whenYouDo asCopy)
   ReplacementEffect.EntryR {} -> []
   ReplacementEffect.DamageR (DamageR.MkDamageR _ (DamageRewrite.RunEffects effects) _) -> Foldable.toList effects
   ReplacementEffect.DamageR {} -> []
@@ -2370,6 +2377,7 @@ effectReplacements effect = case effect of
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidActivation {} -> []
+  Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
@@ -2626,6 +2634,7 @@ reservedSlots =
       Binding.exiledCard,
       Binding.discardedCard,
       Binding.tappedPermanent,
+      Binding.copiedObject,
       Binding.tappedForTotalPower,
       Binding.revealedCard,
       Binding.beheldObject,
@@ -2858,6 +2867,7 @@ effectMintedFaces effect = case effect of
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidActivation {} -> []
+  Effect.ForbidUntap {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
@@ -5010,7 +5020,9 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- holds none (Vesuva).
   -- CR 707.9e's additional counters ride the same payload, and their kinds and
   -- amounts hold card text on the WithCounters arm's axis below.
-  EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _ counters) -> unframed [f] <> concatMap copyExceptionFilters exceptions <> foldMap withCountersFilters counters
+  -- CR 707.9g's linked trigger is effects, walked as such by
+  -- replacementRewriteEffects.
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _ counters _ _) -> unframed [f] <> concatMap copyExceptionFilters exceptions <> foldMap withCountersFilters counters
   -- CR 208.2b's options grant KEYWORDS, and a keyword may carry a Filter of its
   -- own (CR 702.14c's landwalk) -- the axis the AsCopy arm above reaches through
   -- CR 707.9a, on the payload beside it. Vacuous over `data/cards/` while Primal
@@ -5956,6 +5968,7 @@ effectFilters effect = case effect of
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
   -- ForbidBlock's arm again, one rule away.
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
+  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
   -- The Named arm is CantBeRegenerated's ref; the Matching arm's class is read
   -- through a bare Filter.contextFor at
   -- Pawl.Engine.CombatRestriction.storedSubjects, so it is Unframed. The AimedAt

@@ -101,6 +101,7 @@ import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
+import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
@@ -221,6 +222,7 @@ import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromReference as FromReference
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -3261,6 +3263,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.ForbidBlock {} -> False
   Effect.ForbidAttack {} -> False
   Effect.ForbidActivation {} -> False
+  Effect.ForbidUntap {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.TakeTheInitiative {} -> False
@@ -7852,6 +7855,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 )
                 objects
          in gs1 {GameState.activationProhibitions = stored <> GameState.activationProhibitions gs1}
+  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration ref) ->
+    -- CR 502.3 / 611.1: store one prohibition per permanent the ref names.
+    -- ForbidActivation above is the model and every one of its arguments
+    -- carries over. CR 611.2b: a "for as long as" duration that has already
+    -- ended stores nothing (Wall of Stolen Identity gone before its trigger
+    -- resolved), and Expiry's conditional sweep ends a stored row.
+    --
+    -- Nothing is written onto the permanent itself, and nothing is projected: CR
+    -- 613.11 keeps the prohibition out of the layers, so the row is read at
+    -- Pawl.Engine.UntapRestriction.doesNotUntap and never by a projection.
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
+      Nothing -> gs
+      Just expiry ->
+        let objects = objectRefObjects legal resolving controller source gs ref
+            (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              fmap
+                ( \object ->
+                    ActiveUntapProhibition.MkActiveUntapProhibition
+                      { ActiveUntapProhibition.source = source,
+                        ActiveUntapProhibition.timestamp = ts,
+                        ActiveUntapProhibition.expiry = expiry,
+                        ActiveUntapProhibition.object = object
+                      }
+                )
+                objects
+         in gs1 {GameState.untapProhibitions = stored <> GameState.untapProhibitions gs1}
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected aimedAt) ->
     -- CR 508.1c / 611.1: store one restriction per permanent a Named ref names,
     -- or ONE row for a Matching class. ForbidBlock above is the model for the

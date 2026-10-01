@@ -1,9 +1,11 @@
 module Pawl.Types.AsCopy where
 
+import qualified Data.Sequence as Seq
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.WithCounters as WithCounters
+import qualified Pawl.Types.Zone as Zone
 
 -- | CR 707.5 / 614.1c: the payload of Pawl.Types.EntryRewrite's @AsCopy@ arm --
 -- "you may have this permanent enter as a copy of [any enchantment on the
@@ -18,15 +20,15 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- the other.
 --
 -- "On the battlefield" is not in the Filter and cannot be: the zone is the
--- offer's domain rather than a quality of a candidate, and
--- Pawl.Engine.Replacement.legalCopyTargets walks the battlefield to supply it.
+-- offer's domain rather than a quality of a candidate. It is `zone` instead,
+-- which Pawl.Engine.Replacement.legalCopyTargets walks.
 --
 -- The exceptions are CR 707.9's "except ..." clause, empty for a plain Clone.
 -- They ride the rewrite rather than being a rewrite of their own, because CR
 -- 707.9 makes them modifications OF the copying process: they happen only when a
 -- copy is actually made, so declining the "may" leaves the object its printed
 -- self and no exception applies.
-data AsCopy ability = MkAsCopy
+data AsCopy ability effect = MkAsCopy
   { eligible :: Filter.Filter Keyword.Keyword,
     exceptions :: [CopyException.CopyException ability],
     -- | CR 614.1d inside CR 614.1c's sentence: Vesuva's "you may have this land
@@ -64,15 +66,24 @@ data AsCopy ability = MkAsCopy
     -- makes the clause a modification of the copying process, so declining
     -- Clone's "may" leaves the permanent its printed self and no counters.
     --
-    -- CR 707.9e's second sentence -- a copy effect applied to the object AFTER
-    -- this one suppresses the exception's effect -- has no reader here, and no
-    -- board in data/cards/ reaches it. Every EntryR AsCopy row in the pool
-    -- matches Filter.IsSource, which is what CR 707.5's sentence is ("you may
-    -- have this permanent enter as a copy of ..."), so no second copy effect
-    -- applies to this entry; one applied later is CR 707.4's change, and by then
-    -- the counters are on the permanent and no rule takes them off. What would
-    -- refute this is a printed copy effect that copies an object OTHER than its
-    -- own source as that object enters.
-    counters :: Maybe WithCounters.WithCounters
+    -- Not implemented: CR 707.9e's second sentence, a copy effect applied to
+    -- the object AFTER this one suppressing the counters -- Altered Ego copying
+    -- an uncopied Quicksilver Gargantuan, whose own AsCopy then applies to the
+    -- same entry (CR 616.2), still enters with them (#4580).
+    counters :: Maybe WithCounters.WithCounters,
+    -- | CR 707.9g / 603.11: the triggered ability linked to this replacement,
+    -- "When you do, ..." in the same paragraph (Wall of Stolen Identity). Empty
+    -- for none. Its effects read the copied object under
+    -- Pawl.Engine.Binding.copiedObject.
+    --
+    -- Effects rather than a printed triggered ability, because the copy
+    -- overwrites the permanent's abilities (CR 707.2) and the ability is not
+    -- one it has afterwards: it rides the replacement, and Pawl.Engine.Event's
+    -- AsCopy arm arms it as a reflexive entry only where a copy was made.
+    whenYouDo :: Seq.Seq effect,
+    -- | CR 707.5's domain: Battlefield for "any creature on the battlefield"
+    -- (Clone), Graveyard for "any creature card in a graveyard" (Superior
+    -- Spider-Man), every player's graveyard alike.
+    zone :: Zone.Zone
   }
   deriving (Eq, Ord, Show)

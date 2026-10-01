@@ -125,6 +125,8 @@ library codec
     Pawl.Codec.ActiveReplacementSpec
     Pawl.Codec.ActiveUnregeneratable
     Pawl.Codec.ActiveUnregeneratableSpec
+    Pawl.Codec.ActiveUntapProhibition
+    Pawl.Codec.ActiveUntapProhibitionSpec
     Pawl.Codec.AddActivationCost
     Pawl.Codec.AddActivationCostSpec
     Pawl.Codec.AddSpellCost
@@ -632,6 +634,8 @@ library codec
     Pawl.Codec.ForbidAttackSpec
     Pawl.Codec.ForbidBlock
     Pawl.Codec.ForbidBlockSpec
+    Pawl.Codec.ForbidUntap
+    Pawl.Codec.ForbidUntapSpec
     Pawl.Codec.ForEach
     Pawl.Codec.ForEachNumber
     Pawl.Codec.ForEachNumberSpec
@@ -1902,6 +1906,7 @@ library types
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
     Pawl.Types.ActiveUnregeneratable
+    Pawl.Types.ActiveUntapProhibition
     Pawl.Types.AddActivationCost
     Pawl.Types.AddSpellCost
     Pawl.Types.Affected
@@ -2182,6 +2187,7 @@ library types
     Pawl.Types.ForbidActivation
     Pawl.Types.ForbidAttack
     Pawl.Types.ForbidBlock
+    Pawl.Types.ForbidUntap
     Pawl.Types.ForEach
     Pawl.Types.ForEachNumber
     Pawl.Types.ForetellCost
