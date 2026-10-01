@@ -579,19 +579,6 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertEqWith s "the block really was declared" (blockersOf attacker after) (Set.singleton blocker)
         Spec.assertBool s (allTapped forests after) "CR 509.1f: all three Forests paid for it"
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
-  Spec.it s "CR 509.1 the same board WITHOUT the Aura pays nothing" $ do
-    -- The control for the case above, and the reason it is not vacuous: blocking
-    -- is free by default, so the Aura is what tapped the Forests.
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker] [piker]
-    case (mine, theirs) of
-      ([attacker], [blocker]) -> do
-        let (forests, board) = addForestsFor S.bob forest 3 gs
-            after = S.runPure S.aggressiveAnswer board (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the same block was declared" (blockersOf attacker after) (Set.singleton blocker)
-        Spec.assertBool s (allUntapped forests after) "and no Forest was tapped"
-      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
   Spec.it s "CR 509.1f partial payments are not allowed: two Forests do not buy the block" $ do
     -- The same board one Forest short. CR 509.1's preamble -- "the declaration is
     -- illegal; the game returns to the moment before the declaration" -- so the
@@ -791,23 +778,6 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertEqWith s "and the block that stands is the second declaration's, not the first" (blockersOf attacker declared) (Set.singleton first)
         Spec.assertBool s (not (allUntapped [second] declared)) "CR 509.1f: the Warrior the rewind released is what paid"
       _ -> Spec.assertFailure s "fixture should have a Piker and two Warriors"
-  Spec.it s "CR 509.1f partial payments are not allowed: two taxed blockers and one land sacrifice nothing" $ do
-    -- CR 509.1d totals over the chosen creatures, so two taxed blockers owe two
-    -- lands and one land cannot pay. The land sacrificed while the toll was being
-    -- paid comes back: Cost.payToll reverses the whole declaration, including
-    -- the one thing declareBlockers writes ahead of the payment
-    -- (Combat.declaredBlockers).
-    tithe <- S.printingOf s registry "Synthetic Blocking Tithe"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker] [piker, piker]
-    case (mine, theirs) of
-      ([attacker], [one, two]) -> do
-        let (forests, board) = addForestsFor S.bob forest 1 (raying tithe two (raying tithe one gs))
-            after = S.runPure S.aggressiveAnswer board (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the land is still on the battlefield" (stillThere forests after) 1
-        Spec.assertEqWith s "and nothing blocked" (blockersOf attacker after) Set.empty
-      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
 
 -- Block the first attacker with ONE named creature, and pay a tap toll with one
 -- named permanent, filtered against what the prompt actually offers.

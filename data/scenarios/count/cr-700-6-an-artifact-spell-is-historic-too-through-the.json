@@ -1,0 +1,35 @@
+{
+  "description": "CR 700.6 an ARTIFACT spell is historic too, through the other disjunct",
+  "note": "Arcbound Worker is an artifact, historic through CR 700.6's other disjunct, cast off one Swamp; bob's Goblin Piker's block of the Relic Runner is refused, the Runner connects for 2 and lives beside the Worker. This leg is the wiring control; the Kalakscion leg is the supertype's.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Relic Runner", "label": "runner", "ready": true },
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" },
+          { "card": "Swamp", "label": "swamp3" },
+          { "card": "Swamp", "label": "swamp4" }
+        ],
+        "hand": [{ "card": "Arcbound Worker", "label": "spell" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@spell", "mana": ["@swamp1", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@runner"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@piker": ["@runner"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Relic Runner", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Arcbound Worker", "count": 1 } } }
+  ]
+}

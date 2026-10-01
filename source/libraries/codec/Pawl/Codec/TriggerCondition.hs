@@ -133,6 +133,7 @@ codec =
           Arm.payload "SelfBecomesClassLevel" ClassLevel.codec TriggerCondition.SelfBecomesClassLevel (\x -> case x of TriggerCondition.SelfBecomesClassLevel y -> Just y; _ -> Nothing),
           Arm.payload "SelfLastCounterRemoved" SelfCountersRemoved.codec TriggerCondition.SelfLastCounterRemoved (\x -> case x of TriggerCondition.SelfLastCounterRemoved y -> Just y; _ -> Nothing),
           Arm.payload "SelfCountersRemoved" SelfCountersRemoved.codec TriggerCondition.SelfCountersRemoved (\x -> case x of TriggerCondition.SelfCountersRemoved y -> Just y; _ -> Nothing),
+          Arm.payload "SelfCounterRemoved" SelfCountersRemoved.codec TriggerCondition.SelfCounterRemoved (\x -> case x of TriggerCondition.SelfCounterRemoved y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsGetCounters" CounterPlacement.codec TriggerCondition.PermanentsGetCounters (\x -> case x of TriggerCondition.PermanentsGetCounters y -> Just y; _ -> Nothing),
           Arm.payload "PermanentGetsCounters" CounterPlacement.codec TriggerCondition.PermanentGetsCounters (\x -> case x of TriggerCondition.PermanentGetsCounters y -> Just y; _ -> Nothing),
           Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast (\x -> case x of TriggerCondition.SpellCast y -> Just y; _ -> Nothing),
@@ -294,6 +295,7 @@ tagOf x = case x of
   TriggerCondition.SelfBecomesClassLevel {} -> "SelfBecomesClassLevel"
   TriggerCondition.SelfLastCounterRemoved {} -> "SelfLastCounterRemoved"
   TriggerCondition.SelfCountersRemoved {} -> "SelfCountersRemoved"
+  TriggerCondition.SelfCounterRemoved {} -> "SelfCounterRemoved"
   TriggerCondition.PermanentsGetCounters {} -> "PermanentsGetCounters"
   TriggerCondition.PermanentGetsCounters {} -> "PermanentGetsCounters"
   TriggerCondition.SpellCast {} -> "SpellCast"

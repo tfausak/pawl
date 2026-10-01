@@ -1,0 +1,26 @@
+{
+  "description": "CR 509.1h a Druid that dies inside combat gains the 4 too",
+  "note": "Fyndhorn Druid: \"When this creature dies, if it was blocked this turn, you gain 4 life.\" bob's Hill Giant blocks it and the Druid dies to the Giant's combat damage with CR 509.1h's status still live, while the Giant survives the Druid's 2. The Haskell fixture marked 2 damage at the top of the combat damage step; real combat damage replaces it.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Fyndhorn Druid", "label": "druid", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@druid"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@giant": ["@druid"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@druid", "blockers": ["@giant"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Fyndhorn Druid", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "alice", "life": 24 } } }
+  ]
+}

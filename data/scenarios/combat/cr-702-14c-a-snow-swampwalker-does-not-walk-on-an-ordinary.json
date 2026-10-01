@@ -1,0 +1,26 @@
+{
+  "description": "CR 702.14c a snow swampwalker does NOT walk on an ordinary Swamp",
+  "note": "Legions of Lim-Dûl has snow swampwalk. bob's plain Swamp satisfies the subtype and not the supertype, so the conjunction fails and the Piker's block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Legions of Lim-Dûl", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true },
+          { "card": "Swamp", "label": "land" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@blocker"] } } }
+  ]
+}

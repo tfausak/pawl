@@ -124,7 +124,7 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfCountersRemoved",
+            "type": "SelfCounterRemoved",
             "value": {
               "kind": {
                 "type": "Time"

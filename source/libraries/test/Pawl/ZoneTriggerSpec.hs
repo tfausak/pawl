@@ -2547,6 +2547,7 @@ representativeEvents cond =
         -- implementation that had cased on `after` would find no match here and the
         -- eventBindingSlots pin below would see nothing stamped.
         TriggerCondition.SelfCountersRemoved removal -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed (SelfCountersRemoved.kind removal) 3 1))
+        TriggerCondition.SelfCounterRemoved removal -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed (SelfCountersRemoved.kind removal) 3 1))
         -- CR 603.2c's batch placement, on the same event the chapter arm above
         -- names and read the other way round: the id is the SUBJECT the Filter is
         -- applied to rather than the bearer. The Filter below is the trivial one,
@@ -2935,6 +2936,7 @@ everyTriggerCondition =
     TriggerCondition.SelfBecomesClassLevel (ClassLevel.MkClassLevel 2),
     TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Defense Zone.Battlefield),
     TriggerCondition.SelfCountersRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Loyalty Zone.Battlefield),
+    TriggerCondition.SelfCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.PlusOnePlusOne Zone.Battlefield),
     TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement CounterKind.MinusOneMinusOne (Filter.Type.And [])),
     TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement CounterKind.MinusOneMinusOne (Filter.Type.And [])),
     -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this

@@ -14,7 +14,8 @@
 -- reaches the same function and no board can observe it -- see the note on
 -- restampOrderSpec. Objects ENTERING together are Restamp.settle's, driven on
 -- Replenish's MoveToZone road by the data/scenarios/restamp/ files and on the token road by
--- tokenOrderSpec, on Mirror Match's CR 608.2f loop by simultaneousCopiesSpec,
+-- tokenOrderSpec, on Mirror Match's CR 608.2f loop by
+-- cr-613-7m-608-2f-the-controller-orders-every-token-one-loop.json,
 -- and on Ornate Imitations' conjure loop by conjuredOrderSpec.
 module Pawl.RestampSpec where
 
@@ -45,7 +46,6 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -62,7 +62,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
   restampOrderSpec s registry
   apnapOrderSpec s registry
   tokenOrderSpec s registry
-  simultaneousCopiesSpec s registry
   conjuredOrderSpec s registry
   mirrorMatchSiblingSpec s registry
 
@@ -279,76 +278,6 @@ replicate5 reversing cloneId archonId godheadId gs =
         _ -> pure (S.identityAnswer p)
       spell = lastInHand gs
       ((_, after), (_, asked)) = State.runState (Engine.runGame answer gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) (0, [])
-   in (after, asked)
-
--- | CR 613.7m over CR 608.2f's loop: Mirror Match's tokens enter in one action,
--- so the seat that controls them orders ALL their stamps, not one iteration's.
---
--- SHARED TEAM TURNS (CR 805.10a) is the board that can tell. In a two-player
--- game every attacker is one seat's, so the loop's own CR 608.2f order
--- (Prompt.OrderForEach, the caster's) already reaches every permutation of the
--- one-token iterations. Here alice attacks with Godhead of Awe and her teammate
--- bob with Harmonious Archon, so the loop's APNAP key puts alice's copy first
--- and nobody may reorder it -- while CR 613.7m hands both tokens to carol, who
--- controls them.
---
--- The copies write base P/T in layer 7b (1/1 and 3/3) and are stamped after both
--- originals, so alice's Godhead reads whichever copy is later: 1/1 only if
--- carol's answer put the Godhead copy last.
-simultaneousCopiesSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-simultaneousCopiesSpec s registry =
-  Spec.describe s "ForEach" $ do
-    Spec.it s "CR 613.7m / 608.2f the controller orders every token one loop made" $ do
-      (board, godheadId) <- mirrorMatchBoard s registry
-      let (after, asked) = mirrorMatch S.carol (Just [1, 0]) board
-          (canonical, _) = mirrorMatch S.carol Nothing board
-          carols g = filter (\oid -> Projection.controllerOf oid g == Just S.carol) (S.tokensOf g)
-      Spec.assertEqWith s "CR 613.7m carol stamped the Godhead copy last, so alice's Godhead is 1/1" (S.powerToughnessOf godheadId after) (Just (1, 1))
-      Spec.assertEqWith s "while the arrival order leaves the Archon copy last, so it is 3/3" (S.powerToughnessOf godheadId canonical) (Just (3, 3))
-      Spec.assertEqWith s "and carol was asked once, over both tokens" asked [(S.carol, 2)]
-      Spec.assertEqWith s "CR 707.1 both copies are carol's" (length (carols after)) 2
-
--- Four seats in two teams under the shared team turns option, alice's team
--- attacking carol in the declare blockers step: alice's Godhead of Awe and bob's
--- Harmonious Archon. carol holds Mirror Match and six Islands.
-mirrorMatchBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
-mirrorMatchBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  godhead <- S.printingOf s registry "Godhead of Awe"
-  archon <- S.printingOf s registry "Harmonious Archon"
-  mirror <- S.printingOf s registry "Mirror Match"
-  let teamed = S.inTeams [[S.alice, S.bob], [S.carol, S.dave]] S.fourPlayerGame
-      (godheadId, g1) = S.addPermanent godhead S.alice (S.landsFor island S.carol 6 teamed)
-      (archonId, g2) = S.addPermanent archon S.bob g1
-      (_, g3) = S.addHandCard mirror S.carol g2
-      attacking = Map.fromList [(godheadId, AttackTarget.OfPlayer S.carol), (archonId, AttackTarget.OfPlayer S.carol)]
-  pure
-    ( g3
-        { GameState.settings = (GameState.settings g3) {GameSettings.sharedTeamTurns = True},
-          GameState.activePlayer = S.alice,
-          GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
-          GameState.priority = Just S.carol,
-          GameState.combat = Combat.emptyCombat {Combat.Type.attackers = attacking, Combat.Type.defenders = [S.carol, S.dave]}
-        },
-      godheadId
-    )
-
--- `caster` casts the Mirror Match in their hand, it resolves, and the triggers
--- it set off are put on the stack. CR 613.7m's order is answered with `answer`,
--- a permutation of the offered indices, or with the offered order. Hands back
--- the board and who was asked that order, over how many.
-mirrorMatch :: PlayerId.PlayerId -> Maybe [Natural.Natural] -> GameState.GameState -> (GameState.GameState, [(PlayerId.PlayerId, Int)])
-mirrorMatch caster permutation gs =
-  let answer :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, Int)] r
-      answer p = case p of
-        Prompt.OrderTimestamps _ pid batch -> do
-          State.modify (<> [(pid, length batch)])
-          pure (Maybe.fromMaybe (zipWith const [0 ..] batch) permutation)
-        _ -> pure (S.identityAnswer p)
-      spell = case Game.zoneMembers Zone.Hand caster gs of
-        oid : _ -> oid
-        [] -> ObjectId.MkObjectId 0
-      ((_, after), asked) = State.runState (Engine.runGame answer gs (S.cast caster spell >> Stack.resolveTop >> Engine.settleForPriority)) []
    in (after, asked)
 
 -- | CR 613.7m over a conjure: Ornate Imitations ({X}{G}{U} Sorcery, "For each

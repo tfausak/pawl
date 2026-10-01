@@ -410,6 +410,9 @@ data TriggerCondition
     -- (Chandra, Fire Artisan) -- the arm above with no reading of the after
     -- count.
     SelfCountersRemoved SelfCountersRemoved.SelfCountersRemoved
+  | -- | CR 603.2c's per-occurrence reading of the arm above: "whenever a
+    -- [kind] counter is removed from this" (Protean Hydra), once per counter.
+    SelfCounterRemoved SelfCountersRemoved.SelfCountersRemoved
   | -- | CR 603.2c's batch reading of a CR 122.6 placement: "whenever one or more
     -- [kind] counters are put on one or more [permanents]", once for the batch.
     PermanentsGetCounters CounterPlacement.CounterPlacement

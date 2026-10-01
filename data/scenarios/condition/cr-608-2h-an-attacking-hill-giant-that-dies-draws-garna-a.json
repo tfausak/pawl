@@ -1,0 +1,29 @@
+{
+  "description": "CR 608.2h an attacking Hill Giant that dies draws Garna a card",
+  "note": "Garna, Bloodfist of Keld: \"Whenever another creature you control dies, draw a card if it was attacking. Otherwise, Garna deals 1 damage to each opponent.\" alice attacks with the Giant alone and Bolts it in the declare attackers step, so CR 608.2h's last-known status says attacking: she draws her one library card and bob stays at 20. The Giant dies before combat damage, so bob's life answers for Garna alone; the Haskell fixture marked the 3 damage directly.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Garna, Bloodfist of Keld", "label": "garna" },
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Mountain", "label": "mountain" }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }],
+        "library": [{ "card": "Swamp" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@giant"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@giant": "@bob" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@giant"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Hill Giant", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Swamp", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

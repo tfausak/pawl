@@ -8997,6 +8997,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
+  TriggerCondition.SelfCounterRemoved _ -> False
   TriggerCondition.PermanentsGetCounters {} -> False
   TriggerCondition.PermanentGetsCounters {} -> False
   -- CR 601.2i says nothing about whose turn it is and CR 117.1a lets an instant

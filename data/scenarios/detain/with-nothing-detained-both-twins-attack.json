@@ -1,0 +1,28 @@
+{
+  "description": "with nothing detained both twins attack",
+  "note": "The pair to the detained case: Azorius Arrester sits on alice's side with its trigger never resolved, so both of bob's Prodigal Sorcerers are offered as attackers and both attack. It rules out the detained case passing because bob could never have attacked at all. Three seats as in the fixture, so bob names alice for each.",
+  "board": {
+    "active": "bob",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Azorius Arrester" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Prodigal Sorcerer", "label": "victim", "ready": true },
+          { "card": "Prodigal Sorcerer", "label": "control", "ready": true }
+        ]
+      },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@victim", "@control"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "@victim", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "source": "@control", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "@victim": "@alice", "@control": "@alice" } } } }
+  ]
+}
