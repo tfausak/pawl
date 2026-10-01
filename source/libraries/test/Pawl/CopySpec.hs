@@ -76,7 +76,9 @@
 -- And CR 707.10d's and CR 707.10e's answers whole, end to end: Zada, Hedron
 -- Grinder's one copy per candidate (zadaSpec) and Ivy, Gleeful Spellthief's one
 -- copy on a stated new target (ivySpec), the second of which is where "the copy
--- isn't created" is read off an illegal one.
+-- isn't created" is read off an illegal one. Radiate's candidates include
+-- players (radiateSpec), and Precursor Golem's "other" is not its source
+-- (precursorGolemSpec).
 --
 -- And CR 707.12's copy of a CARD, made in the zone that card is in and then cast
 -- (Pawl.Engine.Resolve.Effect's castableCopy, under Pawl.Types.OfferCast's
@@ -3200,6 +3202,214 @@ ivySpec s registry =
           Spec.assertEqWith s "CR 707.10e a 2/1 Ivy is no legal target for 'power 4 or greater', so the copy isn't created and she lives" (runOn board) (1, 1, 0)
           Spec.assertEqWith s "CR 707.10e a 5/4 Ivy is one, so the copy is created and destroys her" (runOn pumped) (2, 0, 0)
           Spec.assertBool s (ivyId /= berserkersId) "Ivy and the Berserkers are distinct objects"
+
+-- CR 707.10d over PLAYERS as well as objects, end to end: Radiate {3}{R}{R}
+-- Instant, "Choose target instant or sorcery spell that targets only a single
+-- permanent or player. Copy that spell for each other permanent or player the
+-- spell could target. Each copy targets a different one of those permanents and
+-- players." (data/cards/radiate.json, Oracle text verified 2026-10-01.)
+--
+-- alice Bolts BOB, then Radiates the Bolt. "Could target" does work three ways:
+-- the Wall and the Spider are creatures, so each takes a copy; the Mongoose has
+-- shroud (CR 702.18a) and the Mountains are no legal "any target" (CR 115.4), so
+-- neither does. alice and carol are players the Bolt could target, so each takes
+-- a copy. And bob, the Bolt's own target, is the printed "other": a copy aimed at
+-- him as well would take him to 14.
+radiateSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+radiateSpec s registry =
+  Spec.describe s "Pawl.Engine.Copy" . Spec.it s "CR 707.10d Radiate copies the Bolt for each other permanent or player it could target" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    radiate <- S.printingOf s registry "Radiate"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    wall <- S.printingOf s registry "Wall of Stone"
+    spider <- S.printingOf s registry "Giant Spider"
+    mongoose <- S.printingOf s registry "Blurred Mongoose"
+    let lands = S.landsFor mountain S.alice 6 S.threePlayerGame
+        (wallId, g1) = S.addPermanent wall S.bob lands
+        (spiderId, g2) = S.addPermanent spider S.carol g1
+        (mongooseId, g3) = S.addPermanent mongoose S.alice g2
+        (boltId, g4) = S.addHandCard bolt S.alice g3
+        (radiateId, board) = S.addHandCard radiate S.alice g4
+        -- The Bolt is aimed at bob and Radiate at the Bolt, which is a new
+        -- object on the stack (CR 400.7). The copies' targets are the
+        -- effect's, and reach no target prompt at all.
+        aimed :: Maybe ObjectId -> Prompt.Prompt r -> r
+        aimed spell p = case p of
+          Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (\r -> r == Recipient.ToPlayer S.bob || (Maybe.isJust spell && Recipient.objectOf r == spell)) offered) asked
+          _ -> S.identityAnswer p
+        bolted = snd (Engine.runGamePure (aimed Nothing) board {GameState.priority = Just S.alice} (S.cast S.alice boltId))
+        boltOnStack = Maybe.listToMaybe (GameState.stack bolted)
+        radiated = snd (Engine.runGamePure (aimed boltOnStack) bolted {GameState.priority = Just S.alice} (S.cast S.alice radiateId))
+        -- Radiate alone, which is the moment the copies exist and none has
+        -- resolved.
+        afterRadiate = resolveOne (aimed boltOnStack) radiated
+        after = drainStack (aimed boltOnStack) afterRadiate
+        life p = S.lifeOf p after
+        damage oid = S.damageOf oid after
+    Spec.assertEqWith s "CR 707.10d a copy targeted carol, a player the Bolt could target" (life S.carol) (Just 17)
+    Spec.assertEqWith s "CR 707.10d and another alice, Radiate's own controller" (life S.alice) (Just 17)
+    Spec.assertEqWith s "the printed OTHER: bob, the Bolt's own target, took the original alone" (life S.bob) (Just 17)
+    Spec.assertEqWith s "CR 707.10d a copy targeted the Wall" (damage wallId) (Just 3)
+    Spec.assertEqWith s "CR 707.10d and another the Spider" (damage spiderId) (Just 3)
+    Spec.assertEqWith s "CR 707.10d the Mongoose has shroud, so the Bolt could not target it" (damage mongooseId) (Just 0)
+    Spec.assertEqWith s "four copies over the Bolt, none for a Mountain" (length (GameState.stack afterRadiate)) 5
+    Spec.assertEqWith s "the Bolt alone was on the stack as Radiate was cast" (length (GameState.stack bolted)) 1
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+
+-- CR 707.10d's "could target" is the ORIGINAL's, read from its controller's seat
+-- (CR 109.5) and not from the seat of whoever copies it. Ink-Treader Nephilim's
+-- ruling (Scryfall, 2006-02-01) gives the example: the copies "see that from the
+-- perspective of the original spell's controller", and a copy aimed where only
+-- that seat could reach is countered on resolution.
+--
+-- bob casts Crumb and Get It ("target creature you control") on his Icehide
+-- Golem, and alice Radiates it. From bob's seat the Coal Golem is a creature he
+-- controls and alice's Spider is not, so the one copy goes to the Coal Golem. The
+-- copy is alice's, and from her seat the Coal Golem is no creature she controls,
+-- so it is countered (CR 608.2b). Read from alice's seat instead, the Spider
+-- would take the copy and grow to 4/6.
+radiatePerspectiveSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+radiatePerspectiveSpec s registry =
+  Spec.describe s "Pawl.Engine.Copy" . Spec.it s "CR 707.10d / 109.5 Radiate's candidates are what the original's controller could target" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    radiate <- S.printingOf s registry "Radiate"
+    crumb <- S.printingOf s registry "Crumb and Get It"
+    spider <- S.printingOf s registry "Giant Spider"
+    coal <- S.printingOf s registry "Coal Golem"
+    icehide <- S.printingOf s registry "Icehide Golem"
+    let lands = S.landsFor plains S.bob 1 (S.landsFor mountain S.alice 5 S.threePlayerGame)
+        (spiderId, g1) = S.addPermanent spider S.alice lands
+        (coalId, g2) = S.addPermanent coal S.bob g1
+        (icehideId, g3) = S.addPermanent icehide S.bob g2
+        (crumbId, g4) = S.addHandCard crumb S.bob g3
+        (radiateId, board) = S.addHandCard radiate S.alice g4
+        aimed :: Maybe ObjectId -> Prompt.Prompt r -> r
+        aimed spell p = case p of
+          Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (\r -> Recipient.objectOf r == Just icehideId || (Maybe.isJust spell && Recipient.objectOf r == spell)) offered) asked
+          _ -> S.identityAnswer p
+        crumbed = snd (Engine.runGamePure (aimed Nothing) board {GameState.priority = Just S.bob} (S.cast S.bob crumbId))
+        crumbOnStack = Maybe.listToMaybe (GameState.stack crumbed)
+        radiated = snd (Engine.runGamePure (aimed crumbOnStack) crumbed {GameState.priority = Just S.alice} (S.cast S.alice radiateId))
+        afterRadiate = resolveOne (aimed crumbOnStack) radiated
+        after = drainStack (aimed crumbOnStack) afterRadiate
+        pt oid = S.powerToughnessOf oid after
+    Spec.assertEqWith s "CR 109.5 alice's Spider is no creature bob controls, so it takes no copy" (pt spiderId) (Just (2, 4))
+    Spec.assertEqWith s "CR 707.10d one copy, for the Coal Golem, over the Crumb" (length (GameState.stack afterRadiate)) 2
+    Spec.assertEqWith s "CR 608.2b the copy is alice's, so the Coal Golem is no legal target and it is countered" (pt coalId) (Just (3, 3))
+    Spec.assertEqWith s "and the Icehide took the original" (pt icehideId) (Just (4, 4))
+
+-- CR 707.10d's "each OTHER" where the other is not the source: Precursor Golem
+-- {5} Artifact Creature -- Golem 3/3, "When this creature enters, create two 3/3
+-- colorless Golem artifact creature tokens. Whenever a player casts an instant or
+-- sorcery spell that targets only a single Golem, that player copies that spell
+-- for each other Golem that spell could target. Each copy targets a different one
+-- of those Golems." (data/cards/precursor-golem.json, Oracle text verified
+-- 2026-10-01.)
+--
+-- bob Grows his Icehide Golem under alice's Precursor Golem. The Icehide is the
+-- Growth's target and a Golem, so only the printed "other" keeps a second copy
+-- off it: 5/5 with the original alone, 8/8 with one. THREE DISTINCT PAIRS
+-- afterwards -- the Icehide 5/5, the Coal Golem 6/6, the Precursor 6/6 read
+-- apart by id -- and the Spider, no Golem, still 2/4.
+precursorGolemSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+precursorGolemSpec s registry =
+  Spec.describe s "Pawl.Engine.Copy" . Spec.it s "CR 707.10d Precursor Golem copies the spell for each OTHER Golem, under the caster's control" $ do
+    forest <- S.printingOf s registry "Forest"
+    precursor <- S.printingOf s registry "Precursor Golem"
+    coal <- S.printingOf s registry "Coal Golem"
+    icehide <- S.printingOf s registry "Icehide Golem"
+    spider <- S.printingOf s registry "Giant Spider"
+    growth <- S.printingOf s registry "Giant Growth"
+    let lands = S.landsFor forest S.bob 1 S.threePlayerGame
+        (precursorId, g1) = S.addPermanent precursor S.alice lands
+        (coalId, g2) = S.addPermanent coal S.bob g1
+        (icehideId, g3) = S.addPermanent icehide S.bob g2
+        (spiderId, g4) = S.addPermanent spider S.bob g3
+        (growthId, board) = S.addHandCard growth S.bob g4
+        aimed :: Prompt.Prompt r -> r
+        aimed p = case p of
+          Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just icehideId) . Recipient.objectOf) offered) asked
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure aimed board {GameState.priority = Just S.bob} (S.cast S.bob growthId))
+        -- The trigger alone, so the copies are on the stack and none has
+        -- resolved.
+        afterTrigger = resolveOne aimed (snd (Engine.runGamePure aimed cast Engine.settleForPriority))
+        after = drainStack aimed afterTrigger
+        pt oid = S.powerToughnessOf oid after
+        copies = List.init (GameState.stack afterTrigger)
+    Spec.assertEqWith s "the printed OTHER: the Icehide, the Growth's own target, took the original alone" (pt icehideId) (Just (5, 5))
+    Spec.assertEqWith s "CR 707.10d a copy targeted the Coal Golem" (pt coalId) (Just (6, 6))
+    Spec.assertEqWith s "CR 707.10d and another Precursor Golem itself" (pt precursorId) (Just (6, 6))
+    Spec.assertEqWith s "the Spider is no Golem" (pt spiderId) (Just (2, 4))
+    Spec.assertEqWith s "CR 707.10 'that player copies': bob owns both copies" (fmap (fmap Object.owner . (`Game.lookupObject` afterTrigger)) copies) [Just S.bob, Just S.bob]
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+
+-- Precursor Golem's "that player copies" makes the CASTER the copies'
+-- controller (CR 707.10), so the caster orders them (CR 707.10d), and the
+-- caster's is also the seat "could target" is read from (CR 109.5). alice
+-- controls the Golem and bob casts, so the Golem's controller is neither.
+--
+-- Crumb and Get It's "target creature you control" is bob's: his Coal Golem is a
+-- creature he controls and takes a copy, 5/5; alice's Precursor Golem is not, so
+-- it gets no copy and stays 3/3. Read from alice's seat, the two answers swap.
+--
+-- The ORDER is a pair of runs from one board that differ only in whether bob's
+-- OrderForEach answer reverses the copies. bob Bolts alice's Icehide Golem, so
+-- her other two Golems take one copy each, and only the player who is asked can
+-- change the order.
+precursorGolemSeatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+precursorGolemSeatSpec s registry =
+  let -- The Growth-like spell is aimed at the Icehide; nothing else is asked
+      -- except the order, which `reorder` answers for bob alone.
+      aimedAt :: ObjectId -> ([Natural.Natural] -> [Natural.Natural]) -> Prompt.Prompt r -> r
+      aimedAt victim reorder p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just victim) . Recipient.objectOf) offered) asked
+        Prompt.OrderForEach _ player _ group | player == S.bob -> reorder (zipWith const [0 ..] group)
+        _ -> S.identityAnswer p
+      afterTriggerOf :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> GameState.GameState -> GameState.GameState
+      afterTriggerOf answer spellId board =
+        let cast = snd (Engine.runGamePure answer board {GameState.priority = Just S.bob} (S.cast S.bob spellId))
+         in resolveOne answer (snd (Engine.runGamePure answer cast Engine.settleForPriority))
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        Spec.it s "CR 707.10 / 109.5 Precursor Golem's copies are judged from the caster's seat" $ do
+          plains <- S.printingOf s registry "Plains"
+          precursor <- S.printingOf s registry "Precursor Golem"
+          coal <- S.printingOf s registry "Coal Golem"
+          icehide <- S.printingOf s registry "Icehide Golem"
+          crumb <- S.printingOf s registry "Crumb and Get It"
+          let lands = S.landsFor plains S.bob 1 S.threePlayerGame
+              (precursorId, g1) = S.addPermanent precursor S.alice lands
+              (coalId, g2) = S.addPermanent coal S.bob g1
+              (icehideId, g3) = S.addPermanent icehide S.bob g2
+              (crumbId, board) = S.addHandCard crumb S.bob g3
+              after = drainStack (aimedAt icehideId id) (afterTriggerOf (aimedAt icehideId id) crumbId board)
+              pt oid = S.powerToughnessOf oid after
+          Spec.assertEqWith s "CR 109.5 bob's copy pumped his Coal Golem, a creature he controls" (pt coalId) (Just (5, 5))
+          Spec.assertEqWith s "and alice's Precursor Golem is no creature bob controls" (pt precursorId) (Just (3, 3))
+          Spec.assertEqWith s "the Icehide took the original" (pt icehideId) (Just (4, 4))
+        Spec.it s "CR 707.10d the caster, not the Golem's controller, orders the copies" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          precursor <- S.printingOf s registry "Precursor Golem"
+          coal <- S.printingOf s registry "Coal Golem"
+          icehide <- S.printingOf s registry "Icehide Golem"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          let lands = S.landsFor mountain S.bob 1 S.threePlayerGame
+              (_, g1) = S.addPermanent precursor S.alice lands
+              (_, g2) = S.addPermanent coal S.alice g1
+              (icehideId, g3) = S.addPermanent icehide S.alice g2
+              (boltId, board) = S.addHandCard bolt S.bob g3
+              -- What each object on the stack targets, top first, less CR 201.5's
+              -- self slot -- zadaSpec's reading. The copies' ids are minted in
+              -- the chosen order, so the ids alone would not show it.
+              stackedWith reorder =
+                let gs = afterTriggerOf (aimedAt icehideId reorder) boltId board
+                 in fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Map.delete Binding.triggerSource (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs))))))) (GameState.stack gs)
+              offered = stackedWith id
+              reversed = stackedWith List.reverse
+          Spec.assertBool s (offered /= reversed) "bob's answer reorders the copies, so bob was the one asked"
+          Spec.assertEqWith s "and reverses them" (take 2 reversed) (List.reverse (take 2 offered))
+          Spec.assertEqWith s "two copies over the Bolt in both runs" (length offered, length reversed) (3, 3)
 
 -- CR 115.1's "targets only a single ..." NARROWED by a description of the one
 -- target, end to end: Leyline of Resonance {2}{R}{R} Enchantment, "If this card
