@@ -2747,9 +2747,10 @@ claimOf slots pid oid component gs =
                 )
             )
             1
-        -- Nothing, and no printing can observe it: CR 107.6's {Q} spends TAPPED-ness,
-        -- a third axis, and names the object the cost is on, so two such claims could
-        -- only come from one cost carrying {Q} twice.
+        -- Nothing: CR 107.6's {Q} spends TAPPED-ness, a third axis, and names the
+        -- object the cost is on, so two such claims come from one cost carrying {Q}
+        -- twice or from two mana abilities of one permanent that a board takes
+        -- together (Mana.sourceOptions). data/cards/ prints neither.
         CostComponent.UntapThis -> Nothing
         -- The FEWEST candidates whose powers reach the threshold (`fewestReaching`),
         -- and deliberately not the Natural: that number is a THRESHOLD on an
@@ -5423,10 +5424,11 @@ tapForMana perform pid oid = fmap (\(produced, _, _) -> produced) (tapForManaWit
 tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> Mana.InFlight -> PlayerId -> ObjectId -> Game (Bool, [ObjectId], Mana.InFlight)
 tapForManaWith perform window inFlight refused activator oid = do
   gs <- State.get
-  -- Every route of this permanent, which is what a source with no route left to
-  -- choose answers as refused: the offer and the filter below agree, so this
-  -- only keeps payManaWindow's loop finite should they ever not.
-  let everyRoute = Set.fromList (fmap (\option -> (oid, ManaOption.ability option)) (Mana.manaOptionsOf oid gs))
+  -- Every route of this permanent, off the offer's own list
+  -- (Mana.manaRoutesOfGiven), which is what a source with no route left to
+  -- choose answers as refused. A FENCE: the offer and the filter below agree,
+  -- so this only keeps payManaWindow's loop finite should they ever not.
+  let everyRoute = Set.fromList (fmap (\(_, _, ability, _) -> (oid, ability)) (Mana.manaRoutesOfGiven Map.empty oid gs))
   case Game.lookupObject oid gs of
     Nothing -> pure (False, [], everyRoute)
     Just _ -> do

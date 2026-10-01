@@ -577,7 +577,13 @@ manaOptionsOfGiven pcs oid gs =
                       ManaOption.steps = fmap (\(i, (clause, _)) -> (clause, pooled [part | (j, part) <- parts, j == i])) indexed
                     }
               )
-              (traverse (\(i, addition) -> fmap ((,) i . (,) (ManaAddition.player addition) . replicate (howMany addition) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
+              (traverse (\(i, addition) -> fmap ((,) i . (,) (ManaAddition.player addition)) (additionUnits addition)) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
+      -- CR 106.5: an addition of an undefined type -- CR 607.2d's chosen colour
+      -- with none chosen -- adds no mana, and the activation is still one the
+      -- player may make. Resolve.Effect's AddMana arm answers the same.
+      additionUnits addition = case producedTypes oid gs (ManaAddition.production addition) of
+        [] -> [[]]
+        types -> fmap (replicate (howMany addition) . unitFor addition) types
    in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- Every unit one option adds, whoever gets it, in printed order within each
