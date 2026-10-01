@@ -13,7 +13,10 @@
 -- during the turn (CR 701.26b) is untouched -- which is the printed reading, not
 -- a shortcut.
 --
--- The PRINTED carrier alone. The one-shot prohibitions stored on the victim
+-- The printed carrier, and GameState.untapProhibitions beside it: the rows a
+-- resolution leaves behind (Pawl.Types.ActiveUntapProhibition, Wall of Stolen
+-- Identity's linked trigger), unioned in so the caller never learns which road
+-- a prohibition took. The one-shot prohibitions stored on the victim
 -- (Object.doesNotUntapFor, written by Effect.DoesNotUntapNext, and
 -- Object.exertedBy, written by CR 508.1g's exert payment) are not gathered here
 -- and could not be: they are fields on the VICTIM rather than on anything the
@@ -25,6 +28,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
@@ -73,4 +77,8 @@ doesNotUntap candidates gs =
       fromRestriction source changes restriction =
         let affected = UntapRestriction.affected restriction
          in filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
-   in Set.fromList (concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs)))
+      -- CR 611.2b: a stored row is in force until Expiry's sweep drops it, so
+      -- its presence is the whole answer. Asked of nothing but the id, which
+      -- CR 400.7 makes a zone change outdate.
+      stored = Set.fromList (fmap ActiveUntapProhibition.object (GameState.untapProhibitions gs))
+   in Set.fromList (filter (`Set.member` stored) candidates <> concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs)))

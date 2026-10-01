@@ -1,0 +1,35 @@
+{
+  "description": "CR 707.9g declining the second copy leaves the Wall's linked trigger to tap the Gargantuan",
+  "note": "The control for the scenario beside it, the same board with the Gargantuan's copied \"may\" declined: no copy effect is applied after the Wall's, so its linked trigger taps the creature it copied, the Gargantuan, and leaves bob's Giant alone. The Wall stays a copy of the Gargantuan, a Wall in addition to its other types.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Quicksilver Gargantuan", "label": "gargantuan" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ],
+        "hand": [{ "card": "Wall of Stolen Identity", "label": "wall" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$wall", "mana": ["$island-1", "$island-2", "$island-3", "$island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$gargantuan" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": null } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$gargantuan", "tapped": true } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "Wall of Stolen Identity", "subtypes": ["Shapeshifter", "Wall"] } } }
+  ]
+}

@@ -124,7 +124,7 @@ spec s =
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False Nothing))))
+            (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False Nothing Seq.empty))))
             " {\"type\":\"EntryR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"AsCopy\",\"value\":{\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}}} "
         -- CR 208.2b: Primal Plasma's ChoiceOf, carrying P/T and keywords.
         Spec.it s "EntryR (Primal Plasma, ChoiceOf)" $

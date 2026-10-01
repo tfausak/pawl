@@ -283,6 +283,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
   Effect.ForbidActivation {} -> Nothing
+  Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing

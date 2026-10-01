@@ -1,5 +1,6 @@
 module Pawl.Codec.AsCopySpec where
 
+import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AsCopy as AsCopy
 import qualified Pawl.JsonCodec.Common as Common
@@ -21,23 +22,23 @@ spec s = Spec.describe s "Pawl.Codec.AsCopy" $ do
   Spec.it s "MkAsCopy, no exceptions: the key is omitted" $
     Common.assertCodec
       s
-      (AsCopy.codec Common.text)
-      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False Nothing)
+      (AsCopy.codec Common.text Common.text)
+      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False Nothing Seq.empty)
       " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 707.9d: Quicksilver Gargantuan's "except it's 7/7", beside the same
   -- eligible set.
   Spec.it s "MkAsCopy, an exception: both keys" $
     Common.assertCodec
       s
-      (AsCopy.codec Common.text)
-      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 7 7)] False Nothing)
+      (AsCopy.codec Common.text Common.text)
+      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 7 7)] False Nothing Seq.empty)
       " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"exceptions\":[{\"type\":\"SetPowerToughness\",\"value\":{\"power\":7,\"toughness\":7}}]} "
   -- CR 614.1d inside CR 614.1c: Vesuva's "enter tapped as a copy".
   Spec.it s "MkAsCopy, entering tapped (Vesuva)" $
     Common.assertCodec
       s
-      (AsCopy.codec Common.text)
-      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Land) [] True Nothing)
+      (AsCopy.codec Common.text Common.text)
+      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Land) [] True Nothing Seq.empty)
       " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"tapped\":true} "
   -- CR 707.9e: Altered Ego's "except it enters with X additional +1/+1 counters
   -- on it", the exception that is an additional effect. CR 107.3m's X is the
@@ -46,7 +47,15 @@ spec s = Spec.describe s "Pawl.Codec.AsCopy" $ do
   Spec.it s "MkAsCopy, additional counters (Altered Ego)" $
     Common.assertCodec
       s
-      (AsCopy.codec Common.text)
-      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False (Just (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "X"))))))
+      (AsCopy.codec Common.text Common.text)
+      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False (Just (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "X"))))) Seq.empty)
       " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"InSlot\",\"value\":\"X\"}}]} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s (AsCopy.codec Common.text)
+  -- CR 707.9g: the linked "when you do" trigger's effects, Wall of Stolen
+  -- Identity's; the effect codec is a parameter, so text stands in for it.
+  Spec.it s "MkAsCopy, a linked trigger (Wall of Stolen Identity)" $
+    Common.assertCodec
+      s
+      (AsCopy.codec Common.text Common.text)
+      (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False Nothing (Seq.fromList [Text.pack "tap", Text.pack "forbid"]))
+      " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"whenYouDo\":[\"tap\",\"forbid\"]} "
+  Spec.it s "has a schema" $ Common.assertHasSchema s (AsCopy.codec Common.text Common.text)

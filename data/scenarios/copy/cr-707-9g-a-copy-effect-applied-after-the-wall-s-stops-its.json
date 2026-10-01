@@ -1,0 +1,35 @@
+{
+  "description": "CR 707.9g a copy effect applied after the Wall's stops its linked trigger",
+  "note": "Alice's Quicksilver Gargantuan is on the battlefield as its printed self, so the Wall that copies it gains the Gargantuan's own \"enter as a copy\" replacement, which CR 616.2 then applies to the same entry: the Wall becomes a 7/7 copy of bob's Hill Giant. That second copy effect is applied after the Wall's, so the Wall's linked \"tap the copied creature\" does not trigger and the Gargantuan stays untapped. The scenario beside it declines the second copy and the Gargantuan is tapped; the two differ in that one answer. No trigger goes on the stack here, so the checks run at the priority the Wall's resolution leaves. The Giant is untapped in both, since the trigger names the Gargantuan.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Quicksilver Gargantuan", "label": "gargantuan" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ],
+        "hand": [{ "card": "Wall of Stolen Identity", "label": "wall" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$wall", "mana": ["$island-1", "$island-2", "$island-3", "$island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$gargantuan" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$gargantuan", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Wall of Stolen Identity", "names": ["Hill Giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Wall of Stolen Identity", "power": 7, "toughness": 7 } } }
+  ]
+}

@@ -120,6 +120,7 @@ import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForbidUntap as ForbidUntap
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.FullText as FullText
@@ -892,6 +893,8 @@ rewriteEffect pairs effect = case effect of
     Effect.ForbidBlock (ForbidBlock.MkForbidBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) ->
     Effect.ForbidActivation (ForbidActivation.MkForbidActivation (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
+  Effect.ForbidUntap (ForbidUntap.MkForbidUntap duration ref) ->
+    Effect.ForbidUntap (ForbidUntap.MkForbidUntap (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   -- CR 612.1 reaches the creatures' words on either arm -- a Named ref's Filters
   -- and a Matching class's -- and not the AimedAt: a PlayerScope prints no word
   -- a text-changing effect reaches, and the kinds are CR 506.3's list.
@@ -1560,13 +1563,15 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- be a whole keyword. A REGRESSION FENCE, the Create arm's reason: Altered
   -- Ego's amount is CR 601.2b's X and its kind is +1/+1, neither of which holds
   -- a word, so neutralizing this half leaves the suite green. The `tapped` flag
-  -- is the one field passed through, and holds no word (Vesuva).
+  -- is the one field passed through, and holds no word (Vesuva). CR 707.9g's
+  -- linked trigger takes RunEffects' descent below.
   EntryRewrite.AsCopy c ->
     EntryRewrite.AsCopy
       c
         { AsCopy.eligible = Filter.rewrite pairs (AsCopy.eligible c),
           AsCopy.exceptions = fmap (rewriteCopyException pairs) (AsCopy.exceptions c),
-          AsCopy.counters = fmap (rewriteWithCounters pairs) (AsCopy.counters c)
+          AsCopy.counters = fmap (rewriteWithCounters pairs) (AsCopy.counters c),
+          AsCopy.whenYouDo = fmap (rewriteEffect pairs) (AsCopy.whenYouDo c)
         }
   -- CR 702.14a's word again, this time inside a keyword an option grants.
   EntryRewrite.ChoiceOf os -> EntryRewrite.ChoiceOf (fmap (\o -> o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}) os)

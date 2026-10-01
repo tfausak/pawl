@@ -1,0 +1,41 @@
+{
+  "description": "CR 707.9g Wall of Stolen Identity's lock outlasts more than one untap step while alice keeps the Wall",
+  "note": "The control for the Act of Treason scenario beside it, the same board with the spell left in bob's hand: alice never stops controlling the Wall, so CR 611.2b's duration runs on and bob's untap step on turn 4 leaves the copied Giant tapped as turn 2's did. A prohibition counted in untap steps (Effect.DoesNotUntapNext's shape) would untap it here.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ],
+        "hand": [{ "card": "Wall of Stolen Identity", "label": "wall" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant", "ready": true },
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" }
+        ],
+        "hand": [{ "card": "Act of Treason", "label": "treason" }],
+        "library": [{ "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$wall", "mana": ["$island-1", "$island-2", "$island-3", "$island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$giant", "tapped": true } } },
+    { "turn": 4, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$giant", "tapped": true } } }
+  ]
+}

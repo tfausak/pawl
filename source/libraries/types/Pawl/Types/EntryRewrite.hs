@@ -39,7 +39,7 @@ data EntryRewrite ability effect
   = -- | CR 707.5 / 614.1c / Clone, Vesuva: "you may have this permanent enter as a
     -- copy of ...", the payload carrying which permanents the printed noun phrase
     -- admits, CR 707.9's exceptions, and CR 707.9e's additional counters.
-    AsCopy (AsCopy.AsCopy ability)
+    AsCopy (AsCopy.AsCopy ability effect)
   | -- | CR 208.2b / 614.1c / Primal Plasma: the controller chooses one of these
     -- entry options as it enters.
     ChoiceOf [EntryOption.EntryOption]

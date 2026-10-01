@@ -432,6 +432,7 @@ manaProduced effect = case effect of
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
   Effect.ForbidActivation {} -> Nothing
+  Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -615,6 +616,7 @@ playerChoice effect = case effect of
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
   Effect.ForbidActivation {} -> Nothing
+  Effect.ForbidUntap {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -883,6 +885,7 @@ movesLibraryCard effect = case effect of
   Effect.ForbidBlock {} -> False
   Effect.ForbidAttack {} -> False
   Effect.ForbidActivation {} -> False
+  Effect.ForbidUntap {} -> False
   Effect.RequireAttack {} -> False
   Effect.CreateEmblem {} -> False
   Effect.Designate (Designate.MkDesignate {}) -> False

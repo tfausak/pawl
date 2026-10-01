@@ -1,5 +1,6 @@
 module Pawl.Types.AsCopy where
 
+import qualified Data.Sequence as Seq
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -26,7 +27,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- 707.9 makes them modifications OF the copying process: they happen only when a
 -- copy is actually made, so declining the "may" leaves the object its printed
 -- self and no exception applies.
-data AsCopy ability = MkAsCopy
+data AsCopy ability effect = MkAsCopy
   { eligible :: Filter.Filter Keyword.Keyword,
     exceptions :: [CopyException.CopyException ability],
     -- | CR 614.1d inside CR 614.1c's sentence: Vesuva's "you may have this land
@@ -73,6 +74,16 @@ data AsCopy ability = MkAsCopy
     -- the counters are on the permanent and no rule takes them off. What would
     -- refute this is a printed copy effect that copies an object OTHER than its
     -- own source as that object enters.
-    counters :: Maybe WithCounters.WithCounters
+    counters :: Maybe WithCounters.WithCounters,
+    -- | CR 707.9g / 603.11: the triggered ability linked to this replacement,
+    -- "When you do, ..." in the same paragraph (Wall of Stolen Identity). Empty
+    -- for none. Its effects read the copied object under
+    -- Pawl.Engine.Binding.copiedObject.
+    --
+    -- Effects rather than a printed triggered ability, because the copy
+    -- overwrites the permanent's abilities (CR 707.2) and the ability is not
+    -- one it has afterwards: it rides the replacement, and Pawl.Engine.Event's
+    -- AsCopy arm arms it as a reflexive entry only where a copy was made.
+    whenYouDo :: Seq.Seq effect
   }
   deriving (Eq, Ord, Show)

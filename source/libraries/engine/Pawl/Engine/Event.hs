@@ -2357,6 +2357,14 @@ apply batch candidate event =
                     case Quantity.evaluate viewOf context (Projection.boardAsEntering gs2) oid (Quantity.substituteAnnouncedX announcedX quantity) of
                       Nothing -> pure () -- unevaluable quantity: no counters, the WithCounters arm's posture
                       Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
+                -- CR 707.9g: a linked trigger an EARLIER copy effect on this entry
+                -- armed no longer triggers, this one being applied after it; then
+                -- this row's own is armed (Replacement.linkedCopyTrigger), on this
+                -- branch alone, with the copied object bound for its effects.
+                let linkedEarlier entry = DelayedTrigger.source entry == oid && Map.member Binding.copiedObject (DelayedTrigger.bindings entry)
+                State.modify' (\g -> g {GameState.delayedTriggers = Seq.filter (not . linkedEarlier) (GameState.delayedTriggers g)})
+                Foldable.for_ (Replacement.linkedCopyTrigger asCopy) $ \linked ->
+                  State.modify' (armDelayed linked oid controller (Map.singleton Binding.copiedObject (Binding.toObject src2)) Onset.Immediately Nothing)
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed
       -- power/toughness-and-keywords option to become. Written into the COPIABLE
