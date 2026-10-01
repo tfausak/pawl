@@ -2956,8 +2956,36 @@ maulerSpec s registry =
           Spec.assertEqWith s "CR 119.3: all three seats lost 4" (lives after) (Just 16, Just 16, Just 16)
           Spec.assertEqWith s "and bob kept both Pikers" (length (filter (\oid -> S.onBattlefield oid after) [bobFirst, bobSecond])) 2
 
+-- CR 607.2d: Kindred Discovery's "Whenever a creature you control of the chosen
+-- type enters or attacks, draw a card" is linked to its "As this enchantment
+-- enters, choose a creature type", so the trigger CONDITION reads the type the
+-- enchantment chose (Pawl.Engine.SourceContext; Oracle checked against Scryfall
+-- on 2026-10-01). The choice is stamped, as Pawl.TargetSpec's From the Rubble
+-- does; the entry road that writes it is Obelisk of Urd's (Pawl.ProjectionSpec).
+--
+-- alice attacks with two Goblin Pikers and a Hill Giant, so each chosen type
+-- draws a distinct number of cards: Goblin 2, Giant 1, Elf 0.
+kindredDiscoverySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+kindredDiscoverySpec s registry =
+  Spec.it s "CR 607.2d Kindred Discovery draws for each attacker of the type it chose" $ do
+    discovery <- S.printingOf s registry "Kindred Discovery"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    island <- S.printingOf s registry "Island"
+    let (g0, mine, _) = S.combatBoardOf [discovery, piker, piker, giant] []
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) g0 [1 :: Int .. 5]
+        drawn chosen =
+          let chose = case mine of
+                discoveryId : _ -> stocked {GameState.objects = Map.adjust (\o -> o {Object.chosenSubtype = Just chosen}) discoveryId (GameState.objects stocked)}
+                [] -> stocked
+           in S.handSize S.alice (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer chose)
+    Spec.assertEqWith s "having chosen Goblin, the two attacking Pikers draw two" (drawn Subtype.Goblin) 2
+    Spec.assertEqWith s "having chosen Giant, the attacking Hill Giant draws one" (drawn Subtype.Giant) 1
+    Spec.assertEqWith s "having chosen Elf, no attacker is of the type and nothing is drawn" (drawn Subtype.Elf) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
+  kindredDiscoverySpec s registry
   logSpec s registry
   scanSpec s registry
   permanentEntersSpec s registry

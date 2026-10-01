@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -1127,7 +1128,7 @@ admittedDepartures gs bearer you p = Seq.filter admits . Moved.departures
   where
     admits departed = case Projection.viewWithLastKnown departed gs departed of
       Nothing -> False
-      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view (CardLeavesZone.filter p)
+      Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (CardLeavesZone.filter p)
 
 -- The attackers `attacker` declared that the condition's Filter admits, CR
 -- 508.3c's "a creature that player controls" read through Combat.joinedUnder
@@ -1140,7 +1141,7 @@ admittedAttackers gs bearer you p attacker = Seq.fromList (filter admits (Set.to
     combat = GameState.combat gs
     admits oid =
       Map.lookup oid (Combat.joinedUnder combat) == Just attacker
-        && maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view (PlayerAttacksWith.filter p)) (Projection.viewWithLastKnown oid gs oid)
+        && maybe False (\view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (PlayerAttacksWith.filter p)) (Projection.viewWithLastKnown oid gs oid)
 
 -- CR 400.7e's `became` slot, in the plural CR 712.21c asks for: "if an effect
 -- can find the new object that a melded permanent becomes as it leaves the
