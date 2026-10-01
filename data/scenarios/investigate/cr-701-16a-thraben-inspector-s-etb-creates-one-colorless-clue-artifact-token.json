@@ -1,0 +1,173 @@
+{
+  "description": "CR 701.16a Thraben Inspector's ETB creates one colorless Clue artifact token",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Thraben Inspector",
+            "label": "thraben-inspector",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$thraben-inspector",
+          "mana": [
+            "$plains",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Thraben Inspector",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Clue Token",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Thraben Inspector",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Thraben Inspector",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Thraben Inspector",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Thraben Inspector",
+        "power": 1,
+        "toughness": 2
+      }
+    },
+    {
+      "Damage": {
+        "object": "Clue Token",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Clue Token",
+        "tapped": false
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Battlefield",
+        "is": [
+          "$plains",
+          "Plains#2",
+          "Plains#3",
+          "Thraben Inspector",
+          "Clue Token"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Battlefield",
+        "is": []
+      }
+    },
+    {
+      "Types": {
+        "object": "Clue Token",
+        "types": [
+          "Artifact"
+        ]
+      }
+    },
+    {
+      "Subtypes": {
+        "object": "Clue Token",
+        "subtypes": [
+          "Clue"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Colors",
+        "object": "Clue Token",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Controller",
+        "object": "Clue Token",
+        "is": "alice"
+      }
+    }
+  ]
+}
