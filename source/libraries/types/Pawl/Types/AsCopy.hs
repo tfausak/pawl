@@ -5,6 +5,7 @@ import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.WithCounters as WithCounters
+import qualified Pawl.Types.Zone as Zone
 
 -- | CR 707.5 / 614.1c: the payload of Pawl.Types.EntryRewrite's @AsCopy@ arm --
 -- "you may have this permanent enter as a copy of [any enchantment on the
@@ -19,8 +20,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- the other.
 --
 -- "On the battlefield" is not in the Filter and cannot be: the zone is the
--- offer's domain rather than a quality of a candidate, and
--- Pawl.Engine.Replacement.legalCopyTargets walks the battlefield to supply it.
+-- offer's domain rather than a quality of a candidate. It is `zone` instead,
+-- which Pawl.Engine.Replacement.legalCopyTargets walks.
 --
 -- The exceptions are CR 707.9's "except ..." clause, empty for a plain Clone.
 -- They ride the rewrite rather than being a rewrite of their own, because CR
@@ -79,6 +80,10 @@ data AsCopy ability effect = MkAsCopy
     -- overwrites the permanent's abilities (CR 707.2) and the ability is not
     -- one it has afterwards: it rides the replacement, and Pawl.Engine.Event's
     -- AsCopy arm arms it as a reflexive entry only where a copy was made.
-    whenYouDo :: Seq.Seq effect
+    whenYouDo :: Seq.Seq effect,
+    -- | CR 707.5's domain: Battlefield for "any creature on the battlefield"
+    -- (Clone), Graveyard for "any creature card in a graveyard" (Superior
+    -- Spider-Man), every player's graveyard alike.
+    zone :: Zone.Zone
   }
   deriving (Eq, Ord, Show)

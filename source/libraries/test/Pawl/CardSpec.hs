@@ -5022,7 +5022,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- amounts hold card text on the WithCounters arm's axis below.
   -- CR 707.9g's linked trigger is effects, walked as such by
   -- replacementRewriteEffects.
-  EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _ counters _) -> unframed [f] <> concatMap copyExceptionFilters exceptions <> foldMap withCountersFilters counters
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _ counters _ _) -> unframed [f] <> concatMap copyExceptionFilters exceptions <> foldMap withCountersFilters counters
   -- CR 208.2b's options grant KEYWORDS, and a keyword may carry a Filter of its
   -- own (CR 702.14c's landwalk) -- the axis the AsCopy arm above reaches through
   -- CR 707.9a, on the payload beside it. Vacuous over `data/cards/` while Primal

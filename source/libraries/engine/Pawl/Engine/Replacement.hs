@@ -2760,17 +2760,18 @@ applyCopyException this own snapshot exception = case exception of
           PC.keywords = Map.filterWithKey (\keyword _ -> not (Projection.definesColorless (Set.singleton keyword))) (PC.keywords snapshot)
         }
 
--- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
--- permanents matching the rewrite's printed noun phrase, other than itself, minus
+-- CR 707.5 / 614.12a: the objects an entering copy may choose. Members of the
+-- rewrite's zone matching its printed noun phrase, other than itself, minus
 -- anything entering in the same batch (see the CR 614.12a note on
 -- Event.applyReplacementsIn for why the batch set, not 614.13a, is what excludes
 -- them).
 --
 -- The Filter comes off the card (Pawl.Types.AsCopy's `eligible`) rather than
 -- being hardcoded here (#1512): Clone writes "any creature" and Copy Enchantment
--- "any enchantment", and this function must not know which. The zone is the one
--- half that is NOT the card's to say -- "on the battlefield" is the domain the
--- walk below supplies.
+-- "any enchantment", and this function must not know which. The zone is the
+-- card's too (Pawl.Types.AsCopy's `zone`): the battlefield for Clone, and for
+-- Superior Spider-Man's "any creature card in a graveyard" every player's
+-- graveyard. No printing names another zone, so any other answers nothing.
 --
 -- Matched through each candidate's own CR 613 projection, revealableFromHand's
 -- reading, so a continuous effect that made a permanent an enchantment reaches
@@ -2778,15 +2779,19 @@ applyCopyException this own snapshot exception = case exception of
 -- entering object, so a filter naming "you" or "this" resolves against the
 -- player making the choice (CR 109.5); nothing printed today uses either, and
 -- supplying Nothing would silently answer False if one did.
-legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> GameState -> [ObjectId]
-legalCopyTargets batch filter_ self gs =
+legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> Zone.Zone -> ObjectId -> GameState -> [ObjectId]
+legalCopyTargets batch filter_ zone self gs =
   let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf self gs) (Just self)
       viewOf = Projection.viewsOf gs
       eligible oid =
         oid /= self
           && not (Set.member oid batch)
           && Filter.matches context (viewOf oid) filter_
-   in filter eligible (Set.toAscList (GameState.battlefield gs))
+      domain = case zone of
+        Zone.Battlefield -> Set.toAscList (GameState.battlefield gs)
+        Zone.Graveyard -> concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (GameState.turnOrder gs)
+        _ -> []
+   in filter eligible domain
 
 -- CR 707.9g / 603.11: the triggered ability linked to a CR 707.5 entry
 -- replacement ("When you do, ..."), as the reflexive entry Pawl.Engine.Event's

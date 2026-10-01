@@ -2286,7 +2286,7 @@ apply batch candidate event =
             -- battlefield walk that supplies "on the battlefield" is
             -- legalCopyTargets'. Read HERE, at CR 614.12a's moment, so an entry
             -- replacement applied earlier in the same batch is already visible.
-            let legal = Replacement.legalCopyTargets batch (AsCopy.eligible asCopy) oid gs
+            let legal = Replacement.legalCopyTargets batch (AsCopy.eligible asCopy) (AsCopy.zone asCopy) oid gs
             answer <-
               if null legal
                 then -- With nothing eligible, declining is the only legal answer
