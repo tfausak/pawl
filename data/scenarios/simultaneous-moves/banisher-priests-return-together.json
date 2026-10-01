@@ -1,0 +1,66 @@
+{
+  "description": "CR 610.3d two Banisher Priests dying together return their prisoners as one event, so each Soul Warden sees the other enter",
+  "note": "Each prisoner has its own controller, so no seat orders two of its own triggers. A per-prisoner return lets only the later Warden see the earlier one, leaving bob or carol one life short.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "p1" },
+          { "card": "Plains", "label": "p2" },
+          { "card": "Plains", "label": "p3" },
+          { "card": "Plains", "label": "p4" },
+          { "card": "Plains", "label": "p5" },
+          { "card": "Plains", "label": "p6" },
+          { "card": "Plains", "label": "p7" },
+          { "card": "Plains", "label": "p8" },
+          { "card": "Plains", "label": "p9" },
+          { "card": "Plains", "label": "p10" }
+        ],
+        "hand": [
+          { "card": "Banisher Priest", "label": "first" },
+          { "card": "Banisher Priest", "label": "second" },
+          { "card": "Day of Judgment", "label": "wrath" }
+        ],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Soul Warden", "label": "bob warden" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Soul Warden", "label": "carol warden" }],
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$first", "mana": ["$p1", "$p2", "$p3", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$bob warden"] } }, "source": "Banisher Priest#2" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$second", "mana": ["$p4", "$p5", "$p6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$carol warden"] } }, "source": "Banisher Priest#2" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 21 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 22 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$wrath", "mana": ["$p7", "$p8", "$p9", "$p10"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Life": { "player": "bob", "life": 22 } },
+    { "Life": { "player": "carol", "life": 23 } },
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Soul Warden", "count": 1 } },
+    { "Count": { "player": "carol", "zone": "Battlefield", "card": "Soul Warden", "count": 1 } }
+  ]
+}

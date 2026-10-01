@@ -2882,12 +2882,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Delve -> keyword
   Keyword.Type.Improvise -> keyword
   -- CR 702.41a's [text] is a printed quality, so `rewrite` reaches it as
-  -- landwalk's criterion is reached.
-  --
-  -- Nothing observes the swap today: affinity's one reader is
-  -- Pawl.Engine.Cost.selfReductions, which takes Face.keywords off Game.faceOf --
-  -- the PRINTED face (gap #1859) -- so the rewritten keyword this produces never
-  -- reaches a cost.
+  -- landwalk's criterion is reached. Affinity's reader,
+  -- Pawl.Engine.Cost.selfReductions, takes the projected keywords, so the
+  -- rewritten quality is the one counted.
   Keyword.Type.Affinity quality -> Keyword.Type.Affinity (rewrite pairs quality)
   -- CR 702.125a counts OPPONENTS, so there is no printed word here to swap.
   Keyword.Type.Undaunted -> keyword

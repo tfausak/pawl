@@ -1,0 +1,160 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Deathtouch"
+        },
+        {
+          "type": "Flying"
+        },
+        {
+          "type": "Affinity",
+          "value": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Creature"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 6
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Witherbloom, the Balancer",
+      "power": {
+        "type": "Literal",
+        "value": 5
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingOffBattlefield",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Library"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Hand"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Graveyard"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Exile"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Command"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Instant"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Sorcery"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Affinity",
+                "value": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 5
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Dragon"
+          },
+          {
+            "type": "Elder"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

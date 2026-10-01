@@ -376,9 +376,7 @@ simultaneously body = do
 -- CR 401.4 / 404.3's scope: the cards a replacement redirects into a library,
 -- and the cards put into a graveyard, while `body` runs are put there "at the
 -- same time", and their owners arrange them as it ends (arrangeArrivals).
--- `simultaneously` opens one; so do the one-at-a-time moves that are one
--- instruction without being one event group -- a mill (millFromReturningTaken)
--- and a surveil's graveyard half. The OUTERMOST scope wins, `simultaneously`'s
+-- `simultaneously` opens one. The OUTERMOST scope wins, `simultaneously`'s
 -- posture.
 arrivingTogether :: Game a -> Game a
 arrivingTogether body = do
@@ -5649,6 +5647,26 @@ changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneInBatchReturnin
 changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Seq.Seq ObjectId)
 changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
 
+-- CR 608.2f / 610.3d: move every member of `moves` under the rules' defaults as
+-- ONE event, answering each member's CR 400.7 ids in order. The batch door for a
+-- caller with nothing to say about how its members enter: one
+-- `simultaneously` group (CR 603.2c, 603.6a), one board every member's CR 616.1
+-- loop reads (applyReplacementsIn), the other members visible to CR 614.12's
+-- entry choices as changeZoneEnteringIn's batch sees them (amongPending), CR
+-- 401.4 / 404.3's arrangement, and CR 613.7m's order (together).
+--
+-- Pawl.LeavesTriggerSpec's Rest in Peace case and data/scenarios/
+-- simultaneous-moves' Banisher Priest and Palace Jailer boards prove it.
+changeZonesTogether :: [(ObjectId, Zone)] -> Game [Seq.Seq ObjectId]
+changeZonesTogether moves = simultaneously . together $ do
+  before <- State.get
+  let entering = [oid | (oid, Zone.Battlefield) <- moves]
+      step (sofar, acc) (oid, dest) = do
+        State.modify' (\g -> g {GameState.enteringPending = Map.delete oid (GameState.enteringPending g)})
+        new <- changeZoneAttaching (Just before) sofar oid dest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
+        pure (foldr Set.insert sofar new, new : acc)
+  fmap (reverse . snd) (amongPending Nothing entering (Monad.foldM step (Set.empty, []) moves))
+
 -- changeZoneReturning's body, returning the destination incarnations' ids: one
 -- fresh id per arrival on a completed move (CR 400.7), which is one for every
 -- object but a melded permanent leaving the battlefield and one per component for
@@ -5693,9 +5711,8 @@ millFromReturningTaken pid n
           -- Pawl.Engine.Replacement.stocked) had already measured against the
           -- printed one.
           let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
-          -- One CR 401.4 / 404.3 scope and not one event group: the moves stay
-          -- separately recorded, as before.
-          arrived <- arrivingTogether (fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards))
+          -- ONE event (CR 608.2f), whose cards the owner may arrange (CR 404.3).
+          arrived <- fmap (concatMap Foldable.toList) (changeZonesTogether (fmap (\card -> (card, Zone.Graveyard)) cards))
           pure (cards, arrived)
 
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)

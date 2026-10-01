@@ -13,9 +13,9 @@ import qualified Pawl.Types.Quantity as Quantity
 -- Prey's "costs {2} more"), the same sentence with the other sign.
 --
 -- A face may print that sentence out (Face.costReductions), an effect may grant
--- it (Pawl.Types.GrantedAbility.SelfCostReduction, Richlau, Headmaster), or a
--- face may state it as a
--- rule-702 keyword, which Pawl.Engine.Keyword.selfCostReductionsOf mints into
+-- it (Pawl.Types.GrantedAbility.SelfCostReduction, Richlau, Headmaster), or the
+-- spell may have it as a rule-702 keyword, printed or granted (Mycosynth Golem),
+-- which Pawl.Engine.Keyword.selfCostReductionsOf mints into
 -- this type: CR 702.41a's affinity and CR 702.125a's undaunted are the two, and
 -- neither reaches this type through a card's own text beyond affinity's quality.
 --

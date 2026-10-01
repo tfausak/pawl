@@ -722,13 +722,13 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         gone = S.departs Departure.Type.Conceded S.alice afterEtb
         settled = monarchSettle gone
     Spec.assertEqWith s "alice is the monarch on ETB" (GameState.monarch afterEtb) (Just S.alice)
-    Spec.assertEqWith s "bob's creature is exiled under the watch, keyed to alice and undischarged" (Map.elems (GameState.exiledUntilMonarch afterEtb)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = False}]
+    Spec.assertEqWith s "bob's creature is exiled under the watch, keyed to alice and undischarged" (Map.elems (GameState.exiledUntilMonarch afterEtb)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = Nothing}]
     Spec.assertEqWith s "the original is off the battlefield" (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb)))) 0
     -- CR 800.4a: alice's own object leaves; bob's exiled card does not.
     Spec.assertEqWith s "Palace Jailer left the game with alice" (Game.lookupObject jailer gone) Nothing
     -- CR 725.4's crowning goes through Monarch.crown like any other, so the
     -- watch is marked as carol takes the crown, before this settle returns it.
-    Spec.assertEqWith s "but the watch survived her departure, still keyed to her and now marked by carol's crowning" (Map.elems (GameState.exiledUntilMonarch gone)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = True}]
+    Spec.assertEqWith s "but the watch survived her departure, still keyed to her and now marked by carol's crowning" (fmap (\watch -> (MonarchWatch.controller watch, Maybe.isJust (MonarchWatch.due watch))) (Map.elems (GameState.exiledUntilMonarch gone))) [(S.alice, True)]
     -- CR 725.4, first sentence.
     Spec.assertEqWith s "carol, the active player, is the monarch" (GameState.monarch gone) (Just S.carol)
     -- CR 800.4i: carol is in departed alice's frozen opponent set, so the
