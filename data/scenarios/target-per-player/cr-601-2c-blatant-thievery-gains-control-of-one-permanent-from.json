@@ -32,7 +32,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@thievery", "targetsBySlot": { "target#player1": ["@piker"], "target#player2": ["@thopter"] }, "mana": ["@island1", "@island2", "@island3", "@island4", "@island5", "@island6", "@island7"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$thievery", "targetsBySlot": { "target#player1": ["$piker"], "target#player2": ["$thopter"] }, "mana": ["$island1", "$island2", "$island3", "$island4", "$island5", "$island6", "$island7"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },

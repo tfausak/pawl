@@ -28,10 +28,10 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["@globe"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$evolution", "targets": ["$globe"], "mana": ["$island", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Artificial Evolution", "do": { "ChooseTypeSwap": { "from": { "type": "Dragon" }, "to": { "type": "Goblin" } } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@creature", "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$creature", "mana": ["$mountain-1", "$mountain-2", "$mountain-3", "$mountain-4", "$mountain-5", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Hoarding Dragon", "do": { "ChooseOptional": { "type": "Declines" } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },

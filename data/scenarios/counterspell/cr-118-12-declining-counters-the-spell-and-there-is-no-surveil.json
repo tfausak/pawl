@@ -79,10 +79,10 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@piker",
+          "object": "$piker",
           "mana": [
-            "@mountain-1",
-            "@mountain-2",
+            "$mountain-1",
+            "$mountain-2",
             null
           ]
         }
@@ -94,13 +94,13 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@sound",
+          "object": "$sound",
           "targets": [
             "Goblin Piker#4"
           ],
           "mana": [
-            "@alice-island-1",
-            "@alice-island-2"
+            "$alice-island-1",
+            "$alice-island-2"
           ]
         }
       }

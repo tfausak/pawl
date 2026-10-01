@@ -22,14 +22,14 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Cast": { "object": "@inversion", "targets": ["@door"], "mana": ["@swamp1", "@swamp2"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Cast": { "object": "$inversion", "targets": ["$door"], "mana": ["$swamp1", "$swamp2"] } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@door", "subtypes": [] } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "@door", "types": ["Artifact", "Creature"] } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "@wall", "subtypes": ["Wall"] } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@juggernaut"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@door": ["@juggernaut"] } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@juggernaut", "blockers": ["@door"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "$door", "subtypes": [] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Types": { "object": "$door", "types": ["Artifact", "Creature"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Subtypes": { "object": "$wall", "subtypes": ["Wall"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$juggernaut"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$door": ["$juggernaut"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$juggernaut", "blockers": ["$door"] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Otarian Juggernaut", "count": 0 } } }
   ]

@@ -27,12 +27,12 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@piker", "do": { "ChooseAttackTarget": "@bob" } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@piker": "@bob" } } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@splinter", "mana": ["@swamp", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$piker", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "$piker": "$bob" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "$splinter", "mana": ["$swamp", null] } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "Splinter, Hamato Yoshi": "@bob" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "Splinter, Hamato Yoshi": "$bob" } } } },
     { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Splinter, Hamato Yoshi", "tapped": true } } }
   ]
 }

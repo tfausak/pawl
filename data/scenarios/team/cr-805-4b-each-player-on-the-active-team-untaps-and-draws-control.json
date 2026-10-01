@@ -52,7 +52,7 @@
   "timeline": [
     { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Island", "count": 0 } } },
     { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Hand", "card": "Island", "count": 0 } } },
-    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Tapped": { "object": "@bobs", "tapped": true } } },
-    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Tapped": { "object": "@carols", "tapped": true } } }
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Tapped": { "object": "$bobs", "tapped": true } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Tapped": { "object": "$carols", "tapped": true } } }
   ]
 }

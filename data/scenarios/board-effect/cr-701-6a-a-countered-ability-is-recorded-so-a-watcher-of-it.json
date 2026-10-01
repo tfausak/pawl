@@ -113,9 +113,9 @@
       "player": "alice",
       "do": {
         "Activate": {
-          "object": "@sorcerer",
+          "object": "$sorcerer",
           "targets": [
-            "@alice"
+            "$alice"
           ]
         }
       }
@@ -181,12 +181,12 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@answer",
+          "object": "$answer",
           "mana": [
-            "@island-1",
-            "@island-2",
-            "@island-3",
-            "@island-4"
+            "$island-1",
+            "$island-2",
+            "$island-3",
+            "$island-4"
           ]
         }
       }

@@ -43,23 +43,23 @@
     "step": "Upkeep"
   },
   "timeline": [
-    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@forest-1", null] } }, "source": "@jaguar" },
-    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@forest-1", "tapped": true } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$forest-1", null] } }, "source": "$jaguar" },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "$forest-1", "tapped": true } } },
     { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Pouncing Jaguar", "count": 1 } } },
-    { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@forest-1", "tapped": false } } },
+    { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "$forest-1", "tapped": false } } },
     { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
-    { "turn": 4, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@control-magic", "targets": ["@jaguar"], "mana": ["@island-1", "@island-2", "@island-3", "@island-4", null] } } },
+    { "turn": 4, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$control-magic", "targets": ["$jaguar"], "mana": ["$island-1", "$island-2", "$island-3", "$island-4", null] } } },
     { "turn": 4, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
     { "turn": 4, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Pouncing Jaguar", "count": 1 } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["@bob-forest-1", null] } }, "source": "@jaguar" },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$bob-forest-1", null] } }, "source": "$jaguar" },
     { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Pouncing Jaguar", "count": 1 } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-1", "tapped": true } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-2", "tapped": false } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-3", "tapped": false } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@bob-forest-4", "tapped": false } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@island-1", "tapped": false } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@forest-1", "tapped": false } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@forest-2", "tapped": false } } },
-    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "@forest-3", "tapped": false } } }
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$bob-forest-1", "tapped": true } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$bob-forest-2", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$bob-forest-3", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$bob-forest-4", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$island-1", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$forest-1", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$forest-2", "tapped": false } } },
+    { "turn": 6, "step": "Upkeep", "player": "bob", "check": { "Tapped": { "object": "$forest-3", "tapped": false } } }
   ]
 }

@@ -13,6 +13,6 @@ import qualified Pawl.Types.SubtypesAre as SubtypesAre.Type
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.SubtypesAre" $ do
   Spec.it s "an object and its subtypes" $
-    Common.assertCodec s SubtypesAre.codec (SubtypesAre.Type.MkSubtypesAre (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "piker"))) (Set.fromList [Subtype.Type.Elf, Subtype.Type.Warrior])) " {\"object\":\"@piker\",\"subtypes\":[\"Elf\",\"Warrior\"]} "
+    Common.assertCodec s SubtypesAre.codec (SubtypesAre.Type.MkSubtypesAre (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "piker"))) (Set.fromList [Subtype.Type.Elf, Subtype.Type.Warrior])) " {\"object\":\"$piker\",\"subtypes\":[\"Elf\",\"Warrior\"]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s SubtypesAre.codec

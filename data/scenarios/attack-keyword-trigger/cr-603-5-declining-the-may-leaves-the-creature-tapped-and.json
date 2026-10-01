@@ -16,10 +16,10 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@grappler"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "provoked": ["@piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$grappler"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "provoked": ["$piker"] } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseOptional": { "type": "Declines" } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@grappler", "blockers": null } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "@piker", "tapped": true } } }
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$grappler", "blockers": null } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "$piker", "tapped": true } } }
   ]
 }

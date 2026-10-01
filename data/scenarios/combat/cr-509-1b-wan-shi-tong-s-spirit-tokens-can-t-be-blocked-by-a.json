@@ -26,7 +26,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@oust", "targets": ["@elves"], "mana": ["@plains", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$oust", "targets": ["$elves"], "mana": ["$plains", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
@@ -34,9 +34,9 @@
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Spirit Token", "count": 2 } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
     { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
-    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@wan", "Spirit Token", "Spirit Token#2"] } },
-    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["Spirit Token"] } } },
-    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@seeker": ["Spirit Token"] } } },
-    { "turn": 3, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "Spirit Token", "blockers": ["@seeker"] } } }
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$wan", "Spirit Token", "Spirit Token#2"] } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$piker": ["Spirit Token"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$seeker": ["Spirit Token"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "Spirit Token", "blockers": ["$seeker"] } } }
   ]
 }

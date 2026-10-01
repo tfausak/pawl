@@ -18,8 +18,8 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hero", "@piker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@brigade": ["@hero", "@piker"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@brigade", "do": { "AssignDamage": { "@piker": 2 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$hero", "$piker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$brigade": ["$hero", "$piker"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "$brigade", "do": { "AssignDamage": { "$piker": 2 } } }
   ]
 }

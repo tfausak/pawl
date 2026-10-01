@@ -24,11 +24,11 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@first", "@second", "@third"]} },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@guard": ["@first", "@second", "@third"]}} },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@guard": ["@first"]}} },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@first", "blockers": ["@guard"]}} },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@second", "blockers": null}} },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@third", "blockers": null}} }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$first", "$second", "$third"]} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"$guard": ["$first", "$second", "$third"]}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"$guard": ["$first"]}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$first", "blockers": ["$guard"]}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$second", "blockers": null}} },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "$third", "blockers": null}} }
   ]
 }

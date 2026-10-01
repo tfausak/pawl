@@ -25,8 +25,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
 - **Note.** An optional `note` says in prose what the scenario rules out and
   why its board is built the way it is. It is free text: nothing reads it, and
   the decoder ignores it like any other unknown key.
-- **References.** `"@name"` is a seat or a labelled card. `"Goblin Piker"` is
-  the first live object with that name, `"Goblin Piker#2"` the second, in
+- **References.** `"$name"` is a seat or a labelled card; the sigil is not `@`,
+  so a label quoted in a PR or issue mentions no GitHub user. `"Goblin Piker"`
+  is the first live object with that name, `"Goblin Piker#2"` the second, in
   creation order across every zone.
 - **Timeline.** Each entry is keyed by `turn`, `step` and the `player` who
   decides, and carries `do` (a move) or `check`. Entries sharing a key are
@@ -45,14 +46,14 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   such as `mana`. `ChooseTypeSwap` answers a text change's swap (CR 612.1),
   `{ "from": { "type": "Island" }, "to": { "type": "Swamp" } }`, keyed
   the same way. `ChooseCopyTarget` names what an object entering as a copy
-  copies (CR 707.5), `"@bear"`, or `null` to decline its "may", keyed by
+  copies (CR 707.5), `"$bear"`, or `null` to decline its "may", keyed by
   the entering object. `ChooseTargets` names each slot's
-  targets, `{ "target": ["@moon"] }`, for a target prompt no cast or activation
+  targets, `{ "target": ["$moon"] }`, for a target prompt no cast or activation
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`
   likewise announce their count for a slot that takes a variable number. A
   spell or ability with more than one target slot names them with
-  `targetsBySlot`, `{ "victim": ["@bear"], "gauge": ["@wall"] }`, in place
+  `targetsBySlot`, `{ "victim": ["$bear"], "gauge": ["$wall"] }`, in place
   of `targets`.
   `OrderTriggers` lists one player's simultaneous triggers by source, `null`
   for a sourceless one such as the monarch's draw, in the order they go on the

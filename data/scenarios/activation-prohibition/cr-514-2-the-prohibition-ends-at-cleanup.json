@@ -23,12 +23,12 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@trap", "targets": ["@victim"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$trap", "targets": ["$victim"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@victim", "tapped": true } } },
-    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "@victim", "mana": ["@mountain-1", null] } } },
-    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "@twin", "mana": ["@mountain-2"] } } },
-    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@mountain-1", "tapped": true } } },
-    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@mountain-2", "tapped": true } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "$victim", "tapped": true } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "$victim", "mana": ["$mountain-1", null] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "$twin", "mana": ["$mountain-2"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$mountain-1", "tapped": true } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "$mountain-2", "tapped": true } } }
   ]
 }

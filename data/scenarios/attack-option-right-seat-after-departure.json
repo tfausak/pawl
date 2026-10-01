@@ -16,7 +16,7 @@
   },
   "timeline": [
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Concede" },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@attacker": "@dave" } } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "$attacker": "$dave" } } } }
   ]
 }

@@ -70,7 +70,7 @@
     { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Concede" },
     { "turn": 5, "step": "BeginningOfCombat", "player": "bob", "do": { "ChooseDefender": "dave" } },
-    { "turn": 5, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
-    { "turn": 5, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@dave" } } } }
+    { "turn": 5, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 5, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "$piker": "$dave" } } } }
   ]
 }

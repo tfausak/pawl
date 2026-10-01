@@ -20,11 +20,11 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@card-piker", "@token-piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "@card-piker", "tapped": false } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "@token-piker", "tapped": true } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@card-piker", "power": 3, "toughness": 2 } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@token-piker", "power": 2, "toughness": 1 } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@card-piker": "@bob", "@token-piker": "@bob" } } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$card-piker", "$token-piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "$card-piker", "tapped": false } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "$token-piker", "tapped": true } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$card-piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$token-piker", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "$card-piker": "$bob", "$token-piker": "$bob" } } } }
   ]
 }

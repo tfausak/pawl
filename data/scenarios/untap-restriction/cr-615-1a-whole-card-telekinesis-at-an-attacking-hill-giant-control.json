@@ -41,7 +41,7 @@
       "player": "alice",
       "do": {
         "Attack": [
-          "@giant"
+          "$giant"
         ]
       }
     },

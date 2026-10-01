@@ -19,10 +19,10 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@shroofus", "@alice-piker"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@shroofus", "power": 5, "toughness": 5 } } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@bob-piker": ["@shroofus"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@shroofus", "do": { "AssignDamage": { "@bob-piker": 1, "@bob": 4 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$shroofus", "$alice-piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "$shroofus", "power": 5, "toughness": 5 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$bob-piker": ["$shroofus"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "$shroofus", "do": { "AssignDamage": { "$bob-piker": 1, "$bob": 4 } } },
     { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTimestamps": ["Saproling Token", "Saproling Token#2", "Saproling Token#3", "Saproling Token#4"] } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 14 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },

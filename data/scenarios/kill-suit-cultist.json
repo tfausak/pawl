@@ -23,10 +23,10 @@
       "turn": 1,
       "step": "BeginningOfCombat",
       "player": "alice",
-      "do": { "Activate": { "object": "@cultist", "targets": ["@wall"], "mana": ["@swamp"] } }
+      "do": { "Activate": { "object": "$cultist", "targets": ["$wall"], "mana": ["$swamp"] } }
     },
-    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Block": { "@wall": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Block": { "$wall": ["$attacker"] } } },
     { "turn": 1, "step": "EndOfCombat", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wall of Stone", "count": 0 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "bob", "life": 20 } } }
   ]

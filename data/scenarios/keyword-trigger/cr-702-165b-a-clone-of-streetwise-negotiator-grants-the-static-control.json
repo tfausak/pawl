@@ -27,11 +27,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"]}}},
     {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseCopyTarget": "@model"}},
-    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "@piker", "power": 2, "toughness": 1}}},
-    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@piker"]}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Clone", "do": {"ChooseCopyTarget": "$model"}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$piker", "power": 2, "toughness": 1}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$piker"]}},
     {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
     {"turn": 1, "step": "EndOfCombat", "player": "alice", "check": {"Life": {"player": "bob", "life": 18}}}
   ]

@@ -32,19 +32,19 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "@beast", "power": 3, "toughness": 3 } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Counters": { "object": "@bob-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Counters": { "object": "@carol-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@beast"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@beast", "do": { "ChooseAttackTarget": "@carol" } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["@carol-karn"] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-1", "targets": ["@beast"], "mana": ["@forest-1", null] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-2", "targets": ["@beast"], "mana": ["@forest-2", null] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-3", "targets": ["@beast"], "mana": ["@forest-3", null] } } },
-    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "@growth-4", "targets": ["@beast"], "mana": ["@forest-4"] } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "@carol-karn", "kind": { "type": "Loyalty" }, "count": 3 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "@bob-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "$beast", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Counters": { "object": "$bob-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Counters": { "object": "$carol-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$beast"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$beast", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["$carol-karn"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "$growth-1", "targets": ["$beast"], "mana": ["$forest-1", null] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "$growth-2", "targets": ["$beast"], "mana": ["$forest-2", null] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "$growth-3", "targets": ["$beast"], "mana": ["$forest-3", null] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "Cast": { "object": "$growth-4", "targets": ["$beast"], "mana": ["$forest-4"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "$carol-karn", "kind": { "type": "Loyalty" }, "count": 3 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Counters": { "object": "$bob-karn", "kind": { "type": "Loyalty" }, "count": 6 } } },
     { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 17 } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "@beast", "power": 7, "toughness": 7 } } }
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "PowerToughness": { "object": "$beast", "power": 7, "toughness": 7 } } }
   ]
 }

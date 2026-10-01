@@ -32,8 +32,8 @@
     "step": "Upkeep"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@clone", "mana": ["@b-island-1", "@b-island-2", "@b-island-3", "@b-island-4"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseCopyTarget": "@piker" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$clone", "mana": ["$b-island-1", "$b-island-2", "$b-island-3", "$b-island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseCopyTarget": "$piker" } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Names": { "object": "Clone", "names": ["Goblin Piker"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }

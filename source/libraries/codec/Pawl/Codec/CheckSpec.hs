@@ -40,31 +40,31 @@ spec s = Spec.describe s "Pawl.Codec.Check" $ do
   Spec.it s "Count" $
     Common.assertCodec s Check.codec (Check.Type.Count (CountIs.Type.MkCountIs (Label.Type.MkLabel (Text.pack "bob")) Zone.Type.Battlefield (CardName.Type.MkCardName (Text.pack "Goblin Piker")) 0)) " {\"Count\":{\"player\":\"bob\",\"zone\":\"Battlefield\",\"card\":\"Goblin Piker\",\"count\":0}} "
   Spec.it s "Damage" $
-    Common.assertCodec s Check.codec (Check.Type.Damage (DamageIs.Type.MkDamageIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "wall"))) 2)) " {\"Damage\":{\"object\":\"@wall\",\"damage\":2}} "
+    Common.assertCodec s Check.codec (Check.Type.Damage (DamageIs.Type.MkDamageIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "wall"))) 2)) " {\"Damage\":{\"object\":\"$wall\",\"damage\":2}} "
   Spec.it s "Tapped" $
-    Common.assertCodec s Check.codec (Check.Type.Tapped (TappedIs.Type.MkTappedIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))) TapState.Type.Untapped)) " {\"Tapped\":{\"object\":\"@bear\",\"tapped\":false}} "
+    Common.assertCodec s Check.codec (Check.Type.Tapped (TappedIs.Type.MkTappedIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))) TapState.Type.Untapped)) " {\"Tapped\":{\"object\":\"$bear\",\"tapped\":false}} "
   Spec.it s "Counters" $
-    Common.assertCodec s Check.codec (Check.Type.Counters (CountersAre.Type.MkCountersAre (labelled "jace") CounterKind.Type.Loyalty 3)) " {\"Counters\":{\"object\":\"@jace\",\"kind\":{\"type\":\"Loyalty\"},\"count\":3}} "
+    Common.assertCodec s Check.codec (Check.Type.Counters (CountersAre.Type.MkCountersAre (labelled "jace") CounterKind.Type.Loyalty 3)) " {\"Counters\":{\"object\":\"$jace\",\"kind\":{\"type\":\"Loyalty\"},\"count\":3}} "
   Spec.it s "Types" $
-    Common.assertCodec s Check.codec (Check.Type.Types (TypesAre.Type.MkTypesAre (labelled "soldier") (Set.singleton CardType.Type.Creature))) " {\"Types\":{\"object\":\"@soldier\",\"types\":[\"Creature\"]}} "
+    Common.assertCodec s Check.codec (Check.Type.Types (TypesAre.Type.MkTypesAre (labelled "soldier") (Set.singleton CardType.Type.Creature))) " {\"Types\":{\"object\":\"$soldier\",\"types\":[\"Creature\"]}} "
   Spec.it s "Attackers" $
-    Common.assertCodec s Check.codec (Check.Type.Attackers (AttackersAre.Type.MkAttackersAre (Map.singleton (labelled "bear") (labelled "bob")))) " {\"Attackers\":{\"attackers\":{\"@bear\":\"@bob\"}}} "
+    Common.assertCodec s Check.codec (Check.Type.Attackers (AttackersAre.Type.MkAttackersAre (Map.singleton (labelled "bear") (labelled "bob")))) " {\"Attackers\":{\"attackers\":{\"$bear\":\"$bob\"}}} "
   Spec.it s "Blockers" $
-    Common.assertCodec s Check.codec (Check.Type.Blockers (BlockersAre.Type.MkBlockersAre (labelled "bear") (Just (Set.singleton (labelled "wall"))))) " {\"Blockers\":{\"attacker\":\"@bear\",\"blockers\":[\"@wall\"]}} "
+    Common.assertCodec s Check.codec (Check.Type.Blockers (BlockersAre.Type.MkBlockersAre (labelled "bear") (Just (Set.singleton (labelled "wall"))))) " {\"Blockers\":{\"attacker\":\"$bear\",\"blockers\":[\"$wall\"]}} "
   Spec.it s "Defenders" $
     Common.assertCodec s Check.codec (Check.Type.Defenders (DefendersAre.Type.MkDefendersAre [Label.Type.MkLabel (Text.pack "bob")])) " {\"Defenders\":{\"players\":[\"bob\"]}} "
   Spec.it s "Monarch" $
     Common.assertCodec s Check.codec (Check.Type.Monarch (MonarchIs.Type.MkMonarchIs (Just (Label.Type.MkLabel (Text.pack "alice"))))) " {\"Monarch\":{\"player\":\"alice\"}} "
   Spec.it s "PowerToughness" $
-    Common.assertCodec s Check.codec (Check.Type.PowerToughness (PowerToughnessIs.Type.MkPowerToughnessIs (labelled "bear") 3 3)) " {\"PowerToughness\":{\"object\":\"@bear\",\"power\":3,\"toughness\":3}} "
+    Common.assertCodec s Check.codec (Check.Type.PowerToughness (PowerToughnessIs.Type.MkPowerToughnessIs (labelled "bear") 3 3)) " {\"PowerToughness\":{\"object\":\"$bear\",\"power\":3,\"toughness\":3}} "
   Spec.it s "PlayerCounters" $
     Common.assertCodec s Check.codec (Check.Type.PlayerCounters (PlayerCountersAre.Type.MkPlayerCountersAre (Label.Type.MkLabel (Text.pack "bob")) PlayerCounterKind.Type.Energy 2)) " {\"PlayerCounters\":{\"player\":\"bob\",\"kind\":{\"type\":\"Energy\"},\"count\":2}} "
   Spec.it s "Names" $
-    Common.assertCodec s Check.codec (Check.Type.Names (NamesAre.Type.MkNamesAre (labelled "clone") (Set.singleton (CardName.Type.MkCardName (Text.pack "Goblin Piker"))))) " {\"Names\":{\"object\":\"@clone\",\"names\":[\"Goblin Piker\"]}} "
+    Common.assertCodec s Check.codec (Check.Type.Names (NamesAre.Type.MkNamesAre (labelled "clone") (Set.singleton (CardName.Type.MkCardName (Text.pack "Goblin Piker"))))) " {\"Names\":{\"object\":\"$clone\",\"names\":[\"Goblin Piker\"]}} "
   Spec.it s "Subtypes" $
-    Common.assertCodec s Check.codec (Check.Type.Subtypes (SubtypesAre.Type.MkSubtypesAre (labelled "piker") (Set.singleton Subtype.Type.Goblin))) " {\"Subtypes\":{\"object\":\"@piker\",\"subtypes\":[\"Goblin\"]}} "
+    Common.assertCodec s Check.codec (Check.Type.Subtypes (SubtypesAre.Type.MkSubtypesAre (labelled "piker") (Set.singleton Subtype.Type.Goblin))) " {\"Subtypes\":{\"object\":\"$piker\",\"subtypes\":[\"Goblin\"]}} "
   Spec.it s "Keywords" $
-    Common.assertCodec s Check.codec (Check.Type.Keywords (KeywordsAre.Type.MkKeywordsAre (labelled "bird") Keyword.Type.Flying 1)) " {\"Keywords\":{\"object\":\"@bird\",\"keyword\":{\"type\":\"Flying\"},\"count\":1}} "
+    Common.assertCodec s Check.codec (Check.Type.Keywords (KeywordsAre.Type.MkKeywordsAre (labelled "bird") Keyword.Type.Flying 1)) " {\"Keywords\":{\"object\":\"$bird\",\"keyword\":{\"type\":\"Flying\"},\"count\":1}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Check.codec
 

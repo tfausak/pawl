@@ -26,8 +26,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@summons", "mana": ["@forest-1", "@island-1", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Synthetic Temporal Summons"], "mana": ["@island-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$summons", "mana": ["$forest-1", "$island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$evolution", "targets": ["Synthetic Temporal Summons"], "mana": ["$island-2", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "TimeLord" }, "to": { "type": "Elf" } } }, "source": "Artificial Evolution" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },

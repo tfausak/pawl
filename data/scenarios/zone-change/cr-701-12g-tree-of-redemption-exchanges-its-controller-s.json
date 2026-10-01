@@ -20,10 +20,10 @@
     "step": "Upkeep"
   },
   "timeline": [
-    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@exchanger" } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "$exchanger" } } },
     { "turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Life": { "player": "alice", "life": 14 } } },
-    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@exchanger", "power": 1, "toughness": 8 } } },
-    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "@exchanger", "tapped": true } } }
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "$exchanger", "power": 1, "toughness": 8 } } },
+    { "turn": 1, "step": "Upkeep", "player": "alice", "check": { "Tapped": { "object": "$exchanger", "tapped": true } } }
   ]
 }

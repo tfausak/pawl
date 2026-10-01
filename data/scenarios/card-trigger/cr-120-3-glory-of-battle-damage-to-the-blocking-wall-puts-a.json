@@ -18,10 +18,10 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@strax-sontaran-nurse"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@wall-of-stone": ["@strax-sontaran-nurse"] } } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "@strax-sontaran-nurse", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
-    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Damage": { "object": "@wall-of-stone", "damage": 5 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$strax-sontaran-nurse"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$wall-of-stone": ["$strax-sontaran-nurse"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "$strax-sontaran-nurse", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Damage": { "object": "$wall-of-stone", "damage": 5 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
   ]
 }

@@ -24,7 +24,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@expert", "mana": ["Forest", "Forest#2", "Forest#3", "Forest#4", "Forest#5"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$expert", "mana": ["Forest", "Forest#2", "Forest#3", "Forest#4", "Forest#5"] } } },
     { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 2, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Insect Token", "Insect Token#2"] } },

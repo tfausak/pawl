@@ -121,6 +121,10 @@ to agents as written. What it doesn't say:
   The one thing never to trim is the mutation line --- which assertion
   reddened, named.
 
+- Mention no one. Issues, PRs and comments are posted as the owner, the only
+  person on the project. Put any `@` or `#` that is not meant to link in a code
+  span.
+
 - Mark the PR ready once the self-review's findings are pushed and the suite is
   green, report it, and stop. Don't wait for CI. Don't start the next unit ---
   one unit at a time per checkout. A drain-loop implementer leaves it a draft

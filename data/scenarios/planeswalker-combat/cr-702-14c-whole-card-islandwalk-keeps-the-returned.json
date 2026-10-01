@@ -37,9 +37,9 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@meandering-towershell"] } },
-    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@wall-of-stone": ["Meandering Towershell"] } } },
-    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@wall-of-stone": ["Meandering Towershell"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$meandering-towershell"] } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$wall-of-stone": ["Meandering Towershell"] } } },
+    { "turn": 3, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$wall-of-stone": ["Meandering Towershell"] } } },
     { "turn": 3, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } }
   ]
 }

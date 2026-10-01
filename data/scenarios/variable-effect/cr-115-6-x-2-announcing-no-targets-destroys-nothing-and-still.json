@@ -27,7 +27,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@infestation", "x": 2, "targets": [], "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4", "@forest-5"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$infestation", "x": 2, "targets": [], "mana": ["$forest-1", "$forest-2", "$forest-3", "$forest-4", "$forest-5"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Pest Token", "Pest Token#2", "Pest Token#3", "Pest Token#4"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Sol Ring", "count": 1 } } },

@@ -90,8 +90,8 @@
       "player": "bob",
       "do": {
         "Attack": [
-          "@aimed",
-          "@other"
+          "$aimed",
+          "$other"
         ]
       }
     },
@@ -99,18 +99,18 @@
       "turn": 1,
       "step": "DeclareAttackers",
       "player": "bob",
-      "source": "@aimed",
+      "source": "$aimed",
       "do": {
-        "ChooseAttackTarget": "@alice"
+        "ChooseAttackTarget": "$alice"
       }
     },
     {
       "turn": 1,
       "step": "DeclareAttackers",
       "player": "bob",
-      "source": "@other",
+      "source": "$other",
       "do": {
-        "ChooseAttackTarget": "@alice"
+        "ChooseAttackTarget": "$alice"
       }
     },
     {
@@ -119,16 +119,16 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@tables",
+          "object": "$tables",
           "targets": [
-            "@aimed"
+            "$aimed"
           ],
           "mana": [
-            "@plains1",
-            "@plains2",
-            "@plains3",
-            "@plains4",
-            "@plains5"
+            "$plains1",
+            "$plains2",
+            "$plains3",
+            "$plains4",
+            "$plains5"
           ]
         }
       }
@@ -145,15 +145,15 @@
       "player": "carol",
       "do": {
         "Cast": {
-          "object": "@ray",
+          "object": "$ray",
           "targets": [
-            "@aimed"
+            "$aimed"
           ],
           "mana": [
-            "@island1",
-            "@island2",
-            "@island3",
-            "@island4"
+            "$island1",
+            "$island2",
+            "$island3",
+            "$island4"
           ]
         }
       }
@@ -184,7 +184,7 @@
       "check": {
         "Attackers": {
           "attackers": {
-            "@other": "@alice"
+            "$other": "$alice"
           }
         }
       }

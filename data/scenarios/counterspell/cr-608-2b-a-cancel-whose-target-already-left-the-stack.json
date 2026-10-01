@@ -72,10 +72,10 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@piker",
+          "object": "$piker",
           "mana": [
-            "@mountain-1",
-            "@mountain-2"
+            "$mountain-1",
+            "$mountain-2"
           ]
         }
       }
@@ -92,14 +92,14 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@cancel-a",
+          "object": "$cancel-a",
           "targets": [
             "Goblin Piker"
           ],
           "mana": [
-            "@island-1",
-            "@island-2",
-            "@island-3",
+            "$island-1",
+            "$island-2",
+            "$island-3",
             null
           ]
         }
@@ -111,14 +111,14 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@cancel-b",
+          "object": "$cancel-b",
           "targets": [
             "Goblin Piker"
           ],
           "mana": [
-            "@island-4",
-            "@island-5",
-            "@island-6"
+            "$island-4",
+            "$island-5",
+            "$island-6"
           ]
         }
       }

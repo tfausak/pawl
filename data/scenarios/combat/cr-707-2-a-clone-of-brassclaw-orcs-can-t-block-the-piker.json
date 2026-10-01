@@ -28,14 +28,14 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseCopyTarget": "@orcs" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseCopyTarget": "$orcs" } },
     { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Names": { "object": "Clone", "names": ["Brassclaw Orcs"] } } },
-    { "turn": 2, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker", "@elves"] } },
-    { "turn": 2, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "Clone": ["@piker"] } } },
-    { "turn": 2, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "Clone": ["@elves"] } } },
-    { "turn": 2, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@elves", "blockers": ["Clone"] } } },
-    { "turn": 2, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@piker", "blockers": null } } }
+    { "turn": 2, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$piker", "$elves"] } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "Clone": ["$piker"] } } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "Clone": ["$elves"] } } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$elves", "blockers": ["Clone"] } } },
+    { "turn": 2, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "$piker", "blockers": null } } }
   ]
 }

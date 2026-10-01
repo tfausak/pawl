@@ -70,10 +70,10 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@victim",
+          "object": "$victim",
           "mana": [
-            "@mountain-1",
-            "@mountain-2"
+            "$mountain-1",
+            "$mountain-2"
           ]
         }
       }
@@ -161,14 +161,14 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@cancel",
+          "object": "$cancel",
           "targets": [
             "Goblin Piker"
           ],
           "mana": [
-            "@island-1",
-            "@island-2",
-            "@island-3"
+            "$island-1",
+            "$island-2",
+            "$island-3"
           ]
         }
       }

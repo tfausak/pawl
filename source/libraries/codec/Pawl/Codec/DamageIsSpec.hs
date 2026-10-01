@@ -11,6 +11,6 @@ import qualified Pawl.Types.Reference as Reference.Type
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamageIs" $ do
   Spec.it s "an object and its damage" $
-    Common.assertCodec s DamageIs.codec (DamageIs.Type.MkDamageIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "wall"))) 2) " {\"object\":\"@wall\",\"damage\":2} "
+    Common.assertCodec s DamageIs.codec (DamageIs.Type.MkDamageIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "wall"))) 2) " {\"object\":\"$wall\",\"damage\":2} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s DamageIs.codec

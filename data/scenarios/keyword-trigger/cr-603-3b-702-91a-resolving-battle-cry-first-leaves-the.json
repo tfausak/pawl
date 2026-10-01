@@ -15,8 +15,8 @@
     "step": "DeclareAttackers"
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hero"] } },
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@hero", "@hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["$hero", "$hero"] } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Soldier Token", "Soldier Token#2"] } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Soldier Token", "power": 1, "toughness": 1 } } },
     { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Soldier Token#2", "power": 1, "toughness": 1 } } },

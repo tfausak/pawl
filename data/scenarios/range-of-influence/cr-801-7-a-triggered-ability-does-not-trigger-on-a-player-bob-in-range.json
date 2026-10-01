@@ -35,7 +35,7 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "@bobs-greed", "mana": ["@bobs-swamp"] } } }
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "$bobs-greed", "mana": ["$bobs-swamp"] } } }
   ],
   "final": [
     { "Life": { "player": "bob", "life": 18 } },

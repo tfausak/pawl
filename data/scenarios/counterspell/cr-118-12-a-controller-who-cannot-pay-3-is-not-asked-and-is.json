@@ -60,10 +60,10 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@piker",
+          "object": "$piker",
           "mana": [
-            "@mountain-1",
-            "@mountain-2",
+            "$mountain-1",
+            "$mountain-2",
             null
           ]
         }
@@ -81,13 +81,13 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@leak",
+          "object": "$leak",
           "targets": [
             "Goblin Piker"
           ],
           "mana": [
-            "@alice-island-1",
-            "@alice-island-2"
+            "$alice-island-1",
+            "$alice-island-2"
           ]
         }
       }
@@ -104,7 +104,7 @@
       "player": "bob",
       "check": {
         "Tapped": {
-          "object": "@bob-island-1",
+          "object": "$bob-island-1",
           "tapped": false
         }
       }
@@ -115,7 +115,7 @@
       "player": "bob",
       "check": {
         "Tapped": {
-          "object": "@bob-island-2",
+          "object": "$bob-island-2",
           "tapped": false
         }
       }

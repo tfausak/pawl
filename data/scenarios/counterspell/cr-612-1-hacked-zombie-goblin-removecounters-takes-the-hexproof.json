@@ -25,14 +25,14 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@erode", "targets": ["@piker"], "mana": ["@island-1", null] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Synthetic Erode the Warding"], "mana": ["@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$erode", "targets": ["$piker"], "mana": ["$island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$evolution", "targets": ["Synthetic Erode the Warding"], "mana": ["$island-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Zombie" }, "to": { "type": "Goblin" } } }, "source": "Artificial Evolution" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "Keyword", "value": { "type": "Hexproof", "value": { "type": "HasSubtype", "value": { "type": "Goblin" } } } }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "$piker", "kind": { "type": "Keyword", "value": { "type": "Hexproof", "value": { "type": "HasSubtype", "value": { "type": "Goblin" } } } }, "count": 0 } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "Cast": { "object": "@tarfire", "targets": ["@piker"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "Cast": { "object": "$tarfire", "targets": ["$piker"], "mana": ["$mountain"] } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } }
   ]

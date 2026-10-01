@@ -15,8 +15,8 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
-    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@warden": ["@attacker"] } } },
-    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@attacker", "damage": 4 } } }
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$warden": ["$attacker"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "$attacker", "damage": 4 } } }
   ]
 }

@@ -30,8 +30,8 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
-    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "@piker", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["$piker"] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "$piker", "do": { "ChooseAttackTarget": "$alice" } },
     { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 18 } } }
   ]
 }

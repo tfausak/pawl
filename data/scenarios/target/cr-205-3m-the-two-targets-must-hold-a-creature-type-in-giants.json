@@ -27,7 +27,7 @@
     ]
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@unbury", "modes": [1], "targetsBySlot": {"first": ["@giant-a"], "second": ["@giant-b"]}, "mana": ["@swamp1", "@swamp2"]}} },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$unbury", "modes": [1], "targetsBySlot": {"first": ["$giant-a"], "second": ["$giant-b"]}, "mana": ["$swamp1", "$swamp2"]}} },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Hill Giant", "count": 2}} },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Unbury", "count": 0}} },

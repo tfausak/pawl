@@ -56,12 +56,12 @@
       "player": "bob",
       "do": {
         "Cast": {
-          "object": "@volley",
+          "object": "$volley",
           "targets": [
-            "@sorcerer"
+            "$sorcerer"
           ],
           "mana": [
-            "@mountain-1"
+            "$mountain-1"
           ]
         }
       }
@@ -78,14 +78,14 @@
       "player": "alice",
       "do": {
         "Cast": {
-          "object": "@cancel",
+          "object": "$cancel",
           "targets": [
             "Rending Volley"
           ],
           "mana": [
-            "@island-1",
-            "@island-2",
-            "@island-3"
+            "$island-1",
+            "$island-2",
+            "$island-3"
           ]
         }
       }

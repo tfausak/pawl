@@ -30,11 +30,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lightning", "mana": ["@mountain", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5", "@mountain-6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$lightning", "mana": ["$mountain", "$mountain-2", "$mountain-3", "$mountain-4", "$mountain-5", "$mountain-6", null] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Elemental Token", "Elemental Token#2", "Elemental Token#3"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elemental Token", "count": 3 } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@doom-blade", "targets": ["Elemental Token"], "mana": ["@swamp", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$doom-blade", "targets": ["Elemental Token"], "mana": ["$swamp", "$swamp-2"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elemental Token", "count": 2 } } },
     { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
