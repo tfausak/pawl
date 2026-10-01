@@ -1722,17 +1722,22 @@ eventTriggers events gs =
       -- may see of the answer is `arrivedLater`'s subtraction below.
       --
       -- Narrow by construction, which keeps a large graveyard cheap: membership is
-      -- decided by `functionsIn` over the PRINTED card first -- a total case over
-      -- a closed condition type and a walk of the ability's own effects, no
-      -- projection and no board walk -- and only a card passing it is projected.
+      -- decided by `functionsIn` over the card's ability face first
+      -- (Projection.abilityFaceOf: the printing with any copy stamp laid over it,
+      -- so a duplicate of a Clone of Bloodghast passes) -- a total case over a
+      -- closed condition type and a walk of the ability's own effects, no
+      -- projection and no board walk -- and only a card passing it, or any card
+      -- while a grant of a keyword minting one is in force
+      -- (`graveyardGrantInForce`), is projected.
       -- Cards contributing nothing are dropped rather than carried as empty
       -- entries.
       --
       -- The abilities offered are the PROJECTION's (CR 613.1 names no zone), so
       -- Yixlid Jailer's "cards in graveyards lose all abilities" silences them --
       -- Pawl.ZoneTriggerSpec's "CR 613.1f Yixlid Jailer keeps a milled Narcomoeba
-      -- from triggering" proves it. A card printing no such ability is never
-      -- projected, so one an effect GRANTS in a graveyard is not seen (gap #1859).
+      -- from triggering" proves it. A card whose ability face has no such
+      -- ability is projected only for a keyword grant, so a triggered ability an
+      -- effect GRANTS in a graveyard is not seen (gap #1859).
       -- The controller is the OWNER, CR 113.8's second clause: a card in a
       -- graveyard has no controller (CR 108.4).
       --
@@ -1756,17 +1761,22 @@ eventTriggers events gs =
       -- Pawl.Engine.Keyword.graveyardTriggeredAbilitiesOf is what decides which
       -- keywords reach this: recover, and CR 702.55a's haunt on an instant or
       -- sorcery -- which is why it is handed the face's card TYPES as well.
-      graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-        (Just obj, Just face) ->
-          let inGraveyard subtypes cardTypes triggered keywords = Maybe.mapMaybe (functionsIn subtypes (Face.delayedAbilities face) Zone.Graveyard) triggered <> fmap whole (Keyword.graveyardTriggeredAbilitiesOf cardTypes keywords)
-           in case inGraveyard (TypeLine.subtypes (Face.typeLine face)) (TypeLine.types (Face.typeLine face)) (Face.triggeredAbilities face) (Face.keywordSet face) of
-                [] -> Nothing
-                _ ->
-                  let pc = Projection.project oid gs
-                   in case inGraveyard (PC.subtypes pc) (PC.cardTypes pc) (PC.triggeredAbilities pc) (Map.keysSet (PC.keywords pc)) of
-                        [] -> Nothing
-                        abilities -> Just (oid, (Object.owner obj, abilities))
+      graveyardCandidate oid = case Game.lookupObject oid gs of
+        Just obj
+          | Just face <- Projection.abilityFaceOf oid obj gs ->
+              let inGraveyard subtypes cardTypes triggered keywords = Maybe.mapMaybe (functionsIn subtypes (Face.delayedAbilities face) Zone.Graveyard) triggered <> fmap whole (Keyword.graveyardTriggeredAbilitiesOf cardTypes keywords)
+               in case inGraveyard (TypeLine.subtypes (Face.typeLine face)) (TypeLine.types (Face.typeLine face)) (Face.triggeredAbilities face) (Face.keywordSet face) of
+                    [] | not graveyardGrantInForce -> Nothing
+                    _ ->
+                      let pc = Projection.project oid gs
+                       in case inGraveyard (PC.subtypes pc) (PC.cardTypes pc) (PC.triggeredAbilities pc) (Map.keysSet (PC.keywords pc)) of
+                            [] -> Nothing
+                            abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
+      -- Does anything grant a keyword that mints a graveyard trigger? A thunk,
+      -- `exileGrantInForce`'s twin. Haunt mints only on an instant or sorcery,
+      -- so the roster is asked with both types: a superset.
+      graveyardGrantInForce = Projection.mintingGrantInForce (Keyword.graveyardTriggeredAbilitiesOf Projection.spellStaticTypes) gs
       inGraveyards =
         Map.fromList
           (concatMap (Maybe.mapMaybe graveyardCandidate . Foldable.toList) (Map.elems (GameState.graveyard gs)))
@@ -1789,7 +1799,7 @@ eventTriggers events gs =
       -- leaves-your-graveyard trigger, which only this source serves, and
       -- Pawl.ZoneTriggerSpec's "CR 603.10a Oglor's perpetual grant fires as the
       -- milled card leaves the graveyard" proves it -- where `inGraveyards`'
-      -- printed gate would miss one (gap #1859). Not `abilitiesOf` either,
+      -- ability-face gate would miss one (gap #1859). Not `abilitiesOf` either,
       -- and not `graveyardTriggeredAbilitiesOf`, which `inGraveyards` does consult:
       -- both abilities on that roster -- CR 702.59a's recover and CR 702.55a's
       -- haunt on an instant or sorcery -- move the card they are on, and an id
@@ -1851,8 +1861,9 @@ eventTriggers events gs =
       -- "it gains suspend" mints suspend's two triggered abilities on the card it
       -- exiled -- Pawl.SpecialActionSpec's "CR 702.62a Delay" group proves it.
       -- Gated so the scan does not project every exiled card: a card is
-      -- projected only when its printed face yields such an ability or some
-      -- grantor writes a keyword that mints one (`exileGrantInForce`).
+      -- projected only when its ability face (Projection.abilityFaceOf) yields
+      -- such an ability or some grantor writes a keyword that mints one
+      -- (`exileGrantInForce`).
       --
       -- Not implemented: a triggered ability granted to a card in exile with no
       -- keyword behind it, which that gate does not consult (#1859).
@@ -1878,12 +1889,13 @@ eventTriggers events gs =
       -- that says nothing about exile. Pawl.Engine.Keyword.exileTriggeredAbilitiesOf
       -- is what decides which keywords reach this: suspend. CR 702.35a's
       -- madness trigger is `exiledForMadness`'s, off the discard event.
-      exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-        (Just obj, Just face)
-          | not (Object.exiledFaceDown obj) ->
+      exileCandidate oid = case Game.lookupObject oid gs of
+        Just obj
+          | not (Object.exiledFaceDown obj),
+            Just face <- Projection.abilityFaceOf oid obj gs ->
               let inExileZone subtypes triggered keywords = Maybe.mapMaybe (functionsIn subtypes (Face.delayedAbilities face) Zone.Exile) triggered <> fmap whole (Keyword.exileTriggeredAbilitiesOf keywords)
-                  printed = inExileZone (TypeLine.subtypes (Face.typeLine face)) (Face.triggeredAbilities face) (Face.keywordSet face)
-               in if null printed && not exileGrantInForce
+                  onFace = inExileZone (TypeLine.subtypes (Face.typeLine face)) (Face.triggeredAbilities face) (Face.keywordSet face)
+               in if null onFace && not exileGrantInForce
                     then Nothing
                     else
                       let pc = Projection.project oid gs
@@ -1892,8 +1904,8 @@ eventTriggers events gs =
                             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
       -- Does anything grant a keyword that mints an exile trigger? A thunk:
-      -- only an exiled card whose printed face yields none forces it.
-      exileGrantInForce = Projection.keywordGrantInForce (not . null . Keyword.exileTriggeredAbilitiesOf . Set.singleton) gs
+      -- only an exiled card whose ability face yields none forces it.
+      exileGrantInForce = Projection.mintingGrantInForce Keyword.exileTriggeredAbilitiesOf gs
       inExile = Map.fromList (Maybe.mapMaybe exileCandidate (Set.toAscList (GameState.exile gs)))
       -- CR 702.35a's SECOND ability, for the card its first ability exiled:
       -- minted off the madness abilities the discard RECORDED
@@ -2071,7 +2083,7 @@ eventTriggers events gs =
         Just obj ->
           if not (Vanguard.functionsFromCommandZone oid gs)
             then Nothing
-            else case Game.faceOf oid gs of
+            else case Projection.abilityFaceOf oid obj gs of
               Nothing -> Nothing
               Just face -> case Face.triggeredAbilities face of
                 [] -> Nothing
@@ -2096,9 +2108,10 @@ eventTriggers events gs =
       -- emblem source: the rule at issue here IS CR 113.6k. Without it a drawn
       -- Doomed Traveler would be offered its dies trigger from a hand.
       --
-      -- The abilities are the PRINTED ones plus the ones rule 702 MINTS from the
-      -- card's keywords -- and miracle's is entirely the latter, so dropping the
-      -- mint would leave this source with nothing to find. The keywords are the
+      -- The abilities are the ability face's (Projection.abilityFaceOf) plus the
+      -- ones rule 702 MINTS from the card's keywords -- and miracle's is entirely
+      -- the latter, so dropping the mint would leave this source with nothing to
+      -- find. The keywords are the
       -- PROJECTION's (CR 613.1), Event.offerMiracleReveal's read, so a miracle an
       -- effect granted in the hand mints the trigger its reveal was offered for.
       -- Only the revealed ability's own trigger, of the card's miracle abilities
@@ -2109,8 +2122,8 @@ eventTriggers events gs =
       -- reveal is one a player makes from their own hand, so the owner is also the
       -- revealer, and CR 109.5's "you" lands on the same seat either way.
       revealedInHand event = case event of
-        GameEvent.Revealed (Revealed.MkRevealed _ oid (RevealCause.ForMiracle cost) _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-          (Just obj, Just face) ->
+        GameEvent.Revealed (Revealed.MkRevealed _ oid (RevealCause.ForMiracle cost) _) -> case Game.lookupObject oid gs of
+          Just obj | Just face <- Projection.abilityFaceOf oid obj gs ->
             case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.handTriggeredAbilitiesOf (Keyword.revealedForMiracle cost (Map.keysSet (Projection.keywordsOf oid gs)))) of
               [] -> Map.empty
               abilities -> Map.singleton oid (Object.owner obj, abilities)
@@ -3037,10 +3050,12 @@ stateTriggers gs
       Just ctrl -> forOne oid ctrl (Projection.triggeredAbilitiesOf oid gs)
     -- eventTriggers' `commandCandidate`, read the same way: CR 113.6p's objects
     -- only, unfiltered by `functionsIn` (CR 114.4 is about the object), the owner
-    -- as controller (CR 114.2, CR 902.6), and the printed abilities (CR 114.3).
-    inCommand oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-      (Just obj, Just face)
-        | Vanguard.functionsFromCommandZone oid gs -> forOne oid (Plane.commandControllerOf oid obj gs) (Face.triggeredAbilities face)
+    -- as controller (CR 114.2, CR 902.6), and the ability face's (CR 114.3).
+    inCommand oid = case Game.lookupObject oid gs of
+      Just obj
+        | Vanguard.functionsFromCommandZone oid gs,
+          Just face <- Projection.abilityFaceOf oid obj gs ->
+            forOne oid (Plane.commandControllerOf oid obj gs) (Face.triggeredAbilities face)
       _ -> []
     -- The same hoist eventTriggers' `grants` binding makes.
     grants = Projection.controlGrants gs
