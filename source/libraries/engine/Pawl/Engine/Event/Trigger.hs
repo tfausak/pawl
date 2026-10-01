@@ -705,6 +705,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
+  TriggerCondition.SelfCounterRemoved _ -> False
   -- CR 603.10a's list does not name counter placements, so the normal reading
   -- applies: the abilities checked are the ones existing immediately after the
   -- event. Every counter mirror above answers alike, both placement scopes
@@ -1001,6 +1002,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
+  TriggerCondition.SelfCounterRemoved _ -> False
   -- A True beside PermanentsDie and PlayersGainLife: CR 603.2c's FIRST sentence
   -- is what this constructor exists for -- "one or more counters ... on one or
   -- more permanents" names the whole group as the trigger event, which occurs
@@ -1075,6 +1077,17 @@ stepTriggerPlayers gs you cond event ability = case (cond, event) of
   (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began _))
     | began == wanted && Map.member Binding.triggerPlayer (Slots.triggeredAbilitySlots ability) -> Just (stepPlayers gs scope you)
   (TriggerCondition.AnyOf conditions, _) -> Maybe.listToMaybe (Maybe.mapMaybe (\c -> stepTriggerPlayers gs you c event ability) conditions)
+  _ -> Nothing
+
+-- CR 603.2c's second sentence for a per-counter removal: "whenever a [kind]
+-- counter is removed from this" triggers once for each counter one removal took
+-- off the bearer (Protean Hydra's ruling). Nothing for every other pair, which
+-- keeps its single trigger. Pawl.EventSpec's Protean Hydra cases prove it.
+countersRemovedOccurrences :: ObjectId -> TriggerCondition -> GameEvent -> Maybe Natural
+countersRemovedOccurrences bearer cond event = case (cond, event) of
+  (TriggerCondition.SelfCounterRemoved removal, GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind before after))
+    | oid == bearer && kind == SelfCountersRemoved.kind removal && before > after -> Just (before - after)
+  (TriggerCondition.AnyOf conditions, _) -> Maybe.listToMaybe (Maybe.mapMaybe (\c -> countersRemovedOccurrences bearer c event) conditions)
   _ -> Nothing
 
 -- CR 603.6a: every event is checked against every permanent currently on the
@@ -2206,7 +2219,8 @@ eventTriggers events gs =
             pends (cond, ab) =
               let one = pend (cond, ab)
                   for player = one {PendingTrigger.bindings = Binding.setTriggerPlayer player (PendingTrigger.bindings one)}
-               in maybe [one] (fmap for) (stepTriggerPlayers gs ctrl cond event ab)
+                  perPlayer = maybe [one] (fmap for) (stepTriggerPlayers gs ctrl cond event ab)
+               in maybe perPlayer (\n -> concat (List.genericReplicate n perPlayer)) (countersRemovedOccurrences oid cond event)
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -2931,6 +2945,7 @@ zonesTriggeredFrom cond =
         -- the exile answer.
         TriggerCondition.SelfLastCounterRemoved removal -> Set.singleton (SelfCountersRemoved.zone removal)
         TriggerCondition.SelfCountersRemoved removal -> Set.singleton (SelfCountersRemoved.zone removal)
+        TriggerCondition.SelfCounterRemoved removal -> Set.singleton (SelfCountersRemoved.zone removal)
         -- The battlefield, every counter mirror's answer: a permanent takes CR 122.6
         -- counters there, and these conditions' bearers are bystanders watching from
         -- it.
@@ -3295,6 +3310,7 @@ stateTriggers gs
             TriggerCondition.SelfBecomesClassLevel _ -> False
             TriggerCondition.SelfLastCounterRemoved _ -> False
             TriggerCondition.SelfCountersRemoved _ -> False
+            TriggerCondition.SelfCounterRemoved _ -> False
             TriggerCondition.PermanentsGetCounters {} -> False
             TriggerCondition.PermanentGetsCounters {} -> False
             TriggerCondition.SpellCast {} -> False

@@ -245,13 +245,13 @@ isMainPhase phase = case phase of
   Phase.Combat _ -> False
   Phase.Ending _ -> False
 
--- CR 122's removal as the two bearer-scoped counter-removal conditions read it:
+-- CR 122's removal as the three bearer-scoped counter-removal conditions read it:
 -- the before/after pair of a GameEvent.CountersRemoved that took counters of
 -- `wanted` off `bearer`, and Nothing for every other event.
 --
--- ONE exhaustive case shared by TriggerCondition.SelfLastCounterRemoved and
--- TriggerCondition.SelfCountersRemoved rather than a copy each, because the two
--- ask the identical question of the identical constructor and differ only in what
+-- ONE exhaustive case shared by TriggerCondition.SelfLastCounterRemoved,
+-- SelfCountersRemoved and SelfCounterRemoved rather than a copy each, because
+-- they ask the identical question of the identical constructor and differ only in what
 -- they then do with the pair. A new GameEvent constructor still breaks the build
 -- here, which is what the exhaustive list is for.
 countersRemovedFrom :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> GameEvent -> Maybe (Natural, Natural)
@@ -7968,10 +7968,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   --
   -- No "one or more" conjunct either, and for the arm above's reason: the record
   -- exists only where something came off.
-  --
-  -- Not implemented: "whenever A [kind] counter is removed" (Protean Hydra)
-  -- triggering once per counter the removal took off (#4553).
   TriggerCondition.SelfCountersRemoved removal -> Maybe.isJust (countersRemovedFrom bearer (SelfCountersRemoved.kind removal) event)
+  -- "Whenever A [kind] counter is removed" (Protean Hydra): the same match.
+  -- How many times it triggers is Pawl.Engine.Event.Trigger's
+  -- `occurrencesIn`, one per counter removed (CR 603.2c).
+  TriggerCondition.SelfCounterRemoved removal -> Maybe.isJust (countersRemovedFrom bearer (SelfCountersRemoved.kind removal) event)
   -- CR 603.2c's PER-PERMANENT placement (Wickersmith's Tools' "whenever one or
   -- more -1/-1 counters are put on A CREATURE"): counters of this kind landed on
   -- a permanent the Filter admits. One event at a time, so a batch that touched
