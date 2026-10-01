@@ -3011,6 +3011,7 @@ rewriteComponent pairs component = case component of
   CostComponent.BeholdAndExile criterion -> CostComponent.BeholdAndExile (rewrite pairs criterion)
   CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n which criterion spread) -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n (rewriteWhichCounters pairs which) (rewrite pairs criterion) spread)
   CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemovePlusOneCountersX (rewrite pairs criterion)
+  CostComponent.SacrificeX criterion -> CostComponent.SacrificeX (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component

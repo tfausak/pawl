@@ -1,0 +1,23 @@
+{
+  "description": "CR 118.3 a payer with no {E} is not asked how much to pay",
+  "note": "Pia Nalaar connects alone and is no artifact, so alice gains no {E} and her end-step \"pay one or more {E}\" has no payable amount: one outcome, so nothing to ask. Any ChoosePaidEnergy prompt would fail the run, which is the assertion this case exists for; the board alone cannot tell paying zero from being spared the question, since both leave no Aetherjet.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Pia Nalaar, Chief Mechanic", "label": "pia", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@pia"] } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Energy" }, "count": 0 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Nalaar Aetherjet", "count": 0 } } }
+  ]
+}

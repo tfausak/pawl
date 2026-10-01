@@ -1,0 +1,185 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "SacrificeX",
+                "value": {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Squirrel"
+                  }
+                }
+              }
+            ],
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Black"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "modification": {
+                            "type": "ModifyPowerToughness",
+                            "value": {
+                              "power": {
+                                "type": "InSlot",
+                                "value": "X"
+                              },
+                              "toughness": {
+                                "type": "Negate",
+                                "value": {
+                                  "type": "InSlot",
+                                  "value": "X"
+                                }
+                              }
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Landwalk",
+          "value": {
+            "type": "HasSubtype",
+            "value": {
+              "type": "Forest"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Chatterfang, Squirrel General",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "TokenR",
+            "value": {
+              "matching": {
+                "whose": {
+                  "type": "Yours"
+                }
+              },
+              "plus": {
+                "type": "ThatMany",
+                "value": {
+                  "faces": [
+                    {
+                      "colorIndicator": [
+                        {
+                          "type": "Green"
+                        }
+                      ],
+                      "name": "Squirrel Token",
+                      "power": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "toughness": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "typeLine": {
+                        "subtypes": [
+                          {
+                            "type": "Squirrel"
+                          }
+                        ],
+                        "types": [
+                          {
+                            "type": "Creature"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Squirrel"
+          },
+          {
+            "type": "Warrior"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

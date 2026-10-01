@@ -19,6 +19,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.TokenPlus as TokenPlus
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TypeLine as TypeLine
 
@@ -45,10 +46,22 @@ spec s = Spec.describe s "Pawl.Codec.TokenR" $ do
       ( TokenR.MkTokenR
           { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours, TokenPattern.whatToken = Filter.HasCardType CardType.Creature},
             TokenR.scaling = Nothing,
-            TokenR.plus = Just soldier
+            TokenR.plus = Just (TokenPlus.One soldier)
           }
       )
-      " {\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whatToken\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"plus\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}} "
+      " {\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whatToken\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"plus\":{\"type\":\"One\",\"value\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}}} "
+  -- CR 614.1a: Chatterfang, Squirrel General appends one per token created.
+  Spec.it s "an append sized by the event" $
+    Common.assertCodec
+      s
+      codec
+      ( TokenR.MkTokenR
+          { TokenR.matching = TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours, TokenPattern.whatToken = Filter.And []},
+            TokenR.scaling = Nothing,
+            TokenR.plus = Just (TokenPlus.ThatMany soldier)
+          }
+      )
+      " {\"matching\":{\"whose\":{\"type\":\"Yours\"}},\"plus\":{\"type\":\"ThatMany\",\"value\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
 
 -- A one-face creature token with every other field at the value

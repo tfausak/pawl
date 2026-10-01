@@ -101,6 +101,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.Opponent)
       " {\"type\":\"SelfDealsCombatDamageToPlayer\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 510.1b / 310.5 and CR 510.2: the two wider recipients, each its own tag.
+  Spec.it s "SelfDealsCombatDamageToPlayerOrBattle" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle
+      " {\"type\":\"SelfDealsCombatDamageToPlayerOrBattle\"} "
+  Spec.it s "SelfDealsCombatDamage" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfDealsCombatDamage
+      " {\"type\":\"SelfDealsCombatDamage\"} "
   -- CR 603.2 / 120.1: the same pair without the combat narrowing -- Akki
   -- Lavarunner's own condition. A separate TAG and not a flag on the arm above,
   -- so a card written for one can never decode as the other.

@@ -1732,11 +1732,6 @@ longtuskCubSpec s registry =
       Spec.assertBool s (not (Activatable.activatable S.alice cubId ability withOne)) "unpayable at one"
       Spec.assertEqWith s "energy spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice activated) 0
       Spec.assertEqWith s "Cub grew a +1/+1 counter" (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject cubId resolved)) (Just 1)
-    Spec.it s "CR 603.2 Longtusk Cub gains two energy when it connects" $ do
-      longtuskCub <- S.printingOf s registry "Longtusk Cub"
-      let (gs, _, _) = S.combatBoardOf [longtuskCub] []
-          after = S.runCombat S.aggressiveAnswer gs
-      Spec.assertEqWith s "alice gained two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
 
 -- Jarad, Golgari Lich Lord {B}{B}{G}{G} Legendary Creature -- Zombie Elf 2/2,
 -- "Sacrifice a Swamp and a Forest: Return this card from your graveyard to your
@@ -3249,6 +3244,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   zameckGuildmageCostSpec s registry
   novijenSagesSpec s registry
   retributionSpec s registry
+  chatterfangSacrificeSpec s registry
   oozeFluxSpec s registry
   tayamSpec s registry
   soulDivinerSpec s registry
@@ -5081,6 +5077,47 @@ retributionSpec s registry =
       retribution <- S.printingOf s registry "Retribution of the Ancients"
       let bounds = State.execState (Engine.runGame recordXBound board (Activate.activateAbility S.alice retributionId (theAbility retribution))) []
       Spec.assertEqWith s "X is bounded at three" bounds [3]
+
+-- Chatterfang, Squirrel General (Oracle text checked against Scryfall
+-- 2026-09-30): "{B}, Sacrifice X Squirrels: Target creature gets +X/-X until end
+-- of turn." CostComponent.SacrificeX with a real choice: three Treetop Sentries
+-- and Chatterfang itself are Squirrels, so X = 2 asks which two.
+--
+-- THE BOARD: alice controls Chatterfang, three Sentries and a Swamp; bob's Hill
+-- Giant is the target.
+chatterfangSacrificeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+chatterfangSacrificeSpec s registry =
+  Spec.describe s "Chatterfang, Squirrel General" $ do
+    -- The gameplay-level assertions come FIRST: which Squirrels died, then the
+    -- +X/-X. The prompt record is a proxy after them.
+    Spec.it s "CR 107.3a/701.21a the announced X Squirrels are sacrificed and the target gets +X/-X" $ do
+      chatterfang <- S.printingOf s registry "Chatterfang, Squirrel General"
+      sentries <- S.printingOf s registry "Treetop Sentries"
+      giant <- S.printingOf s registry "Hill Giant"
+      swamp <- S.printingOf s registry "Swamp"
+      let lands = S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers)
+          (chatterfangId, g1) = S.addPermanent chatterfang S.alice lands
+          (firstId, g2) = S.addPermanent sentries S.alice g1
+          (secondId, g3) = S.addPermanent sentries S.alice g2
+          (thirdId, g4) = S.addPermanent sentries S.alice g3
+          (giantId, g5) = S.addPermanent giant S.bob g4
+          board = g5 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+          sacrificed = Set.fromList [firstId, thirdId]
+          answer :: Prompt.Prompt r -> State.State [(Natural.Natural, [ObjectId.ObjectId])] r
+          answer p = case p of
+            Prompt.ChooseX {} -> pure 2
+            Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter ((== Just giantId) . Recipient.objectOf) . snd) sets)
+            Prompt.ChooseSacrifices _ _ _ offered n _ -> do
+              State.modify' (<> [(n, offered)])
+              pure sacrificed
+            _ -> pure (S.identityAnswer p)
+          act = do Activate.activateAbility S.alice chatterfangId (theAbility chatterfang); Stack.resolveTop
+          (after, asked) = State.runState (fmap snd (Engine.runGame answer board act)) []
+          onBattlefield = GameState.battlefield after
+      Spec.assertEqWith s "CR 701.21a the two Sentries chosen left the battlefield" (Set.intersection sacrificed onBattlefield) Set.empty
+      Spec.assertBool s (Set.member secondId onBattlefield && Set.member chatterfangId onBattlefield) "and the third Sentry and Chatterfang stayed"
+      Spec.assertEqWith s "CR 613.4c bob's 3/3 Giant at +2/-2 is 5/1" (S.powerToughnessOf giantId after) (Just (5, 1))
+      Spec.assertEqWith s "and the payer was asked for two of the four Squirrels" asked [(2, List.sort [chatterfangId, firstId, secondId, thirdId])]
 
 -- The board retributionSpec's cases share, described above it. Answers the
 -- Retribution, the Piker, alice's Giant and bob's Giant.

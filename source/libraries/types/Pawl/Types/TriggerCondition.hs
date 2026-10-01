@@ -63,6 +63,12 @@ data TriggerCondition
     -- are different triggers on a board where the damage is redirected to the
     -- creature's own controller (CR 614.9).
     SelfDealsCombatDamageToPlayer PlayerRelation.PlayerRelation
+  | -- | CR 510.1b / 310.5: the bearer dealt combat damage to a player or a
+    -- battle (Archpriest of Shadows). Self-scoped, one trigger per recipient.
+    SelfDealsCombatDamageToPlayerOrBattle
+  | -- | CR 510.2 / 603.2c: the bearer dealt combat damage to any recipient,
+    -- once per combat damage step (Leyline Phantom). Self-scoped.
+    SelfDealsCombatDamage
   | -- | CR 603.2 / 120.1: the bearer dealt damage of ANY kind to a player the
     -- PlayerRelation admits -- the arm above without CR 510.1's combat narrowing.
     -- Akki Lavarunner's "whenever this creature deals damage to an opponent" is

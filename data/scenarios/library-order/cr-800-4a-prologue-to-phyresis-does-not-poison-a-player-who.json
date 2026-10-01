@@ -1,0 +1,33 @@
+{
+  "description": "CR 800.4a Prologue to Phyresis does not poison a player who has left the game",
+  "note": "carol concedes in the precombat main phase, before alice casts the instant Prologue to Phyresis at the beginning of combat, so she is no longer an opponent (CR 102.1, CR 800.4a; #279). Poison on a departed player's record would put a non-player on the next proliferate prompt. bob is poisoned, carol and the caster are not.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true }
+        ],
+        "hand": [{ "card": "Prologue to Phyresis", "label": "prologue" }],
+        "library": [{ "card": "Goblin Piker" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "Cast": { "object": "@prologue", "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 1 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "carol", "kind": { "type": "Poison" }, "count": 0 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Poison" }, "count": 0 } } }
+  ]
+}

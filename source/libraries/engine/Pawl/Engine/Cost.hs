@@ -365,7 +365,7 @@ withOffering pid oid gs candidate =
             CandidateCost.instantSpeed = True
           }
       | quality <- Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs)),
-        vid <- Replacement.sacrificeCandidates Map.empty pid (Just oid) quality gs
+        vid <- Replacement.sacrificeCandidates (Just pid) Map.empty pid (Just oid) quality gs
       ]
 
 -- | candidateCostsFor, told whether CR 601.3's permission comes from the EFFECT
@@ -538,15 +538,12 @@ candidateCostsGiven permitted pid name oid gs =
               -- CR 601.2h. Rule 701.21a is also why the criterion states no
               -- control clause -- "a player can't sacrifice ... something that's a
               -- permanent they don't control", which that pool is already the
-              -- caster's. Filter.ControlledBy could not say it anyway:
-              -- Replacement.matchesPermanent asks every sacrifice criterion with NO
-              -- perspective, in every zone, so that atom is vacuously False there
-              -- whatever the criterion is on.
+              -- caster's, so a ControlledBy atom would only repeat it.
               emerged =
                 let victims criterion =
                       Maybe.mapMaybe
                         (\vid -> fmap ((,) vid) (Filter.manaValue (Projection.viewOfObject vid gs)))
-                        (Replacement.sacrificeCandidates Map.empty pid (Just oid) criterion gs)
+                        (Replacement.sacrificeCandidates (Just pid) Map.empty pid (Just oid) criterion gs)
                     offer emerge (vid, n) =
                       CandidateCost.MkCandidateCost
                         (Just (Keyword.Type.Emerge emerge))
@@ -1460,6 +1457,7 @@ substituteXInComponent x component = case component of
   CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.RemoveCounters {} -> component
   CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents x (WhichCounters.OfKind CounterKind.PlusOnePlusOne) criterion CounterSpread.FromAmong)
+  CostComponent.SacrificeX criterion -> CostComponent.Sacrifice (Sacrifice.MkSacrifice x criterion)
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
   CostComponent.Forage -> component
@@ -1537,6 +1535,7 @@ componentHasVariable component = case component of
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> True
+  CostComponent.SacrificeX _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> True
@@ -1643,6 +1642,9 @@ componentDemandGrowsWithX component = case component of
   -- CR 118.3 measures the announced count against the +1\/+1 counters the
   -- criterion admits between them, so a big enough X refuses.
   CostComponent.RemovePlusOneCountersX _ -> True
+  -- CR 701.21a: one permanent per sacrifice, so an X past the matching
+  -- permanents the payer controls refuses.
+  CostComponent.SacrificeX _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.Forage -> False
@@ -1952,6 +1954,7 @@ loyaltyAmountOf component = case component of
   -- ability, and this is a +1\/+1 counter.
   CostComponent.RemoveCounters {} -> Nothing
   CostComponent.RemovePlusOneCountersX _ -> Nothing
+  CostComponent.SacrificeX _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
@@ -2088,6 +2091,7 @@ zoneOfComponent component = case component of
   -- ANOTHER permanent, which CR 113.6m does not ask about either way.
   CostComponent.RemoveCounters {} -> Nothing
   CostComponent.RemovePlusOneCountersX _ -> Nothing
+  CostComponent.SacrificeX _ -> Nothing
   -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
   -- out of any zone.
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
@@ -2180,6 +2184,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> False
+  CostComponent.SacrificeX _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -2407,11 +2412,11 @@ evidenceValue candidate gs = Maybe.fromMaybe 0 (Filter.manaValue (Projection.vie
 -- component on `oid`: every battlefield object matching the criterion, ascending.
 --
 -- NOT Replacement.sacrificeCandidates, and the difference is the CONTEXT: that
--- one matches with no perspective and pre-narrows to `Projection.controls pid`,
--- where CR 702.122a's criterion needs the atoms that throws away. So the
--- perspective is the PAYER and the source is the permanent whose ability is being
--- paid for -- without it a Vehicle that has already become a creature could crew
--- itself.
+-- one pre-narrows to `Projection.controls pid` and applies CR 101.2's sacrifice
+-- restrictions, where this one carries CR 702.122d's prohibition and the source's
+-- colours (CR 702.78a). Both read the PAYER as "you" and the permanent
+-- whose ability is being paid for as the source -- without it a Vehicle that has
+-- already become a creature could crew itself.
 tapCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 tapCandidates slots pid oid criterion gs =
   let -- CR 702.122d's prohibition rides the CONTEXT rather than narrowing the
@@ -2636,7 +2641,7 @@ claimOf slots pid oid component gs =
    in case component of
         -- CR 701.21a: the permanents this player controls that match the criterion.
         CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-          claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs)) n
+          claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs)) n
         CostComponent.SacrificeThis ->
           claim
             (ClaimAxis.Removal Zone.Battlefield)
@@ -2815,6 +2820,7 @@ claimOf slots pid oid component gs =
         -- the Blight arm below's shape.
         CostComponent.RemoveCounters {} -> Nothing
         CostComponent.RemovePlusOneCountersX _ -> Nothing
+        CostComponent.SacrificeX _ -> Nothing
         CostComponent.PutPlusOneCountersOnThis _ -> Nothing
         -- Nothing, though this one DOES pick an object out of a pool: CR 701.68a takes
         -- nothing out of a zone. Two blights in one cost may choose the same creature,
@@ -3279,6 +3285,7 @@ uncountedCeiling pid oid claims gs component = case component of
   CostComponent.RemoveCounters {} -> Just 1
   -- Zero, PayLifeX's answer above and for its reason.
   CostComponent.RemovePlusOneCountersX _ -> Just 0
+  CostComponent.SacrificeX _ -> Just 0
   -- Nothing: this component PUTS counters on, so it spends nothing that runs
   -- out, and repeating it is bounded by whatever else the cost spends. Blight's
   -- arm below and for its reason; a FENCE, no mana ability in `data/cards/`
@@ -3619,6 +3626,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.RemoveCountersFromThis _ -> 0
   CostComponent.RemoveCounters {} -> 0
   CostComponent.RemovePlusOneCountersX _ -> 0
+  CostComponent.SacrificeX _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
@@ -3671,6 +3679,7 @@ energyOwedByComponent component = case component of
   CostComponent.RemoveCountersFromThis _ -> 0
   CostComponent.RemoveCounters {} -> 0
   CostComponent.RemovePlusOneCountersX _ -> 0
+  CostComponent.SacrificeX _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
@@ -3713,6 +3722,7 @@ countersOwedByComponent component = case component of
   -- `oid`'s counters has nothing to learn from it.
   CostComponent.RemoveCounters {} -> []
   CostComponent.RemovePlusOneCountersX _ -> []
+  CostComponent.SacrificeX _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayHalfLife _ -> []
@@ -3815,11 +3825,12 @@ canPayComponent slots pid oid component gs = case component of
   CostComponent.PayEnergyX -> False
   -- CR 601.2b again, PayEnergyX's arm above and for its reason.
   CostComponent.RemovePlusOneCountersX _ -> False
+  CostComponent.SacrificeX _ -> False
   -- CR 701.21a: this player must control at least `n` matching permanents. This
   -- component ALONE, PayLife's caveat -- two Sacrifice components of one cost can
   -- each find the same permanent here, and `jointlyPayable` asks them together.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    Natural.length (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs) >= n
+    Natural.length (Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs) >= n
   -- CR 702.122a: payable iff SOME subset of the candidates reaches the
   -- threshold, decided without enumerating one -- the greatest total any subset
   -- can reach is the sum of the candidates' POSITIVE powers, since adding one of
@@ -4085,6 +4096,7 @@ criteriaOf component = case component of
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
   CostComponent.RemoveCounters remove -> [CountersFromPermanents.whichPermanent remove]
   CostComponent.RemovePlusOneCountersX criterion -> [criterion]
+  CostComponent.SacrificeX criterion -> [criterion]
   -- No criterion: rule 701.59a describes the cards by a TOTAL and by nothing else,
   -- so this belongs with the amount-carrying arms below.
   CostComponent.CollectEvidence _ -> []
@@ -4815,6 +4827,7 @@ paidInSecondPass component = case component of
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> False
+  CostComponent.SacrificeX _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -4952,6 +4965,7 @@ orderSensitive component = case component of
   -- True, the substituted component's answer; unreachable before the
   -- announcement substitutes it.
   CostComponent.RemovePlusOneCountersX _ -> True
+  CostComponent.SacrificeX _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.Blight _ -> True
@@ -5831,6 +5845,7 @@ payComponent moment slots pid oid component = case component of
   CostComponent.PayEnergyX -> pure Payment.Unpaid
   -- Unpayable, PayEnergyX's arm above and for its reason.
   CostComponent.RemovePlusOneCountersX _ -> pure Payment.Unpaid
+  CostComponent.SacrificeX _ -> pure Payment.Unpaid
   -- CR 701.17a: the top `n` cards of the PAYING player's own library (CR 400.3),
   -- moved to their graveyard. `canPayComponent` above has already refused a cost
   -- milling more than the library holds (CR 701.17b); a MillCountR row resizing
@@ -5849,7 +5864,8 @@ payComponent moment slots pid oid component = case component of
     Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
     pure bindsNothing
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
-  -- prompt. Elided only when forced -- exactly as many candidates as the count.
+  -- prompt. Elided only when forced -- exactly as many candidates as the count,
+  -- or a count of 0, which a SacrificeX announced at 0 leaves.
   -- Three payable Mountains and a count of two IS asked: they differ in tap
   -- state, counters and attached auras.
   --
@@ -5862,11 +5878,11 @@ payComponent moment slots pid oid component = case component of
   -- Townsfolk once" proves it.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> do
     gs <- State.get
-    let candidates = Replacement.sacrificeCandidates slots pid (Just oid) criterion gs
+    let candidates = Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
-      if Natural.length candidates <= n
-        then pure (Set.fromList candidates)
+      if n == 0 || Natural.length candidates <= n
+        then pure (Set.fromList (List.genericTake n candidates))
         else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n Seq.empty)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do

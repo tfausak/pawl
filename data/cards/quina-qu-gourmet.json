@@ -88,36 +88,39 @@
                 }
               },
               "plus": {
-                "faces": [
-                  {
-                    "colorIndicator": [
-                      {
-                        "type": "Green"
-                      }
-                    ],
-                    "name": "Frog Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "typeLine": {
-                      "subtypes": [
+                "type": "One",
+                "value": {
+                  "faces": [
+                    {
+                      "colorIndicator": [
                         {
-                          "type": "Frog"
+                          "type": "Green"
                         }
                       ],
-                      "types": [
-                        {
-                          "type": "Creature"
-                        }
-                      ]
+                      "name": "Frog Token",
+                      "power": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "toughness": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "typeLine": {
+                        "subtypes": [
+                          {
+                            "type": "Frog"
+                          }
+                        ],
+                        "types": [
+                          {
+                            "type": "Creature"
+                          }
+                        ]
+                      }
                     }
-                  }
-                ]
+                  ]
+                }
               }
             }
           }

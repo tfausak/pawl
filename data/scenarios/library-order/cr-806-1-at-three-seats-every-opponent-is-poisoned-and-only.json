@@ -1,0 +1,32 @@
+{
+  "description": "CR 806.1 at three seats every opponent is poisoned, and only opponents",
+  "note": "Prologue to Phyresis gives each opponent a poison counter. A third seat is the discriminator: Relative Opponent reaching only one of two opponents would pass at two seats. CR 806.1 makes every other player an opponent, so bob and carol are both poisoned and alice is not. The card in alice's library is for the draw.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true }
+        ],
+        "hand": [{ "card": "Prologue to Phyresis", "label": "prologue" }],
+        "library": [{ "card": "Goblin Piker" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@prologue", "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "carol", "kind": { "type": "Poison" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Poison" }, "count": 0 } } }
+  ]
+}

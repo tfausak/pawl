@@ -56,6 +56,8 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Choices as Choices
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
@@ -71,6 +73,8 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -85,6 +89,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Seat as Seat
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
@@ -2090,11 +2095,9 @@ picksSecondCard p = case p of
 -- link -- Phyrexian Ingester's pile above is filled by a triggered ability
 -- instead (CR 607.2a), so the two prove the two halves of rule 607.2.
 --
--- Not implemented: Living Lore's third ability, "whenever this creature deals
--- combat damage, you may sacrifice it. If you do, you may cast the exiled card
--- without paying its mana cost" -- no trigger condition matches combat damage
--- dealt to anything rather than to a player (#3294). Pawl's card is STRICTER
--- than printed.
+-- Its third ability, "whenever this creature deals combat damage, you may
+-- sacrifice it. If you do, you may cast the exiled card without paying its mana
+-- cost", is TriggerCondition.SelfDealsCombatDamage over a CR 118.12 pay gate.
 livingLoreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 livingLoreSpec s registry = Spec.describe s "Living Lore" $ do
   -- THE PROVING CASE. Two instants of DIFFERENT mana values sit in the graveyard
@@ -2136,6 +2139,45 @@ livingLoreSpec s registry = Spec.describe s "Living Lore" $ do
     let (gs, held) = S.handOne livingLore (S.landsInPlay island 4)
         after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
     Spec.assertEqWith s "the 0/0 Living Lore is gone" (newestNamed "Living Lore" after) Nothing
+  -- CR 510.1c: a blocked Living Lore deals its combat damage to its blocker
+  -- alone, and that fires the third ability. Silent Arbiter (1/5) survives the
+  -- 4 damage, so only the exiled Day of Judgment, cast after the sacrifice, can
+  -- destroy it. The pair differs only in whether alice pays.
+  Spec.it s "CR 510.1c / 118.12 combat damage to its blocker lets it be sacrificed to cast the exiled card" $ do
+    paid <- livingLoreCombat s registry PaymentDecision.Pays
+    declined <- livingLoreCombat s registry PaymentDecision.Declines
+    Spec.assertEqWith s "CR 608.2g paid: the free Day of Judgment destroyed the blocker" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.bob paid) 0
+    Spec.assertEqWith s "declined: the blocker stands" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.bob declined) 1
+    Spec.assertEqWith s "paid: Living Lore was sacrificed and Day of Judgment resolved" (length (graveyardNamed "Living Lore" paid), length (graveyardNamed "Day of Judgment" paid)) (1, 1)
+    Spec.assertEqWith s "declined: Day of Judgment is still in exile" (length (exiledNamed "Day of Judgment" declined)) 1
+
+-- Living Lore enters exiling a lone Day of Judgment (a 4/4), then attacks bob,
+-- whose Silent Arbiter blocks it; `decision` answers the sacrifice.
+livingLoreCombat :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> PaymentDecision.PaymentDecision -> m GameState.GameState
+livingLoreCombat s registry decision = do
+  livingLore <- S.printingOf s registry "Living Lore"
+  island <- S.printingOf s registry "Island"
+  judgment <- S.printingOf s registry "Day of Judgment"
+  arbiter <- S.printingOf s registry "Silent Arbiter"
+  let withJudgment = snd (S.addGraveyardCard judgment S.alice (S.landsInPlay island 4))
+      (gs, held) = S.handOne livingLore (snd (S.addPermanent arbiter S.bob withJudgment))
+      entered = S.runPure picksSecondCard gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      settle o = o {Object.sickness = Sickness.Settled S.alice}
+      ready loreId =
+        entered
+          { GameState.objects = Map.adjust settle loreId (GameState.objects entered),
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = (GameState.combat entered) {Combat.Type.defenders = [S.bob]},
+            GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
+          }
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseToPay {} -> decision
+        Prompt.OfferedCast {} -> OptionalDecision.Exercises
+        _ -> S.aggressiveAnswer p
+  case newestNamed "Living Lore" entered of
+    Nothing -> pure entered
+    Just loreId -> pure (S.runCombat answer (ready loreId))
 
 -- The PROJECTED box -- the finished layer fold, never the printed values -- of
 -- every object whose card carries this name. A list rather than a Maybe so the
