@@ -903,22 +903,6 @@ aimedAtObject oid p = case p of
     fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just oid) candidates) sets
   _ -> S.identityAnswer p
 
--- CR 508.5's second sentence: once a creature is no longer attacking anything,
--- the defending player its abilities refer to is the controller of the
--- planeswalker it WAS attacking before that planeswalker was removed from combat
--- -- last known information. CR 702.19e is what settles that such a creature
--- still HAS a defending player at all: it assigns its damage to one.
---
--- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so CR
--- 702.14c is exactly an ability of an attacking creature that refers to a
--- defending player and no other text is in play. Each pair of cases differs in one
--- thing -- which of the two seats holds the Swamp -- and the removed pair differs
--- from the still-attacked pair in one more, whether the Bolt was cast, so no case
--- can pass because of the board rather than the rule.
-lastKnownDefendingPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-lastKnownDefendingPlayerSpec s registry = Spec.describe s "LastKnownDefendingPlayer" $ do
-  let blocks blocker wraith = Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton wraith))
-
 -- CR 802.2a: alice attacks CAROL's Jace Beleren with a Bog Wraith at three seats,
 -- with both opponents defending (CR 802.2, the default option). bob is FIRST in CR
 -- 802.4's APNAP order, so an engine folding "a defending player" onto the group's
@@ -2084,6 +2068,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   planeswalkerAttackSpec s registry
   trampleOverPlaneswalkersSpec s registry
   sharedBlockerSpec s registry
-  lastKnownDefendingPlayerSpec s registry
   splitDefenderSpec s registry
   soulSnareSpec s registry

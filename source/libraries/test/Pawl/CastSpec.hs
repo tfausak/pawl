@@ -52,7 +52,6 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -4628,7 +4627,7 @@ warpCost = [ManaSymbol.Generic 3]
 -- you control get +1\/+1" (Oracle text checked on Scryfall, 2026-09-18): a
 -- PERMANENT spell, which the sorcery above cannot be, so that the rider has a
 -- permanent to ride on.
-sneakSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sneakSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 sneakSpec s registry = Spec.describe s "Sneak" $ do
   Spec.it s "CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer" $ do
     island <- S.printingOf s registry "Island"

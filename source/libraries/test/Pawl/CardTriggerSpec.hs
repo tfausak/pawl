@@ -1030,7 +1030,7 @@ anafenzaAttackSpec s registry =
 -- themselves, so alice declaring leaves the "if" false whichever relation is
 -- read. What the boards do falsify is You -- bob declares on all three, and a
 -- You reading fires nothing at all.
-everWatchingThresholdSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+everWatchingThresholdSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 everWatchingThresholdSpec s registry =
   let -- Declares `attacker` alone and announces it at `target`, FILTERED out of
       -- what the engine offered rather than built, for seiferSpec's reason.
@@ -1988,20 +1988,6 @@ monarchTriggerSpec s registry =
       -- ExpirySpec's monarch group drives the same rule the same way.
       combatDamageTo monarch damager =
         S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)]
-      -- Attack bob with everything, block with everything, and divide a
-      -- trampler's damage the way CR 510.1c and CR 702.19b together require --
-      -- each blocker's own threshold first, the excess through to bob. The
-      -- thresholds the prompt offers ARE CR 510.1c's lethal amounts, so nothing
-      -- here restates a creature's toughness. Written out rather than left to
-      -- S.identityAnswer, which never names a player recipient and would put the
-      -- whole assignment on the blocker. Pawl.InitiativeSpec keeps its own copy,
-      -- Pawl.Support being too expensive a home for a two-case helper.
-      tramplingAtBob :: Prompt.Prompt r -> r
-      tramplingAtBob p = case p of
-        Prompt.AssignCombatDamage _ _ _ thresholds n ->
-          let toBlockers = Map.delete (Recipient.ToPlayer S.bob) thresholds
-           in Map.insert (Recipient.ToPlayer S.bob) (n - sum (Map.elems toBlockers)) toBlockers
-        _ -> S.attackTo S.bob p
    in Spec.describe s "MonarchTrigger" $ do
         -- The whole chain off one entry: CR 603.6a's entry trigger crowns alice,
         -- Effect.BecomeMonarch records CR 725.1's event, and the second ability
