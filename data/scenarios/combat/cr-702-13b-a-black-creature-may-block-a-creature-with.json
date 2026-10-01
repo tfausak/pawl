@@ -1,0 +1,27 @@
+{
+  "description": "CR 702.13b a black creature may block a creature with intimidate",
+  "note": "Typhoid Rats is black, sharing a colour with the black Highborn Ghoul, so its block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Highborn Ghoul", "label": "ghoul", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Typhoid Rats", "label": "blocker", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@ghoul"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@ghoul"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@ghoul", "blockers": ["@blocker"] } } }
+  ]
+}

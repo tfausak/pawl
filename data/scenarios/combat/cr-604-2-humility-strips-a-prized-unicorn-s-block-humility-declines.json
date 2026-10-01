@@ -1,0 +1,28 @@
+{
+  "description": "CR 604.2 Humility strips a Prized Unicorn's block requirement, so declining becomes legal",
+  "note": "CR 604.2: a static ability works only while its permanent has it, so Humility's layer-6 LoseAllAbilities takes the Unicorn's requirement with it. Without Humility declining is refused; with it declining stands, and blocking stands too, so the combat is still live and declining became legal because the requirement went away.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Prized Unicorn", "label": "unicorn", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true },
+          { "card": "Humility" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@unicorn"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@unicorn", "blockers": null } } }
+  ]
+}

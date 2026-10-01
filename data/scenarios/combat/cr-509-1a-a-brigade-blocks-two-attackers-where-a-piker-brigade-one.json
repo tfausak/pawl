@@ -1,0 +1,30 @@
+{
+  "description": "CR 509.1a a Brigade blocks two attackers where a Piker blocks one",
+  "note": "Foriysian Brigade can block an additional creature. The Piker beside it is the anti-vacuity control: it may block one attacker, and its pair is refused, so the Brigade's pair is the permission talking. This board: the Brigade blocks one.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "first", "ready": true},
+          {"card": "Goblin Piker", "label": "second", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Foriysian Brigade", "label": "brigade", "ready": true},
+          {"card": "Goblin Piker", "label": "plain", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@first", "@second"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@brigade": ["@first"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@first", "blockers": ["@brigade"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@second", "blockers": null}}}
+  ]
+}

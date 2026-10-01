@@ -1,0 +1,30 @@
+{
+  "description": "CR 702.118b skulk bars a bigger blocker, admits an equal or smaller one",
+  "note": "Furtive Homunculus has power 2. The 3-power Hill Giant is refused; the 2-power Piker (equal, the boundary a >= gets wrong) and the 1-power Elves block it together, which stands only if neither is barred.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Furtive Homunculus", "label": "homunculus", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "bigger", "ready": true },
+          { "card": "Goblin Piker", "label": "equal", "ready": true },
+          { "card": "Llanowar Elves", "label": "smaller", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@homunculus"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@bigger": ["@homunculus"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@equal": ["@homunculus"], "@smaller": ["@homunculus"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@homunculus", "blockers": ["@equal", "@smaller"] } } }
+  ]
+}

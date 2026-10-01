@@ -1,0 +1,59 @@
+{
+  "description": "CR 611.2c whole cards: a creature that entered after the Escape resolved still can't attack alice",
+  "note": "Chronomantic Escape's 'creatures can't attack you' modifies the rules (CR 611.2c), so it reaches bob's Goblin Chariot, cast with haste after the Escape resolved. Three seats with both opponents defending (CR 802.2), so carol stays attackable: both creatures are declared, at carol. The control leaves the Escape in alice's hand and both attack alice.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "p1" },
+          { "card": "Plains", "label": "p2" },
+          { "card": "Plains", "label": "p3" },
+          { "card": "Plains", "label": "p4" },
+          { "card": "Plains", "label": "p5" },
+          { "card": "Plains", "label": "p6" }
+        ],
+        "hand": [
+          { "card": "Chronomantic Escape", "label": "escape" }
+        ],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "early", "ready": true },
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Mountain", "label": "m3" }
+        ],
+        "hand": [
+          { "card": "Goblin Chariot", "label": "late" }
+        ],
+        "library": [
+          { "card": "Mountain" },
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@late", "mana": ["@m1", "@m2", "@m3"] } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@early", "Goblin Chariot"] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "@early", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "Goblin Chariot", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 16 } } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "carol", "life": 20 } } }
+  ]
+}

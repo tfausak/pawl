@@ -1,0 +1,31 @@
+{
+  "description": "CR 509.1b the restrictions are checked against EACH attacker blocked",
+  "note": "Foriysian Brigade may block two creatures but has neither flying nor reach, so the Bird Maiden is refused it whether alone or beside the ground attacker; the ground attacker alone stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Bird Maiden", "label": "flier", "ready": true},
+          {"card": "Goblin Piker", "label": "ground", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Foriysian Brigade", "label": "brigade", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@flier", "@ground"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@brigade": ["@flier", "@ground"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": {"Block": {"@brigade": ["@flier"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@brigade": ["@ground"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@flier", "blockers": null}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@ground", "blockers": ["@brigade"]}}}
+  ]
+}

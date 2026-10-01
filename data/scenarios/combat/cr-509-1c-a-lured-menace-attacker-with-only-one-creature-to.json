@@ -1,0 +1,28 @@
+{
+  "description": "CR 509.1c a Lured menace attacker with only ONE creature to block it may go unblocked",
+  "note": "Menace bounds CR 509.1c's maximization rather than competing with it: the lone Piker is able to block, but no legal declaration has it blocking, so the maximum is zero and declining stands. Computing the maximum before the set-shaped restriction would leave bob no legal answer.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Boggart Brute", "label": "brute", "ready": true},
+          {"card": "Lure", "label": "lure", "attached": "brute"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "blocker", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@brute"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@brute", "blockers": null}}}
+  ]
+}
