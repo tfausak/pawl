@@ -1,0 +1,31 @@
+{
+  "description": "CR 612.1 a swap naming a word the rider does not carry leaves the route live",
+  "note": "Magical Hack on Nimbus Maze swaps Plains for Swamp, which moves the Maze's {U} rider and leaves its {W} rider reading Island. The Island alice tapped for the Hack still answers it, since CR 602.5 asks what she controls, not what is untapped, so the Maze pays Luminesce's {W} and Luminesce leaves her hand. The Island is her only {U} source and Luminesce costs exactly {W}, so the Maze's {C} route pays nothing; the Island -> Swamp leg strands Luminesce instead.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Nimbus Maze", "label": "maze" },
+          { "card": "Island", "label": "island" }
+        ],
+        "hand": [
+          { "card": "Magical Hack", "label": "hack" },
+          { "card": "Luminesce", "label": "luminesce" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@maze"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Plains" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@luminesce", "mana": ["@maze"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "White" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Luminesce", "count": 0 } } }
+  ]
+}

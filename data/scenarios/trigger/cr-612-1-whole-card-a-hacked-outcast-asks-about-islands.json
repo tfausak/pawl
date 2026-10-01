@@ -1,0 +1,31 @@
+{
+  "description": "CR 612.1 whole card: a hacked Outcast asks about ISLANDS, fires and sacrifices itself",
+  "note": "Barbarian Outcast's 'When you control no Swamps, sacrifice this creature' is printed in its text box, so bob's Magical Hack swapping Swamp for Island reaches it (CR 612.1, 613.1c) and the CR 603.8 state trigger reads the projection. alice's board did not move, one Swamp and no Islands, but 'no Islands' is true, so it fires. The Outcast still on the battlefield while bob holds priority stands for the trigger on the stack; it is gone, into alice's graveyard, once that resolves. The unhacked control is a separate test.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "ready": true },
+          { "card": "Barbarian Outcast", "label": "outcast", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Island", "label": "island", "ready": true }],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@hack", "targets": ["@outcast"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Swamp" }, "to": { "type": "Island" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Barbarian Outcast", "count": 1 } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Barbarian Outcast", "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Barbarian Outcast", "count": 1 } }
+  ]
+}

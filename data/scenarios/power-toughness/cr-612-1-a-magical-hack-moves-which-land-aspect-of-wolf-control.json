@@ -1,0 +1,42 @@
+{
+  "description": "CR 612.1 a Magical Hack moves which land Aspect of Wolf counts",
+  "note": "The control leg of the Aspect of Wolf pair: the same board and the same Hack naming Plains -> Swamp. The Aura's clause spells no Plains, so the Giant stays 5/6, which a rewrite that blanked or greedily replaced the quantity would fail.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Aspect of Wolf", "label": "aspect", "attached": "giant" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 5, "toughness": 6 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@aspect"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Plains" }, "to": { "type": "Swamp" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 5, "toughness": 6 } } }
+  ]
+}

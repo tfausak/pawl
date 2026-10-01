@@ -58,9 +58,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:protector`: a battle's protector
 - `move:LookUpCard`: the `LookUpCard` prompt
 - `board:command`: the command zone
-- `move:ChooseLandTypeSwap`: the `ChooseLandTypeSwap` prompt
 - `move:ReverseManaAbilities`: the `ReverseManaAbilities` prompt
-- `move:ChooseCreatureTypeSwap`: the `ChooseCreatureTypeSwap` prompt
 - `move:ChooseCardName`: the `ChooseCardName` prompt
 - `move:ChooseTapsForTotalPower`: the `ChooseTapsForTotalPower` prompt
 - `board:objects-ids`
@@ -234,6 +232,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `move:ChooseExert`: the `ChooseExert` prompt
 - `check:player-control`: which player controls another player's decisions
 - `check:commander-damage`: the combat damage a commander has dealt each player
+- `check:text-changes`: the text changes affecting an object
 
 ## Tests
 
@@ -261,7 +260,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 307.5/109.5 whole card: the Augur does nothing in the opponent's upkeep | `check:keywords` `check:on-battlefield`
 - CR 400.3 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 400.7 / 602.5b the permanent that returns may activate it again | `check:helper-activationsOf` `check:helper-isOnlyOnce` `check:offered-actions`
-- CR 400.7a/612.1 whole card: hacking the Tidal Warrior SPELL makes its target a Swamp | `move:ChooseLandTypeSwap`
+- CR 400.7a/612.1 whole card: hacking the Tidal Warrior SPELL makes its target a Swamp | `check:subtypes`
 - CR 506.7b/g the rider opens at the declaration and runs to the end of the combat phase | `board:combat`
 - CR 513.2 the encore tokens are sacrificed at the beginning of the next end step | `check:delayed-triggers`
 - CR 601.2b the ChooseX bound is the energy the player can spend | `check:prompt-payload`
@@ -303,10 +302,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 602.5e with Leonin Shikari alice equips during bob's turn | `check:active-player` `check:helper-attachedTo`
 - CR 608.2h the value is LAST KNOWN, not printed: a pumped Fire-Eater deals 5 | `board:continuous-effect`
 - CR 611.2 without the spell the creature has its printed ability alone | `check:abilities` `check:helper-helixSorcerer` `check:helper-helixState`
-- CR 612.1 whole card: hacking Arbor Elf moves which land its ability may target | `move:ChooseLandTypeSwap`
-- CR 612.1 whole card: hacking Dark Heart of the Wood moves which land its cost demands | `move:ChooseLandTypeSwap`
-- CR 612.1 whole card: hacking the Bargainer moves which land its offer demands | `move:ChooseLandTypeSwap` `move:OfferedCast`
-- CR 612.1 whole card: hacking the Tidal Warrior PERMANENT makes its target a Swamp | `move:ChooseLandTypeSwap`
+- CR 612.1 whole card: hacking Arbor Elf moves which land its ability may target | `check:legal-targets`
+- CR 612.1 whole card: hacking the Bargainer moves which land its offer demands | `move:OfferedCast`
+- CR 612.1 whole card: hacking the Tidal Warrior PERMANENT makes its target a Swamp | `check:subtypes`
 - CR 612.2a an evolved Presence of Gond's granted ability mints a Goblin Warrior Token | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 613.1f the enchanted creature has the granted ability ALONGSIDE its printed one | `check:abilities` `check:helper-grantedAbility` `check:helper-theAbility`
 - CR 613.7 Humility AFTER the Aura takes the granted ability with the rest | `check:abilities`
@@ -421,7 +419,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 303.4e whole cards: Aura Graft takes bob's Control Magic and the creature it moves onto | `move:ChooseAttachment`
 - CR 303.4f Replenish returns Animate Dead enchanting a graveyard card, which it returns | `move:ChooseAttachment`
 - CR 303.4j whole cards: Crown of the Ages cannot move Setessan Training onto an opponent's creature | `board:controller` `board:mana-pool`
-- CR 400.7a hacking the Aura SPELL leaves the permanent counting Islands | `move:ChooseLandTypeSwap`
 - CR 603.3d/701.3a whole cards: Sigarda's Aid equips the Piker it can target and nothing at all when the only creature has shroud | `board:stack`
 - CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing | `check:attached-to` `check:stack`
 - CR 603.7a: a returned creature the Aura cannot enchant is still sacrificed | `check:controller` `check:helper-named`
@@ -751,9 +748,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 611.2b with no Swamp the duration never starts and nothing is stored | `check:helper-conditionalSilenceCasts` `check:other-GameState.playerEffects` `check:stack`
 - CR 611.2c a spell with the name the resolution chose can't be cast, and its neighbour still can | `move:ChooseCardName` `move:LookUpCard`
 - CR 611.2c the effect reaches a spell that did not exist when it began | `check:offered-actions` `check:other-GameState.playerEffects` `check:other-PlayerEffect.prohibitsCasting`
-- CR 612.1 a Magical Hack on the Silence rewrites the duration's own word | `move:ChooseLandTypeSwap`
-- CR 612.1/612.2 an Artificial Evolution on Liliana moves the -3 onto the new word | `move:ChooseCreatureTypeSwap`
-- CR 612.2 the same hack moves the -2's count onto the new word | `move:ChooseCreatureTypeSwap`
+- CR 612.1 a Magical Hack on the Silence rewrites the duration's own word | `check:offered-actions` `check:player-effects` `check:stack`
+- CR 612.1/612.2 an Artificial Evolution on Liliana moves the -3 onto the new word | `check:offered-actions` `check:player-effects` `move:expect-rejected`
 - CR 612.7 / 206.3a a Spy Kit host has the Arabian Nights names of cards the game has never seen, and City in a Bottle sweeps it | `board:object-attachedto`
 - CR 612.7 / 702.16e a Spy Kit host has the chosen name of a card in no zone, and its damage is prevented | `board:combat` `board:controller` `board:hand-order` `board:mana-pool` `board:object-attachedto` `board:object-chosennames`
 - CR 612.7 / 709.4a a Spy Kit host has both names of a split card with a creature half | `board:combat` `board:controller` `board:hand-order` `board:mana-pool` `board:object-attachedto` `board:object-chosennames`
@@ -831,7 +827,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2h a Scrapshooter killed in response still has the promised opponent draw | `board:stack`
 - CR 608.2i Octomancer copies a token that entered this turn, and not one that entered last turn | `move:ChooseKicker` `move:ChooseOpponent`
 - CR 608.3 a resolving creature spell becomes a permanent | `check:creature-count` `check:stack` `check:zone-contents`
-- CR 612/305.6 a hacked basic Mountain taps for its new color | `move:ChooseLandTypeSwap`
+- CR 612/305.6 a hacked basic Mountain taps for its new color | `check:mana-types` `check:subtypes`
 - CR 613.1f a PRINTED flashback is ONE instance on the spell it was cast for | `check:helper-theRed` `check:keywords`
 - CR 616.1e Rest in Peace taken first exiles the bought-back spell instead | `move:ChooseBuyback` `move:ChooseReplacement`
 - CR 616.1e Rest in Peace taken first exiles the rebound spell and arms nothing | `move:ChooseReplacement`
@@ -1074,7 +1070,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 509.1b Spitfire Handler can't block a creature with greater power than its own | `check:helper-blocks`
 - CR 509.1b Wan Shi Tong's Spirit tokens can't block a non-Spirit, and can block a Spirit | `check:controller` `move:expect-rejected`
 - CR 509.1b a creature with power 3 may block Questing Beast | `move:expect-rejected`
-- CR 509.1b a hacked Embargo's block half BINDS a Swamp the printed one left alone | `move:ChooseLandTypeSwap`
 - CR 509.1b aimed elsewhere, both of bob's twins block | `board:blockprohibitions` `board:mana-pool`
 - CR 509.1b an enchanted creature can't block either, and the Piker beside it still can | `check:other-Combat.canBlock` `check:other-Combat.legalBlockers` `move:expect-rejected`
 - CR 509.1b menace and fear are cumulative: two blockers, and both must pass fear | `move:expect-rejected`
@@ -1089,7 +1084,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 509.1c a Prized Unicorn does not lure the OTHER attacker alongside it | `move:expect-rejected`
 - CR 509.1c a Razorgrass Screen must block, though nothing names an attacker | `move:expect-rejected`
 - CR 509.1c a creature that CANNOT block the Lured attacker is not required to | `move:expect-rejected`
-- CR 509.1c a hacked Frenzy's block half BINDS bob's Piker to the animated Swamp | `move:ChooseLandTypeSwap`
 - CR 509.1c a required blocker the restriction covers may decline after all | `board:blockprohibitions` `board:mana-pool`
 - CR 509.1c a threshold blocking requirement bites only once the gate holds | `check:other-Combat.forcedBlockDeclaration` `move:expect-rejected`
 - CR 509.1c blocking the Lured attacker is legal | `move:expect-rejected`
@@ -1110,16 +1104,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 611.2a the restriction outlasts every other seat's turn and ends as alice's begins | `check:active-player` `check:other-GameState.attackProhibitions` `move:expect-rejected`
 - CR 611.2a the window names alice's next turn, so bob attacks with the creature on his | `board:attackprohibitions`
 - CR 611.2c whole cards: a creature that entered after the Escape resolved still can't attack alice | `move:expect-rejected`
-- CR 612.1 a hack to a type nobody controls BINDS a Crasher the board had freed | `move:ChooseLandTypeSwap`
-- CR 612.1 a hacked Bog Wraith walks on ISLANDS | `move:ChooseLandTypeSwap`
-- CR 612.1 a hacked Crasher reads ISLANDS and alice's own Island frees it | `move:ChooseLandTypeSwap`
-- CR 612.1 a hacked Embargo reads FORESTS and the animated Swamp may attack | `move:ChooseLandTypeSwap`
-- CR 612.1 a hacked Frenzy reads FORESTS and the animated Swamp is required no more | `move:ChooseLandTypeSwap`
-- CR 612.1 a hacked Goblin Scouts mints SWAMPwalkers instead | `move:ChooseLandTypeSwap`
-- CR 612.1 a hacked Lord of Atlantis grants SWAMPwalk instead | `move:ChooseLandTypeSwap`
-- CR 612.1 whole cards: the rewritten affected sets decide a real combat phase | `move:ChooseLandTypeSwap`
-- CR 612.1 whole cards: the rewritten gate decides a real declare attackers step | `move:ChooseLandTypeSwap`
-- CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing | `move:ChooseLandTypeSwap`
+- CR 612.1 a hacked Goblin Scouts mints SWAMPwalkers instead | `check:subtypes`
 - CR 613.11 Tapestry Warden compares power and toughness after characteristic effects | `board:continuous-effect`
 - CR 613.1f Hammerheim takes BOTH landwalks and the Hag can be blocked | `board:combat`
 - CR 613.1f a flier that loses flying to Sky Tether may no longer block a flier | `check:keywords` `move:expect-rejected`
@@ -1586,43 +1571,36 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 118.3 a controller holding no land card is not asked, and draws | `check:helper-handCardResponses` `check:helper-namesIn` `check:helper-payResponses` `check:stack` `check:zone-contents`
 - CR 118.3 a larger announced X the controller cannot pay counters the spell | `board:stack`
 - CR 118.3 an empty graveyard cannot pay, so the Vultures are sacrificed | `check:helper-payResponses` `check:on-battlefield` `check:other-Replay.record` `check:other-Stack.resolveTop` `check:stack` `check:zone-contents`
-- CR 122.1 hacked Zombie -> Skeleton, the two colliding riders merge into one tally of three | `move:ChooseCreatureTypeSwap`
 - CR 404.2 with two creature cards it is the TOP one that is exiled | `check:helper-isExileResponse` `check:helper-namesIn` `check:on-battlefield` `check:other-Replay.record` `check:other-Stack.resolveTop`
 - CR 601.2f a cost increase taxes the CAST and not the resolution payment | `board:stack`
 - CR 601.2f a noncreature card in the graveyard cannot pay it either | `check:helper-namesIn` `check:on-battlefield` `check:other-Replay.record` `check:other-Stack.resolveTop`
 - CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles | `check:creature-count` `check:stack` `check:zone-contents`
 - CR 608.2b a Cancel whose target already left the stack fizzles | `board:stack`
-- CR 608.2b an evolved Piety Charm finds its target illegal and fizzles | `move:ChooseCreatureTypeSwap`
-- CR 612 the Evolution's own restriction reaches the player being asked | `move:ChooseCreatureTypeSwap` `move:ChooseLandTypeSwap`
-- CR 612.1 a Magical Hack on the theft rewrites the duration's own word | `move:ChooseLandTypeSwap`
-- CR 612.1 an Evolution on an Evolution rewrites the restriction itself | `move:ChooseCreatureTypeSwap`
+- CR 612 the Evolution's own restriction reaches the player being asked | `check:prompt-payload`
+- CR 612.1 an Evolution on an Evolution rewrites the restriction itself | `check:prompt-payload`
 - CR 612.1 an evolved Ajani's emblem mints Wurms rather than Cats | `board:command`
-- CR 612.1 an evolved Clavileño's granted ability mints a Vampire Elf Token | `move:ChooseCreatureTypeSwap`
-- CR 612.1 an evolved Goblin War Strike counts Elves instead | `move:ChooseCreatureTypeSwap`
-- CR 612.1 an evolved Moonmist's shield spares Goblins instead, so the Werewolf's damage is the prevented one | `move:ChooseCreatureTypeSwap`
-- CR 612.1 hacked Zombie -> Goblin, PutCounters puts a hexproof from Goblins counter on | `move:ChooseCreatureTypeSwap`
-- CR 612.1 hacked Zombie -> Goblin, RemoveCounters takes the hexproof from Goblins counter off | `move:ChooseCreatureTypeSwap`
-- CR 612.1 hacked Zombie -> Goblin, the entry rider's counter is a hexproof from Goblins counter | `move:ChooseCreatureTypeSwap`
+- CR 612.1 an evolved Clavileño's granted ability mints a Vampire Elf Token | `check:keywords` `check:subtypes`
+- CR 612.1 an evolved Moonmist's shield spares Goblins instead, so the Werewolf's damage is the prevented one | `check:events` `check:other-Damage.applyDamage` `check:other-GameState.replacements`
+- CR 612.1 hacked Zombie -> Goblin, PutCounters puts a hexproof from Goblins counter on | `check:legal-targets`
+- CR 612.1 hacked Zombie -> Goblin, the entry rider's counter is a hexproof from Goblins counter | `check:legal-targets`
 - CR 612.1 whole card: hacking Lithophage moves which land its CR 118.12 gate demands | `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 612.2 an Evolution naming Cleric leaves the token's Demon a Demon | `move:ChooseCreatureTypeSwap`
-- CR 612.2 an Evolution naming Human leaves the Spirits Spirits | `move:ChooseCreatureTypeSwap`
-- CR 612.2 an Evolution naming a word the charm lacks leaves it resolving | `move:ChooseCreatureTypeSwap`
+- CR 612.2 an Evolution naming Cleric leaves the token's Demon a Demon | `check:subtypes`
+- CR 612.2 an Evolution naming Human leaves the Spirits Spirits | `check:subtypes`
 - CR 612.2 an Evolution naming a word the emblem lacks leaves the Cats alone | `board:command`
-- CR 612.2 an evolved Coulson counters the Goblin and not the Hero | `move:ChooseCreatureTypeSwap`
-- CR 612.2 an evolved Goblin Piker is an Elf Warrior still NAMED Goblin Piker | `move:ChooseCreatureTypeSwap`
-- CR 612.2 an evolved Ursine Rite's token turns Elf but keeps its name | `move:ChooseCreatureTypeSwap`
-- CR 612.2 whole card: Artificial Evolution on the Turn to Frog spell makes an Elf instead | `move:ChooseCreatureTypeSwap`
+- CR 612.2 an evolved Goblin Piker is an Elf Warrior still NAMED Goblin Piker | `check:subtypes`
+- CR 612.2 an evolved Ursine Rite's token turns Elf but keeps its name | `check:subtypes`
+- CR 612.2 whole card: Artificial Evolution on the Turn to Frog spell makes an Elf instead | `check:subtypes`
 - CR 612.2a an evolved Bitterblossom's second name word moves too | `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 612.2a an evolved Temporal Summons replaces both words at once | `move:ChooseCreatureTypeSwap`
+- CR 612.2a an evolved Temporal Summons replaces both words at once | `check:subtypes`
 - CR 612.2a whole card: an evolved Bitterblossom's trigger mints an Elf Rogue Token | `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 612.2a whole card: an evolved Dragon Fodder mints Elves, name and all | `move:ChooseCreatureTypeSwap`
-- CR 612.2a whole card: an evolved Ministrant of Obligation leaves Elves | `move:ChooseCreatureTypeSwap`
-- CR 612.3 an evolved Goblin Piker's GRANTED afterlife still mints a Spirit Token | `move:ChooseCreatureTypeSwap`
-- CR 613.7 whole card: two Evolutions on the Turn to Frog spell compose | `move:ChooseCreatureTypeSwap`
+- CR 612.2a whole card: an evolved Dragon Fodder mints Elves, name and all | `check:subtypes`
+- CR 612.2a whole card: an evolved Ministrant of Obligation leaves Elves | `check:keywords` `check:subtypes`
+- CR 612.3 an evolved Goblin Piker's GRANTED afterlife still mints a Spirit Token | `check:keywords` `check:subtypes`
+- CR 613.7 whole card: two Evolutions on the Turn to Frog spell compose | `check:subtypes` `check:text-changes`
 - CR 614 Cancel under Rest in Peace exiles the countered spell | `board:stack`
 - CR 701.6 Cancel counters a spell into its owner's graveyard | `board:stack`
 - CR 702.135a an unevolved Ministrant of Obligation leaves two Spirit Tokens | `check:subtypes`
-- CR 702.135b an evolved Ministrant plus a granted afterlife leaves two Elves and a Spirit | `move:ChooseCreatureTypeSwap`
+- CR 702.135b an evolved Ministrant plus a granted afterlife leaves two Elves and a Spirit | `check:keywords` `check:subtypes`
 - CR 704.5a a Bolt can end the game mid-step | `check:game-result` `check:priority`
 - CR 704.5g an indestructible creature survives lethal marked damage | `check:creature-count` `check:zone-contents`
 - CR 704.5h an indestructible creature survives deathtouch | `check:creature-count`
@@ -1872,7 +1850,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 302.6 the goblin that took the counter cannot attack that turn | `board:controller` `board:hand-order` `board:mana-pool`
 - CR 514.2 a creature entering on a later turn enters without it | `move:ChooseManaToSpend`
 - CR 608.2i the damage is THIS turn's: the handoff clears it | `board:turn-number`
-- CR 612.2/122.1 hacked Island -> Swamp, the two rows merge into one tally of three | `move:ChooseLandTypeSwap`
 - CR 614.10a spending Brine's row lets Savor's expire with its own turn | `move:ChooseManaSource` `move:ChooseReplacement`
 - CR 614.10a spending Savor's row leaves Brine's to take the following untap step | `move:ChooseManaSource` `move:ChooseReplacement`
 - CR 614.12 a 4/3 under Glorious Anthem does not count itself, so the row does not apply | `check:helper-countersOn`
@@ -2473,9 +2450,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing | `check:helper-tappedFor` `check:other-Cost.manaActivations` `check:other-Mana.canPay` `check:other-Mana.manaTypesOf` `check:other-Object.chosenColor`
 - CR 607.2d a Coldsteel Heart that chose blue offers blue and nothing else | `board:controller` `board:hand-order` `board:mana-pool` `board:object-chosencolor`
 - CR 607.2d the colour is the player's, not the engine's | `move:ChooseColor` `move:ChooseReplacement`
-- CR 612.1 a swap naming a word the rider does not carry leaves the route live | `move:ChooseLandTypeSwap`
-- CR 612.1 a swap naming the rider's own word moves which land it counts | `move:ChooseLandTypeSwap`
-- CR 612.1 a text change naming the count's word moves which permanents it counts | `move:ChooseLandTypeSwap`
+- CR 612.1 a swap naming the rider's own word moves which land it counts | `move:expect-rejected`
+- CR 612.1 a text change naming the count's word moves which permanents it counts | `move:expect-rejected`
 - CR 614.1c Hickory Woodlot enters tapped with two depletion counters | `move:ChooseReplacement`
 - Typhoid Rats is cast off one Swamp and resolves onto the battlefield | `check:creature-count` `check:stack` `check:tapped-count`
 - War Mammoth is cast off four Forests and resolves onto the battlefield | `check:creature-count` `check:stack` `check:tapped-count`
@@ -2794,12 +2770,12 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2f or the unconfined one first, for {1} | `move:ChooseReducedCost` `move:ChooseReductionHalf`
 - CR 601.2f payment spends the total cost | `check:tapped-count`
 - CR 601.2f the payer may apply the confined reduction first, for {0} | `move:ChooseReducedCost` `move:ChooseReductionHalf`
-- CR 601.2f whole cards: the rewritten filter decides a real cast | `move:ChooseCreatureTypeSwap`
+- CR 601.2f whole cards: the rewritten filter decides a real cast | `check:offered-actions` `move:expect-rejected`
 - CR 601.3 a player who has cast a nonartifact spell can't cast another | `check:offered-actions` `check:priority`
 - CR 601.3 an artifact spell cast this turn does not use up the one nonartifact spell | `check:offered-actions`
 - CR 601.3 casting Rule of Law itself uses up the turn's one spell | `check:helper-anySpell` `check:helper-anySpellId` `check:helper-isCast` `check:offered-actions` `check:other-PlayerEffect.prohibitsCasting`
-- CR 612.1 an evolved Edgewalker discounts Zombies and no longer discounts Clerics | `move:ChooseCreatureTypeSwap`
-- CR 612.2 a land-type pair leaves the creature-type filter alone | `move:ChooseLandTypeSwap`
+- CR 612.1 an evolved Edgewalker discounts Zombies and no longer discounts Clerics | `check:helper-textChangesAffecting` `check:helper-totalManaCost`
+- CR 612.2 a land-type pair leaves the creature-type filter alone | `check:helper-textChangesAffecting` `check:helper-totalManaCost`
 - CR 612.5 the evolved discount moves to the Piker with the text box | `board:continuous-effect` `board:mana-pool`
 - CR 613.11 an increase after Reliquary Tower still leaves no maximum | `check:hand-size` `check:other-PlayerEffect.maximumHandSize` `check:zone-contents`
 - CR 613.11 the Cindermaw's controller can't gain either | `check:helper-lifeGainsOf`
@@ -2830,9 +2806,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2h the count is the CASTER's hand, not the target's controller's | `check:hand-size`
 - CR 608.2i last turn's life gain does not count | `board:continuous-effect` `board:mana-pool` `board:turn-number`
 - CR 611.2d the pump reads the exiled card's own power and toughness | `check:other-S.countByName`
-- CR 612.1 a Magical Hack makes Nightmare's CDA count Islands | `move:ChooseLandTypeSwap`
-- CR 612.1 a Magical Hack moves which land Aspect of Wolf counts | `move:ChooseLandTypeSwap`
-- CR 612.1 a Magical Hack moves which land the 'as long as' clause names | `move:ChooseLandTypeSwap`
 - CR 613.1d a Convincing Mirage'd Forest stops being one, and the pump stops with it | `move:ChooseBasicLandType`
 - CR 613.4c/107.3a whole card: X=3 buries the 2/1 and the 3/3, leaves the 5/5 a 2/2, and costs 3 life | `check:on-battlefield` `check:stack` `check:tapped-count` `check:zone-contents`
 - CR 614.1c/614.14 the exiled card's mana value is the Avatar's power and toughness | `move:ChooseCardInGraveyard`
@@ -3227,19 +3200,15 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 122.1c the counter does not save the bird from a rule's destruction | `board:controller` `board:hand-order` `board:mana-pool`
 - CR 122.1c the same Bolt kills the same bird with no counter on it | `board:controller` `board:mana-pool`
 - CR 122.1c the shield covers its own permanent and no other recipient | `board:controller` `board:mana-pool`
-- CR 400.7a a spell that became no permanent carries no text change into its graveyard | `move:ChooseCreatureTypeSwap`
 - CR 514.2 the prohibition lasts exactly the turn, and the same shield saves the same creature next turn | `board:replacement`
-- CR 612.1 a text change reaches a replacement effect: the hacked Globe swells an entering Goblin | `move:ChooseCreatureTypeSwap`
-- CR 612.1 the printed word is gone: after the hack an entering Dragon gets nothing | `move:ChooseCreatureTypeSwap`
 - CR 613.1f a Humility'd bird keeps its shield | `board:controller` `board:mana-pool`
-- CR 614.12 the hacked spell's own entry row counts the swapped land type | `move:ChooseLandTypeSwap`
 - CR 614.1a two Goblins would be created, so two Goblins plus a Soldier are | `check:colors`
 - CR 615.12 an unpreventable Bolt kills the shielded bird | `board:controller` `board:mana-pool`
 - CR 616.1 racing Doubling Season: the Soldier is doubled only when the Queen applies first | `move:ChooseReplacement`
 - CR 701.19c / 704.5g the prohibited creature's shield does not save it from lethal damage | `board:replacement`
 - unhacked, the printed Dragon leaves that same Goblin alone | `check:helper-countersOn`
 - unhacked, the printed Island is what its row counts | `check:helper-countersOn` `check:stack`
-- uninterdicted, the same spell becomes a permanent and the text change rides across | `move:ChooseCreatureTypeSwap`
+- uninterdicted, the same spell becomes a permanent and the text change rides across | `check:subtypes`
 
 ### `SpecialActionSpec`
 
@@ -3451,7 +3420,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2h counting first means the token is still alive and is not counted | `move:OrderTriggers-departed-source`
 - CR 608.2h sacrificing first makes the Ghoul count the token | `move:OrderTriggers-departed-source`
 - CR 608.2h the watcher reads the dead Saga's last known information | `move:ChooseProliferate`
-- CR 612.1 whole card: a hacked Outcast asks about ISLANDS, fires and sacrifices itself | `move:ChooseLandTypeSwap`
 - CR 613.1f "they gain haste" reaches BOTH minted tokens | `check:keywords`
 - CR 707.2 a COPY of the Saga answers with the copy's chapters | `board:stack`
 - CR 800.4d a departed player's delayed ability triggers, is consumed, and is not put on the stack | `board:delayed-trigger` `board:graveyard` `board:hand-order` `board:mana-pool` `board:player-status`

@@ -1433,14 +1433,11 @@ paysWithWhite p = case p of
 -- Plains she does not control -- so casting the Hack taps it and leaves the Maze
 -- as the only untapped source Luminesce's {W} can come from. Luminesce's printed
 -- cost is exactly {W}, so the Maze's unridden {C} route pays nothing here.
-nimbusMazeTextChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nimbusMazeTextChangeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 nimbusMazeTextChangeSpec s registry = Spec.describe s "Nimbus Maze text change" $ do
   Spec.it s "CR 612.1 a swap naming the rider's own word moves which land it counts" $ do
     stuck <- strandedAfterHack s registry Subtype.Island Subtype.Swamp
     Spec.assertBool s stuck "CR 602.5 the rider now reads Swamp, alice controls none, and Luminesce stays in her hand"
-  Spec.it s "CR 612.1 a swap naming a word the rider does not carry leaves the route live" $ do
-    stuck <- strandedAfterHack s registry Subtype.Plains Subtype.Swamp
-    Spec.assertBool s (not stuck) "CR 602.5 the rider still reads Island, the tapped Island answers it, and Luminesce leaves her hand"
 
 -- alice controls a Nimbus Maze and one Island, both untapped, and holds Magical
 -- Hack and Luminesce. She casts the Hack at the Maze with the swap under test,

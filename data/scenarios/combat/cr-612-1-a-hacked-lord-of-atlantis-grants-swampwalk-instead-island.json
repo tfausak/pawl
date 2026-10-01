@@ -1,0 +1,35 @@
+{
+  "description": "CR 612.1 a hacked Lord of Atlantis grants SWAMPwalk instead",
+  "note": "Magical Hack swaps Island for Swamp on Lord of Atlantis, so the islandwalk it grants Tidal Warrior becomes swampwalk. bob's Island no longer stops the block and the block sticks; the Lord's +1/+1 half is untouched, so the 1/1 Warrior is still 2/2. alice pays the Hack from her own Island: CR 702.14c reads only the defender's lands.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Tidal Warrior", "label": "warrior", "ready": true },
+          { "card": "Lord of Atlantis", "label": "lord", "ready": true },
+          { "card": "Island", "label": "island" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@lord"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Island" }, "to": { "type": "Swamp" } } }, "source": "Magical Hack" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@warrior", "@lord"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@warrior"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@warrior", "blockers": ["@piker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@warrior", "power": 2, "toughness": 2 } } }
+  ]
+}

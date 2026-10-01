@@ -105,6 +105,7 @@ import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TypeSwap as TypeSwap
 import qualified Pawl.Types.TypesAre as TypesAre
 import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
@@ -491,6 +492,19 @@ answerTopPrompt decider asked =
               Monad.when (Paying.decision paying == PaymentDecision.Pays) $
                 State.modify' (\rehearsal -> rehearsal {pending = Just (key, verb, Paying.choices paying)})
               pure (Paying.decision paying)
+            _ -> Nothing
+        -- CR 612.1's text change, keyed like ChooseOptional by what applies it.
+        Prompt.Type.ChooseLandTypeSwap who _ applying _ _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          let named = Maybe.fromMaybe applying (Game.abilitySourceOf applying gs)
+          onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
+            Move.ChooseTypeSwap swap -> Just (pure (TypeSwap.from swap, TypeSwap.to swap))
+            _ -> Nothing
+        Prompt.Type.ChooseCreatureTypeSwap who _ applying _ _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          let named = Maybe.fromMaybe applying (Game.abilitySourceOf applying gs)
+          onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
+            Move.ChooseTypeSwap swap -> Just (pure (TypeSwap.from swap, TypeSwap.to swap))
             _ -> Nothing
         -- CR 614.1a's optional redirect, a "may" keyed by the redirect's own
         -- source like ChooseOptional above.

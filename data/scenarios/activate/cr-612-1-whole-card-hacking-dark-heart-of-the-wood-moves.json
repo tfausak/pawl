@@ -1,0 +1,33 @@
+{
+  "description": "CR 612.1 whole card: hacking Dark Heart of the Wood moves which land its cost demands",
+  "note": "Dark Heart of the Wood's \"Sacrifice a Forest: You gain 3 life.\" under a Magical Hack swapping Forest for Island: CR 118.1 puts the cost in the text box CR 612.1 reaches, and CR 602.2a gives the activated ability the projected text, so the Island dies and the Forest is not even eligible. alice holds one tapped Forest and one tapped Island, two land types so the swap and an ignored filter pick different lands; Seat of the Synod, neither type, pays the Hack. An enchantment, so CR 302.6 gates nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Dark Heart of the Wood", "label": "heart", "ready": true },
+          { "card": "Forest", "label": "forest", "tapped": true, "ready": true },
+          { "card": "Island", "label": "island", "tapped": true, "ready": true },
+          { "card": "Seat of the Synod", "label": "seat", "ready": true }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@heart"], "mana": ["@seat"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Forest" }, "to": { "type": "Island" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@heart" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 23 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Island", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Forest", "count": 1 } } }
+  ]
+}
