@@ -1048,8 +1048,11 @@ selfSentences pid oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, G
 -- granted casualty copies Lightning Bolt" prove a grant reaching it.
 --
 -- What the CARD has where it lies, before the move -- the keywords that permit
--- the cast or offer an alternative cost from that zone (Cast.projectedKeywords,
--- candidateCostsGiven) -- is a different question, asked of the proposal board.
+-- the cast from that zone (Cast.projectedKeywords) -- is a different question,
+-- asked of the proposal board. Not implemented: candidateCostsGiven asks that
+-- board for every alternative cost, including those whose keyword functions
+-- on the stack (prowl, blitz), so one granted to spells you cast is not offered
+-- (#4585).
 spellKeywords :: PlayerId -> ObjectId -> GameState -> Map.Map Keyword.Type.Keyword Natural
 spellKeywords pid oid gs = PC.keywords (asSpellProjected pid oid gs)
 

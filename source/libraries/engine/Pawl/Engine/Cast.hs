@@ -3417,15 +3417,10 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- component and rule 702.126 names no relation at all.
                           -- No printing states both (Scryfall keyword:convoke
                           -- keyword:improvise, 2026-09-13, no hit), but a grant
-                          -- mixes them -- Chief Engineer's convoke on Foundry
-                          -- Assembler's improvise -- and an artifact tapped for
-                          -- improvise is then recorded as convoking. Nothing reads
-                          -- that record off an artifact spell: Scryfall
-                          -- o:convoked, 2026-10-01, six cards, each reading its own
-                          -- convokers and none an artifact. The other mix, a
-                          -- granted improvise beside a printed convoke, would be
-                          -- read (Inspiring Statuary under Venerated Loxodon); no
-                          -- card in data/cards grants improvise.
+                          -- can give a spell both (Chief Engineer's convoke on
+                          -- Foundry Assembler). Not implemented: telling the taps
+                          -- apart then, so an artifact tapped for improvise is
+                          -- recorded as convoking (#4586).
                           --
                           -- Off the SUBSTITUTION's own bindings rather than the
                           -- whole payment's, which Binding.tappedPermanent would
