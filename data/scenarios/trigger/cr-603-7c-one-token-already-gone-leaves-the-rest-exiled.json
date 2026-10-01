@@ -1,0 +1,44 @@
+{
+  "description": "CR 603.7c one token already gone leaves the rest exiled",
+  "note": "Feral Lightning's delayed \"exile them\" reads its group of three Elementals; one already gone (Doom Blade, standing in for the Haskell test's direct destroy) does not spare the other two. Alice's own Goblin Piker is the bystander \"them\" must not reach. The observable is the battlefield, since CR 111.7 makes an exiled token cease to exist.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" },
+          { "card": "Mountain", "label": "mountain-4" },
+          { "card": "Mountain", "label": "mountain-5" },
+          { "card": "Mountain", "label": "mountain-6" },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [
+          { "card": "Feral Lightning", "label": "lightning" },
+          { "card": "Doom Blade", "label": "doom-blade" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Typhoid Rats", "label": "rats" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@lightning", "mana": ["@mountain", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5", "@mountain-6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Elemental Token", "Elemental Token#2", "Elemental Token#3"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elemental Token", "count": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@doom-blade", "targets": ["Elemental Token"], "mana": ["@swamp", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elemental Token", "count": 2 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Elemental Token", "count": 0 } } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

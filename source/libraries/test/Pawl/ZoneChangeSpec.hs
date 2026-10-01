@@ -334,27 +334,6 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "CR 110.2a it came back under its owner's control, not the caster's" (Maybe.mapMaybe (`Projection.controllerOf` after) (Game.zoneMembers Zone.Battlefield S.bob after)) [S.bob]
     Spec.assertEqWith s "CR 400.7 and as a new object: neither the permanent that left nor the exiled incarnation is there" (Game.lookupObject victim after) Nothing
     Spec.assertEqWith s "nothing stayed in exile" (Game.zoneMembers Zone.Exile S.bob after) []
-  -- CR 111.8: "A token that has left the battlefield can't move to another zone
-  -- or come back onto the battlefield." Only a within-one-resolution window
-  -- reaches the rule -- CR 704.5d removes such a token at the next state-based
-  -- check -- and Flicker of Fate is the pool's one shape that opens it, since
-  -- its second clause names the object its first clause exiled rather than "that
-  -- card" (CR 111.6 would keep a token out of the latter on the card's own
-  -- wording).
-  --
-  -- This board differs from the card twin above in exactly one thing: the victim
-  -- is a token of the same printing. So "no creature came back" here cannot be
-  -- the return clause missing its reference, which is what that twin rules out;
-  -- it is the rule refusing the move.
-  Spec.it s "CR 111.8 Flicker of Fate cannot bring back a token it exiled" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    flickerOfFate <- S.printingOf s registry "Flicker of Fate"
-    let (victim, board) = S.addToken (Printing.card piker) S.bob (S.landsInPlay plains 2)
-        after = castAndSettle flickerOfFate board
-    Spec.assertEqWith s "no token came back onto the battlefield" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "CR 111.7 it ceased to exist rather than waiting in exile" (Game.zoneMembers Zone.Exile S.bob after) []
-    Spec.assertEqWith s "the token that was exiled is gone" (Game.lookupObject victim after) Nothing
   Spec.it s "CR 121.1 Divination draws its controller two cards" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"

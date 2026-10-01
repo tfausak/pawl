@@ -1,0 +1,28 @@
+{
+  "description": "CR 614.16/603.7c a doubled Create binds every minted token, so the rider takes both",
+  "note": "The control: the same cast without Doubling Season makes one Wall, sacrificed at the end step, and asks exactly what the doubled cast asks less its timestamp order.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [{ "card": "Tidal Wave", "label": "wave" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@wave", "mana": ["@island", "@island-2", "@island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wall Token", "count": 1 } } },
+    { "turn": 2, "step": "Upkeep", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wall Token", "count": 0 } } }
+  ]
+}

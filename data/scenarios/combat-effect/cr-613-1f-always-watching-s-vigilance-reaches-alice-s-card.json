@@ -1,0 +1,30 @@
+{
+  "description": "CR 613.1f Always Watching's vigilance reaches alice's card Piker and not her token one",
+  "note": "Always Watching grants nontoken creatures +1/+1 and vigilance. Both of alice's Pikers attack and the only difference between them is that one is a token, so a grant ignoring \"nontoken\" leaves the token untapped too, and the +1/+1 goes the same way.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "card-piker", "ready": true },
+          { "card": "Always Watching", "label": "always-watching" },
+          { "card": "Goblin Piker", "label": "token-piker", "token": true, "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bobs-piker", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@card-piker", "@token-piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "@card-piker", "tapped": false } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Tapped": { "object": "@token-piker", "tapped": true } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@card-piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@token-piker", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@card-piker": "@bob", "@token-piker": "@bob" } } } }
+  ]
+}

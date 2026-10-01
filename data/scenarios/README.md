@@ -12,8 +12,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `battlefield`, `hand`, `graveyard`, `library` and `exile` placements (a
   library top card first; an exiled card face up and linked to nothing). A
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
-  302.6), `damage`, `counters`, a `controller` and the label of the object or
-  seat it is `attached` to. `active` names a seat;
+  302.6), `damage`, `counters`, `token` (CR 111.1, battlefield only), a
+  `controller` and the label of the object or seat it is `attached` to. `active` names a seat;
   `step` is where turn 1 starts; `monarch` optionally names a seat;
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent. Setup is a

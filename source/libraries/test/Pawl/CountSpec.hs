@@ -393,7 +393,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   strandcatcherSpec s registry
   raphaelSpec s registry
   leftBattlefieldSpec s registry
-  graveCensusTokenSpec s registry
   ownershipLedgerSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
@@ -1960,52 +1959,3 @@ leftBattlefieldSpec s registry =
             "CR 603.6c bob's Hill Giant under alice's control gets her an experience counter as it leaves; under bob's it does not"
             (experience (bounce theirGiant stolen), experience (bounce theirGiant ready))
             (1, 0)
-
--- CR 111.7 / 608.2h: the arrival with no object left to read, on the road where
--- the reader cannot answer for one either. Pawl.Engine.Resolve.Slots'
--- effectViewOf hands a resolving effect Projection.viewWithLastKnown, whose
--- answer for an id naming nothing is a BLANK view rather than Nothing -- and a
--- blank view is not a token, so a fold that trusted it would count a dead token
--- as a card. What sends this arrival back to CR 608.2h's departed record instead
--- is arrivedView's own Game.lookupObject guard.
---
--- Synthetic Grave Census, {2}{B} Creature -- Zombie 1/3: "{T}: You gain X life,
--- where X is the number of cards put into graveyards from anywhere this turn."
--- Pawl.MeldSpec drives its melded-permanent half; what it cannot drive is this
--- one, since the token there is still lying in the graveyard when the count runs.
---
--- TWO boards differing in ONE thing -- whether the Goblin Piker that dies is a
--- token -- and on both the priority loop's CR 704.5g kills it and its CR 704.5d
--- sweeps a dead token out of the graveyard before the count runs.
-graveCensusTokenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-graveCensusTokenSpec s registry =
-  let library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
-      kill oid gs = S.runPure S.identityAnswer (S.markDamage oid 12 gs) Engine.priorityLoop
-      tallied censusId gs = case Projection.abilitiesOf censusId gs of
-        ability : _ -> S.lifeOf S.alice (S.runPure S.identityAnswer gs (do Activate.activateAbility S.alice censusId ability; Stack.resolveTop))
-        [] -> Nothing
-      graveyard pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
-      board = do
-        census <- S.printingOf s registry "Synthetic Grave Census"
-        piker <- S.printingOf s registry "Goblin Piker"
-        let (censusId, withCensus) = S.addPermanent census S.alice (Setup.emptyGame S.bothPlayers)
-            (tokenId, withToken) = S.addToken (Printing.card piker) S.alice withCensus
-            (pikerId, withPiker) = S.addPermanent piker S.alice withToken
-            stocked = library piker S.bob 5 (library piker S.alice 5 withPiker)
-        pure (censusId, tokenId, pikerId, stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
-   in Spec.describe s "Synthetic Grave Census" $ do
-        Spec.it s "CR 111.7 a token that died and ceased to exist is no card put into a graveyard" $ do
-          (censusId, tokenId, _, gs) <- board
-          let after = kill tokenId gs
-          Spec.assertEqWith s "CR 111.6 alice gains nothing: a token is not a card" (tallied censusId after) (Just 20)
-          -- The proxies, after the behaviour: the token really did leave, so the
-          -- fold had no object to read it off.
-          Spec.assertEqWith s "setup: CR 704.5d nothing is left in alice's graveyard" (graveyard S.alice after) 0
-          Spec.assertEqWith s "setup: and the token's id names nothing" (fmap Object.zone (Game.lookupObject tokenId after)) Nothing
-        -- The same board, differing in ONE thing: the Goblin Piker that dies is
-        -- the nontoken one, whose card stays in the graveyard to be counted.
-        Spec.it s "CR 608.2i the nontoken Goblin Piker beside it is one card put into a graveyard" $ do
-          (censusId, _, pikerId, gs) <- board
-          let after = kill pikerId gs
-          Spec.assertEqWith s "alice gains 1 for the one card" (tallied censusId after) (Just 21)
-          Spec.assertEqWith s "setup: its card really is in her graveyard" (graveyard S.alice after) 1

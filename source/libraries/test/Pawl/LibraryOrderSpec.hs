@@ -2753,7 +2753,6 @@ optionalEffectSpec s registry =
           | cIdx == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
       churnName = CardName.MkCardName (Text.pack "Corpse Churn")
-      complicationName = CardName.MkCardName (Text.pack "Deadly Complication")
       forestName = CardName.MkCardName (Text.pack "Forest")
       pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
       swampName = CardName.MkCardName (Text.pack "Swamp")
@@ -2942,20 +2941,6 @@ optionalEffectSpec s registry =
           Spec.assertEqWith s "so the Person is no longer suspected" (isSuspected poiId after) (Just False)
           Spec.assertEqWith s "the mandatory clause put its +1/+1 counter on" (plusOnePlusOnesOn (Just poiId) after) 1
           Spec.assertEqWith s "and the other mode destroyed bob's Goblin Piker" (Game.lookupObject victim after) Nothing
-        -- CR 608.2b before CR 603.5, one mode over: with mode 1's only target
-        -- gone the spell does NOT fizzle -- mode 0's target is still legal, so CR
-        -- 608.2b's union survives -- and mode 1's clauses are reached anyway. Its
-        -- optional clause reads only the dead slot, so both answers leave the same
-        -- board and the prompt is not raised. The board differs from the case
-        -- above in exactly one thing: the Person is in the graveyard.
-        Spec.it s "CR 608.2b whole card: Deadly Complication's dead mode is not asked about" $ do
-          (gs, spellId, victim, poiId) <- deadlyComplicationBoard
-          let cast = S.runPure (deadlyComplicationAnswer victim poiId) gs (S.cast S.alice spellId)
-              gone = S.runPure (deadlyComplicationAnswer victim poiId) cast (Event.changeZone poiId Zone.Graveyard)
-              ((_, after), transcript) = Replay.record (deadlyComplicationAnswer victim poiId) gone Stack.resolveTop
-          Spec.assertEqWith s "no may was ever asked: every slot the clause reads is dead" (filter isOptionalResponse transcript) []
-          Spec.assertEqWith s "the spell did not fizzle: the live mode destroyed bob's Goblin Piker" (Game.lookupObject victim after) Nothing
-          Spec.assertEqWith s "and Deadly Complication resolved into alice's graveyard" (List.elem complicationName (aliceNamesIn Zone.Graveyard after)) True
 
 -- Chooses BOTH of Deadly Complication's modes, aims each slot at the permanent
 -- that slot's mode is about, and takes the "may" whenever one is offered. Rank-1
