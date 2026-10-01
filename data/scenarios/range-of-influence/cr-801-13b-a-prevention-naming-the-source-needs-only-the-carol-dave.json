@@ -1,0 +1,37 @@
+{
+  "description": "CR 801.13b a prevention naming the source needs only the source in range",
+  "note": "Luminesce prevents damage red sources would deal, naming the source, so an in-range source is enough. alice casts it on the attacker's turn, once the attack is declared, in place of the Haskell test's staged combat on her own turn: its \"this turn\" is the same either way. Every seat at range 1: carol's Goblin Piker is out of her range, so it deals dave 2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "range": 1,
+        "battlefield": [{ "card": "Plains", "label": "land" }],
+        "hand": [{ "card": "Luminesce", "label": "spell" }]
+      },
+      {
+        "name": "bob",
+        "range": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "bobs-piker", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "range": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "carols-piker", "ready": true }]
+      },
+      {
+        "name": "dave",
+        "range": 1
+      }
+    ],
+    "active": "carol",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "do": { "Attack": ["@carols-piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "@carols-piker", "do": { "ChooseAttackTarget": "@dave" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "check": { "Attackers": { "attackers": { "@carols-piker": "@dave" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Cast": { "object": "@spell", "mana": ["@land"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "carol", "check": { "Life": { "player": "dave", "life": 18 } } }
+  ]
+}

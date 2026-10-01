@@ -64,6 +64,7 @@ import qualified Pawl.Types.CountersAre as CountersAre
 import qualified Pawl.Types.DamageIs as DamageIs
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DefendersAre as DefendersAre
+import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.Entry as Entry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
@@ -87,6 +88,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt.Type
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Readiness as Readiness
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reference as Reference
@@ -99,6 +101,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -207,7 +210,16 @@ stage registry board =
                     GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
                     GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives, Player.counters = Map.findWithDefault (Player.counters p) pid counters}) (GameState.players base),
                     GameState.monarch = monarch,
-                    GameState.settings = (GameState.settings base) {GameSettings.attackOption = Board.attackOption board}
+                    GameState.settings =
+                      (GameState.settings base)
+                        { GameSettings.attackOption = Board.attackOption board,
+                          GameSettings.brawl = Board.brawl board,
+                          GameSettings.sharedTeamTurns = Board.sharedTeamTurns board,
+                          GameSettings.deployCreatures = Board.deployCreatures board,
+                          GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
+                          GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
+                          GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(team, pid) | (seat, pid) <- NonEmpty.toList seated, Seat.emperor seat, Just team <- [Seat.team seat]])
+                        }
                   }
           placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
           pure (fmap designateDefenders (placed >>= attachAll (placementsOf board)))
@@ -249,9 +261,14 @@ boardFailure ids board =
       counts = Map.fromListWith (+) (fmap (\label -> (label, 1 :: Natural)) labels)
       duplicate = fmap fst (List.find ((> 1) . snd) (Map.toAscList counts))
       unknownController = List.find (\label -> not (Map.member label ids)) (Maybe.mapMaybe Placement.controller placements)
+      -- CR 809.2: one emperor per team, and an emperor is on one.
+      emperors = filter Seat.emperor seats
+      illegalEmperor = List.find (maybe True (\team -> length (filter ((== Just team) . Seat.team) emperors) > 1) . Seat.team) emperors
    in case duplicate of
         Just label -> Just (Failure.MkDuplicateLabel label)
-        Nothing -> fmap Failure.MkUnknownController unknownController
+        Nothing -> case unknownController of
+          Just label -> Just (Failure.MkUnknownController label)
+          Nothing -> fmap (Failure.MkIllegalEmperor . Seat.name) illegalEmperor
 
 placeSeats :: (Monad m) => Registry.Registry m -> [(Seat.Seat, PlayerId.PlayerId)] -> Staged.Staged -> m (Either Failure.ScenarioFailure Staged.Staged)
 placeSeats registry seated board = case seated of
@@ -1013,6 +1030,7 @@ render failure = case failure of
   Failure.MkUnknownController label -> Label.unwrap label <> Text.pack " controls a placed card but has no seat"
   Failure.MkUnknownCard name -> Text.pack "no card named " <> CardName.unwrap name
   Failure.MkIllegalAttachment label -> Text.pack "a placement cannot be attached to " <> Label.unwrap label
+  Failure.MkIllegalEmperor label -> Label.unwrap label <> Text.pack " is an emperor on no team, or not its team's only one"
   Failure.MkTokenOffBattlefield name -> Text.pack "a token " <> CardName.unwrap name <> Text.pack " placed off the battlefield"
   Failure.MkUnknownMonarch label -> Label.unwrap label <> Text.pack " is the monarch but has no seat"
   Failure.MkUnknownObject ref known ->

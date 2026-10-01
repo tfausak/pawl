@@ -13,6 +13,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind.Type
 import qualified Pawl.Types.Readiness as Readiness.Type
 import qualified Pawl.Types.Seat as Seat.Type
 import qualified Pawl.Types.TapState as TapState.Type
+import qualified Pawl.Types.TeamId as TeamId.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Seat" $ do
@@ -25,13 +26,16 @@ spec s = Spec.describe s "Pawl.Codec.Seat" $ do
       (empty "alice")
         { Seat.Type.life = 7,
           Seat.Type.counters = Map.fromList [(PlayerCounterKind.Type.Energy, 3)],
+          Seat.Type.team = Just (TeamId.Type.MkTeamId 1),
+          Seat.Type.range = Just 2,
+          Seat.Type.emperor = True,
           Seat.Type.battlefield = Seq.singleton (card "Mountain"),
           Seat.Type.hand = Seq.singleton (card "Lightning Bolt"),
           Seat.Type.graveyard = Seq.singleton (card "Goblin Piker"),
           Seat.Type.library = Seq.singleton (card "Island"),
           Seat.Type.exile = Seq.singleton (card "Bad Moon")
         }
-      " {\"name\":\"alice\",\"life\":7,\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":3}],\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}],\"graveyard\":[{\"card\":\"Goblin Piker\"}],\"library\":[{\"card\":\"Island\"}],\"exile\":[{\"card\":\"Bad Moon\"}]} "
+      " {\"name\":\"alice\",\"life\":7,\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":3}],\"team\":1,\"range\":2,\"emperor\":true,\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}],\"graveyard\":[{\"card\":\"Goblin Piker\"}],\"library\":[{\"card\":\"Island\"}],\"exile\":[{\"card\":\"Bad Moon\"}]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Seat.codec
 
@@ -41,6 +45,9 @@ empty name =
     { Seat.Type.name = Label.Type.MkLabel (Text.pack name),
       Seat.Type.life = 20,
       Seat.Type.counters = Map.empty,
+      Seat.Type.team = Nothing,
+      Seat.Type.range = Nothing,
+      Seat.Type.emperor = False,
       Seat.Type.battlefield = Seq.empty,
       Seat.Type.hand = Seq.empty,
       Seat.Type.graveyard = Seq.empty,

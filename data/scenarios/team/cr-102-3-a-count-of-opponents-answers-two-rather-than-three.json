@@ -1,0 +1,40 @@
+{
+  "description": "CR 102.3 a count of opponents answers two rather than three",
+  "note": "alice and bob against carol and dave. alice's Tyranid Invasion makes one token per opponent, and her teammate bob is not one, so two tokens rather than three; the spell reaching her graveyard shows it resolved.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Forest", "label": "forest-4", "ready": true }
+        ],
+        "hand": [{ "card": "Tyranid Invasion", "label": "invasion" }]
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@invasion", "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Tyranid Warrior Token", "Tyranid Warrior Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Tyranid Warrior Token", "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Tyranid Invasion", "count": 1 } } }
+  ]
+}

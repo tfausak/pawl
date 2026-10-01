@@ -48,7 +48,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:turn-number`: a turn other than the first
 - `check:step`: the current step
 - `check:creature-count`: how many creatures a player controls
-- `board:settings`: game settings other than the default
 - `check:keywords`: the keywords an object has
 - `board:face`: a face other than the front
 - `move:RollDie`: the `RollDie` prompt
@@ -230,6 +229,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `check:supertypes`: an object's supertypes
 - `check:tokens`: whether an object is a token
 - `check:named-copy-choices`: the cards a copy effect has already named
+- `move:ChoosePlayer`: the `ChoosePlayer` prompt
+- `move:ChooseActivePlayer`: the `ChooseActivePlayer` prompt
+- `move:ChooseExert`: the `ChooseExert` prompt
+- `check:player-control`: which player controls another player's decisions
+- `check:commander-damage`: the combat damage a commander has dealt each player
 
 ## Tests
 
@@ -1177,7 +1181,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 903.10a fourteen does not | `board:command`
 - CR 903.10a only the commander's combat damage is tallied | `board:command`
 - CR 903.10a twenty-one combat damage from one commander loses the game | `board:command`
-- CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game | `board:settings`
+- CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game | `board:command` `check:commander-damage` `check:game-result`
 - CR 903.8 the second cast from the command zone costs {2} more | `move:ChooseAnyNumberToSacrifice` `move:ReturnCommander`
 - CR 903.9a a commander that dies is offered back to the command zone | `move:ChooseAnyNumberToSacrifice` `move:ReturnCommander`
 - CR 903.9a declining leaves it in the graveyard | `move:ChooseAnyNumberToSacrifice` `move:ReturnCommander`
@@ -1860,8 +1864,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `EmperorSpec`
 
-- CR 809.3c a player can attack only an opponent seated immediately next to them | `board:settings`
-- CR 809.5c the game is a draw for a team if it is a draw for its emperor | `board:settings`
+- CR 809.5c the game is a draw for a team if it is a draw for its emperor | `check:game-result`
 
 ### `EntryReplacementSpec`
 
@@ -2080,7 +2083,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `GameSpec`
 
-- CR 104.2c gameplay: a Shahrazad subgame won by a team excludes every player on it | `board:settings`
+- CR 104.2c gameplay: a Shahrazad subgame won by a team excludes every player on it | `check:game-result` `move:RandomFirstPlayer` `move:Shuffle` `move:nested`
 - CR 104.3a concede does not use the stack: a spell on it never resolves | `board:stack`
 - CR 104.3a/104.2a a concede ends the game immediately, opponent wins | `check:game-result`
 - CR 117.3c the caster is asked again, rather than passing priority on | `check:helper-askedPlayers`
@@ -2973,18 +2976,13 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `RangeOfInfluenceSpec`
 
-- CR 801.10 a resolving spell or ability does not affect an object or player outside its controller's range | `board:settings`
-- CR 801.10 proliferate offers only players within its controller's range | `board:settings`
-- CR 801.13a a redirection to a destination outside its controller's range does nothing | `board:combat` `board:settings`
-- CR 801.13b a prevention naming neither source nor recipient needs both in range | `board:settings`
-- CR 801.13b a prevention naming the source needs only the source in range | `board:settings`
+- CR 801.10 proliferate offers only players within its controller's range | `check:prompt-offers` `move:ChooseProliferate`
+- CR 801.13a a redirection to a destination outside its controller's range does nothing | `board:combat`
 - CR 801.15 a draw is a draw for its controller and the players within their range | `board:controller` `board:hand-order` `board:mana-pool`
-- CR 801.2c a seat emptied mid-turn closes up only when the next turn begins | `board:settings`
-- CR 801.4 a target opponent slot does not offer an opponent outside the controller's range | `board:settings`
-- CR 801.5a a choice of opponent offers only opponents within the chooser's range | `board:settings`
-- CR 801.5a a choice of player offers only players within the chooser's range | `board:settings`
-- CR 801.7 a delayed triggered ability does not trigger outside its controller's range | `board:settings`
-- CR 801.7 a triggered ability does not trigger on a player outside its controller's range | `board:settings`
+- CR 801.2c a seat emptied mid-turn closes up only when the next turn begins | `check:legal-targets`
+- CR 801.4 a target opponent slot does not offer an opponent outside the controller's range | `check:legal-targets`
+- CR 801.5a a choice of opponent offers only opponents within the chooser's range | `check:prompt-offers` `move:ChooseOpponent`
+- CR 801.5a a choice of player offers only players within the chooser's range | `check:prompt-offers` `move:ChoosePlayer`
 
 ### `RemoveCounterSpec`
 
@@ -3147,7 +3145,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `RestampSpec`
 
 - CR 613.7m / 608.2f the controller orders every card one conjure loop made | `move:LookUpCard` `move:ReferenceCards`
-- CR 613.7m / 608.2f the controller orders every token one loop made | `board:combat` `board:settings`
+- CR 613.7m / 608.2f the controller orders every token one loop made | `board:combat`
 - CR 613.7m the seat's own answer decides which simultaneous token is stamped later | `move:ChooseCopyTarget` `move:ChooseKicker`
 - CR 614.12 / 608.2f a card one conjure loop made later enters beside the earlier ones, not after them | `move:ChooseLegend` `move:LookUpCard` `move:ReferenceCards`
 - CR 614.12 / 608.2f a token one loop made later enters beside the earlier ones, not after them | `board:combat`
@@ -3362,38 +3360,23 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `TeamSpec`
 
-- CR 102.3 a count of opponents answers two rather than three | `board:settings`
-- CR 102.3 a target opponent slot does not offer the teammate | `board:settings`
-- CR 102.3 each opponent skips the teammate | `board:settings`
-- CR 502.2a the handoff records what the previous active team cast | `board:settings`
-- CR 508.3c a teammate's attack-with-two counts only his creatures | `board:settings`
-- CR 508.3d a teammate's whenever-you-attack trigger fires | `board:settings`
-- CR 514.1 each player on the active team discards to hand size | `board:settings`
-- CR 701.43a a teammate's exerted attacker skips his next untap step | `board:settings`
-- CR 702.154a a teammate enlists a creature he controls | `board:settings`
-- CR 702.179d each active teammate's speed rises once | `board:player-speed` `board:settings`
-- CR 725.4 the active team's primary player names the new monarch | `board:settings`
-- CR 804.2 a creature taps to hand itself to a teammate | `board:settings`
-- CR 805.10a a teammate's tokens enter attacking | `board:settings`
-- CR 805.10a the nonactive team is the defending team | `board:settings`
-- CR 805.10b a teammate pays the toll on their own attacker | `board:settings`
-- CR 805.10b a teammate's creature attacks on the team's turn | `board:settings`
-- CR 805.10c melee counts the teammate's own opponents | `board:settings`
-- CR 805.10c raid reads the teammate's own attack | `board:settings`
-- CR 805.10d a teammate's creature blocks an attacker aimed at the team | `board:settings`
-- CR 805.2 a departed active player's teammate declares the attack | `board:player-status` `board:settings`
-- CR 805.4 a teammate's your-upkeep trigger fires on the team's turn | `board:settings`
-- CR 805.4b each player on the active team untaps and draws | `board:settings`
-- CR 805.4c each player on the active team may play a land | `board:settings`
-- CR 805.4d an each-opponent's-upkeep trigger asks its if of each active opponent | `board:settings`
-- CR 805.4d an each-player's-upkeep trigger fires once per active teammate | `board:settings`
-- CR 805.5 a teammate who passed is asked again before the team passes | `board:settings`
-- CR 805.5b a departed active player's teammate receives priority | `board:player-status` `board:settings`
-- CR 805.8 a teammate's skip is the team's | `board:settings`
-- CR 805.8 controlling a player controls their team | `board:settings`
-- CR 805.8 one effect gives a team one extra turn | `board:settings`
-- CR 805.8 one effect skips a team's step once | `board:settings`
-- CR 805.9 the banding creature's controller names the active player who divides | `board:settings`
+- CR 102.3 a target opponent slot does not offer the teammate | `check:legal-targets` `move:expect-rejected`
+- CR 502.2a the handoff records what the previous active team cast | `check:events` `check:other-GameState.spellsCastLastTurn`
+- CR 514.1 each player on the active team discards to hand size | `move:ChooseDiscard`
+- CR 701.43a a teammate's exerted attacker skips his next untap step | `move:ChooseExert`
+- CR 702.154a a teammate enlists a creature he controls | `move:ChooseEnlist`
+- CR 702.179d each active teammate's speed rises once | `board:player-speed`
+- CR 725.4 the active team's primary player names the new monarch | `check:prompt-offers` `move:ChooseActivePlayer`
+- CR 804.2 a creature taps to hand itself to a teammate | `check:legal-targets` `check:offered-actions`
+- CR 805.10b a teammate pays the toll on their own attacker | `move:ChooseManaSource`
+- CR 805.2 a departed active player's teammate declares the attack | `board:player-status`
+- CR 805.4c each player on the active team may play a land | `move:expect-rejected`
+- CR 805.5 a teammate who passed is asked again before the team passes | `check:priority`
+- CR 805.5b a departed active player's teammate receives priority | `board:player-status`
+- CR 805.8 controlling a player controls their team | `check:player-control`
+- CR 805.8 one effect gives a team one extra turn | `check:active-player`
+- CR 805.8 one effect skips a team's step once | `board:face-down` `move:action-TurnFaceUp`
+- CR 805.9 the banding creature's controller names the active player who divides | `move:ChoosePlayer`
 
 ### `TimeTravelSpec`
 

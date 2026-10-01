@@ -1,0 +1,34 @@
+{
+  "description": "CR 805.10d a teammate's creature blocks an attacker aimed at the team",
+  "note": "CR 805.10d: the defending team has one combined block, so dave's Hill Giant may block a creature attacking his teammate carol, which CR 802.4a forbids without the option. Control: without the option dave is not asked, and the Piker gets through.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@piker" },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

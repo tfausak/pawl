@@ -27,6 +27,8 @@ data ScenarioFailure
     MkIllegalAttachment Label.Label
   | -- | A token placed off the battlefield, where CR 111.7 says it would not exist.
     MkTokenOffBattlefield CardName.CardName
+  | -- | An emperor seat on no team, or a second emperor on one team (CR 809.2).
+    MkIllegalEmperor Label.Label
   | -- | The monarch names no seat.
     MkUnknownMonarch Label.Label
   | -- | The reference named no live object, with whether the board did label

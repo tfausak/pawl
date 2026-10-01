@@ -1,0 +1,31 @@
+{
+  "description": "CR 805.10a the nonactive team is the defending team",
+  "note": "CR 805.10a: without the attack multiple players option CR 507.1 asks the active player to choose one defending player; under shared team turns the whole nonactive team defends and nobody is asked, so an unscheduled ChooseDefender would fail the run. Control: without shared turns alice is asked and chooses carol alone.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "attackOption": null,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "ChooseDefender": "carol" } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Defenders": { "players": ["carol"] } } }
+  ]
+}

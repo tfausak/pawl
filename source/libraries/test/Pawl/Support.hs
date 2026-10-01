@@ -208,6 +208,9 @@ playerSetup pid =
     { Seat.name = seatLabel pid,
       Seat.life = 20,
       Seat.counters = Map.empty,
+      Seat.team = Nothing,
+      Seat.range = Nothing,
+      Seat.emperor = False,
       Seat.battlefield = Seq.empty,
       Seat.hand = Seq.empty,
       Seat.graveyard = Seq.empty,
@@ -236,7 +239,10 @@ board seats active step =
               Board.active = seatLabel active,
               Board.phase = step,
               Board.monarch = Nothing,
-              Board.attackOption = Just AttackOption.MultiplePlayers
+              Board.attackOption = Just AttackOption.MultiplePlayers,
+              Board.brawl = False,
+              Board.sharedTeamTurns = False,
+              Board.deployCreatures = False
             }
         else error "S.board: seats must be listed alice, bob, carol, dave"
 

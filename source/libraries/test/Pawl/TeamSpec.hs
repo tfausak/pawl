@@ -31,7 +31,6 @@
 -- which is why the combat case can read the whole defending group.
 module Pawl.TeamSpec where
 
-import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -144,37 +143,10 @@ spec s registry = Spec.describe s "Teams" $ do
       "CR 802.2 the defending players are the other team"
       (Combat.Type.defenders (GameState.combat settled))
       [S.carol, S.dave]
-  -- CR 102.3 through the effect DSL's PlayerRef.Relative Opponent, which
-  -- Pawl.Engine.Resolve.Slots.playerRefPlayers resolves.
-  --
-  -- Prologue to Phyresis, {1}{U} Instant: "Each opponent gets a poison counter.
-  -- Draw a card." The whole card is that one instruction plus a draw, so nothing
-  -- else can move a counter, and the four totals are read as ONE list so that no
-  -- seat's answer can be checked without the others.
-  Spec.it s "CR 102.3 each opponent skips the teammate" $ do
-    prologue <- S.printingOf s registry "Prologue to Phyresis"
-    island <- S.printingOf s registry "Island"
-    plains <- S.printingOf s registry "Plains"
-    let lands = S.landsFor island S.alice 2 (twoTeams S.fourPlayerGame)
-        stocked = snd (S.addLibraryCard plains S.alice lands)
-        (held, staged) = S.addHandCard prologue S.alice stocked
-        board =
-          staged
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        cast = S.runPure S.identityAnswer board (S.cast S.alice held)
-        after = S.runPure S.identityAnswer cast Engine.priorityLoop
-    Spec.assertEqWith
-      s
-      "CR 102.3 only carol and dave are poisoned"
-      (fmap (\pid -> S.playerCounterOf PlayerCounterKind.Poison pid after) [S.alice, S.bob, S.carol, S.dave])
-      [0, 0, 1, 1]
-    Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
-  -- CR 102.3 through a TARGET SLOT, which neither case above reaches: the offer
-  -- comes from Pawl.Engine.Target's Filter.IsPlayer atom rather than from a
-  -- PlayerRef, and it is filtered against a Context built by Target.slotContext.
+  -- CR 102.3 through a TARGET SLOT, which neither
+  -- data/scenarios/team/cr-102-3-*.json case reaches: the offer comes from
+  -- Pawl.Engine.Target's Filter.IsPlayer atom rather than from a PlayerRef, and
+  -- it is filtered against a Context built by Target.slotContext.
   --
   -- Ravenous Rats, {1}{B} Rat: "When this creature enters, target opponent
   -- discards a card." The OFFER is what is asserted, and it is the engine's own
@@ -249,29 +221,6 @@ spec s registry = Spec.describe s "Teams" $ do
     Spec.assertEqWith s "and nothing of bob's was exiled" (length (Game.zoneMembers Zone.Exile S.bob alsoAfter)) 0
     Spec.assertEqWith s "CR 614.1a carol's was exiled instead" (length (Game.zoneMembers Zone.Exile S.carol alsoAfter)) 1
     Spec.assertEqWith s "and never reached carol's graveyard" (length (Game.zoneMembers Zone.Graveyard S.carol alsoAfter)) 0
-  -- CR 102.3 through a Count over the same reference, which
-  -- Pawl.Engine.Count.playersFor resolves and which no effect above reaches.
-  --
-  -- Tyranid Invasion, {3}{G} Sorcery: "Create a number of 3/3 green Tyranid
-  -- Warrior creature tokens with trample equal to the number of opponents you
-  -- have." Pawl.CountSpec's group is the same card at three seats with no teams,
-  -- where the answer is 2 for a different reason; here three other seats make 2
-  -- the team answer and 3 the free-for-all one.
-  Spec.it s "CR 102.3 a count of opponents answers two rather than three" $ do
-    invasion <- S.printingOf s registry "Tyranid Invasion"
-    forest <- S.printingOf s registry "Forest"
-    let lands = S.landsFor forest S.alice 4 (twoTeams S.fourPlayerGame)
-        (held, staged) = S.addHandCard invasion S.alice lands
-        board =
-          staged
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        cast = S.runPure S.identityAnswer board (S.cast S.alice held)
-        after = S.runPure S.identityAnswer cast Engine.priorityLoop
-    Spec.assertEqWith s "one token per opponent, and bob is not one" (length (S.tokensOf after)) 2
-    Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
   -- CR 804.2 through a PAIR of boards differing only in the option. alice,
   -- bob and carol against dave, so alice has two teammates to choose between
   -- and the offer separates CR 102.3's teammates from every other seat; carol is
@@ -330,20 +279,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
     island <- S.printingOf s registry "Island"
     Spec.assertEqWith s "carol's team, then alice's, then carol's" (takers 3 (stockedWith island sharedTurns)) [S.carol, S.alice, S.carol]
     Spec.assertEqWith s "without the option every seat takes one" (takers 3 (stockedWith island id)) [S.bob, S.carol, S.dave]
-  -- CR 805.4b / 502.3: bob is an active player on alice's turn, so he untaps and
-  -- draws in it. Carol is not, and does neither.
-  Spec.it s "CR 805.4b each player on the active team untaps and draws" $ do
-    island <- S.printingOf s registry "Island"
-    let run option =
-          let (bobs, staged) = S.addPermanent island S.bob (stockedWith island option)
-              (carols, placed) = S.addPermanent island S.carol staged
-              board = S.tapObject carols (S.tapObject bobs placed)
-           in fst (TurnSpec.runTurn S.identityAnswer board)
-        after = run sharedTurns
-        alone = run id
-        observe gs = (fmap (`S.handSize` gs) [S.bob, S.carol], fmap (`S.tappedCount` gs) [S.bob, S.carol])
-    Spec.assertEqWith s "bob drew and untapped on alice's turn, carol neither" (observe after) ([1, 0], [0, 1])
-    Spec.assertEqWith s "without the option bob does neither" (observe alone) ([0, 0], [1, 1])
   -- CR 805.4c: bob may play a land during his team's turn. The land play is
   -- offered to whoever holds priority, so the one board differs only in the
   -- option.
@@ -388,55 +323,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in S.handSize S.bob (fst (TurnSpec.runTurn S.identityAnswer board))
     Spec.assertEqWith s "bob ends alice's turn at seven" (run sharedTurns) 7
     Spec.assertEqWith s "without the option he keeps eight" (run id) 8
-  -- CR 805.4 / 603.2: "your upkeep" is bob's upkeep on his team's turn.
-  --
-  -- Bitterblossom, {1}{B} Kindred Enchantment: "At the beginning of your upkeep,
-  -- you lose 1 life and create a 1/1 black Faerie Rogue creature token with
-  -- flying."
-  Spec.it s "CR 805.4 a teammate's your-upkeep trigger fires on the team's turn" $ do
-    island <- S.printingOf s registry "Island"
-    bitterblossom <- S.printingOf s registry "Bitterblossom"
-    let run option =
-          let (_, board) = S.addPermanent bitterblossom S.bob (stockedWith island option)
-              after = fst (TurnSpec.runTurn S.identityAnswer board)
-           in (S.lifeOf S.bob after, length (S.tokensOf after))
-    Spec.assertEqWith s "bob lost 1 life and made a Faerie" (run sharedTurns) (Just 19, 1)
-    Spec.assertEqWith s "without the option nothing happened" (run id) (Just 20, 0)
-  -- CR 805.4d: "each player's upkeep" reading "that player" triggers once per
-  -- active player. Carol controls it, so "that player" is neither her nor alone
-  -- the seat the turn began with.
-  --
-  -- Elkin Lair, {3}{R} World Enchantment: "At the beginning of each player's
-  -- upkeep, that player exiles a card at random from their hand. ..." Each hand
-  -- holds one card, so the random pick is forced. Nobody plays it, so by the end
-  -- of the turn its third clause has put each one into a graveyard.
-  Spec.it s "CR 805.4d an each-player's-upkeep trigger fires once per active teammate" $ do
-    island <- S.printingOf s registry "Island"
-    lair <- S.printingOf s registry "Elkin Lair"
-    let run option =
-          let (_, placed) = S.addPermanent lair S.carol (stockedWith island option)
-              board = List.foldl' (\g pid -> snd (S.addHandCard island pid g)) placed [S.alice, S.bob]
-              after = fst (TurnSpec.runTurn S.identityAnswer board)
-           in fmap (\pid -> length (Game.zoneMembers Zone.Graveyard pid after)) [S.alice, S.bob]
-    Spec.assertEqWith s "alice and bob each lost their card to the Lair" (run sharedTurns) [1, 1]
-    Spec.assertEqWith s "without the option only alice did" (run id) [1, 0]
-  -- CR 805.4d / 603.4: the intervening "if" is asked of each opponent in turn.
-  -- Only bob holds seven, so a single trigger naming alice would do nothing.
-  --
-  -- Ebony Owl Netsuke, {2} Artifact: "At the beginning of each opponent's
-  -- upkeep, if that player has seven or more cards in hand, this artifact deals
-  -- 4 damage to that player."
-  Spec.it s "CR 805.4d an each-opponent's-upkeep trigger asks its if of each active opponent" $ do
-    island <- S.printingOf s registry "Island"
-    owl <- S.printingOf s registry "Ebony Owl Netsuke"
-    let run option =
-          let (_, placed) = S.addPermanent owl S.carol (stockedWith island option)
-              hands = List.foldl' (\g _ -> snd (S.addHandCard island S.alice g)) placed [1 :: Int .. 2]
-              board = List.foldl' (\g _ -> snd (S.addHandCard island S.bob g)) hands [1 :: Int .. 8]
-              after = fst (TurnSpec.runTurn S.identityAnswer board)
-           in fmap (`S.lifeOf` after) [S.alice, S.bob]
-    Spec.assertEqWith s "bob took 4, alice nothing" (run sharedTurns) [Just 20, Just 16]
-    Spec.assertEqWith s "without the option bob's upkeep has not come" (run id) [Just 20, Just 20]
   -- CR 805.4d's other half: an ability that does not refer to "that player"
   -- triggers once, however many players share the turn.
   --
@@ -616,26 +502,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in fmap (\pid -> Combat.legalAttackDeclarationAs S.alice [(mine, AttackTarget.OfPlayer pid)] settled) [S.bob, S.carol]
     Spec.assertEqWith s "CR 803.1b attacking right, neither bob nor carol" (run AttackOption.Rightward) [False, False]
     Spec.assertEqWith s "CR 803.1a attacking left, bob only" (run AttackOption.Leftward) [True, False]
-  -- CR 805.10a: without the attack multiple players option CR 507.1 asks the
-  -- active player to choose ONE defending player; under the shared team turns
-  -- option the whole nonactive team defends and nobody is asked.
-  Spec.it s "CR 805.10a the nonactive team is the defending team" $ do
-    let run option =
-          let teamed = option (twoTeams S.fourPlayerGame)
-              board = (atCombat teamed) {GameState.settings = (GameState.settings teamed) {GameSettings.attackOption = Nothing}}
-              settled = S.runPure S.identityAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-           in Combat.Type.defenders (GameState.combat settled)
-    Spec.assertEqWith s "carol and dave both defend" (run sharedTurns) [S.carol, S.dave]
-    Spec.assertEqWith s "without the option alice chose carol alone" (run id) [S.carol]
-  -- CR 805.10b: the active team has one combined attack, so bob's Goblin Piker
-  -- attacks on alice's turn.
-  Spec.it s "CR 805.10b a teammate's creature attacks on the team's turn" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let run option =
-          let (_, board) = S.addPermanent piker S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
-           in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
-    Spec.assertEqWith s "bob's Piker dealt carol 2" (run sharedTurns) (Just 18)
-    Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
   -- CR 603.2c / 805.10a: alice's and bob's Pikers connect with carol in one CR
   -- 510.2 step, and Norn's Decree's "one or more creatures AN OPPONENT controls"
   -- is one occurrence per opponent -- so each attacking player gets a poison
@@ -673,21 +539,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol, S.dave]
     Spec.assertEqWith s "CR 508.3b one trigger: dave, alice and bob each gained 2" (run sharedTurns) [Just 22, Just 22, Just 16, Just 22]
     Spec.assertEqWith s "without the option only alice attacked" (run id) [Just 22, Just 20, Just 18, Just 22]
-  -- CR 805.10d: the defending team has one combined block, so dave's creature
-  -- may block a creature attacking his teammate carol, which CR 802.4a forbids
-  -- without the option.
-  --
-  -- Hill Giant, {3}{R} 3/3 Creature -- Giant.
-  Spec.it s "CR 805.10d a teammate's creature blocks an attacker aimed at the team" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    giant <- S.printingOf s registry "Hill Giant"
-    let run option =
-          let (mine, staged) = S.addPermanent piker S.alice (atCombat (option (twoTeams S.fourPlayerGame)))
-              (_, board) = S.addPermanent giant S.dave staged
-              after = S.runCombat (S.attackTo S.carol) board
-           in (S.lifeOf S.carol after, S.onBattlefield mine after)
-    Spec.assertEqWith s "dave's Giant blocked and killed the Piker" (run sharedTurns) (Just 20, False)
-    Spec.assertEqWith s "without the option the Piker got through" (run id) (Just 18, True)
   -- CR 805.10b / 508.1j: each attacking player pays the toll on their own
   -- creatures. Bob's Forests pay for bob's Piker; alice has no mana, so a toll
   -- charged to her would rewind the attack.
@@ -707,18 +558,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (S.lifeOf S.carol after, S.tappedCount S.bob after)
     Spec.assertEqWith s "bob tapped both Forests and his Piker, which dealt carol 2" (run sharedTurns) (Just 18, 3)
     Spec.assertEqWith s "without the option nothing attacked or paid" (run id) (Just 20, 0)
-  -- CR 805.10a / 508.3d: bob is an attacking player, so "whenever you attack"
-  -- triggers for him when a creature he controls is declared.
-  --
-  -- Boggart Prankster, {1}{B} 1/3 Creature -- Goblin Warrior: "Whenever you
-  -- attack, target attacking Goblin you control gets +1/+0 until end of turn."
-  Spec.it s "CR 508.3d a teammate's whenever-you-attack trigger fires" $ do
-    prankster <- S.printingOf s registry "Boggart Prankster"
-    let run option =
-          let (_, board) = S.addPermanent prankster S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
-           in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
-    Spec.assertEqWith s "bob's Prankster pumped itself and dealt carol 2" (run sharedTurns) (Just 18)
-    Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
   -- CR 805.10a / 701.43a: bob exerts his own attacker, so it is his next untap
   -- step that it skips -- his team's next turn, where his tapped Forest untaps
   -- beside it. The pair differs only in the exert.
@@ -786,106 +625,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (S.lifeOf S.carol after, asked)
     Spec.assertEqWith s "bob declared and his Piker dealt carol 2" (run sharedTurns) (Just 18, [S.bob])
     Spec.assertEqWith s "without the option nobody declared" (run id) (Just 20, [])
-  -- CR 805.10a / 506.3b: bob is an attacking player, so tokens he is told to put
-  -- onto the battlefield attacking do attack.
-  --
-  -- Hanweir Garrison, {2}{R} 2/3 Creature -- Human Soldier: "Whenever this
-  -- creature attacks, create two 1/1 red Human creature tokens that are tapped
-  -- and attacking."
-  Spec.it s "CR 805.10a a teammate's tokens enter attacking" $ do
-    garrison <- S.printingOf s registry "Hanweir Garrison"
-    let run option =
-          let (_, board) = S.addPermanent garrison S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
-           in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
-    Spec.assertEqWith s "the Garrison and both Humans dealt carol 4" (run sharedTurns) (Just 16)
-    Spec.assertEqWith s "without the option the Garrison was not offered" (run id) (Just 20)
-  -- CR 805.10c / 207.2c: raid asks whether YOU attacked, and a teammate's attack
-  -- is not yours. Bob casts the Skullhunter after combat; the legs differ only
-  -- in whose Piker attacked.
-  --
-  -- Mardu Skullhunter, {1}{B} 2/1 Creature -- Human Warrior: "This creature
-  -- enters tapped. Raid -- When this creature enters, if you attacked this turn,
-  -- target opponent discards a card."
-  Spec.it s "CR 805.10c raid reads the teammate's own attack" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    swamp <- S.printingOf s registry "Swamp"
-    island <- S.printingOf s registry "Island"
-    skullhunter <- S.printingOf s registry "Mardu Skullhunter"
-    let run attacker =
-          let (alices, staged) = S.addPermanent piker S.alice (atCombat (twoTeams S.fourPlayerGame))
-              (bobs, placed) = S.addPermanent piker S.bob staged
-              lands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.bob g)) placed [1 :: Int, 2]
-              (_, held) = S.addHandCard skullhunter S.bob lands
-              board = sharedTurns (List.foldl' (\g pid -> snd (S.addHandCard island pid g)) held [S.carol, S.dave])
-              chosen = if attacker == S.alice then alices else bobs
-              raiding :: Prompt.Prompt r -> r
-              raiding p = case p of
-                Prompt.DeclareAttackers _ _ ids -> filter (== chosen) ids
-                Prompt.ChooseAction {} -> S.castAnswer p
-                _ -> S.attackTo S.carol p
-              after = S.runPure raiding (S.runCombat raiding board) Engine.runStep
-           in (S.handSize S.carol after + S.handSize S.dave after, S.countOnBattlefieldByName (S.printingName skullhunter) S.bob after)
-    Spec.assertEqWith s "bob attacked, so his raid made an opponent discard" (run S.bob) (1, 1)
-    Spec.assertEqWith s "only alice attacked, so bob's Skullhunter entered and nobody discarded" (run S.alice) (2, 1)
-  -- CR 805.10c / 702.121a: melee counts the opponents YOU attacked. Bob's Wings
-  -- attack carol; alice's Piker attacks dave in one leg and carol in the other,
-  -- and the Wings are 2/2 in both.
-  --
-  -- Wings of the Guard, {1}{W} 1/1 Creature -- Bird: "Flying. Melee (Whenever
-  -- this creature attacks, it gets +1/+1 until end of turn for each opponent you
-  -- attacked this combat.)"
-  Spec.it s "CR 805.10c melee counts the teammate's own opponents" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    wings <- S.printingOf s registry "Wings of the Guard"
-    let run pikerAt =
-          let (alices, staged) = S.addPermanent piker S.alice (atCombat (sharedTurns (twoTeams S.fourPlayerGame)))
-              (_, board) = S.addPermanent wings S.bob staged
-              aiming :: Prompt.Prompt r -> r
-              aiming p = case p of
-                Prompt.ChooseAttackTarget _ _ oid options ->
-                  let who = if oid == alices then pikerAt else S.carol
-                   in Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer who) (NonEmpty.toList options))
-                _ -> S.attackTo S.carol p
-              after = S.runCombat aiming board
-           in (S.lifeOf S.carol after, S.lifeOf S.dave after)
-    Spec.assertEqWith s "the Wings dealt carol 2 while alice's Piker dealt dave 2" (run S.dave) (Just 18, Just 18)
-    Spec.assertEqWith s "with both at carol she took 4" (run S.carol) (Just 16, Just 20)
-  -- CR 805.10c / 508.3c: "you attack with two or more creatures" counts only
-  -- the creatures you control. Bob attacks beside alice with one Piker in one
-  -- leg and with two in the other.
-  --
-  -- Military Intelligence, {1}{U} Enchantment: "Whenever you attack with two or
-  -- more creatures, draw a card."
-  Spec.it s "CR 508.3c a teammate's attack-with-two counts only his creatures" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    intelligence <- S.printingOf s registry "Military Intelligence"
-    let run bobs =
-          let (_, staged) = S.addPermanent intelligence S.bob (atCombat (stockedWith island sharedTurns))
-              withAlice = snd (S.addPermanent piker S.alice staged)
-              board = List.foldl' (\g _ -> snd (S.addPermanent piker S.bob g)) withAlice [1 .. bobs]
-           in S.handSize S.bob (S.runCombat (S.attackTo S.carol) board)
-    Spec.assertEqWith s "one Piker of bob's beside alice's draws nothing" (run (1 :: Int)) 0
-    Spec.assertEqWith s "two of bob's draw a card" (run 2) 1
-  -- CR 805.8: a skip naming bob is his team's, so Fatigue aimed at him takes
-  -- the draw step of alice's team's next turn from both of them. The control
-  -- casts nothing.
-  --
-  -- Fatigue, {1}{U} Sorcery: "Target player skips their next draw step."
-  Spec.it s "CR 805.8 a teammate's skip is the team's" $ do
-    island <- S.printingOf s registry "Island"
-    fatigue <- S.printingOf s registry "Fatigue"
-    let run casting =
-          let (held, staged) = S.addHandCard fatigue S.alice (S.landsFor island S.alice 2 (stockedWith island sharedTurns))
-              board = staged {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-              cast = if casting then PreventionSpec.castEach (PreventionSpec.aimPlayer S.bob) board [held] else board
-              -- The rest of alice's turn and carol's, then the untap, upkeep and
-              -- draw steps of alice's team's next.
-              next = fst (TurnSpec.runTurn S.identityAnswer (fst (TurnSpec.runTurn S.identityAnswer cast)))
-              drawn = S.runPure S.identityAnswer next (Monad.replicateM_ 3 Engine.runStep)
-           in fmap (\pid -> S.handSize pid drawn - S.handSize pid next) [S.alice, S.bob]
-    Spec.assertEqWith s "neither alice nor bob drew" (run True) [0, 0]
-    Spec.assertEqWith s "without Fatigue both drew" (run False) [1, 1]
   -- CR 805.8: ONE effect skipping two players on a team skips that team's step
   -- once. Carol turns Brine Elemental face up, so alice and bob each skip their
   -- next untap step: their team's next untap step is skipped and the one after
