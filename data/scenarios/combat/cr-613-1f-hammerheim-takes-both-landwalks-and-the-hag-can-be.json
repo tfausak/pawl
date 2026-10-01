@@ -1,0 +1,36 @@
+{
+  "description": "CR 613.1f Hammerheim takes BOTH landwalks and the Hag can be blocked",
+  "note": "Stalker Hag prints swampwalk and forestwalk and bob controls a Swamp and a Forest, so both landwalks must go for the Piker's block to be legal: either alone would still find its land. Hammerheim's \"loses all landwalk abilities\" reaches the family, and Concordant Crossroads' haste, no landwalk, survives it. The unhammered control is cr-702-14c-an-unhammered-stalker-hag-walks-over-bob-s-swamp. The activation answers the engine's offer of a further mana source with none (CR 605.3a).",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Stalker Hag", "label": "hag", "ready": true },
+          { "card": "Concordant Crossroads", "label": "crossroads" },
+          { "card": "Hammerheim", "label": "hammerheim" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Forest", "label": "forest" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hag"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Activate": { "object": "@hammerheim", "ability": 1, "targets": ["@hag"], "mana": [null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@hag"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@hag", "blockers": ["@blocker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@hag", "keyword": { "type": "Haste" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@hag", "keyword": { "type": "Landwalk", "value": { "type": "HasSubtype", "value": { "type": "Swamp" } } }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Keywords": { "object": "@hag", "keyword": { "type": "Landwalk", "value": { "type": "HasSubtype", "value": { "type": "Forest" } } }, "count": 0 } } }
+  ]
+}

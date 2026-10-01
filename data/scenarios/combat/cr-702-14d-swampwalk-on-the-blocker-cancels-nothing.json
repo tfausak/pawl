@@ -1,0 +1,27 @@
+{
+  "description": "CR 702.14d swampwalk on the BLOCKER cancels nothing",
+  "note": "CR 702.14d's own example, in swamps: bob controls a Swamp and a Bog Wraith of his own, and still may not block alice's Bog Wraith. Comparing the attacker's landwalk with the blocker's, as protection reads, would wrongly allow it.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Bog Wraith", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Bog Wraith", "label": "blocker", "ready": true },
+          { "card": "Swamp", "label": "land" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@blocker": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": null } } }
+  ]
+}

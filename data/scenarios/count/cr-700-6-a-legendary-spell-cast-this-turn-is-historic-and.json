@@ -1,0 +1,35 @@
+{
+  "description": "CR 700.6 a LEGENDARY spell cast this turn is historic, and the block is illegal",
+  "note": "Relic Runner can't be blocked if alice has cast a historic spell this turn. She casts Kalakscion, Hunger Tyrant, legendary, off three of four Swamps, so bob's Goblin Piker's block is refused; the Runner connects for 2 and both creatures live beside the Crocodile.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Relic Runner", "label": "runner", "ready": true },
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" },
+          { "card": "Swamp", "label": "swamp3" },
+          { "card": "Swamp", "label": "swamp4" }
+        ],
+        "hand": [{ "card": "Kalakscion, Hunger Tyrant", "label": "spell" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@spell", "mana": ["@swamp1", "@swamp2", "@swamp3", null] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@runner"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@piker": ["@runner"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Relic Runner", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Kalakscion, Hunger Tyrant", "count": 1 } } }
+  ]
+}

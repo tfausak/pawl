@@ -1,0 +1,26 @@
+{
+  "description": "CR 506.4 an attacking creature that phases out mid-combat deals no combat damage",
+  "note": "The control: the same declaration with no Reality Ripple cast, so both Pikers connect and bob takes 4. It keeps the experiment's 2 from passing because the board was never in combat.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "victim", "ready": true },
+          { "card": "Goblin Piker", "label": "other", "ready": true },
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" }
+        ],
+        "hand": [{ "card": "Reality Ripple", "label": "ripple" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@victim", "@other"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@victim": "@bob", "@other": "@bob" } } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } }
+  ]
+}

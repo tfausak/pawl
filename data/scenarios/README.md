@@ -58,7 +58,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   An entry carrying `refuse` in place of `do` answers its prompt with a move
   the engine must reverse and ask for again (CR 733.1), such as an illegal
   block declaration; the move standing fails the scenario, and the prompt
-  asked again takes the next entry at that key.
+  asked again takes the next entry at that key. An illegal `do` is asked
+  again too, so turning a `refuse` into `do` proves nothing: a `refuse` is
+  proven by changing the board until the move is legal.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones;
   the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),

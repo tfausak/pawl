@@ -1,0 +1,31 @@
+{
+  "description": "CR 509.1h a removed BLOCKER leaves the attacker blocked, so nothing is dealt combat damage",
+  "note": "The control for the removal: the same board and the same blocks, with the Labyrinth never activated, so the two 2/1 Pikers trade and both die.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" },
+          { "card": "Labyrinth of Skophos", "label": "maze" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "blocker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@attacker"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } }
+  ]
+}

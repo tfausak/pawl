@@ -1,0 +1,35 @@
+{
+  "description": "CR 702.190b a Splinter cast for its printed {1}{B} enters untapped and attacking nothing",
+  "note": "The control for the sneaked Splinter, and why CR 702.190b keys on the cost paid rather than on the card: the same card on the same board, cast in alice's precombat main phase for its printed {1}{B} with both Swamps, enters untapped and out of combat.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" }
+        ],
+        "hand": [{ "card": "Splinter, Hamato Yoshi", "label": "splinter" }],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Jace Beleren", "label": "jace", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@splinter", "mana": ["@swamp", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "Splinter, Hamato Yoshi", "tapped": false } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Attackers": { "attackers": {} } } }
+  ]
+}
