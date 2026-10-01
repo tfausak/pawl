@@ -6,6 +6,7 @@ import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.CostKeyword as CostKeyword
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.FullText as FullText
 import qualified Pawl.Codec.Keyword as Keyword
@@ -35,7 +36,7 @@ codec abilityCodec =
         tagOf
         [ Arm.payload "GainAbility" abilityCodec Modification.GainAbility (\x -> case x of Modification.GainAbility y -> Just y; _ -> Nothing),
           Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword (\x -> case x of Modification.GainKeyword y -> Just y; _ -> Nothing),
-          Arm.nullary "GainFlashbackAtManaCost" Modification.GainFlashbackAtManaCost,
+          Arm.payload "GainKeywordAtManaCost" CostKeyword.codec Modification.GainKeywordAtManaCost (\x -> case x of Modification.GainKeywordAtManaCost y -> Just y; _ -> Nothing),
           Arm.payload "GainEnchant" TargetSlot.codec Modification.GainEnchant (\x -> case x of Modification.GainEnchant y -> Just y; _ -> Nothing),
           Arm.payload "LoseEnchant" TargetSlot.codec Modification.LoseEnchant (\x -> case x of Modification.LoseEnchant y -> Just y; _ -> Nothing),
           Arm.payload "GainCastingPermission" CastingPermission.codec Modification.GainCastingPermission (\x -> case x of Modification.GainCastingPermission y -> Just y; _ -> Nothing),
@@ -77,7 +78,7 @@ tagOf :: Modification.Modification ability -> String
 tagOf x = case x of
   Modification.GainAbility {} -> "GainAbility"
   Modification.GainKeyword {} -> "GainKeyword"
-  Modification.GainFlashbackAtManaCost {} -> "GainFlashbackAtManaCost"
+  Modification.GainKeywordAtManaCost {} -> "GainKeywordAtManaCost"
   Modification.GainEnchant {} -> "GainEnchant"
   Modification.LoseEnchant {} -> "LoseEnchant"
   Modification.GainCastingPermission {} -> "GainCastingPermission"

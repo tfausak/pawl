@@ -1,0 +1,163 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "Sacrifice",
+                "value": {
+                  "count": 1,
+                  "whichPermanents": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "IsSource"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Replace",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "effect": {
+                            "type": "DestructionR",
+                            "value": {
+                              "rewrite": {
+                                "type": "Regenerate"
+                              }
+                            }
+                          },
+                          "origin": {
+                            "type": "Other"
+                          },
+                          "uses": {
+                            "type": "Once"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Varolz, the Scar-Striped",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingOffBattlefield",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "IsInZone",
+                  "value": {
+                    "type": "Graveyard"
+                  }
+                },
+                {
+                  "type": "OwnedBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeywordAtManaCost",
+              "value": {
+                "type": "Scavenge"
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Troll"
+          },
+          {
+            "type": "Warrior"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

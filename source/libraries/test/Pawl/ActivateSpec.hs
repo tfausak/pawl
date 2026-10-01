@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Activate: activating an ability onto the stack, summoning-sickness
 -- gating, and the CR 605 mana-ability exclusion from stack activations. Also the
@@ -159,6 +160,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   scavengeSpec s registry
   craftSpec s registry
   encoreSpec s registry
+  ownManaCostKeywordSpec s registry
   transmuteSpec s registry
   transfigureSpec s registry
   twoSacrificeComponentSpec s registry
@@ -3860,6 +3862,82 @@ encoreSpec s registry = Spec.describe s "Encore (CR 702.141)" $ do
     Spec.assertEqWith s "CR 513.2 and neither is on the battlefield once the end step has begun" (pilferersOn ended) []
     Spec.assertEqWith s "the card the cost exiled is still in exile" (length (Game.zoneMembers Zone.Exile S.alice ended)) 1
     Spec.assertEqWith s "and the delayed ability is spent" (Seq.length (GameState.delayedTriggers ended)) 0
+
+-- CR 613.1f / 202.1a: a keyword granted at the RECEIVING card's own mana cost
+-- (Modification.GainKeywordAtManaCost), one granter per keyword. Six Mountains
+-- and three seats throughout; the card in the graveyard is priced differently
+-- from its granter, so the lands tapped name which card priced the ability.
+-- Returns the granter (if any), the graveyard card and the state.
+ownManaCostBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe String -> String -> m (Maybe ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ownManaCostBoard s registry granterName cardName = do
+  card <- S.printingOf s registry cardName
+  mountain <- S.printingOf s registry "Mountain"
+  granter <- traverse (S.printingOf s registry) granterName
+  let (gyId, g0) = S.addGraveyardCard card S.alice (S.landsFor mountain S.alice 6 S.threePlayerGame)
+      (granterId, g1) = case granter of
+        Just printing -> let (oid, g) = S.addPermanent printing S.alice g0 in (Just oid, g)
+        Nothing -> (Nothing, g0)
+  pure
+    ( granterId,
+      gyId,
+      g1
+        { GameState.priority = Just S.alice,
+          GameState.activePlayer = S.alice,
+          GameState.phase = Phase.PrecombatMain,
+          GameState.remaining = S.phasesAfter Phase.PrecombatMain
+        }
+    )
+
+-- The tokens on the battlefield named `name`, read off the projection: they are
+-- copies (CR 707.2), so the printed card a token carries is not what they are.
+tokensNamed :: String -> GameState.GameState -> [ObjectId.ObjectId]
+tokensNamed name gs = filter (Set.member (CardName.MkCardName (Text.pack name)) . PC.names . (`Projection.project` gs)) (S.tokensOf gs)
+
+-- Activate `oid`'s one ability with `answer` and resolve it; a roster of any
+-- other size leaves the state unchanged, which every assertion below then fails.
+activateOnly :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+activateOnly answer oid gs = case Activatable.abilitiesFor oid gs of
+  [ability] -> S.runPure answer gs (Activate.activateAbility S.alice oid ability >> Stack.resolveTop)
+  _ -> gs
+
+ownManaCostKeywordSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ownManaCostKeywordSpec s registry = Spec.describe s "Keyword priced at the card's own mana cost (CR 202.1a)" $ do
+  -- Varolz, the Scar-Striped {1}{B}{G} 2/2 grants scavenge to Hill Giant {3}{R}
+  -- 3/3. Three counters on the 2/2 read 5/5, where a count taken off the target
+  -- reads 4/4; four lands tapped is the Giant's {3}{R}, not Varolz's three.
+  Spec.it s "CR 702.97a Varolz's scavenge is paid with the Giant's own {3}{R} and moves its power" $ do
+    (varolz, gyId, gs) <- ownManaCostBoard s registry (Just "Varolz, the Scar-Striped") "Hill Giant"
+    let varolzId = Maybe.fromMaybe gyId varolz
+        after = activateOnly (aimAtCreature varolzId) gyId gs
+    Spec.assertEqWith s "CR 702.97a the 2/2 Varolz takes the Giant's three counters and is a 5/5" (S.powerToughnessOf varolzId after) (Just (5, 5))
+    Spec.assertEqWith s "CR 202.1a paid with the Giant's own {3}{R}: four Mountains tapped" (S.tappedCount S.alice after) 4
+    (_, gyAlone, alone) <- ownManaCostBoard s registry Nothing "Hill Giant"
+    Spec.assertBool s (null (Activatable.abilitiesFor gyAlone alone)) "and without Varolz the Giant has no scavenge"
+
+  -- Cursecloth Wrappings {2}{B}{B} grants embalm until end of turn. The token is
+  -- a white Zombie copy of the 3/3 Giant, so the Wrappings' own "Zombies you
+  -- control get +1/+1" makes it 4/4.
+  Spec.it s "CR 702.128a Cursecloth Wrappings' embalm is paid with the Giant's own {3}{R}" $ do
+    (wrappings, gyId, gs) <- ownManaCostBoard s registry (Just "Cursecloth Wrappings") "Hill Giant"
+    let aim :: Prompt.Prompt r -> r
+        aim p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring (const True) sets
+          _ -> S.identityAnswer p
+        granted = activateOnly aim (Maybe.fromMaybe gyId wrappings) gs
+        after = activateOnly S.identityAnswer gyId granted
+    case tokensNamed "Hill Giant" after of
+      [token] -> do
+        Spec.assertEqWith s "CR 702.128a the token is a Zombie copy of the Giant, a 4/4 under the Wrappings" (S.powerToughnessOf token after) (Just (4, 4))
+        Spec.assertEqWith s "CR 202.1a paid with the Giant's own {3}{R}: the Wrappings and four Mountains tapped" (S.tappedCount S.alice after) 5
+      tokens -> Spec.assertFailure s ("expected one embalmed Hill Giant, got " <> show (length tokens))
+
+  -- Wire Surgeons {4}{B}{B} grants encore to Yotian Soldier {3}, an artifact
+  -- creature card: one token per opponent, three lands tapped.
+  Spec.it s "CR 702.141a Wire Surgeons' encore is paid with the Soldier's own {3}" $ do
+    (_, gyId, gs) <- ownManaCostBoard s registry (Just "Wire Surgeons") "Yotian Soldier"
+    let after = activateOnly S.identityAnswer gyId gs
+    Spec.assertEqWith s "CR 702.141a one Yotian Soldier token per opponent" (length (tokensNamed "Yotian Soldier" after)) 2
+    Spec.assertEqWith s "CR 202.1a paid with the Soldier's own {3}: three Mountains tapped" (S.tappedCount S.alice after) 3
 
 -- CR 702.84a, every sentence of it: "[Cost]: Return this card from your graveyard
 -- to the battlefield. It gains haste. Exile it at the beginning of the next end

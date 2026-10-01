@@ -18,6 +18,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostKeyword as CostKeyword
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FullText as FullText
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -53,14 +54,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.GainKeyword Keyword.Deathtouch)
       " {\"type\":\"GainKeyword\",\"value\":{\"type\":\"Deathtouch\"}} "
-  -- layer 6, CR 702.34a: nullary on the wire, since the cost this grant states
-  -- is the RECEIVING card's mana cost and no card writes it.
-  Spec.it s "GainFlashbackAtManaCost" $
+  -- layer 6, CR 202.1a: only the keyword is on the wire, since the cost this
+  -- grant states is the RECEIVING card's mana cost and no card writes it.
+  Spec.it s "GainKeywordAtManaCost" $
     Common.assertCodec
       s
       codec
-      Modification.GainFlashbackAtManaCost
-      " {\"type\":\"GainFlashbackAtManaCost\"} "
+      (Modification.GainKeywordAtManaCost CostKeyword.Scavenge)
+      " {\"type\":\"GainKeywordAtManaCost\",\"value\":{\"type\":\"Scavenge\"}} "
   -- layer 6, CR 702.5a: the granted enchant ability. The payload is a
   -- whole TargetSlot, so this arm's wire form is the one Face.enchant's entries
   -- already take.
