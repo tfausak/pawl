@@ -82,6 +82,12 @@ spec s registry = Spec.describe s "Scenario" $ do
     result <- Scenario.stage registry setup
     Spec.assertEqWith s "duplicate alias" result (Left (ScenarioFailure.MkDuplicateLabel (Label.MkLabel (Text.pack "same"))))
 
+  Spec.it s "CR 809.2 an emperor seat on no team is rejected" $ do
+    let alice = (S.playerSetup S.alice) {Seat.emperor = True}
+        setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+    result <- Scenario.stage registry setup
+    Spec.assertEqWith s "teamless emperor" result (Left (ScenarioFailure.MkIllegalEmperor (Label.MkLabel (Text.pack "alice"))))
+
   Spec.it s "CR 111.7 a token placed off the battlefield is rejected" $ do
     let token = (S.permanent "Goblin Piker") {Placement.token = True}
         alice = (S.playerSetup S.alice) {Seat.hand = Seq.singleton token}
