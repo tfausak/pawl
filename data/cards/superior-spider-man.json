@@ -1,0 +1,129 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Superior Spider-Man",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "AsCopy",
+                "value": {
+                  "eligible": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  "exceptions": [
+                    {
+                      "type": "SetName",
+                      "value": "Superior Spider-Man"
+                    },
+                    {
+                      "type": "SetPowerToughness",
+                      "value": {
+                        "power": 4,
+                        "toughness": 4
+                      }
+                    },
+                    {
+                      "type": "AddSubtypes",
+                      "value": [
+                        {
+                          "type": "Hero"
+                        },
+                        {
+                          "type": "Human"
+                        },
+                        {
+                          "type": "Spider"
+                        }
+                      ]
+                    }
+                  ],
+                  "whenYouDo": [
+                    {
+                      "type": "MoveToZone",
+                      "value": {
+                        "ref": {
+                          "type": "InSlot",
+                          "value": "thatCopiedObject"
+                        },
+                        "zone": {
+                          "type": "Exile"
+                        }
+                      }
+                    }
+                  ],
+                  "zone": {
+                    "type": "Graveyard"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Hero"
+          },
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Spider"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

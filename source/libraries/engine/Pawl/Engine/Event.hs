@@ -2286,7 +2286,7 @@ apply batch candidate event =
             -- battlefield walk that supplies "on the battlefield" is
             -- legalCopyTargets'. Read HERE, at CR 614.12a's moment, so an entry
             -- replacement applied earlier in the same batch is already visible.
-            let legal = Replacement.legalCopyTargets batch (AsCopy.eligible asCopy) oid gs
+            let legal = Replacement.legalCopyTargets batch (AsCopy.eligible asCopy) (AsCopy.zone asCopy) oid gs
             answer <-
               if null legal
                 then -- With nothing eligible, declining is the only legal answer
@@ -2355,6 +2355,14 @@ apply batch candidate event =
                     case Quantity.evaluate viewOf context (Projection.boardAsEntering gs2) oid (Quantity.substituteAnnouncedX announcedX quantity) of
                       Nothing -> pure () -- unevaluable quantity: no counters, the WithCounters arm's posture
                       Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
+                -- CR 707.9g: a linked trigger an EARLIER copy effect on this entry
+                -- armed no longer triggers, this one being applied after it; then
+                -- this row's own is armed (Replacement.linkedCopyTrigger), on this
+                -- branch alone, with the copied object bound for its effects.
+                let linkedEarlier entry = DelayedTrigger.source entry == oid && Map.member Binding.copiedObject (DelayedTrigger.bindings entry)
+                State.modify' (\g -> g {GameState.delayedTriggers = Seq.filter (not . linkedEarlier) (GameState.delayedTriggers g)})
+                Foldable.for_ (Replacement.linkedCopyTrigger asCopy) $ \linked ->
+                  State.modify' (armDelayed linked oid controller (Map.singleton Binding.copiedObject (Binding.toObject src2)) Onset.Immediately Nothing)
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed
       -- power/toughness-and-keywords option to become. Written into the COPIABLE
@@ -9106,7 +9114,8 @@ controllerTurnScoped cond = case cond of
 -- an event that already happened. Every entry is built here: by
 -- Pawl.Engine.Resolve.Effect for Effect.ArmDelayedTrigger, by Pawl.Engine.Stack
 -- for CR 702.109a's, CR 702.152a's and CR 702.185a's spell, and by
--- Pawl.Engine.Combat for CR 702.154a's reflexive ability at rule 508.1g.
+-- Pawl.Engine.Combat for CR 702.154a's reflexive ability at rule 508.1g, and by the
+-- AsCopy arm above for CR 707.9g's linked one.
 armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName.SlotName Binding.Type.Binding -> Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
 armDelayed ability source controller captured onset expiry gs = case armOnset source controller gs onset of
   -- "That turn" names no turn this resolution created, so the ability could

@@ -62,6 +62,7 @@ import qualified Pawl.Codec.ForEachNumber as ForEachNumber
 import qualified Pawl.Codec.ForbidActivation as ForbidActivation
 import qualified Pawl.Codec.ForbidAttack as ForbidAttack
 import qualified Pawl.Codec.ForbidBlock as ForbidBlock
+import qualified Pawl.Codec.ForbidUntap as ForbidUntap
 import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Codec.GiveControl as GiveControl
 import qualified Pawl.Codec.GrantLookAtExiled as GrantLookAtExiled
@@ -249,6 +250,7 @@ codec cardCodec abilityCodec =
           Arm.payload "RequireAttack" RequireAttack.codec Effect.RequireAttack (\x -> case x of Effect.RequireAttack y -> Just y; _ -> Nothing),
           Arm.payload "ForbidBlock" ForbidBlock.codec Effect.ForbidBlock (\x -> case x of Effect.ForbidBlock y -> Just y; _ -> Nothing),
           Arm.payload "ForbidActivation" ForbidActivation.codec Effect.ForbidActivation (\x -> case x of Effect.ForbidActivation y -> Just y; _ -> Nothing),
+          Arm.payload "ForbidUntap" ForbidUntap.codec Effect.ForbidUntap (\x -> case x of Effect.ForbidUntap y -> Just y; _ -> Nothing),
           Arm.payload "ForbidAttack" ForbidAttack.codec Effect.ForbidAttack (\x -> case x of Effect.ForbidAttack y -> Just y; _ -> Nothing),
           Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
           Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch (\x -> case x of Effect.BecomeMonarch y -> Just y; _ -> Nothing),
@@ -416,6 +418,7 @@ tagOf x = case x of
   Effect.RequireAttack {} -> "RequireAttack"
   Effect.ForbidBlock {} -> "ForbidBlock"
   Effect.ForbidActivation {} -> "ForbidActivation"
+  Effect.ForbidUntap {} -> "ForbidUntap"
   Effect.ForbidAttack {} -> "ForbidAttack"
   Effect.CreateEmblem {} -> "CreateEmblem"
   Effect.BecomeMonarch {} -> "BecomeMonarch"

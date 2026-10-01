@@ -35,8 +35,9 @@ import qualified Pawl.Types.Affected as Affected
 -- Object.doesNotUntapFor, written by Effect.DoesNotUntapNext; CR 508.1g's exert
 -- payment writes Object.exertedBy beside it, keyed to the exerting player rather
 -- than to the victim's controller (CR 701.43a). Both are stored on the victim and
--- spent by Pawl.Engine.Engine.untapAll, which is the one place all three carriers
--- are read.
+-- spent by Pawl.Engine.Engine.untapAll, which is the one place every carrier is
+-- read; the fourth, a resolution's stored row (Pawl.Types.ActiveUntapProhibition),
+-- reaches it through Pawl.Engine.UntapRestriction beside this one.
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.UntapRestriction is the only module that may read it, and it

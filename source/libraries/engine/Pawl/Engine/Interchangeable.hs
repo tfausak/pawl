@@ -120,9 +120,10 @@ representatives pcs gs candidates =
 --     fields describe the GAME rather than any object.
 --
 -- GameState.copyEffects, GameState.unregeneratables, GameState.blockProhibitions,
--- GameState.attackProhibitions and GameState.activationProhibitions ARE listed
--- below, for the reason every other listed field is: a row names one object and
--- not another (CR 613.1a, CR 701.19c, CR 509.1b, CR 508.1c, CR 602.2), so two creatures
+-- GameState.attackProhibitions, GameState.activationProhibitions and
+-- GameState.untapProhibitions ARE listed below, for the reason every other listed
+-- field is: a row names one object and not another (CR 613.1a, CR 701.19c, CR
+-- 509.1b, CR 508.1c, CR 602.2, CR 502.3), so two creatures
 -- alike in every characteristic are told apart by which of them a row covers.
 --
 -- GameState.enteringCounters, GameState.enteringTogether,
@@ -145,6 +146,7 @@ quiet gs =
     && null (GameState.blockProhibitions gs)
     && null (GameState.attackProhibitions gs)
     && null (GameState.activationProhibitions gs)
+    && null (GameState.untapProhibitions gs)
     && null (GameState.ignoredAbilities gs)
     && Seq.null (GameState.delayedTriggers gs)
     && Seq.null (GameState.pendingPreventionRiders gs)
