@@ -1,0 +1,32 @@
+{
+  "description": "CR 107.3a Grim Hireling sacrifices the X Treasures announced and gives -X/-X",
+  "note": "The Hireling's combat damage makes the two Treasures, so the activations in the postcombat main phase find them. X = 0 first sacrifices nothing and asks nothing, so an unscheduled sacrifice prompt fails the run. Then X = 2 sacrifices both and shrinks alice's 3/3 Hill Giant to 1/1; X = 1 would leave a Treasure and a 2/2. Each activation declines to tap a Treasure for mana. Bob controls nothing, so no block is asked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Grim Hireling", "label": "hireling", "ready": true },
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Swamp", "label": "swamp-2" }
+        ]
+      },
+      { "name": "bob" }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hireling"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTimestamps": ["Treasure Token", "Treasure Token#2"] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 2 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Activate": { "object": "@hireling", "targets": ["@giant"], "x": 0, "mana": ["@swamp", null] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 2 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Activate": { "object": "@hireling", "targets": ["@giant"], "x": 2, "mana": ["@swamp-2", null] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Treasure Token", "count": 0 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 1, "toughness": 1 } } }
+  ]
+}

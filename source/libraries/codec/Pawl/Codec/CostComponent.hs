@@ -40,6 +40,7 @@ codec keywordCodec =
       Arm.nullary "PayLifeX" CostComponent.PayLifeX,
       Arm.payload "PayHalfLife" Rounding.codec CostComponent.PayHalfLife (\x -> case x of CostComponent.PayHalfLife y -> Just y; _ -> Nothing),
       Arm.payload "Sacrifice" (Sacrifice.codec keywordCodec) CostComponent.Sacrifice (\x -> case x of CostComponent.Sacrifice y -> Just y; _ -> Nothing),
+      Arm.payload "SacrificeX" (Filter.codec keywordCodec) CostComponent.SacrificeX (\x -> case x of CostComponent.SacrificeX y -> Just y; _ -> Nothing),
       Arm.payload "TapForTotalPower" (TapForTotalPower.codec keywordCodec) CostComponent.TapForTotalPower (\x -> case x of CostComponent.TapForTotalPower y -> Just y; _ -> Nothing),
       Arm.payload "TapPermanents" (TapPermanents.codec keywordCodec) CostComponent.TapPermanents (\x -> case x of CostComponent.TapPermanents y -> Just y; _ -> Nothing),
       Arm.payload "ReturnPermanents" (ReturnPermanents.codec keywordCodec) CostComponent.ReturnPermanents (\x -> case x of CostComponent.ReturnPermanents y -> Just y; _ -> Nothing),
@@ -95,6 +96,7 @@ tagOf x = case x of
   CostComponent.PayLifeX {} -> "PayLifeX"
   CostComponent.PayHalfLife {} -> "PayHalfLife"
   CostComponent.Sacrifice {} -> "Sacrifice"
+  CostComponent.SacrificeX {} -> "SacrificeX"
   CostComponent.TapForTotalPower {} -> "TapForTotalPower"
   CostComponent.TapPermanents {} -> "TapPermanents"
   CostComponent.ReturnPermanents {} -> "ReturnPermanents"

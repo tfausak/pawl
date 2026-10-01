@@ -5,6 +5,7 @@ module Pawl.Codec.TokenR where
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Scaling as Scaling
 import qualified Pawl.Codec.TokenPattern as TokenPattern
+import qualified Pawl.Codec.TokenPlus as TokenPlus
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -19,7 +20,7 @@ codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (T
 codec cardCodec = Fields.object $ do
   matching <- Fields.required "matching" TokenPattern.codec TokenR.matching
   scaling <- Fields.defaulted "scaling" Nothing (Common.maybe Scaling.codec) TokenR.scaling
-  plus <- Fields.defaulted "plus" Nothing (Common.maybe cardCodec) TokenR.plus
+  plus <- Fields.defaulted "plus" Nothing (Common.maybe (TokenPlus.codec cardCodec)) TokenR.plus
   pure
     TokenR.MkTokenR
       { TokenR.matching = matching,
