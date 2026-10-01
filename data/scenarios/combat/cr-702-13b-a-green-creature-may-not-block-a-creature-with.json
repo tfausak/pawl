@@ -1,0 +1,28 @@
+{
+  "description": "CR 702.13b a green creature may not block a creature with intimidate",
+  "note": "Highborn Ghoul prints intimidate and nothing else; the green Prowling Serpopard shares no colour with it and is no artifact, so its block is refused.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Highborn Ghoul", "label": "ghoul", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Prowling Serpopard", "label": "blocker", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@ghoul"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@blocker": ["@ghoul"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@ghoul", "blockers": null } } }
+  ]
+}

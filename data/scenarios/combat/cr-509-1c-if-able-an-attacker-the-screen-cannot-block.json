@@ -1,0 +1,27 @@
+{
+  "description": "CR 509.1c 'if able': an attacker the Screen cannot block requires nothing",
+  "note": "Bird Maiden has flying and Razorgrass Screen has no reach, so no requirement pair is minted, the maximum is zero, and declining stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Bird Maiden", "label": "flier", "ready": true}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Razorgrass Screen", "label": "screen", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@flier"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@flier", "blockers": null}}}
+  ]
+}

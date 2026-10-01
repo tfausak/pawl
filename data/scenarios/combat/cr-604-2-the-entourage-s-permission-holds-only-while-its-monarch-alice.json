@@ -1,0 +1,31 @@
+{
+  "description": "CR 604.2 the Entourage's permission holds only while its controller is the monarch",
+  "note": "Entourage of Trest blocks an additional creature while 'you' are the monarch, and CR 109.5's 'you' is its controller: with bob the monarch it blocks both Pikers; with no monarch, or alice the monarch, the pair is refused and one block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "monarch": "alice",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "first", "ready": true },
+          { "card": "Goblin Piker", "label": "second", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Entourage of Trest", "label": "entourage", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@entourage": ["@first", "@second"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@entourage": ["@first"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@first", "blockers": ["@entourage"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@second", "blockers": null } } }
+  ]
+}

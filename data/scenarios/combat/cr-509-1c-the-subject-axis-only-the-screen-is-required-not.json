@@ -1,0 +1,30 @@
+{
+  "description": "CR 509.1c the SUBJECT axis: only the Screen is required, not everything bob controls",
+  "note": "Razorgrass Screen's requirement is over itself, not all creatures able, so the Piker beside it carries none and cannot attain the maximum in its place. The Piker's block and declining are refused; the Screen's block stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Razorgrass Screen", "label": "wall", "ready": true },
+          { "card": "Goblin Piker", "label": "bystander", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@bystander": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@wall": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@wall"] } } }
+  ]
+}

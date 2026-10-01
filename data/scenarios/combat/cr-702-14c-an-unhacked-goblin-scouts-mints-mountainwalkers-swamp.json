@@ -1,0 +1,85 @@
+{
+  "description": "CR 702.14c an unhacked Goblin Scouts mints MOUNTAINwalkers",
+  "note": "The unhacked Goblin Scouts' tokens have mountainwalk, so bob's Swamp does not stop the Piker's block, which stands. The -mountain file is the refused leg.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          },
+          {
+            "card": "Mountain",
+            "label": "m3"
+          },
+          {
+            "card": "Mountain",
+            "label": "m4"
+          },
+          {
+            "card": "Mountain",
+            "label": "m5"
+          },
+          {
+            "card": "Island",
+            "label": "island"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Scouts",
+            "label": "scouts"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "land"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@scouts", "mana": ["@m1", "@m2", "@m3", "@m4", "@m5", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"OrderTimestamps": ["Goblin Scout Token", "Goblin Scout Token#2", "Goblin Scout Token#3"]}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Goblin Scout Token", "count": 3}}},
+    {"turn": 2, "step": "DeclareAttackers", "player": "bob", "do": {"Attack": []}},
+    {"turn": 3, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["Goblin Scout Token", "Goblin Scout Token#2", "Goblin Scout Token#3"]}},
+    {"turn": 3, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@piker": ["Goblin Scout Token"]}}},
+    {"turn": 3, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "Goblin Scout Token", "blockers": ["@piker"]}}}
+  ]
+}

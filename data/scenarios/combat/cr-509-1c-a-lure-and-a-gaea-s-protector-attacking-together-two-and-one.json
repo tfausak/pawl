@@ -1,0 +1,32 @@
+{
+  "description": "CR 509.1c a Lure and a Gaea's Protector attacking together compose",
+  "note": "A Lured Piker and Gaea's Protector attack into three Pikers: the Lure is three requirements, the Protector one over all three, so the maximum is three. All three on the Lure, or two there and one on the Protector, attain it; one on the Lure and two on the Protector, or all three on the Protector, are refused. This board: two on the Lure, one on the Protector.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Gaea's Protector", "label": "protector", "ready": true},
+          {"card": "Goblin Piker", "label": "lured", "ready": true},
+          {"card": "Lure", "label": "lure", "attached": "lured"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "b1", "ready": true},
+          {"card": "Goblin Piker", "label": "b2", "ready": true},
+          {"card": "Goblin Piker", "label": "b3", "ready": true}
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["@protector", "@lured"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"@b1": ["@lured"], "@b2": ["@lured"], "@b3": ["@protector"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@protector", "blockers": ["@b3"]}}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "alice", "check": {"Blockers": {"attacker": "@lured", "blockers": ["@b1", "@b2"]}}}
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "description": "CR 509.1c with two able creatures BOTH are required to block",
+  "note": "One Lure over two able creatures is two requirements, since 509.1c checks each creature: a single block obeys one of two and is illegal, blocking with both attains the maximum.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true },
+          { "card": "Lure", "attached": "attacker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "first", "ready": true },
+          { "card": "Goblin Piker", "label": "second", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@first": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@first": ["@attacker"], "@second": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@first", "@second"] } } }
+  ]
+}

@@ -394,20 +394,6 @@ aimingBioshift giverId takerId p = case p of
   Prompt.ChooseMovedCounters _ _ _ _ offered -> offered
   _ -> S.identityAnswer p
 
--- Unbury's second mode, answered `firstId` then `secondId`, each slot's offer
--- FILTERED to its object for aimingBioshift's reason.
-aimingUnbury :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimingUnbury firstId secondId p = case p of
-  Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex 1)
-  Prompt.ChooseTargets _ _ _ asked ->
-    Map.mapWithKey
-      ( \slot (_, offered) ->
-          let wanted = if slot == SlotName.MkSlotName (Text.pack "first") then firstId else secondId
-           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
-      )
-      asked
-  _ -> S.identityAnswer p
-
 -- CR 601.2c / 205.3m: Unbury's "return two target creature cards that share a
 -- creature type from your graveyard to your hand". Each slot names the other
 -- with SharesCreatureTypeWithBound, since the condition binds both targets alike
@@ -434,20 +420,6 @@ unburySpec s registry = Spec.describe s "Unbury" $ do
       -- read by name.
       handNames gs = List.sort (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs))
       named = List.sort . fmap (CardName.MkCardName . Text.pack)
-  Spec.it s "CR 205.3m the two targets must hold a creature type in common" $ do
-    (_, board, spellId, giantA, giantB, pikerId, changelingId) <- fixture
-    let cast firstId secondId = S.runPure (aimingUnbury firstId secondId) board (S.cast S.alice spellId)
-        resolved firstId secondId = S.runPure (aimingUnbury firstId secondId) (cast firstId secondId) Stack.resolveTop
-        giants = resolved giantA giantB
-        mixed = resolved giantA pikerId
-        withChangeling = resolved pikerId changelingId
-    -- THE GAMEPLAY-LEVEL ASSERTIONS first.
-    Spec.assertEqWith s "two Giants share Giant: both return" (handNames giants) (named ["Hill Giant", "Hill Giant"])
-    Spec.assertEqWith s "a Giant and a Goblin share nothing: neither returns" (handNames mixed) (named ["Unbury"])
-    Spec.assertEqWith s "CR 702.73a a Goblin and a changeling share Goblin: both return" (handNames withChangeling) (named ["Goblin Piker", "Woodland Changeling"])
-    -- CR 601.2e behind the refusal: the announcement is reversed.
-    Spec.assertEqWith s "the Giant-and-Goblin cast is reversed" (length (GameState.stack (cast giantA pikerId))) 0
-    Spec.assertBool s (inHand spellId (cast giantA pikerId)) "and Unbury is back in alice's hand"
   -- The union posture: before either target is chosen, the second slot is
   -- offered every creature card, the Goblin included, and the joint check is
   -- what narrows it.

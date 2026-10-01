@@ -1,0 +1,41 @@
+{
+  "description": "CR 509.1c the gated requirement still names only the enchanted attacker",
+  "note": "Seton's Desire's threshold holds (seven cards in alice's graveyard), but a Piker attacking beside the enchanted one carries no requirement: blocking it instead obeys nothing, and declining is illegal too.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "enchanted", "ready": true },
+          { "card": "Seton's Desire", "attached": "enchanted" },
+          { "card": "Goblin Piker", "label": "other", "ready": true }
+        ],
+        "graveyard": [
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "blocker", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@enchanted", "@other"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": { "@blocker": ["@other"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "refuse": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@blocker": ["@enchanted"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@enchanted", "blockers": ["@blocker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@other", "blockers": null } } }
+  ]
+}
