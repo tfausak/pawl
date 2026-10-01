@@ -613,7 +613,7 @@ Finish one ring before broadening to the next. Within a ring, rank work by **dow
 
 1. **Basic Magic** — the rules and features regular paper cards need.
 2. **Paper extras** — multiplayer and variants (Commander, Planechase, Archenemy, Two-Headed Giant), shortcuts (CR 732), dexterity, ante, and un-set mechanics (stickers, Contraptions).
-3. **Digital-only** — Alchemy: perpetual, seek, conjure, boons, covercast, intensity. The CR defines none of these, so there is no rules ground truth: derive behaviour from the cards' own text and Arena's published descriptions, and say so where it lands.
+3. **Digital-only** — Alchemy: perpetual, seek, conjure, boons, covercast, intensity. The CR defines none of these, so there is no rules ground truth: derive behaviour from the cards' own text, their official rulings (Tenacious Pup's defines a one-time boon), and Arena's published descriptions, and say so where it lands.
 4. **Non-engine** — deck building and format legality, clients, tooling.
 
 Ring-2 notes that still hold:
