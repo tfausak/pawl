@@ -1,0 +1,92 @@
+{
+  "description": "CR 704.5a a Bolt can end the game mid-step",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "lightning-bolt",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 3
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$lightning-bolt",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "bob",
+        "life": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Lightning Bolt",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Result",
+        "is": {
+          "won": "alice"
+        }
+      }
+    },
+    {
+      "View": {
+        "of": "Priority",
+        "is": null
+      }
+    }
+  ]
+}
