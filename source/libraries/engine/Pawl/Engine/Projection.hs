@@ -24,7 +24,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -1271,9 +1271,14 @@ applySubtypeDefining pc =
     else pc
 
 -- affects evaluated against an object's BASE characteristics (used by
--- source-liveness, which must not recurse into the projection it feeds).
+-- source-liveness, which must not recurse into the projection it feeds). BASE
+-- here is the layer-1 value, copiableCharacteristics, never the printed card: CR
+-- 613.1a applies copy effects before every layer these gates decide for, so a
+-- land that became a copy of a nonland creature is no land to them. Proved by
+-- the scenario "CR 613.1 Blood Moon spares a land Mirrorweave made a Lord of
+-- Atlantis".
 affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
-affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (baseCharacteristics oid gs) gs
+affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (copiableCharacteristics oid gs) gs
 
 -- The ViewOf that reads every object at its BASE characteristics, for a caller
 -- feeding the projection rather than reading it. fullView and viewUpTo are the
@@ -1282,7 +1287,7 @@ affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (baseChara
 baseView :: GameState -> Count.ViewOf
 baseView gs oid =
   if Map.member oid (GameState.objects gs)
-    then Just (viewOfCharacteristics (baseView gs) oid (baseCharacteristics oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
+    then Just (viewOfCharacteristics (baseView gs) oid (copiableCharacteristics oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
     else Nothing
 
 -- CR 608.2h / 611.2d: evaluate a modification's quantities once and rewrite them
@@ -1586,7 +1591,7 @@ setLandSubtypeEffectsGiven functioning gs =
 liveGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveGiven functioning setEffs oid gs =
   not
-    ( hasLandType (baseCharacteristics oid gs)
+    ( hasLandType (copiableCharacteristics oid gs)
         && any strips (List.inits applied `zip` applied)
     )
   where
@@ -1600,7 +1605,7 @@ liveGiven functioning setEffs oid gs =
     -- setter merely waits for. Applied to `oid`, do they move it out of reach?
     escapes src aff =
       let stamp = fmap Object.timestamp (Game.lookupObject src gs)
-          strippedBy c = affectsBase src (gSource c) aff gs && hasLandType (baseCharacteristics (gSource c) gs)
+          strippedBy c = affectsBase src (gSource c) aff gs && hasLandType (copiableCharacteristics (gSource c) gs)
           before (c, printed) = not (printed && strippedBy c) || maybe True (gTimestamp c <) stamp
        in case fmap fst (filter before (typeChangersGiven functioning gs)) of
             [] -> False
@@ -1659,7 +1664,7 @@ hasLandType = Set.member CardType.Land . PC.cardTypes
 -- The same CR 305.7 gate for a reader OUTSIDE the layer fold. CR 613.10 and CR
 -- 613.11 run such readers after the projection is finished, so this may read the
 -- projection where liveGiven must read base. Not a fixpoint: liveGiven bottoms out
--- at baseCharacteristics, which folds nothing. WHICH effects apply is still
+-- at copiableCharacteristics, which folds nothing. WHICH effects apply is still
 -- answered against base by appliedSetEffects; only the final membership test moves
 -- to the finished projection, which keeps CR 613.8's ordering out of here.
 liveAfterLayers :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
@@ -1789,7 +1794,7 @@ textChangesAffecting oid gs =
   let stored = GameState.continuousEffects gs
       pairOf eff = case ContinuousEffect.modification eff of
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
-          if affectsGiven (baseView gs) (ContinuousEffect.source eff) oid (ContinuousEffect.affected eff) (baseCharacteristics oid gs) gs
+          if affectsGiven (baseView gs) (ContinuousEffect.source eff) oid (ContinuousEffect.affected eff) (copiableCharacteristics oid gs) gs
             then Just (from, to)
             else Nothing
         _ -> Nothing

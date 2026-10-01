@@ -1,0 +1,34 @@
+{
+  "description": "CR 613.1 an Island Mirrorweave made a Lord of Atlantis keeps its lord ability",
+  "note": "Tidal Warrior makes Dryad Arbor an Island, then Mirrorweave makes both of them copies of Lord of Atlantis. Tidal Warrior's effect still names the Arbor, but layer 1 has taken its land type away, so CR 305.7 strips nothing and the real Lord gets +1/+1 from each copy. Judging land-ness from the printed card strips the Arbor-copy's lord ability and leaves the Lord 3/3. No Blood Moon: the setter here names its object outright, so only the land test can spare it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains1", "ready": true },
+          { "card": "Plains", "label": "plains2", "ready": true },
+          { "card": "Plains", "label": "plains3", "ready": true },
+          { "card": "Plains", "label": "plains4", "ready": true },
+          { "card": "Tidal Warrior", "label": "warrior", "ready": true },
+          { "card": "Lord of Atlantis", "label": "lord" },
+          { "card": "Dryad Arbor", "label": "arbor" }
+        ],
+        "hand": [{ "card": "Mirrorweave", "label": "mirrorweave" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@warrior", "targets": ["@arbor"], "mana": [null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mirrorweave", "targets": ["@lord"], "mana": ["@plains1", "@plains2", "@plains3", "@plains4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@lord", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@arbor", "power": 4, "toughness": 4 } } }
+  ]
+}
