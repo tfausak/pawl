@@ -1,0 +1,41 @@
+{
+  "description": "CR 400.7a hacking the Aura SPELL leaves the permanent counting Islands",
+  "note": "Aspect of Wolf gives +X/+Y off half the Forests its controller controls. Magical Hack swaps Forest for Island on the Aura SPELL while it is on the stack, and CR 400.7a carries the swap onto the permanent it becomes, so its static ability counts Islands (CR 612.1, 613.1c). Three Forests and seven Islands are unequal and odd, so the hacked +3/+4 (a 5/5 Piker) and the printed +1/+2 (a 3/3) cannot coincide.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1", "ready": true },
+          { "card": "Forest", "label": "forest-2", "ready": true },
+          { "card": "Forest", "label": "forest-3", "ready": true },
+          { "card": "Island", "label": "island-1", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "hand": [
+          { "card": "Aspect of Wolf", "label": "aspect" },
+          { "card": "Magical Hack", "label": "hack" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@aspect", "targets": ["@piker"], "mana": ["@forest-1", "@forest-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["Aspect of Wolf"], "mana": ["@island-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Forest" }, "to": { "type": "Island" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 5, "toughness": 5 } } }
+  ]
+}

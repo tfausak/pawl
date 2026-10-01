@@ -1,0 +1,34 @@
+{
+  "description": "CR 612.1 a hacked Bog Wraith walks on ISLANDS",
+  "note": "Bog Wraith's printed swampwalk is a word on its own type line, so Magical Hack's Swamp -> Island swap reaches the projected keyword at CR 613.1c layer 3 (CR 702.14a, 612.1). alice pays the {U} from her own Island, which CR 702.14c never reads; bob defends with a Goblin Piker and one land. Here bob's land is an Island, which now stops the block: his declaration is rejected whole (CR 509.1b) and he declares none.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Bog Wraith", "label": "wraith", "ready": true },
+          { "card": "Island", "label": "island", "ready": true }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Island", "label": "land", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@wraith"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Swamp" }, "to": { "type": "Island" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@wraith"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@wraith"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@wraith", "blockers": null } } }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "description": "CR 612.1 a text change reaches a replacement effect: the hacked Globe swells an entering Goblin",
+  "note": "Dragonstorm Globe's 'Each Dragon you control enters with an additional +1/+1 counter' is a CR 614.1c replacement watching other objects, so the Globe on the battlefield is what a text change points at. Artificial Evolution swaps Dragon for Goblin on it (CR 612.1, 612.2), the change is layer 3 (CR 613.1c), and the entry loop reads the rewritten row: the 2/1 Goblin Piker enters with one counter, a 3/2. The unhacked Piker leg stays in Haskell.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Mountain", "label": "mountain-3", "ready": true },
+          { "card": "Mountain", "label": "mountain-4", "ready": true },
+          { "card": "Mountain", "label": "mountain-5", "ready": true },
+          { "card": "Mountain", "label": "mountain-6", "ready": true },
+          { "card": "Dragonstorm Globe", "label": "globe", "ready": true }
+        ],
+        "hand": [
+          { "card": "Artificial Evolution", "label": "evolution" },
+          { "card": "Goblin Piker", "label": "creature" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["@globe"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Artificial Evolution", "do": { "ChooseTypeSwap": { "from": { "type": "Dragon" }, "to": { "type": "Goblin" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@creature", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Goblin Piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Goblin Piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}

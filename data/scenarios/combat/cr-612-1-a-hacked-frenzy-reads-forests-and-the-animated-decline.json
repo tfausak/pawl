@@ -1,0 +1,31 @@
+{
+  "description": "CR 612.1 a hacked Frenzy reads FORESTS and the animated Swamp is required no more",
+  "note": "Synthetic Wetland Frenzy prints \"Swamps attack each combat if able. All creatures able to block Islands do so.\"; Kormus Bell makes every Swamp a 1/1 creature. A text change on the source must reach the subtype word in the requirement's affected set (CR 612.1, 508.1d, 509.1c). alice pays the Hack from her own Island, never animated, named so the animated Swamp is not tapped for it. Swamp -> Forest on the Frenzy lifts the attack requirement, and the Swamp may still attack, so the requirement lifted rather than the creature dropping off CR 508.1a's candidates. This leg declines to attack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kormus Bell", "label": "bell", "ready": true },
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Synthetic Wetland Frenzy", "label": "source", "ready": true }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": []
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@source"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Swamp" }, "to": { "type": "Forest" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } }
+  ]
+}

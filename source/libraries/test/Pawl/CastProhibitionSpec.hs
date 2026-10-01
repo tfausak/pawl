@@ -817,15 +817,6 @@ projectedAbility n oid gs = case drop n (Projection.abilitiesOf oid gs) of
   ability : _ -> Just ability
   [] -> Nothing
 
--- Filters the offered set down to the recipient naming `oid`, whatever arm the
--- pool wrapped it in -- a Pool.Creatures slot offers Recipient.ToCreature and a
--- hand-built ToObject of the same permanent is a different recipient that CR
--- 608.2b's re-read drops with no error.
-aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimAtCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
-  _ -> S.identityAnswer p
-
 -- alice controls Liliana with four loyalty counters, one untapped Island (the
 -- {U} the changer costs) and two untapped Swamps; she holds an Artificial
 -- Evolution. Her graveyard holds a Whipstitched Zombie ({1}{B} Creature --
@@ -970,39 +961,6 @@ lilianaSpec s registry =
           Spec.assertBool s (not (any (S.isCastOf zombieId) (Action.legalActions S.alice after))) "while the Zombie is not"
           Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Graveyard evangelId after) "the typed question agrees"
           Spec.assertEqWith s "and exactly one restriction is stored" (length (GameState.playerEffects after)) 1
-
-        -- CR 612.2 again from the other side, and the reason the counts are TWO
-        -- and ONE rather than one apiece: alice controls two Whipstitched Zombies
-        -- and one Cabal Evangel, so the printed word measures -2/-2 and the
-        -- swapped one measures -1/-1. A board with one of each cannot tell them
-        -- apart. Berserkers of Blood Ridge is 4/4, so it survives either reading
-        -- and no state-based action has to run before the assertion.
-        Spec.it s "CR 612.2 the same hack moves the -2's count onto the new word" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          liliana <- S.printingOf s registry "Liliana, Untouched by Death"
-          evolution <- S.printingOf s registry "Artificial Evolution"
-          island <- S.printingOf s registry "Island"
-          zombie <- S.printingOf s registry "Whipstitched Zombie"
-          evangel <- S.printingOf s registry "Cabal Evangel"
-          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
-          let (_, g1) = S.addPermanent island S.alice (S.landsInPlay swamp 2)
-              (lilianaId, g2) = S.addPermanent liliana S.alice g1
-              (_, g3) = S.addPermanent zombie S.alice g2
-              (_, g4) = S.addPermanent zombie S.alice g3
-              (_, g5) = S.addPermanent evangel S.alice g4
-              (victim, g6) = S.addPermanent berserkers S.bob g5
-              (evolutionId, g7) = S.addHandCard evolution S.alice g6
-              ready =
-                (S.addCounter CounterKind.Loyalty 4 lilianaId g7)
-                  { GameState.phase = Phase.PrecombatMain,
-                    GameState.activePlayer = S.alice,
-                    GameState.priority = Just S.alice
-                  }
-              plain = activateLoyalty (aimAtCreature victim) 1 lilianaId ready
-              swapped = activateLoyalty (aimAtCreature victim) 1 lilianaId (hackLiliana lilianaId evolutionId Subtype.Zombie Subtype.Cleric ready)
-          Spec.assertEqWith s "unhacked the two Zombies are counted" (Projection.powerOf victim plain) (Just 2)
-          Spec.assertEqWith s "hacked the one Cleric is counted instead" (Projection.powerOf victim swapped) (Just 3)
-          Spec.assertEqWith s "and the toughness follows the same count" (Projection.toughnessOf victim swapped) (Just 3)
 
         -- The +1's tally HIT: three Zombie cards milled, so the clause condition
         -- comparing Quantity.InSlot against one holds and the drain happens.

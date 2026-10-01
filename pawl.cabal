@@ -697,6 +697,8 @@ library codec
     Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
     Pawl.Codec.LayoutSpec
+    Pawl.Codec.LibraryArrival
+    Pawl.Codec.LibraryArrivalSpec
     Pawl.Codec.LibraryDepth
     Pawl.Codec.LibraryDepthSpec
     Pawl.Codec.LibraryPlacement
@@ -1235,6 +1237,8 @@ library codec
     Pawl.Codec.TypeLineSpec
     Pawl.Codec.TypesAre
     Pawl.Codec.TypesAreSpec
+    Pawl.Codec.TypeSwap
+    Pawl.Codec.TypeSwapSpec
     Pawl.Codec.UntapR
     Pawl.Codec.UntapRestriction
     Pawl.Codec.UntapRestrictionSpec
@@ -2129,6 +2133,7 @@ library types
     Pawl.Types.EntryFlip
     Pawl.Types.EntryOption
     Pawl.Types.EntryR
+    Pawl.Types.EntryRefusal
     Pawl.Types.EntryRestriction
     Pawl.Types.EntryRewrite
     Pawl.Types.EntryRiders
@@ -2210,6 +2215,7 @@ library types
     Pawl.Types.Layer
     Pawl.Types.Layout
     Pawl.Types.LearnMode
+    Pawl.Types.LibraryArrival
     Pawl.Types.LibraryDepth
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition
@@ -2484,6 +2490,7 @@ library types
     Pawl.Types.TeamId
     Pawl.Types.Teams
     Pawl.Types.TheseDiscard
+    Pawl.Types.Threshold
     Pawl.Types.Timed
     Pawl.Types.Times
     Pawl.Types.Timestamp
@@ -2512,6 +2519,7 @@ library types
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
     Pawl.Types.TypesAre
+    Pawl.Types.TypeSwap
     Pawl.Types.UntapR
     Pawl.Types.UntapRestriction
     Pawl.Types.UntapRewrite

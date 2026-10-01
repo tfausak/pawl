@@ -513,47 +513,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertEqWith s "no CDA survives layer 6" (PC.characteristicPT (Projection.project nightId gs)) Nothing
     Spec.assertEqWith s "1 power" (Projection.powerOf nightId gs) (Just 1)
     Spec.assertEqWith s "1 toughness" (Projection.toughnessOf nightId gs) (Just 1)
-  -- CR 208.2a makes the star in Nightmare's power box stand for an ability
-  -- printed in its TEXT BOX, and CR 604.3 makes it a characteristic-defining one.
-  -- CR 612.1 reaches any word printed on the object, so a Magical Hack naming
-  -- Swamp rewrites the words inside that ability too: the hacked Nightmare counts
-  -- Islands.
-  --
-  -- The two halves run in different layers, which is the whole of the ordering
-  -- argument. ChangeSubtypeWord is layer 3 (CR 613.1c) and rewrites the
-  -- UNEVALUATED quantity; applyCharacteristicPT determines it at layer 7a (CR
-  -- 613.4a). The third assertion is the ordering one: an Island entering AFTER
-  -- the Hack resolved still moves the P/T, which a swap that had baked a number
-  -- in at layer 3 could not do. A fence rather than a proof -- the rewrite
-  -- produces a Quantity and not a number, so no mutation of it can freeze one.
-  --
-  -- NO TWO READINGS OF THE CDA AGREE ON THIS BOARD. alice has 4 Swamps and 1
-  -- Island, bob has 1 Swamp and 2 Islands, so "Swamps you control" is 4, "Islands
-  -- you control" 1, "Swamps anyone controls" 5 and "Islands anyone controls" 3.
-  -- alice's lone Island is also the {U} that pays for the Hack.
-  --
-  -- THE NEGATIVE is the same board and the same spell with one word changed:
-  -- Forest -> Island instead of Swamp -> Island. Nightmare's CDA names no Forest,
-  -- so it stays 4/4 -- which a rewrite that blanked or greedily replaced the
-  -- quantity would fail.
-  Spec.it s "CR 612.1 a Magical Hack makes Nightmare's CDA count Islands" $ do
-    nightmare <- S.printingOf s registry "Nightmare"
-    swamp <- S.printingOf s registry "Swamp"
-    island <- S.printingOf s registry "Island"
-    magicalHack <- S.printingOf s registry "Magical Hack"
-    let lands = S.landsFor island S.bob 2 (S.landsFor swamp S.bob 1 (S.landsFor swamp S.alice 4 (S.landsInPlay island 1)))
-        (nightId, withNight) = S.addPermanent nightmare S.alice lands
-        (withHack, hackSpell) = S.handOne magicalHack withNight
-        hackTo from to =
-          let cast = S.runPure (hackAt nightId from to) withHack (S.cast S.alice hackSpell)
-           in S.runPure (hackAt nightId from to) cast Stack.resolveTop
-        hacked = hackTo Subtype.Swamp Subtype.Island
-        unhacked = hackTo Subtype.Forest Subtype.Island
-        andAnotherIsland = snd (S.addPermanent island S.alice hacked)
-    Spec.assertEqWith s "4 Swamps you control, as printed" (S.powerToughnessOf nightId withNight) (Just (4, 4))
-    Spec.assertEqWith s "hacked, it counts the 1 Island you control" (S.powerToughnessOf nightId hacked) (Just (1, 1))
-    Spec.assertEqWith s "and follows a second Island that enters after the Hack resolved" (S.powerToughnessOf nightId andAnotherIsland) (Just (2, 2))
-    Spec.assertEqWith s "the same Hack naming Forest reaches nothing in the CDA" (S.powerToughnessOf nightId unhacked) (Just (4, 4))
   Spec.it s "CR 303.4m: an attached Unholy Strength gives the enchanted creature +2/+1" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unholyStrength <- S.printingOf s registry "Unholy Strength"
@@ -1197,53 +1156,6 @@ kirdApeSpec s registry = Spec.describe s "Kird Ape" $ do
     Spec.assertEqWith s "CR 305.7 the land is now only an Island" (Projection.subtypesOf forestId enchanted) (Set.singleton Subtype.Island)
     Spec.assertEqWith s "so the Ape is back to 1/1" (S.powerToughnessOf apeId enchanted) (Just (1, 1))
     Spec.assertEqWith s "and 2/3 again once the Aura is gone" (S.powerToughnessOf apeId unenchanted) (Just (2, 3))
-  -- The other side of the same coin, and the one #765 was about: the test above
-  -- moves the BOARD under a fixed clause, this one moves the CLAUSE over a fixed
-  -- board.
-  --
-  -- CR 612.1: a text-changing effect "can apply to any words or symbols printed
-  -- on that object, but generally affects only that object's rules text (which
-  -- appears in its text box)". CR 604.2's "as long as" clause is printed in that
-  -- text box exactly as the +1/+2 beside it is, so a Magical Hack naming Forest
-  -- rewrites the clause too -- the hacked Ape asks after a Swamp.
-  --
-  -- CR 612.2 is satisfied on the way in: the clause's Forest is "a land type
-  -- word used as a land type", which is the one use the rule lets a swap reach.
-  -- That both words are BASIC land types is Magical Hack's own restriction
-  -- rather than CR 612.2's.
-  --
-  -- Forest -> SWAMP rather than Forest -> Island, deliberately: the Island that
-  -- pays the Hack's {U} is a land alice controls, so hacking into Island would
-  -- read 2/3 for a reason that has nothing to do with the clause being rewritten.
-  -- Both halves are asserted, since "the Ape is 1/1" alone passes for an engine
-  -- that dropped the ability outright.
-  Spec.it s "CR 612.1 a Magical Hack moves which land the 'as long as' clause names" $ do
-    kirdApe <- S.printingOf s registry "Kird Ape"
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    swamp <- S.printingOf s registry "Swamp"
-    magicalHack <- S.printingOf s registry "Magical Hack"
-    let base = S.landsInPlay island 1
-        (_, withForest) = S.addPermanent forest S.alice base
-        (apeId, withApe) = S.addPermanent kirdApe S.alice withForest
-        (withHack, hackSpell) = S.handOne magicalHack withApe
-        cast = S.runPure (hackAt apeId Subtype.Forest Subtype.Swamp) withHack (S.cast S.alice hackSpell)
-        hacked = S.runPure (hackAt apeId Subtype.Forest Subtype.Swamp) cast Stack.resolveTop
-        withSwamp = snd (S.addPermanent swamp S.alice hacked)
-    Spec.assertEqWith s "2/3 with a Forest, as printed" (S.powerToughnessOf apeId withApe) (Just (2, 3))
-    Spec.assertEqWith s "the Forest is still there, but the clause no longer names it" (S.powerToughnessOf apeId hacked) (Just (1, 1))
-    Spec.assertEqWith s "and a Swamp is what it names now" (S.powerToughnessOf apeId withSwamp) (Just (2, 3))
-
--- Magical Hack's two prompts: its target, forced onto the permanent the test
--- cares about (the board offers several), and the basic-land-type pair its own
--- text asks for.
--- Everything else defers to S.identityAnswer. Same shape as CombatSpec's
--- castHackAt, which is local there for the same reason this one is local here.
-hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
-hackAt oid from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
-  Prompt.ChooseLandTypeSwap {} -> (from, to)
-  _ -> S.identityAnswer p
 
 -- Convincing Mirage's two prompts: its CR 303.4a enchant slot, forced onto the
 -- one land the test cares about (the board offers five), and its CR 614.1c
@@ -1567,7 +1479,7 @@ ridersOn host gs =
 -- BOB's Hill Giant while bob holds Forests of his own, so a count read against
 -- the enchanted creature's controller would find two rather than the five alice
 -- has. Empyrial Armor's group above is where that reading is argued in full.
-aspectOfWolfSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aspectOfWolfSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 aspectOfWolfSpec s registry = Spec.describe s "Aspect of Wolf" $ do
   -- FIVE Forests: 2 and 3, which is the case an even board cannot state. A
   -- Hill Giant is printed 3/3, so the whole answer is 5/6 -- and the two
@@ -1580,47 +1492,6 @@ aspectOfWolfSpec s registry = Spec.describe s "Aspect of Wolf" $ do
     Spec.assertEqWith s "before the Aura, the Hill Giant is its printed 3/3" (S.powerToughnessOf giantId before) (Just (3, 3))
     Spec.assertEqWith s "the Aura really attached, so the count genuinely runs (CR 303.4m)" (length (ridersOn giantId after)) 1
     Spec.assertEqWith s "half of five: down for the power, up for the toughness" (S.powerToughnessOf giantId after) (Just (5, 6))
-  -- CR 612.1 at a P/T modification's quantities (see #711): the "for each
-  -- Forest you control" inside a layer-7c P/T modification is printed in the
-  -- text box exactly as Kird Ape's "as long as" clause is, so a Magical Hack
-  -- aimed at the AURA moves which land the Aura counts.
-  --
-  -- NO TWO READINGS AGREE ON THIS BOARD. alice has 5 Forests and 3 Swamps, bob 2
-  -- Forests and 1 Swamp, so "Forests you control" is 5 (+2/+3), "Swamps you
-  -- control" 3 (+1/+2), "Forests anyone controls" 7 (+3/+4) and "Swamps anyone
-  -- controls" 4 (+2/+2). On a 3/3 Hill Giant those are 5/6, 4/5, 6/7 and 5/5.
-  --
-  -- Forest -> SWAMP rather than Forest -> Island, for the Kird Ape group's
-  -- reason: alice's lone Island is the {U} that pays the Hack, so hacking into
-  -- Island would count a land the test did not put there on purpose.
-  --
-  -- The Aura is put onto the battlefield attached rather than cast, so the Hack
-  -- is the only spell and alice's Island is certainly untapped when it is paid.
-  --
-  -- THE NEGATIVE is the same board and the same spell with one word changed:
-  -- Plains -> Swamp. The Aura's clause spells no Plains, so it stays 5/6 -- which
-  -- a rewrite that blanked or greedily replaced the quantity would fail.
-  Spec.it s "CR 612.1 a Magical Hack moves which land Aspect of Wolf counts" $ do
-    forest <- S.printingOf s registry "Forest"
-    swamp <- S.printingOf s registry "Swamp"
-    island <- S.printingOf s registry "Island"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    aspect <- S.printingOf s registry "Aspect of Wolf"
-    magicalHack <- S.printingOf s registry "Magical Hack"
-    let lands = S.landsFor swamp S.bob 1 (S.landsFor forest S.bob 2 (S.landsFor island S.alice 1 (S.landsFor swamp S.alice 3 (S.landsInPlay forest 5))))
-        (giantId, withGiant) = S.addPermanent hillGiant S.bob lands
-        (auraId, withAura) = S.addPermanent aspect S.alice withGiant
-        attached = S.attach auraId giantId withAura
-        (withHack, hackSpell) = S.handOne magicalHack attached
-        hackTo from to =
-          let cast = S.runPure (hackAt auraId from to) withHack (S.cast S.alice hackSpell)
-           in S.runPure (hackAt auraId from to) cast Stack.resolveTop
-        hacked = hackTo Subtype.Forest Subtype.Swamp
-        unhacked = hackTo Subtype.Plains Subtype.Swamp
-    Spec.assertEqWith s "the Aura really attached, so the count genuinely runs (CR 303.4m)" (length (ridersOn giantId attached)) 1
-    Spec.assertEqWith s "half of alice's five Forests, as printed" (S.powerToughnessOf giantId attached) (Just (5, 6))
-    Spec.assertEqWith s "hacked, it counts alice's three Swamps" (S.powerToughnessOf giantId hacked) (Just (4, 5))
-    Spec.assertEqWith s "the same Hack naming Plains reaches nothing in the clause" (S.powerToughnessOf giantId unhacked) (Just (5, 6))
 
 -- alice with `n` Forests and Aspect of Wolf in hand, bob with a Hill Giant and
 -- TWO Forests of his own; alice casts the Aura on the Giant and it resolves.

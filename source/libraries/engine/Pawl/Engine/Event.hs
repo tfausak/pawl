@@ -121,6 +121,7 @@ import qualified Pawl.Types.EnteringTogether as EnteringTogether
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.EntryRefusal as EntryRefusal
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
@@ -144,6 +145,7 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.LibraryArrival as LibraryArrival
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LifeGainR as LifeGainR
@@ -358,12 +360,77 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
 -- each source's gain an event of its own.
+--
+-- The body is also one arrivingTogether scope, so CR 401.4 is settled before the
+-- group closes.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
-  result <- body
+  result <- arrivingTogether body
   State.modify' closeEventGroup
   pure result
+
+-- CR 401.4's scope: the cards a replacement redirects into a library while
+-- `body` runs are put there "at the same time", and their owners arrange them as
+-- it ends (arrangeLibraryArrivals). `simultaneously` opens one; so do the
+-- one-at-a-time moves that are one instruction without being one event group --
+-- a mill (millFromReturningTaken) and a surveil's graveyard half. The OUTERMOST
+-- scope wins, `simultaneously`'s posture.
+arrivingTogether :: Game a -> Game a
+arrivingTogether body = do
+  open <- State.gets (Maybe.isJust . GameState.libraryArrivals)
+  if open
+    then body
+    else do
+      State.modify' (\g -> g {GameState.libraryArrivals = Just Seq.empty})
+      result <- body
+      arrangeLibraryArrivals
+      pure result
+
+-- CR 401.4: "if an effect puts two or more cards in a specific position in a
+-- library at the same time, the owner of those cards may arrange them in any
+-- order". The redirected arrivals the scope recorded (noteLibraryArrival),
+-- grouped by owner and end; a group of two or more MOVES is asked of its owner
+-- with Prompt.ArrangeLibraryArrivals, and the cards are rewritten into the slots
+-- they already hold. A lone move is one order -- a melded permanent's two cards
+-- were arranged by CR 712.21a as they moved.
+--
+-- After the fact rather than before each move, which no reader can tell apart:
+-- nothing inside the scope reads a library's order.
+--
+-- Pawl.ZoneChangeSpec's Library of Leng and Wheel of Sun and Moon CR 401.4 cases
+-- prove it.
+arrangeLibraryArrivals :: Game ()
+arrangeLibraryArrivals = do
+  pending <- State.gets (Maybe.fromMaybe Seq.empty . GameState.libraryArrivals)
+  State.modify' (\g -> g {GameState.libraryArrivals = Nothing})
+  Monad.unless (Seq.null pending) $ do
+    gs0 <- State.get
+    let movesAt owner position = filter (\arrival -> LibraryArrival.owner arrival == owner && LibraryArrival.position arrival == position) (Foldable.toList pending)
+    Monad.forM_ (Game.apnapOrder gs0) $ \owner -> Monad.forM_ [minBound .. maxBound] $ \position -> do
+      let moves = movesAt owner position
+      Monad.when (length moves >= 2) $ do
+        gs <- State.get
+        let library = Map.findWithDefault Seq.empty owner (GameState.library gs)
+            members = Set.fromList (concatMap (Foldable.toList . LibraryArrival.cards) moves)
+            held = [i | (i, oid) <- zip [0 :: Int ..] (Foldable.toList library), Set.member oid members]
+            -- From the arrival end inward, the prompt's reading.
+            slots = case position of
+              LibraryPosition.Top -> held
+              LibraryPosition.Bottom -> reverse held
+            batch = fmap (Seq.index library) slots
+        Monad.when (length batch >= 2) $ do
+          answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+          let arranged = Game.permute batch answer
+              rewrite lib = List.foldl' (\acc (slot, oid) -> Seq.update slot oid acc) lib (zip slots arranged)
+          State.modify' (\g -> g {GameState.library = Map.adjust rewrite owner (GameState.library g)})
+
+-- CR 401.4's record: inside an arrivingTogether scope, note a move a
+-- replacement redirected to an end of `owner`'s library. Outside one the move is
+-- alone, and one move is one order.
+noteLibraryArrival :: PlayerId -> LibraryPosition.LibraryPosition -> Seq.Seq ObjectId -> GameState -> GameState
+noteLibraryArrival owner position cards gs =
+  gs {GameState.libraryArrivals = fmap (Seq.|> LibraryArrival.MkLibraryArrival owner position cards) (GameState.libraryArrivals gs)}
 
 -- CR 613.7m over CR 608.2f's action: run `body` so that everything it puts onto
 -- the battlefield is one batch, settled by Restamp.settle once it ends rather
@@ -1127,7 +1194,7 @@ conjureOntoBattlefield controller card copied count tapped = do
       ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue tapped))
       Monad.forM_ copied (\snapshot -> Monad.mapM_ (`markDuplicate` snapshot) ids)
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
-      entered <- Monad.filterM (\oid -> runEntry (siblingsOf oid) oid) ids
+      entered <- Monad.filterM (\oid -> Maybe.isNothing <$> runEntry (siblingsOf oid) oid) ids
       Monad.mapM_ unmake (filter (`List.notElem` entered) ids)
       settleMinted (GameState.nextTimestamp gs) entered
       pure (Seq.fromList entered)
@@ -4381,9 +4448,10 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- Moved event is recorded, so no trigger scan and no state-based action can see
 -- it.
 --
--- Answers whether the object entered: False is CR 614.1a's "instead" from an
--- EntryRewrite.SacrificeToEnter arm that could not be paid, the one EntryR arm
--- that answers `Nothing`. Each caller unmakes the entry.
+-- Answers Nothing when the object entered, and otherwise why it did not: CR
+-- 614.1a's "instead" from an EntryRewrite.SacrificeToEnter arm that could not be
+-- paid, the one EntryR arm that answers `Nothing`, or CR 303.4g from
+-- seatEnteringAura. Each caller unmakes the entry.
 --
 -- Always the LIVE board (`Nothing`), even when the zone change containing this
 -- entry belongs to a CR 608.2f batch: the entering object is not on the
@@ -4393,7 +4461,7 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- speaks only to the ORDER the two events' effects are chosen in, not to which
 -- board each collects from. That a contained event keeps its own footing is this
 -- engine's reading, resting on CR 614.12; no rule states it outright.
-runEntry :: Set ObjectId -> ObjectId -> Game Bool
+runEntry :: Set ObjectId -> ObjectId -> Game (Maybe EntryRefusal.EntryRefusal)
 runEntry given oid = do
   -- CR 608.2f / 614.12: inside one action (`together`), what an EARLIER call
   -- put onto the battlefield entered at the same moment as this object, so it
@@ -4417,10 +4485,48 @@ runEntry given oid = do
   beforeSubjects <- State.gets GameState.enteringSubjects
   State.modify' (\gs -> gs {GameState.enteringBeside = batch, GameState.enteringSubjects = Set.insert oid beforeSubjects})
   outcome <- applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid)
+  -- Inside the span, so the host sweep sees the subject and its siblings as
+  -- materialized but not entered, exactly as the loop's own arms do.
+  hosted <- if Maybe.isJust outcome then seatEnteringAura batch oid else pure True
   flushEnteringCounters oid
   designateProtector oid
   State.modify' (\gs -> gs {GameState.enteringBeside = before, GameState.enteringSubjects = beforeSubjects})
-  pure (Maybe.isJust outcome)
+  pure $ case outcome of
+    Nothing -> Just EntryRefusal.Unpaid
+    Just _ -> if hosted then Nothing else Just EntryRefusal.Unhosted
+
+-- CR 303.4f for an object that is an Aura only once its entry loop has run --
+-- Copy Enchantment entering as a copy of Unholy Strength (CR 707.5, 614.12a).
+-- changeZoneAttaching's gate asks the same question BEFORE the move, of an
+-- object that is already an Aura; this one asks it of whatever entered
+-- unattached and is an Aura now, so a seeded Aura and one that gate already
+-- seated are left alone. Read through the projection, which is where the copy
+-- the loop stamped lives.
+--
+-- Answers False for CR 303.4g, nothing legal to enchant; the caller unmakes the
+-- entry. MINUS `batch` and GameState.enteringSubjects for the EntersAttachedTo
+-- arm's reason: a permanent entering beside this one is not on the battlefield
+-- when the choice is made.
+--
+-- Not implemented: an Aura that enchants a PLAYER, which Attach.entryHostsFor
+-- never offers (#4542).
+seatEnteringAura :: Set ObjectId -> ObjectId -> Game Bool
+seatEnteringAura batch oid = do
+  gs <- State.get
+  let unattached = Maybe.isNothing (Game.lookupObject oid gs >>= Object.attachedTo)
+  case Projection.controllerOf oid gs of
+    Just controller | unattached && Set.member Subtype.Aura (Projection.subtypesOf oid gs) -> do
+      let entering h = Set.member h batch || Set.member h (GameState.enteringSubjects gs)
+          hosts = filter (not . entering) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid gs)
+      chosen <- Attach.chooseHost controller oid hosts
+      -- THE TAG the enchant slot produced, for changeZoneAttaching's reason:
+      -- Sba.stillLegalEnchant compares the (pool, tag) pair.
+      case chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs of
+        Nothing -> pure False
+        Just recipient -> do
+          State.modify' $ \g -> g {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Just recipient}) oid (GameState.objects g)}
+          pure True
+    _ -> pure True
 
 -- CR 614.12b: what each member of the batch not yet moved will have to
 -- sacrifice as it enters, and out of which permanents -- read off its own rows
@@ -5553,7 +5659,9 @@ millFromReturningTaken pid n
           -- Pawl.Engine.Replacement.stocked) had already measured against the
           -- printed one.
           let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
-          arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
+          -- One CR 401.4 scope and not one event group: the moves stay
+          -- separately recorded, as before.
+          arrived <- arrivingTogether (fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards))
           pure (cards, arrived)
 
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
@@ -6143,6 +6251,9 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- effects" is the whole restriction -- there is no card text to intersect
           -- it with, which is the difference from CR 303.4k's Attach.turnUpHosts.
           --
+          -- Not implemented: an Aura that enchants a PLAYER, which
+          -- Attach.entryHostsFor never offers (#4542).
+          --
           -- The Aura test is the PROJECTION's subtypes (CR 205.3 -- CR 303.4 speaks
           -- about characteristics) rather than the printed type line
           -- Pawl.Engine.Card.isAura reads, and the two now differ: Cloudform GRANTS
@@ -6170,11 +6281,12 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- effect names the host itself (EntryRiders.attachedTo) and a token with
           -- none is refused rather than minted.
           --
-          -- Not implemented: CR 303.4g's remaining branch, an Aura whose current
-          -- zone is the STACK, which that rule buries instead of leaving where it is
-          -- (gap #1734). No road in this pool reaches it: CR 303.4a makes a cast
-          -- Aura spell target, so Pawl.Engine.Stack's Aura branch always hands this
-          -- funnel a seed, and CR 608.2b counters the spell whose target has gone.
+          -- CR 303.4g's STACK branch never reaches this gate: CR 303.4a makes a
+          -- cast Aura spell target, so Pawl.Engine.Stack's Aura branch always
+          -- hands this funnel a seed. A permanent spell that becomes an Aura only
+          -- as it enters (Copy Enchantment, CR 707.5) is not an Aura on `gs` at
+          -- all; seatEnteringAura asks it after the entry loop has made the copy
+          -- choice, which CR 614.12a puts first.
           settledSeed <-
             if dest == Zone.Battlefield && entryFacing == Facing.FaceUp && Maybe.isNothing seed && Set.member Subtype.Aura (Projection.subtypesOf oid gs)
               then do
@@ -6430,46 +6542,72 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- The OWNER's library, CR 400.3: every zone this funnel places into
               -- is keyed by owner, and `pid` is the id placeObject was handed.
               Monad.when shuffling (shuffleLibrary pid)
+              -- CR 401.4: a redirect INTO a library at a stated end, for the
+              -- scope's owner to arrange (arrangeLibraryArrivals). A move
+              -- headed for a library already had its order settled by its
+              -- instruction (Pawl.Engine.Resolve.Effect.settleArrivals), and a
+              -- shuffle leaves no position to arrange.
+              Monad.when (dest == Zone.Library && requestedDest /= Zone.Library && not shuffling) $
+                State.modify' (noteLibraryArrival pid position (newId Seq.<| trailingIds0))
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
               -- same-batch siblings, empty for every door but changeZoneEnteringIn
               -- (CR 614.12a; see applyReplacementsIn for why 614.12a and not
               -- 614.13a).
-              Monad.when (dest == Zone.Battlefield) $ do
-                -- CR 122.6a: the counters the EFFECT says the object enters with --
-                -- undying's and persist's "with a +1/+1 counter on it". Into the
-                -- pending map before the entry loop, so the loop's own CR 616.1 pool
-                -- can scale them and flushEnteringCounters places what it settles on
-                -- -- exactly as the EntryRewrite.WithCounters arm inside the loop
-                -- does. Still inside the move and before the Moved event below, so
-                -- nothing outside the entry can see the permanent without them (the
-                -- tap state's reason, one field over).
-                --
-                -- Before the loop rather than during it, which no card observes: no
-                -- entry replacement in the pool reads a counter the entering object
-                -- already has, and the two are simultaneous in the rules anyway.
-                --
-                -- That claim is WIDER than it was. These counters used to be on the
-                -- object by the time the loop began; now they sit pending for the
-                -- loop's whole duration, so a row reading them would answer
-                -- differently at every iteration rather than only before the first.
-                -- Checked when the pending map landed: Filter.HasCounters and
-                -- Replacement.admitsEntry are two readers a row could reach a
-                -- counter through, and a filter naming power or toughness is a
-                -- third, via Projection.counterGathered (CR 614.12); none of the
-                -- three is fed by an entering permanent's own pending counters
-                -- today.
-                Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
-                entered <- runEntry batch newId
-                -- CR 614.1a: EntryRewrite.SacrificeToEnter's "if you don't, put it
-                -- into its owner's graveyard", the entry unmade as CR 712.13a's is
-                -- below. A card that was already in the graveyard stays there.
-                Monad.unless entered $ do
-                  State.put unentered
-                  State.modify' (\g -> g {GameState.refusedEntries = fmap (Set.insert oid) (GameState.refusedEntries g)})
-                  Monad.unless (fromZone == Zone.Graveyard) (Monad.void (changeZoneReturning oid Zone.Graveyard))
-              refused <- State.gets (Maybe.isNothing . Game.lookupObject newId)
+              refusal <-
+                if dest /= Zone.Battlefield
+                  then pure Nothing
+                  else do
+                    -- CR 122.6a: the counters the EFFECT says the object enters with --
+                    -- undying's and persist's "with a +1/+1 counter on it". Into the
+                    -- pending map before the entry loop, so the loop's own CR 616.1 pool
+                    -- can scale them and flushEnteringCounters places what it settles on
+                    -- -- exactly as the EntryRewrite.WithCounters arm inside the loop
+                    -- does. Still inside the move and before the Moved event below, so
+                    -- nothing outside the entry can see the permanent without them (the
+                    -- tap state's reason, one field over).
+                    --
+                    -- Before the loop rather than during it, which no card observes: no
+                    -- entry replacement in the pool reads a counter the entering object
+                    -- already has, and the two are simultaneous in the rules anyway.
+                    --
+                    -- That claim is WIDER than it was. These counters used to be on the
+                    -- object by the time the loop began; now they sit pending for the
+                    -- loop's whole duration, so a row reading them would answer
+                    -- differently at every iteration rather than only before the first.
+                    -- Checked when the pending map landed: Filter.HasCounters and
+                    -- Replacement.admitsEntry are two readers a row could reach a
+                    -- counter through, and a filter naming power or toughness is a
+                    -- third, via Projection.counterGathered (CR 614.12); none of the
+                    -- three is fed by an entering permanent's own pending counters
+                    -- today.
+                    Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
+                    refusal <- runEntry batch newId
+                    case refusal of
+                      Nothing -> pure ()
+                      -- CR 614.1a: EntryRewrite.SacrificeToEnter's "if you don't, put
+                      -- it into its owner's graveyard", the entry unmade as CR
+                      -- 712.13a's is below. A card that was already in the graveyard
+                      -- stays there.
+                      Just EntryRefusal.Unpaid -> do
+                        State.put unentered
+                        State.modify' (\g -> g {GameState.refusedEntries = fmap (Set.insert oid) (GameState.refusedEntries g)})
+                        Monad.unless (fromZone == Zone.Graveyard) (Monad.void (changeZoneReturning oid Zone.Graveyard))
+                      -- CR 303.4g: an Aura with nothing to enchant "remains in its
+                      -- current zone, unless that zone is the stack", which puts it
+                      -- into its owner's graveyard instead. Copy Enchantment that
+                      -- copied Betrayal with no creature to steal from;
+                      -- Pawl.CopySpec's Betrayal pair proves the stack branch, and
+                      -- no test drives another origin.
+                      Just EntryRefusal.Unhosted -> do
+                        State.put unentered
+                        Monad.when (fromZone == Zone.Stack) (Monad.void (changeZoneReturning oid Zone.Graveyard))
+                    pure refusal
+              -- Read off the refusal and not off whether `newId` still names an
+              -- object: the graveyard move above re-mints from the rolled-back
+              -- counter, so the card arriving there can carry that same id.
+              let refused = Maybe.isJust refusal
               -- CR 712.13a: a resolving double-faced spell that entered
               -- transformed onto an instant or sorcery back face "doesn't enter
               -- the battlefield, and is instead put into its owner's graveyard";
@@ -7758,13 +7896,15 @@ createTokens controller card copy n tapped entering attached = do
               -- `siblingsOf` then hands each entry loop.
               let siblingsOf oid = Set.delete oid (Set.fromList ids)
               Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
-              entered <- Monad.filterM (\oid -> runEntry (siblingsOf oid) oid) ids
+              entered <- Monad.filterM (\oid -> Maybe.isNothing <$> runEntry (siblingsOf oid) oid) ids
               Monad.mapM_ unmake (filter (`List.notElem` entered) ids)
               settleMinted (GameState.nextTimestamp unminted) entered
               pure entered
 
 -- CR 614.1a on the two roads that MINT onto the battlefield: an object whose
--- EntryRewrite.SacrificeToEnter went unpaid never entered, so it is removed.
+-- EntryRewrite.SacrificeToEnter went unpaid never entered, so it is removed --
+-- as is one that became an Aura with nothing to enchant, which CR 303.4g's last
+-- sentence says "isn't created".
 -- Not implemented: putting a refused token or conjured card into its owner's
 -- graveyard, which only a "put into a graveyard from anywhere" trigger could
 -- tell apart -- no card in data/cards/ creates or conjures a card carrying the
@@ -8428,6 +8568,27 @@ offerMiracleReveal pid drawn = do
 -- MINTED, since CR 702.29c's abilities trigger from wherever the card winds up.
 discard :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game ()
 discard cause pid oid = Monad.void (discardReturning cause pid oid)
+
+-- CR 118.12: run `body` as the "[do something]" of a resolving "If [a player]
+-- does": "the action [do something] is a cost, paid when the spell or ability
+-- resolves". Saved and restored, so nothing outside the body is a cost.
+payingOnResolution :: Game a -> Game a
+payingOnResolution body = do
+  saved <- State.gets GameState.payingOnResolution
+  State.modify' (\g -> g {GameState.payingOnResolution = True})
+  result <- body
+  State.modify' (\g -> g {GameState.payingOnResolution = saved})
+  pure result
+
+-- Why a resolving instruction's discard happens: ByEffect (CR 609.1), unless
+-- it is CR 118.12's cost (payingOnResolution) -- Library of Leng's ruling,
+-- "costs aren't effects". Pawl.ZoneChangeSpec's Tweeze case proves it.
+-- Pawl.Engine.Cost.counterCause still reads such a cost as an effect for
+-- counters (#4544).
+resolvingDiscardCause :: GameState -> DiscardCause.DiscardCause
+resolvingDiscardCause gs
+  | GameState.payingOnResolution gs = DiscardCause.Ordinary
+  | otherwise = DiscardCause.ByEffect
 
 -- A second door rather than a return type on `discard`, the changeZoneReturning
 -- and destroyReturning shape: the ~dozen callers that only perform the discard

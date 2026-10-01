@@ -1,0 +1,32 @@
+{
+  "description": "CR 612.2 the same hack moves the -2's count onto the new word",
+  "note": "Liliana, Untouched by Death's -2 gives target creature -X/-X, X the Zombies alice controls. An Artificial Evolution on Liliana swapping Zombie for Cleric moves the count onto the new word (CR 612.1, 612.2). alice controls two Whipstitched Zombies and one Cabal Evangel, so the printed word measures -2/-2 and the swapped one -1/-1; bob's 4/4 Berserkers of Blood Ridge survive either, so no state-based action runs first. This is the unhacked control: the Evolution stays in hand.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Liliana, Untouched by Death", "label": "liliana", "ready": true, "counters": [{ "key": { "type": "Loyalty" }, "value": 4 }] },
+          { "card": "Whipstitched Zombie", "ready": true },
+          { "card": "Whipstitched Zombie", "ready": true },
+          { "card": "Cabal Evangel", "ready": true }
+        ],
+        "hand": [{ "card": "Artificial Evolution", "label": "evolution" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Berserkers of Blood Ridge", "label": "berserkers", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@liliana", "ability": 1, "targets": ["@berserkers"], "mana": [null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@berserkers", "power": 2, "toughness": 2 } } }
+  ]
+}

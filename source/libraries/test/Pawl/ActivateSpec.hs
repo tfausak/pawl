@@ -3151,7 +3151,7 @@ activateSole s oid gs = case soleProjectedAbility oid gs of
 -- An enchantment rather than a creature deliberately: CR 302.6's summoning
 -- sickness gates no ability here, so nothing but the swap can decide which land
 -- dies.
-textChangedCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedCostSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 textChangedCostSpec s registry =
   let forestName = CardName.MkCardName (Text.pack "Forest")
       islandName = CardName.MkCardName (Text.pack "Island")
@@ -3173,14 +3173,6 @@ textChangedCostSpec s registry =
           Spec.assertEqWith s "alice gained 3 life" (S.lifeOf S.alice after) (fmap (+ 3) before)
           Spec.assertEqWith s "the Forest is gone" (S.countOnBattlefieldByName forestName S.alice after) 0
           Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
-        -- The swap. alice's board did not move -- the same Forest and the same
-        -- Island -- but the cost printed on the Dark Heart now reads "Sacrifice an
-        -- Island", so the Island is what dies and the Forest is not even eligible.
-        Spec.it s "CR 612.1 whole card: hacking Dark Heart of the Wood moves which land its cost demands" $ do
-          (before, after) <- run True
-          Spec.assertEqWith s "alice gained 3 life" (S.lifeOf S.alice after) (fmap (+ 3) before)
-          Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
-          Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
 
 -- CR 612.1 reaching CR 118.9's STATED alternative cost, on the offer that applies
 -- it (Pawl.Types.CastOffer.payingInstead).

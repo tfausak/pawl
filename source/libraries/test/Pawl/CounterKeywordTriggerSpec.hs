@@ -1748,9 +1748,8 @@ afflictSpec s registry =
 -- is the ANSWERERS here that aim every attack at one of them, which holds the
 -- bonus to 0 or 1. What separates the two is CR 506.3's other attackable
 -- permanents: a creature that attacked only a planeswalker attacked no opponent.
---
--- Not implemented: a case splitting the declaration across both opponents, where
--- CR 702.121a's bonus is 2 (#3039).
+-- The split declaration, where the bonus is 2, is
+-- data/scenarios/counter-keyword-trigger/cr-702-121a-attacking-both-opponents-makes-wings-of-the-guard-3-3.json.
 meleeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 meleeSpec s registry =
   let -- Attacks `who` with everything, aiming every attack at the player.

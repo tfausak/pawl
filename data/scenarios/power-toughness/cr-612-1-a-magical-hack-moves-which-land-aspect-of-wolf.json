@@ -1,0 +1,42 @@
+{
+  "description": "CR 612.1 a Magical Hack moves which land Aspect of Wolf counts",
+  "note": "Aspect of Wolf's 'for each Forest you control' is printed in its text box, so a Magical Hack aimed at the Aura moves which land it counts (CR 612.1). No two readings agree: alice has 5 Forests and 3 Swamps, bob 2 Forests and 1 Swamp, so on the 3/3 Hill Giant the four readings are 5/6, 4/5, 6/7 and 5/5. Forest -> Swamp rather than Island, since alice's lone Island pays the Hack. The Aura starts attached, so the Hack is the only spell. The Plains -> Swamp swap is the control file.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Aspect of Wolf", "label": "aspect", "attached": "giant" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Swamp", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 5, "toughness": 6 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@aspect"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Forest" }, "to": { "type": "Swamp" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 4, "toughness": 5 } } }
+  ]
+}
