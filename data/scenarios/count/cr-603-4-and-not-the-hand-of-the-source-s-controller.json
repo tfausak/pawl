@@ -1,0 +1,248 @@
+{
+  "description": "CR 603.4 and not the hand of the source's controller",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Ebony Owl Netsuke",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "carol",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Goblin Piker",
+          "count": 9
+        }
+      }
+    }
+  ]
+}
