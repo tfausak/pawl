@@ -4975,9 +4975,6 @@ rhysticSpec s registry =
             (gs, dashId) = S.handOne dash withPiker
             onStack = S.runPure S.identityAnswer gs (S.cast S.alice dashId >> Engine.settleForPriority)
         pure onStack
-      -- By NAME: casting made Dash Hopes a new object on the stack (CR 400.7).
-      stackNames gs = List.sort (fmap (`S.soleFaceName` gs) (GameState.stack gs))
-      named = CardName.MkCardName . Text.pack
    in Spec.describe s "CR 118.12a unless any player pays" $ do
         Spec.it s "CR 118.12a bob alone pays, so alice does not search" $ do
           (pikerId, onStack) <- tutorBoard

@@ -940,7 +940,7 @@ trygonPredatorSpec s registry =
 -- controller changes. A creature can only ever deal combat damage to a player who
 -- is its controller's opponent, so the nullary condition admits exactly the
 -- printed events.
-questingBeastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+questingBeastSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 questingBeastSpec s registry =
   let plan :: Prompt.Prompt r -> r
       plan p = case p of

@@ -1401,7 +1401,7 @@ spiderPunkSpec s registry =
 -- The whole group therefore turns on the same Cancel counting differently for a
 -- CREATURE spell and a NONCREATURE one on one board -- an assertion no
 -- unfiltered arm can pass.
-prowlingSerpopardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowlingSerpopardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 prowlingSerpopardSpec s registry =
   let withVictim name act = do
         island <- S.printingOf s registry "Island"

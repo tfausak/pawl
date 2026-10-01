@@ -58,7 +58,6 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expiry as Expiry
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -78,7 +77,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState

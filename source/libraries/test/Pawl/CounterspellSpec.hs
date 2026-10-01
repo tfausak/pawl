@@ -198,9 +198,6 @@ cancelVictim island cancel victim =
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (victimId, resolved)
 
-counterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-counterSpec s registry = Spec.describe s "Counter" $ do
-
 -- The board every Mana Leak case starts from, with only `bobLands` varying.
 -- alice has two Islands (Mana Leak's {1}{U}) and a Mana Leak in hand; bob has
 -- `bobLands` untapped Islands of his own and a Goblin Piker already on the
@@ -2990,7 +2987,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   fizzleSpec s registry
   indestructibleSpec s registry
-  counterSpec s registry
   manaLeakSpec s registry
   rakshasasDisdainSpec s registry
   clashOfWillsSpec s registry

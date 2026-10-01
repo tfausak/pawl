@@ -843,17 +843,7 @@ controllerAtTriggerSpec s registry =
 -- (#487), so `Exercises` below draws AND discards.
 counterTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterTriggerSpec s registry =
-  let -- bob: a Baral, three Islands, one card in his library and a Cancel in
-      -- hand. alice: `victim` on the stack. bob's library and hand each hold
-      -- exactly one card, so the draw and the discard are both countable, and CR
-      -- 701.9b has nothing to ask (a one-card hand discards forced, #63).
-      board victim island cancel baral spare =
-        let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
-            withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withBaral [1 .. (3 :: Int)]
-            (_, withLibrary) = S.addLibraryCard spare S.bob withLands
-            (victimId, onStack) = S.spellOnStack victim S.alice withLibrary
-            (cancelId, gs) = S.addHandCard cancel S.bob onStack
-         in (victimId, cancelId, gs)
+  let
       -- Targets the spell already on the stack, and takes rule 603.5's "may".
       answerWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       answerWith victimId p = case p of
@@ -861,7 +851,9 @@ counterTriggerSpec s registry =
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
    in Spec.describe s "CounterTrigger" $ do
-        -- The negative that keeps the first case from passing vacuously. CR
+        -- The negative that keeps
+        -- cr-701-6a-whole-cards-bob-s-cancel-counters-alice-s-spell.json from
+        -- passing vacuously. CR
         -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
         -- zone change rule 701.6a's countering makes -- so an implementation
         -- that matched the zone pair rather than the recorded countering would

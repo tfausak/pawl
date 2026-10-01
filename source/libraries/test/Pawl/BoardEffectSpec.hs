@@ -2764,9 +2764,6 @@ glenElendrasAnswerSpec s registry = Spec.describe s "GlenElendrasAnswer" $ do
         Spec.assertBool s (all (\oid -> Maybe.isNothing (Game.lookupObject oid resolved)) theirs) "CR 608.2n both opponent abilities ceased to exist"
         Spec.assertEqWith s "and nothing reached alice's graveyard: an ability has none to reach (CR 608.2n)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
 
-echoSilencerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-echoSilencerSpec s registry = Spec.describe s "EchoSilencer" $ do
-
 -- Kadena's Silencer {1}{U} Creature - Snake Wizard 2/1: "When this creature is
 -- turned face up, counter all abilities your opponents control. / Megamorph
 -- {1}{U}". Oracle text checked against api.scryfall.com, 2026-09-16.
@@ -3987,7 +3984,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   comeBackWrongSpec s registry
   swiftSilenceSpec s registry
   glenElendrasAnswerSpec s registry
-  echoSilencerSpec s registry
   kadenasSilencerSpec s registry
   countOnLuckSpec s registry
   soldeviDiggerSpec s registry
