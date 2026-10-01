@@ -5674,8 +5674,8 @@ stampChosenPlayer oid pid =
 -- 601.2g's window activates mana abilities before any part is paid and CR 601.2h
 -- lets the payer order the parts, so either can spend what a later part needs --
 -- Brittle Effigy's ExileThis ahead of its own {T}, Cadaverous Bloom exiling the
--- Trumpeting Carnosaur whose "discard this card" is still owed, a Synthetic
--- Dynamo Conduit spending the energy "Pay X {E}" counts. That makes the ORDER
+-- Trumpeting Carnosaur whose "discard this card" is still owed, an Aether Hub
+-- spending the energy "Pay X {E}" counts. That makes the ORDER
 -- unpayable rather than the cost, so `canPay` was right to allow it, and CR
 -- 601.2h refuses the payment whole: Unpaid rather than a funnel's silent no-op
 -- or floor, which `pay` turns into CR 733.1's reversal of the entire action.
@@ -5685,8 +5685,8 @@ stampChosenPlayer oid pid =
 --
 -- ONE guard ahead of every arm, so the gate and the payment ask one question.
 -- Pawl.CostSpec's Hanweir Battlements, Ashnod's Altar, Brittle Effigy and
--- Trumpeting Carnosaur groups and Pawl.ActivateSpec's "CR 601.2h energy a
--- Conduit spends mid-payment is not there for Pay X {E}" are the proofs.
+-- Trumpeting Carnosaur groups and Pawl.ActivateSpec's "CR 601.2h energy an
+-- Aether Hub spends mid-payment is not there for Pay X {E}" are the proofs.
 payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent moment slots pid oid component = do
   gs <- State.get
@@ -5711,8 +5711,8 @@ payPayable moment slots pid oid component = case component of
   -- rather than a shortcut: CR 614.6 replaces the EVENT the paying produces, and
   -- CR 601.2h's "partial payments are not allowed" is about what the player
   -- performs, not about what the event turns into. That is a replaced event and
-  -- not an unpayable part, so it is the guard below that has to be able to tell
-  -- them apart -- CR 122.1d leaves the permanent on the battlefield and tapped,
+  -- not an unpayable part, so it is `payComponent`'s guard that has to be able
+  -- to tell them apart -- CR 122.1d leaves the permanent on the battlefield and tapped,
   -- which `canPayComponent` calls payable.
   CostComponent.UntapThis -> do
     Event.untap oid

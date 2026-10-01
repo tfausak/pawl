@@ -2585,22 +2585,22 @@ sphinxBoard s registry energy = do
       g2 = S.addPlayerCounter PlayerCounterKind.Energy energy S.alice g1
   pure (sphinx, srcId, g2 {GameState.priority = Just S.alice})
 
--- sphinxBoard with a Synthetic Dynamo Conduit in place of one of the Islands, so
--- one {U} of the {W}{U}{U} costs an energy counter.
-sphinxConduitBoard ::
+-- sphinxBoard with an Aether Hub in place of one of the Islands, so one {U} of
+-- the {W}{U}{U} costs an energy counter.
+sphinxHubBoard ::
   (Monad m) =>
   Spec.Spec m n ->
   Registry.Registry m ->
   Natural ->
   m (Printing.Printing, ObjectId.ObjectId, GameState.GameState)
-sphinxConduitBoard s registry energy = do
+sphinxHubBoard s registry energy = do
   sphinx <- S.printingOf s registry "Sphinx of the Revelation"
   plains <- S.printingOf s registry "Plains"
   island <- S.printingOf s registry "Island"
-  conduit <- S.printingOf s registry "Synthetic Dynamo Conduit"
+  hub <- S.printingOf s registry "Aether Hub"
   mountain <- S.printingOf s registry "Mountain"
   let (srcId, g0) = S.addPermanent sphinx S.alice (S.landsFor island S.alice 1 (S.landsInPlay plains 1))
-      (_, g1) = S.addPermanent conduit S.alice g0
+      (_, g1) = S.addPermanent hub S.alice g0
       g2 = List.foldl' (\gs _ -> snd (S.addLibraryCard mountain S.alice gs)) g1 [1 .. 6 :: Int]
       g3 = S.addPlayerCounter PlayerCounterKind.Energy energy S.alice g2
   pure (sphinx, srcId, g3 {GameState.priority = Just S.alice})
@@ -2837,11 +2837,11 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     Spec.assertEqWith s "two counters bound X at 2" two [2]
 
   -- CR 118.3 across the cost's two halves: the X energy the component pays and
-  -- the energy a Synthetic Dynamo Conduit spends making the second {U} are one
-  -- count. The board is the one above at two energy with the Conduit in place of
-  -- one Island, so what moves the bound from 2 to 1 is the Conduit's energy alone.
-  Spec.it s "CR 118.3 the Sphinx's X and a Conduit's mana share one count of energy" $ do
-    (sphinx, srcId, g1) <- sphinxConduitBoard s registry 2
+  -- the energy an Aether Hub spends making the second {U} are one count. The
+  -- board is the one above at two energy with the Hub in place of one Island, so
+  -- what moves the bound from 2 to 1 is the Hub's energy alone.
+  Spec.it s "CR 118.3 the Sphinx's X and an Aether Hub's mana share one count of energy" $ do
+    (sphinx, srcId, g1) <- sphinxHubBoard s registry 2
     let act = Activate.activateAbility S.alice srcId (theAbility sphinx)
         bounds = State.execState (Engine.runGame (answerAtBound S.bob) g1 act) []
         after = snd (Engine.runGamePure (answerXMakingBlue 1 S.bob) g1 (act >> Stack.resolveTop))
@@ -2860,34 +2860,34 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     Spec.assertEqWith s "no land and not the Sphinx is tapped" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
 
-  -- CR 601.2h at X = 2 with exactly two energy, on sphinxBoard plus a Synthetic
-  -- Dynamo Conduit ("Pay {E}: Add one mana of any color"). The lands alone pay
+  -- CR 601.2h at X = 2 with exactly two energy, on sphinxBoard plus an Aether
+  -- Hub ("{T}, Pay {E}: Add one mana of any color"). The lands alone pay
   -- {W}{U}{U}, so the activation is rightly offered; CR 605.3a then lets alice
-  -- pay a {U} through the Conduit, spending one of the two counters the "Pay X
-  -- {E}" half still needs. CR 118.3 makes that order unpayable and CR 733.1
+  -- pay a {U} through the Hub, spending one of the two counters the "Pay X {E}"
+  -- half still needs. CR 118.3 makes that order unpayable and CR 733.1
   -- reverses the activation. A PAIR differing in the source named: the same
   -- answerer naming the lands pays both counters and draws two.
-  Spec.it s "CR 601.2h energy a Conduit spends mid-payment is not there for Pay X {E}" $ do
-    spent <- conduitAtTwo True
+  Spec.it s "CR 601.2h energy an Aether Hub spends mid-payment is not there for Pay X {E}" $ do
+    spent <- hubAtTwo True
     Spec.assertEqWith s "nothing was drawn" (S.handSize S.alice spent) 0
     Spec.assertEqWith s "CR 733.1 both counters are back" (S.playerCounterOf PlayerCounterKind.Energy S.alice spent) 2
     Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack spent) []
   Spec.it s "CR 605.3a naming the lands instead pays X = 2 and draws two" $ do
-    paid <- conduitAtTwo False
+    paid <- hubAtTwo False
     Spec.assertEqWith s "alice drew two" (S.handSize S.alice paid) 2
     Spec.assertEqWith s "spending both counters" (S.playerCounterOf PlayerCounterKind.Energy S.alice paid) 0
   where
-    -- sphinxBoard at two energy with a Conduit beside the lands, activated at X
-    -- = 2 and resolved; `viaConduit` is whether the window names the Conduit
+    -- sphinxBoard at two energy with an Aether Hub beside the lands, activated
+    -- at X = 2 and resolved; `viaHub` is whether the window names the Hub
     -- wherever it is offered or never does.
-    conduitAtTwo viaConduit = do
+    hubAtTwo viaHub = do
       (sphinx, srcId, g1) <- sphinxBoard s registry 2
-      conduit <- S.printingOf s registry "Synthetic Dynamo Conduit"
-      let (conduitId, g2) = S.addPermanent conduit S.alice g1
+      hub <- S.printingOf s registry "Aether Hub"
+      let (hubId, g2) = S.addPermanent hub S.alice g1
           naming :: Prompt.Prompt r -> r
           naming p = case p of
             Prompt.ChooseManaSource _ _ candidates ->
-              let wanted c = (c == conduitId) == viaConduit
+              let wanted c = (c == hubId) == viaHub
                in Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find wanted (NonEmpty.toList candidates)))
             _ -> answerXMakingBlue 2 S.bob p
           after = snd (Engine.runGamePure naming g2 (Activate.activateAbility S.alice srcId (theAbility sphinx) >> Stack.resolveTop))
