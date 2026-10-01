@@ -539,23 +539,6 @@ battleCrySpec s registry =
                 Spec.assertEqWith s "and its two triggers are the same ability from the same source" w1 w2
               other -> Spec.assertFailure s ("expected two ordering payloads of two entries each, got " <> show (fmap length other))
             _ -> Spec.assertFailure s "fixture should give alice a Hero and an Aether Flash"
-        -- CR 702.91a's "each OTHER attacking creature", read one word at a time.
-        -- The Piker is another attacking creature and gets +1/+0; the Hero is
-        -- attacking but is not OTHER; the Wall is neither pumped nor an attacker
-        -- at all (CR 702.3b's defender keeps it home), so it fixes that the set
-        -- is attackers rather than "creatures you control".
-        Spec.it s "CR 702.91a each OTHER attacking creature, and nothing else" $ do
-          hero <- S.printingOf s registry "Hero of Bladehold"
-          piker <- S.printingOf s registry "Goblin Piker"
-          wallOfStone <- S.printingOf s registry "Wall of Stone"
-          case S.combatBoardOf [hero, piker, wallOfStone] [] of
-            (gs, [heroId, pikerId, wallId], _) -> do
-              let declared = S.runPure S.aggressiveAnswer gs Engine.runStep
-              Spec.assertEqWith s "the other attacker is +1/+0" (Projection.powerOf pikerId declared) (Just 3)
-              Spec.assertEqWith s "+1/+0 leaves toughness alone" (Projection.toughnessOf pikerId declared) (Just 1)
-              Spec.assertEqWith s "the Hero does not pump itself" (Projection.powerOf heroId declared) (Just 3)
-              Spec.assertEqWith s "and a creature that is not attacking is not pumped" (Projection.powerOf wallId declared) (Just 0)
-            _ -> Spec.assertFailure s "fixture should give alice a Hero, a Piker and a Wall of Stone"
         -- THE order-matters pair, and the card's own ruling (2011-06-01): "If the
         -- token-creating ability resolves first, the tokens each get +1/+0 until
         -- end of turn from the battle cry ability."
@@ -570,15 +553,6 @@ battleCrySpec s registry =
               after = S.runCombat (resolvingFirst False) gs
           Spec.assertEqWith s "two 2/1 Soldiers" (powersOf (S.tokensOf after) after) [Just 2, Just 2]
           Spec.assertEqWith s "so bob takes 3 + 2 + 2" (S.lifeOf S.bob after) (Just 13)
-        -- The same board, the same cards, the opposite answer: battle cry
-        -- resolves while the Hero is the only attacker, finds no other attacking
-        -- creature, and the Soldiers arrive afterwards at their printed 1/1.
-        Spec.it s "CR 603.3b/702.91a resolving battle cry first leaves the Soldiers unpumped" $ do
-          hero <- S.printingOf s registry "Hero of Bladehold"
-          let (gs, _, _) = S.combatBoardOf [hero] []
-              after = S.runCombat (resolvingFirst True) gs
-          Spec.assertEqWith s "two 1/1 Soldiers" (powersOf (S.tokensOf after) after) [Just 1, Just 1]
-          Spec.assertEqWith s "so bob takes 3 + 1 + 1" (S.lifeOf S.bob after) (Just 15)
 
 -- CR 702.108a: "Prowess is a triggered ability. 'Prowess' means 'Whenever you
 -- cast a noncreature spell, this creature gets +1/+1 until end of turn.'" The

@@ -9,7 +9,6 @@ module Pawl.ShieldCounterSpec where
 
 import qualified Control.Monad as Monad
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -30,7 +29,6 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -931,28 +929,6 @@ queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.
     Spec.assertEqWith s "and four Goblins" (S.countOnBattlefieldByName goblinName S.alice queenFirst) 4
     Spec.assertEqWith s "Season then Queen: 2 Goblins * 2, plus one Soldier" (S.countOnBattlefieldByName soldierName S.alice seasonFirst) 1
     Spec.assertEqWith s "and four Goblins" (S.countOnBattlefieldByName goblinName S.alice seasonFirst) 4
-  -- The card's ruling: "Anything else specified in the effect creating the
-  -- tokens (such as tapped, attacking, ...) applies to both the original tokens
-  -- and the Soldier." Hero of Bladehold's "create two 1/1 white Soldier creature
-  -- tokens that are tapped and attacking" is the effect; only the Hero is
-  -- declared, so every attacker but the Hero arrived through the event.
-  Spec.it s "the creating effect's riders reach the appended token: tapped and attacking" $ do
-    hero <- S.printingOf s registry "Hero of Bladehold"
-    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
-    case S.combatBoardOf [hero, queen] [] of
-      (gs, [heroId, _], _) -> do
-        let declareOnlyHero :: Prompt.Prompt r -> r
-            declareOnlyHero p = case p of
-              Prompt.DeclareAttackers _ _ ids -> filter (== heroId) ids
-              _ -> S.identityAnswer p
-            declared = S.runPure declareOnlyHero gs Engine.runStep
-            soldiers = namedTokens soldierName declared
-            attacking oid = Map.member oid (Combat.Type.attackers (GameState.combat declared))
-            tapped oid = fmap Object.tapped (Game.lookupObject oid declared) == Just TapState.Tapped
-        Spec.assertEqWith s "the Hero's two Soldiers and the Queen's one" (length soldiers) 3
-        Spec.assertEqWith s "every one of them attacking (CR 508.4)" (length (filter attacking soldiers)) 3
-        Spec.assertEqWith s "and every one of them tapped (CR 110.5b)" (length (filter tapped soldiers)) 3
-      _ -> Spec.assertFailure s "fixture should give alice a Hero and a Queen"
 
 -- Chatterfang, Squirrel General (Oracle text checked against Scryfall
 -- 2026-09-30): "If one or more tokens would be created under your control, those

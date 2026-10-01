@@ -71,7 +71,8 @@ counts on axes that grow through normal M4-tail vocabulary work.
 Verdicts: **COVERED** (implemented) · **PLANNED-M?** (on the roadmap) ·
 **VOCAB** (grows through normal M4-tail opcode/condition batches — not a
 structural gap) · **GAP** (structural machinery with no roadmap home) ·
-**OOS** (design.md §6 out-of-scope).
+**OOS** (design.md §6 out-of-scope) · **RING-N** (in scope, in that later ring
+of design.md §6).
 
 ### 3.1 Replacement / prevention — GAP (breadth), shapes mostly planned
 
@@ -206,7 +207,7 @@ command-zone casting, even before Commander-format questions.
   battlefield, CR 702.26 — verify); **phasing** as a mechanism is absent. GAP.
 - **Face-down / turned-face-up** (morph, disguise, manifest, cloak) is a status +
   the copy/characteristics machinery — GAP, tied to copy (3.3).
-- **Ante** zone — **OOS** (§6).
+- **Ante** zone — **RING-2** (§6).
 - **"Outside the game"** (wish targets, `MayPlayLandsFromOutsideTheGame`) — mostly
   **OOS**-adjacent (sideboard); flag as VOCAB-if-ever.
 
@@ -329,9 +330,9 @@ Ranked by machinery risk × leverage (design.md's own ordering philosophy), for
   (M4f ✓), modal (M4g ✓ — M4 complete); player-control/restart/subgames (M5); LLM
   transpiler (M6). M4g's fast-follow (modality on activated/triggered abilities)
   is VOCAB on the existing `Mode`/`Modal` payload, not a gap.
-- **OOS (§6):** ante, dexterity, draft/Conspiracy (second VM), un-set social/
-  art-content cards, Contraptions (Attractions substrate only if CR 717 is ever
-  scoped).
+- **RING-2 (§6):** ante, dexterity, Contraptions (on the CR 717 Attractions
+  substrate).
+- **OOS (§6):** draft/Conspiracy (second VM), un-set social/art-content cards.
 
 ## 6. Recommendations for triage (no edits made)
 

@@ -38,6 +38,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`
   likewise announce their count for a slot that takes a variable number.
+  `OrderTriggers` lists one player's simultaneous triggers by source, `null`
+  for a sourceless one such as the monarch's draw, in the order they go on the
+  stack, so the last named resolves first (CR 603.3b).
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones;
   the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),

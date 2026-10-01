@@ -1,0 +1,31 @@
+{
+  "description": "CR 509.3d two blockers are two triggers, each on its own blocker",
+  "note": "CR 509.3d triggers once for each creature that blocks, and each -1/-1 lands on its own blocker. The Hill Giant is the load-bearing reading: a condition matched against the grouped blocked event fires once and leaves it 3/3, and a binding that named the bearer moves the Benalish Cavalry's own 2/2. Readings are taken in the declare blockers step once both triggers have resolved, before damage.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Benalish Cavalry", "label": "cavalry", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@cavalry"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@piker": ["@cavalry"], "@giant": ["@cavalry"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "OrderTriggers": ["@cavalry", "@cavalry"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@cavalry", "power": 2, "toughness": 2 } } }
+  ]
+}

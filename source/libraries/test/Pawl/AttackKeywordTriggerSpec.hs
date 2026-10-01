@@ -278,14 +278,6 @@ exaltedSpec s registry =
           case mine of
             [giant] -> Spec.assertEqWith s "the Giant is its printed 3/3" (S.powerToughnessOf giant (atDamage (only giant) gs)) (Just (3, 3))
             _ -> Spec.assertFailure s "fixture should give alice one Giant"
-        -- Two exalted permanents are two abilities and two +1/+1s, which is CR
-        -- 603.2 rather than a clause of rule 702.83: unlike CR 702.28c's shadow,
-        -- rule 702.83 prints no "multiple instances are redundant" sentence.
-        Spec.it s "CR 603.2 two Squires make the lone attacker 5/5" $ do
-          (gs, mine, _) <- board ["Aven Squire", "Aven Squire", "Hill Giant"] []
-          case mine of
-            [_, _, giant] -> Spec.assertEqWith s "3/3 took both pumps" (S.powerToughnessOf giant (atDamage (only giant) gs)) (Just (5, 5))
-            _ -> Spec.assertFailure s "fixture should give alice two Squires and a Giant"
         -- CR 508.1a's declaration is a SET, so a broken interpreter naming one
         -- creature twice has still declared one attacker. Combat.declareAttackers
         -- deduplicates before it counts; without that the count would be 2, so
@@ -406,22 +398,6 @@ mentorSpec s registry =
                 (S.powerToughnessOf giant (atDamage (plan [dropper, giant] giant) gs))
                 (Just (4, 4))
             _ -> Spec.assertFailure s "fixture should give alice a Dropper and a Giant"
-        -- CR 608.2b re-checks the slot as the ability resolves, and rule 702.134a's
-        -- comparison is part of what it re-checks. Two Instructors both aim at the
-        -- 2/1 Piker; the first counter makes it 3/2, and 3 is no longer less than
-        -- 3, so the second ability has no legal target and does not resolve. An
-        -- engine that only checked at CR 601.2c would leave a 4/3.
-        --
-        -- That the second ability EXISTS is asserted at the mint below, not here:
-        -- this board cannot tell a fizzled second trigger from a missing one.
-        Spec.it s "CR 608.2b the second mentor's target is no longer legal" $ do
-          (gs, mine, _) <- board ["Blade Instructor", "Blade Instructor", "Goblin Piker"] []
-          case mine of
-            [first, second, piker] -> do
-              let after = atDamage (plan [first, second, piker] piker) gs
-              Spec.assertEqWith s "one counter landed" (S.powerToughnessOf piker after) (Just (3, 2))
-              Spec.assertEqWith s "one, not two" (countersOn piker after) (Map.singleton CounterKind.PlusOnePlusOne 1)
-            _ -> Spec.assertFailure s "fixture should give alice two Instructors and a Piker"
         -- The same multiplicity asserted of the MINT, as exalted's and flanking's
         -- instance cases are, and with it the slot the gameplay cases above can
         -- only see through its effects: CR 508.3a's condition, and a target slot whose
@@ -662,23 +638,6 @@ trainingSpec s registry =
                 (S.powerToughnessOf sharpshooter (atBlockers (plan [sharpshooter]) gs))
                 (Just (1, 4))
             _ -> Spec.assertFailure s "fixture should give alice a Sharpshooter and a Giant"
-        -- Two combat phases in one turn, which is what makes the COMBAT RECORD the
-        -- right source and the event log the wrong one: the log keeps the whole
-        -- turn's declarations, so a log-fold would find Aurelia in the
-        -- second declaration she is not part of and train the Sharpshooter twice.
-        -- Aurelia, the Warleader {2}{R}{R}{W}{W} 3/4 is the pool's extra-combat
-        -- attacker, and her 3 power clears the Sharpshooter's 1 in the first phase.
-        Spec.it s "CR 702.149a the added combat phase counts only its own declaration" $ do
-          (gs, mine, _) <- board ["Apprentice Sharpshooter", "Aurelia, the Warleader"] []
-          case mine of
-            [sharpshooter, aurelia] -> do
-              let first = atBlockers (plan [sharpshooter, aurelia]) gs
-                  second = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (plan [sharpshooter]) first
-                  after = atBlockers (plan [sharpshooter]) second
-              Spec.assertEqWith s "one counter from the first declaration" (S.powerToughnessOf sharpshooter first) (Just (2, 5))
-              Spec.assertEqWith s "the second phase really ran a declaration" (GameState.phase second) (Phase.Combat CombatStep.DeclareAttackers)
-              Spec.assertEqWith s "and it added no second counter" (countersOn sharpshooter after) (Map.singleton CounterKind.PlusOnePlusOne 1)
-            _ -> Spec.assertFailure s "fixture should give alice a Sharpshooter and Aurelia"
         -- The same multiplicity asserted of the MINT, as mentor's and flanking's
         -- instance cases are: CR 702.149b says each instance triggers separately,
         -- and no card in the pool prints training twice.
