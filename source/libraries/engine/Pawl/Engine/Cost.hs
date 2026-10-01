@@ -56,6 +56,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Reversal as Reversal
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Integer as Integer
@@ -2278,7 +2279,7 @@ countersOn kind oid gs =
 -- something else under Maskwood Nexus (Pawl.CostSpec's Putrid Raptor pair).
 discardCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates slots pid oid criterion gs =
-  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> candidate /= oid && not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
@@ -2334,7 +2335,7 @@ revealFromHandCandidates = discardCandidates
 -- the battlefield half cannot read the criterion differently.
 beholdCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 beholdCandidates slots pid oid criterion gs =
-  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in revealFromHandCandidates slots pid oid criterion gs
@@ -2393,7 +2394,7 @@ beholdObjects slots pid oid n criterion = do
 -- escape cost can exile.
 exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates slots pid oid criterion gs =
-  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
@@ -2414,7 +2415,7 @@ exileCandidates slots pid oid criterion gs =
 -- leave the ExileThis component nothing to exile.
 materialCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 materialCandidates slots pid oid criterion gs =
-  let context = Projection.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
+  let context = SourceContext.withChoicesOf oid gs (Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots)
       viewOf = Projection.viewsOf gs
       matches candidate = candidate /= oid && Filter.matches context (viewOf candidate) criterion
    in filter matches (List.sort (Projection.controls pid gs))
@@ -2473,10 +2474,10 @@ tapCandidates slots pid oid criterion gs =
       -- sourceManaValue by -- and empty where the object is gone, which the atom
       -- already answers False for.
       --
-      -- CR 607.2d, the source's entry choices (Projection.withChoicesOf), for
+      -- CR 607.2d, the source's entry choices (SourceContext.withChoicesOf), for
       -- a criterion naming "the chosen type" -- matchesPermanent's reading.
       context =
-        Projection.withChoicesOf
+        SourceContext.withChoicesOf
           oid
           gs
           (Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs))

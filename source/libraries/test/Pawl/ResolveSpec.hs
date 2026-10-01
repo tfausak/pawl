@@ -5152,8 +5152,48 @@ cleansingSpec s registry =
           -- alice tapped all four Islands for the spell, so she is never asked either.
           Spec.assertEqWith s "CR 118.3 bob was asked about his first Spirit only, and alice about nothing" (fmap (\(who, spiritId, _) -> (who, spiritId)) asked) [(S.bob, Just kept)]
 
+-- CR 607.2d: Brass Herald's "When this creature enters, reveal the top four
+-- cards of your library. Put all creature cards of the chosen type revealed this
+-- way into your hand and the rest on the bottom of your library in any order" is
+-- linked to its "As this creature enters, choose a creature type", so the
+-- resolution's own filter reads the type the Herald chose
+-- (Resolve.Slots.effectContext through Pawl.Engine.SourceContext; Oracle checked
+-- against Scryfall on 2026-10-01). The choice is stamped, as Pawl.TargetSpec's
+-- From the Rubble does.
+--
+-- alice's library, top first: Goblin Piker, Hill Giant, Goblin Piker, Plains,
+-- Island. A PAIR OF BOARDS differing only in the type chosen, each taking a
+-- distinct number of cards: Goblin 2, Giant 1. The Island, never revealed, ends
+-- on top either way.
+brassHeraldSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+brassHeraldSpec s registry =
+  Spec.it s "CR 607.2d Brass Herald puts only the revealed creature cards of the type it chose into its controller's hand" $ do
+    herald <- S.printingOf s registry "Brass Herald"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    let (islandId, g0) = S.addLibraryCard island S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g1) = S.addLibraryCard plains S.alice g0
+        (_, g2) = S.addLibraryCard piker S.alice g1
+        (_, g3) = S.addLibraryCard giant S.alice g2
+        (_, g4) = S.addLibraryCard piker S.alice g3
+        (heraldId, g5) = S.entersWithTrigger herald S.alice g4
+        resolved chosen =
+          let chose = g5 {GameState.objects = Map.adjust (\o -> o {Object.chosenSubtype = Just chosen}) heraldId (GameState.objects g5)}
+              placed = S.runPure S.identityAnswer chose Engine.placePendingTriggers
+           in S.runPure S.identityAnswer placed Stack.resolveTop
+        top g = Seq.lookup 0 =<< Map.lookup S.alice (GameState.library g)
+        goblins = resolved Subtype.Goblin
+        giants = resolved Subtype.Giant
+    Spec.assertEqWith s "having chosen Goblin, both revealed Pikers go to hand and nothing else" (S.handSize S.alice goblins) 2
+    Spec.assertEqWith s "having chosen Giant, only the Hill Giant does" (S.handSize S.alice giants) 1
+    Spec.assertEqWith s "the rest went to the bottom, so the unrevealed Island is on top" (top goblins, top giants) (Just islandId, Just islandId)
+    Spec.assertEqWith s "and the library keeps every card that did not go to hand" (fmap Seq.length (Map.lookup S.alice (GameState.library goblins)), fmap Seq.length (Map.lookup S.alice (GameState.library giants))) (Just 3, Just 4)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
+  brassHeraldSpec s registry
   cleansingSpec s registry
   targetSpec s registry
   resolveSpec s registry

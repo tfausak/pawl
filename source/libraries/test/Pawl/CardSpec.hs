@@ -5347,11 +5347,15 @@ blockPermissionFilters permission =
 --     Gauntlet of Power, Obelisk of Urd).
 --   * ActivationCostFramed -- an activated ability's own cost, whose pools in
 --     Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent fill the
---     same two fields off the source (Projection.withChoicesOf, Doom Cannon).
+--     same two fields off the source (SourceContext.withChoicesOf, Doom Cannon).
 --   * ManaRestrictionFramed -- CR 106.6's restriction on the mana an ability
 --     adds, matched by Pawl.Engine.Mana.admitsUnder, which fills
 --     sourceChosenSubtype off the mana unit and not the colour (Pillar of
 --     Origins).
+--   * TriggerConditionFramed -- a triggered ability's own CR 603.2 trigger
+--     condition, matched by Pawl.Engine.Event.Match against the bearer through
+--     Pawl.Engine.SourceContext, which fills the bearer's CR 607.2d choices
+--     (Kindred Discovery). Unframed's answer for every other atom.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -5512,6 +5516,8 @@ data Framing
     ActivationCostFramed
   | -- | CR 106.6's restriction on added mana. See the overview above.
     ManaRestrictionFramed
+  | -- | A triggered ability's own trigger condition. See the overview above.
+    TriggerConditionFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -5588,6 +5594,7 @@ sweptForSingularSlots framing = case framing of
   AffectedSetFramed -> True
   ActivationCostFramed -> True
   ManaRestrictionFramed -> True
+  TriggerConditionFramed -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -6308,7 +6315,7 @@ enchantSlots card = Face.enchant card <> grantedEnchantSlots card
 
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
-  frame Unframed (triggerConditionFilters (TriggeredAbility.condition ability))
+  frame TriggerConditionFramed (triggerConditionFilters (TriggeredAbility.condition ability))
     -- THE CR 603.4 position: Pawl.Engine.Event.Trigger.interveningHolds and
     -- Pawl.Engine.Stack's CR 608.2a re-check both supply the source's host here,
     -- and the trigger CONDITION above them is matched by Event.matchesTrigger,
