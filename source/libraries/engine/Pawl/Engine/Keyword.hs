@@ -5133,11 +5133,25 @@ mintedRemovalRestrictionsFor keyword =
 --
 -- A bare IsSource only, and the wildcard is right: rule 702.16n's spare is
 -- "that specific Aura or all Auras", and the second names no object.
-grantedBy :: ObjectId -> Keyword -> Keyword
-grantedBy granter keyword = case keyword of
-  Keyword.Protection protection
-    | Protection.spares protection == Just Filter.IsSource ->
-        Keyword.Protection protection {Protection.spares = Just (Filter.IsObject granter)}
+--
+-- CR 607.2d's "protection from the chosen color" likewise: `chosen` is the
+-- GRANTER's entry choice (Cho-Manno's Blessing), which the host's frame cannot
+-- read, so a bare Filter.HasChosenColor quality bakes it into Filter.HasColor,
+-- and into the empty Or -- protection from nothing -- where none was chosen.
+-- Pawl.FilterPositionLintSpec's grantedChosenColors admits the bare atom
+-- alone, so a card burying it is rejected rather than misread.
+grantedBy :: ObjectId -> Maybe Color.Color -> Keyword -> Keyword
+grantedBy granter chosen keyword = case keyword of
+  Keyword.Protection protection ->
+    Keyword.Protection
+      protection
+        { Protection.quality = case Protection.quality protection of
+            Filter.HasChosenColor -> maybe (Filter.Or []) Filter.HasColor chosen
+            quality -> quality,
+          Protection.spares = case Protection.spares protection of
+            Just Filter.IsSource -> Just (Filter.IsObject granter)
+            spares -> spares
+        }
   _ -> keyword
 
 -- Exhaustive for `abilitiesFor`'s reason: the next keyword that forbids an

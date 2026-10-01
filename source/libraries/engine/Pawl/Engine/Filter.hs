@@ -1498,7 +1498,9 @@ data Context = MkContext
     -- (Pawl.Engine.Resolve.Slots.effectContext, Brass Herald) and the cost pools
     -- of Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent. The other
     -- is Pawl.Engine.Target.slotContext's target slot (Pentarch Paladin), which
-    -- builds its record by hand.
+    -- builds its record by hand. A static grant's bare protection quality
+    -- (Cho-Manno's Blessing) never reaches it: Pawl.Engine.Keyword.grantedBy
+    -- bakes the granter's choice out.
     --
     -- The SOURCE's, sourceChosenNames' direction rather than carrierChosenPlayer's:
     -- the permanent whose ability asks is the permanent that made the choice, and
