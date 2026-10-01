@@ -1,0 +1,36 @@
+{
+  "description": "CR 603.5 whole card: cycling Deem Worthy and taking the may deals 2 to the target",
+  "note": "Deem Worthy's cycle trigger, 'you may have it deal 2 damage to target creature': the target is chosen as the trigger goes on the stack (CR 603.3d) and the option only on resolution (CR 603.5). alice cycles it off four Mountains, aims the trigger at her Hill Giant (the Haskell board's Goblin Piker would die to the 2, and a played resolution checks state-based actions before the check can read its damage), and declines the may, marking none: the Haskell test's declining leg. Checked before the cycling draw below it resolves.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Mountain", "label": "m3" },
+          { "card": "Mountain", "label": "m4" },
+          { "card": "Hill Giant", "label": "giant" }
+        ],
+        "hand": [
+          { "card": "Deem Worthy", "label": "worthy" }
+        ],
+        "library": [
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@worthy", "mana": ["@m1", "@m2", "@m3", "@m4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseTargets": {"target": ["@giant"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"ChooseOptional": {"type": "Declines"}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Damage": {"object": "@giant", "damage": 0}}}
+  ]
+}

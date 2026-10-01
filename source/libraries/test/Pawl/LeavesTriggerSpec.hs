@@ -2817,27 +2817,6 @@ hauntSpellSpec s registry =
           Spec.assertEqWith s "CR 702.55b the card haunts bob's Piker and nothing else" (Map.elems (GameState.haunting after)) [victimId]
           Spec.assertEqWith s "CR 702.55a it is in exile rather than the graveyard CR 608.2n sent it to" (Set.size (GameState.exile after), length (Game.zoneMembers Zone.Graveyard S.alice after)) (1, 0)
           Spec.assertEqWith s "and the spell's own clause made bob discard" (handSizes after) (1, 1, 2)
-        -- The narrowness, on the same board with the same mana: CR 701.6a's
-        -- ending reaches the same graveyard from the same zone.
-        Spec.it s "CR 701.6a a countered Cry of Contrition reaches the graveyard and haunts nothing" $ do
-          (victimId, _, cryId, _, cancelId, gs) <- board
-          let onStack = castCry cryId gs
-              -- CR 117.3d's pass, written onto the board rather than played: CR
-              -- 117.3c leaves priority with alice after her own cast, and bob is
-              -- the next player in turn order. Answered by S.identityAnswer and
-              -- not `aimAt`: the Cry is the only spell on the stack, so the
-              -- Cancel's one target is forced rather than chosen -- which is also
-              -- why the answerer cannot BUILD the wrong recipient here.
-              countering = S.runPure S.identityAnswer onStack {GameState.priority = Just S.bob} (S.cast S.bob cancelId)
-              countered = S.runPure S.identityAnswer countering Stack.resolveTop
-              -- Aimed at the very Piker the positive board haunts, so a trigger
-              -- that fired here would exile the Cry and show up in the first
-              -- assertion rather than fizzling on an illegal target.
-              (placed, after) = settleAndResolve (aimAt (Recipient.ToCreature victimId)) countered
-          Spec.assertEqWith s "nothing haunts anything" (Map.toList (GameState.haunting after)) []
-          Spec.assertEqWith s "CR 701.6a the Cry is in alice's graveyard and not in exile" (length (Game.zoneMembers Zone.Graveyard S.alice after), Set.size (GameState.exile after)) (1, 0)
-          Spec.assertEqWith s "and no trigger reached the stack" (length (GameState.stack placed)) 0
-          Spec.assertEqWith s "the Cancel really did counter: it is in bob's graveyard and the stack is clear" (length (Game.zoneMembers Zone.Graveyard S.bob countered), length (GameState.stack countered)) (1, 0)
         -- CR 702.55c: the exiled card's own printed ability, which is what makes
         -- the haunt worth minting.
         Spec.it s "CR 702.55b/702.55c the haunted creature dying fires the card's rider" $ do

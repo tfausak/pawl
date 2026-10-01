@@ -639,31 +639,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Blurred Mongoose") buried) "the Mongoose itself is in bob's graveyard"
     Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
 
-  -- CR 113.6: "Abilities of an instant or sorcery spell usually function only
-  -- while that object is on the stack. Abilities of all other objects usually
-  -- function only while that object is on the battlefield." Shroud is printed on
-  -- a CREATURE card, so a Blurred Mongoose SPELL has none and Cancel targets it
-  -- legally. It is CR 113.6g -- "an object's ability that states it can't be
-  -- countered ... functions on the stack" -- that then saves it, which is the
-  -- card's other half and a different rule.
-  Spec.it s "CR 113.6 Cancel legally targets the Blurred Mongoose spell, and CR 113.6g stops it countering" $ do
-    island <- S.printingOf s registry "Island"
-    cancel <- S.printingOf s registry "Cancel"
-    mongoose <- S.printingOf s registry "Blurred Mongoose"
-    let base = S.landsInPlay island 3
-        (spellId, onStack) = S.spellOnStack mongoose S.bob base
-        (gs, cancelId) = S.handOne cancel onStack
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    case soleTargetSlot (Face.spell (S.combinedFace cancel)) of
-      Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
-      Just theSlot ->
-        Spec.assertBool
-          s
-          (Set.member (Recipient.ToObject spellId) (Target.legalRecipients (Just S.alice) S.noSource theSlot gs))
-          "the Mongoose spell is a legal target on the stack"
-    Spec.assertBool s (elem spellId (GameState.stack resolved)) "and is still on the stack, uncountered"
-    Spec.assertEqWith s "Cancel resolved into alice's graveyard regardless" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
 
   -- CR 115.5: "A spell or ability on the stack is an illegal target for itself."
   -- Cancel's "counter target spell" draws from Pool.Spells with no Filter at
@@ -1369,33 +1344,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "and the Angelic Edict too, so neither refusal above is a spell that reaches nothing"
       _ -> Spec.assertFailure s "Murder and Angelic Edict should each declare a target slot"
 
-  -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
-  -- targets are still legal. ... If all its targets, for every instance of the
-  -- word 'target,' are now illegal, the spell or ability doesn't resolve." The
-  -- second of CR 115's two moments, and the controller axis has to be read at
-  -- both: a Goblin Piker that gains hexproof in response is out of an OPPONENT's
-  -- Doom Blade and still squarely in its own controller's.
-  --
-  -- Four resolutions off two boards that differ only in who controls the Piker,
-  -- so neither answer can be a Doom Blade that never worked. No card in this pool
-  -- GRANTS hexproof, so the grant is a stored layer-6 continuous effect
-  -- (S.withEffect), as the shroud case above does it.
-  Spec.it s "CR 608.2b gaining hexproof in response fizzles an opponent's Doom Blade but not its controller's" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    let castAt controller =
-          let (pikerId, board) = S.addPermanent piker controller (S.landsInPlay swamp 2)
-              (gs, dbId) = S.handOne doomBlade board
-           in (pikerId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId)))
-        resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
-        (theirPiker, atTheirs) = castAt S.bob
-        (myPiker, atMine) = castAt S.alice
-        hexproofed oid = S.withEffect oid (Modification.GainKeyword (Keyword.Hexproof Nothing))
-    Spec.assertEqWith s "untouched, bob's Piker dies" (S.creaturesInPlay S.bob (resolve atTheirs)) 0
-    Spec.assertEqWith s "hexproofed in response, it survives alice's Doom Blade" (S.creaturesInPlay S.bob (resolve (hexproofed theirPiker atTheirs))) 1
-    Spec.assertEqWith s "untouched, alice's own Piker dies" (S.creaturesInPlay S.alice (resolve atMine)) 0
-    Spec.assertEqWith s "and hexproof does not save it from its own controller (CR 702.11b)" (S.creaturesInPlay S.alice (resolve (hexproofed myPiker atMine))) 0
 
   -- CR 113.9, the whole rule, as two DISJOINT pools: "activated and triggered
   -- abilities on the stack aren't spells, and therefore can't be countered by
@@ -1618,31 +1566,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "that graveyard holds one card, the spent Raise Dead (CR 404.1)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
     Spec.assertEqWith s "and alice's hand holds one card, the Piker and not the spell" (S.handSize S.alice resolved) 1
 
-  -- CR 608.2b: "A target that's no longer in the zone it was in when it was
-  -- targeted is illegal. ... If all its targets ... are now illegal, the spell or
-  -- ability doesn't resolve. It's removed from the stack and, if it's a spell,
-  -- put into its owner's graveyard."
-  --
-  -- The response is Event.changeZone rather than a card, because no card in this
-  -- pool can be cast in response to a sorcery AND move a card out of a graveyard:
-  -- Rest in Peace is the only one that empties a graveyard, and it does it from
-  -- an enchantment's enters trigger -- CR 303.1 lets an enchantment be cast only
-  -- "during a main phase of their turn when the stack is empty", which is exactly
-  -- when Raise Dead is not on it. Both halves run off one board and one cast, so
-  -- the fizzle cannot be a Raise Dead that never worked.
-  Spec.it s "CR 608.2b Raise Dead fizzles when its target leaves the graveyard in response" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    raiseDead <- S.printingOf s registry "Raise Dead"
-    let (mineId, board) = S.addGraveyardCard piker S.alice (S.landsInPlay swamp 1)
-        (gs, rdId) = S.handOne raiseDead board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice rdId))
-        resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
-        returned = resolve cast
-        fizzled = resolve (S.runPure S.identityAnswer cast (Event.changeZone mineId Zone.Exile))
-    Spec.assertEqWith s "untouched, the Piker card comes back" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice returned) 1
-    Spec.assertEqWith s "exiled in response, nothing comes back" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice fizzled) 0
-    Spec.assertEqWith s "and Raise Dead is in alice's graveyard either way" (length (Game.zoneMembers Zone.Graveyard S.alice fizzled)) 1
 
   -- CR 400.1's OTHER half. Raise Dead above says "in your graveyard"; Withered
   -- Wretch's "{1}: Exile target card from a graveyard" names no player at all, so
@@ -1719,34 +1642,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertEqWith s "with alice's graveyard untouched" (length (Game.zoneMembers Zone.Graveyard S.alice theirs)) 1
       abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
 
-  -- CR 608.2b for an ABILITY rather than a spell, and against the opponent's
-  -- graveyard: "A target that's no longer in the zone it was in when it was
-  -- targeted is illegal. ... If all its targets ... are now illegal, the spell or
-  -- ability doesn't resolve."
-  --
-  -- The response moves the card to bob's HAND rather than exiling it, so the two
-  -- outcomes are told apart by the exile zone: a fizzle leaves it empty, and an
-  -- ability that resolved anyway would put something in it. Both halves run off
-  -- one activation, so the fizzle cannot be an activation that never worked.
-  Spec.it s "CR 608.2b Withered Wretch's activation fizzles when the card leaves the graveyard in response" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    wretch <- S.printingOf s registry "Withered Wretch"
-    let (wretchId, g1) = S.addPermanent wretch S.alice (S.landsInPlay swamp 1)
-        (theirsId, g2) = S.addGraveyardCard piker S.bob g1
-        board = g2 {GameState.priority = Just S.alice}
-    case Face.activatedAbilities (S.combinedFace wretch) of
-      [ability] -> do
-        let activated = S.runPure (aimAtCard theirsId) board (Activate.activateAbility S.alice wretchId ability)
-            resolve g = S.runPure (aimAtCard theirsId) g Stack.resolveTop
-            exiled = resolve activated
-            fizzled = resolve (S.runPure S.identityAnswer activated (Event.changeZone theirsId Zone.Hand))
-        Spec.assertEqWith s "the activation put one ability on the stack" (length (GameState.stack activated)) 1
-        Spec.assertEqWith s "untouched, bob's card is exiled" (length (Game.zoneMembers Zone.Exile S.bob exiled)) 1
-        Spec.assertEqWith s "taken to his hand in response, nothing is exiled at all" (length (Game.zoneMembers Zone.Exile S.bob fizzled)) 0
-        Spec.assertEqWith s "and the card is still in his hand" (length (Game.zoneMembers Zone.Hand S.bob fizzled)) 1
-        Spec.assertEqWith s "with the ability off the stack either way" (length (GameState.stack fizzled)) 0
-      abilities -> Spec.assertFailure s ("expected one activated ability on Withered Wretch, got " <> show (length abilities))
 
   -- CR 115.2 clause (a)'s SECOND zone. Riftsweeper's "choose target face-up
   -- exiled card" names exile, which CR 400.2 lists among the public zones

@@ -1,0 +1,171 @@
+{
+  "description": "CR 113.6g whole card: Cancel resolves but cannot counter Rending Volley",
+  "note": "CR 113.6g: Rending Volley's \"can't be countered\" functions on the stack, and CR 101.2 makes the \"can't\" win. The twin is the plain Cancel case, where the same Cancel counters a spell that does not say it. The countering spell is not itself stopped: Cancel targets legally, resolves, does nothing, and goes to alice's graveyard (CR 608.2n). bob casts the Volley for real, so it needs a white or blue creature to target: alice's Prodigal Sorcerer, which dies when the Volley then resolves -- the proof it was still on the stack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island-1"
+          },
+          {
+            "card": "Island",
+            "label": "island-2"
+          },
+          {
+            "card": "Island",
+            "label": "island-3"
+          },
+          {
+            "card": "Prodigal Sorcerer",
+            "label": "sorcerer"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Cancel",
+            "label": "cancel"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rending Volley",
+            "label": "volley"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "@volley",
+          "targets": [
+            "@sorcerer"
+          ],
+          "mana": [
+            "@mountain-1"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@cancel",
+          "targets": [
+            "Rending Volley"
+          ],
+          "mana": [
+            "@island-1",
+            "@island-2",
+            "@island-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Stack",
+          "card": "Rending Volley",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Rending Volley",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Cancel",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Rending Volley",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Prodigal Sorcerer",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "description": "CR 118.12 declining counters the spell, and there is no surveil",
+  "note": "Don't Make a Sound: \"Counter target spell unless its controller pays {2}. If they do, surveil 2.\" bob declines on a board of four Islands that could afford the {2} twice, and the IfPaid clause reads the recorded refusal rather than offering the {2} again: a second offer would be an unscheduled prompt. The Piker is countered and alice's three-card library is untouched, so no surveil happened. bob casts the Piker for real off two Mountains.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "alice-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "alice-island-2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Don't Make a Sound",
+            "label": "sound"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-2"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-3"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "@piker",
+          "mana": [
+            "@mountain-1",
+            "@mountain-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@sound",
+          "targets": [
+            "Goblin Piker#4"
+          ],
+          "mana": [
+            "@alice-island-1",
+            "@alice-island-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseToPay": {
+          "decision": {
+            "type": "Declines"
+          }
+        }
+      },
+      "source": "Don't Make a Sound"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Goblin Piker",
+          "count": 3
+        }
+      }
+    }
+  ]
+}

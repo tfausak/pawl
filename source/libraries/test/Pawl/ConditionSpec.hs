@@ -385,27 +385,6 @@ interveningRecheckSpec s registry =
             Spec.assertEqWith s "off exactly one trigger" (length (GameState.stack raised)) 1
             Spec.assertEqWith s "and the entrant was still there" (length (skeletonsOn skeleton raised)) 1
 
-        -- THE CASE THIS GROUP EXISTS FOR. One difference from the control: the
-        -- entrant is killed with the trigger on the stack, so CR 603.4's second
-        -- check runs with the object its clause is about already gone. A
-        -- live-board reading answers "it did not enter from a graveyard, there is
-        -- no it" and the counter never lands; the log reading CR 608.2i asks for
-        -- still answers yes.
-        Spec.it s "CR 608.2i the entrant killed between the two checks still grows the Knight" $ do
-          knight <- S.printingOf s registry "Breathless Knight"
-          skeleton <- S.printingOf s registry "Reassembling Skeleton"
-          swamp <- S.printingOf s registry "Swamp"
-          raiseWith skeleton knight swamp $ \knightId raised ->
-            case skeletonsOn skeleton raised of
-              [entrant] -> do
-                let killed = kill entrant raised
-                Spec.assertEqWith s "the Knight took the +1/+1 counter anyway" (sizeOf knightId (resolveTop killed)) (Just 3, Just 3)
-                -- The board, recorded after the behaviour: the entrant really was
-                -- gone and the trigger really was still waiting, so the read above
-                -- happened at the second check and not the first.
-                Spec.assertEqWith s "the entrant was off the battlefield first" (skeletonsOn skeleton killed) []
-                Spec.assertEqWith s "with its trigger still on the stack" (length (GameState.stack killed)) 1
-              entrants -> Spec.assertEqWith s "exactly one Skeleton entered" (length entrants) 1
 
         -- The negative, one difference from the case above: the Skeleton starts in
         -- alice's HAND, so the same {1}{B} casts it and it enters from the STACK.

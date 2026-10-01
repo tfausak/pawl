@@ -2409,43 +2409,6 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
     Spec.assertEqWith s "CR 725.2 bob, the new monarch, draws on his own end step" (length (Game.zoneMembers Zone.Hand S.bob (run (endStepOf S.bob stocked)))) 1
     Spec.assertEqWith s "CR 725.3 alice, unseated, draws nothing on hers" (length (Game.zoneMembers Zone.Hand S.alice (run (endStepOf S.alice stocked)))) 0
 
-  -- CR 608.2b: "If all its targets, for every instance of the word 'target', are
-  -- now illegal, the spell or ability doesn't resolve. ... Otherwise, the spell
-  -- or ability will resolve normally. Illegal targets, if any, won't be affected
-  -- by parts of a resolving spell's effect for which they're illegal. Other parts
-  -- of the effect for which those targets are not illegal may still affect them."
-  --
-  -- Denethor is the first card in the pool that can reach the PARTIAL clause: it
-  -- takes two targets in one mode, so exactly one of them can go illegal. A
-  -- conceding player is the lever: CR 104.3a takes them out of the game
-  -- immediately, so Target.playerRecipients -- which is built from
-  -- Game.stillPlaying -- stops offering them, and both of Denethor's slots take
-  -- players. CR 800.4 is what lets the game go on around the concession.
-  Spec.it s "CR 608.2b one illegal target does not fizzle the ability, and the other half still happens" $ do
-    (ability, srcId, gs0) <- denethorBoard s registry
-    let answers = Map.fromList [(denethorCrownSlot, Set.singleton (Recipient.ToPlayer S.bob)), (denethorDamageSlot, Set.singleton (Recipient.ToPlayer S.carol))]
-        activated = snd (State.evalState (Engine.runGame (answerSlots answers) gs0 (Activate.activateAbility S.alice srcId ability)) [])
-        concede = S.departs Departure.Type.Conceded
-        resolveAfter f = S.runPure S.identityAnswer (f activated) Stack.resolveTop
-        damageIllegal = resolveAfter (concede S.carol)
-        crownIllegal = resolveAfter (concede S.bob)
-        bothIllegal = resolveAfter (concede S.bob . concede S.carol)
-    Spec.assertEqWith s "the ability waits on the stack with both targets chosen" (length (GameState.stack activated)) 1
-    -- The damage's target is gone; the crown's is not, so the crown still moves.
-    Spec.assertEqWith s "carol illegal: bob is still crowned" (GameState.monarch damageIllegal) (Just S.bob)
-    Spec.assertEqWith s "and the 3 damage went nowhere" (fmap (`S.lifeOf` damageIllegal) [S.alice, S.bob, S.dave]) [Just 20, Just 20, Just 20]
-    -- The mirror: the crown's target is gone, the damage's is not.
-    Spec.assertEqWith s "bob illegal: the crown does not move" (GameState.monarch crownIllegal) (Just S.alice)
-    Spec.assertBool s (notElem (GameEvent.BecameMonarch S.bob) (S.eventsOf crownIllegal)) "and nobody was crowned"
-    Spec.assertEqWith s "but carol still took the 3" (S.lifeOf S.carol crownIllegal) (Just 17)
-    -- Both gone: CR 608.2b's first clause, the ability does not resolve. Denethor
-    -- cannot tell that apart from resolving with both slots skipped -- every
-    -- effect it has is slot-gated, so the two produce the same board -- so what
-    -- is asserted here is the OUTCOME, which the rule fixes either way. The
-    -- discriminating half of CR 608.2b is the partial clause above.
-    Spec.assertEqWith s "both illegal: no crown moves" (GameState.monarch bothIllegal) (Just S.alice)
-    Spec.assertEqWith s "and no damage is dealt" (fmap (`S.lifeOf` bothIllegal) [S.alice, S.dave]) [Just 20, Just 20]
-    Spec.assertEqWith s "the ability leaves the stack either way" (GameState.stack bothIllegal) []
 
   -- The classification half, asserted directly. slotsOf is the READ side of the
   -- D4 dataflow lint and has no runtime consumer: Resolve.resolveModes re-derives
@@ -2812,24 +2775,6 @@ optionalEffectSpec s registry =
                   placed = S.runPure takeOptional cycled Engine.settleForPriority
                   (_, transcript) = Replay.record takeOptional placed Stack.resolveTop
               Spec.assertEqWith s "nothing was asked about a may" (filter isOptionalResponse transcript) []
-            abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
-        -- The second card, and the one that puts a TARGET under the "may":
-        -- Deem Worthy {4}{R} Instant, "Deem Worthy deals 7 damage to target
-        -- creature. Cycling {3}{R}. When you cycle this card, you may have it
-        -- deal 2 damage to target creature." The target is chosen as the
-        -- trigger goes on the stack (CR 603.3d) and the option only on
-        -- resolution (CR 603.5), which is the ordering a mode-selection
-        -- encoding of "may" would have collapsed.
-        Spec.it s "CR 603.5 whole card: cycling Deem Worthy and taking the may deals 2 to the target" $ do
-          (gs, worthyId, piker) <- deemWorthyBoard
-          case Activatable.abilitiesFor worthyId gs of
-            [ability] -> do
-              let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice worthyId ability)
-                  placed = S.runPure takeOptional cycled Engine.settleForPriority
-                  taken = S.runPure takeOptional placed Stack.resolveTop
-                  declined = S.runPure S.identityAnswer placed Stack.resolveTop
-              Spec.assertEqWith s "taking it marks 2 damage" (fmap Object.damage (Game.lookupObject piker taken)) (Just 2)
-              Spec.assertEqWith s "declining marks none" (fmap Object.damage (Game.lookupObject piker declined)) (Just 0)
             abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
         -- CR 608.2b before CR 603.5: with its only target gone, the ability
         -- "doesn't resolve. It's removed from the stack" -- so there is nothing

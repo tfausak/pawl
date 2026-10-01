@@ -1,0 +1,39 @@
+{
+  "description": "CR 608.2b gaining hexproof in response fizzles an opponent's Doom Blade but not its controller's",
+  "note": "The discriminator: hexproof does not stop a spell its controller controls (CR 702.11b). alice targets her own Piker with Doom Blade and gives it hexproof in response with her own Saiba Cryptomancer's backup trigger; it still dies. The Haskell original granted hexproof with a stored continuous effect; the Cryptomancer is a real card standing in for it. One of four files with the bob-controlled pair and the two controls.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker"},
+          {"card": "Swamp", "label": "swamp1"},
+          {"card": "Swamp", "label": "swamp2"},
+          {"card": "Island", "label": "island1"},
+          {"card": "Island", "label": "island2"}
+        ],
+        "hand": [
+          {"card": "Doom Blade", "label": "doom-blade"},
+          {"card": "Saiba Cryptomancer", "label": "saiba"}
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@doom-blade", "targets": ["@piker"], "mana": ["@swamp1", "@swamp2", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@saiba", "mana": ["@island1", "@island2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Saiba Cryptomancer", "do": {"ChooseTargets": {"backupRecipient": ["@piker"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "@piker", "keyword": {"type": "Hexproof"}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Doom Blade", "count": 1}}}
+  ]
+}
