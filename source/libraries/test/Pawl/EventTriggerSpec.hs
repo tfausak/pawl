@@ -80,60 +80,14 @@ import qualified Pawl.Types.Zone as Zone
 -- whenever a player 'cycles or discards' a card. These abilities trigger only
 -- once when a card is cycled." An engine that recorded the cycle and the discard
 -- as two log entries, both of them describing the one discard, would answer 4
--- damage to the second case below instead of 2.
+-- damage in cr-702-29d-cycling-a-card-fires-the-discard-trigger-exactly.json
+-- instead of 2.
 --
 -- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
 -- every "an opponent" below is alice.
-discardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+discardTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 discardTriggerSpec s registry =
   Spec.describe s "DiscardTrigger" $ do
-    -- CR 601.2f's "costs may include ... discarding cards", and CR 701.9a is
-    -- per CARD: Cathartic Reunion's additional cost discards two, so the one
-    -- Megrim triggers twice and alice takes 4.
-    Spec.it s "CR 701.9a whole cards: Cathartic Reunion's two discards fire bob's Megrim twice" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      reunion <- S.printingOf s registry "Cathartic Reunion"
-      megrim <- S.printingOf s registry "Megrim"
-      let base = snd (S.addPermanent megrim S.bob (S.landsInPlay mountain 2))
-          (reunionId, g1) = S.addHandCard reunion S.alice base
-          -- Exactly two other cards, so CR 701.9b has nothing to ask and the
-          -- discard is forced -- the prompt is not what this case is about.
-          g2 = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) g1 [1 .. (2 :: Int)]
-          g3 = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g2 [1 .. (4 :: Int)]
-          gs =
-            g3
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-          cast = S.runPure S.identityAnswer gs (S.cast S.alice reunionId)
-          placed = S.runPure S.identityAnswer cast Engine.settleForPriority
-          after = S.runPure S.identityAnswer cast Engine.priorityLoop
-      Spec.assertEqWith s "both cards were discarded as the cost was paid" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 2
-      Spec.assertEqWith s "two triggers, above the sorcery that caused them" (length (GameState.stack placed)) 3
-      Spec.assertEqWith s "alice took 2 per discarded card" (S.lifeOf S.alice after) (fmap (subtract 4) (S.lifeOf S.alice gs))
-      Spec.assertEqWith s "bob discarded nothing and took nothing" (S.lifeOf S.bob after) (S.lifeOf S.bob gs)
-    -- THE case. CR 702.29d: "These abilities trigger only once when a card is
-    -- cycled." Barkhide Mauler's whole text is "Cycling {2}", so nothing on it
-    -- can contribute a second trigger and the count is the discard's alone.
-    Spec.it s "CR 702.29d cycling a card fires the discard trigger exactly once" $ do
-      forest <- S.printingOf s registry "Forest"
-      piker <- S.printingOf s registry "Goblin Piker"
-      mauler <- S.printingOf s registry "Barkhide Mauler"
-      megrim <- S.printingOf s registry "Megrim"
-      let base = snd (S.addPermanent megrim S.bob (S.landsInPlay forest 2))
-          (_, withLibrary) = S.addLibraryCard piker S.alice base
-          (gs, maulerId) = S.handOne mauler withLibrary
-      case Activatable.abilitiesFor maulerId gs of
-        [ability] -> do
-          let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
-              placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
-              after = S.runPure S.identityAnswer cycled Engine.priorityLoop
-          Spec.assertEqWith s "the Mauler was discarded to pay the cost" (length (Game.zoneMembers Zone.Graveyard S.alice cycled)) 1
-          Spec.assertEqWith s "cycling's own draw plus ONE Megrim trigger" (length (GameState.stack placed)) 2
-          Spec.assertEqWith s "so alice took 2, not 4" (S.lifeOf S.alice after) (fmap (subtract 2) (S.lifeOf S.alice gs))
-        abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
     -- "An OPPONENT discards", not "a player": the axis is load-bearing, and a
     -- board where only the opponent ever discards cannot tell a correct
     -- implementation from one that ignores the player entirely. The same
@@ -889,79 +843,16 @@ controllerAtTriggerSpec s registry =
 -- (#487), so `Exercises` below draws AND discards.
 counterTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterTriggerSpec s registry =
-  let -- bob: a Baral, three Islands, one card in his library and a Cancel in
-      -- hand. alice: `victim` on the stack. bob's library and hand each hold
-      -- exactly one card, so the draw and the discard are both countable, and CR
-      -- 701.9b has nothing to ask (a one-card hand discards forced, #63).
-      board victim island cancel baral spare =
-        let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
-            withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withBaral [1 .. (3 :: Int)]
-            (_, withLibrary) = S.addLibraryCard spare S.bob withLands
-            (victimId, onStack) = S.spellOnStack victim S.alice withLibrary
-            (cancelId, gs) = S.addHandCard cancel S.bob onStack
-         in (victimId, cancelId, gs)
-      -- Targets the spell already on the stack, and takes rule 603.5's "may".
+  let -- Targets the spell already on the stack, and takes rule 603.5's "may".
       answerWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       answerWith victimId p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
    in Spec.describe s "CounterTrigger" $ do
-        Spec.it s "CR 701.6a whole cards: bob's Cancel counters alice's spell, and Baral draws then discards" $ do
-          island <- S.printingOf s registry "Island"
-          cancel <- S.printingOf s registry "Cancel"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          piker <- S.printingOf s registry "Goblin Piker"
-          mountain <- S.printingOf s registry "Mountain"
-          let (victimId, cancelId, gs) = board piker island cancel baral mountain
-              answer :: Prompt.Prompt r -> r
-              answer = answerWith victimId
-              cast = S.runPure answer gs (S.cast S.bob cancelId)
-              countered = S.runPure answer cast Stack.resolveTop
-              placed = S.runPure answer countered Engine.settleForPriority
-              after = S.runPure answer placed Stack.resolveTop
-          Spec.assertEqWith s "the victim was countered into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice countered)) 1
-          Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.alice countered) 0
-          Spec.assertEqWith s "Baral's trigger is the only thing on the stack" (length (GameState.stack placed)) 1
-          -- The trigger LANDED, not merely fired: bob's one library card was
-          -- drawn (library empty) and then discarded (his graveyard holds the
-          -- Cancel and that card, and his hand is empty again).
-          Spec.assertEqWith s "bob drew his only library card" (length (Game.zoneMembers Zone.Library S.bob after)) 0
-          Spec.assertEqWith s "and discarded it, beside the spent Cancel" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
-          Spec.assertEqWith s "so bob's hand is empty again" (S.handSize S.bob after) 0
-          Spec.assertEqWith s "the stack is empty" (length (GameState.stack after)) 0
-        -- THE composition case, and the reason the pair exists. CR 113.6g: "an
-        -- object's ability that states it can't be countered ... functions on
-        -- the stack", and CR 101.2 makes the "can't" win -- so Rending Volley
-        -- is not countered, no countering event happens, and Baral has nothing
-        -- to see. The falsifier for an implementation that recorded the event
-        -- before the gate, or that read the zone change instead.
-        --
-        -- Rending Volley rather than Blurred Mongoose, whose "this spell
-        -- can't be countered" sits on a creature card, so an uncountered
-        -- resolution leaves a permanent behind for the rest of the case to
-        -- carry, where the instant's resolution ends the board it was cast on.
-        -- Both cards are in the pool and both reach this gate the same way --
-        -- through Face.counterability, read off the spell on the stack.
-        Spec.it s "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
-          island <- S.printingOf s registry "Island"
-          cancel <- S.printingOf s registry "Cancel"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          rendingVolley <- S.printingOf s registry "Rending Volley"
-          mountain <- S.printingOf s registry "Mountain"
-          let (victimId, cancelId, gs) = board rendingVolley island cancel baral mountain
-              answer :: Prompt.Prompt r -> r
-              answer = answerWith victimId
-              cast = S.runPure answer gs (S.cast S.bob cancelId)
-              resolved = S.runPure answer cast Stack.resolveTop
-              placed = S.runPure answer resolved Engine.settleForPriority
-          -- CR 101.2 from the other side: the Cancel itself was not stopped.
-          -- It targeted legally (CR 113.6g grants no shroud), resolved, did
-          -- nothing, and CR 608.2n put it into bob's graveyard.
-          Spec.assertEqWith s "Rending Volley is still on the stack, alone" (GameState.stack placed) [victimId]
-          Spec.assertEqWith s "the spent Cancel is bob's only graveyard card" (length (Game.zoneMembers Zone.Graveyard S.bob placed)) 1
-          Spec.assertEqWith s "bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
-        -- The negative that keeps the first case from passing vacuously. CR
+        -- The negative that keeps
+        -- cr-701-6a-whole-cards-bob-s-cancel-counters-alice-s-spell.json from
+        -- passing vacuously. CR
         -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
         -- zone change rule 701.6a's countering makes -- so an implementation
         -- that matched the zone pair rather than the recorded countering would
@@ -986,39 +877,6 @@ counterTriggerSpec s registry =
           Spec.assertEqWith s "alice took 3, so it resolved rather than fizzling" (S.lifeOf S.alice resolved) (fmap (subtract 3) (S.lifeOf S.alice gs))
           Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
           Spec.assertEqWith s "bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
-        -- "A spell or ability YOU CONTROL", not "a spell or ability": the
-        -- PlayerRelation is load-bearing, and a board where only bob ever
-        -- counters cannot tell a correct implementation from one that ignores
-        -- the countering source's controller entirely. The same Cancel at the
-        -- same victim, one caster apart -- alice's Cancel counters BOB's
-        -- spell, and bob's Baral watches it happen and does nothing.
-        --
-        -- Also the other half of Baral's static: alice pays Cancel's full
-        -- {1}{U}{U}, since "spells YOU cast" is scoped to bob.
-        Spec.it s "CR 109.5 'you control': alice's Cancel countering bob's spell does not fire bob's Baral" $ do
-          island <- S.printingOf s registry "Island"
-          cancel <- S.printingOf s registry "Cancel"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          piker <- S.printingOf s registry "Goblin Piker"
-          mountain <- S.printingOf s registry "Mountain"
-          let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
-              withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withBaral [1 .. (3 :: Int)]
-              (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
-              (victimId, onStack) = S.spellOnStack piker S.bob withLibrary
-              (cancelId, gs) = S.addHandCard cancel S.alice onStack
-              answer :: Prompt.Prompt r -> r
-              answer = answerWith victimId
-              cast = S.runPure answer gs (S.cast S.alice cancelId)
-              countered = S.runPure answer cast Stack.resolveTop
-              placed = S.runPure answer countered Engine.settleForPriority
-          -- The countering really happened, so the silence below is the
-          -- relation and not a broken board.
-          Spec.assertEqWith s "bob's spell was countered into his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob countered)) 1
-          -- By NAME, not S.creaturesInPlay: bob's own Baral is a creature on
-          -- his battlefield throughout, so a bare count could never read 0.
-          Spec.assertEqWith s "and the Piker never reached the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.bob countered) 0
-          Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
-          Spec.assertEqWith s "so bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
         -- THE discriminating case for rule 701.6a's OTHER subject. That rule is
         -- about "a spell or ability", and Stifle ({U} Instant, "Counter target
         -- activated or triggered ability") counters the second -- but Baral's
@@ -1094,29 +952,6 @@ counterTriggerSpec s registry =
               Spec.assertEqWith s "no ability went to a graveyard: alice's is empty" (length (Game.zoneMembers Zone.Graveyard S.alice abilityPlaced)) 0
               Spec.assertEqWith s "bob's holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob abilityPlaced)) 1
               Spec.assertEqWith s "and Baral never fired: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob abilityPlaced)) 1
-        -- Baral's OTHER half, and the reason the board above gives bob exactly
-        -- three Islands: "instant and sorcery spells you cast cost {1} less to
-        -- cast" (CR 601.2f's cost reductions) turns Cancel's {1}{U}{U} into
-        -- {U}{U}, so one Island is still untapped once it is paid for.
-        Spec.it s "CR 601.2f Baral's reduction leaves an Island untapped after Cancel is cast" $ do
-          island <- S.printingOf s registry "Island"
-          cancel <- S.printingOf s registry "Cancel"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          piker <- S.printingOf s registry "Goblin Piker"
-          mountain <- S.printingOf s registry "Mountain"
-          let (victimId, cancelId, gs) = board piker island cancel baral mountain
-              answer :: Prompt.Prompt r -> r
-              answer = answerWith victimId
-              cast = S.runPure answer gs (S.cast S.bob cancelId)
-              untapped g =
-                length $ do
-                  oid <- Game.zoneMembers Zone.Battlefield S.bob g
-                  Just obj <- [Game.lookupObject oid g]
-                  Monad.guard (Object.tapped obj == TapState.Untapped)
-                  pure oid
-          -- Three Islands and the Baral start untapped; paying {U}{U} taps two.
-          Spec.assertEqWith s "four untapped permanents before" (untapped gs) 4
-          Spec.assertEqWith s "two after, so only two Islands were tapped" (untapped cast) 2
 
 -- CR 603.2's binding half of a per-permanent counter trigger: the ability names
 -- the permanent the counters went on, and that permanent is neither the bearer

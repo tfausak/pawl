@@ -1,0 +1,86 @@
+{
+  "description": "CR 500.1 the control turn runs its steps and the end step trigger fires",
+  "note": "The control for the Time Stop group: the same board with alice casting nothing. bob plays Burst Lightning at alice and activates Brothers of Fire at her in her precombat main; both resolve (alice 17, bob 19, the Brothers pinging him too). The turn then runs every step, each checked as it is reached, through the end step, where Sinister Gnarlbark's trigger draws a card and blights the Gnarlbark, and on to bob's turn. The Haskell original put bob's spell and ability on the stack by hand; here bob plays them.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Sinister Gnarlbark", "label": "gnarlbark"},
+          {"card": "Island", "label": "island1"},
+          {"card": "Island", "label": "island2"},
+          {"card": "Island", "label": "island3"},
+          {"card": "Island", "label": "island4"},
+          {"card": "Island", "label": "island5"},
+          {"card": "Island", "label": "island6"},
+          {"card": "Island", "label": "island7"},
+          {"card": "Island", "label": "island8"},
+          {"card": "Island", "label": "island9"}
+        ],
+        "hand": [
+          {"card": "Time Stop", "label": "time-stop"},
+          {"card": "Divination", "label": "divination"}
+        ],
+        "library": [
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Mountain", "label": "mountain1"},
+          {"card": "Mountain", "label": "mountain2"},
+          {"card": "Mountain", "label": "mountain3"},
+          {"card": "Mountain", "label": "mountain4"},
+          {"card": "Brothers of Fire", "label": "brothers"}
+        ],
+        "hand": [
+          {"card": "Burst Lightning", "label": "burst"}
+        ],
+        "library": [
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"},
+          {"card": "Mountain"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@burst", "targets": ["@alice"], "mana": ["@mountain1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Activate": {"object": "@brothers", "targets": ["@alice"], "mana": ["@mountain2", "@mountain3", "@mountain4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 19}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "bob", "life": 19}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 17}}},
+    {"turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": {"Life": {"player": "alice", "life": 17}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "check": {"Life": {"player": "alice", "life": 17}}},
+    {"turn": 1, "step": "EndOfCombat", "player": "alice", "check": {"Life": {"player": "alice", "life": 17}}},
+    {"turn": 1, "step": "PostcombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 10}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 9}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Counters": {"object": "@gnarlbark", "kind": {"type": "MinusOneMinusOne"}, "count": 1}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "alice", "life": 17}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "bob", "life": 19}}},
+    {"turn": 2, "step": "Upkeep", "player": "bob", "check": {"Count": {"player": "alice", "zone": "Library", "card": "Mountain", "count": 9}}}
+  ]
+}

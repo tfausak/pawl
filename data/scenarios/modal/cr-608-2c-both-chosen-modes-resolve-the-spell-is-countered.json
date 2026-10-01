@@ -1,0 +1,42 @@
+{
+  "description": "CR 608.2c both chosen modes resolve: the spell is countered and a card is drawn",
+  "note": "Cryptic Command cast for its counter and draw modes, aimed at bob's Slaughter Drone spell: the Drone goes to bob's graveyard and never reaches the battlefield, and alice draws the one Piker in her library. The two unchosen modes do nothing, so bob's Piker stays on the battlefield untapped. Played rather than placed: bob is active and casts the Drone off two Swamps, and alice responds.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ],
+        "hand": [{ "card": "Cryptic Command", "label": "cryptic" }],
+        "library": [{ "card": "Goblin Piker" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" }
+        ],
+        "hand": [{ "card": "Slaughter Drone", "label": "drone" }]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@drone", "mana": ["@swamp-1", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@cryptic", "modes": [0, 3], "targets": ["Slaughter Drone"], "mana": ["@island-1", "@island-2", "@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Stack", "card": "Slaughter Drone", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Slaughter Drone", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Slaughter Drone", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Cryptic Command", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@piker", "tapped": false } } }
+  ]
+}

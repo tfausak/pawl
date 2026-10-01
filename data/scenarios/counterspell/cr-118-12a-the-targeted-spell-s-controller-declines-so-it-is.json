@@ -1,0 +1,205 @@
+{
+  "description": "CR 118.12a the targeted spell's controller declines, so it is countered",
+  "note": "Mana Leak's \"unless its controller pays {3}\" is a cost paid as the Leak resolves, by the targeted spell's controller. bob holds three untapped Islands, so he could pay and is really asked; the refusal is his and not CR 118.3's. A second offer would be an unscheduled prompt. bob casts the Piker for real off two Mountains, so his Islands are the ones the check reads. Mana Leak finishes resolving into alice's graveyard on the refusal branch too.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "alice-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "alice-island-2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mana Leak",
+            "label": "leak"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-2"
+          },
+          {
+            "card": "Island",
+            "label": "bob-island-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "@piker",
+          "mana": [
+            "@mountain-1",
+            "@mountain-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@leak",
+          "targets": [
+            "Goblin Piker"
+          ],
+          "mana": [
+            "@alice-island-1",
+            "@alice-island-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseToPay": {
+          "decision": {
+            "type": "Declines"
+          }
+        }
+      },
+      "source": "Mana Leak"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "@bob-island-1",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "@bob-island-2",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Tapped": {
+          "object": "@bob-island-3",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Mana Leak",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Stack",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Stack",
+          "card": "Mana Leak",
+          "count": 0
+        }
+      }
+    }
+  ]
+}

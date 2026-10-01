@@ -504,25 +504,6 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertEqWith s "alice drew a card (mode 3)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
     Spec.assertEqWith s "bob's Piker is tapped (mode 2)" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Tapped)
 
-  Spec.it s "CR 608.2c both chosen modes resolve: the spell is countered and a card is drawn" $ do
-    island <- S.printingOf s registry "Island"
-    crypticCommand <- S.printingOf s registry "Cryptic Command"
-    piker <- S.printingOf s registry "Goblin Piker"
-    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
-    let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
-        (droneId, withSpell) = S.spellOnStack slaughterDrone S.bob board
-        (_, gs) = S.addLibraryCard piker S.alice withSpell
-        answer :: Prompt.Prompt r -> r
-        answer = chooseTwo (fmap ModeIndex.MkModeIndex [0, 3]) [(spellSlot, Recipient.ToObject droneId)]
-        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
-    Spec.assertBool s (notElem droneId (GameState.stack after)) "the Drone spell is off the stack"
-    Spec.assertEqWith s "countered into bob's graveyard, never onto the battlefield" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "alice drew a card (mode 3)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
-    -- The two UNCHOSEN modes did nothing: no bounce, and nothing tapped.
-    Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "bob's Piker was not bounced (mode 1 unchosen)"
-    Spec.assertEqWith s "bob's Piker is untapped (mode 2 unchosen)" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Untapped)
-
   -- Two chosen modes whose effects touch the same board: the bounce (mode 1)
   -- runs first (CR 608.2c), so "tap all creatures your opponents control" sweeps
   -- what is left. Not a test OF that order -- tapping the Piker and then bouncing
@@ -567,28 +548,6 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertEqWith s "alice's hand is empty: no card was drawn" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
     Spec.assertEqWith s "Cryptic Command is in alice's graveyard, unresolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
-
-  -- The other half of CR 608.2b, and the falsifier for an engine that fizzled per
-  -- MODE rather than per spell: one of the two chosen modes' targets is gone and
-  -- the other is not, so the spell resolves and only the illegal mode is skipped.
-  Spec.it s "CR 608.2b counter + bounce still counters when only the bounce target is gone" $ do
-    island <- S.printingOf s registry "Island"
-    crypticCommand <- S.printingOf s registry "Cryptic Command"
-    piker <- S.printingOf s registry "Goblin Piker"
-    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
-    let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
-        (droneId, gs) = S.spellOnStack slaughterDrone S.bob board
-        answer :: Prompt.Prompt r -> r
-        answer =
-          chooseTwo
-            (fmap ModeIndex.MkModeIndex [0, 1])
-            [(spellSlot, Recipient.ToObject droneId), (permanentSlot, Recipient.ToObject pikerId)]
-        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-        gone = S.runPure S.identityAnswer cast (Event.changeZone pikerId Zone.Graveyard)
-        after = snd (Engine.runGamePure answer gone Stack.resolveTop)
-    Spec.assertBool s (notElem droneId (GameState.stack after)) "the Drone spell was still countered"
-    Spec.assertEqWith s "bob's graveyard holds the countered Drone and the Piker that left" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
-    Spec.assertEqWith s "nothing reached bob's hand: the bounce mode was skipped" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
 
 -- Ojutai's Command's four modes, in printed order (CR 700.2 /
 -- data/cards/ojutais-command.json), under "Choose two --":

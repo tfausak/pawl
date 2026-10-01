@@ -1,0 +1,51 @@
+{
+  "description": "CR 604.2 destroying Spider-Punk makes the spell counterable again",
+  "note": "The standing half of the pair: the same board as the destroyed half, Murder held and never cast, so bob's Cancel counters nothing while Spider-Punk stands and the Piker resolves. This is the gameplay reading of the Haskell test's \"protected while it stands\" query. Playing the cast for real taps alice's Mountains and bob's Islands, which nothing here reads.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" },
+          { "card": "Swamp", "label": "swamp-3" },
+          { "card": "Prodigal Sorcerer", "label": "sorcerer", "ready": true },
+          { "card": "Spider-Punk", "label": "punk", "ready": true }
+        ],
+        "hand": [
+          { "card": "Goblin Piker", "label": "victim" },
+          { "card": "Murder", "label": "murder" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [
+          { "card": "Cancel", "label": "cancel" },
+          { "card": "Stifle", "label": "stifle" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@victim", "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@cancel", "targets": ["Goblin Piker"], "mana": ["@island-1", "@island-2", "@island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Stack", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Stack", "card": "Cancel", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Cancel", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Stifle", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

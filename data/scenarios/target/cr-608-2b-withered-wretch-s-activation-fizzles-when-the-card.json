@@ -1,0 +1,42 @@
+{
+  "description": "CR 608.2b Withered Wretch's activation fizzles when the card leaves the graveyard in response",
+  "note": "CR 608.2b for an ability, against the opponent's graveyard. bob answers alice's Wretch activation with Unbury, returning the targeted Piker card to his hand, so the target is illegal and the ability does nothing: nothing reaches exile and the card stays in his hand. The Haskell original moved the card with a bare zone change; Unbury is a real card standing in for it. Its assertion that the activation put one ability on the stack is read here as the Wretch's {1} having been paid (the Swamp tapped), and \"off the stack\" as the turn reaching combat.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Swamp", "label": "swamp"},
+          {"card": "Withered Wretch", "label": "wretch"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Swamp", "label": "bob-swamp1"},
+          {"card": "Swamp", "label": "bob-swamp2"}
+        ],
+        "graveyard": [
+          {"card": "Goblin Piker", "label": "bob-piker"}
+        ],
+        "hand": [
+          {"card": "Unbury", "label": "unbury"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@wretch", "targets": ["@bob-piker"], "mana": ["@swamp"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Tapped": {"object": "@swamp", "tapped": true}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@unbury", "targets": ["@bob-piker"], "mana": ["@bob-swamp1", "@bob-swamp2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 1}}}
+  ]
+}

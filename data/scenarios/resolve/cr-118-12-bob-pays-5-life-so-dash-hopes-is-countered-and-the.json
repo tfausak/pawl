@@ -1,0 +1,44 @@
+{
+  "description": "CR 118.12 bob pays 5 life, so Dash Hopes is countered and the Piker is not",
+  "note": "Dash Hopes' cast trigger offers 5 life to every player (an IfPaid gate over each player), and bob's payment alone counters it, so the Goblin Piker it targeted stays on the stack. Played rather than placed: bob is active and casts the Piker, alice answers with Dash Hopes, so the offers run bob, carol, alice in APNAP order rather than alice first. The trigger itself carries no card name, so the setup reads Dash Hopes and the Piker on the stack by name and the trigger by the three offers it raises.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp-1" },
+          { "card": "Swamp", "label": "swamp-2" }
+        ],
+        "hand": [{ "card": "Dash Hopes", "label": "dash" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" }
+        ],
+        "hand": [{ "card": "Goblin Piker", "label": "piker" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@piker", "mana": ["@mountain-1", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@dash", "targets": ["Goblin Piker"], "mana": ["@swamp-1", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Stack", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Stack", "card": "Dash Hopes", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" } } }, "source": "Dash Hopes" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "Dash Hopes" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseToPay": { "decision": { "type": "Declines" } } }, "source": "Dash Hopes" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Stack", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Stack", "card": "Dash Hopes", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Dash Hopes", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Life": { "player": "bob", "life": 15 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "check": { "Life": { "player": "carol", "life": 20 } } }
+  ]
+}

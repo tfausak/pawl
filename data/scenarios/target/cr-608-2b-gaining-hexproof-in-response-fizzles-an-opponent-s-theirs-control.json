@@ -1,0 +1,38 @@
+{
+  "description": "CR 608.2b gaining hexproof in response fizzles an opponent's Doom Blade but not its controller's",
+  "note": "The control for the hexproof pair: the same board, with the Saiba Cryptomancer left in hand, so Doom Blade destroys bob's Piker. Without it a survival could be a Doom Blade that never worked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Swamp", "label": "swamp1"},
+          {"card": "Swamp", "label": "swamp2"}
+        ],
+        "hand": [
+          {"card": "Doom Blade", "label": "doom-blade"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker"},
+          {"card": "Island", "label": "island1"},
+          {"card": "Island", "label": "island2"}
+        ],
+        "hand": [
+          {"card": "Saiba Cryptomancer", "label": "saiba"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@doom-blade", "targets": ["@piker"], "mana": ["@swamp1", "@swamp2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Doom Blade", "count": 1}}}
+  ]
+}
