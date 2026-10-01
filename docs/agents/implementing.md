@@ -1,10 +1,11 @@
 # Implementing a unit
 
 Read this first when you are dispatched to work an issue end to end and open a
-PR. `CLAUDE.md` and `CONTRIBUTING.md` still apply and override anything here;
-this file is the standing procedure a dispatch brief would otherwise repeat, so
-the brief carries only what is specific to your unit. Rules only: the incidents
-behind them are in git history.
+PR. `CLAUDE.md` and `CONTRIBUTING.md` still apply and override anything here,
+except where this file says it overrides them: a supervisor sits above you, so
+your PR stays a draft. This file is the standing procedure a dispatch brief
+would otherwise repeat, so the brief carries only what is specific to your
+unit. Rules only: the incidents behind them are in git history.
 
 You hold the build. The one other thing that may be building is the previous
 unit, if its PR went red on CI and its agent was sent back.
@@ -368,10 +369,14 @@ reaches is a capability the design forbids building anyway.
 ## Git and the PR
 
 - Branch off latest `origin/main`, named `issue-slug`. Never commit to `main`.
+- **Leave the PR a draft, and report.** The supervisor marks it ready when it
+  arms auto-merge, after any audit and send-back of its own; marking it ready
+  yourself announces a merge the supervisor has not decided. This overrides
+  `CONTRIBUTING.md` and `CLAUDE.md`'s "mark the PR ready".
 - **When your sites collide with an unmerged PR**, branch off that PR's branch
-  instead and keep yours a draft, then `git rebase --onto main <old-base>` once
-  it squash-merges and re-run the suite and the load-bearing mutations against
-  the merged state. Say in the PR body which base it was cut from.
+  instead, then `git rebase --onto main <old-base>` once it squash-merges and
+  re-run the suite and the load-bearing mutations against the merged state.
+  Say in the PR body which base it was cut from.
 - Immediately before the self-review and the push, `git fetch` and merge
   `origin/main` again, however recently you last did. Then re-run the suite
   and the load-bearing mutations against the merged state.
