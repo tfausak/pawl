@@ -916,8 +916,6 @@ batchScoped condition = case condition of
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.CreatureAttacks _ -> False
-  TriggerCondition.AttachedPlayerIsAttacked -> False
-  TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
@@ -927,15 +925,23 @@ batchScoped condition = case condition of
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.CreatureBlocks _ -> False
   TriggerCondition.SelfBlocksCreature _ -> False
+  -- CR 508.3b / 805.10b: one combined declaration attacks a target once, but
+  -- Pawl.Engine.Combat records one GameEvent.BecameAttacked per (attacking
+  -- player, target) pair, CR 508.3e's arity, bracketed as one group. Each of
+  -- these matches one target only, so one trigger per group is one per target.
+  -- Pawl.TeamSpec's "CR 508.3b a player two teammates attack is attacked once"
+  -- is the proof.
+  TriggerCondition.AttachedPlayerIsAttacked -> True
+  TriggerCondition.SelfIsAttacked -> True
   -- FALSE despite naming batches in the RULES, which is the one group of answers
-  -- here that is not what it looks like. Rule 509.3e's "one or more" and rule
-  -- 508.3b's are already once-per-declaration, structurally: their events
-  -- (GameEvent.BlocksDeclared, GameEvent.AttackerBlocked, GameEvent.BecameAttacked)
+  -- here that is not what it looks like. Rule 509.3e's "one or more" is already
+  -- once-per-declaration, structurally: its events
+  -- (GameEvent.BlocksDeclared, GameEvent.AttackerBlocked)
   -- are minted at that arity by Pawl.Engine.Combat, the one emitter that sees a
   -- whole declaration, so there is nothing left for this predicate to dedup and
   -- True would be a second dedup over an already-unique trigger. Deaths get the
   -- other treatment because they reach a graveyard from four places and no event
-  -- carries the arity; GameEvent.BecameAttacked's own haddock draws that line.
+  -- carries the arity.
   TriggerCondition.SelfBlocksAtLeast _ -> False
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
