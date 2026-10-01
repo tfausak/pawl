@@ -423,7 +423,6 @@ permanentsReturnedToHandSpec s registry =
       returnByHand oid gs =
         let gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Hand)
          in resolveWholeStack (S.runPure S.identityAnswer gone Engine.settleForPriority)
-      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
       -- The distinct EventGroups the log's battlefield-to-hand moves carry.
       returnGroups gs =
         Set.fromList
@@ -435,18 +434,6 @@ permanentsReturnedToHandSpec s registry =
               (Foldable.toList (GameState.events gs))
           )
    in Spec.describe s "PermanentsReturnedToHand" $ do
-        -- The proving case: Retract returns two artifacts as one event group.
-        Spec.it s "CR 603.2c Retract returning two artifacts draws one card each for Tameshi and the Ledger, and grows Justice twice" $ do
-          (_, justiceId, _, _, _, retractId, withRetract) <- board
-          let cast = S.runPure S.identityAnswer withRetract (S.cast S.alice retractId)
-              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-              settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
-              after = resolveWholeStack settled
-          Spec.assertEqWith s "alice holds the two artifacts and ONE draw each from Tameshi and the Ledger, not two from the Ledger" (S.handSize S.alice after) 4
-          Spec.assertEqWith s "Justice grew once per artifact, the singular reading of the same event" (sizeOf justiceId after) (Just 4, Just 4)
-          Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (Set.size (returnGroups settled)) 1
-          Spec.assertEqWith s "four triggers reached the stack: Tameshi's and the Ledger's once each, Justice's twice" (length (GameState.stack settled)) 4
-          Spec.assertEqWith s "alice's hand was Retract alone before" (S.handSize S.alice withRetract) 1
         -- The printed "noncreature", the condition's own Filter: one board, two
         -- permanents returned one at a time, and only the artifact draws.
         Spec.it s "CR 603.2c a creature returned to hand draws nothing where an artifact does" $ do

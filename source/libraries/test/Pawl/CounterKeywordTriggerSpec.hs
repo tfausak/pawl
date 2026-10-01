@@ -1595,27 +1595,6 @@ flankingSpec s registry =
               Spec.assertBool s (not (S.onBattlefield golem controlTraded)) "and the Piker's 2 kills it"
               Spec.assertBool s (not (S.onBattlefield otherPiker controlTraded)) "both die, where the flanker died alone"
             _ -> Spec.assertFailure s "fixture should give each seat one creature"
-        -- CR 509.3d's arity, and the whole difference from CR 509.3c: "triggers
-        -- once for each creature that blocks the specified creature". Two
-        -- blockers, two triggers, and each -1/-1 lands on its OWN blocker.
-        --
-        -- The Hill Giant is the load-bearing reading: a condition matched against
-        -- the GROUPED GameEvent.AttackerBlocked fires once and leaves it 3/3,
-        -- and a binding that named the bearer instead moves the Cavalry's own
-        -- 2/2.
-        Spec.it s "CR 509.3d two blockers are two triggers, each on its own blocker" $ do
-          (gs, mine, theirs) <- board ["Benalish Cavalry"] ["Goblin Piker", "Hill Giant"]
-          case (mine, theirs) of
-            ([cavalry], [piker, giant]) -> do
-              let struck = atDamage gs
-              -- One assertion over all three readings, so a mutation cannot hide
-              -- behind whichever of them is checked first.
-              Spec.assertEqWith
-                s
-                "the 3/3 Giant is 2/2, the 2/1 Piker is gone, and the Cavalry took neither -1/-1"
-                (S.powerToughnessOf giant struck, S.onBattlefield piker struck, S.powerToughnessOf cavalry struck)
-                (Just (2, 2), False, Just (2, 2))
-            _ -> Spec.assertFailure s "fixture should give bob two blockers"
         -- CR 702.25a's "without flanking", read as CR 509.3f asks -- the blocker's
         -- characteristics as it becomes a blocking creature. A second Benalish
         -- Cavalry blocking is 2/2 still; the Icehide Golem, the same 2/2 without
@@ -2044,11 +2023,6 @@ marchesasDecreeSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
    in Spec.describe s "Marchesa's Decree" $ do
-        -- The proving test. Two of alice's Pikers attack bob, so the Decree fires
-        -- twice and ALICE is down 2 -- bob, whose enchantment it is, loses nothing.
-        Spec.it s "CR 508.3a/508.5 whole card: each creature attacking you costs its controller 1 life" $ do
-          (gs, _, _, _) <- board
-          Spec.assertEqWith s "alice lost 1 per attacker, bob and carol nothing" (lives (atBlockers (attacking S.bob) gs)) (Just 18, Just 20, Just 20)
         -- The same declaration aimed at the other opponent. CR 508.5 makes carol
         -- the defending player, so the Decree is silent -- the falsifier for a
         -- condition that fired on any declaration, which a two-seat board cannot

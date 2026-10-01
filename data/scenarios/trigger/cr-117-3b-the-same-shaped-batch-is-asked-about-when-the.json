@@ -1,0 +1,30 @@
+{
+  "description": "CR 117.3b the same-shaped batch IS asked about when the payload reads the entrant (Aether Flash)",
+  "note": "Aether Flash is Warstorm Surge's shape: Dragon Fodder's two Goblins enter as one event, and the two entries are equal but their bindings name different creatures, with CR 117.3b handing priority back between the resolutions, so which Goblin is shot first is observable and the order is asked exactly once. Both triggers resolve: 2 damage kills each 1/1 (CR 704.5g).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Aether Flash", "label": "aether-flash", "ready": true }
+        ],
+        "hand": [{ "card": "Dragon Fodder", "label": "dragon-fodder" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@dragon-fodder", "mana": ["@mountain", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["@aether-flash", "@aether-flash"] } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 0 } }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "description": "CR 603.2 two Squires make the lone attacker 5/5",
+  "note": "Two exalted permanents are two abilities and two +1/+1s, which is CR 603.2 rather than a clause of rule 702.83: unlike shadow, exalted prints no \"multiple instances are redundant\" sentence. alice's Hill Giant attacks alone while both Aven Squires stay home; the reading is taken at the combat damage step, before damage.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Aven Squire", "label": "squire", "ready": true },
+          { "card": "Aven Squire", "label": "squire-2", "ready": true },
+          { "card": "Hill Giant", "label": "giant", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@giant"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@squire", "@squire-2"] } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 5, "toughness": 5 } } }
+  ]
+}

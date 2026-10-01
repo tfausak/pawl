@@ -1,0 +1,29 @@
+{
+  "description": "CR 608.2b the second mentor's target is no longer legal",
+  "note": "CR 608.2b re-checks the slot as the ability resolves, and rule 702.134a's power comparison is part of what it re-checks. Two Blade Instructors attack beside a Goblin Piker and both aim at it; the first counter makes it 3/2, 3 is not less than 3, so the second ability has no legal target and does not resolve. An engine that checked only at CR 601.2c would leave a 4/3 with two counters. Readings are taken at the combat damage step, before damage.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Blade Instructor", "label": "first", "ready": true },
+          { "card": "Blade Instructor", "label": "second", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second", "@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@first", "@second"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@first", "do": { "ChooseTargets": { "mentored": ["@piker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@second", "do": { "ChooseTargets": { "mentored": ["@piker"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } }
+  ]
+}

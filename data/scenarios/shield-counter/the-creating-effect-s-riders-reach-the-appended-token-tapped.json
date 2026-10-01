@@ -1,0 +1,30 @@
+{
+  "description": "the creating effect's riders reach the appended token: tapped and attacking",
+  "note": "Queen Allenal's ruling: anything else the creating effect specifies applies to the original tokens and the Soldier alike. Hero of Bladehold's attack trigger creates two Soldiers tapped and attacking, the Queen appends a third, and only the Hero is declared, so every other attacker arrived through the event.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hero of Bladehold", "label": "hero", "ready": true },
+          { "card": "Queen Allenal of Ruadach", "label": "queen", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTriggers": ["@hero", "@hero"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Soldier Token", "Soldier Token#2", "Soldier Token#3"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Soldier Token", "count": 3 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@hero": "@bob", "Soldier Token": "@bob", "Soldier Token#2": "@bob", "Soldier Token#3": "@bob" } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Soldier Token", "tapped": true } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Soldier Token#2", "tapped": true } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Tapped": { "object": "Soldier Token#3", "tapped": true } } }
+  ]
+}

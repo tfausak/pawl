@@ -37,6 +37,9 @@ data Move
   | -- | CR 601.2c / 603.3d: the targets of each slot a prompt outside a cast
     -- or activation offers, which also answers its announcement of how many.
     ChooseTargets (Map.Map SlotName.SlotName (Seq.Seq Reference.Reference))
+  | -- | CR 603.3b: one player's triggers by source, Nothing the sourceless,
+    -- in the order put on the stack.
+    OrderTriggers (Seq.Seq (Maybe Reference.Reference))
   | -- | CR 104.3a.
     Concede
   | -- | CR 117.3d.

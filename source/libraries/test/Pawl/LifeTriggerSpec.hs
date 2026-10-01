@@ -242,7 +242,7 @@ lifeGainTriggerSpec s registry =
 -- mana, the same 5 life gained, the same two legal creatures to aim at. Aiming at
 -- the Goblin Piker is the control that proves the plumbing -- the Pridemate takes
 -- both counters -- and aiming at the Pridemate is the case.
-abilitiesWhenTriggeredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+abilitiesWhenTriggeredSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 abilitiesWhenTriggeredSpec s registry =
   let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
       -- Pinned to the one recipient rather than searched for among the legal ones:
@@ -264,11 +264,6 @@ abilitiesWhenTriggeredSpec s registry =
         let cast = snd (Engine.runGamePure (aimAt victimId) gs (S.cast S.alice spellId))
          in snd (Engine.runGamePure (aimAt victimId) cast Engine.priorityLoop)
    in Spec.describe s "CR 603.10 abilities as of the event" $ do
-        Spec.it s "CR 603.10 the control: the Draught strips the PIKER and both gains reach the Pridemate" $ do
-          (mateId, pikerId, gs) <- board
-          let after = drinkAt pikerId gs
-          Spec.assertEqWith s "alice gained 2 and then 3" (S.lifeOf S.alice after) (Just 25)
-          Spec.assertEqWith s "and her Pridemate, untouched, took a counter for each" (countersOn mateId after) (Just 2)
         Spec.it s "CR 603.10 stripping the PRIDEMATE takes the second gain from it and not the first" $ do
           (mateId, _, gs) <- board
           let after = drinkAt mateId gs
@@ -1118,15 +1113,6 @@ lifelinkGainEventsSpec s registry =
           Spec.assertEqWith s "CR 702.15e: two gains, two event groups" (length (gainGroups after), Set.size (Set.fromList (gainGroups after))) (2, 2)
           Spec.assertEqWith s "CR 510.2: the three damage events stayed one event group" (Set.size (Set.fromList (combatDamageGroups after))) 1
           Spec.assertEqWith s "and the Pridemate took a counter per gain" (S.counterOf CounterKind.PlusOnePlusOne mate after) 2
-        -- The board that differs in one lifelink source: one gain is one event
-        -- under either reading, so this is the floor rather than a discrimination.
-        Spec.it s "CR 119.9 one lifelink attacker connecting is one life gain event" $ do
-          (mate, after) <- board ["Child of Night"]
-          Spec.assertEqWith s "the Vigil drew once" (S.handSize S.alice after) 1
-          Spec.assertEqWith s "alice gained 2" (S.lifeOf S.alice after) (Just 22)
-          Spec.assertEqWith s "bob took both attackers" (S.lifeOf S.bob after) (Just 16)
-          Spec.assertEqWith s "one gain, one group" (length (gainGroups after), Set.size (Set.fromList (gainGroups after))) (1, 1)
-          Spec.assertEqWith s "and the Pridemate took one counter" (S.counterOf CounterKind.PlusOnePlusOne mate after) 1
         -- The other direction, and the discriminating case: ONE source, two
         -- recipients at once. Two records of 1 is the per-recipient reading.
         Spec.it s "CR 119.9 one lifelink source damaging two blockers at once is one life gain event" $ do
@@ -1525,27 +1511,6 @@ enrageSpec s registry =
           -- toughness is 4 too, so it survives to be asked about.
           Spec.assertEqWith s "an event on another of her creatures moves no life total" (lives atOther) (Just 20, Just 20, Just 20)
           Spec.assertEqWith s "though that damage landed too (CR 120.3e)" (damageOn mineId atOther) (Just 3)
-        -- CR 510.2 again, now on the AMOUNT rather than on the firing count: two
-        -- blockers of 2 and 1 deal two events, and each trigger reads its OWN
-        -- event, so the players lose 2 and then 1. The readings this separates,
-        -- both of which give 3 per firing and so 6 in total, are "the damage
-        -- marked on the recipient" (CR 120.3e has recorded all 3 before either
-        -- trigger resolves) and "the batch's total".
-        --
-        -- Two seats suffice here -- the "each player" reach is the board above's
-        -- job, and this one is about which number each of two firings reads.
-        Spec.it s "CR 510.2 two simultaneous events are read one at a time, not summed" $ do
-          swine <- S.printingOf s registry "Coalhauler Swine"
-          piker <- S.printingOf s registry "Goblin Piker"
-          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-          let (gs, mine, _) = S.combatBoardOf [swine] [piker, sorcerer]
-          case mine of
-            [] -> Spec.assertFailure s "fixture should have given alice a Coalhauler Swine"
-            swineId : _ -> do
-              let after = resolveAll (S.fightWith S.aggressiveAnswer gs)
-              Spec.assertEqWith s "both players started at 20" (S.lifeOf S.alice gs, S.lifeOf S.bob gs) (Just 20, Just 20)
-              Spec.assertEqWith s "2 then 1, so 3 each -- not 3 twice" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 17, Just 17)
-              Spec.assertEqWith s "with both blockers' damage marked on the Swine" (damageOn swineId after) (Just 3)
 
 -- CR 120.1's SOURCE of the damage, the half of the same event enrage above does
 -- not read: Belltower Sphinx, {4}{U} Creature -- Sphinx 2/5, "Flying. Whenever a

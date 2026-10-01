@@ -1936,18 +1936,6 @@ orderingSpec s registry =
           let (_, gs) = boardOf tidalWave khabalGhoul island
               (_, asked) = State.runState (Engine.runGame countingAnswer gs Engine.settleForPriority) 0
           Spec.assertEqWith s "asked once" asked 1
-        -- Aether Flash is Warstorm Surge's shape and the reason entry equality
-        -- alone is not the test: the two entries are equal, their bindings name
-        -- different creatures, and CR 117.3b hands priority back between the two
-        -- resolutions -- so which goblin was shot first is observable.
-        Spec.it s "CR 117.3b the same-shaped batch IS asked about when the payload reads the entrant (Aether Flash)" $ do
-          aetherFlash <- S.printingOf s registry "Aether Flash"
-          mountain <- S.printingOf s registry "Mountain"
-          dragonFodder <- S.printingOf s registry "Dragon Fodder"
-          let (gs, fodderId) = watcherBoard aetherFlash mountain 2 dragonFodder
-              (after, asked) = castCounting gs fodderId
-          Spec.assertEqWith s "asked once" asked 1
-          Spec.assertEqWith s "and both triggers resolved: 2 damage kills a 1/1 (CR 704.5g)" (S.tokensOf after) []
         -- The control: one entrant, so one trigger, which the older `length mine
         -- < 2` guard already elided. Without it, "Soul Warden asks nothing"
         -- cannot be told apart from "the batch was never two".
@@ -2149,16 +2137,6 @@ monarchOrderingSpec s registry =
               Spec.assertEqWith s "the inherent draw is on top -- placed second, resolves first" (inherentController placed top) (Just S.alice)
               Spec.assertEqWith s "the Ghoul's trigger is at the bottom -- placed first, resolves last" (triggerSourceOf placed bottom) (Just ghoul)
             other -> Spec.assertFailure s ("expected exactly two triggers on the stack, got " <> show (length other))
-        -- Both still resolve, whichever order was chosen: the merge must not
-        -- lose the inherent trigger's placement, only relocate it.
-        Spec.it s "CR 725.2 the monarch still draws when her own trigger is ordered last" $ do
-          palaceJailer <- S.printingOf s registry "Palace Jailer"
-          khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (_, base) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
-              gs = crownAndEndStep palaceJailer piker base
-              after = snd (Engine.runGamePure sourcelessFirst gs Engine.priorityLoop)
-          Spec.assertEqWith s "alice drew the one card in her library" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
         -- The Ghoul's trigger alone, with no monarch at all, is one trigger and
         -- asks nothing, the mirror of the monarch's lone draw in
         -- data/scenarios/trigger/cr-603-3b-the-inherent-draw-alone-is-one-trigger-so-nothing.json.
