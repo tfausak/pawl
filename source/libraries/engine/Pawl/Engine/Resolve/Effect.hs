@@ -1565,7 +1565,9 @@ offerCastOnce context named caster optionality verb retake offer = do
         | verb == PermissionVerb.Play && Cast.landDropOpen caster gs =
             [ (oid, mName, Face.name face)
             | oid <- named,
-              not (PlayerEffect.prohibitsPlayingLand caster oid gs),
+              -- CR 406.3a: judged on the card turned up, as Cast.asProposed does
+              -- for a cast, so a land exiled face down shows its name.
+              not (PlayerEffect.prohibitsPlayingLand caster oid (Cast.turnedUpForPlay oid Facing.FaceUp gs)),
               Just obj <- [Game.lookupObject oid gs],
               Just card <- [Game.cardOf oid gs],
               (mName, face) <- Game.landFacesOf obj card
