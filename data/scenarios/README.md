@@ -8,7 +8,9 @@ schema scenario` prints the schema. A test moved from a Haskell spec goes in a
 subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones still to move.
 
 - **Board.** `seats` in turn order, each with a `name`, `life` (default 20),
-  player `counters` (`[{ "key": { "type": "Energy" }, "value": 3 }]`) and
+  player `counters` (`[{ "key": { "type": "Energy" }, "value": 3 }]`), a
+  `team` number (CR 808.1), a `range` of influence (CR 801.2a, default
+  unlimited), `emperor` (CR 809.2) and
   `battlefield`, `hand`, `graveyard`, `library` and `exile` placements (a
   library top card first; an exiled card face up and linked to nothing). A
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
@@ -16,7 +18,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `controller` and the label of the object or seat it is `attached` to. `active` names a seat;
   `step` is where turn 1 starts; `monarch` optionally names a seat;
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
-  CR 507.1's choice among every opponent. Setup is a
+  CR 507.1's choice among every opponent; `brawl` (CR 903.12a),
+  `sharedTeamTurns` (CR 805.1) and `deployCreatures` (CR 804.2) are off unless
+  given. Setup is a
   state, not a history: nothing placed triggers anything.
 - **Note.** An optional `note` says in prose what the scenario rules out and
   why its board is built the way it is. It is free text: nothing reads it, and

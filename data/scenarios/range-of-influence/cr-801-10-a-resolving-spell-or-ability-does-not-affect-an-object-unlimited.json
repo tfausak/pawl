@@ -1,0 +1,39 @@
+{
+  "description": "CR 801.10 a resolving spell or ability does not affect an object or player outside its controller's range",
+  "note": "The control for the range-1 file: the same board at an unlimited range, where alice's Day of Judgment destroys carol's Goblin Piker too and the Cutthroat's trigger costs carol 1.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains-1" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Plains", "label": "plains-3" },
+          { "card": "Plains", "label": "plains-4" },
+          { "card": "Zulaport Cutthroat", "label": "cutthroat" }
+        ],
+        "hand": [{ "card": "Day of Judgment", "label": "judgment" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bobs-piker" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "label": "carols-piker" }]
+      },
+      {
+        "name": "dave"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@judgment", "mana": ["@plains-1", "@plains-2", "@plains-3", "@plains-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 19 } } }
+  ]
+}

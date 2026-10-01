@@ -33,7 +33,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -56,7 +55,6 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
@@ -325,41 +323,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
       [[Recipient.ToPlayer S.alice, Recipient.ToPlayer S.dave]]
     Spec.assertEqWith s "the handoff skipped bob's seat" (GameState.activePlayer carolsTurn) S.carol
 
-  -- CR 801.7 for a player the event involves: alice's Exquisite Blood
-  -- ("Whenever an opponent loses life, you gain that much life.") while carol,
-  -- two seats away, pays 2 life for her own Greed ("{B}, Pay 2 life: Draw a
-  -- card.") -- a loss nothing of alice's causes, so CR 801.10 has no part in it.
-  -- Bob, one seat away, pays for his own on the same board.
-  Spec.it s "CR 801.7 a triggered ability does not trigger on a player outside its controller's range" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    blood <- S.printingOf s registry "Exquisite Blood"
-    greed <- S.printingOf s registry "Greed"
-    case Face.activatedAbilities (S.combinedFace greed) of
-      [] -> Spec.assertFailure s "Greed should carry an activated ability"
-      ability : _ -> do
-        let (_, g0) = S.addPermanent blood S.alice S.fourPlayerGame
-            stock pid gs =
-              let (_, withSwamp) = S.addPermanent swamp pid gs
-                  (greedId, withGreed) = S.addPermanent greed pid withSwamp
-                  (_, withLibrary) = S.addLibraryCard swamp pid withGreed
-               in (greedId, withLibrary)
-            (bobsGreed, g1) = stock S.bob g0
-            (carolsGreed, g2) = stock S.carol g1
-            board = g2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-            pays pid greedId gs = resolveAll (S.runPure S.identityAnswer gs (Activate.activateAbility pid greedId ability))
-            carolPaid = pays S.carol carolsGreed (S.withRange 1 board)
-        Spec.assertEqWith s "carol really paid 2 at range 1" (S.lifeOf S.carol carolPaid) (Just 18)
-        Spec.assertEqWith s "CR 801.7 so alice gains nothing" (S.lifeOf S.alice carolPaid) (Just 20)
-        Spec.assertEqWith s "at an unlimited range she gains 2" (S.lifeOf S.alice (pays S.carol carolsGreed board)) (Just 22)
-        Spec.assertEqWith s "and at range 1 bob's payment, in range, gains her 2" (S.lifeOf S.alice (pays S.bob bobsGreed (S.withRange 1 board))) (Just 22)
-        -- CR 801.7a: bob pays his last 2 life and leaves the game to CR 704.5a
-        -- before the trigger is put on the stack, but he was in range as he
-        -- lost it.
-        let lastLife = board {GameState.players = Map.adjust (\p -> p {Player.life = 2}) S.bob (GameState.players board)}
-            bobLeft = pays S.bob bobsGreed (S.withRange 1 lastLife)
-        Spec.assertBool s (notElem S.bob (Game.stillPlaying bobLeft)) "bob lost the game"
-        Spec.assertEqWith s "CR 801.7a and alice still gains the 2 he lost" (S.lifeOf S.alice bobLeft) (Just 22)
-
   -- CR 801.7 for an object the event involves: alice's Soul Warden ("Whenever
   -- another creature enters, you gain 1 life.") sees a Goblin Piker enter under
   -- carol, two seats away, and one under bob, one seat away.
@@ -392,57 +355,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 801.7a at range 1 carol's Shredder sees it leave" (S.powerToughnessOf carols limited) (Just (2, 2))
     Spec.assertEqWith s "and alice's, two seats from carol, does not" (S.powerToughnessOf alices limited) (Just (1, 1))
     Spec.assertEqWith s "at an unlimited range alice's does" (S.powerToughnessOf alices (dies board)) (Just (2, 2))
-
-  -- CR 801.7 on a CR 603.7 delayed ability: alice's False Cure ("Until end of
-  -- turn, whenever a player gains life, that player loses 2 life for each 1
-  -- life they gained.") while carol's Radiant Fountain ("When this land enters,
-  -- you gain 2 life.") enters under her.
-  Spec.it s "CR 801.7 a delayed triggered ability does not trigger outside its controller's range" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    falseCure <- S.printingOf s registry "False Cure"
-    fountain <- S.printingOf s registry "Radiant Fountain"
-    let lands = S.landsFor swamp S.alice 2 S.fourPlayerGame
-        (spellId, g0) = S.addHandCard falseCure S.alice lands
-        board = g0 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-        carolAfter gs =
-          let armed = resolveAll (S.runPure S.identityAnswer gs (S.cast S.alice spellId))
-              (entrant, placed) = S.addPermanent fountain S.carol armed
-           in S.lifeOf S.carol (entering entrant placed)
-    Spec.assertEqWith s "CR 801.7 at range 1 carol keeps the 2 she gained" (carolAfter (S.withRange 1 board)) (Just 22)
-    Spec.assertEqWith s "at an unlimited range she loses 4 for them" (carolAfter board) (Just 18)
-
-  -- CR 801.13b's third case: alice's Fog ("Prevent all combat damage that would
-  -- be dealt this turn.") names neither source nor recipient, so it reaches
-  -- only damage whose source and recipient are both in alice's range. Carol's
-  -- Goblin Piker attacks dave; bob's attacks alice, then carol.
-  Spec.it s "CR 801.13b a prevention naming neither source nor recipient needs both in range" $ do
-    forest <- S.printingOf s registry "Forest"
-    fog <- S.printingOf s registry "Fog"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (spellId, g0) = S.addHandCard fog S.alice (S.landsFor forest S.alice 1 S.fourPlayerGame)
-        (carols, g1) = S.addPermanent piker S.carol g0
-        (bobs, g2) = S.addPermanent piker S.bob g1
-        fogged ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g2))
-    Spec.assertEqWith s "CR 801.13b at range 1 carol's Piker still deals dave 2" (S.lifeOf S.dave (strike S.carol [carols] S.dave (fogged (S.withRange 1)))) (Just 18)
-    Spec.assertEqWith s "at an unlimited range Fog prevents it" (S.lifeOf S.dave (strike S.carol [carols] S.dave (fogged id))) (Just 20)
-    Spec.assertEqWith s "and at range 1 it prevents bob's, in range, to alice" (S.lifeOf S.alice (strike S.bob [bobs] S.alice (fogged (S.withRange 1)))) (Just 20)
-    Spec.assertEqWith s "but not bob's to carol, whom alice does not reach" (S.lifeOf S.carol (strike S.bob [bobs] S.carol (fogged (S.withRange 1)))) (Just 18)
-
-  -- CR 801.13b's first case: alice's Luminesce ("Prevent all damage that black
-  -- sources and red sources would deal this turn.") names the source, so an
-  -- in-range source is enough. Bob's red Piker attacks carol, whom alice does
-  -- not reach; carol's attacks dave.
-  Spec.it s "CR 801.13b a prevention naming the source needs only the source in range" $ do
-    plains <- S.printingOf s registry "Plains"
-    luminesce <- S.printingOf s registry "Luminesce"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (spellId, g0) = S.addHandCard luminesce S.alice (S.landsFor plains S.alice 1 S.fourPlayerGame)
-        (carols, g1) = S.addPermanent piker S.carol g0
-        (bobs, g2) = S.addPermanent piker S.bob g1
-        cast ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g2))
-    Spec.assertEqWith s "CR 801.13b at range 1 bob's Piker deals carol nothing" (S.lifeOf S.carol (strike S.bob [bobs] S.carol (cast (S.withRange 1)))) (Just 20)
-    Spec.assertEqWith s "but carol's, out of range, deals dave 2" (S.lifeOf S.dave (strike S.carol [carols] S.dave (cast (S.withRange 1)))) (Just 18)
-    Spec.assertEqWith s "at an unlimited range it deals him nothing" (S.lifeOf S.dave (strike S.carol [carols] S.dave (cast id))) (Just 20)
 
   -- CR 801.13b's second case: alice's Selfless Squire ("When this creature
   -- enters, prevent all damage that would be dealt to you this turn.") names
@@ -517,29 +429,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 801.13a at range 1 carol takes 2" (S.lifeOf S.carol (strike S.bob [bobs] S.carol (S.withRange 1 board))) (Just 18)
     Spec.assertEqWith s "at an unlimited range she takes 4" (S.lifeOf S.carol (strike S.bob [bobs] S.carol board)) (Just 16)
     Spec.assertEqWith s "and at range 1 alice, in range, takes 4" (S.lifeOf S.alice (strike S.bob [bobs] S.alice (S.withRange 1 board))) (Just 16)
-
-  -- CR 801.10 for objects and for players: alice's Day of Judgment ("Destroy all
-  -- creatures.") over a Goblin Piker each for bob, one seat away, and carol, two
-  -- seats away, and over her own Zulaport Cutthroat ("Whenever this creature or
-  -- another creature you control dies, each opponent loses 1 life and you gain 1
-  -- life.").
-  Spec.it s "CR 801.10 a resolving spell or ability does not affect an object or player outside its controller's range" $ do
-    plains <- S.printingOf s registry "Plains"
-    judgment <- S.printingOf s registry "Day of Judgment"
-    piker <- S.printingOf s registry "Goblin Piker"
-    cutthroat <- S.printingOf s registry "Zulaport Cutthroat"
-    let (spellId, g0) = S.addHandCard judgment S.alice (S.landsFor plains S.alice 4 S.fourPlayerGame)
-        (_, g1) = S.addPermanent cutthroat S.alice g0
-        (bobs, g2) = S.addPermanent piker S.bob g1
-        (carols, g3) = S.addPermanent piker S.carol g2
-        cast ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g3))
-        limited = cast (S.withRange 1)
-    Spec.assertBool s (S.onBattlefield carols limited) "CR 801.10 at range 1 carol's Piker survives"
-    Spec.assertBool s (not (S.onBattlefield bobs limited)) "and bob's, in range, is destroyed"
-    Spec.assertBool s (not (S.onBattlefield carols (cast id))) "at an unlimited range carol's is destroyed too"
-    Spec.assertEqWith s "CR 801.10 at range 1 the Cutthroat costs carol nothing" (S.lifeOf S.carol limited) (Just 20)
-    Spec.assertEqWith s "and bob, in range, 1" (S.lifeOf S.bob limited) (Just 19)
-    Spec.assertEqWith s "at an unlimited range it costs carol 1" (S.lifeOf S.carol (cast id)) (Just 19)
 
   -- CR 801.10 for every graveyard: alice's Rest in Peace ("When this enchantment
   -- enters, exile all graveyards.") enters while carol, two seats away, and bob,

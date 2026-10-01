@@ -1,0 +1,56 @@
+{
+  "description": "CR 805.4 a teammate's your-upkeep trigger fires on the team's turn",
+  "note": "CR 805.4 / 603.2: under shared team turns \"your upkeep\" is bob's upkeep on his team's turn. Bitterblossom: \"At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token with flying.\" The pair differs only in the option. Each library holds four cards so CR 704.5b ends nothing.",
+  "board": {
+    "active": "alice",
+    "step": "Untap",
+    "sharedTeamTurns": true,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Bitterblossom" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Faerie Rogue Token", "count": 1 } } }
+  ]
+}

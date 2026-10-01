@@ -1,0 +1,41 @@
+{
+  "description": "CR 102.3 each opponent skips the teammate",
+  "note": "alice and bob against carol and dave, so bob sits in the seat a free-for-all reading of \"each opponent\" reaches first. alice's Prologue to Phyresis poisons only carol and dave; the spell reaching her graveyard shows it resolved.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true }
+        ],
+        "hand": [{ "card": "Prologue to Phyresis", "label": "prologue" }],
+        "library": [{ "card": "Plains" }]
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@prologue", "mana": ["@island", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Poison" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "carol", "kind": { "type": "Poison" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "dave", "kind": { "type": "Poison" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Prologue to Phyresis", "count": 1 } } }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "description": "CR 809.3c a player can attack only an opponent seated immediately next to them",
+  "note": "Pawl.Engine.Emperor.setUp spelled out: alice, bob and carol are team 1 with bob its emperor, dave, erin and frank team 2 with erin its emperor; emperors at range 2 and generals at 1 (CR 809.3a), creatures deployable (CR 809.3b) and the Adjacent attack option (CR 809.3c). carol concedes on bob's turn: bob still attacks nobody that turn (CR 801.2c), but from his next turn the seats have closed up and dave, now beside him, is attacked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "range": 1,
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "range": 2,
+        "emperor": true,
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }],
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 1,
+        "range": 1,
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "range": 1,
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "erin",
+        "team": 2,
+        "range": 2,
+        "emperor": true,
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      },
+      {
+        "name": "frank",
+        "team": 2,
+        "range": 1,
+        "library": [
+          { "card": "Plains" },
+          { "card": "Plains" }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain",
+    "attackOption": "Adjacent",
+    "deployCreatures": true
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
+    { "turn": 6, "step": "DeclareAttackers", "player": "bob", "check": { "Attackers": { "attackers": { "@piker": "@dave" } } } }
+  ]
+}

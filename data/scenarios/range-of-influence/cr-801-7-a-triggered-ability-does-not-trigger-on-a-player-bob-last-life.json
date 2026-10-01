@@ -1,0 +1,46 @@
+{
+  "description": "CR 801.7 a triggered ability does not trigger on a player outside its controller's range",
+  "note": "CR 801.7a: bob pays his last 2 life and leaves the game to CR 704.5a before the trigger is put on the stack, but he was in alice's range as he lost it, so she still gains 2. His Greed leaving the battlefield with him (CR 800.4a) is how the board shows he left.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "range": 1,
+        "battlefield": [{ "card": "Exquisite Blood", "label": "blood" }]
+      },
+      {
+        "name": "bob",
+        "range": 1,
+        "life": 2,
+        "battlefield": [
+          { "card": "Swamp", "label": "bobs-swamp", "ready": true },
+          { "card": "Greed", "label": "bobs-greed" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "range": 1,
+        "battlefield": [
+          { "card": "Swamp", "label": "carols-swamp", "ready": true },
+          { "card": "Greed", "label": "carols-greed" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "dave",
+        "range": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "@bobs-greed", "mana": ["@bobs-swamp"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "bob", "life": 0 } },
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Greed", "count": 0 } },
+    { "Life": { "player": "alice", "life": 22 } }
+  ]
+}
