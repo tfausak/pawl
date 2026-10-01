@@ -630,7 +630,7 @@ copyTargetsRefs :: CopyTargets.CopyTargets -> [ObjectRef]
 copyTargetsRefs targets = case targets of
   CopyTargets.Copied -> []
   CopyTargets.ChosenByController -> []
-  CopyTargets.ForEach ref -> [ref]
+  CopyTargets.ForEach refs -> NonEmpty.toList refs
   CopyTargets.Stated ref -> [ref]
 
 -- Every ObjectRef this ONE effect holds, its own only: a nested effect's refs

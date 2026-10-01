@@ -1,0 +1,40 @@
+{
+  "description": "CR 608.2b Raise Dead fizzles when its target leaves the graveyard in response",
+  "note": "The response: bob's Withered Wretch exiles the targeted Piker card, so at resolution Raise Dead's only target is no longer in the zone it was targeted in (CR 608.2b) and nothing comes back; Raise Dead still goes to alice's graveyard. The Haskell original moved the card with a bare zone change; the Wretch's activated ability is a real instant-speed answer. The control file is the same board with no response.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Swamp", "label": "swamp"}
+        ],
+        "graveyard": [
+          {"card": "Goblin Piker", "label": "piker"}
+        ],
+        "hand": [
+          {"card": "Raise Dead", "label": "raise-dead"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Swamp", "label": "bob-swamp"},
+          {"card": "Withered Wretch", "label": "wretch"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@raise-dead", "targets": ["@piker"], "mana": ["@swamp"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Activate": {"object": "@wretch", "targets": ["@piker"], "mana": ["@bob-swamp"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Raise Dead", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 0}}}
+  ]
+}

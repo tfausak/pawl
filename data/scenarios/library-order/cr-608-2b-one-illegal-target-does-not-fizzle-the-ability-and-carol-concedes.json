@@ -1,0 +1,40 @@
+{
+  "description": "CR 608.2b one illegal target does not fizzle the ability, and the other half still happens",
+  "note": "Denethor, Stone Seer's ability names two targets, a player to crown and something to take 3, so exactly one can go illegal (CR 608.2b's partial clause). alice, the monarch, activates it at bob and carol; a concession while it waits on the stack takes a player out of the game (CR 104.3a), and CR 800.4 lets the four-seat game go on. carol concedes: the damage's target is gone, bob is still crowned and nobody takes the 3. The Haskell test's 'waits on the stack' is shown by the effects arriving only after the concession; 'nobody was crowned' is the monarch check.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Mountain", "label": "m3" },
+          { "card": "Mountain", "label": "m4" },
+          { "card": "Denethor, Stone Seer", "label": "denethor", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      },
+      {
+        "name": "dave"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "monarch": "alice"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@denethor", "targetsBySlot": {"player": ["@bob"], "damage": ["@carol"]}, "mana": ["@m1", "@m2", "@m3", "@m4"], "costOrder": [0, 1]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Monarch": {"player": "bob"}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 20}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "bob", "life": 20}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "dave", "life": 20}}}
+  ]
+}

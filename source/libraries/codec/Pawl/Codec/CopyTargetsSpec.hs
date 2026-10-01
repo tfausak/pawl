@@ -1,5 +1,6 @@
 module Pawl.Codec.CopyTargetsSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Codec.CopyTargets as CopyTargets
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -18,8 +19,8 @@ spec s = Spec.describe s "Pawl.Codec.CopyTargets" $ do
     Common.assertCodec
       s
       CopyTargets.codec
-      (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You)))
-      " {\"type\":\"ForEach\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}} "
+      (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You) NonEmpty.:| [ObjectRef.EachPlayer]))
+      " {\"type\":\"ForEach\",\"value\":[{\"type\":\"EachMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}},{\"type\":\"EachPlayer\"}]} "
   Spec.it s "Stated" $
     Common.assertCodec
       s

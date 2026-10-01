@@ -145,14 +145,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" . Spec.describe s "PerPla
     card <- S.printingOf s registry "Blatant Thievery"
     let (bare, bareSpellId) = S.handOne card (S.landsFor island S.alice 7 S.threePlayerGame)
     Spec.assertBool s (not (S.castable S.alice bareSpellId bare)) "and not castable with no opponent controlling anything"
-  -- Blatant Thievery's own ruling: "If a permanent changes controller after
-  -- being targeted but before this spell resolves, you won't gain control of
-  -- that permanent."
-  Spec.it s "CR 608.2b Blatant Thievery does not take the Piker once carol controls it" $ do
-    (gs, spellId, pikerId, thopterId) <- thievery False
-    let after = resolve (S.giveControl pikerId S.carol (steal (Set.fromList [pikerId, thopterId]) gs spellId))
-    Spec.assertEqWith s "carol still controls the Piker" (Projection.controllerOf pikerId after) (Just S.carol)
-    Spec.assertEqWith s "alice controls carol's Ornithopter" (Projection.controllerOf thopterId after) (Just S.alice)
   -- The activation's road (CR 602.2b's announcement), on a loyalty ability.
   Spec.it s "CR 602.2b The Theorist, Jace Beleren's -2 returns each opponent's chosen artifact or creature" $ do
     jace <- S.printingOf s registry "The Theorist, Jace Beleren"

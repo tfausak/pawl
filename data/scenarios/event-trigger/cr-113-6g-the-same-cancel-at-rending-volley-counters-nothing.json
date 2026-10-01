@@ -1,0 +1,48 @@
+{
+  "description": "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger",
+  "note": "CR 113.6g / CR 101.2: Rending Volley can't be countered, so bob's Cancel resolves, does nothing, and goes to his graveyard; no countering happens and Baral has nothing to see. alice casts the Volley for real, at bob's Baral (it needs a white or blue creature), so it kills the Baral once it resolves, after every Baral reading. 'Still on the stack, alone' is read as state: the Volley is in no graveyard until the next pass resolves it, and a Baral trigger above it would raise an unscheduled may and fail the run.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "m1" }
+        ],
+        "hand": [
+          { "card": "Rending Volley", "label": "volley" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Baral, Chief of Compliance", "label": "baral" },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" }
+        ],
+        "hand": [
+          { "card": "Cancel", "label": "cancel" }
+        ],
+        "library": [
+          { "card": "Mountain" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@volley", "targets": ["@baral"], "mana": ["@m1"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@cancel", "targets": ["Rending Volley"], "mana": ["@i1", "@i2", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Rending Volley", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Cancel", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Mountain", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Library", "card": "Mountain", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Rending Volley", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Baral, Chief of Compliance", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Library", "card": "Mountain", "count": 1}}}
+  ]
+}

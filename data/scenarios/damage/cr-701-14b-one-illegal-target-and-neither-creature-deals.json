@@ -1,0 +1,181 @@
+{
+  "description": "CR 701.14b one illegal target and NEITHER creature deals damage",
+  "note": "Prey Upon: \"target creature you control fights target creature you don't control\". bob answers it with Ray of Command, taking control of alice's Piker until end of turn, so the \"mine\" target is illegal (CR 608.2b) while the Piker is still on the battlefield and still a creature. Prey Upon still has its other target, so it resolves rather than being countered, and CR 701.14b says neither creature fights or deals damage: an implementation that let the remaining fighter swing marks the Giant's own 3 on the Giant. Ray of Command replaces the Haskell test's bare control change; its untap and haste touch nothing checked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Prey Upon",
+            "label": "prey"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "giant"
+          },
+          {
+            "card": "Island",
+            "label": "island-1"
+          },
+          {
+            "card": "Island",
+            "label": "island-2"
+          },
+          {
+            "card": "Island",
+            "label": "island-3"
+          },
+          {
+            "card": "Island",
+            "label": "island-4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ray of Command",
+            "label": "ray"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@prey",
+          "targetsBySlot": {
+            "mine": [
+              "@piker"
+            ],
+            "theirs": [
+              "@giant"
+            ]
+          },
+          "mana": [
+            "@forest"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "@ray",
+          "targets": [
+            "@piker"
+          ],
+          "mana": [
+            "@island-1",
+            "@island-2",
+            "@island-3",
+            "@island-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "@piker",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "@giant",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Prey Upon",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Stack",
+          "card": "Prey Upon",
+          "count": 0
+        }
+      }
+    }
+  ]
+}

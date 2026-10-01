@@ -1,0 +1,38 @@
+{
+  "description": "CR 608.2b Withered Wretch's activation fizzles when the card leaves the graveyard in response",
+  "note": "The control for the fizzle: the same activation with bob's Unbury left in hand, so the Wretch's ability resolves and exiles bob's Piker card. The activation's cost being paid (the Swamp tapped) stands for the ability going on the stack, and reaching combat for its leaving it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Swamp", "label": "swamp"},
+          {"card": "Withered Wretch", "label": "wretch"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Swamp", "label": "bob-swamp1"},
+          {"card": "Swamp", "label": "bob-swamp2"}
+        ],
+        "graveyard": [
+          {"card": "Goblin Piker", "label": "bob-piker"}
+        ],
+        "hand": [
+          {"card": "Unbury", "label": "unbury"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "@wretch", "targets": ["@bob-piker"], "mana": ["@swamp"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Tapped": {"object": "@swamp", "tapped": true}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 1}}}
+  ]
+}

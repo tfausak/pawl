@@ -1,0 +1,58 @@
+{
+  "description": "CR 608.2b Blatant Thievery does not take the Piker once carol controls it",
+  "note": "The card's own ruling: a permanent that changes controller after being targeted but before the spell resolves is not taken. bob's slot names his Piker, carol's her Ornithopter; carol answers with Ray of Command on the Piker, so at resolution it is no longer a permanent bob controls and bob's slot is illegal, while carol's slot still resolves. The Haskell original handed carol the Piker with a bare control change; Ray of Command is a real card standing in for it, and also untaps the Piker and gives it haste.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Island", "label": "island1"},
+          {"card": "Island", "label": "island2"},
+          {"card": "Island", "label": "island3"},
+          {"card": "Island", "label": "island4"},
+          {"card": "Island", "label": "island5"},
+          {"card": "Island", "label": "island6"},
+          {"card": "Island", "label": "island7"}
+        ],
+        "hand": [
+          {"card": "Blatant Thievery", "label": "thievery"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker"},
+          {"card": "Forest", "label": "forest"}
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {"card": "Ornithopter", "label": "thopter"},
+          {"card": "Island", "label": "carol-island1"},
+          {"card": "Island", "label": "carol-island2"},
+          {"card": "Island", "label": "carol-island3"},
+          {"card": "Island", "label": "carol-island4"}
+        ],
+        "hand": [
+          {"card": "Ray of Command", "label": "ray"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@thievery", "targetsBySlot": {"target#player1": ["@piker"], "target#player2": ["@thopter"]}, "mana": ["@island1", "@island2", "@island3", "@island4", "@island5", "@island6", "@island7"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "do": {"Cast": {"object": "@ray", "targets": ["@piker"], "mana": ["@carol-island1", "@carol-island2", "@carol-island3", "@carol-island4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "carol", "zone": "Battlefield", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "carol", "zone": "Battlefield", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Ornithopter", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "carol", "zone": "Battlefield", "card": "Ornithopter", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Blatant Thievery", "count": 1}}}
+  ]
+}

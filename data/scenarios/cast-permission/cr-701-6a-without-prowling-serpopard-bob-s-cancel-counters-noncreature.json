@@ -1,0 +1,43 @@
+{
+  "description": "CR 701.6a without Prowling Serpopard bob's Cancel counters alice's noncreature spell",
+  "note": "The control for the Serpopard's noncreature half, so its refusal is a statement about the filter rather than about a Cancel that never resolved: with no Serpopard, bob's Cancel counters alice's Lightning Bolt and bob takes nothing. Playing the cast for real taps alice's Mountains and bob's Islands, which nothing here reads.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Prodigal Sorcerer", "label": "sorcerer", "ready": true }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "victim" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [
+          { "card": "Cancel", "label": "cancel" },
+          { "card": "Stifle", "label": "stifle" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@victim", "targets": ["@bob"], "mana": ["@mountain-1"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@cancel", "targets": ["Lightning Bolt"], "mana": ["@island-1", "@island-2", "@island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Stack", "card": "Lightning Bolt", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Stack", "card": "Cancel", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Lightning Bolt", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Lightning Bolt", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

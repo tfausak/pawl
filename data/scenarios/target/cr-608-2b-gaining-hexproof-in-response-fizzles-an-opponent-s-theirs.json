@@ -1,0 +1,44 @@
+{
+  "description": "CR 608.2b gaining hexproof in response fizzles an opponent's Doom Blade but not its controller's",
+  "note": "CR 608.2b re-checks targets at resolution, and hexproof (CR 702.11b) is read against the spell's controller. bob answers alice's Doom Blade on his Piker with Saiba Cryptomancer, whose backup 1 trigger puts a +1/+1 counter on the Piker and gives it hexproof until end of turn, so the Doom Blade's only target is illegal and the Piker survives. The Haskell original granted hexproof with a stored continuous effect; the Cryptomancer is the pool's real instant-speed producer, and leaves bob a second creature and the Piker a counter, so survival is counted by name. One of four files: the other three are this board's control and the pair with alice controlling the Piker.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {"card": "Swamp", "label": "swamp1"},
+          {"card": "Swamp", "label": "swamp2"}
+        ],
+        "hand": [
+          {"card": "Doom Blade", "label": "doom-blade"}
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {"card": "Goblin Piker", "label": "piker"},
+          {"card": "Island", "label": "island1"},
+          {"card": "Island", "label": "island2"}
+        ],
+        "hand": [
+          {"card": "Saiba Cryptomancer", "label": "saiba"}
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "@doom-blade", "targets": ["@piker"], "mana": ["@swamp1", "@swamp2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "@saiba", "mana": ["@island1", "@island2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "source": "Saiba Cryptomancer", "do": {"ChooseTargets": {"backupRecipient": ["@piker"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "@piker", "keyword": {"type": "Hexproof"}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Doom Blade", "count": 1}}}
+  ]
+}

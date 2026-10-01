@@ -1,0 +1,42 @@
+{
+  "description": "CR 608.2b a target that changes hands is no longer that player's",
+  "note": "The control twin: the same board and the same answers, without bob's Word of Seizing. The trigger's target is still carol's when it resolves, so alice takes the may and carol's Bad Moon is destroyed.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Trygon Predator", "label": "trygon", "ready": true },
+          { "card": "Bad Moon" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Bad Moon" },
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Mountain", "label": "mountain-3" },
+          { "card": "Mountain", "label": "mountain-4" },
+          { "card": "Mountain", "label": "mountain-5" }
+        ],
+        "hand": [{ "card": "Word of Seizing", "label": "seizing" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Bad Moon", "label": "carol-moon" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@trygon"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@trygon", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseTargets": { "target": ["@carol-moon"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Bad Moon", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Graveyard", "card": "Bad Moon", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Bad Moon", "count": 1 } } }
+  ]
+}
