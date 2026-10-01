@@ -457,6 +457,13 @@ answerTopPrompt decider asked =
           onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
             Move.ChooseOptional decision -> Just (pure decision)
             _ -> Nothing
+        -- CR 614.1a's optional redirect, a "may" keyed by the redirect's own
+        -- source like ChooseOptional above.
+        Prompt.Type.ChooseRedirect who _ source _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          onEntry unscheduled key kind [] (takeForSource gs key source) $ \verb -> case verb of
+            Move.ChooseOptional decision -> Just (pure decision)
+            _ -> Nothing
         -- The order named is the whole group, each object once; the engine
         -- wants it as positions in the group it offered.
         Prompt.Type.OrderTimestamps who _ group -> do

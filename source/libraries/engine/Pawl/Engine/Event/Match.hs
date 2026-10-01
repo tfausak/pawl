@@ -16,7 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
-import Pawl.Engine.Event.Binding (admittedAttackers, admittedDepartures)
+import Pawl.Engine.Event.Binding (admittedAttackers, admittedDepartures, postEventView)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -550,22 +550,17 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
       | ZoneChange.to zc == Zone.Battlefield ->
           -- Deliberately NOT the snapshot the Moved event carries: that is the
           -- object as it last existed in the zone it LEFT, and reading it here
-          -- would answer CR 603.6b backwards. The entrant's characteristics come
-          -- from the game as it stands, which is what CR 603.10 asks for.
+          -- would answer CR 603.6b backwards. The entrant comes off `board`
+          -- (Event.Binding.postEventView), CR 603.10's battlefield immediately
+          -- after the entry, and not the live one: CR 704's pass may since have
+          -- buried what pumped it. Pawl.CardTriggerSpec's "CR 603.10 a Kongming
+          -- that entered as a 3/3 pays nothing" proves it.
           --
-          -- viewWithLastKnown rather than viewOfObject, so an entrant that has
-          -- already left again -- a creature entering as a 0/0 and buried by CR
-          -- 704.5f before the CR 117.5 boundary -- is still read as it was on the
-          -- battlefield (CR 608.2h) instead of vanishing from the match.
-          --
-          -- Recomputed per (bearer, entry event) pair rather than shared: this is
-          -- handed the GameState and nothing else. Forced only inside this arm, so
-          -- a board with no such ability pays nothing.
-          --
-          -- Nothing is an entrant that is gone AND filed no last known information,
-          -- about which no Filter can honestly answer.
+          -- Nothing is an entrant the sample does not hold that is gone AND
+          -- filed no last known information, about which no Filter can
+          -- honestly answer.
           let entrant = ZoneChange.object zc
-           in case Projection.viewWithLastKnown entrant gs entrant of
+           in case postEventView board gs entrant of
                 Nothing -> False
                 Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.Moved {} -> False
@@ -1131,20 +1126,19 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- the bearer contributing only CR 109.5's "you" and the Filter.Context's source
   -- -- which is what would make Filter.IsSource the self-scoped reading.
   --
-  -- viewWithLastKnown, not fullView: CR 603.10's first sentence wants the damager
-  -- as it existed immediately after the damage, and pawl scans the log after CR
-  -- 704's pass, so a trampler that connected and died to its blocker in the same
-  -- CR 510.2 event is already gone. CR 608.2h's record is what still answers "was
-  -- it a Wolf". No board in the pool reaches that -- Tovolar's Wolves are vanilla
-  -- and unblocked -- so this is a fence rather than a tested branch, as is the
-  -- DamageKind test beside it: no card in the pool makes a Wolf or Werewolf deal
-  -- NONCOMBAT damage while a Tovolar watches.
+  -- The damager off `board` (Event.Binding.postEventView), not the live view:
+  -- CR 603.10's first sentence wants it as it existed immediately after the
+  -- damage, and pawl scans the log after CR 704's pass, which may have buried
+  -- what granted the quality the Filter asks about. data/scenarios/event-trigger's
+  -- "The Raven's Warning sees Venser's Sliver fly as it hit" proves it. The
+  -- DamageKind test is a fence rather than a tested branch: no card in the pool
+  -- makes a Wolf or Werewolf deal NONCOMBAT damage while a Tovolar watches.
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> case event of
     GameEvent.DamageDealt ev ->
       DamageEvent.kind ev == DamageKind.Combat
         && isPlayerRecipient (DamageEvent.target ev)
         && ( let damager = DamageEvent.source ev
-              in case Projection.viewWithLastKnown damager gs damager of
+              in case postEventView board gs damager of
                    Nothing -> False
                    Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
            )
