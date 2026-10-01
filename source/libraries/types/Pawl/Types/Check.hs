@@ -8,6 +8,7 @@ import qualified Pawl.Types.DamageIs as DamageIs
 import qualified Pawl.Types.DefendersAre as DefendersAre
 import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.MonarchIs as MonarchIs
+import qualified Pawl.Types.PlayerCountersAre as PlayerCountersAre
 import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TypesAre as TypesAre
@@ -26,4 +27,5 @@ data Check
   | Defenders DefendersAre.DefendersAre
   | Monarch MonarchIs.MonarchIs
   | PowerToughness PowerToughnessIs.PowerToughnessIs
+  | PlayerCounters PlayerCountersAre.PlayerCountersAre
   deriving (Eq, Ord, Show)

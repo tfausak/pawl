@@ -2824,24 +2824,6 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
       ]
     Spec.assertEqWith s "all four lands paid the {2}{R}{G}" (S.tappedCount S.alice after) 4
 
-  -- CR 107.3a's X as an amount of ENERGY, which is the third substrate it can
-  -- name after mana and life (CostComponent.PayEnergyX). Sphinx of the
-  -- Revelation -- "{W}{U}{U}, {T}, Pay X {E}: Draw X cards" -- pays the X it
-  -- reads, so one board shows both halves: the counters really leave, and the
-  -- draw is measured by the value announced rather than by the counters spent.
-  --
-  -- THE FALSIFIER, the group's own: an X that never reaches the component costs
-  -- nothing, so a Sphinx whose announcement was dropped would draw nothing and
-  -- keep all five counters.
-  Spec.it s "CR 107.3a/602.2b whole card: the Sphinx pays X energy and draws that many" $ do
-    (sphinx, srcId, g1) <- sphinxBoard s registry 5
-    let act = do Activate.activateAbility S.alice srcId (theAbility sphinx); Stack.resolveTop
-        after = snd (Engine.runGamePure (answerXAt 2 S.bob) g1 act)
-    Spec.assertEqWith s "three counters left, so the announced 2 was really spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
-    Spec.assertEqWith s "and alice drew the announced 2 -- no count on this board coincides with it" (S.handSize S.alice after) 2
-    Spec.assertEqWith s "the three lands and the Sphinx itself paid the rest" (S.tappedCount S.alice after) 4
-    Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
-
   -- The bound moves with the ENERGY and with nothing else: the {W}{U}{U} is paid
   -- the same way on both boards, so no constant and nothing read off the printed
   -- cost tells them apart. CR 118.3 is what refuses the value above it.

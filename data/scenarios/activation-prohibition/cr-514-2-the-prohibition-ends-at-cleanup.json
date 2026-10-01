@@ -1,0 +1,34 @@
+{
+  "description": "CR 514.2 the prohibition ends at cleanup",
+  "note": "Deadlock Trap's \"its activated abilities can't be activated this turn\" ends in the cleanup step (CR 514.2), so on bob's next turn both of his Uthden Trolls may regenerate again: the one the Trap named and its twin. The Troll's {R} pays mana and nothing else, so the Trap's tap cannot answer for the prohibition, and each Troll gets its own Mountain so both activations are made.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [{ "key": { "type": "Energy" }, "value": 2 }],
+        "battlefield": [{ "card": "Deadlock Trap", "label": "trap" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Uthden Troll", "label": "victim" },
+          { "card": "Uthden Troll", "label": "twin" }
+        ],
+        "library": [{ "card": "Mountain" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@trap", "targets": ["@victim"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Tapped": { "object": "@victim", "tapped": true } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "@victim", "mana": ["@mountain-1", null] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "@twin", "mana": ["@mountain-2"] } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@mountain-1", "tapped": true } } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Tapped": { "object": "@mountain-2", "tapped": true } } }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "description": "CR 614.16 Doubling Season does not reach a player's counters",
+  "note": "The negative control for a counter replacement's \"on a permanent you control\": no player is a permanent, so Doubling Season leaves the {E}{E}{E} from alice's own Sage of Shaila's Claim trigger undoubled. The Sage is cast so its enters trigger fires; one pass resolves the Sage and a second its trigger.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Doubling Season", "label": "doubling-season" },
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" }
+        ],
+        "hand": [{ "card": "Sage of Shaila's Claim", "label": "sage" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@sage", "mana": ["@forest-1", "@forest-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Energy" }, "count": 3 } } }
+  ]
+}

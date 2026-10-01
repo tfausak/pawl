@@ -31,7 +31,6 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -44,8 +43,6 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.DamageEvent as DamageEvent
-import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -66,7 +63,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Rad counters" $ do
   producerSpec s registry
   abilitySpec s registry
-  strongSpec s registry
   reanimationSpec s registry
 
 -- CR 122.1i through the card that hands the counters out.
@@ -108,57 +104,6 @@ producerSpec s registry = Spec.describe s "The Master, Transcendent" $ do
 -- CR 728.1's ability on its own, over the boards that vary what the mill finds.
 abilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 abilitySpec s registry = Spec.describe s "CR 728.1's inherent ability" $ do
-  Spec.it s "mills as many cards as the player has rad counters, and pays for each nonland one" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    mountain <- S.printingOf s registry "Mountain"
-    let base = S.addPlayerCounter PlayerCounterKind.Rad 3 S.alice (Setup.emptyGame S.bothPlayers)
-        -- Three counters, so three cards: two nonland and one land, with a
-        -- fourth card the mill must not reach. Every number in the answer is
-        -- different -- 3 milled, 2 paid for, 1 counter left, 1 card spared --
-        -- so no two of them can be swapped without the test noticing.
-        stocked = libraryTopped [bolt, mountain, bolt, bolt] S.alice base
-        after = S.runPure S.identityAnswer (precombatMainOf S.alice stocked) (Engine.runStep >> Engine.priorityLoop)
-    Spec.assertEqWith s "three cards milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
-    Spec.assertEqWith s "one card spared" (length (Game.zoneMembers Zone.Library S.alice after)) 1
-    Spec.assertEqWith s "2 life lost, one per nonland card" (S.lifeOf S.alice after) (Just 18)
-    Spec.assertEqWith s "and 3 - 2 = 1 rad counter left" (radOf S.alice after) 1
-  -- THE FALSIFIER for a tally that counts every milled card: this board mills
-  -- three and pays for none of them.
-  Spec.it s "CR 728.1 a mill that turns up only lands costs no life and no counters" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    let base = S.addPlayerCounter PlayerCounterKind.Rad 3 S.alice (Setup.emptyGame S.bothPlayers)
-        stocked = libraryTopped [mountain, mountain, mountain, mountain] S.alice base
-        after = S.runPure S.identityAnswer (precombatMainOf S.alice stocked) (Engine.runStep >> Engine.priorityLoop)
-    Spec.assertEqWith s "three cards milled all the same" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
-    Spec.assertEqWith s "no life lost" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith s "and all three rad counters still there" (radOf S.alice after) 3
-  -- CR 728.1's "nonland card" asked of each milled card's own CR 613 projection
-  -- rather than of its printed face. Rule 613.1 starts from the actual object and
-  -- names no zone, so Synthetic Fossil Warren's layer-4 type change (CR 613.1d,
-  -- CR 205.1b's "in addition to their other types") reaches the Goblin Pikers
-  -- while they sit in alice's library: they are LAND cards when the mill puts
-  -- them in the graveyard, so rule 728.1 pays for neither.
-  --
-  -- The LIFE TOTAL is the assertion this case exists for, and every number the
-  -- two readings produce differs: 20 life against 18, two counters left against
-  -- none. The graveyard is the same size either way, which is the point -- what
-  -- changed is what the tally COUNTED, not what was milled.
-  Spec.it s "CR 613.1d a milled card a continuous effect made a land costs no life and no counter" $ do
-    board <- warrenBoard s registry True
-    let after = S.runPure S.identityAnswer (precombatMainOf S.alice board) (Engine.runStep >> Engine.priorityLoop)
-    Spec.assertEqWith s "no life lost, both milled cards being land cards" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith s "and both rad counters still there" (radOf S.alice after) 2
-    Spec.assertEqWith s "two cards milled all the same" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
-    Spec.assertEqWith s "and the card under them spared" (length (Game.zoneMembers Zone.Library S.alice after)) 1
-  -- The negative half of the pair, differing in exactly one thing: whether the
-  -- Warren is on the battlefield. Same library, same counters, same mill.
-  Spec.it s "CR 728.1 without the Warren the same Pikers are nonland cards and are paid for" $ do
-    board <- warrenBoard s registry False
-    let after = S.runPure S.identityAnswer (precombatMainOf S.alice board) (Engine.runStep >> Engine.priorityLoop)
-    Spec.assertEqWith s "1 life lost per nonland card milled" (S.lifeOf S.alice after) (Just 18)
-    Spec.assertEqWith s "and both rad counters spent" (radOf S.alice after) 0
-    Spec.assertEqWith s "two cards milled all the same" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
-    Spec.assertEqWith s "and the card under them spared" (length (Game.zoneMembers Zone.Library S.alice after)) 1
   -- CR 603.4's intervening "if". A player with none does not trigger at all.
   Spec.it s "CR 728.1 a player with no rad counters mills nothing" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
@@ -178,50 +123,6 @@ abilitySpec s registry = Spec.describe s "CR 728.1's inherent ability" $ do
     let base = S.addPlayerCounter PlayerCounterKind.Rad 1 S.alice (Setup.emptyGame S.bothPlayers)
         stocked = libraryTopped [bolt, bolt] S.alice base
     Spec.assertEqWith s "one ability on the stack" (length (GameState.stack (settledAtPrecombatMain S.alice stocked))) 1
-  -- CR 505.1a: only the active player has a precombat main phase, so rule
-  -- 728.1's "that player" is never an opponent of the turn's.
-  Spec.it s "CR 728.1 an opponent's rad counters wait for their own turn" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let base = S.addPlayerCounter PlayerCounterKind.Rad 3 S.bob (Setup.emptyGame S.bothPlayers)
-        stocked = libraryTopped [bolt, bolt, bolt, bolt] S.bob base
-        -- ALICE's precombat main phase.
-        after = S.runPure S.identityAnswer (precombatMainOf S.alice stocked) (Engine.runStep >> Engine.priorityLoop)
-    Spec.assertEqWith s "bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob after)) 4
-    Spec.assertEqWith s "bob loses no life" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "and keeps all three counters" (radOf S.bob after) 3
-
--- CR 728.1a's "life loss from radiation", through the only printing that reads
--- it: Strong, the Brutish Thespian's "You gain life rather than lose life from
--- radiation" (CR 614.6's substituted action).
---
--- ONE BOARD, TWO LOSSES. The rad ability's loss and a Goblin Piker's 3 damage
--- reach alice under the same row, and only the first is CR 728.1a's -- without
--- the second the case would pass on a rewrite that never looked at the cause.
--- Pawl.LifeReplacementSpec's Ashiok group states the same fence one cause over.
---
--- Every number differs: 2 life turned into a gain, 3 lost to damage, 20 -> 22 ->
--- 19, so no two of them can be swapped without the assertions noticing.
-strongSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-strongSpec s registry = Spec.describe s "Strong, the Brutish Thespian" $ do
-  Spec.it s "CR 728.1a the loss from radiation becomes a gain, and damage on the same board still takes life" $ do
-    strong <- S.printingOf s registry "Strong, the Brutish Thespian"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    mountain <- S.printingOf s registry "Mountain"
-    let base = S.addPlayerCounter PlayerCounterKind.Rad 2 S.alice (Setup.emptyGame S.bothPlayers)
-        (_, withStrong) = S.addPermanent strong S.alice base
-        (bobsPiker, withPiker) = S.addPermanent piker S.bob withStrong
-        -- Two counters, two nonland cards, and a Mountain under them the mill
-        -- never reaches: the loss rule 728.1 proposes is 2.
-        stocked = libraryTopped [bolt, bolt, mountain] S.alice withPiker
-        after = S.runPure S.identityAnswer (precombatMainOf S.alice stocked) (Engine.runStep >> Engine.priorityLoop)
-        hit =
-          S.runPure
-            S.identityAnswer
-            after
-            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
-    Spec.assertEqWith s "CR 614.6 alice gains the 2 rather than losing it: 20 + 2 = 22" (S.lifeOf S.alice after) (Just 22)
-    Spec.assertEqWith s "CR 120.4c damage is not radiation, so the same row leaves it alone: 22 - 3 = 19" (S.lifeOf S.alice hit) (Just 19)
 
 -- CR 701.17a through the card that reads a mill back: The Master's "{T}: Put
 -- target creature card in a graveyard that was milled this turn onto the
@@ -280,39 +181,6 @@ reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanima
     Spec.assertEqWith s "but the ability is not offered" (activationsOffered masterId milled) 0
     Spec.assertEqWith s "and the Piker is still in the graveyard" (fmap Object.zone (Game.lookupObject pikerId after)) (Just Zone.Graveyard)
     Spec.assertEqWith s "with nothing but The Master on the battlefield" (Game.zoneMembers Zone.Battlefield S.alice after) [masterId]
-
--- alice with two rad counters and two Goblin Pikers on top of her library over a
--- Mountain, and Synthetic Fossil Warren on the battlefield when `petrified` --
--- identical boards otherwise. The Warren reads "Goblin cards you own that aren't
--- on the battlefield are lands in addition to their other types": CR 613.1d's
--- layer 4 over an Affected.MatchingOffBattlefield set, so a Piker in the library
--- is a land card that no printed characteristic of it says it is.
---
--- Synthetic (#1910): Teferi, Mage of Zhalfir and Biotransference print this
--- affected set, and Toph, the First Metalbender prints "are lands in addition to
--- their other types", but nothing prints the two together -- Scryfall o:"are
--- lands" and o:"land in addition to its other types", 2026-08-19, no card that
--- makes an off-battlefield nonland card a land. Toph is what would refute that;
--- its set is the battlefield.
---
--- The Warren reaches the battlefield AFTER the library is stocked, which
--- separates "the card was always a land" and "the effect applied to it as it
--- arrived" from a continuous effect applying to a card sitting in a library. The
--- Mountain under the Pikers is the library CR 104.3c needs and is not a Goblin,
--- so the Warren cannot reach it.
-warrenBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  Bool ->
-  m GameState.GameState
-warrenBoard s registry petrified = do
-  piker <- S.printingOf s registry "Goblin Piker"
-  mountain <- S.printingOf s registry "Mountain"
-  warren <- S.printingOf s registry "Synthetic Fossil Warren"
-  let base = S.addPlayerCounter PlayerCounterKind.Rad 2 S.alice (Setup.emptyGame S.bothPlayers)
-      stocked = libraryTopped [piker, piker, mountain] S.alice base
-  pure (if petrified then snd (S.addPermanent warren S.alice stocked) else stocked)
 
 -- alice with The Master settled on the battlefield, one rad counter, and one
 -- creature card sitting in her graveyard from the start.

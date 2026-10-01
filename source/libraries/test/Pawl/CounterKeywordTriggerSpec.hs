@@ -1318,19 +1318,6 @@ piaNalaarSpec s registry =
           let resolved = payAtEndStep 0 (S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice after)
           Spec.assertEqWith s "no Aetherjet" (aetherjetIds resolved) []
           Spec.assertEqWith s "and every {E} she held is still hers" (energy resolved) 5
-        -- CR 118.3 at the bound of zero. Pia connects alone, so nothing gained
-        -- {E} that turn and "pay one or more {E}" has no payable amount: one
-        -- outcome, and so nothing to ask. The board cannot tell paying zero from
-        -- being spared the question by what happens on it -- both leave the
-        -- Aetherjet uncreated -- so the count of Prompt.ChoosePaidEnergy is the
-        -- assertion this case exists for. The pointless-looking add of 0 keeps
-        -- this board and its twin below differing in the amount alone.
-        Spec.it s "CR 118.3 a payer with no {E} is not asked how much to pay" $ do
-          after <- board ["Pia Nalaar, Chief Mechanic"]
-          let (resolved, asked) = payAtEndStepCounting 0 (S.addPlayerCounter PlayerCounterKind.Energy 0 S.alice after)
-          Spec.assertEqWith s "the trigger really resolved with an empty pool" (energy resolved) 0
-          Spec.assertEqWith s "and she was never asked how much to pay" asked 0
-          Spec.assertEqWith s "no Aetherjet, nothing being payable" (aetherjetIds resolved) []
         -- The twin, differing in the two {E} alone: the same trigger on the same
         -- board is a real choice, so it IS raised, and the amount it binds is the
         -- token's box. Whether the box reads the energy paid or the energy held

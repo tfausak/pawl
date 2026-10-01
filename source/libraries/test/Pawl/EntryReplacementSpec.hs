@@ -1554,16 +1554,6 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
         (plainPiker, plain) = bobsBoard False
     Spec.assertEqWith s "half of one, rounded down" (countersOn CounterKind.PlusOnePlusOne halvedPiker halved) 0
     Spec.assertEqWith s "and one without the praetor" (countersOn CounterKind.PlusOnePlusOne plainPiker plain) 1
-  -- The negative control for CounterPattern.onWho: Doubling Season says "on a
-  -- permanent you control", which no player is, so alice's own energy is
-  -- untouched by it. Same seat and same trigger as the doubling case above.
-  Spec.it s "CR 614.16 Doubling Season does not reach a player's counters" $ do
-    doublingSeason <- S.printingOf s registry "Doubling Season"
-    sage <- S.printingOf s registry "Sage of Shaila's Claim"
-    let (_, seated) = S.addPermanent doublingSeason S.alice S.threePlayerGame
-        (_, entered) = S.entersWithTrigger sage S.alice seated
-        after = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-    Spec.assertEqWith s "three, not six" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
   -- CR 122.6a's default putter, which is the one thing the cases above cannot
   -- see: an entering permanent's counters are put on by ITS controller, so bob's
   -- riot counter is halved by alice's praetor. A putter read off the active

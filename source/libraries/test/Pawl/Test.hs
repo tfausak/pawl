@@ -438,6 +438,7 @@ import qualified Pawl.Codec.PlayerAttacksWithSpec
 import qualified Pawl.Codec.PlayerControlSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerCounterTallySpec
+import qualified Pawl.Codec.PlayerCountersAreSpec
 import qualified Pawl.Codec.PlayerCountersSpec
 import qualified Pawl.Codec.PlayerDesignationSpec
 import qualified Pawl.Codec.PlayerDesignationTallySpec
@@ -1234,6 +1235,7 @@ spec s registry = do
   Pawl.Codec.CountIsSpec.spec s
   Pawl.Codec.TypesAreSpec.spec s
   Pawl.Codec.MonarchIsSpec.spec s
+  Pawl.Codec.PlayerCountersAreSpec.spec s
   Pawl.Codec.PowerToughnessIsSpec.spec s
   Pawl.Codec.DefendersAreSpec.spec s
   Pawl.Codec.CountersAreSpec.spec s

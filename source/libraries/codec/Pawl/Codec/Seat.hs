@@ -2,9 +2,11 @@
 
 module Pawl.Codec.Seat where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Pawl.Codec.Label as Label
 import qualified Pawl.Codec.Placement as Placement
+import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -15,6 +17,7 @@ codec :: Codec.Codec Seat.Seat
 codec = Fields.object $ do
   name <- Fields.required "name" Label.codec Seat.name
   life <- Fields.defaulted "life" 20 Common.integer Seat.life
+  counters <- Fields.defaulted "counters" Map.empty (Common.multiset PlayerCounterKind.codec) Seat.counters
   battlefield <- Fields.defaulted "battlefield" Seq.empty (Common.seq Placement.codec) Seat.battlefield
   hand <- Fields.defaulted "hand" Seq.empty (Common.seq Placement.codec) Seat.hand
   graveyard <- Fields.defaulted "graveyard" Seq.empty (Common.seq Placement.codec) Seat.graveyard
@@ -24,6 +27,7 @@ codec = Fields.object $ do
     Seat.MkSeat
       { Seat.name = name,
         Seat.life = life,
+        Seat.counters = counters,
         Seat.battlefield = battlefield,
         Seat.hand = hand,
         Seat.graveyard = graveyard,

@@ -1,0 +1,40 @@
+{
+  "description": "CR 701.10e Aetheric Amplifier doubles each kind of counter its controller has",
+  "note": "alice has two kinds in different counts (three energy, two poison) and none of the other two; bob's poison is the \"you\" the mode does not reach. The untapped Amplifier is itself a mana source, so the payment declines it as an extra one (CR 605.3a).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [
+          { "key": { "type": "Energy" }, "value": 3 },
+          { "key": { "type": "Poison" }, "value": 2 }
+        ],
+        "battlefield": [
+          { "card": "Aetheric Amplifier", "label": "amplifier", "ready": true },
+          { "card": "Forest", "label": "f1", "ready": true },
+          { "card": "Forest", "label": "f2", "ready": true },
+          { "card": "Forest", "label": "f3", "ready": true },
+          { "card": "Forest", "label": "f4", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "counters": [{ "key": { "type": "Poison" }, "value": 1 }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@amplifier", "ability": 1, "modes": [1], "mana": ["@f1", "@f2", "@f3", "@f4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Energy" }, "count": 6 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Poison" }, "count": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Rad" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "alice", "kind": { "type": "Experience" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Poison" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Energy" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Rad" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Experience" }, "count": 0 } } }
+  ]
+}
