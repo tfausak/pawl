@@ -1,0 +1,25 @@
+{
+  "description": "CR 115.6 Rat Out with zero targets announced resolves, leaving the creature alone",
+  "note": "Rat Out's \"up to one target creature\" announced at zero: CR 608.2b does not fizzle a spell that chose no targets at all, so the Rat is still made, and bob's Piker stays 2/1. The Rat is what makes the zero-target case observable.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Swamp", "label": "swamp" }],
+        "hand": [{ "card": "Rat Out", "label": "rat-out" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@rat-out", "targets": [], "mana": ["@swamp"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Rat Token", "count": 1 } } }
+  ]
+}

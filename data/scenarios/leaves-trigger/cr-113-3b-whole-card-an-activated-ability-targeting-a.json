@@ -1,0 +1,56 @@
+{
+  "description": "CR 113.3b whole card: an ACTIVATED ability targeting a creature you control draws",
+  "note": "Joraga Auxiliary's support ability targets one of alice's two Goblin Pikers, so Professor Hojo's \"one or more creatures you control become the target of an activated ability\" draws her a card. The counter landing on the Piker is the control: the ability really resolved, so a leg that drew nothing cannot pass for one that did. Three seats keep \"a creature you control\" apart from \"a creature\"; every library holds only Forests, so a Forest in alice's hand is the draw.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Forest", "label": "forest-4" },
+          { "card": "Plains", "label": "plains" },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Professor Hojo", "label": "hojo" },
+          { "card": "Joraga Auxiliary", "label": "joraga" },
+          { "card": "Goblin Piker", "label": "piker-1" },
+          { "card": "Goblin Piker", "label": "piker-2" }
+        ],
+        "hand": [{ "card": "Rune-Brand Juggler" }],
+        "library": [
+          { "card": "Forest" },
+          { "card": "Forest" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bobs-piker" }],
+        "library": [
+          { "card": "Forest" },
+          { "card": "Forest" }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          { "card": "Forest" },
+          { "card": "Forest" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Rune-Brand Juggler", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Forest", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@joraga", "targets": ["@piker-1"], "mana": ["@forest-1", "@plains", "@forest-2", "@forest-3", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Forest", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Rune-Brand Juggler", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker-1", "power": 3, "toughness": 2 } } }
+  ]
+}

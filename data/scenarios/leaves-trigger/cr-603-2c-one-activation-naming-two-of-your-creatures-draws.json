@@ -1,0 +1,57 @@
+{
+  "description": "CR 603.2c one activation naming two of your creatures draws once",
+  "note": "One Joraga Auxiliary activation targets both of alice's Goblin Pikers; CR 603.2c makes that one \"one or more\" event, so the watcher draws once, not twice. Synthetic Target Scryer is Professor Hojo's clause without its once-each-turn rider, which would collapse a second firing by itself and so cannot tell the two readings apart. Both Pikers taking a counter is the control that both were really targeted. Every library holds only Forests, so the Forests in alice's hand count the draws.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Forest", "label": "forest-4" },
+          { "card": "Plains", "label": "plains" },
+          { "card": "Swamp", "label": "swamp" },
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Synthetic Target Scryer", "label": "scryer" },
+          { "card": "Joraga Auxiliary", "label": "joraga" },
+          { "card": "Goblin Piker", "label": "piker-1" },
+          { "card": "Goblin Piker", "label": "piker-2" }
+        ],
+        "hand": [{ "card": "Rune-Brand Juggler" }],
+        "library": [
+          { "card": "Forest" },
+          { "card": "Forest" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bobs-piker" }],
+        "library": [
+          { "card": "Forest" },
+          { "card": "Forest" }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          { "card": "Forest" },
+          { "card": "Forest" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Rune-Brand Juggler", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Forest", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@joraga", "targets": ["@piker-1", "@piker-2"], "mana": ["@forest-1", "@plains", "@forest-2", "@forest-3", "@forest-4", "@swamp", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Forest", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Rune-Brand Juggler", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker-1", "power": 3, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker-2", "power": 3, "toughness": 2 } } }
+  ]
+}

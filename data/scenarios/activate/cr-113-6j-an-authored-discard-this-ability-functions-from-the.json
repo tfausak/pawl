@@ -1,0 +1,39 @@
+{
+  "description": "CR 113.6j an authored discard-this ability functions from the hand",
+  "note": "Faerie Macabre's ability costs discarding itself, a cost that can't be paid on the battlefield, so it functions from the hand (CR 113.6j, 113.6m). Activated from the hand with no ability index, so the activation is refused unless exactly one ability of the Macabre is offered. \"Up to two\" is a maximum, not a sweep: alice's own Forest in her graveyard was a legal target and stays put beside the discarded Macabre (CR 404.1). The checks between the activation and the pass read the paid cost while the ability waits on the stack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "hand": [{ "card": "Faerie Macabre", "label": "macabre" }],
+        "graveyard": [{ "card": "Forest" }]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Barkhide Mauler", "label": "mauler" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@macabre", "targets": ["@piker", "@mauler"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Faerie Macabre", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Faerie Macabre", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Forest", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Barkhide Mauler", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Barkhide Mauler", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Barkhide Mauler", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Faerie Macabre", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Forest", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Forest", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Faerie Macabre", "count": 0 } } }
+  ]
+}

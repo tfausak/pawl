@@ -1,0 +1,37 @@
+{
+  "description": "CR 607.2a whole card: the Savior leaving the battlefield returns what it exiled, to its owner",
+  "note": "Savior of Ollenbock trains and exiles bob's Ogre Sentry from his graveyard, then leaves the battlefield and its third ability returns the linked card. The victim is bob's, so \"under their owners' control\" is observable: the ability's controller is alice, and an owner-blind return would hand her the Sentry. The Haskell test destroyed the Savior directly; here alice's Lightning Bolt kills the trained 2/3.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Savior of Ollenbock", "label": "savior", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Mountain", "label": "mountain" }
+        ],
+        "hand": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Ogre Sentry", "label": "sentry" }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@savior", "@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@sentry"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Ogre Sentry", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Cast": { "object": "@bolt", "targets": ["@savior"], "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Savior of Ollenbock", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Ogre Sentry", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Ogre Sentry", "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Ogre Sentry", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ogre Sentry", "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

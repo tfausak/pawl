@@ -1,0 +1,32 @@
+{
+  "description": "CR 601.2c announcing one target pumps one creature",
+  "note": "The same board and spell as the two-target case, differing only in the announced number: one target is pumped and the Wall, which two would have taken, is untouched.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain1", "ready": true },
+          { "card": "Mountain", "label": "mountain2", "ready": true }
+        ],
+        "hand": [{ "card": "Hearts on Fire", "label": "hearts" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Typhoid Rats", "label": "rats" },
+          { "card": "Wall of Stone", "label": "wall" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hearts", "targets": ["@piker"], "mana": ["@mountain1", "@mountain2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@wall", "power": 0, "toughness": 8 } } }
+  ]
+}

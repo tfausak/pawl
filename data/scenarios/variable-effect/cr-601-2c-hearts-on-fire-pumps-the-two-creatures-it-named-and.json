@@ -1,0 +1,33 @@
+{
+  "description": "CR 601.2c Hearts on Fire pumps the two creatures it named, and only those",
+  "note": "Hearts on Fire takes one or two target creatures. bob's three creatures have distinct boxes (2/1, 1/1, 0/8), so which two were pumped is legible, and two of three makes the count a choice rather than a sweep.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain1", "ready": true },
+          { "card": "Mountain", "label": "mountain2", "ready": true }
+        ],
+        "hand": [{ "card": "Hearts on Fire", "label": "hearts" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Typhoid Rats", "label": "rats" },
+          { "card": "Wall of Stone", "label": "wall" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hearts", "targets": ["@piker", "@wall"], "mana": ["@mountain1", "@mountain2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 4, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@wall", "power": 2, "toughness": 9 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@rats", "power": 1, "toughness": 1 } } }
+  ]
+}

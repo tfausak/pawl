@@ -1,0 +1,31 @@
+{
+  "description": "CR 702.149c whole card: training exiles the targeted creature",
+  "note": "Savior of Ollenbock (1/2, training) attacks beside a Goblin Piker, whose 2 power clears the Savior's 1, so training puts a +1/+1 counter on the Savior and its \"whenever this creature trains\" trigger exiles the creature it targets, bob's Hill Giant. The exile is what makes the trigger observable; the counters prove the training half happened, on the Savior and not its companion.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Savior of Ollenbock", "label": "savior", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant" }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@savior", "@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseTargets": { "target": ["@giant"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@savior", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Counters": { "object": "@piker", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Savior of Ollenbock", "count": 0 } } }
+  ]
+}
