@@ -9,29 +9,19 @@
           },
           "filter": {
             "type": "And",
-            "value": [
-              {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Soldier"
-                }
-              },
-              {
-                "type": "ControlledBy",
-                "value": {
-                  "type": "You"
-                }
-              }
-            ]
+            "value": []
           },
           "scope": {
             "type": "InZone",
             "value": {
               "player": {
-                "type": "EachPlayer"
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
               },
               "zone": {
-                "type": "Battlefield"
+                "type": "Hand"
               }
             }
           }
@@ -47,20 +37,15 @@
                   "type": "Variable"
                 },
                 {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "White"
-                    }
-                  }
+                  "type": "Generic",
+                  "value": 3
                 },
                 {
                   "type": "OfType",
                   "value": {
                     "type": "Colored",
                     "value": {
-                      "type": "White"
+                      "type": "Blue"
                     }
                   }
                 }
@@ -83,12 +68,21 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "White"
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Benalish Commander",
+      "name": "Aeon Chronicler",
       "power": {
         "type": "Star"
       },
@@ -115,39 +109,13 @@
                   {
                     "effects": [
                       {
-                        "type": "Create",
+                        "type": "Draw",
                         "value": {
-                          "card": {
-                            "faces": [
-                              {
-                                "colorIndicator": [
-                                  {
-                                    "type": "White"
-                                  }
-                                ],
-                                "name": "Soldier Token",
-                                "power": {
-                                  "type": "Literal",
-                                  "value": 1
-                                },
-                                "toughness": {
-                                  "type": "Literal",
-                                  "value": 1
-                                },
-                                "typeLine": {
-                                  "subtypes": [
-                                    {
-                                      "type": "Soldier"
-                                    }
-                                  ],
-                                  "types": [
-                                    {
-                                      "type": "Creature"
-                                    }
-                                  ]
-                                }
-                              }
-                            ]
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
                           },
                           "quantity": {
                             "type": "Literal",
@@ -166,10 +134,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Human"
-          },
-          {
-            "type": "Soldier"
+            "type": "Avatar"
           }
         ],
         "types": [

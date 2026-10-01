@@ -1765,17 +1765,12 @@ delaying s registry = Spec.describe s "CR 702.62a Delay" $ do
 
 -- Benalish Commander (PLC 2) {3}{W} Creature -- Human Soldier */*, "Benalish
 -- Commander's power and toughness are each equal to the number of Soldiers you
--- control. / Suspend X--{X}{W}{W}. X can't be 0." -- checked against Scryfall,
--- 2026-09-17. CR 107.3d's announcement, which rule 107.3i makes one number: the
--- X the player names as the special action is taken is both the mana it charges
--- and the time counters the card is exiled with.
---
--- Not implemented: the card's third ability, "Whenever a time counter is removed
--- from this card while it's exiled, create a 1/1 white Soldier creature token" --
--- TriggerCondition.SelfCountersRemoved functions only on the battlefield
--- (gap #3819). That leaves pawl's card STRICTER than printed: the suspended
--- Commander makes no Soldiers, so nothing it does is anything the printing would
--- not also do.
+-- control. / Suspend X--{X}{W}{W}. X can't be 0. / Whenever a time counter is
+-- removed from this card while it's exiled, create a 1/1 white Soldier creature
+-- token." -- checked against Scryfall, 2026-10-01. CR 107.3d's announcement,
+-- which rule 107.3i makes one number: the X the player names as the special
+-- action is taken is both the mana it charges and the time counters the card is
+-- exiled with. `whileExiled` below is its third ability.
 --
 -- SIX PLAINS, which is what makes the announcement cases below discriminating.
 -- {X}{W}{W} at X=3 taps five of them and leaves one, so the count reads the
@@ -1862,6 +1857,51 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
         (enoughId, enough) = benalishBoard 3 plains commander
     Spec.assertBool s (List.notElem (Action.Type.Suspend tooPoorId) (Action.legalActions S.alice tooPoor)) "two Plains cannot pay {1}{W}{W}, so the action is not offered"
     Spec.assertBool s (List.elem (Action.Type.Suspend enoughId) (Action.legalActions S.alice enough)) "the control: three Plains can, and it is"
+
+-- CR 113.6b: "an ability that states which zones it functions in functions only
+-- from those zones". "While it's exiled" is such a statement, so a suspended
+-- card's own counter-removal triggers fire from exile, where CR 702.62b keeps it,
+-- as suspend's upkeep ability takes each counter off.
+--
+-- Libraries are stocked so nobody decks while the countdown runs (CR 104.3c).
+whileExiled :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+whileExiled s registry = Spec.describe s "CR 113.6b while it's exiled" $ do
+  -- Benalish Commander at X=2: a Soldier for each of the two counters, the
+  -- second beside suspend's own last-counter trigger.
+  Spec.it s "a suspended Benalish Commander makes a Soldier each time a time counter comes off" $ do
+    plains <- S.printingOf s registry "Plains"
+    commander <- S.printingOf s registry "Benalish Commander"
+    let (commanderId, gs) = benalishBoard 6 plains commander
+        suspended = snd (Engine.runGamePure (suspendForX 2 commanderId) (stockLibraries plains gs) Engine.priorityLoop)
+        soldiers = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Soldier Token")) S.alice
+        firstUpkeep = pastUpkeepOfAlice suspended
+        secondUpkeep = pastUpkeepOfAlice firstUpkeep
+    Spec.assertEqWith
+      s
+      "one Soldier after the first counter comes off, two after the last"
+      (soldiers suspended, soldiers firstUpkeep, soldiers secondUpkeep)
+      (0, 1, 2)
+    Spec.assertEqWith s "the first upkeep left one time counter on the exiled card" (exiledTimeCounters firstUpkeep) (Just 1)
+  -- Riftmarked Knight's "when the last time counter is removed": nothing at
+  -- the first two upkeeps, the Knight token at the third.
+  Spec.it s "a suspended Riftmarked Knight makes its Knight only when the last time counter comes off" $ do
+    plains <- S.printingOf s registry "Plains"
+    knight <- S.printingOf s registry "Riftmarked Knight"
+    let (knightId, gs) = benalishBoard 3 plains knight
+        suspended = snd (Engine.runGamePure (suspendAnswer knightId) (stockLibraries plains gs) Engine.priorityLoop)
+        tokens = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Knight Token")) S.alice
+        secondUpkeep = pastUpkeepOfAlice (pastUpkeepOfAlice suspended)
+        thirdUpkeep = pastUpkeepOfAlice secondUpkeep
+    Spec.assertEqWith s "no Knight token until the last counter, one after it" (tokens secondUpkeep, tokens thirdUpkeep) (0, 1)
+    Spec.assertEqWith s "one time counter left before the third upkeep" (exiledTimeCounters secondUpkeep) (Just 1)
+
+-- The end of alice's next draw step, so her next upkeep has run. Counted by
+-- steps rather than turn numbers: a board built standing in her precombat main
+-- phase runs that turn's beginning phase after it.
+pastUpkeepOfAlice :: GameState.GameState -> GameState.GameState
+pastUpkeepOfAlice g =
+  let drawing h = GameState.activePlayer h == S.alice && GameState.phase h == Phase.Beginning BeginningStep.DrawStep
+   in runUntil delayAnswer drawing (snd (Engine.runGamePure delayAnswer g Engine.runStep))
 
 -- Poison the Cup (KHM 103) {1}{B}{B} Instant, "Destroy target creature. If this
 -- spell was foretold, scry 2. / Foretell {1}{B}" -- checked against Scryfall,
@@ -2077,6 +2117,7 @@ spec s registry = do
   suspending s registry
   suspendHaste s registry
   suspendingForX s registry
+  whileExiled s registry
   delaying s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is

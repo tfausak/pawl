@@ -101,6 +101,7 @@ import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
+import qualified Pawl.Types.SelfCountersRemoved as SelfCountersRemoved
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -2924,8 +2925,12 @@ zonesTriggeredFrom cond =
         -- chapter ability functions from the battlefield alone.
         TriggerCondition.SelfCountersReached {} -> battlefield
         TriggerCondition.SelfBecomesClassLevel _ -> battlefield
-        TriggerCondition.SelfLastCounterRemoved _ -> battlefield
-        TriggerCondition.SelfCountersRemoved _ -> battlefield
+        -- CR 113.6b: the zone the ability states, Benalish Commander's "while
+        -- it's exiled"; the battlefield, CR 113.6's default, when it states
+        -- none. Pawl.SpecialActionSpec's suspended Benalish Commander proves
+        -- the exile answer.
+        TriggerCondition.SelfLastCounterRemoved removal -> Set.singleton (SelfCountersRemoved.zone removal)
+        TriggerCondition.SelfCountersRemoved removal -> Set.singleton (SelfCountersRemoved.zone removal)
         -- The battlefield, every counter mirror's answer: a permanent takes CR 122.6
         -- counters there, and these conditions' bearers are bystanders watching from
         -- it.

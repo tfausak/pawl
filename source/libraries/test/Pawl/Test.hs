@@ -525,6 +525,7 @@ import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
 import qualified Pawl.Codec.SeatSpec
 import qualified Pawl.Codec.SelfCountersReachedSpec
+import qualified Pawl.Codec.SelfCountersRemovedSpec
 import qualified Pawl.Codec.SetBasePowerToughnessSpec
 import qualified Pawl.Codec.SetClassLevelSpec
 import qualified Pawl.Codec.SetHalfLockedSpec
@@ -1332,6 +1333,7 @@ spec s registry = do
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SearchSpec.spec s
   Pawl.Codec.SelfCountersReachedSpec.spec s
+  Pawl.Codec.SelfCountersRemovedSpec.spec s
   Pawl.Codec.SetBasePowerToughnessSpec.spec s
   Pawl.Codec.SetClassLevelSpec.spec s
   Pawl.Codec.SetHalfLockedSpec.spec s
