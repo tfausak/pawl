@@ -1,0 +1,42 @@
+{
+  "description": "CR 707.10c a copy's new targets are judged as one announcement",
+  "note": "CR 707.10c's new targets are judged as one CR 601.2c announcement: Fall of the Hammer's victim slot excludes the dealer, so naming the Giant in both of the copy's slots passes each slot's offer but not the joint check, and the copy keeps the targets CR 707.10 gave it. The Wall of Stone is 0/8 so nothing dies in any run. The -spider and -giant files are the same board with the re-target prompt answered otherwise, so the prompt is live and the Giant really is offered as a victim.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1" },
+          { "card": "Mountain", "label": "mountain-2" },
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Giant Spider", "label": "spider" }
+        ],
+        "hand": [
+          { "card": "Fall of the Hammer", "label": "hammer" },
+          { "card": "Twincast", "label": "twincast" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Wall of Stone", "label": "wall" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hammer", "targetsBySlot": { "dealer": ["@giant"], "victim": ["@wall"] }, "mana": ["@mountain-1", "@mountain-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@twincast", "targets": ["Fall of the Hammer"], "mana": ["@island-1", "@island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "dealer": ["@giant"], "victim": ["@giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@wall", "damage": 6 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@giant", "damage": 0 } } }
+  ]
+}

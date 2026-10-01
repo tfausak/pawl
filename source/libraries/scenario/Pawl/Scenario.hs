@@ -325,7 +325,7 @@ answerPrompt asked = do
       waiting <- State.gets pending
       case waiting of
         Just (key, verb, choices)
-          | subChoiceFor key prompt decider -> answerActionChoice key verb choices asked
+          | subChoiceFor key prompt decider choices -> answerActionChoice key verb choices asked
           -- Any other prompt means the action has finished. A choice it never
           -- asked for is a scenario error, reported here rather than at the
           -- next prompt that happens to want an answer.
@@ -337,11 +337,13 @@ answerPrompt asked = do
 
 -- | Whether a prompt is one a cast or activation asks its own decider between
 -- the ChooseAction that began it and its completion (CR 601.2b-h, CR 602.2b).
-subChoiceFor :: When.When -> Prompt.Type.Prompt r -> Maybe Label.Label -> Bool
-subChoiceFor key prompt decider =
+-- A target prompt is only while the move still holds targets: once they are
+-- spent, the next one is a triggered ability's (CR 603.3d).
+subChoiceFor :: When.When -> Prompt.Type.Prompt r -> Maybe Label.Label -> Choices.Choices -> Bool
+subChoiceFor key prompt decider choices =
   decider == Just (When.player key) && case prompt of
-    Prompt.Type.ChooseTargets {} -> True
-    Prompt.Type.AnnounceTargets {} -> True
+    Prompt.Type.ChooseTargets {} -> holdsTargets
+    Prompt.Type.AnnounceTargets {} -> holdsTargets
     Prompt.Type.ChooseModes {} -> True
     Prompt.Type.ChooseX {} -> True
     Prompt.Type.ChooseCost {} -> True
@@ -350,6 +352,8 @@ subChoiceFor key prompt decider =
     Prompt.Type.ChooseExtraManaSource {} -> True
     Prompt.Type.ChooseManaYield {} -> True
     _ -> False
+  where
+    holdsTargets = Maybe.isJust (Choices.targets choices) || not (Map.null (Choices.targetsBySlot choices))
 
 answerTopPrompt :: Maybe Label.Label -> Asked.Asked r -> Run r
 answerTopPrompt decider asked =
@@ -549,6 +553,22 @@ answerActionChoice key verb choices asked =
       unexpected :: Run b
       unexpected = failWith (Failure.MkUnexpectedActionChoice key verb kind)
    in case prompt of
+        -- Slot by slot: this prompt takes the slots it offers, every one named.
+        Prompt.Type.ChooseTargets _ _ _ offered
+          | not (Map.null (Choices.targetsBySlot choices)) -> do
+              let mine = Map.restrictKeys (Choices.targetsBySlot choices) (Map.keysSet offered)
+              Monad.unless (Map.size mine == Map.size offered) unexpected
+              chosen <- resolveSlots gs key verb offered mine
+              updateChoices (\current -> current {Choices.targetsBySlot = Map.withoutKeys (Choices.targetsBySlot current) (Map.keysSet offered)})
+              pure chosen
+        Prompt.Type.AnnounceTargets _ _ _ offered
+          | not (Map.null (Choices.targetsBySlot choices)) -> do
+              let mine = Map.restrictKeys (Choices.targetsBySlot choices) (Map.keysSet offered)
+              Monad.unless (Map.size mine == Map.size offered) unexpected
+              counts <- announceSlots key verb offered mine
+              -- A slot announced at zero raises no ChooseTargets to spend it.
+              updateChoices (\current -> current {Choices.targetsBySlot = Map.withoutKeys (Choices.targetsBySlot current) (Map.keysSet (Map.filter (== 0) counts))})
+              pure counts
         Prompt.Type.ChooseTargets _ _ _ offered -> case (Choices.targets choices, Map.toList offered) of
           (Just targets, [(slot, (count, candidates))])
             | Natural.length targets == count -> do

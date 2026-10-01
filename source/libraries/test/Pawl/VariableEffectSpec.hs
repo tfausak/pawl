@@ -26,7 +26,6 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -60,7 +59,6 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Zone as Zone
 
 -- Pays what a resolving spell or ability offers `who`, and declines elsewhere,
@@ -1700,12 +1698,6 @@ decliningTargets p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (const 0) offers
   _ -> S.identityAnswer p
 
--- Announces one named slot and declines the rest.
-announcingOnly :: SlotName.SlotName -> Prompt.Prompt r -> r
-announcingOnly slot p = case p of
-  Prompt.AnnounceTargets _ _ _ offers -> Map.mapWithKey (\name (count, legal) -> if name == slot then TargetCount.ceilingOn (Natural.length legal) count else 0) offers
-  _ -> S.identityAnswer p
-
 -- CR 115.6's "up to one target", read at resolution.
 --
 -- Rat Out {B} Instant (data/cards/rat-out.json): "Up to one target creature gets
@@ -1717,7 +1709,7 @@ announcingOnly slot p = case p of
 -- Explosive Entry {1}{R} Sorcery (data/cards/explosive-entry.json): "Destroy up
 -- to one target artifact. Put a +1/+1 counter on up to one target creature." Two
 -- independently optional slots, so one can be taken while the other is declined.
-upToOneTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+upToOneTargetSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
   Spec.it s "CR 115.6 Rat Out aimed at a creature shrinks it and still makes the Rat" $ do
     swamp <- S.printingOf s registry "Swamp"
@@ -1730,31 +1722,6 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
     Spec.assertEqWith s "power 1" (Projection.powerOf victim after) (Just 1)
     Spec.assertEqWith s "toughness 0" (Projection.toughnessOf victim after) (Just 0)
     Spec.assertEqWith s "one Rat" (length (S.tokensOf after)) 1
-  Spec.it s "CR 115.6 Explosive Entry takes one slot and declines the other" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    piker <- S.printingOf s registry "Goblin Piker"
-    explosiveEntry <- S.printingOf s registry "Explosive Entry"
-    let (equipment, withArtifact) = S.addPermanent bonesplitter S.bob (S.landsInPlay mountain 2)
-        (creature, board) = S.addPermanent piker S.bob withArtifact
-        (gs, spellId) = S.handOne explosiveEntry board
-        answer = announcingOnly (SlotName.MkSlotName (Text.pack "artifact"))
-        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
-    Spec.assertBool s (not (Set.member equipment (GameState.battlefield after))) "the artifact was destroyed"
-    Spec.assertEqWith s "the creature got no counter" (Projection.powerOf creature after) (Just 2)
-  Spec.it s "CR 115.6 Explosive Entry takes both slots" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    piker <- S.printingOf s registry "Goblin Piker"
-    explosiveEntry <- S.printingOf s registry "Explosive Entry"
-    let (equipment, withArtifact) = S.addPermanent bonesplitter S.bob (S.landsInPlay mountain 2)
-        (creature, board) = S.addPermanent piker S.bob withArtifact
-        (gs, spellId) = S.handOne explosiveEntry board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertBool s (not (Set.member equipment (GameState.battlefield after))) "the artifact was destroyed"
-    Spec.assertEqWith s "and the creature got its counter" (Projection.powerOf creature after) (Just 3)
 
 -- CR 608.2f's per-object BODY, and the per-iteration binding that makes it more
 -- than a repeated opcode.

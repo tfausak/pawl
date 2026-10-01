@@ -1,0 +1,51 @@
+{
+  "description": "CR 702.46a whole card: the dead Kami returns the one Spirit card its N reaches",
+  "note": "Murder kills Kami of Empty Graves (soulshift 3). Alice's graveyard holds a Goblin Piker (not a Spirit), Shimatsu the Bloodcloaked (a Spirit of mana value 4) and a Disowned Ancestor; bob's holds an identical Ancestor. Only her own Ancestor is a legal target (CR 400.1, rule 702.46a's N), and taking the may returns it alone; the Kami itself, a Spirit of mana value 4, stays in the graveyard beside the spent Murder.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kami of Empty Graves", "label": "kami" },
+          { "card": "Swamp", "label": "swamp-1", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true }
+        ],
+        "hand": [{ "card": "Murder", "label": "murder" }],
+        "graveyard": [
+          { "card": "Goblin Piker" },
+          { "card": "Shimatsu the Bloodcloaked" },
+          { "card": "Disowned Ancestor", "label": "mine" }
+        ],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Disowned Ancestor", "label": "theirs" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@murder", "targets": ["@kami"], "mana": ["@swamp-1", "@swamp-2", "@swamp-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "soulshifted": ["@mine"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Kami of Empty Graves", "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Hand", "card": "Disowned Ancestor", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Disowned Ancestor", "count": 0 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Shimatsu the Bloodcloaked", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Graveyard", "card": "Disowned Ancestor", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Kami of Empty Graves", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Murder", "count": 1 } }
+  ]
+}

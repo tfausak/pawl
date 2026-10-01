@@ -1,0 +1,57 @@
+{
+  "description": "CR 702.55b only the creature the card haunts fires it",
+  "note": "The link, not the zone: the same board and the same exile, and the creature the second Bolt kills is the other, identical Piker, which the card does not haunt. Nothing triggers, so no target prompt is raised and no life total moves.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Blind Hunter", "label": "hunter" },
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true }
+        ],
+        "hand": [
+          { "card": "Lightning Bolt", "label": "first-bolt" },
+          { "card": "Lightning Bolt", "label": "second-bolt" }
+        ],
+        "library": [
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Mountain" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "victim" },
+          { "card": "Goblin Piker", "label": "bystander" }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@first-bolt", "targets": ["@hunter"], "mana": ["@mountain-1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "haunted": ["@victim"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Blind Hunter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@second-bolt", "targets": ["@bystander"], "mana": ["@mountain-2"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 20 } },
+    { "Life": { "player": "bob", "life": 20 } },
+    { "Life": { "player": "carol", "life": 20 } },
+    { "Count": { "player": "bob", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Exile", "card": "Blind Hunter", "count": 1 } }
+  ]
+}

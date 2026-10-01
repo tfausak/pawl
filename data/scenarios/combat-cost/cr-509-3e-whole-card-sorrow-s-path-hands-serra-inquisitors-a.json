@@ -1,0 +1,35 @@
+{
+  "description": "CR 509.3e whole card: Sorrow's Path hands Serra Inquisitors a black attacker and it triggers",
+  "note": "Serra Inquisitors (\"whenever this creature blocks or becomes blocked by one or more black creatures\") is declared against a red Hill Giant, which fires nothing, and Sorrow's Path's exchange hands it the black Bog Wraith a second Hill Giant was blocking. Per the Path's ruling the two creatures block anew, so the Inquisitors triggers and is 5/3. The -control file declares the same blocks and never activates the Path.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Sorrow's Path", "label": "path" },
+          { "card": "Hill Giant", "label": "red", "ready": true },
+          { "card": "Bog Wraith", "label": "black", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Serra Inquisitors", "label": "inq" },
+          { "card": "Hill Giant", "label": "other" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@red", "@black"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@inq": ["@red"], "@other": ["@black"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "@path", "targetsBySlot": { "first": ["@inq"], "second": ["@other"] } } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@inq", "power": 5, "toughness": 3 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@black", "blockers": ["@inq"] } } }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "description": "CR 700.2 choosing both destroys both targets",
+  "note": "Vandalize's choose one or both, answered with both: two separate slots are filled, and each destruction is separately visible as bob losing exactly that permanent.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Mountain", "label": "mountain-3", "ready": true },
+          { "card": "Mountain", "label": "mountain-4", "ready": true },
+          { "card": "Mountain", "label": "mountain-5", "ready": true }
+        ],
+        "hand": [{ "card": "Vandalize", "label": "vandalize" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Bonesplitter", "label": "bonesplitter" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@vandalize", "modes": [0, 1], "targetsBySlot": { "artifact": ["@bonesplitter"], "land": ["@forest"] }, "mana": ["@mountain-1", "@mountain-2", "@mountain-3", "@mountain-4", "@mountain-5"] } } }
+  ],
+  "final": [
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Vandalize", "count": 1 } },
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Bonesplitter", "count": 0 } },
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Forest", "count": 0 } }
+  ]
+}

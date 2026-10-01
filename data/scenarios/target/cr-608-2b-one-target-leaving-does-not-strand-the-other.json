@@ -1,0 +1,43 @@
+{
+  "description": "CR 608.2b one target leaving does not strand the other",
+  "note": "Unbury's second mode names two Hill Giants that must share a creature type. bob's Withered Wretch exiles one in response, so at resolution the other is re-checked against the exiled one as it last existed (CR 608.2h) and still returns. The Haskell original exiled the card with a bare zone change; the Wretch is a real card standing in for it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp1" },
+          { "card": "Swamp", "label": "swamp2" }
+        ],
+        "graveyard": [
+          { "card": "Hill Giant", "label": "giant-a" },
+          { "card": "Hill Giant", "label": "giant-b" },
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Woodland Changeling", "label": "changeling" }
+        ],
+        "hand": [{ "card": "Unbury", "label": "unbury" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Swamp", "label": "bob-swamp" },
+          { "card": "Withered Wretch", "label": "wretch" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@unbury", "modes": [1], "targetsBySlot": { "first": ["@giant-a"], "second": ["@giant-b"] }, "mana": ["@swamp1", "@swamp2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Activate": { "object": "@wretch", "targets": ["@giant-a"], "mana": ["@bob-swamp"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Exile", "card": "Hill Giant", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Unbury", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Woodland Changeling", "count": 0 } } }
+  ]
+}

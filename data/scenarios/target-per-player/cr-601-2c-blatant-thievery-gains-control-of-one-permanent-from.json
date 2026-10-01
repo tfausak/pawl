@@ -1,0 +1,42 @@
+{
+  "description": "CR 601.2c Blatant Thievery gains control of one permanent from each opponent",
+  "note": "\"For each opponent, gain control of target permanent that player controls\" is one slot per opponent, each offering only that player's permanents. Three seats, so bob's slot and carol's are two different players; alice holds no Piker or Ornithopter of her own, so finding them on her battlefield is the control change.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" },
+          { "card": "Island", "label": "island3" },
+          { "card": "Island", "label": "island4" },
+          { "card": "Island", "label": "island5" },
+          { "card": "Island", "label": "island6" },
+          { "card": "Island", "label": "island7" }
+        ],
+        "hand": [{ "card": "Blatant Thievery", "label": "thievery" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Forest", "label": "forest" }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Ornithopter", "label": "thopter" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@thievery", "targetsBySlot": { "target#player1": ["@piker"], "target#player2": ["@thopter"] }, "mana": ["@island1", "@island2", "@island3", "@island4", "@island5", "@island6", "@island7"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Ornithopter", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Ornithopter", "count": 0 } } }
+  ]
+}

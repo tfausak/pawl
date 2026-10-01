@@ -1,0 +1,33 @@
+{
+  "description": "CR 400.7 the copy cast from the graveyard is a new object, so it announces and resolves Acidic Soil",
+  "note": "Synthetic Mirror of the Fallen makes alice's graveyard Acidic Soil a copy of bob's Lightning Bolt, so Lier prices its flashback at the Bolt's {R}. Casting it moves it to the stack, and CR 400.7 makes the spell a new object the copy effect does not reach: it announces no target (an unscheduled target prompt would fail the run) and resolves as Acidic Soil, dealing alice 3 for her three lands and bob nothing for his none. The Mirror's own target prompt must offer exactly its two slots.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Lier, Disciple of the Drowned", "label": "lier" }
+        ],
+        "hand": [{ "card": "Synthetic Mirror of the Fallen", "label": "mirror" }],
+        "graveyard": [{ "card": "Acidic Soil", "label": "soil" }]
+      },
+      {
+        "name": "bob",
+        "graveyard": [{ "card": "Lightning Bolt", "label": "bolt" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mirror", "targetsBySlot": { "archetype": ["@bolt"], "mirrored": ["@soil"] }, "mana": ["@island-1", "@island-2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@soil", "mana": ["@mountain"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 17 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

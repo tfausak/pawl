@@ -2099,19 +2099,6 @@ handAppend printing pid gs =
           }
       )
 
--- THREE seats: the copy's controller (alice), the original's target (bob) and
--- somewhere else for CR 707.10c to send the copy (carol). Two would collapse the
--- last two onto one player, and the re-target case would prove nothing.
---
--- alice holds Lightning Bolt and Twincast with a Mountain and two Islands
--- untapped -- exactly both costs, so neither cast can fail for mana.
-twincastBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, GameState.GameState)
-twincastBoard mountain island bolt twincast =
-  let lands = S.landsFor island S.alice 2 (S.landsFor mountain S.alice 1 S.threePlayerGame)
-      (withBolt, boltId) = S.handOne bolt lands
-      (twincastId, board) = handAppend twincast S.alice withBolt
-   in (boltId, twincastId, board)
-
 -- Answer a ChooseTargets by FILTERING the offered set down to one recipient,
 -- never by building one: CR 608.2b re-reads what was chosen, and a hand-built
 -- Recipient.ToObject of the same permanent is a different recipient that the
@@ -2150,45 +2137,6 @@ topOfStack = Maybe.listToMaybe . GameState.stack
 resolveOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 resolveOne answer gs = snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
 
--- alice casts Lightning Bolt at bob, then -- CR 117.3c, still holding priority --
--- Twincast at the Bolt. Returns the board with [Twincast, Bolt] on the stack.
---
--- `answer` resolves Twincast, and so is the answerer CR 707.10c's prompt reaches.
-boltThenTwincast :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> ObjectId -> GameState.GameState -> Maybe GameState.GameState
-boltThenTwincast answer boltId twincastId board =
-  let cast1 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) board (S.cast S.alice boltId))
-   in do
-        boltSpell <- topOfStack cast1
-        let cast2 = snd (Engine.runGamePure (pinTarget (Recipient.ToObject boltSpell)) cast1 (S.cast S.alice twincastId))
-        -- Twincast, then the copy it put on the stack, then the Bolt itself.
-        pure (resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne answer cast2)))
-
--- CR 601.2c's whole announcement for Fall of the Hammer, pinned per slot name and
--- FILTERED out of the offered set for pinTarget's reason. Reaches both the cast
--- and CR 707.10c's re-target prompt, which is why each run below hands it its
--- own pair.
-retargetHammer :: ObjectId -> ObjectId -> Prompt.Prompt r -> r
-retargetHammer dealerId victimId p = case p of
-  Prompt.ChooseTargets _ _ _ asked ->
-    Map.mapWithKey
-      ( \slot (_, offered) ->
-          let wanted = if slot == SlotName.MkSlotName (Text.pack "dealer") then dealerId else victimId
-           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
-      )
-      asked
-  _ -> S.identityAnswer p
-
--- alice casts Fall of the Hammer with the Giant dealing to bob's Wall, then --
--- CR 117.3c, still holding priority -- Twincast at it, and resolves Twincast,
--- then the copy, then the original. `answer` is what CR 707.10c's prompt reaches.
-hammerThenTwincast :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> ObjectId -> ObjectId -> ObjectId -> GameState.GameState -> Maybe GameState.GameState
-hammerThenTwincast answer dealerId victimId hammerId twincastId board =
-  let cast1 = snd (Engine.runGamePure (retargetHammer dealerId victimId) board (S.cast S.alice hammerId))
-   in do
-        hammerSpell <- topOfStack cast1
-        let cast2 = snd (Engine.runGamePure (pinTarget (Recipient.ToObject hammerSpell)) cast1 (S.cast S.alice twincastId))
-        pure (resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne answer cast2)))
-
 -- Synthetic Mimicry's announcement, pinned per slot name and FILTERED out of the
 -- offered set for pinTarget's reason: `subject` becomes a copy of `original`.
 aimMimicry :: ObjectId -> ObjectId -> Prompt.Prompt r -> r
@@ -2212,37 +2160,8 @@ transcantationAnswer bolt retarget p = case p of
 
 copySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
-  -- CR 707.1 / 707.2: a spell ON THE STACK becomes a copy of another. alice
-  -- casts Lightning Bolt at bob, then Think Twice, then Synthetic Mimicry turning
-  -- the Think Twice into a copy of the Bolt. bob at 14 needs both halves of CR
-  -- 707.2 -- the copied text AND the Bolt's target, the Think Twice having chosen
-  -- none of its own -- and either missing leaves him at 17. alice's empty hand
-  -- is the printed "draw a card" never resolving.
-  Spec.it s "CR 707.2 a spell that becomes a copy of a Bolt resolves as the Bolt, at the Bolt's target" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    thinkTwice <- S.printingOf s registry "Think Twice"
-    mimicry <- S.printingOf s registry "Synthetic Mimicry"
-    let lands = S.landsFor island S.alice 4 (S.landsFor mountain S.alice 1 S.threePlayerGame)
-        (withBolt, boltId) = S.handOne bolt lands
-        (thinkId, withThink) = S.addHandCard thinkTwice S.alice withBolt
-        (mimicryId, withMimicry) = S.addHandCard mimicry S.alice withThink
-        -- Stocked, so the mutant's draw is a card in hand rather than CR 704.5b.
-        board = snd (S.addLibraryCard island S.alice (snd (S.addLibraryCard island S.alice withMimicry)))
-        cast1 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) board (S.cast S.alice boltId))
-        cast2 = snd (Engine.runGamePure S.identityAnswer cast1 (S.cast S.alice thinkId))
-    case (topOfStack cast1, topOfStack cast2) of
-      (Just boltSpell, Just thinkSpell) | boltSpell /= thinkSpell -> do
-        let cast3 = snd (Engine.runGamePure (aimMimicry thinkSpell boltSpell) cast2 (S.cast S.alice mimicryId))
-            -- Mimicry, then the copied Think Twice, then the Bolt.
-            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne S.identityAnswer cast3))
-        Spec.assertEqWith s "bob took the Bolt's 3 and the copied Think Twice's 3" (S.lifeOf S.bob after) (Just 14)
-        Spec.assertEqWith s "and alice drew nothing: the printed text never resolved" (S.handSize S.alice after) 0
-        Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
-      _ -> Spec.assertFailure s "the spells never reached the stack"
-  -- CR 707.2 / 715.3d: the case above with Battle Display, cast as an Adventure
-  -- at the Bonesplitter, as the subject. Once it is a copy of the Bolt it is no
+  -- CR 707.2 / 715.3d: Synthetic Mimicry makes Battle Display, cast as an
+  -- Adventure at the Bonesplitter, a copy of the Bolt. Once it is one it is no
   -- longer an Adventure, so it resolves into the graveyard rather than into
   -- exile. CR 720.3d's Omen rider reads the same face.
   Spec.it s "CR 707.2 an Adventure that becomes a copy of a Bolt goes to the graveyard" $ do
@@ -2266,28 +2185,6 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             -- Mimicry, then the Bolt, then the copied Battle Display.
             after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne S.identityAnswer cast3))
         Spec.assertBool s (CardName.MkCardName (Text.pack "Embereth Shieldbreaker") `elem` graveyardNames after) "the card went to alice's graveyard, not into exile"
-        Spec.assertEqWith s "bob took the Bolt's 3 and the copy's 3" (S.lifeOf S.bob after) (Just 14)
-      _ -> Spec.assertFailure s "the spells never reached the stack"
-  -- CR 707.2 / 702.34a: a Think Twice cast with flashback that becomes a copy of
-  -- the Bolt no longer has flashback, and acquires the Bolt's cast record, which
-  -- paid no flashback cost -- so it goes to the graveyard rather than into exile.
-  Spec.it s "CR 707.2 a flashed-back spell that becomes a copy of a Bolt goes to the graveyard" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    thinkTwice <- S.printingOf s registry "Think Twice"
-    mimicry <- S.printingOf s registry "Synthetic Mimicry"
-    let lands = S.landsFor island S.alice 5 (S.landsFor mountain S.alice 1 S.threePlayerGame)
-        (withBolt, boltId) = S.handOne bolt lands
-        (thinkId, withThink) = S.addGraveyardCard thinkTwice S.alice withBolt
-        (mimicryId, board) = S.addHandCard mimicry S.alice withThink
-        cast1 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) board (S.cast S.alice boltId))
-        cast2 = snd (Engine.runGamePure S.identityAnswer cast1 (S.cast S.alice thinkId))
-    case (topOfStack cast1, topOfStack cast2) of
-      (Just boltSpell, Just thinkSpell) | boltSpell /= thinkSpell -> do
-        let cast3 = snd (Engine.runGamePure (aimMimicry thinkSpell boltSpell) cast2 (S.cast S.alice mimicryId))
-            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne S.identityAnswer cast3))
-        Spec.assertEqWith s "nothing of alice's was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
         Spec.assertEqWith s "bob took the Bolt's 3 and the copy's 3" (S.lifeOf S.bob after) (Just 14)
       _ -> Spec.assertFailure s "the spells never reached the stack"
   -- Transcantation (CMB2 playtest) {1}{R} Instant: "Target instant or sorcery
@@ -2333,102 +2230,6 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             after = resolveOne S.identityAnswer (resolveOne (transcantationAnswer bolt (const Set.empty)) cast2)
         Spec.assertEqWith s "bob, the Bolt's old target, and carol are both untouched" (fmap (`S.lifeOf` after) [S.bob, S.carol]) [Just 20, Just 20]
       Nothing -> Spec.assertFailure s "the Bolt never reached the stack"
-  -- CR 707.10 end to end: the copy exists, carries the original's decisions (CR
-  -- 707.10's "all decisions made for it" -- here the Bolt's target), resolves as
-  -- a spell of its own, and then does NOT reach a graveyard.
-  --
-  -- The two assertions cannot reach each other's values, which is what makes the
-  -- pair discriminating. bob at 14 rather than 17 is the copy existing AND
-  -- resolving -- an engine that minted an object but never resolved it reads 17.
-  -- alice's graveyard holding two cards rather than three is CR 704.5e: a copy
-  -- minted as an ordinary card-backed spell deals the same 3 damage and is then
-  -- filed into a graveyard by CR 608.2n, so the damage cannot tell that bug
-  -- apart and the count is the only place the state-based action is visible.
-  Spec.it s "CR 707.10 Twincast copies a Bolt, the copy resolves, and CR 704.5e removes it" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    twincast <- S.printingOf s registry "Twincast"
-    let (boltId, twincastId, board) = twincastBoard mountain island bolt twincast
-    case boltThenTwincast (pinTarget (Recipient.ToPlayer S.bob)) boltId twincastId board of
-      Nothing -> Spec.assertFailure s "the Bolt never reached the stack"
-      Just after -> do
-        Spec.assertEqWith s "bob took the copy's 3 and the Bolt's 3" (S.lifeOf S.bob after) (Just 14)
-        Spec.assertEqWith s "carol, whom neither targeted, is untouched" (S.lifeOf S.carol after) (Just 20)
-        Spec.assertEqWith s "and alice, who left the copy where it was, took none" (S.lifeOf S.alice after) (Just 20)
-        -- BY NAME as well as by count: a count alone passes on a graveyard
-        -- holding the copy and missing the Bolt.
-        Spec.assertEqWith
-          s
-          "alice's graveyard holds the two CARDS and not the copy"
-          (List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid after)) (Game.zoneMembers Zone.Graveyard S.alice after)))
-          (List.sort (fmap (CardName.MkCardName . Text.pack) ["Lightning Bolt", "Twincast"]))
-        Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
-  -- CR 707.10c: "the player may leave any number of the targets unchanged ... if
-  -- the player chooses to change some or all of the targets, the new targets must
-  -- be legal". The board is the case above's, differing in ONE thing -- the
-  -- answerer that CR 707.10c's prompt reaches -- so the life totals below are the
-  -- prompt's doing and nothing else's.
-  Spec.it s "CR 707.10c the copy's controller sends it at a different player" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    twincast <- S.printingOf s registry "Twincast"
-    let (boltId, twincastId, board) = twincastBoard mountain island bolt twincast
-    case boltThenTwincast (pinTarget (Recipient.ToPlayer S.carol)) boltId twincastId board of
-      Nothing -> Spec.assertFailure s "the Bolt never reached the stack"
-      Just after -> do
-        Spec.assertEqWith s "carol took the re-targeted copy's 3" (S.lifeOf S.carol after) (Just 17)
-        Spec.assertEqWith s "bob took only the original Bolt's 3" (S.lifeOf S.bob after) (Just 17)
-        Spec.assertEqWith s "and alice, who cast both, took none" (S.lifeOf S.alice after) (Just 20)
-  -- CR 707.10c through CR 601.2c: the new targets are judged as ONE
-  -- announcement, not slot by slot. The offered set per slot is the union over
-  -- what a sibling slot could still take, so a pair of slots that exclude each
-  -- other passes the per-slot check and only the joint re-derivation catches it;
-  -- the rule's own no-op is what a rejection falls to, "the player may leave any
-  -- number of the targets unchanged".
-  --
-  -- Fall of the Hammer {1}{R} Instant (data/cards/fall-of-the-hammer.json):
-  -- "Target creature you control deals damage equal to its power to another
-  -- target creature." Its victim slot is Filter.Not (Filter.IsBound "dealer"),
-  -- a filter-side sibling read (Pawl.TargetSpec has its cast-time cases).
-  --
-  -- THREE RUNS off one board, differing in exactly one thing -- the answer CR
-  -- 707.10c's prompt is given -- and no two share a number. The Wall of Stone is
-  -- 0/8 so that nothing dies in any run: a dead dealer would leave the ORIGINAL
-  -- spell with an illegal target and make every run read zero for its own reason.
-  Spec.it s "CR 707.10c a copy's new targets are judged as one announcement" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    giant <- S.printingOf s registry "Hill Giant"
-    spider <- S.printingOf s registry "Giant Spider"
-    wall <- S.printingOf s registry "Wall of Stone"
-    hammer <- S.printingOf s registry "Fall of the Hammer"
-    twincast <- S.printingOf s registry "Twincast"
-    let lands = S.landsFor island S.alice 2 (S.landsFor mountain S.alice 2 S.threePlayerGame)
-        (giantId, g1) = S.addPermanent giant S.alice lands
-        (spiderId, g2) = S.addPermanent spider S.alice g1
-        (wallId, g3) = S.addPermanent wall S.bob g2
-        (withHammer, hammerId) = S.handOne hammer g3
-        (twincastId, board) = handAppend twincast S.alice withHammer
-        run dealerId victimId = hammerThenTwincast (retargetHammer dealerId victimId) giantId wallId hammerId twincastId board
-        atSelf = run giantId giantId
-        atSpider = run spiderId wallId
-        atGiant = run spiderId giantId
-        damage oid = fmap (S.damageOf oid)
-    -- The behaviour first: naming the Giant in both of the copy's slots is not an
-    -- announcement CR 601.2c allows, so the copy keeps the targets CR 707.10
-    -- gave it and the Wall takes the Giant's 3 twice over.
-    Spec.assertEqWith s "the rejected re-target leaves the copy where it was, so the Wall takes the Giant's 3 from the copy and 3 from the original" (damage wallId atSelf) (Just (Just 6))
-    Spec.assertEqWith s "and the Giant, named twice, took none of its own damage" (damage giantId atSelf) (Just (Just 0))
-    -- The prompt is LIVE on this board, which is what keeps the run above from
-    -- passing off a prompt that was never raised: the same prompt moves the
-    -- copy's dealer slot to the Spider, and 2 + 3 is a number no other run reads.
-    Spec.assertEqWith s "re-targeting the copy's dealer at the Spider, the Wall takes 2 from the copy and 3 from the original" (damage wallId atSpider) (Just (Just 5))
-    -- And the Giant IS offered for the victim slot, so the first run's rejection
-    -- is the joint check rather than a slot the offer had emptied.
-    Spec.assertEqWith s "with the Spider dealing instead, the Giant is a legal victim and takes its 2" (damage giantId atGiant) (Just (Just 2))
-    Spec.assertEqWith s "while the Wall then takes only the original's 3" (damage wallId atGiant) (Just (Just 3))
 
   -- CR 707.10: "a copy of a spell is owned by the player under whose control it
   -- was put on the stack ... a copy of a spell or ability is controlled by the
@@ -2465,36 +2266,6 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "bob gains only his own 6" (S.lifeOf S.bob after) (Just 26)
         Spec.assertEqWith s "carol gains nothing" (S.lifeOf S.carol after) (Just 20)
         Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
-  -- CR 109.5's "you", which the case above cannot reach: Renewed Faith says "you"
-  -- with a PlayerRef the resolution answers from its controller, where Char's
-  -- "and 2 damage to you" says it with the reserved `you` SLOT -- and that slot is
-  -- stamped with the CASTER as the original is cast. CR 707.10 copies the
-  -- decisions and not the caster, so the copy's `you` is alice.
-  --
-  -- bob's Char sends 4 at carol and 2 at bob; alice's copy sends 4 at carol
-  -- (unchanged, CR 707.10c) and 2 at ALICE. carol 12 / bob 18 / alice 18, against
-  -- carol 12 / bob 16 / alice 20 for a copy that kept the caster's `you` -- alice
-  -- and bob differ under the two readings and carol does not, which is the point:
-  -- the TARGET is copied and the "you" is not.
-  Spec.it s "CR 707.10 the copy's own \"you\" is its controller, not the copied spell's caster" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    twincast <- S.printingOf s registry "Twincast"
-    char <- S.printingOf s registry "Char"
-    let lands = S.landsFor mountain S.bob 3 (S.landsFor island S.alice 2 S.threePlayerGame)
-        (withTwincast, twincastId) = S.handOne twincast lands
-        (charId, board) = handAppend char S.bob withTwincast
-        castChar = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.carol)) board (S.cast S.bob charId))
-    case topOfStack castChar of
-      Nothing -> Spec.assertFailure s "Char never reached the stack"
-      Just charSpell -> do
-        let cast = snd (Engine.runGamePure (pinTarget (Recipient.ToObject charSpell)) castChar (S.cast S.alice twincastId))
-            -- Twincast, then the copy (CR 707.10c leaves carol targeted), then
-            -- bob's own Char.
-            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne (pinTarget (Recipient.ToPlayer S.carol)) cast))
-        Spec.assertEqWith s "alice takes the COPY's 2, being the copy's you" (S.lifeOf S.alice after) (Just 18)
-        Spec.assertEqWith s "bob takes only his own Char's 2" (S.lifeOf S.bob after) (Just 18)
-        Spec.assertEqWith s "carol takes 4 from each, the target having been copied" (S.lifeOf S.carol after) (Just 12)
   -- CR 707.10's "that player copies it", on Meletis Charlatan {2}{U} Creature --
   -- Human Wizard 2/3, "{2}{U}, {T}: The controller of target instant or sorcery
   -- spell copies it. That player may choose new targets for the copy" (Oracle
@@ -2702,8 +2473,10 @@ announcing x recipient p = case p of
 --
 -- One graveyard, four cards. alice announces X = 2 and names the Piker; the copy
 -- is then offered the Evangel (the other mana value 2 creature card) and nothing
--- else. The pair below differs in exactly one thing -- which recipient the copy's
--- prompt is pinned to -- and between them they fix the number at 2: the Evangel
+-- else. The case below and
+-- data/scenarios/copy/cr-707-10c-the-copy-s-new-target-is-judged-against-the.json
+-- differ in exactly one thing -- which recipient the copy's prompt is pinned
+-- to -- and between them they fix the number at 2: the Evangel
 -- is reachable, the mana value 3 card is not, and a bound left unanswered would
 -- have admitted neither and elided CR 707.10c's prompt altogether.
 --
@@ -2716,9 +2489,9 @@ announcing x recipient p = case p of
 -- Filter.boundAmounts, which is the CR-correct channel and the one every other
 -- slot atom reads, but for the X it is dead code: neutralizing the seed leaves
 -- this group green. Widening Filter's ManaValueAtMostAmount arm reddens the
--- second case, which is what makes this a proof of the BOUND rather than of
+-- case below, which is what makes this a proof of the BOUND rather than of
 -- either road.
-stirCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stirCopySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 stirCopySpec s registry =
   let boardOf = do
         swamp <- S.printingOf s registry "Swamp"
@@ -2738,21 +2511,7 @@ stirCopySpec s registry =
               let castTwincast = S.runPure (pinTarget (Recipient.ToObject stirSpell)) castStir (S.cast S.alice twincastId)
               pure (drainStack S.identityAnswer (resolveOne (pinTarget retarget) castTwincast))
    in Spec.describe s "Pawl.Engine.Copy" $ do
-        -- THE proving case: the copy is offered, and takes, a card the ANNOUNCED
-        -- X admits and the original did not name.
-        Spec.it s "CR 707.10c the copy's new target is judged against the copied X" $ do
-          (stirId, twincastId, ids, board) <- boardOf
-          case ids of
-            [pikerId, evangelId, _, _] ->
-              case play (Recipient.ToObject evangelId) pikerId stirId twincastId board of
-                Nothing -> Spec.assertFailure s "Stir the Grave never reached the stack"
-                Just after -> do
-                  Spec.assertEqWith s "CR 202.3: the copy returned the OTHER mana value 2 creature card" (S.countOnBattlefieldByName (cardNamed "Cabal Evangel") S.alice after) 1
-                  Spec.assertEqWith s "and the original returned the one it named" (S.countOnBattlefieldByName (cardNamed "Goblin Piker") S.alice after) 1
-                  Spec.assertEqWith s "the mana value 3 card stayed in the graveyard" (S.countOnBattlefieldByName (cardNamed "Kalakscion, Hunger Tyrant") S.alice after) 0
-                  Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
-            _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
-        -- The same board, the same announcement, one recipient different: the
+        -- The scenario's board and announcement, one recipient different: the
         -- mana value 3 card is the FIRST one an announced 2 excludes, so pinning
         -- the copy there is what fixes the number at 2 rather than at any bound
         -- the Evangel also satisfies. It is never offered, the answer names a

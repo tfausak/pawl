@@ -1,0 +1,33 @@
+{
+  "description": "the card draws as it resolves",
+  "note": "Carom's second sentence, so the whole card is exercised: cast with its two slots aimed, from at the victim and to at the haven, it leaves alice's hand and a card arrives as it resolves. Her hand held only the Carom and her library only a Plains, so one Plains in hand and no Carom is the hand size unchanged.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains", "label": "plains" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Goblin Piker", "label": "victim" },
+          { "card": "Goblin Piker", "label": "haven" }
+        ],
+        "hand": [{ "card": "Carom", "label": "carom" }],
+        "library": [{ "card": "Plains" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Carom", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@carom", "targetsBySlot": { "from": ["@victim"], "to": ["@haven"] }, "mana": ["@plains", "@plains-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Carom", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Plains", "count": 1 } } }
+  ]
+}
