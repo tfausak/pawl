@@ -1,0 +1,174 @@
+{
+  "description": "CR 603.4 unpromised, a gift sorcery gives nothing",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Cabal Evangel",
+            "label": "cabal-evangel",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Longstalk Brawl",
+            "label": "longstalk-brawl",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseKicker",
+          "with": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "mine",
+              [
+                [
+                  "Creature",
+                  "$cabal-evangel"
+                ]
+              ]
+            ],
+            [
+              "theirs",
+              [
+                [
+                  "Creature",
+                  "$hill-giant"
+                ]
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$longstalk-brawl",
+          "mana": [
+            "$forest"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Cabal Evangel",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Longstalk Brawl",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Cabal Evangel",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Longstalk Brawl",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "$hill-giant",
+        "damage": 2
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Battlefield",
+        "is": [
+          "$forest"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Battlefield",
+        "is": [
+          "$hill-giant"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "carol",
+        "zone": "Battlefield",
+        "is": []
+      }
+    }
+  ]
+}
