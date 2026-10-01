@@ -20,7 +20,8 @@
 -- (Object.doesNotUntapFor, written by Effect.DoesNotUntapNext, and
 -- Object.exertedBy, written by CR 508.1g's exert payment) are not gathered here
 -- and could not be: they are fields on the VICTIM rather than on anything the
--- battlefield walk below would reach. Engine.untapAll subtracts all three.
+-- battlefield walk below would reach. Engine.untapAll subtracts them beside
+-- this module's answer.
 module Pawl.Engine.UntapRestriction where
 
 import Data.Set (Set)

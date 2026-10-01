@@ -65,15 +65,10 @@ data AsCopy ability effect = MkAsCopy
     -- makes the clause a modification of the copying process, so declining
     -- Clone's "may" leaves the permanent its printed self and no counters.
     --
-    -- CR 707.9e's second sentence -- a copy effect applied to the object AFTER
-    -- this one suppresses the exception's effect -- has no reader here, and no
-    -- board in data/cards/ reaches it. Every EntryR AsCopy row in the pool
-    -- matches Filter.IsSource, which is what CR 707.5's sentence is ("you may
-    -- have this permanent enter as a copy of ..."), so no second copy effect
-    -- applies to this entry; one applied later is CR 707.4's change, and by then
-    -- the counters are on the permanent and no rule takes them off. What would
-    -- refute this is a printed copy effect that copies an object OTHER than its
-    -- own source as that object enters.
+    -- Not implemented: CR 707.9e's second sentence, a copy effect applied to
+    -- the object AFTER this one suppressing the counters -- Altered Ego copying
+    -- an uncopied Quicksilver Gargantuan, whose own AsCopy then applies to the
+    -- same entry (CR 616.2), still enters with them (#4580).
     counters :: Maybe WithCounters.WithCounters,
     -- | CR 707.9g / 603.11: the triggered ability linked to this replacement,
     -- "When you do, ..." in the same paragraph (Wall of Stolen Identity). Empty

@@ -9114,7 +9114,8 @@ controllerTurnScoped cond = case cond of
 -- an event that already happened. Every entry is built here: by
 -- Pawl.Engine.Resolve.Effect for Effect.ArmDelayedTrigger, by Pawl.Engine.Stack
 -- for CR 702.109a's, CR 702.152a's and CR 702.185a's spell, and by
--- Pawl.Engine.Combat for CR 702.154a's reflexive ability at rule 508.1g.
+-- Pawl.Engine.Combat for CR 702.154a's reflexive ability at rule 508.1g, and by the
+-- AsCopy arm above for CR 707.9g's linked one.
 armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName.SlotName Binding.Type.Binding -> Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
 armDelayed ability source controller captured onset expiry gs = case armOnset source controller gs onset of
   -- "That turn" names no turn this resolution created, so the ability could
