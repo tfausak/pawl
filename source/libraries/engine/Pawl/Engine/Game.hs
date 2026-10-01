@@ -46,6 +46,7 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -293,7 +294,8 @@ astrotoriumBack oid gs = case fmap Object.source (lookupObject oid gs) of
 -- (Pawl.Engine.Engine), CR 401.4's library arrangement and CR 701.44d's per-seat
 -- "for each" groups (Pawl.Engine.Resolve), CR 601.2h's cost components and the
 -- combat tolls beside them (Pawl.Engine.Cost), and the arrangement of a melded
--- permanent's component cards (Pawl.Engine.Event). Not every ordering prompt:
+-- permanent's component cards and CR 401.4 / 404.3's arrivals
+-- (Pawl.Engine.Event). Not every ordering prompt:
 -- Prompt.OrderDamage spells this body out inline in
 -- Pawl.Engine.Replacement.askOne, and Prompt.Shuffle -- the sibling branch of the
 -- CR 401.4 site named above -- answers with object ids and goes through
@@ -420,6 +422,14 @@ zoneMembers zone pid gs =
 -- through, so the card a Condition tests is the card the effect then moves.
 topOfGraveyard :: PlayerId -> GameState -> Maybe ObjectId
 topOfGraveyard pid gs = Maybe.listToMaybe (reverse (zoneMembers Zone.Graveyard pid gs))
+
+-- CR 404.3: set a player's standing graveyard-order setting
+-- (Pawl.Types.GraveyardOrder). The player's to change, not the rules': a client
+-- writes it at setup or between engine calls on that player's word. No game
+-- action changes it, and the engine never calls it.
+setGraveyardOrder :: PlayerId -> GraveyardOrder.GraveyardOrder -> GameState -> GameState
+setGraveyardOrder pid order gs =
+  gs {GameState.players = Map.adjust (\p -> p {Player.graveyardOrder = order}) pid (GameState.players gs)}
 
 -- CR 506.4: remove a permanent from combat. The one performer, shared by CR
 -- 701.19a regeneration (Pawl.Engine.Replacement), an effect that specifically

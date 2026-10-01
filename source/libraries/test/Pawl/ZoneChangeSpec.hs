@@ -51,6 +51,8 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mana as Mana
@@ -231,6 +233,80 @@ wheelCurateBoard s registry reversing = do
         Prompt.ArrangeLibraryArrivals _ pid _ oids
           | reversing && pid == S.alice -> reverse (zipWith const [0 ..] oids)
           | otherwise -> zipWith const [0 ..] oids
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
+-- CR 404.3's owner, answering Prompt.ArrangeGraveyardArrivals: bob gives
+-- `answer` the batch he is offered; any other seat asked takes any order, so
+-- asking the wrong player leaves the move order.
+graveyardBy :: ([ObjectId.ObjectId] -> GraveyardArrangement.GraveyardArrangement) -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> GraveyardArrangement.GraveyardArrangement
+graveyardBy answer pid oids
+  | pid == S.bob = answer oids
+  | otherwise = GraveyardArrangement.AnyOrder
+
+-- Reverse the offered batch.
+reversedBatch :: [ObjectId.ObjectId] -> GraveyardArrangement.GraveyardArrangement
+reversedBatch oids = GraveyardArrangement.InOrder (reverse (zipWith const [0 ..] oids))
+
+-- bob controls Volrath's Shapeshifter over a library of Ogre Sentry, Plains,
+-- Island, Swamp and Mountain from the top, then a Goblin Piker, with his
+-- graveyard order set to `order`, or left at the game's default; alice casts Tome Scour at him, so the Sentry
+-- is milled first and the Mountain last, and bob gives `answer` any
+-- arrangement he is offered. Returns the resolved state and the Shapeshifter.
+shapeshifterScourBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe GraveyardOrder.GraveyardOrder -> ([ObjectId.ObjectId] -> GraveyardArrangement.GraveyardArrangement) -> m (GameState.GameState, ObjectId.ObjectId)
+shapeshifterScourBoard s registry order arrange = do
+  island <- S.printingOf s registry "Island"
+  shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+  scour <- S.printingOf s registry "Tome Scour"
+  pile <- traverse (S.printingOf s registry) ["Goblin Piker", "Mountain", "Swamp", "Island", "Plains", "Ogre Sentry"]
+  let base = maybe id (Game.setGraveyardOrder S.bob) order (S.landsInPlay island 1)
+      (shifterId, withShifter) = S.addPermanent shapeshifter S.bob base
+      stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) withShifter pile
+      (gs, spellId) = S.handOne scour stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ArrangeGraveyardArrivals _ pid oids -> graveyardBy arrange pid oids
+        _ -> atBobAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop), shifterId)
+
+-- bob controls a Goblin Piker and an Ogre Sentry, and arranges what he is
+-- offered with `answer`, his graveyard order Matters; alice casts Day of
+-- Judgment. Returns the resolved state.
+judgmentBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> ([ObjectId.ObjectId] -> GraveyardArrangement.GraveyardArrangement) -> m GameState.GameState
+judgmentBoard s registry arrange = do
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  judgment <- S.printingOf s registry "Day of Judgment"
+  let base = Game.setGraveyardOrder S.bob GraveyardOrder.Matters (S.landsInPlay plains 4)
+      (_, withPiker) = S.addPermanent piker S.bob base
+      (_, withSentry) = S.addPermanent sentry S.bob withPiker
+      (gs, spellId) = S.handOne judgment withSentry
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ArrangeGraveyardArrivals _ pid oids -> graveyardBy arrange pid oids
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+  pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
+
+-- alice, her graveyard order Matters, casts Curate over her library of Plains,
+-- Island and Goblin Piker from the top and surveils both top cards into her
+-- graveyard, Plains first. Any graveyard arrangement she is offered she
+-- reverses. Returns the resolved state.
+curateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+curateBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  curate <- S.printingOf s registry "Curate"
+  pile <- traverse (S.printingOf s registry) ["Goblin Piker", "Island", "Plains"]
+  let base = Game.setGraveyardOrder S.alice GraveyardOrder.Matters (S.landsInPlay island 2)
+      stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) base pile
+      (gs, spellId) = S.handOne curate stocked
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseSurveil _ _ looked -> (looked, [])
+        Prompt.ArrangeGraveyardArrivals _ _ oids -> reversedBatch oids
         _ -> S.identityAnswer p
       cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
   pure (snd (Engine.runGamePure answer cast Stack.resolveTop))
@@ -964,6 +1040,47 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "reversed: the Plains, put first, is under the Island" (namesIn Zone.Library S.alice reversed) (names ["Swamp", "Island", "Plains", "Curate"])
     Spec.assertEqWith s "kept: the Island, put last, is under the Plains" (namesIn Zone.Library S.alice kept) (names ["Swamp", "Plains", "Island", "Curate"])
     Spec.assertEqWith s "and she drew the Goblin Piker" (namesIn Zone.Hand S.alice reversed) (names ["Goblin Piker"])
+  -- CR 404.3: "if an effect or rule puts two or more cards into the same
+  -- graveyard at the same time, the owner of those cards may arrange them in
+  -- any order", and CR 404.1 makes the top observable: Volrath's Shapeshifter
+  -- has the full text of the top card of bob's graveyard. Tome Scour mills
+  -- five at once (CR 701.17a), so bob, whose graveyard order Matters, is asked
+  -- -- he and not alice, who cast it.
+  Spec.it s "CR 404.3 bob puts the milled Ogre Sentry on top of his graveyard, and Volrath's Shapeshifter becomes it" $ do
+    (reversed, shifterId) <- shapeshifterScourBoard s registry (Just GraveyardOrder.Matters) reversedBatch
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+    Spec.assertEqWith s "the Shapeshifter is a 3/3 Ogre Sentry" (Projection.namesOf shifterId reversed, S.powerToughnessOf shifterId reversed) (Set.singleton (CardName.MkCardName (Text.pack "Ogre Sentry")), Just (3, 3))
+    Spec.assertEqWith s "the Ogre Sentry is on top" (namesIn Zone.Graveyard S.bob reversed) (names ["Mountain", "Swamp", "Island", "Plains", "Ogre Sentry"])
+  -- The same board with bob's standing setting left at a new game's default:
+  -- the order does not matter to him, so he is not asked and the cards keep the order they
+  -- moved in, his reversing answer never given.
+  Spec.it s "CR 404.3 bob, to whom graveyard order does not matter, is not asked" $ do
+    (unasked, shifterId) <- shapeshifterScourBoard s registry Nothing reversedBatch
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+    Spec.assertEqWith s "the Mountain, milled last, is on top, and the Shapeshifter is its printed 0/1" (Projection.namesOf shifterId unasked, S.powerToughnessOf shifterId unasked) (Set.singleton (CardName.MkCardName (Text.pack "Volrath's Shapeshifter")), Just (0, 1))
+    Spec.assertEqWith s "in the order they moved" (namesIn Zone.Graveyard S.bob unasked) (names ["Ogre Sentry", "Plains", "Island", "Swamp", "Mountain"])
+  -- Asked, bob may answer that this batch's order does not matter to him; it
+  -- then keeps the order it moved in.
+  Spec.it s "CR 404.3 answering any order keeps the order the cards moved in" $ do
+    (anyOrder, shifterId) <- shapeshifterScourBoard s registry (Just GraveyardOrder.Matters) (const GraveyardArrangement.AnyOrder)
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+    Spec.assertEqWith s "the Mountain is on top" (namesIn Zone.Graveyard S.bob anyOrder) (names ["Ogre Sentry", "Plains", "Island", "Swamp", "Mountain"])
+    Spec.assertEqWith s "and the Shapeshifter is its printed 0/1" (S.powerToughnessOf shifterId anyOrder) (Just (0, 1))
+  -- The same rule through the destroy funnel: Day of Judgment's two victims
+  -- reach bob's graveyard at once, and he orders them.
+  Spec.it s "CR 404.3 bob orders the two creatures Day of Judgment puts into his graveyard" $ do
+    reversed <- judgmentBoard s registry reversedBatch
+    kept <- judgmentBoard s registry (GraveyardArrangement.InOrder . zipWith const [0 ..])
+    Spec.assertEqWith s "reversed is kept, the other way up" (namesIn Zone.Graveyard S.bob reversed) (reverse (namesIn Zone.Graveyard S.bob kept))
+    Spec.assertEqWith s "two cards" (length (namesIn Zone.Graveyard S.bob kept)) 2
+  -- A surveil's answer already orders the cards it puts into the graveyard
+  -- (Prompt.ChooseSurveil), so alice is not asked again: her reversing
+  -- answerer leaves the Plains, put first, under the Island, and Curate on top
+  -- (CR 608.2n).
+  Spec.it s "CR 404.3 a surveil's graveyard cards are not arranged a second time" $ do
+    after <- curateBoard s registry
+    let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
+    Spec.assertEqWith s "the Plains, then the Island, then Curate" (namesIn Zone.Graveyard S.alice after) (names ["Plains", "Island", "Curate"])
   -- CR 118.12: Tweeze's "You may discard a card. If you do, draw a card" makes
   -- the discard a cost paid on resolution, and Library of Leng's ruling: "you
   -- can't use the Library of Leng ability ... when you discard a card as a cost,

@@ -39,6 +39,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -185,7 +186,8 @@ emptyGame order =
               Player.companion = Nothing,
               -- CR 116.2g's "only if they haven't done so yet this game": nobody
               -- has, the game not having started.
-              Player.companionTaken = False
+              Player.companionTaken = False,
+              Player.graveyardOrder = GraveyardOrder.Indifferent
             }
         )
    in GameState.MkGameState
@@ -212,7 +214,7 @@ emptyGame order =
           GameState.nextEventGroup = EventGroup.first,
           GameState.eventGroupDepth = 0,
           GameState.enteringTogether = Nothing,
-          GameState.libraryArrivals = Nothing,
+          GameState.arrivals = Nothing,
           GameState.payingOnResolution = False,
           GameState.lastKnown = Map.empty,
           GameState.stackArchive = Map.empty,
@@ -912,7 +914,7 @@ restartGame perform exempt starter = do
             GameState.nextEventGroup = EventGroup.first,
             GameState.eventGroupDepth = 0,
             GameState.enteringTogether = Nothing,
-            GameState.libraryArrivals = Nothing,
+            GameState.arrivals = Nothing,
             GameState.payingOnResolution = False,
             GameState.lastKnown = Map.empty,
             GameState.stackArchive = Map.empty,
@@ -1171,7 +1173,7 @@ subgameStateFrom starter parent =
           GameState.nextEventGroup = EventGroup.first,
           GameState.eventGroupDepth = 0,
           GameState.enteringTogether = Nothing,
-          GameState.libraryArrivals = Nothing,
+          GameState.arrivals = Nothing,
           GameState.payingOnResolution = False,
           GameState.lastKnown = Map.empty,
           GameState.stackArchive = Map.empty,

@@ -68,6 +68,8 @@ import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Arrival as Arrival
+import qualified Pawl.Types.ArrivalEnd as ArrivalEnd
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
@@ -141,11 +143,12 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility.Type
+import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Layout as Layout
-import qualified Pawl.Types.LibraryArrival as LibraryArrival
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LifeGainR as LifeGainR
@@ -361,8 +364,8 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
 -- each source's gain an event of its own.
 --
--- The body is also one arrivingTogether scope, so CR 401.4 is settled before the
--- group closes.
+-- The body is also one arrivingTogether scope, so CR 401.4 and CR 404.3 are
+-- settled before the group closes.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
@@ -370,67 +373,98 @@ simultaneously body = do
   State.modify' closeEventGroup
   pure result
 
--- CR 401.4's scope: the cards a replacement redirects into a library while
--- `body` runs are put there "at the same time", and their owners arrange them as
--- it ends (arrangeLibraryArrivals). `simultaneously` opens one; so do the
--- one-at-a-time moves that are one instruction without being one event group --
--- a mill (millFromReturningTaken) and a surveil's graveyard half. The OUTERMOST
--- scope wins, `simultaneously`'s posture.
+-- CR 401.4 / 404.3's scope: the cards a replacement redirects into a library,
+-- and the cards put into a graveyard, while `body` runs are put there "at the
+-- same time", and their owners arrange them as it ends (arrangeArrivals).
+-- `simultaneously` opens one; so do the one-at-a-time moves that are one
+-- instruction without being one event group -- a mill (millFromReturningTaken)
+-- and a surveil's graveyard half. The OUTERMOST scope wins, `simultaneously`'s
+-- posture.
 arrivingTogether :: Game a -> Game a
 arrivingTogether body = do
-  open <- State.gets (Maybe.isJust . GameState.libraryArrivals)
+  open <- State.gets (Maybe.isJust . GameState.arrivals)
   if open
     then body
     else do
-      State.modify' (\g -> g {GameState.libraryArrivals = Just Seq.empty})
+      State.modify' (\g -> g {GameState.arrivals = Just Seq.empty})
       result <- body
-      arrangeLibraryArrivals
+      arrangeArrivals
       pure result
 
 -- CR 401.4: "if an effect puts two or more cards in a specific position in a
 -- library at the same time, the owner of those cards may arrange them in any
--- order". The redirected arrivals the scope recorded (noteLibraryArrival),
--- grouped by owner and end; a group of two or more MOVES is asked of its owner
--- with Prompt.ArrangeLibraryArrivals, and the cards are rewritten into the slots
+-- order"; CR 404.3 says the same of a graveyard. The arrivals the scope recorded
+-- (noteArrival), grouped by owner and end; a group of two or more MOVES is asked
+-- of its owner -- Prompt.ArrangeLibraryArrivals or
+-- Prompt.ArrangeGraveyardArrivals -- and the cards are rewritten into the slots
 -- they already hold. A lone move is one order -- a melded permanent's two cards
--- were arranged by CR 712.21a as they moved.
+-- were arranged by CR 712.21a as they moved. Only CARDS are arranged (CR
+-- 404.3's "two or more cards"): a token in the group keeps its slot.
+--
+-- A graveyard batch is asked only of an owner whose Player.graveyardOrder is
+-- Matters. Otherwise it keeps the order it moved in, which is the owner's own
+-- standing answer (Pawl.Types.GraveyardOrder), not the engine's choice.
 --
 -- After the fact rather than before each move, which no reader can tell apart:
--- nothing inside the scope reads a library's order.
+-- nothing inside the scope reads a library's or a graveyard's order.
 --
--- Pawl.ZoneChangeSpec's Library of Leng and Wheel of Sun and Moon CR 401.4 cases
--- prove it.
-arrangeLibraryArrivals :: Game ()
-arrangeLibraryArrivals = do
-  pending <- State.gets (Maybe.fromMaybe Seq.empty . GameState.libraryArrivals)
-  State.modify' (\g -> g {GameState.libraryArrivals = Nothing})
+-- Pawl.ZoneChangeSpec's Library of Leng, Wheel of Sun and Moon and Volrath's
+-- Shapeshifter CR 401.4 / 404.3 cases prove it.
+arrangeArrivals :: Game ()
+arrangeArrivals = do
+  pending <- State.gets (Maybe.fromMaybe Seq.empty . GameState.arrivals)
+  State.modify' (\g -> g {GameState.arrivals = Nothing})
   Monad.unless (Seq.null pending) $ do
     gs0 <- State.get
-    let movesAt owner position = filter (\arrival -> LibraryArrival.owner arrival == owner && LibraryArrival.position arrival == position) (Foldable.toList pending)
-    Monad.forM_ (Game.apnapOrder gs0) $ \owner -> Monad.forM_ [minBound .. maxBound] $ \position -> do
-      let moves = movesAt owner position
-      Monad.when (length moves >= 2) $ do
+    let movesAt owner end = filter (\arrival -> Arrival.owner arrival == owner && Arrival.end arrival == end) (Foldable.toList pending)
+        ends = Set.toAscList (Set.fromList (fmap Arrival.end (Foldable.toList pending)))
+        asked owner end = case end of
+          ArrivalEnd.IntoLibrary _ -> True
+          ArrivalEnd.OntoGraveyard -> maybe GraveyardOrder.Indifferent Player.graveyardOrder (Map.lookup owner (GameState.players gs0)) == GraveyardOrder.Matters
+    Monad.forM_ (Game.apnapOrder gs0) $ \owner -> Monad.forM_ ends $ \end -> do
+      let moves = movesAt owner end
+      Monad.when (length moves >= 2 && asked owner end) $ do
         gs <- State.get
-        let library = Map.findWithDefault Seq.empty owner (GameState.library gs)
-            members = Set.fromList (concatMap (Foldable.toList . LibraryArrival.cards) moves)
-            held = [i | (i, oid) <- zip [0 :: Int ..] (Foldable.toList library), Set.member oid members]
-            -- From the arrival end inward, the prompt's reading.
-            slots = case position of
-              LibraryPosition.Top -> held
-              LibraryPosition.Bottom -> reverse held
-            batch = fmap (Seq.index library) slots
-        Monad.when (length batch >= 2) $ do
-          answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
-          let arranged = Game.permute batch answer
-              rewrite lib = List.foldl' (\acc (slot, oid) -> Seq.update slot oid acc) lib (zip slots arranged)
-          State.modify' (\g -> g {GameState.library = Map.adjust rewrite owner (GameState.library g)})
+        let pile = case end of
+              ArrivalEnd.IntoLibrary _ -> Map.findWithDefault Seq.empty owner (GameState.library gs)
+              ArrivalEnd.OntoGraveyard -> Map.findWithDefault Seq.empty owner (GameState.graveyard gs)
+            members = Set.fromList (concatMap (Foldable.toList . Arrival.cards) moves)
+            held = [i | (i, oid) <- zip [0 :: Int ..] (Foldable.toList pile), Set.member oid members, not (Game.isToken oid gs)]
+            -- From the arrival end inward, the prompt's reading. A library's top
+            -- is its first member; a graveyard's is its last (Game.topOfGraveyard).
+            slots = case end of
+              ArrivalEnd.IntoLibrary LibraryPosition.Top -> held
+              ArrivalEnd.IntoLibrary LibraryPosition.Bottom -> reverse held
+              ArrivalEnd.OntoGraveyard -> reverse held
+            batch = fmap (Seq.index pile) slots
+            rewrite arranged zone = List.foldl' (\acc (slot, oid) -> Seq.update slot oid acc) zone (zip slots arranged)
+        Monad.when (length batch >= 2) $ case end of
+          ArrivalEnd.IntoLibrary position -> do
+            answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+            State.modify' (\g -> g {GameState.library = Map.adjust (rewrite (Game.permute batch answer)) owner (GameState.library g)})
+          ArrivalEnd.OntoGraveyard -> do
+            answer <- Game.choose (Prompt.ArrangeGraveyardArrivals (Decide.deciderFor owner gs) owner batch)
+            case answer of
+              -- Any order will do: the batch keeps the order it moved in.
+              GraveyardArrangement.AnyOrder -> pure ()
+              GraveyardArrangement.InOrder order ->
+                State.modify' (\g -> g {GameState.graveyard = Map.adjust (rewrite (Game.permute batch order)) owner (GameState.graveyard g)})
 
--- CR 401.4's record: inside an arrivingTogether scope, note a move a
--- replacement redirected to an end of `owner`'s library. Outside one the move is
+-- CR 401.4 / 404.3's record: inside an arrivingTogether scope, note a move to
+-- an end of `owner`'s library or onto their graveyard. Outside one the move is
 -- alone, and one move is one order.
-noteLibraryArrival :: PlayerId -> LibraryPosition.LibraryPosition -> Seq.Seq ObjectId -> GameState -> GameState
-noteLibraryArrival owner position cards gs =
-  gs {GameState.libraryArrivals = fmap (Seq.|> LibraryArrival.MkLibraryArrival owner position cards) (GameState.libraryArrivals gs)}
+noteArrival :: PlayerId -> ArrivalEnd.ArrivalEnd -> Seq.Seq ObjectId -> GameState -> GameState
+noteArrival owner end cards gs =
+  gs {GameState.arrivals = fmap (Seq.|> Arrival.MkArrival owner end cards) (GameState.arrivals gs)}
+
+-- CR 404.3: drop the graveyard arrivals of `cards` from the open scope, for a
+-- move whose instruction already had the owner order them (a surveil's
+-- Prompt.ChooseSurveil answer).
+arrangedAlready :: Seq.Seq ObjectId -> GameState -> GameState
+arrangedAlready cards gs =
+  let named = Set.fromList (Foldable.toList cards)
+      keep arrival = Arrival.end arrival /= ArrivalEnd.OntoGraveyard || not (any (`Set.member` named) (Arrival.cards arrival))
+   in gs {GameState.arrivals = fmap (Seq.filter keep) (GameState.arrivals gs)}
 
 -- CR 613.7m over CR 608.2f's action: run `body` so that everything it puts onto
 -- the battlefield is one batch, settled by Restamp.settle once it ends rather
@@ -5659,7 +5693,7 @@ millFromReturningTaken pid n
           -- Pawl.Engine.Replacement.stocked) had already measured against the
           -- printed one.
           let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
-          -- One CR 401.4 scope and not one event group: the moves stay
+          -- One CR 401.4 / 404.3 scope and not one event group: the moves stay
           -- separately recorded, as before.
           arrived <- arrivingTogether (fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards))
           pure (cards, arrived)
@@ -6543,12 +6577,15 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- is keyed by owner, and `pid` is the id placeObject was handed.
               Monad.when shuffling (shuffleLibrary pid)
               -- CR 401.4: a redirect INTO a library at a stated end, for the
-              -- scope's owner to arrange (arrangeLibraryArrivals). A move
-              -- headed for a library already had its order settled by its
-              -- instruction (Pawl.Engine.Resolve.Effect.settleArrivals), and a
-              -- shuffle leaves no position to arrange.
+              -- scope's owner to arrange (arrangeArrivals). A move headed for
+              -- a library already had its order settled by its instruction
+              -- (Pawl.Engine.Resolve.Effect.settleArrivals), and a shuffle
+              -- leaves no position to arrange. CR 404.3: every move into a
+              -- graveyard, whatever sent it there.
               Monad.when (dest == Zone.Library && requestedDest /= Zone.Library && not shuffling) $
-                State.modify' (noteLibraryArrival pid position (newId Seq.<| trailingIds0))
+                State.modify' (noteArrival pid (ArrivalEnd.IntoLibrary position) (newId Seq.<| trailingIds0))
+              Monad.when (dest == Zone.Graveyard) $
+                State.modify' (noteArrival pid ArrivalEnd.OntoGraveyard (newId Seq.<| trailingIds0))
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the

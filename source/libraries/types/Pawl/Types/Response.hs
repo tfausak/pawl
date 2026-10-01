@@ -20,6 +20,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ForageMode as ForageMode
+import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
@@ -764,6 +765,8 @@ data Response
     -- for cards put back into their library, as a permutation of the offered
     -- indices.
     ArrangedLibraryCards [Natural.Natural]
+  | -- | CR 404.3's answer for a graveyard: the order an owner chose, or any.
+    ArrangedGraveyardArrivals GraveyardArrangement.GraveyardArrangement
   | -- | CR 702.140c's answer: which side of the target creature a mutating
     -- creature spell was put on.
     ChoseMutateSide MutateSide.MutateSide

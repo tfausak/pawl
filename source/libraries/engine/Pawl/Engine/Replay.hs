@@ -30,6 +30,7 @@ import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ForageMode as ForageMode
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -142,6 +143,7 @@ encode p answer = case p of
   Prompt.ChooseLibraryEnd {} -> Response.ChoseLibraryEnd answer
   Prompt.ArrangeLibraryArrivals {} -> Response.ArrangedLibraryArrivals answer
   Prompt.ArrangeLibraryCards {} -> Response.ArrangedLibraryCards answer
+  Prompt.ArrangeGraveyardArrivals {} -> Response.ArrangedGraveyardArrivals answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
@@ -687,6 +689,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ArrangeLibraryCards {} -> case response of
     Response.ArrangedLibraryCards order -> Just order
+    _ -> Nothing
+  Prompt.ArrangeGraveyardArrivals {} -> case response of
+    Response.ArrangedGraveyardArrivals arrangement -> Just arrangement
     _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
@@ -1274,6 +1279,8 @@ defaultAnswer p = case p of
   Prompt.ArrangeLibraryArrivals _ _ _ oids -> zipWith const [0 ..] oids
   -- CR 401.4 again, for cards that never left the library.
   Prompt.ArrangeLibraryCards _ _ oids -> zipWith const [0 ..] oids
+  -- CR 404.3: any order is the order the batch moved in, always legal.
+  Prompt.ArrangeGraveyardArrivals {} -> GraveyardArrangement.AnyOrder
 
 -- Run a game under a base interpreter, keeping every answer in order.
 --

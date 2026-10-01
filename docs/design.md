@@ -656,9 +656,9 @@ Two categories XMage punts that this architecture gets cheaply.
 
 **Artist / expansion symbol matters** — in scope, via §2.8. XMage is class-per-card; there is nowhere to put an artist. That's a symptom of *their* data model, not an inherent difficulty. Artist is a string, expansion symbol is a rarity enum, and "Our Market Research Shows That Players Like Really Long Card Names…" needs `length`. Roughly two-thirds of the category is free. Only art-*content* stays out.
 
-**Graveyard order** — in scope, via `OrderGraveyard` (§2.1) and elided by §2.9. Bounded and closed: only 21 cards ever cared, the last being Volrath's Shapeshifter in Stronghold, and Rosewater rates it a 10 on the Storm Scale. It cannot grow on you.
+**Graveyard order** — in scope, via `Prompt.ArrangeGraveyardArrivals`, asked only of a player whose standing `Player.graveyardOrder` setting says the order matters to them. Bounded and closed: only 21 cards ever cared, the last being Volrath's Shapeshifter in Stronghold, and Rosewater rates it a 10 on the Storm Scale. It cannot grow on you.
 
-Note rule **404.3**: when multiple cards hit a graveyard simultaneously, the owner *chooses the order*. Cast Wrath of God and you arrange everything that died however you like, then Wrath goes on top (a resolving sorcery is the last thing to arrive). So graveyard order isn't a list — it's a `Prompt`, fired on every mass removal spell. Which is exactly why §2.9 matters.
+Note rule **404.3**: when multiple cards hit a graveyard simultaneously, the owner *chooses the order*. Cast Wrath of God and you arrange everything that died however you like, then Wrath goes on top (a resolving sorcery is the last thing to arrive). So graveyard order isn't a list — it's a `Prompt`, fired on every mass removal spell. The engine does not elide it by analysing the card pool. Each player declares up front whether the order matters to them, like an auto-yield, and the default is that it does not. That keeps the choice the player's: one who left the setting off chose the move order in advance, and one who turned it on may still answer "any order" for a batch. A client may turn the setting on from a deck's contents; the engine never does.
 
 ---
 

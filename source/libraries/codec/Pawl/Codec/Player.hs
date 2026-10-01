@@ -5,6 +5,7 @@ module Pawl.Codec.Player where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Codec.PrintingId as PrintingId
@@ -12,6 +13,7 @@ import qualified Pawl.Codec.Status as Status
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder.Type
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.Status as Status.Type
 
@@ -47,6 +49,7 @@ codec = Fields.object $ do
   startingDeck <- Fields.defaulted "startingDeck" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.startingDeck
   companion <- Fields.defaulted "companion" Nothing (Common.maybe PrintingId.codec) Player.companion
   companionTaken <- Fields.defaulted "companionTaken" False Common.boolean Player.companionTaken
+  graveyardOrder <- Fields.defaulted "graveyardOrder" GraveyardOrder.Type.Indifferent GraveyardOrder.codec Player.graveyardOrder
   pure
     Player.MkPlayer
       { Player.life = life,
@@ -64,5 +67,6 @@ codec = Fields.object $ do
         Player.completedDungeonNames = completedDungeonNames,
         Player.startingDeck = startingDeck,
         Player.companion = companion,
-        Player.companionTaken = companionTaken
+        Player.companionTaken = companionTaken,
+        Player.graveyardOrder = graveyardOrder
       }

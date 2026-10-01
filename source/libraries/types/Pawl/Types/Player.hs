@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -265,6 +266,9 @@ data Player = MkPlayer
     -- and nothing in rule 702.139 gives it back; and separate from `companion`
     -- above rather than clearing it, because CR 702.139c keeps the card in the game
     -- afterwards and a card that reads "your chosen companion" would still find it.
-    companionTaken :: Bool
+    companionTaken :: Bool,
+    -- | CR 404.3: whether this player arranges the cards put into their
+    -- graveyard together, their own standing setting (Pawl.Types.GraveyardOrder).
+    graveyardOrder :: GraveyardOrder.GraveyardOrder
   }
   deriving (Eq, Ord, Show)

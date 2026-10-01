@@ -30,6 +30,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
@@ -538,6 +539,10 @@ data Prompt r where
   -- Asked at two or more cards, rule 401.4's own count being where one order
   -- stops being the only order.
   ArrangeLibraryCards :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
+  -- | CR 404.3: the owner arranges two or more cards put into their graveyard at
+  -- once, from the top down; asked only while their Pawl.Types.GraveyardOrder is
+  -- Matters.
+  ArrangeGraveyardArrivals :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt GraveyardArrangement.GraveyardArrangement
   -- | CR 601.2b / 700.2a: the modes, before X and targets, from the legal ones;
   -- a Seq because CR 700.2d may let one mode be chosen twice. A forced
   -- selection is not asked.
