@@ -136,14 +136,9 @@ data Effect card ability
   | -- | CR 612: rewrite subtype words in the target spell or permanent, the
     -- pair announced as the effect applies (CR 608.2d).
     ChangeText ChangeText.ChangeText
-  | -- | CR 605: one player adds one unit of mana, of the type the payload's
-    -- ManaProduction names -- one fixed type, or one colour its controller
+  | -- | CR 605: the players the payload names add mana of the type its
+    -- ManaProduction names -- one fixed type, or one colour the recipient
     -- chooses (CR 105.4).
-    --
-    -- Not implemented: on a mana ability's payment route (Cost.tapForMana, CR
-    -- 605.3b) a recipient naming a BINDING SLOT names nobody, that activation
-    -- having no object to have bound one (#3081). Every other reference is
-    -- resolved there (Mana.recipientsOf), as it is under Resolve.applyEffect.
     AddMana ManaAddition.ManaAddition
   | -- | CR 605.3: each player the payload names activates a mana ability of each
     -- permanent they control that its filter matches (Drain Power).

@@ -4225,9 +4225,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   hickoryWoodlotSpec s registry
   manaCacheSpec s registry
   recipientsSpec s registry
+  valleymakerSpec s registry
+  spectralSearchlightSpec s registry
 
--- CR 605.3b's road has no ability object, so a mana addition naming a BINDING
--- SLOT names nobody -- Mana.recipientsOf's own stated posture. Function-level
+-- CR 605.3b's road has no ability object, so a mana addition excluding a
+-- BINDING SLOT's players names nobody -- Mana.recipientsOf's own stated posture.
+-- Function-level
 -- because no card in data/cards/ pairs Pawl.Types.PlayerRef's EachPlayerExcept
 -- with an AddMana, and adding one to buy a gameplay board would be a card no
 -- printing reaches (Scryfall o:"each other player adds", 2026-09-08, no hit;
@@ -4245,10 +4248,73 @@ recipientsSpec s registry = Spec.describe s "recipientsOf" $ do
     forest <- S.printingOf s registry "Forest"
     let (_, board) = S.addPermanent forest S.alice S.threePlayerGame
         excepting = PlayerRef.EachPlayerExcept (SlotName.MkSlotName (Text.pack "x"))
-    Spec.assertEqWith s "CR 605.3b the excluding reference resolves to no recipient at all" (Mana.recipientsOf S.alice board excepting) []
+    Spec.assertEqWith s "CR 605.3b the excluding reference resolves to no recipient at all" (Mana.recipientsOf S.alice Map.empty board excepting) []
     -- Behind the assertion above, and the guard against it passing because the
     -- board has no players to name: the slotless sibling names all three.
-    Spec.assertEqWith s "CR 102.1 while the slotless EachPlayer beside it names the whole table" (Mana.recipientsOf S.alice board PlayerRef.EachPlayer) [S.alice, S.bob, S.carol]
+    Spec.assertEqWith s "CR 102.1 while the slotless EachPlayer beside it names the whole table" (Mana.recipientsOf S.alice Map.empty board PlayerRef.EachPlayer) [S.alice, S.bob, S.carol]
+
+-- Valleymaker ({5}{R/G} Creature -- Giant Shaman 5/5, Shadowmoor; Oracle text
+-- checked against Scryfall 2026-10-01): "{T}, Sacrifice a Forest: Choose a
+-- player. That player adds {G}{G}{G}." A mana ability (its ruling: "It doesn't
+-- target a player and it doesn't use the stack"), so the choice is made on CR
+-- 605.3b's road, where no ability object holds the slot "that player" reads.
+--
+-- THREE seats, so the chosen player is told apart both from the activator and
+-- from "each other player".
+valleymakerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+valleymakerSpec s registry = Spec.describe s "Valleymaker" $ do
+  Spec.it s "CR 608.2c the player chosen as the mana ability resolves is the one who adds its mana" $ do
+    valleymaker <- S.printingOf s registry "Valleymaker"
+    forest <- S.printingOf s registry "Forest"
+    let (valleymakerId, g1) = S.addPermanent valleymaker S.alice S.threePlayerGame
+        (_, board) = S.addPermanent forest S.alice g1
+        -- Pinned by seat out of the offered set, never built.
+        choosesBob :: Prompt.Prompt r -> r
+        choosesBob p = case p of
+          Prompt.ChoosePlayer _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== S.bob) (NonEmpty.toList offered))
+          _ -> S.identityAnswer p
+        tapped = S.runPure choosesBob board (S.tapForMana valleymakerId)
+    Spec.assertEqWith s "CR 608.2c bob, whom alice chose, adds {G}{G}{G}, and neither alice nor carol adds anything" (fmap (`poolTypes` tapped) [S.alice, S.bob, S.carol]) [[], replicate 3 (ManaType.Colored Color.Green), []]
+
+-- Spectral Searchlight ({3} Artifact, Commander Masters; Oracle text checked
+-- against Scryfall 2026-10-01): "{T}: Choose a player. That player adds one mana
+-- of any color they choose." Its ruling: "You may choose yourself."
+spectralSearchlightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spectralSearchlightSpec s registry = Spec.describe s "Spectral Searchlight" $ do
+  -- CR 106.3 / 608.2d: "they choose" is the CHOSEN player's colour. The answerer
+  -- picks blue when carol is asked and red when anybody else is, so a colour
+  -- asked of alice puts red in carol's pool. THREE seats for Valleymaker's
+  -- reason.
+  Spec.it s "CR 608.2d the chosen player picks the colour of the mana they add" $ do
+    searchlight <- S.printingOf s registry "Spectral Searchlight"
+    let (searchlightId, board) = S.addPermanent searchlight S.alice S.threePlayerGame
+        tapped = S.runPure (searchlightAnswer S.carol (\asked -> if asked == S.carol then Color.Blue else Color.Red) Nothing) board (S.tapForMana searchlightId)
+    Spec.assertEqWith s "CR 608.2d carol, whom alice chose, adds the blue she picked, and nobody else adds anything" (fmap (`poolTypes` tapped) [S.alice, S.bob, S.carol]) [[], [], [ManaType.Colored Color.Blue]]
+
+  -- CR 601.2g / 605.3a: alice may choose herself, so the Searchlight is a source
+  -- of any colour for her own payment. The pair differs in exactly the
+  -- Searchlight: the same Llanowar Elves in hand, the same phase, no other mana.
+  Spec.it s "CR 605.3a its activator may choose themself, so it pays for their own spell" $ do
+    searchlight <- S.printingOf s registry "Spectral Searchlight"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (elvesId, g1) = S.addHandCard elves S.alice S.threePlayerGame
+        bare = g1 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        (searchlightId, board) = S.addPermanent searchlight S.alice bare
+        offers g = length (filter (S.isCastOf elvesId) (Action.legalActions S.alice g))
+        cast = S.runPure (searchlightAnswer S.alice (const Color.Green) (Just searchlightId)) board (S.cast S.alice elvesId)
+    Spec.assertEqWith s "CR 605.3a the Elves are castable with the Searchlight and not without it" (fmap offers [board, bare]) [1, 0]
+    Spec.assertEqWith s "CR 601.2h and alice pays for them by choosing herself and green" (fmap (`Projection.controllerOf` cast) (GameState.stack cast)) [Just S.alice]
+
+-- Chooses `chosen` when a player is asked for, answers a yield prompt with the
+-- option adding the colour `colourFor` gives the seat ASKED, and taps `source`
+-- for a payment. Each answer is pinned out of the offered set, never built.
+searchlightAnswer :: PlayerId.PlayerId -> (PlayerId.PlayerId -> Color.Color) -> Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
+searchlightAnswer chosen colourFor source p = case p of
+  Prompt.ChoosePlayer _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== chosen) (NonEmpty.toList offered))
+  Prompt.ChooseManaYield _ asked _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (\option -> fmap ManaUnit.manaType (Mana.yieldUnits option) == [ManaType.Colored (colourFor asked)]) (NonEmpty.toList candidates))
+  Prompt.ChooseManaSource _ _ candidates -> List.find (`elem` NonEmpty.toList candidates) source
+  Prompt.ChooseExtraManaSource {} -> Nothing
+  _ -> S.identityAnswer p
 
 -- CR 106.4's other half, which no printing reaches: a mana ability whose mana
 -- the ACTIVATOR can never get. "{T}: Each opponent adds {C}" -- one activated
