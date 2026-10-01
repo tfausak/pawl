@@ -405,7 +405,19 @@ subChoiceFor key prompt decider choices =
     holdsTargets = Maybe.isJust (Choices.targets choices) || not (Map.null (Choices.targetsBySlot choices))
 
 answerTopPrompt :: Maybe Label.Label -> Asked.Asked r -> Run r
-answerTopPrompt decider asked =
+answerTopPrompt decider asked = do
+  -- An Answer naming this prompt wins over its dedicated move, so a recording
+  -- can answer anything one way.
+  found <- case Asked.prompt asked of
+    Prompt.Type.ChooseAction {} -> pure Nothing
+    Prompt.Type.Concede {} -> pure Nothing
+    prompt -> takeAnswer (Asked.game asked) decider (Prompt.kindOf prompt)
+  case found of
+    Just (key, index, timed) -> answerGeneric (Asked.game asked) key (Prompt.kindOf (Asked.prompt asked)) index timed (Asked.prompt asked)
+    Nothing -> answerDedicated decider asked
+
+answerDedicated :: Maybe Label.Label -> Asked.Asked r -> Run r
+answerDedicated decider asked =
   let prompt = Asked.prompt asked
       gs = Asked.game asked
       kind = Prompt.kindOf prompt
@@ -557,11 +569,7 @@ answerTopPrompt decider asked =
                 then pure (Maybe.mapMaybe (\oid -> List.elemIndex oid group >>= Int.toNatural) chosen)
                 else failWith (Failure.MkActionNotOffered key verb offers)
             _ -> Nothing
-        _ -> do
-          found <- takeAnswer gs decider kind
-          case found of
-            Just (key, index, timed) -> answerGeneric gs key kind index timed prompt
-            Nothing -> unscheduled []
+        _ -> unscheduled []
 
 -- | The first Answer naming this prompt at its moment: the decider's, or the
 -- active player's for a prompt nobody decides (a shuffle, a die).
