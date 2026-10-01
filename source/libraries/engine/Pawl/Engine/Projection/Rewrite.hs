@@ -1434,7 +1434,7 @@ rewriteReplacementEffect pairs effect = case effect of
     ReplacementEffect.TokenR
       r
         { TokenR.matching = (TokenR.matching r) {TokenPattern.whatToken = Filter.rewrite pairs (TokenPattern.whatToken (TokenR.matching r))},
-          TokenR.plus = fmap (rewriteCard pairs) (TokenR.plus r)
+          TokenR.plus = fmap (fmap (rewriteCard pairs)) (TokenR.plus r)
         }
   ReplacementEffect.TurnUpR r ->
     ReplacementEffect.TurnUpR

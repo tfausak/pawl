@@ -55,6 +55,10 @@ data CostComponent keyword
   | -- | CR 701.21a / Village Rites, Fireblast: sacrifice this many permanents
     -- matching the Filter, which the payer chooses.
     Sacrifice (Sacrifice.Sacrifice keyword)
+  | -- | CR 107.3a / 602.2b / Grim Hireling: sacrifice X permanents matching the
+    -- Filter, X announced and rewritten to a Sacrifice by
+    -- Pawl.Engine.Cost.substituteX.
+    SacrificeX (Filter.Filter keyword)
   | -- | CR 702.122a's cost half / crew: tap any number of untapped permanents
     -- matching the Filter, chosen so that their TOTAL power reaches totalPower.
     TapForTotalPower (TapForTotalPower.TapForTotalPower keyword)

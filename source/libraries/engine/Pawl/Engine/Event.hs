@@ -218,6 +218,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TokenLot as TokenLot
+import qualified Pawl.Types.TokenPlus as TokenPlus
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
@@ -2731,7 +2732,7 @@ apply batch candidate event =
             -- which is channel 3 of applyReplacementsIn's note and not this
             -- exclusion.
             let entering oid2 = oid2 == oid || Set.member oid2 batch
-                offered = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
+                offered = filter (not . entering) (Replacement.sacrificeCandidates (Just controller) Map.empty controller (Just oid) criterion gs)
             chosen <-
               -- Where the rules leave nothing to ask, don't prompt: with no
               -- candidate the empty set is the only answer. ONE candidate is
@@ -2816,7 +2817,7 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             let entering oid2 = oid2 == oid || Set.member oid2 batch || Set.member oid2 (GameState.enteringSubjects gs)
-                own = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
+                own = filter (not . entering) (Replacement.sacrificeCandidates (Just controller) Map.empty controller (Just oid) criterion gs)
                 owed = fmap (fmap (filter (not . entering))) (pendingSacrifices controller gs)
                 sets = Replacement.subsetsOf n own
                 joint = filter (\chosen -> Replacement.jointlyPayable (Set.fromList chosen) owed) sets
@@ -4160,12 +4161,19 @@ apply batch candidate event =
     -- created instead" appends a lot to the SAME event -- scaled first, then
     -- appended, so a row applied after this one (CR 616.1) scales the Soldier
     -- too, and the creating effect's riders reach it (Queen Allenal's ruling).
-    -- Pawl.ReplacementSpec's Queen Allenal group is the proof, both orders.
+    -- Pawl.ShieldCounterSpec's Queen Allenal and Chatterfang groups are the
+    -- proof, both orders.
     (ReplacementEffect.TokenR (TokenR.MkTokenR _ scaling plus), ProposedEvent.WouldCreateTokens pid lots) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       let scaleLot factor lot = lot {TokenLot.count = Replacement.scale factor (TokenLot.count lot)}
           scaled = maybe lots (\factor -> fmap (scaleLot factor) lots) scaling
-          appended = maybe scaled (\card -> scaled Seq.|> TokenLot.MkTokenLot {TokenLot.card = card, TokenLot.copy = Nothing, TokenLot.count = 1}) plus
+          lotOf card n = TokenLot.MkTokenLot {TokenLot.card = card, TokenLot.copy = Nothing, TokenLot.count = n}
+          appended = case plus of
+            Nothing -> scaled
+            Just (TokenPlus.One card) -> scaled Seq.|> lotOf card 1
+            -- Chatterfang's "that many": every token the event would create as
+            -- this row applies, its own scaling included.
+            Just (TokenPlus.ThatMany card) -> scaled Seq.|> lotOf card (sum (fmap TokenLot.count scaled))
       pure (Just (ProposedEvent.WouldCreateTokens pid appended))
     -- Unreachable: `applies` admits TokenR only against WouldCreateTokens.
     (ReplacementEffect.TokenR {}, _) -> pure (Just event)
@@ -4423,7 +4431,7 @@ runEntry given oid = do
 -- two players' SacrificeToEnter cards in one batch (Second Sunrise would).
 pendingSacrifices :: PlayerId -> GameState -> [(Natural, [ObjectId])]
 pendingSacrifices chooser gs =
-  [ (count, Replacement.sacrificeCandidates Map.empty chooser (Just member) criterion gs)
+  [ (count, Replacement.sacrificeCandidates (Just chooser) Map.empty chooser (Just member) criterion gs)
   | (member, controller) <- Map.toAscList (GameState.enteringPending gs),
     controller == chooser,
     Just obj <- [Game.lookupObject member gs],

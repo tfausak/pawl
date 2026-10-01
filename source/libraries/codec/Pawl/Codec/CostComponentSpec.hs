@@ -176,6 +176,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.RemovePlusOneCountersX (Filter.HasCardType CardType.Creature))
       " {\"type\":\"RemovePlusOneCountersX\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- Sacrifice's X form, Grim Hireling's.
+  Spec.it s "SacrificeX" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.SacrificeX (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"SacrificeX\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 118.12's counter-placing cost, CR 701.63a's endure.
   Spec.it s "PutPlusOneCountersOnThis" $
     Common.assertCodec

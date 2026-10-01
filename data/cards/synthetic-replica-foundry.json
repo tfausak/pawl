@@ -31,34 +31,37 @@
                 }
               },
               "plus": {
-                "faces": [
-                  {
-                    "name": "Servo Token",
-                    "power": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "toughness": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Servo"
-                        }
-                      ],
-                      "types": [
-                        {
-                          "type": "Artifact"
-                        },
-                        {
-                          "type": "Creature"
-                        }
-                      ]
+                "type": "One",
+                "value": {
+                  "faces": [
+                    {
+                      "name": "Servo Token",
+                      "power": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "toughness": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "typeLine": {
+                        "subtypes": [
+                          {
+                            "type": "Servo"
+                          }
+                        ],
+                        "types": [
+                          {
+                            "type": "Artifact"
+                          },
+                          {
+                            "type": "Creature"
+                          }
+                        ]
+                      }
                     }
-                  }
-                ]
+                  ]
+                }
               }
             }
           }
