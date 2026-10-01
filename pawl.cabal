@@ -152,6 +152,8 @@ library codec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
     Pawl.Codec.Amass
+    Pawl.Codec.Answer
+    Pawl.Codec.AnswerSpec
     Pawl.Codec.AnyNumberDiscard
     Pawl.Codec.AnyNumberDiscardSpec
     Pawl.Codec.AnyNumberMatching
@@ -1051,6 +1053,7 @@ library codec
     Pawl.Codec.ReplacementProvenance
     Pawl.Codec.ReplacementProvenanceSpec
     Pawl.Codec.ReplaceSpec
+    Pawl.Codec.Reply
     Pawl.Codec.RequireAttack
     Pawl.Codec.RequireAttackSpec
     Pawl.Codec.RequireBlock
@@ -1675,6 +1678,7 @@ library scenario
     Pawl.Scenario
     Pawl.Scenario.Load
     Pawl.Scenario.Prompt
+    Pawl.Scenario.Reply
 
 -- Converts text (card names) into slugs, which can be used for convenient file
 -- names.
@@ -1921,6 +1925,7 @@ library types
     Pawl.Types.AlternativeActivationCost
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
+    Pawl.Types.Answer
     Pawl.Types.AnyNumberDiscard
     Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction
@@ -2431,6 +2436,7 @@ library types
     Pawl.Types.ReplacementEntry
     Pawl.Types.ReplacementOrigin
     Pawl.Types.ReplacementProvenance
+    Pawl.Types.Reply
     Pawl.Types.RequireAttack
     Pawl.Types.RequireBlock
     Pawl.Types.RequiredDefender

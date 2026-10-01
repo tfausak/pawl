@@ -102,6 +102,8 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.SubtypesAre as SubtypesAre
+import qualified Pawl.Types.Answer as Answer
+import qualified Pawl.Scenario.Reply as Reply
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Teams as Teams
@@ -369,7 +371,14 @@ answerPrompt asked = do
           -- Any other prompt means the action has finished. A choice it never
           -- asked for is a scenario error, reported here rather than at the
           -- next prompt that happens to want an answer.
-          | choices /= Choices.none -> failWith (Failure.MkUnusedActionChoices key verb choices)
+          | choices /= Choices.none -> do
+              -- A prompt another rule raises mid-action (a kicker, a
+              -- shuffle) is answered by an Answer and leaves the action
+              -- pending.
+              found <- takeAnswer gs decider kind
+              case found of
+                Just (answerKey, index, timed) -> answerGeneric gs answerKey kind index timed prompt
+                Nothing -> failWith (Failure.MkUnusedActionChoices key verb choices)
         Just {} -> do
           State.modify' (\rehearsal -> rehearsal {pending = Nothing})
           answerTopPrompt decider asked
@@ -548,7 +557,35 @@ answerTopPrompt decider asked =
                 then pure (Maybe.mapMaybe (\oid -> List.elemIndex oid group >>= Int.toNatural) chosen)
                 else failWith (Failure.MkActionNotOffered key verb offers)
             _ -> Nothing
-        _ -> unscheduled []
+        _ -> do
+          found <- takeAnswer gs decider kind
+          case found of
+            Just (key, index, timed) -> answerGeneric gs key kind index timed prompt
+            Nothing -> unscheduled []
+
+-- | The first Answer naming this prompt at its moment: the decider's, or the
+-- active player's for a prompt nobody decides (a shuffle, a die).
+takeAnswer :: GameState.GameState -> Maybe Label.Label -> Text.Text -> Run (Maybe (When.When, Int, Timed.Timed))
+takeAnswer gs decider kind = do
+  label <- maybe (labelOf (GameState.activePlayer gs)) pure decider
+  let key = When.MkWhen (GameState.turnNumber gs) (GameState.phase gs) label
+      names timed = case Timed.entry timed of
+        Entry.Do (Move.Answer answer) -> Answer.prompt answer == kind
+        _ -> False
+  entries <- queueAt key
+  pure (fmap (\(index, timed) -> (key, index, timed)) (List.find (names . snd) (zip [0 ..] (Foldable.toList entries))))
+
+answerGeneric :: GameState.GameState -> When.When -> Text.Text -> Int -> Timed.Timed -> Prompt.Type.Prompt r -> Run r
+answerGeneric gs key kind index timed prompt = case Timed.entry timed of
+  Entry.Do verb@(Move.Answer answer) -> do
+    popAt key index
+    let resolve needs = case needs of
+          Reply.Done a -> pure a
+          Reply.Failed problem -> failWith (Failure.MkUnexpectedActionChoice key verb (kind <> Text.pack ": " <> problem))
+          Reply.NeedObject ref k -> resolveObject ref gs >>= resolve . k
+          Reply.NeedPlayer label k -> resolvePlayer label >>= resolve . k
+    resolve (Reply.decode (Reply.shapeOf prompt) (Answer.with answer))
+  entry -> failWith (Failure.MkUnexpectedPrompt key entry kind [])
 
 -- | A priority prompt: first the checks at the head of this moment, in timeline
 -- order, then the first move that takes priority, and a pass when there is

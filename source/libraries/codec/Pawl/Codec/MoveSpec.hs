@@ -8,6 +8,8 @@ import qualified Pawl.Codec.Move as Move
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Activation as Activation.Type
+import qualified Pawl.Types.Answer as Answer.Type
+import qualified Pawl.Types.Reply as Reply.Type
 import qualified Pawl.Types.Casting as Casting.Type
 import qualified Pawl.Types.Choices as Choices.Type
 import qualified Pawl.Types.Label as Label.Type
@@ -52,6 +54,8 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.ChooseCopyTarget (Just (ref "bear"))) " {\"ChooseCopyTarget\":\"$bear\"} "
   Spec.it s "ChooseCopyTarget declined" $
     Common.assertCodec s Move.codec (Move.Type.ChooseCopyTarget Nothing) " {\"ChooseCopyTarget\":null} "
+  Spec.it s "Answer" $
+    Common.assertCodec s Move.codec (Move.Type.Answer (Answer.Type.MkAnswer (Text.pack "ChooseDiscard") (Reply.Type.Array [Reply.Type.Text (Text.pack "@card")]))) " {\"Answer\":{\"prompt\":\"ChooseDiscard\",\"with\":[\"@card\"]}} "
   Spec.it s "ChooseTypeSwap" $
     Common.assertCodec s Move.codec (Move.Type.ChooseTypeSwap (TypeSwap.Type.MkTypeSwap Subtype.Type.Goblin Subtype.Type.Elf)) " {\"ChooseTypeSwap\":{\"from\":{\"type\":\"Goblin\"},\"to\":{\"type\":\"Elf\"}}} "
   Spec.it s "Concede" $
