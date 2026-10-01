@@ -6523,7 +6523,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                       -- current zone, unless that zone is the stack", which puts it
                       -- into its owner's graveyard instead. Copy Enchantment that
                       -- copied Betrayal with no creature to steal from;
-                      -- Pawl.CopySpec's pair proves both halves.
+                      -- Pawl.CopySpec's Betrayal pair proves the stack branch, and
+                      -- no test drives another origin.
                       Just EntryRefusal.Unhosted -> do
                         State.put unentered
                         Monad.when (fromZone == Zone.Stack) (Monad.void (changeZoneReturning oid Zone.Graveyard))
