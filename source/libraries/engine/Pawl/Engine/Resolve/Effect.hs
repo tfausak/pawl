@@ -128,6 +128,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChooseNumber as ChooseNumber
+import qualified Pawl.Types.ChoosePermanents as ChoosePermanents
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Chooser as Chooser
@@ -782,7 +783,19 @@ anyNumberMatching ::
   ObjectId ->
   AnyNumberMatching.AnyNumberMatching ->
   Game [ObjectId]
-anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) = do
+anyNumberMatching legal resolving controller = anyNumberMatchingBy controller legal resolving controller
+
+-- anyNumberMatching asked of the seat named first, the candidates still read
+-- from the ability's perspective (CR 109.5) -- Effect.ChoosePermanents' road.
+anyNumberMatchingBy ::
+  PlayerId ->
+  Map.Map SlotName (Set Recipient) ->
+  ObjectId ->
+  PlayerId ->
+  ObjectId ->
+  AnyNumberMatching.AnyNumberMatching ->
+  Game [ObjectId]
+anyNumberMatchingBy chooser legal resolving controller source (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) = do
   gs <- State.get
   let candidates = battlefieldMatching legal resolving controller source gs filter_
       context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -792,7 +805,7 @@ anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumb
   if null candidates || ceiling_ == Just 0
     then pure []
     else do
-      answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates ceiling_)
+      answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor chooser gs) chooser source candidates ceiling_)
       pure (capped (filter (`Set.member` answer) candidates))
 
 -- CR 701.9a's move for every Effect.Discard arm, once the cards are named:
@@ -3210,6 +3223,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.PlaySubgame {} -> False
   Effect.ChoosePlayer {} -> False
   Effect.ChoosePlayerAtRandom {} -> False
+  Effect.ChoosePermanents {} -> False
   Effect.RollDie {} -> False
   Effect.FlipCoin {} -> False
   Effect.ExileHandThenDraw {} -> False
@@ -4218,6 +4232,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         answer <- Game.ask (Prompt.RandomPlayer offered)
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
     Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot (Set.singleton pid))
+  -- CR 608.2d: the seat the payload names picks any number of the matching
+  -- permanents -- Archfiend of Depravity's "that player chooses up to two
+  -- creatures they control" -- and the pick is bound as a group for a later
+  -- instruction to act on, through Filter.IsBound ("the rest") or InSlot.
+  -- askedChooser is ChosenPermanent's road to the seat, CR 800.4g included; a
+  -- ref naming nobody asks nobody and binds nothing (CR 101.3). Proved by
+  -- Pawl.BoardEffectSpec's "CR 608.2d that player chooses the two they keep and
+  -- sacrifices the rest".
+  Effect.ChoosePermanents (ChoosePermanents.MkChoosePermanents chooser choice slot) -> do
+    asked <- askedChooser source controller legal chooser
+    picked <- maybe (pure []) (\who -> anyNumberMatchingBy who legal resolving controller source choice) asked
+    Monad.unless (null picked) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList picked)))
   -- CR 706.1: roll a die of the stated kind, and bind CR 706.4's result at the
   -- slot for a later effect of this same resolution to read (Ancient Copper
   -- Dragon's "roll a d20. You create a number of Treasure tokens equal to the
