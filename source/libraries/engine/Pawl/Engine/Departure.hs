@@ -86,7 +86,16 @@ depart reason pid = departTogether reason [pid]
 -- CR 809.5b / 809.5c: a departing emperor's team leaves in the same event
 -- (Emperor.fallsWith), after the players named.
 departTogether :: Departure -> [PlayerId] -> Game ()
-departTogether reason named = do
+departTogether reason named = Monad.join (leaveTogether reason named)
+
+-- `departTogether` up to CR 800.4a's fourth clause, which it hands back rather
+-- than performs: that clause comes "Then", so it is an event of its own, and a
+-- caller already inside a `simultaneously` bracket -- Pawl.Engine.Sba's pass --
+-- runs it after its bracket closes, where it gets its own event group. The
+-- Palace Jailer and Banisher Priest board in data/scenarios/simultaneous-moves
+-- where the monarch loses to a state-based action proves it.
+leaveTogether :: Departure -> [PlayerId] -> Game (Game ())
+leaveTogether reason named = do
   continues <- State.gets continuesAfterDeparture
   before <- State.get
   let departing = fmap (\pid -> (reason, pid)) named <> Emperor.fallsWith reason named before
@@ -110,7 +119,7 @@ departTogether reason named = do
       -- active player takes the initiative at the same time its holder leaves.
       Initiative.reassignOnDeparture pid
   -- CR 800.4a's fourth clause: "Then", so after the instant above.
-  Monad.when continues $ do
+  pure . Monad.when continues $ do
     Monad.mapM_ remainingControlledExiled pids
     -- CR 901.10: the replacement plane, once CR 800.4a is done.
     Planechase.ownersLeft before pids
