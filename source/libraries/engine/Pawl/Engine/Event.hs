@@ -5651,7 +5651,9 @@ changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneInBatchReturnin
 -- changeZoneInBatch, answering with the destination incarnations' ids -- what
 -- changeZoneReturning is to changeZone, and the same answer: the CR 400.7 ids,
 -- empty when the move was cancelled or the id named no object. The destroy
--- funnel is the one caller, for CR 701.8b's "put into a graveyard this way".
+-- funnel reads them for CR 701.8b's "put into a graveyard this way", and a
+-- search's and a surveil's batches (Resolve.Effect.putFound, applySurveil) for
+-- the cards they moved.
 changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Seq.Seq ObjectId)
 changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
 
