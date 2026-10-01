@@ -1442,6 +1442,8 @@ spec s registry = do
   Pawl.CopySpec.ivySpec s registry
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.zadaSpec s registry
+  Pawl.CopySpec.radiateSpec s registry
+  Pawl.CopySpec.precursorGolemSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry
   Pawl.CopySpec.flamerushRiderSpec s registry
   Pawl.CopySpec.castCopySpec s registry

@@ -1,5 +1,6 @@
 module Pawl.Codec.CopyStackObjectSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
@@ -38,8 +39,8 @@ spec s = Spec.describe s "Pawl.Codec.CopyStackObject" $ do
     Common.assertCodec
       s
       (CopyStackObject.codec Common.text)
-      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You))) CopyStackObject.defaultQuantity CopyStackObject.defaultCopier [])
-      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"targets\":{\"type\":\"ForEach\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}} "
+      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You) NonEmpty.:| [])) CopyStackObject.defaultQuantity CopyStackObject.defaultCopier [])
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"targets\":{\"type\":\"ForEach\",\"value\":[{\"type\":\"EachMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}]}} "
   -- CR 702.40a, storm's "copy it for each": a count other than one is written.
   Spec.it s "MkCopyStackObject, a count: it is written" $
     Common.assertCodec

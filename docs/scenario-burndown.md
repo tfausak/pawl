@@ -1184,6 +1184,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.10d the copies go onto the stack in their controller's chosen order | `move:OrderForEach`
 - CR 707.10e no copy is created where Ivy is not a legal target | `board:continuous-effect`
 - CR 707.10e the copy targets Ivy rather than what the original announced | `check:stack`
+- CR 707.10d Radiate copies the Bolt for each other permanent or player it could target | `move:OrderForEach` `check:stack`
+- CR 707.10d Precursor Golem copies the spell for each OTHER Golem, under the caster's control | `move:OrderForEach` `check:stack`
 - CR 707.10f a copy of a creature spell resolves as a token creature beside the card | `check:controller` `check:helper-rollickersOn` `check:other-Face.name` `check:other-Game.faceOf` `check:other-Game.isToken` `check:stack` `check:zone-contents`
 - CR 707.12 Mizzix's Mastery casts a copy of the exiled Bolt, which the card itself never becomes | `move:OfferedCast`
 - CR 707.12a overloaded, each of the two exiled Bolts is copied and its copy offered separately | `move:ChooseOfferedCastSpell` `move:OfferedCast`

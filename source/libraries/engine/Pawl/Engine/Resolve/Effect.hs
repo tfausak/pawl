@@ -2692,28 +2692,36 @@ stackTargetSlots obj oid gs =
 -- controller's seat, whose copy it will be. Rule 707.10c's own derivation, with
 -- the same seed: the slots being written are dropped from the environment, so a
 -- sibling read is not answered off the target it is about to replace.
-copyRetargets :: PlayerId -> ObjectId -> GameState -> [ObjectId] -> [(ObjectId, Map.Map SlotName (Set Recipient))]
+--
+-- A candidate is a player or an object (CR 115.1), matched against the offered
+-- recipients by referent, since the pool that offers a permanent tags it
+-- (Recipient.ToCreature) where the ref that named it did not.
+copyRetargets :: PlayerId -> ObjectId -> GameState -> [Recipient] -> [(Recipient, Map.Map SlotName (Set Recipient))]
 copyRetargets controller original gs candidates = Maybe.fromMaybe [] $ do
   obj <- Game.lookupObject original gs
   let slots = stackTargetSlots obj original gs
       current = targetsOnStack original gs
       seed = Map.withoutKeys (Object.bindings obj) (Map.keysSet slots)
       fresh = Target.legalSets (Just controller) False seed original slots gs
-      takes oid slot = Set.filter ((== Just oid) . Recipient.objectOf) (Map.findWithDefault Set.empty slot fresh)
-      pick oid =
-        let chosen = Map.mapWithKey (\slot _ -> takes oid slot) current
+      takes candidate slot = Set.filter (Recipient.sameReferent candidate) (Map.findWithDefault Set.empty slot fresh)
+      pick candidate =
+        let chosen = Map.mapWithKey (\slot _ -> takes candidate slot) current
          in if not (Map.null current)
               && and (Map.elems (Map.map ((== 1) . Set.size) current))
               && and (Map.elems (Map.map ((== 1) . Set.size) chosen))
               && Target.jointlyCoherent (Just controller) seed original slots chosen gs
-              then Just (oid, chosen)
+              then Just (candidate, chosen)
               else Nothing
   pure (Maybe.mapMaybe pick candidates)
 
--- CR 707.10e: ONE copy, every one of whose targets is the object the effect
--- names. Answers the empty list where "the copy isn't created", so the copy does
--- not exist rather than existing and being countered for an illegal target (CR
--- 608.2b).
+-- CR 707.10e: ONE copy, every one of whose targets is the player or object the
+-- effect names. Answers the empty list where "the copy isn't created", so the
+-- copy does not exist rather than existing and being countered for an illegal
+-- target (CR 608.2b).
+--
+-- A PLAYER named here is a regression fence rather than a proven line: Zevlor,
+-- Elturel Exile is its producer (#4563), and Ivy, Gleeful Spellthief names an
+-- object.
 --
 -- A ref naming anything but exactly ONE object also answers the empty list: rule
 -- 707.10e specifies "a new target", singular, so a ref that swept several has
@@ -2726,7 +2734,7 @@ copyRetargets controller original gs candidates = Maybe.fromMaybe [] $ do
 copyStatedTargets :: PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
 copyStatedTargets controller resolving source legal original newRef = do
   gs <- State.get
-  pure $ case objectRefObjects legal resolving controller source gs newRef of
+  pure $ case objectRefRecipients legal resolving controller source gs newRef of
     [new] -> fmap snd (copyRetargets controller original gs [new])
     _ -> []
 
@@ -2766,21 +2774,30 @@ copyStackSubjects legal resolving controller source gs ref =
 -- CR 707.10d: the copies' targets, one map per candidate, in the order their
 -- controller chose. Answers the empty list where nothing is copied at all.
 --
--- The candidates are the card's own description ("each other creature you
--- control"), narrowed by the rule's "could target" -- copyRetargets above, whose
--- test rule 707.10e shares.
+-- The candidates are the card's own description, every ref's players and
+-- objects together (Radiate's "each other permanent or player"), narrowed by the
+-- rule's "could target" -- copyRetargets above, whose test rule 707.10e shares.
+--
+-- Less what the original already targets, which is the printed "OTHER": every
+-- hit for Scryfall o:"could target" (2026-10-01) that copies per candidate reads
+-- "for each other ...", and each gates on an original with a single target, so
+-- "other" is that target. A printing without the "other" would refute this.
+-- Precursor Golem's "each other Golem" is where that target is not the source.
 --
 -- The ORDER is the whole of what CR 707.10d leaves to a player, and
 -- Prompt.OrderForEach is the question; the rule states no primary key, so the
 -- one prompt covers the whole list rather than forEachOrder's APNAP groups.
 -- Elided for fewer than two, which is one order.
-copyForEachTargets :: PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
-copyForEachTargets controller resolving source legal original candidateRef = do
+copyForEachTargets :: PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> NonEmpty.NonEmpty ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
+copyForEachTargets controller resolving source legal original candidateRefs = do
   gs <- State.get
-  let picks = copyRetargets controller original gs (objectRefObjects legal resolving controller source gs candidateRef)
+  let targeted = Foldable.fold (targetsOnStack original gs)
+      other candidate = not (any (Recipient.sameReferent candidate) targeted)
+      candidates = ListUtils.nubOrd (concatMap (filter other . objectRefRecipients legal resolving controller source gs) candidateRefs)
+      picks = copyRetargets controller original gs candidates
   ordered <- case picks of
     _ : _ : _ -> do
-      answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor controller gs) controller resolving (fmap (Recipient.ToObject . fst) picks))
+      answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor controller gs) controller resolving (fmap fst picks))
       pure (Game.permute picks answer)
     _ -> pure picks
   pure (fmap snd ordered)
@@ -7080,7 +7097,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           plan <- case targets of
             CopyTargets.Copied -> pure [Map.empty]
             CopyTargets.ChosenByController -> pure [Map.empty]
-            CopyTargets.ForEach candidateRef -> copyForEachTargets controller resolving source legal original candidateRef
+            CopyTargets.ForEach candidateRefs -> copyForEachTargets controller resolving source legal original candidateRefs
             CopyTargets.Stated newRef -> copyStatedTargets controller resolving source legal original newRef
           Monad.forM_ plan $ \retarget -> do
             gsNow <- State.get

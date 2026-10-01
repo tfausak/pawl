@@ -634,7 +634,7 @@ objectRefPositions =
         -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
         -- reach: a copy effect whose candidate description reads a slot no clause
         -- binds is a dangling read like any other.
-        ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each")) CopyStackObject.defaultQuantity CopyStackObject.defaultCopier []), [plantedRef "cs-ref", plantedRef "cs-each"]),
+        ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each" NonEmpty.:| [])) CopyStackObject.defaultQuantity CopyStackObject.defaultCopier []), [plantedRef "cs-ref", plantedRef "cs-each"]),
         ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
         ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
         ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
@@ -3744,7 +3744,7 @@ copyTargetsRefs :: CopyTargets.CopyTargets -> [ObjectRef.ObjectRef]
 copyTargetsRefs targets = case targets of
   CopyTargets.Copied -> []
   CopyTargets.ChosenByController -> []
-  CopyTargets.ForEach ref -> [ref]
+  CopyTargets.ForEach refs -> NonEmpty.toList refs
   CopyTargets.Stated ref -> [ref]
 
 copyTargetsFilters :: CopyTargets.CopyTargets -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
