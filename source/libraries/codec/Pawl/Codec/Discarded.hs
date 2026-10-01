@@ -20,7 +20,7 @@ codec = Fields.object $ do
   player <- Fields.required "player" PlayerId.codec Discarded.player
   card <- Fields.required "card" ObjectId.codec Discarded.card
   cause <- Fields.required "cause" DiscardCause.codec Discarded.cause
-  madness <- Fields.required "madness" (Common.set (MadnessCost.codec Keyword.codec)) Discarded.madness
+  madness <- Fields.required "madness" (Common.maybe (MadnessCost.codec Keyword.codec)) Discarded.madness
   pure
     Discarded.MkDiscarded
       { Discarded.player = player,

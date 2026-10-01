@@ -2507,7 +2507,7 @@ circlingVultures s registry = Spec.describe s "CR 116.2e Circling Vultures" $ do
       s
       "CR 701.9a the discard was logged, and CR 702.29c's cycling cause is not what caused it"
       (filter isDiscarded (S.eventsOf after))
-      (fmap (\oid -> GameEvent.Discarded (Discarded.MkDiscarded S.alice oid DiscardCause.Ordinary Set.empty)) graveyard)
+      (fmap (\oid -> GameEvent.Discarded (Discarded.MkDiscarded S.alice oid DiscardCause.Ordinary Nothing)) graveyard)
   -- CR 116.3: "if a player takes a special action, that player receives
   -- priority afterward." Both halves of the arm are pinned by the one sequence.
   -- Retaining priority puts alice's second prompt before bob's first; restarting

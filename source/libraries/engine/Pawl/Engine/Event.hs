@@ -157,6 +157,7 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.MergeComponent as MergeComponent
@@ -8669,7 +8670,7 @@ discardReturning cause pid oid = do
   before <- State.get
   -- READ BEFORE THE MOVE: CR 400.7 deletes this incarnation, so the hand card's
   -- own keywords are unreadable by the time the funnel returns.
-  let madness = Set.fromList (Keyword.madnessCosts (Projection.handMintingKeywordsOf oid before))
+  let madness = Keyword.madnessCosts (Projection.handMintingKeywordsOf oid before)
   moved <- changeZoneWithCause (Just cause) Nothing Set.empty oid Zone.Graveyard LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
   after <- State.get
   -- CR 702.35a's "exiled THIS WAY": which redirect the CR 616.1 loop applied,
@@ -8679,7 +8680,7 @@ discardReturning cause pid oid = do
   -- is the discarded card itself. Rest in Peace's row chosen instead files Rest
   -- in Peace, and an unredirected discard files nothing.
   --
-  -- The recorded set, empty for a card without madness, is what makes "the row
+  -- The madness abilities, none for a card without madness, are what make "the row
   -- was the card's own" and "the row was rule 702.35a's" coincide rather than
   -- merely agree. Rule 702.35a's is the
   -- only row any rule MINTS onto a card in a hand (Keyword.handReplacementsOf),
@@ -8696,12 +8697,40 @@ discardReturning cause pid oid = do
   let madnessOf newId =
         if fmap ExileLink.source (Map.lookup newId (GameState.exiledWith after)) == Just oid
           then madness
-          else Set.empty
+          else []
   -- One record per arrival: a card discarded is a card, so this loop runs once
   -- for every move the funnel makes. A melded permanent is never in a hand, so
   -- the sequence never holds two here.
-  Monad.forM_ moved $ \newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause (madnessOf newId))))
+  Monad.forM_ moved $ \newId -> do
+    applied <- madnessChoice pid newId (madnessOf newId)
+    State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause applied)))
   pure moved
+
+-- CR 616.1 / 702.35a: which of the card's madness abilities was the replacement
+-- that exiled it, and so which trigger fires -- Falkenrath Gorger's ruling,
+-- "you'll choose which madness ability exiles it". The discarding player is the
+-- card's owner (CR 701.9a), CR 616.1's chooser for a card in a hand.
+--
+-- Asked AFTER the move rather than inside the CR 616.1 loop: every madness row
+-- makes the same redirect (Keyword.handReplacementsOf mints one), so the loop
+-- has nothing to tell them apart by, and nothing happens between the redirect
+-- and this question. The options are the SETTLED costs, since two madness
+-- abilities alike in cost are indistinguishable answers (Asylum Visitor's
+-- {1}{B} beside the Gorger's), and the prompt is raised only where two differ.
+-- Pawl.CastSpec's "CR 616.1 Bloodmad Vampire under the Gorger casts for the
+-- madness cost chosen" proves it.
+madnessChoice :: PlayerId -> ObjectId -> [MadnessCost.MadnessCost Keyword.Type.Keyword] -> Game (Maybe (MadnessCost.MadnessCost Keyword.Type.Keyword))
+madnessChoice pid oid payloads = do
+  gs <- State.get
+  let manaCost = PC.manaCost (Projection.project oid gs)
+      bySettled = Map.fromListWith (\_ kept -> kept) [(Keyword.madnessCostFor manaCost p, p) | p <- payloads]
+  case Map.toAscList bySettled of
+    [] -> pure Nothing
+    [(_, only)] -> pure (Just only)
+    offered@((_, first) : _) -> do
+      answer <- Game.choose (Prompt.ChooseCost (Decide.deciderFor pid gs) pid oid (fmap fst offered))
+      -- Reject-not-repair: an answer outside the offer keeps the first.
+      pure (Just (Maybe.fromMaybe first (Map.lookup answer bySettled)))
 
 -- Ask the interpreter to shuffle this player's library (CR 103.3 / 701.24).
 --

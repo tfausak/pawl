@@ -586,7 +586,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Mayhem _ -> []
   -- CR 702.35a's two abilities are minted elsewhere, suspend's shape: the
   -- static half by `handReplacementsOf` and the triggered half by
-  -- `madnessTriggersOf`, so this roster stays empty.
+  -- `madnessCast`, so this roster stays empty.
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
   Keyword.Scavenge _ -> []
@@ -3042,7 +3042,7 @@ warpCosts keywords =
 -- ascending Set order. mayhemCosts' shape above, read by
 -- `handReplacementsOf`, which mints rule 702.35a's discard replacement while
 -- the card is in a hand, and by Pawl.Engine.Event.discardReturning, which
--- records them for the triggered half (`madnessTriggersOf`).
+-- records the one applied for the triggered half (`madnessCast`).
 --
 -- A LIST for flashbackCosts' reason: rule 702.35 states no limit on how many
 -- madness abilities an object has.
@@ -4072,12 +4072,10 @@ castFromGraveyardExile =
 -- handed Pawl.Engine.Projection.handMintingKeywordsOf by
 -- Pawl.Engine.Projection.replacementsAffecting's hand walk.
 --
--- ONE ROW however many madness abilities, unlike riot's per-instance rows.
--- Scryfall `keyword:madness`, 2026-09-12, answers 62 cards and every one of
--- them prints a single madness ability; a second reaches a card only by a
--- grant, Falkenrath Gorger's. Not implemented: the CR 616.1 choice of WHICH
--- madness ability exiles the card, which decides the trigger's cost when the
--- two costs differ (#4443).
+-- ONE ROW however many madness abilities, unlike riot's per-instance rows:
+-- every madness row makes the same redirect, so the CR 616.1 loop has nothing
+-- to tell them apart by. WHICH one applied is asked once the row has, by
+-- Pawl.Engine.Event.discardReturning (`madnessChoice`).
 handReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts keywords))]
 
@@ -8366,24 +8364,6 @@ exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbili
 exileTriggeredAbilitiesOf keywords = case suspendKeyword keywords of
   Nothing -> []
   Just keyword -> [suspendUpkeep, suspendLastCounter keyword]
-
--- CR 702.35a's SECOND ability for a card its first ability exiled, off the
--- madness abilities the discard recorded (Discarded.madness) and the exiled
--- card's mana cost, which a payload naming it settles against
--- (`madnessCostFor`). Pawl.Engine.Event.Trigger mints it off that event
--- rather than off the exiled card, so a grant that has since ended still
--- triggers -- Pawl.CastSpec's "CR 702.35a the Gorger dying before the trigger
--- is gathered still casts the Vampire" proves it.
---
--- ONE per distinct SETTLED cost: Falkenrath Gorger's grant beside Asylum
--- Visitor's printed madness {1}{B} settles to the same {1}{B}, so choosing
--- which madness ability applied is a choice between indistinguishable answers.
--- Not implemented: that choice when the costs differ -- Bloodmad Vampire's
--- madness {1}{R} beside the Gorger's {2}{R} -- which mints both triggers
--- (#4443).
-madnessTriggersOf :: Maybe ManaCost.ManaCost -> Set (MadnessCost.MadnessCost Keyword) -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-madnessTriggersOf manaCost payloads =
-  fmap (madnessCast manaCost) (Map.elems (Map.fromListWith (\_ kept -> kept) [(madnessCostFor manaCost p, p) | p <- Set.toAscList payloads]))
 
 -- CR 702.59a's ability, "a triggered ability that functions only while the card
 -- with recover is in a player's graveyard" -- the roster the graveyard scan in
