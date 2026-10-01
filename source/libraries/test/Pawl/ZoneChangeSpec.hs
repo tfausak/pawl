@@ -1049,10 +1049,10 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   -- The same rule through the destroy funnel: Day of Judgment's two victims
   -- reach bob's graveyard at once, and bob orders them -- where the game can
   -- tell the orders apart. A Volrath's Shapeshifter in his library reads the
-  -- top card; so does Circling Vultures' cost (CR 404.2's "the top creature
-  -- card"), and Ornate Imitations can conjure either. With none of them nothing
-  -- in the game reads a graveyard's order, so docs/design.md section 2.9 asks
-  -- nothing and his reversing answer is never given.
+  -- top card; so does Circling Vultures' cost ("the top creature card of your
+  -- graveyard"), and Ornate Imitations can conjure either. With none of them
+  -- nothing in the game reads a graveyard's order, so docs/design.md section
+  -- 2.9 asks nothing and his reversing answer is never given.
   Spec.it s "CR 404.3 bob orders the two creatures Day of Judgment puts into his graveyard" $ do
     reversed <- judgmentBoard s registry (Just "Volrath's Shapeshifter") True
     kept <- judgmentBoard s registry (Just "Volrath's Shapeshifter") False
@@ -1065,8 +1065,9 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "Ornate Imitations could conjure a reader, so bob is asked" (namesIn Zone.Graveyard S.bob imitations) (namesIn Zone.Graveyard S.bob reversed)
     Spec.assertEqWith s "two cards" (length (namesIn Zone.Graveyard S.bob kept)) 2
   -- A surveil's answer already orders the cards it puts into the graveyard
-  -- (CR 701.25a), so alice is not asked again: her reversing answerer leaves
-  -- the Plains, put first, under the Island, and Curate on top (CR 608.2n).
+  -- (Prompt.ChooseSurveil), so alice is not asked again: her reversing
+  -- answerer leaves the Plains, put first, under the Island, and Curate on top
+  -- (CR 608.2n).
   Spec.it s "CR 404.3 a surveil's graveyard cards are not arranged a second time" $ do
     after <- curateBoard s registry
     let names = fmap (Just . CardName.MkCardName . Text.pack) :: [String] -> [Maybe CardName.CardName]
