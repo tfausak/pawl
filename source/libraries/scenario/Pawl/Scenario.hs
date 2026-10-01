@@ -24,7 +24,9 @@ import qualified Pawl.Codec.Choices as Codec.Choices
 import qualified Pawl.Codec.Move as Codec.Move
 import qualified Pawl.Codec.Phase as Codec.Phase
 import qualified Pawl.Codec.Reference as Codec.Reference
+import qualified Pawl.Codec.Reply as Codec.Reply
 import qualified Pawl.Codec.Timed as Codec.Timed
+import qualified Pawl.Engine.Action as ActionEngine
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -42,9 +44,12 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario.Prompt as Prompt
+import qualified Pawl.Scenario.Reply as Reply
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Activation as Activation
+import qualified Pawl.Types.Answer as Answer
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackersAre as AttackersAre
@@ -94,6 +99,8 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Readiness as Readiness
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reference as Reference
+import qualified Pawl.Types.Reply as ReplyType
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scenario as Scenario
 import qualified Pawl.Types.ScenarioFailure as Failure
 import qualified Pawl.Types.Seat as Seat
@@ -102,22 +109,17 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.SubtypesAre as SubtypesAre
-import qualified Pawl.Types.Answer as Answer
-import qualified Pawl.Types.ViewIs as ViewIs
-import qualified Pawl.Types.View as View
-import qualified Pawl.Types.Reply as ReplyType
-import qualified Pawl.Types.Result as Result
-import qualified Pawl.Codec.Reply as Codec.Reply
-import qualified Pawl.Engine.Action as ActionEngine
-import qualified Pawl.Scenario.Reply as Reply
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TypeSwap as TypeSwap
 import qualified Pawl.Types.TypesAre as TypesAre
+import qualified Pawl.Types.View as View
+import qualified Pawl.Types.ViewIs as ViewIs
 import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
 
@@ -1111,10 +1113,18 @@ resolveDamage gs key kind offered (ref, amount) = do
 describeObject :: GameState.GameState -> ObjectId.ObjectId -> Run Text.Text
 describeObject gs oid = do
   labels <- State.gets (Staged.objects . staged)
+  let describeSource source = case List.find ((== source) . snd) (Map.toAscList labels) of
+        Just (label, _) -> Codec.Reference.toText (Reference.Labelled label)
+        Nothing -> case Game.cardOf source gs of
+          Just card -> CardName.unwrap (Face.name (NonEmpty.head (Card.faces card)))
+          Nothing -> Text.pack ("object " <> show (ObjectId.unwrap source))
   pure $ case List.find ((== oid) . snd) (Map.toAscList labels) of
     Just (label, _) -> Codec.Reference.toText (Reference.Labelled label)
     Nothing -> case Game.cardOf oid gs of
-      Nothing -> Text.pack ("object " <> show (ObjectId.unwrap oid))
+      Nothing -> case fmap Object.source (Game.lookupObject oid gs) of
+        Just (Source.OfTrigger trigger) -> Text.pack "trigger of " <> describeSource (TriggeredAbilitySource.source trigger)
+        Just (Source.OfAbility ability) -> Text.pack "ability of " <> describeSource (ActivatedAbilitySource.source ability)
+        _ -> Text.pack ("object " <> show (ObjectId.unwrap oid))
       Just card ->
         let name = Face.name (NonEmpty.head (Card.faces card))
             occurrence = Natural.length (takeWhile (/= oid) (namedObjects name gs)) + 1
@@ -1145,14 +1155,14 @@ renderView gs viewIs =
                 _ -> pure (ReplyType.Text (Text.pack (show recipient)))
         View.Controller -> do
           oid <- needObject
-          maybe (pure ReplyType.Null) named (fmap labelOf (Projection.controllerOf oid gs))
+          maybe (pure ReplyType.Null) (named . labelOf) (Projection.controllerOf oid gs)
         View.Result -> case GameState.result gs of
           Nothing -> pure ReplyType.Null
           Just (Result.Won pid) -> fmap (\l -> ReplyType.Object [(Text.pack "won", ReplyType.Text (Label.unwrap l))]) (labelOf pid)
           Just (Result.TeamWon team) -> pure (ReplyType.Object [(Text.pack "teamWon", ReplyType.Text (Text.pack (show team)))])
           Just Result.Drawn -> pure (ReplyType.Text (Text.pack "Drawn"))
         View.ActivePlayer -> named (labelOf (GameState.activePlayer gs))
-        View.Priority -> maybe (pure ReplyType.Null) named (fmap labelOf (GameState.priority gs))
+        View.Priority -> maybe (pure ReplyType.Null) (named . labelOf) (GameState.priority gs)
         View.Zone -> do
           pid <- needPlayer
           zone <- maybe (failWith (Failure.MkCheckFailed Nothing (Check.View viewIs) (Text.pack "this view needs a zone"))) pure (ViewIs.zone viewIs)
@@ -1176,6 +1186,15 @@ describeAction gs action = case action of
   Action.Cast oid _ _ -> fmap (Text.pack "Cast " <>) (describeObject gs oid)
   Action.Play oid _ -> fmap (Text.pack "PlayLand " <>) (describeObject gs oid)
   Action.Activate oid _ -> fmap (Text.pack "Activate " <>) (describeObject gs oid)
+  Action.ActivateManaAbility oid -> fmap (Text.pack "ActivateManaAbility " <>) (describeObject gs oid)
+  Action.TurnFaceUp oid procedure -> fmap (\named -> Text.pack "TurnFaceUp " <> named <> Text.pack (" " <> show procedure)) (describeObject gs oid)
+  Action.Unlock oid half -> fmap (\named -> Text.pack "Unlock " <> named <> Text.pack " " <> CardName.unwrap half) (describeObject gs oid)
+  Action.DiscardFromHand oid -> fmap (Text.pack "DiscardFromHand " <>) (describeObject gs oid)
+  Action.Ignore oid _ -> fmap (Text.pack "Ignore " <>) (describeObject gs oid)
+  Action.Plot oid _ -> fmap (Text.pack "Plot " <>) (describeObject gs oid)
+  Action.Foretell oid -> fmap (Text.pack "Foretell " <>) (describeObject gs oid)
+  Action.Suspend oid -> fmap (Text.pack "Suspend " <>) (describeObject gs oid)
+  Action.EndEffect oid -> fmap (Text.pack "EndEffect " <>) (describeObject gs oid)
   _ -> pure (Text.pack (show action))
 
 -- | One line per failure, naming entries in the JSON a scenario writes them in.
