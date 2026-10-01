@@ -1,0 +1,53 @@
+{
+  "description": "CR 115.7d / 707.10 Wild Ricochet re-aims the spell, then copies it",
+  "note": "Wild Ricochet: \"You may choose new targets for target instant or sorcery spell. Then copy that spell. You may choose new targets for the copy.\" bob re-aims alice's Giant Growth from her Piker to his own, and the copy is of the re-aimed spell, so his Piker takes both (2/1 to 8/7) and hers neither. Three seats, the board Redirect's cases share; bob's Honor Guard and Bogle go unnamed here.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest1" },
+          { "card": "Forest", "label": "forest2" },
+          { "card": "Forest", "label": "forest3" },
+          { "card": "Goblin Piker", "label": "alice-piker" }
+        ],
+        "hand": [{ "card": "Giant Growth", "label": "growth" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain1" },
+          { "card": "Mountain", "label": "mountain2" },
+          { "card": "Mountain", "label": "mountain3" },
+          { "card": "Mountain", "label": "mountain4" },
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" },
+          { "card": "Tomakul Honor Guard", "label": "guard" },
+          { "card": "Slippery Bogle", "label": "bogle" },
+          { "card": "Goblin Piker", "label": "bob-piker" }
+        ],
+        "hand": [
+          { "card": "Redirect", "label": "redirect" },
+          { "card": "Wild Ricochet", "label": "ricochet" }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@growth", "targets": ["@alice-piker"], "mana": ["@forest1", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "@ricochet", "targets": ["Giant Growth"], "mana": ["@mountain1", "@mountain2", "@mountain3", "@mountain4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@bob-piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseTargets": { "target": ["@bob-piker"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@bob-piker", "power": 8, "toughness": 7 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@alice-piker", "power": 2, "toughness": 1 } } }
+  ]
+}

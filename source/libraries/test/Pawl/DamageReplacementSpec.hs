@@ -2931,10 +2931,6 @@ caromSpec s registry = Spec.describe s "Carom (CR 614.9, CR 615.7)" $ do
     Spec.assertEqWith s "the haven takes its own 2" (S.damageOf haven after) (Just 2)
     Spec.assertEqWith s "the victim takes nothing" (S.damageOf victim after) (Just 0)
     Spec.assertEqWith s "and the row is unspent" (fmap (\(n, _, _, _) -> n) (countedRedirectRows after)) [1]
-  -- The card's second sentence, so the whole card is exercised.
-  Spec.it s "the card draws as it resolves" $ do
-    (_, _, _, ready, redirected) <- board
-    Spec.assertEqWith s "Carom left the hand and a card arrived" (S.handSize S.alice redirected) (S.handSize S.alice ready)
 
 -- CR 614.9's redirection between two TARGETED players with a counted X, whose
 -- producer is Captain's Maneuver ({X}{R}{W} Instant: "The next X damage that

@@ -35,6 +35,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -898,14 +899,17 @@ rewriteEffect pairs effect = case effect of
           RestrictedCreatures.Named ref -> RestrictedCreatures.Named (rewriteObjectRef pairs ref)
           RestrictedCreatures.Matching f -> RestrictedCreatures.Matching (Filter.rewrite pairs f)
      in Effect.ForbidAttack (ForbidAttack.MkForbidAttack (rewriteDuration pairs duration) rewritten aimedAt)
-  -- CR 612.1 reaches the OBJECT axis on either arm, ForbidAttack's reading, and
-  -- not its player: the defender clause of Alluring Siren's sentence is "you"
-  -- rather than any word a Filter could name.
+  -- CR 612.1 reaches the creatures on either arm, ForbidAttack's reading, and a
+  -- defender only where it names permanents: a PlayerRef prints no word a
+  -- Filter could name (Alluring Siren's "you").
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker defender) ->
     let rewritten = case attacker of
           RestrictedCreatures.Named ref -> RestrictedCreatures.Named (rewriteObjectRef pairs ref)
           RestrictedCreatures.Matching f -> RestrictedCreatures.Matching (Filter.rewrite pairs f)
-     in Effect.RequireAttack (RequireAttack.MkRequireAttack (rewriteDuration pairs duration) rewritten defender)
+        rewrittenDefender = case defender of
+          AttackTargetRef.Players _ -> defender
+          AttackTargetRef.Permanents ref -> AttackTargetRef.Permanents (rewriteObjectRef pairs ref)
+     in Effect.RequireAttack (RequireAttack.MkRequireAttack (rewriteDuration pairs duration) rewritten rewrittenDefender)
   -- CR 114.3 leaves an emblem no type line and no name, so its ABILITIES are the
   -- whole of what CR 612.1 can reach.
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)

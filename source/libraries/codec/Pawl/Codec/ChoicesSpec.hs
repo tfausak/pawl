@@ -1,5 +1,6 @@
 module Pawl.Codec.ChoicesSpec where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Choices as Choices
@@ -9,6 +10,7 @@ import qualified Pawl.Types.Choices as Choices.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.ModeIndex as ModeIndex.Type
 import qualified Pawl.Types.Reference as Reference.Type
+import qualified Pawl.Types.SlotName as SlotName.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Choices" $ do
@@ -26,5 +28,11 @@ spec s = Spec.describe s "Pawl.Codec.Choices" $ do
           Choices.Type.manaSources = Seq.fromList [Just (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "mountain"))), Nothing]
         }
       " {\"targets\":[\"@bob\"],\"modes\":[1],\"x\":3,\"costOrder\":[1,0],\"mana\":[\"@mountain\",null]} "
+  Spec.it s "targets by slot" $
+    Common.assertCodec
+      s
+      Choices.codec
+      Choices.Type.none {Choices.Type.targetsBySlot = Map.singleton (SlotName.Type.MkSlotName (Text.pack "victim")) (Seq.singleton (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))))}
+      " {\"targetsBySlot\":{\"victim\":[\"@bear\"]}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Choices.codec

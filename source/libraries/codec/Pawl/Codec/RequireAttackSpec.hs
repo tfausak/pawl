@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.RequireAttack as RequireAttack
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -22,8 +23,8 @@ spec s = Spec.describe s "Pawl.Codec.RequireAttack" $ do
       ( RequireAttack.MkRequireAttack
           { RequireAttack.duration = Duration.UntilEndOfTurn,
             RequireAttack.attacker = RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
-            RequireAttack.defender = PlayerRef.Relative PlayerRelation.You
+            RequireAttack.defender = AttackTargetRef.Players (PlayerRef.Relative PlayerRelation.You)
           }
       )
-      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"defender\":{\"type\":\"Players\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RequireAttack.codec

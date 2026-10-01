@@ -1,0 +1,30 @@
+{
+  "description": "CR 509.3e whole card: Sorrow's Path hands Serra Inquisitors a black attacker and it triggers",
+  "note": "The control for the Path-exchange case: the same board and the same declared blocks, with the Path never activated. The Inquisitors blocks only the red Hill Giant, so its trigger never fires and it stays 3/3.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Sorrow's Path", "label": "path" },
+          { "card": "Hill Giant", "label": "red", "ready": true },
+          { "card": "Bog Wraith", "label": "black", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Serra Inquisitors", "label": "inq" },
+          { "card": "Hill Giant", "label": "other" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@red", "@black"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@inq": ["@red"], "@other": ["@black"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "PowerToughness": { "object": "@inq", "power": 3, "toughness": 3 } } }
+  ]
+}

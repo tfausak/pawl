@@ -1,0 +1,31 @@
+{
+  "description": "CR 701.14a each fighter deals damage equal to its power to the other",
+  "note": "CR 701.14 through Prey Upon, whose whole card is the keyword action. The bodies make every reading of CR 701.14a differ: powers 2 against 3, so a fight that ran one blow twice or swapped the dealers reads wrong, and toughnesses 1 against 3, so exactly one creature dies and which one is the rule's answer. The fixture's own numbers are checked first. 2 on the Giant is the Piker dealing its own power; the Piker gone is the Giant's 3 back (CR 704.5g), and the Giant standing is the control.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Prey Upon", "label": "prey-upon" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@piker", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@giant", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@prey-upon", "targetsBySlot": { "mine": ["@piker"], "theirs": ["@giant"] }, "mana": ["@forest"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Damage": { "object": "@giant", "damage": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hill Giant", "count": 1 } } }
+  ]
+}

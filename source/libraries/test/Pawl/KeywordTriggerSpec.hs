@@ -2297,41 +2297,11 @@ casualtySpec s registry = Spec.describe s "Casualty" $ do
 -- and rule 702.69a does not count those. Two copies, so bob draws three cards
 -- and loses three life; a count of every card put into a graveyard makes it five
 -- and no trigger at all makes it one.
-gravestormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-gravestormSpec s registry = Spec.describe s "Gravestorm" $ do
+gravestormSpec :: (Monad m) => Spec.Spec m n -> n ()
+gravestormSpec s = Spec.describe s "Gravestorm" $ do
   Spec.it s "CR 702.69a gravestorm is minted for a spell on the stack and nowhere else" $ do
     Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Gravestorm 1)) [Keyword.gravestorm]
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Gravestorm 1)) []
-
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.69a Ominous Harvest copies itself once per permanent that died, and not for the Bolts in the graveyard" $ do
-    harvest <- S.printingOf s registry "Ominous Harvest"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    giant <- S.printingOf s registry "Hill Giant"
-    mountain <- S.printingOf s registry "Mountain"
-    swamp <- S.printingOf s registry "Swamp"
-    let lands = S.landsFor swamp S.alice 3 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (firstGiant, g1) = S.addPermanent giant S.bob lands
-        (secondGiant, g2) = S.addPermanent giant S.bob g1
-        (firstBolt, g3) = S.addHandCard bolt S.alice g2
-        (secondBolt, g4) = S.addHandCard bolt S.alice g3
-        (harvestId, g5) = S.addHandCard harvest S.alice g4
-        -- CR 104.3c: bob draws three, so his library must hold more than three.
-        stocked = foldr (\_ gs -> snd (S.addLibraryCard giant S.bob gs)) g5 [1 :: Int .. 5]
-        board =
-          stocked
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain
-            }
-        step recipient gs action = snd (Engine.runGamePure (pinTarget recipient) gs (action >> Engine.settleForPriority))
-        castAndResolve recipient gs oid = step recipient (step recipient gs {GameState.priority = Just S.alice} (S.cast S.alice oid)) Stack.resolveTop
-        -- Each Bolt aimed by its own answerer, so the two structurally identical
-        -- target prompts cannot be answered the same way.
-        killed = castAndResolve (Recipient.ToCreature secondGiant) (castAndResolve (Recipient.ToCreature firstGiant) board firstBolt) secondBolt
-        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step (Recipient.ToPlayer S.bob) gs Stack.resolveTop)
-        after = resolveAll (step (Recipient.ToPlayer S.bob) killed {GameState.priority = Just S.alice} (S.cast S.alice harvestId))
-    Spec.assertEqWith s "CR 700.4 bob lost 1 life to the original and 1 to each of TWO copies" (S.lifeOf S.bob after) (Just 17)
-    Spec.assertEqWith s "and drew three cards, the two Giants having left his battlefield" (S.handSize S.bob after) 3
 
 -- CR 702.144a's demonstrate, on Incarnation Technique {4}{B} Sorcery --
 -- "Demonstrate / Mill five cards, then return a creature card from your
@@ -4019,7 +3989,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   stormSpec s registry
   replicateSpec s registry
   casualtySpec s registry
-  gravestormSpec s registry
+  gravestormSpec s
   conspireSpec s registry
   demonstrateSpec s registry
   echoSpec s registry

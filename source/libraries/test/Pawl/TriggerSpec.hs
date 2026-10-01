@@ -24,7 +24,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -468,27 +467,12 @@ sacrificeSpec s registry =
 -- generic zone-change funnel would pass the firing case and fail only the silent
 -- one -- which is exactly the confusion #386 describes.
 --
--- THREE SEATS. The Devil fires on ANY player's sacrifice, its own controller's
--- included, so alice has to be the sacrificing player -- a two-handed board where
--- bob sacrificed would leave a wrong "opponent only" reading passing. carol is
--- the third seat, and she absorbs the Fire-Eater's damage so that the Devil's 1
--- lands alone on bob: pointing the two sources at the SAME player would let a
--- single total agree for the wrong reason.
---
--- Ghitu Fire-Eater ({T}, Sacrifice this creature: it deals damage equal to its
--- power to any target) is the sacrificing card, chosen because its cost
--- sacrifices ITSELF -- so nothing is prompted about WHICH permanent, and the
--- fixture stays free of an answerer choice that could drift.
---
--- ONE TUPLE of all three totals, per assertion. bob's exact 19 is also the
--- no-double-fire pin: an event recorded both before and after the move, or a
--- condition that matched the Moved event alongside its own, would take him to 18.
+-- The firing half is
+-- data/scenarios/trigger/cr-603-10a-mayhem-devil-fires-on-a-sacrifice-including-its.json;
+-- this group keeps its three-seat board.
 mayhemDevilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 mayhemDevilSpec s registry =
-  let -- Answers every target slot with `who`. Split across the two runs below:
-      -- the Fire-Eater's own target is chosen as the ability is ACTIVATED, and
-      -- the Devil's trigger's when the priority loop places it, so two answerers
-      -- aim the two damage sources at two different players.
+  let -- Answers every target slot with `who`.
       aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       aimAt who p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
@@ -521,23 +505,7 @@ mayhemDevilSpec s registry =
       -- fired. Event.destroy is driven the same way by the case below.
       sacrificeThen pid oid = Event.sacrifice pid oid >> Engine.priorityLoop
    in Spec.describe s "PermanentSacrificed" $ do
-        Spec.it s "CR 603.10a Mayhem Devil fires on a sacrifice, including its own controller's" $ do
-          mayhemDevil <- S.printingOf s registry "Mayhem Devil"
-          ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
-          case Face.activatedAbilities (S.combinedFace ghituFireEater) of
-            [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
-            ability : _ -> do
-              let (fireEater, gs) = board mayhemDevil ghituFireEater
-                  -- The Fire-Eater's own damage goes to carol; the cost paid here
-                  -- is the CR 701.21a sacrifice under test.
-                  activated = S.runPure (aimAt S.carol) gs (Activate.activateAbility S.alice fireEater ability)
-                  -- The Devil's trigger is gathered and placed by the loop, so its
-                  -- target is answered here -- bob, alone.
-                  after = S.runPure (aimAt S.bob) activated Engine.priorityLoop
-              Spec.assertEqWith s "everyone starts at 20" (lives gs) (Just 20, Just 20, Just 20)
-              Spec.assertBool s (not (Set.member fireEater (GameState.battlefield activated))) "the cost really sacrificed the Fire-Eater"
-              Spec.assertEqWith s "CR 701.21a: bob takes the Devil's 1, carol the Fire-Eater's 2" (lives after) (Just 20, Just 19, Just 18)
-        -- The half that makes the half above mean something. Same board, same
+        -- The half that makes the firing half mean something. Same board, same
         -- Devil, a permanent that DIES without being sacrificed: CR 700.4 makes
         -- the zone change identical, so only an engine that records the sacrifice
         -- as a sacrifice can stay silent here.

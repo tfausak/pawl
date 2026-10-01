@@ -4,6 +4,7 @@ import qualified Pawl.Codec.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -25,8 +26,8 @@ spec s = Spec.describe s "Pawl.Codec.ActiveAttackRequirement" $ do
           ActiveAttackRequirement.timestamp = Timestamp.MkTimestamp 2,
           ActiveAttackRequirement.expiry = Expiry.AtCleanup,
           ActiveAttackRequirement.attacker = RestrictedCreatures.Named (ObjectId.MkObjectId 3),
-          ActiveAttackRequirement.defender = PlayerId.MkPlayerId 4
+          ActiveAttackRequirement.defender = AttackTarget.OfPlayer (PlayerId.MkPlayerId 4)
         }
-      " {\"source\":1,\"controller\":5,\"timestamp\":2,\"expiry\":{\"type\":\"AtCleanup\"},\"attacker\":{\"type\":\"Named\",\"value\":3},\"defender\":4} "
+      " {\"source\":1,\"controller\":5,\"timestamp\":2,\"expiry\":{\"type\":\"AtCleanup\"},\"attacker\":{\"type\":\"Named\",\"value\":3},\"defender\":{\"type\":\"OfPlayer\",\"value\":4}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ActiveAttackRequirement.codec
