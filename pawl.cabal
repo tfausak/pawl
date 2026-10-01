@@ -2487,6 +2487,7 @@ library types
     Pawl.Types.TeamId
     Pawl.Types.Teams
     Pawl.Types.TheseDiscard
+    Pawl.Types.Threshold
     Pawl.Types.Timed
     Pawl.Types.Times
     Pawl.Types.Timestamp

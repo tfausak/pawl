@@ -20,11 +20,6 @@ import Pawl.Types.Claim (Claim)
 data Activations = MkActivations
   { -- | CR 118.3: how many times in a row this player could pay the cost.
     times :: Natural,
-    -- | How many of `times` the joint count may take where another source or the
-    -- paid cost contends for these claims: `times`, save 1 for a threshold claim
-    -- (Pawl.Engine.Cost.fewestReaching), whose count of objects the counting
-    -- check does not hold to the objects that reach the threshold (#4433).
-    contendedTimes :: Natural,
     -- | What one activation spends out of a pool of objects, on whichever axis it
     -- spends it (Pawl.Types.ClaimAxis): CR 701.21a's sacrifice, a discard, an
     -- exile from a graveyard, or the untapped-ness a tapping cost takes.

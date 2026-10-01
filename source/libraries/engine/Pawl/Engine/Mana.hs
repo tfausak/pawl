@@ -202,7 +202,7 @@ supplyCapacity capacity _measure pcs pid oid cost restrictions ability gs = case
 -- No activation at all: the answer a Capacity gives for a route this player
 -- cannot take.
 noActivations :: Activations.Activations
-noActivations = Activations.MkActivations {Activations.times = 0, Activations.contendedTimes = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
+noActivations = Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0, Activations.energy = 0}
 
 -- CR 105.4: a player asked to choose a color must choose one of the five;
 -- multicolored and colorless are not colors. So an any-colour producer offers
@@ -1990,6 +1990,7 @@ sourceOptions clauses admitting contends supplies =
         let claims = Activations.claims activations
             life = Activations.life activations
             energy = Activations.energy activations
+            times = Activations.times activations
             contended = contends claims
             alternatives = alternativesOf yields
             eats = not (null (ManaCost.unwrap manaCost))
@@ -1999,13 +2000,10 @@ sourceOptions clauses admitting contends supplies =
             -- shortcut below rests on a board's clauses only ever GROWING as
             -- supplies are added, which stops being true the moment an option adds
             -- a demand as well.
-            -- Activations.contendedTimes where the claims meet another group's:
-            -- the counting check below is exact for them only up to that many.
-            allowed = if not (null claims) && contended then Activations.contendedTimes activations else Activations.times activations
             counts =
               if not eats && (null claims || not contended) && life == 0 && energy == 0
-                then [allowed]
-                else [0 .. allowed]
+                then [times]
+                else [0 .. times]
             -- CR 107.4e's hybrid and CR 107.4f's Phyrexian inside a mana ability's
             -- OWN cost, resolved the way the cost being paid is: one option per
             -- resolution, so the board picks. ManaSpending.AsProduced because rule
