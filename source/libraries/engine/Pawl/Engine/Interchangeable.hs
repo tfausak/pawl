@@ -261,7 +261,7 @@ phasedOutNames row = case row of
   PhasedOut.Orphaned _under -> Set.empty
 
 -- The objects a GameState.exiledUntilMonarch row names beyond its key: none. Its
--- value is a player and a flag. Positional for phasedOutNames' reason.
+-- value is a player and an event group. Positional for phasedOutNames' reason.
 monarchWatchNames :: MonarchWatch.MonarchWatch -> Set.Set ObjectId
 monarchWatchNames watch = case watch of
   MonarchWatch.MkMonarchWatch _controller _due -> Set.empty
