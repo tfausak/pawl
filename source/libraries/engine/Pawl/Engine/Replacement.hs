@@ -1575,14 +1575,11 @@ matchesZoneOwner gs src you rel oid = relationHolds gs src you rel (fmap Object.
 -- Which permanents a pattern admits, matched through Pawl.Engine.Filter over the
 -- PROJECTED view: creature-ness (CR 205.2b / 300.2 / 613.1d, so an Opalescence'd
 -- enchantment counts) and subtype membership (CR 205.3, so Blood Moon is seen).
--- A replacement's pattern frames no player, so the perspective is Nothing.
 --
--- The SOURCE is a parameter rather than the perspective's fixed Nothing,
--- because the two atoms it decides are not the same question: CR 109.5's "you"
--- is a player and IsSource names an object, and every caller below that knows
--- which object frames the match knows it without knowing a perspective. Nothing
--- where no object frames the match, which leaves IsSource vacuously False the
--- way it was before this took a parameter.
+-- The SOURCE is a parameter of its own, apart from `you` below, because the two
+-- atoms they decide are not the same question: CR 109.5's "you" is a player
+-- and IsSource names an object. Nothing where no object frames the match, which
+-- leaves IsSource vacuously False.
 --
 -- sacrificeCandidates below is the one caller that narrows a whole battlefield
 -- with it, and Pawl.Engine.Cost, Pawl.Engine.Event and Pawl.Engine.Resolve's

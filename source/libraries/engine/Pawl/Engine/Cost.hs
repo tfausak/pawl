@@ -538,10 +538,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- CR 601.2h. Rule 701.21a is also why the criterion states no
               -- control clause -- "a player can't sacrifice ... something that's a
               -- permanent they don't control", which that pool is already the
-              -- caster's. Filter.ControlledBy could not say it anyway:
-              -- Replacement.matchesPermanent asks every sacrifice criterion with NO
-              -- perspective, in every zone, so that atom is vacuously False there
-              -- whatever the criterion is on.
+              -- caster's, so a ControlledBy atom would only repeat it.
               emerged =
                 let victims criterion =
                       Maybe.mapMaybe
@@ -2415,11 +2412,11 @@ evidenceValue candidate gs = Maybe.fromMaybe 0 (Filter.manaValue (Projection.vie
 -- component on `oid`: every battlefield object matching the criterion, ascending.
 --
 -- NOT Replacement.sacrificeCandidates, and the difference is the CONTEXT: that
--- one matches with no perspective and pre-narrows to `Projection.controls pid`,
--- where CR 702.122a's criterion needs the atoms that throws away. So the
--- perspective is the PAYER and the source is the permanent whose ability is being
--- paid for -- without it a Vehicle that has already become a creature could crew
--- itself.
+-- one pre-narrows to `Projection.controls pid` and applies CR 101.2's sacrifice
+-- restrictions, where this one carries CR 702.122d's prohibition and the source's
+-- colours (CR 702.78a). Both read the PAYER as "you" and the permanent
+-- whose ability is being paid for as the source -- without it a Vehicle that has
+-- already become a creature could crew itself.
 tapCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 tapCandidates slots pid oid criterion gs =
   let -- CR 702.122d's prohibition rides the CONTEXT rather than narrowing the
