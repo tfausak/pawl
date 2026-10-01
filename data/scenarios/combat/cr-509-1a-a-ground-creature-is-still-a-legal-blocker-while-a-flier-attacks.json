@@ -1,0 +1,83 @@
+{
+  "description": "CR 509.1a a ground creature is still a legal blocker while a flier attacks",
+  "note": "Combat.legalBlockers is read through the block prompt itself: bob is asked to declare blockers only because the Piker is a legal blocker (a board with no legal blocker skips the prompt and the run fails), and the refused block shows it still cannot block the flier.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bird Maiden",
+            "label": "bird-maiden",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$bird-maiden"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$bird-maiden",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "refuse": {
+        "Block": {
+          "Goblin Piker": [
+            "$bird-maiden"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {}
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "check": {
+        "Blockers": {
+          "attacker": "$bird-maiden",
+          "blockers": null
+        }
+      }
+    }
+  ]
+}

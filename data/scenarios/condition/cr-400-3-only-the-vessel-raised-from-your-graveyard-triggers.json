@@ -1,0 +1,253 @@
+{
+  "description": "CR 400.3 only the Vessel raised from YOUR graveyard triggers",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-5",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-6",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-7",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-8",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-9",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rise of the Dark Realms",
+            "label": "rise-of-the-dark-realms",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Archfiend's Vessel"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Archfiend's Vessel"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OrderTimestamps",
+          "with": [
+            0,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$rise-of-the-dark-realms",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$swamp-4",
+            "$swamp-5",
+            "$swamp-6",
+            "$swamp-7",
+            "$swamp-8",
+            "$swamp-9"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Archfiend's Vessel",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Demon Token",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Rise of the Dark Realms",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Archfiend's Vessel",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Rise of the Dark Realms",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Archfiend's Vessel",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Archfiend's Vessel",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Archfiend's Vessel",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Archfiend's Vessel",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Demon Token",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Demon Token",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Demon Token",
+        "power": 5,
+        "toughness": 5
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Exile",
+        "card": "Archfiend's Vessel",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Exile",
+        "card": "Archfiend's Vessel",
+        "count": 0
+      }
+    },
+    {
+      "View": {
+        "of": "Controller",
+        "object": "Archfiend's Vessel",
+        "is": "alice"
+      }
+    },
+    {
+      "View": {
+        "of": "Colors",
+        "object": "Demon Token",
+        "is": [
+          "Black"
+        ]
+      }
+    },
+    {
+      "Subtypes": {
+        "object": "Demon Token",
+        "subtypes": [
+          "Demon"
+        ]
+      }
+    },
+    {
+      "Keywords": {
+        "object": "Demon Token",
+        "keyword": {
+          "type": "Flying"
+        },
+        "count": 1
+      }
+    }
+  ]
+}

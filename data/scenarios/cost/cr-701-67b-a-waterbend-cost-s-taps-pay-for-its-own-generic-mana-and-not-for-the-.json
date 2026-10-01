@@ -1,0 +1,195 @@
+{
+  "description": "CR 701.67b a waterbend cost's taps pay for its own generic mana and not for the tax on top of it",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Geyser Leaper",
+            "label": "geyser-leaper",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-2",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-3",
+            "ready": true
+          },
+          {
+            "card": "Crawlspace",
+            "label": "crawlspace",
+            "ready": true
+          },
+          {
+            "card": "Crawlspace",
+            "ready": true
+          },
+          {
+            "card": "Crawlspace",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Suppression Field",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTaps",
+          "with": [
+            "$goblin-piker",
+            "$goblin-piker-2",
+            "$goblin-piker-3",
+            "$crawlspace"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$geyser-leaper",
+          "ability": 0,
+          "cost": [
+            {
+              "type": "Generic",
+              "value": 2
+            }
+          ],
+          "mana": [
+            "$mountain",
+            "$mountain-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Mountain",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Mountain",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$crawlspace",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$geyser-leaper",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Crawlspace#2",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Crawlspace#3",
+        "tapped": false
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": [
+          "Mountain#4"
+        ]
+      }
+    }
+  ]
+}

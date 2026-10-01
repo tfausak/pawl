@@ -1,0 +1,242 @@
+{
+  "description": "CR 702.51c the entry trigger grows the creatures that convoked the Loxodon, and nothing else",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-2",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-3",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker-4",
+            "ready": true
+          },
+          {
+            "card": "Palace Guard",
+            "label": "palace-guard",
+            "ready": true
+          },
+          {
+            "card": "Giant Spider",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Venerated Loxodon",
+            "label": "venerated-loxodon",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTaps",
+          "with": [
+            "$goblin-piker",
+            "$goblin-piker-2",
+            "$goblin-piker-3",
+            "$goblin-piker-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$venerated-loxodon",
+          "cost": [],
+          "costOrder": [
+            0,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Venerated Loxodon",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Venerated Loxodon",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker-2",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker-2",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker-2",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker-3",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker-3",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker-3",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker-4",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker-4",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$goblin-piker-4",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$palace-guard",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$palace-guard",
+        "power": 2,
+        "toughness": 5
+      }
+    },
+    {
+      "Counters": {
+        "object": "$palace-guard",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Venerated Loxodon",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Venerated Loxodon",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Venerated Loxodon",
+        "power": 4,
+        "toughness": 4
+      }
+    },
+    {
+      "Counters": {
+        "object": "Giant Spider",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}
