@@ -1,0 +1,30 @@
+{
+  "description": "CR 805.10a a teammate's tokens enter attacking",
+  "note": "CR 805.10a / 506.3b: bob is an attacking player, so tokens he is told to put onto the battlefield attacking do attack. Hanweir Garrison: \"Whenever this creature attacks, create two 1/1 red Human creature tokens that are tapped and attacking.\" Control: without the option the Garrison is not offered, so nobody is asked to declare.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Hanweir Garrison", "label": "garrison", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } }
+  ]
+}

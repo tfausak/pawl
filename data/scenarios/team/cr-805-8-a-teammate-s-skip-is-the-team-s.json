@@ -1,0 +1,63 @@
+{
+  "description": "CR 805.8 a teammate's skip is the team's",
+  "note": "Fatigue: \"Target player skips their next draw step.\" Under shared team turns a skip naming bob is his team's (CR 805.8), so Fatigue aimed at him takes the draw step of alice's team's next turn from both alice and bob. The control casts nothing and both draw. Hands are read at that turn's upkeep and again in its main phase.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          { "card": "Island", "label": "island1" },
+          { "card": "Island", "label": "island2" }
+        ],
+        "hand": [{ "card": "Fatigue", "label": "fatigue" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fatigue", "targets": ["@bob"], "mana": ["@island1", "@island2"] } } },
+    { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 0 } } },
+    { "turn": 3, "step": "Upkeep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Island", "count": 0 } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 0 } } },
+    { "turn": 3, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Island", "count": 0 } } }
+  ]
+}

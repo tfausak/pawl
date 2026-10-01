@@ -1,0 +1,58 @@
+{
+  "description": "CR 805.4b each player on the active team untaps and draws",
+  "note": "Alice and bob against carol and dave, so bob is an active player on alice's turn under shared team turns (CR 805.4b / 502.3): he untaps and draws in it, while carol does neither. The control drops the option and bob does neither. Four cards per library keep anyone from decking.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Island", "label": "bobs", "tapped": true }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [{ "card": "Island", "label": "carols", "tapped": true }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Untap"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Island", "count": 0 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Hand", "card": "Island", "count": 0 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Tapped": { "object": "@bobs", "tapped": true } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Tapped": { "object": "@carols", "tapped": true } } }
+  ]
+}

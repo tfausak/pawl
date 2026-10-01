@@ -1,0 +1,41 @@
+{
+  "description": "CR 801.7 a delayed triggered ability does not trigger outside its controller's range",
+  "note": "Four seats at range 1, so carol sits two seats from alice. alice's False Cure arms a delayed trigger for the turn; carol's Radiant Fountain then gains her 2, which CR 801.7 keeps from triggering it. Played on carol's turn so her land can enter after the instant resolves; the Haskell test staged the entry instead. The control drops the ranges and she loses 4.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "range": 1,
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true }
+        ],
+        "hand": [{ "card": "False Cure", "label": "false-cure" }]
+      },
+      {
+        "name": "bob",
+        "range": 1
+      },
+      {
+        "name": "carol",
+        "range": 1,
+        "hand": [{ "card": "Radiant Fountain", "label": "fountain" }]
+      },
+      {
+        "name": "dave",
+        "range": 1
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@false-cure", "mana": ["@swamp", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "PlayLand": "@fountain" } }
+  ],
+  "final": [
+    { "Life": { "player": "carol", "life": 22 } }
+  ]
+}

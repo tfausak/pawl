@@ -1,0 +1,40 @@
+{
+  "description": "CR 801.7 a triggered ability does not trigger on a player outside its controller's range",
+  "note": "The control for the range-1 file: the same board at an unlimited range, where carol's payment triggers alice's Exquisite Blood and she gains 2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Exquisite Blood", "label": "blood" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Swamp", "label": "bobs-swamp", "ready": true },
+          { "card": "Greed", "label": "bobs-greed" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          { "card": "Swamp", "label": "carols-swamp", "ready": true },
+          { "card": "Greed", "label": "carols-greed" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "dave"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "Activate": { "object": "@carols-greed", "mana": ["@carols-swamp"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "carol", "life": 18 } },
+    { "Life": { "player": "alice", "life": 22 } }
+  ]
+}

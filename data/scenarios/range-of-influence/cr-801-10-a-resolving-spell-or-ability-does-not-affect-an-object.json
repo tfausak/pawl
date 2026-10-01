@@ -1,0 +1,45 @@
+{
+  "description": "CR 801.10 a resolving spell or ability does not affect an object or player outside its controller's range",
+  "note": "Every seat at range 1: alice's Day of Judgment destroys bob's Goblin Piker, one seat away, but not carol's, two seats away. Her own Zulaport Cutthroat dies with it, and its trigger costs bob 1 but carol nothing. The -unlimited file is the same board at an unlimited range.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "range": 1,
+        "battlefield": [
+          { "card": "Plains", "label": "plains-1" },
+          { "card": "Plains", "label": "plains-2" },
+          { "card": "Plains", "label": "plains-3" },
+          { "card": "Plains", "label": "plains-4" },
+          { "card": "Zulaport Cutthroat", "label": "cutthroat" }
+        ],
+        "hand": [{ "card": "Day of Judgment", "label": "judgment" }]
+      },
+      {
+        "name": "bob",
+        "range": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "bobs-piker" }]
+      },
+      {
+        "name": "carol",
+        "range": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "carols-piker" }]
+      },
+      {
+        "name": "dave",
+        "range": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@judgment", "mana": ["@plains-1", "@plains-2", "@plains-3", "@plains-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } }
+  ]
+}

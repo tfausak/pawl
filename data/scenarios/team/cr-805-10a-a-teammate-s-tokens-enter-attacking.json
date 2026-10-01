@@ -1,0 +1,36 @@
+{
+  "description": "CR 805.10a a teammate's tokens enter attacking",
+  "note": "CR 805.10a / 506.3b: bob is an attacking player, so tokens he is told to put onto the battlefield attacking do attack. Hanweir Garrison: \"Whenever this creature attacks, create two 1/1 red Human creature tokens that are tapped and attacking.\" The Garrison and both Humans deal carol 4.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Hanweir Garrison", "label": "garrison", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@garrison"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@garrison" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "OrderTimestamps": ["Human Token", "Human Token#2"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseAttackTarget": "@carol" }, "source": "Human Token" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseAttackTarget": "@carol" }, "source": "Human Token#2" },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 16 } } }
+  ]
+}

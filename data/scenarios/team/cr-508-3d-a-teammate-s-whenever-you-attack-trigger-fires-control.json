@@ -1,0 +1,30 @@
+{
+  "description": "CR 508.3d a teammate's whenever-you-attack trigger fires",
+  "note": "The control: without shared team turns bob is not an attacking player on alice's turn, so his Prankster neither attacks nor triggers and carol stays at 20.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Boggart Prankster", "label": "prankster", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "description": "CR 805.10c melee counts the teammate's own opponents",
+  "note": "CR 805.10c / 702.121a: melee counts the opponents YOU attacked. Bob's Wings of the Guard (1/1 flying, melee) attack carol; alice's Piker attacks carol too in this leg, and the Wings are 2/2 as in the other: carol takes 4.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Wings of the Guard", "label": "wings", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker", "@wings"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@piker" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@wings" },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 16 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "dave", "life": 20 } } }
+  ]
+}

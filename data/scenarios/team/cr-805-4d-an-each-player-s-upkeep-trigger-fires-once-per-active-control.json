@@ -1,0 +1,58 @@
+{
+  "description": "CR 805.4d an each-player's-upkeep trigger fires once per active teammate",
+  "note": "Elkin Lair: \"At the beginning of each player's upkeep, that player exiles a card at random from their hand. The player may play that card this turn. At the beginning of the next end step, if the player hasn't played the card, they put it into their graveyard.\" Under shared team turns it triggers once per active player (CR 805.4d); carol controls it, so \"that player\" is neither her nor only the seat the turn began with. Each hand holds one card, so the random pick is forced, and nobody plays it. The control drops the option and only alice loses her card.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "hand": [{ "card": "Island" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "hand": [{ "card": "Island" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [{ "card": "Elkin Lair", "label": "lair" }],
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Untap"
+  },
+  "timeline": [
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Island", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Island", "count": 0 } } }
+  ]
+}
