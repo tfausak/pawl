@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
@@ -63,16 +64,18 @@ import qualified Pawl.Types.Zone as Zone
 -- reading, so a card with no mana cost has an unpayable one (CR 118.6). Two
 -- equal costs are one: nothing tells the actions apart.
 --
--- Read off the CARD (Card.combined) and never a projection, the reading
--- Pawl.Engine.Action.discardableCards gives for CR 116.2e one rule over: the
--- ability functions in a hand or a library, where this reader takes the printed
--- card (#1859). A member with no card behind it has no plot cost.
+-- The card's own plot ability is read through the projection (CR 613.1f),
+-- Pawl.Engine.Suspend.suspendOf's reading: it functions in a hand or a library,
+-- and an effect may take it away there (Patriar's Humiliation).
+-- Pawl.SpecialActionSpec's "CR 613.1f a Djinn of Fool's Fall that perpetually
+-- lost all abilities cannot be plotted" proves it. A member with no card behind
+-- it has no plot cost.
 plotCostsOf :: PlayerId -> ObjectId -> GameState -> [Cost Keyword]
 plotCostsOf pid oid gs = case Game.cardOfHandMember oid gs of
   Nothing -> []
   Just card ->
     let face = Card.combined card
-        printed = Maybe.maybeToList (Keyword.plotCost (Face.keywordSet face))
+        own = Maybe.maybeToList (Keyword.plotCost (Map.keysSet (Projection.keywordsOf oid gs)))
         granted = Cost.Type.MkCost (Face.manaCost face) []
         inHand = elem oid (Game.zoneMembers Zone.Hand pid gs)
         fromPile =
@@ -81,7 +84,7 @@ plotCostsOf pid oid gs = case Game.cardOfHandMember oid gs of
             | (zone, owner) <- PlayerEffect.plotPiles pid gs,
               elem oid (Cast.pileCandidates zone owner gs)
             ]
-     in ListUtils.nubOrd ((if inHand then printed else []) <> (if fromPile then printed <> [granted] else []))
+     in ListUtils.nubOrd ((if inHand then own else []) <> (if fromPile then own <> [granted] else []))
 
 -- CR 702.170a / 116.2k: may this player plot this card for this cost right now?
 -- Three conjuncts, each a clause of the rule:
