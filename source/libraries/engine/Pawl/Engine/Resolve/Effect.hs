@@ -1565,9 +1565,9 @@ offerCastOnce context named caster optionality verb retake offer = do
         | verb == PermissionVerb.Play && Cast.landDropOpen caster gs =
             [ (oid, mName, Face.name face)
             | oid <- named,
+              not (PlayerEffect.prohibitsPlayingLand caster oid gs),
               Just obj <- [Game.lookupObject oid gs],
               Just card <- [Game.cardOf oid gs],
-              not (PlayerEffect.prohibitsPlayingLand caster (Game.copiableNamesOf obj card) oid gs),
               (mName, face) <- Game.landFacesOf obj card
             ]
         | otherwise = []
@@ -8584,7 +8584,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- (Oracle text, Scryfall, 2026-09-06). Either card would refute this.
   --
   -- Written to the SOURCE and not to `resolving`: Pawl.Engine.PlayerEffect
-  -- .chosenNamesOf and the resolution's own context both ask about a source (CR
+  -- .contextFor and the resolution's own context both ask about a source (CR
   -- 113.7), and for a spell the two ids are the same object anyway.
   --
   -- Not implemented: SEVERAL choosers of ONE instruction kept apart. Their

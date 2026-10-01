@@ -118,7 +118,7 @@ data LastKnown = MkLastKnown
     -- CR 611.2c effect whose source chose a name and then left the zone it was
     -- expected to be in: Conjurer's Ban chooses during its own resolution and is
     -- in a graveyard by the time the prohibition it stored is first read
-    -- (Pawl.Engine.PlayerEffect.chosenNamesOf).
+    -- (Pawl.Engine.SourceContext.withChoicesOf).
     --
     -- Not a characteristic either -- CR 109.3's list has no chosen name -- and
     -- not recoverable from `characteristics` or `copiable`, since choosing a name

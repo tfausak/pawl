@@ -82,14 +82,13 @@ import qualified Pawl.Types.Zone as Zone
 -- of its names": no printed land has two, but the prohibition is a membership
 -- test rather than a comparison all the same.
 --
--- The OBJECT goes with the names, because CR 305.1's prohibition may also narrow
--- by a quality a Filter states (City in a Bottle) -- read against the card as
--- this zone shows it, which is the same face the name above is taken from.
+-- Both are one Filter read against the OBJECT as this zone shows it
+-- (Filter.HasChosenName for Null Chamber, City in a Bottle's names beside it).
 playableLands :: PlayerId -> GameState -> [(ObjectId, Maybe CardName.CardName)]
 playableLands pid gs =
   let playable oid = case (Game.lookupObject oid gs, Game.cardOfHandMember oid gs) of
         (Just obj, Just card) ->
-          if PlayerEffect.prohibitsPlayingLand pid (Game.copiableNamesOf obj card) oid gs
+          if PlayerEffect.prohibitsPlayingLand pid oid gs
             then []
             else fmap (\(mName, _) -> (oid, mName)) (Game.landFacesOf obj card)
         _ -> []
