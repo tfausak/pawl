@@ -12,6 +12,7 @@ module Pawl.ReplacementSpec where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -40,15 +41,19 @@ import Pawl.PreventionSpec (aimObject, answersFor, blightAnswer, blueBoard, cast
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -69,8 +74,12 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -78,6 +87,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -1154,6 +1164,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   fixedEntryCostSpec s registry
   warLeechSpec s registry
   faerieSquadronSpec s registry
+  degavolverSpec s registry
   grifterBladeSpec s registry
   hyenaUmbraSpec s registry
   darkblastSpec s registry
@@ -1285,6 +1296,108 @@ faerieSquadronSpec s registry = Spec.describe s "Faerie Squadron" $ do
             Spec.assertBool s (Projection.hasKeyword Keyword.Flying origId after) "and the original still has the flying it entered with"
           tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
       other -> Spec.assertFailure s ("expected one Squadron, got " <> show (length other))
+
+-- Degavolver {1}{W} Creature -- Volver 1/1, whole text: "Kicker {1}{B} and/or {R}
+-- ... If this creature was kicked with its {1}{B} kicker, it enters with two
+-- +1/+1 counters on it and with 'Pay 3 life: Regenerate this creature.' If this
+-- creature was kicked with its {R} kicker, it enters with a +1/+1 counter on it
+-- and with first strike." (oracle checked on Scryfall)
+--
+-- CR 614.1c's enters-with clause granting a QUOTED ability: the same
+-- stored layer-6 grant Faerie Squadron's flying takes, carrying a
+-- GrantedAbility.Activated.
+--
+-- THE BOARD: three Plains, a Swamp and a Mountain -- {1}{W} plus both kickers --
+-- so the cases differ in the kicker answers and in nothing else.
+degavolverBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+degavolverBoard plains swamp mountain degavolver =
+  S.handOne degavolver (S.landsFor mountain S.alice 1 (S.landsFor swamp S.alice 1 (S.landsInPlay plains 3)))
+
+degavolversOut :: GameState.GameState -> [ObjectId.ObjectId]
+degavolversOut gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack "Degavolver")) o gs) (Set.toList (GameState.battlefield gs))
+
+-- CR 702.33f: kicks exactly the one kicker cost `wanted`, told apart by the Cost
+-- the prompt carries.
+kicksOnly :: Cost.Type.Cost Keyword.Keyword -> Prompt.Prompt r -> r
+kicksOnly wanted p = case p of
+  Prompt.ChooseKicker _ _ _ keyword _ -> KickerDecision.MkKickerDecision (if keyword == Keyword.Kicker wanted then 1 else 0)
+  _ -> S.identityAnswer p
+
+blackKicker :: Cost.Type.Cost Keyword.Keyword
+blackKicker = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)]), Cost.Type.components = []}
+
+redKicker :: Cost.Type.Cost Keyword.Keyword
+redKicker = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]), Cost.Type.components = []}
+
+castDegavolver :: Cost.Type.Cost Keyword.Keyword -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castDegavolver wanted gs spellId =
+  let cast = snd (Engine.runGamePure (kicksOnly wanted) gs (S.cast S.alice spellId))
+   in snd (Engine.runGamePure (kicksOnly wanted) cast (Stack.resolveTop >> Engine.settleForPriority))
+
+-- The permanent's projected activated abilities: what it HAS, printed or granted.
+activatedOf :: ObjectId.ObjectId -> GameState.GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
+activatedOf oid gs = ProjectedCharacteristics.activatedAbilities (Projection.project oid gs)
+
+degavolverSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+degavolverSpec s registry = Spec.describe s "Degavolver" $ do
+  -- Every activated ability the permanent has is activated and resolved, then it
+  -- is destroyed. Printed, it has none, so a grant that did not land leaves
+  -- nothing to activate and the destruction goes through: the survival read
+  -- FIRST is the gameplay half, the life total the cost's.
+  Spec.it s "CR 614.1c kicked with {1}{B}, it enters with 'Pay 3 life: Regenerate this creature.' and uses it" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    degavolver <- S.printingOf s registry "Degavolver"
+    let (board, spellId) = degavolverBoard plains swamp mountain degavolver
+        entered = castDegavolver blackKicker board spellId
+    case degavolversOut entered of
+      [permId] -> do
+        let shielded = S.runPure S.identityAnswer entered (Foldable.for_ (activatedOf permId entered) $ \ability -> Activate.activateAbility S.alice permId ability >> Stack.resolveTop)
+            destroyed = S.settleSba (S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [permId]))
+        Spec.assertBool s (Set.member permId (GameState.battlefield destroyed)) "CR 701.19a the granted ability's shield regenerated it"
+        Spec.assertEqWith s "CR 119.4 paying 3 life for it" (S.lifeOf S.alice destroyed) (Just 17)
+        Spec.assertEqWith s "and the counter half placed two +1/+1 counters" (S.powerToughnessOf permId entered) (Just (3, 3))
+      other -> Spec.assertFailure s ("expected one Degavolver, got " <> show (length other))
+  -- The other kicker alone: its row applies and the {1}{B} row does not, so the
+  -- permanent has first strike and no activated ability.
+  Spec.it s "CR 702.33f kicked with {R} only, first strike and no quoted ability" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    degavolver <- S.printingOf s registry "Degavolver"
+    let (board, spellId) = degavolverBoard plains swamp mountain degavolver
+        entered = castDegavolver redKicker board spellId
+    case degavolversOut entered of
+      [permId] -> do
+        Spec.assertEqWith s "CR 604.2 the {1}{B} row did not apply: no activated ability" (length (activatedOf permId entered)) 0
+        Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike permId entered) "CR 614.1c it has first strike"
+        Spec.assertEqWith s "and one +1/+1 counter" (S.powerToughnessOf permId entered) (Just (2, 2))
+      other -> Spec.assertFailure s ("expected one Degavolver, got " <> show (length other))
+  -- CR 707.2: "with '...'" sets no power and toughness, so the grant is not a
+  -- copiable value -- a token copy of the kicked Degavolver has no activated
+  -- ability, where the original keeps its one. The Islands for Rite of
+  -- Replication are added after the entry, so they cannot pay for it.
+  Spec.it s "CR 707.2 a token copy of the kicked Degavolver does not have the quoted ability" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    degavolver <- S.printingOf s registry "Degavolver"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (board, spellId) = degavolverBoard plains swamp mountain degavolver
+        entered = castDegavolver blackKicker board spellId
+        (riteId, withRite) = S.addHandCard rite S.alice (S.landsFor island S.alice 4 entered)
+    case degavolversOut entered of
+      [origId] -> do
+        let cast = snd (Engine.runGamePure (riteAt origId) withRite (S.cast S.alice riteId))
+            after = snd (Engine.runGamePure (riteAt origId) cast (Stack.resolveTop >> Engine.settleForPriority))
+        case Set.toList (Set.difference (Set.fromList (degavolversOut after)) (Set.singleton origId)) of
+          [tokenId] -> do
+            Spec.assertEqWith s "CR 707.2 the token copy has no activated ability" (length (activatedOf tokenId after)) 0
+            Spec.assertEqWith s "and the original still has the one it entered with" (length (activatedOf origId after)) 1
+          tokens -> Spec.assertFailure s ("expected exactly one token copy, got " <> show (length tokens))
+      other -> Spec.assertFailure s ("expected one Degavolver, got " <> show (length other))
 
 -- Monstrous War-Leech {3}{B} Creature -- Leech Horror \*/*, whole text: "Kicker
 -- {U}. As this creature enters, if it was kicked, mill four cards. Monstrous

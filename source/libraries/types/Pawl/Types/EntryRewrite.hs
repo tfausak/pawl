@@ -77,9 +77,10 @@ data EntryRewrite ability effect
     -- lore counter).
     WithCounters WithCounters.WithCounters
   | -- | CR 614.1c / Faerie Squadron: "[This permanent] enters with [counters] ...
-    -- and with [keywords]", one printed sentence as ONE row -- the counter half
-    -- rides in the payload rather than in a WithCounters row beside it, which CR
-    -- 616.1 would count as a second replacement effect and offer an order for.
+    -- and with [keywords or quoted abilities]", one printed sentence as ONE row
+    -- -- the counter half rides in the payload rather than in a WithCounters row
+    -- beside it, which CR 616.1 would count as a second replacement effect and
+    -- offer an order for.
     --
     -- Granted as a stored CR 611.2 continuous effect with CR 611.2a's
     -- rest-of-the-game duration, which is where riot's own grant lands and for
@@ -91,10 +92,10 @@ data EntryRewrite ability effect
     -- of the kicked Squadron has neither the flying nor the counters" is what
     -- proves the two apart.
     --
-    -- Not implemented: the same clause granting a whole quoted ability rather
-    -- than a keyword -- Degavolver's "Pay 3 life: Regenerate this creature"
-    -- (#3006).
-    EntersWith EntersWith.EntersWith
+    -- A quoted ability rides the same payload and lands the same way, as a
+    -- stored layer-6 grant (Degavolver's "with 'Pay 3 life: Regenerate this
+    -- creature.'"); Pawl.ReplacementSpec's Degavolver group proves it.
+    EntersWith (EntersWith.EntersWith ability)
   | -- | CR 616.1b / Gather Specimens: the object enters under the control of the
     -- effect's source's controller, written to Object.enteredUnder.
     UnderSourceControl
