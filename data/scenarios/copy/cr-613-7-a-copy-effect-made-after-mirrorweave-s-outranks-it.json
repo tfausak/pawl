@@ -1,0 +1,52 @@
+{
+  "description": "CR 613.7 a copy effect made after Mirrorweave's outranks it (Dimir Doppelganger)",
+  "note": "Alice activates Dimir Doppelganger at a Hill Giant card in her graveyard and, in response, casts Mirrorweave at her Goblin Piker. Mirrorweave's copy is made first (the Doppelganger is the Piker's 2/1 under it alone), and the ability's copy after it, so layer 1 leaves the Hill Giant now, not only after cleanup (CR 613.7). A Clone entering after both copies the Doppelganger's copiable values, the Hill Giant's. Distinct printed pairs: the Doppelganger's 0/2, the Piker's 2/1, the Giant's 3/3, the Clone's 0/0.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "piker" },
+          { "card": "Dimir Doppelganger", "label": "doppelganger" },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Swamp", "ready": true }
+        ],
+        "hand": [
+          { "card": "Mirrorweave", "label": "mirrorweave" },
+          { "card": "Clone", "label": "clone" }
+        ],
+        "graveyard": [{ "card": "Hill Giant", "label": "giant" }]
+      },
+      {
+        "name": "bob",
+        "library": [{ "card": "Island" }, { "card": "Island" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@doppelganger", "targets": ["@giant"], "mana": ["Island", "Island#2", "Swamp", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@mirrorweave", "targets": ["@piker"], "mana": ["Island#3", "Island#4", "Island#5", "Island#6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@doppelganger", "power": 2, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@doppelganger", "power": 3, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "@doppelganger", "names": ["Hill Giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@clone", "mana": ["Island#7", "Island#8", "Island#9", "Island#10"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "@doppelganger" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 3, "toughness": 3 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "Clone", "power": 3, "toughness": 3 } } },
+    { "turn": 2, "step": "Upkeep", "player": "alice", "check": { "PowerToughness": { "object": "@doppelganger", "power": 3, "toughness": 3 } } }
+  ]
+}

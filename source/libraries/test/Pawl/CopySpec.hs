@@ -243,22 +243,6 @@ copyNamedKeepingFirstLegend wanted p = case p of
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   _ -> copyNamed wanted p
 
--- copyNamed with CR 601.2b's announcement answered: Altered Ego's {X} is chosen
--- as the spell is cast, and CR 107.3m is what carries that number to the entry
--- replacement. Pinned to one value, copyNamed's reason -- an answerer taking the
--- maximum would follow the mana rather than the test.
-copyNamedAnnouncing :: Natural.Natural -> ObjectId -> Prompt.Prompt r -> r
-copyNamedAnnouncing x wanted p = case p of
-  Prompt.ChooseX {} -> x
-  _ -> copyNamed wanted p
-
--- The declining half of the pair above: the same announcement, and the copy
--- refused.
-declineAnnouncing :: Natural.Natural -> Prompt.Prompt r -> r
-declineAnnouncing x p = case p of
-  Prompt.ChooseX {} -> x
-  _ -> declineCopy p
-
 copyNewest :: Prompt.Prompt r -> r
 copyNewest p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> newest legal
@@ -306,22 +290,6 @@ aimByFiltering oid p = case p of
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   _ -> S.identityAnswer p
-
--- CR 302.6: a permanent that entered this turn has not been under its
--- controller's control continuously since their turn began. Written by hand
--- because S.spellOnStack records Sickness.Settled, so the permanent a resolution
--- makes out of it would otherwise be able to attack with no haste at all -- and
--- asserted on the board before the attack, since Dack's Duplicate's haste half
--- rests on it.
-sickened :: ObjectId -> GameState.GameState -> GameState.GameState
-sickened oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
-
--- Distinct life totals, so no reading of "the player with the most life" (CR
--- 702.105a) is reached by a coincidence: bob is ahead and is the one attacked.
-withLives :: Integer -> Integer -> GameState.GameState -> GameState.GameState
-withLives a b gs =
-  let at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
-   in gs {GameState.players = at S.alice a (at S.bob b (GameState.players gs))}
 
 -- S.combatBoardOf's placement, applied to a board a resolution built rather than
 -- a fixture: alice active in the declare attackers step, with bob already the
@@ -850,80 +818,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the excepted copy does not" (S.powerToughnessOf gargantuanId later) $ Just (7, 7)
       _ -> Spec.assertFailure s "the Clone and the Gargantuan should both be on the battlefield"
 
-  -- THE PROVING TEST for WHERE the exception lands: in the copy's own COPIABLE
-  -- values (CR 707.9b), not in a CR 613 layer over them. A token copy of the
-  -- Gargantuan reads the copiable values (CR 707.2), so it is a Tarmogoyf at 7/7
-  -- that ignores the graveyards. Had the exception been layered on the object
-  -- instead, the token would have copied the Goyf's CDA and read 1/2, then 2/3;
-  -- had the token fallen back on its own printed card it would be 7/7 but named
-  -- Quicksilver Gargantuan. The name and the pair together separate all three.
-  --
-  -- The Goyf is BOB's, so the Gargantuan is the Counterpart's only legal target
-  -- ("target creature you control").
-  Spec.it s "a token copy of an excepted copy keeps the exception (CR 707.9b)" $ do
-    island <- S.printingOf s registry "Island"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
-    gargantuan <- S.printingOf s registry "Quicksilver Gargantuan"
-    piker <- S.printingOf s registry "Goblin Piker"
-    counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let (_, withBolt) = S.addGraveyardCard lightningBolt S.alice (S.landsInPlay island 3)
-        (goyfId, board) = S.addPermanent tarmogoyf S.bob withBolt
-        (_, staged) = S.spellOnStack gargantuan S.alice board
-        withGargantuan = resolveAndSettle (copyNamed goyfId) staged
-        resolved = castAndResolve declineCopy counterpart withGargantuan
-        (_, later) = S.addGraveyardCard piker S.bob resolved
-    case tokensOnBattlefield resolved of
-      [tokenId] -> do
-        Spec.assertEqWith s "the token is named for the Goyf, not the Gargantuan" (Projection.namesOf tokenId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Tarmogoyf"
-        Spec.assertEqWith s "and is 7/7, the excepted value" (S.powerToughnessOf tokenId resolved) $ Just (7, 7)
-        Spec.assertEqWith s "the Goyf itself moves with the graveyards" (S.powerToughnessOf goyfId later) $ Just (2, 3)
-        Spec.assertEqWith s "the token does not" (S.powerToughnessOf tokenId later) $ Just (7, 7)
-      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
-  -- THE PROVING TEST for CR 707.9a, the exception that makes the copy GAIN an
-  -- ability. Dack's Duplicate {2}{U}{R} Creature -- Shapeshifter 0/0: "You may
-  -- have this creature enter as a copy of any creature on the battlefield,
-  -- except it has haste and dethrone."
-  --
-  -- Both keywords are read at GAMEPLAY level in one attack: without haste (CR
-  -- 702.10b) the copy could not be declared at all, and dethrone (CR 702.105a)
-  -- is the +1/+1 counter it takes for attacking the player with the most life.
-  -- So 3/2 is "both arrived" and 2/1 is "at least one did not" -- the case
-  -- cannot say which, both keywords riding one Set.
-  --
-  -- A CLONE copying the SAME Piker is the control: the copy without the
-  -- exception, entering the same turn, equally sick. It cannot attack and takes
-  -- no counter, which is what separates the exception from the copy road.
-  -- Everything else about the Duplicate is asserted to be the Piker's (CR
-  -- 707.2), since an exception modifies the copying process rather than
-  -- replacing it.
-  Spec.it s "Dack's Duplicate copies a creature and gains haste and dethrone (CR 707.9a)" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    duplicate <- S.printingOf s registry "Dack's Duplicate"
-    let (pikerId, board) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
-        (_, stagedClone) = S.spellOnStack clone S.alice board
-        withClone = resolveAndSettle (copyNamed pikerId) stagedClone
-        (_, stagedDuplicate) = S.spellOnStack duplicate S.alice withClone
-        entered = resolveAndSettle (copyNamed pikerId) stagedDuplicate
-    case (cloneOnBattlefield entered, newest (printedOnBattlefield "Dack's Duplicate" entered)) of
-      (Just cloneId, Just duplicateId) -> do
-        let ready = sickened duplicateId (sickened cloneId (withLives 15 20 entered))
-            fought = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (S.attackTo S.bob) (intoCombat ready)
-        -- The precondition the haste half rests on: neither copy is settled, so
-        -- CR 302.6 is a real bar for the one without haste.
-        Spec.assertEqWith s "both copies are summoning sick (CR 302.6)" (fmap Object.sickness (Game.lookupObject duplicateId ready), fmap Object.sickness (Game.lookupObject cloneId ready)) (Just Sickness.Sick, Just Sickness.Sick)
-        -- CR 707.2 ran: the exception modified the copy, it did not replace it.
-        Spec.assertEqWith s "the Duplicate is the Piker by name (CR 707.2)" (Projection.namesOf duplicateId entered) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
-        Spec.assertBool s (Set.member Subtype.Goblin (Projection.subtypesOf duplicateId entered)) "and a Goblin, the Piker's own subtype"
-        Spec.assertEqWith s "and the Piker's 2/1" (S.powerToughnessOf duplicateId entered) $ Just (2, 1)
-        -- THE GAMEPLAY ASSERTION, ahead of the two diagnostics below: it attacked
-        -- (haste) and grew (dethrone).
-        Spec.assertEqWith s "the Duplicate attacked and dethrone grew it to 3/2" (S.powerToughnessOf duplicateId fought) $ Just (3, 2)
-        Spec.assertEqWith s "the copy without the exception is still a 2/1" (S.powerToughnessOf cloneId fought) $ Just (2, 1)
-        Spec.assertEqWith s "and the Clone never joined the attack (CR 508.1a)" (Map.keys (Combat.Type.attackers (GameState.combat fought))) [duplicateId]
-      _ -> Spec.assertFailure s "the Clone and the Duplicate should both be on the battlefield"
 
   -- THE PROVING TEST for CR 604.3a's third criterion: an ability acquired
   -- through a copy effect is CHARACTERISTIC-DEFINING. Omni-Changeling {3}{U}{U}
@@ -1154,69 +1049,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "where Azusa herself is still legendary" (PC.supertypes (Projection.project azusaId excepted)) (Set.singleton Supertype.Legendary)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
-  -- THE PROVING TEST for CR 707.9b's ADDITIVE SUBTYPE arm. Wall of Stolen
-  -- Identity {3}{U} Creature -- Shapeshifter Wall 0/0: "You may have this
-  -- creature enter as a copy of any creature on the battlefield, except it's a
-  -- Wall in addition to its other types and has defender."
-  --
-  -- Not implemented: the linked "When you do, tap the copied creature and it
-  -- doesn't untap ..." trigger, CR 707.9g's shape (#3408). Omitting it leaves
-  -- pawl's card stricter than printed -- the clause only ever costs an opponent
-  -- an untap -- and nothing below turns on it.
-  --
-  -- Read at GAMEPLAY level by a card that FILTERS on the subtype: Chaos Charm
-  -- {R}'s first mode is "destroy target Wall", so a permanent the exception did
-  -- not reach is not a legal target for it and the charm falls to its next mode,
-  -- 1 damage.
-  --
-  -- THE COPIED CREATURE IS A HILL GIANT, not the Goblin Piker every case above
-  -- copies: a 2/1 dies to that 1 damage as surely as to the destroy, and the case
-  -- could not then tell the two modes apart. A 3/3 survives it.
-  --
-  -- THE TOKEN is what the charm is aimed at, not the Wall copy itself: CR 707.2
-  -- copies the copiable values, so a subtype WRITTEN INTO the snapshot travels to
-  -- the token where a CR 613 layer-4 write over the Wall copy would be left
-  -- behind.
-  --
-  -- A Clone copying the SAME Giant is the control, on the same board: the copy
-  -- made without the exception, which is no Wall and which the charm could not
-  -- have taken.
-  Spec.it s "a token copy of Wall of Stolen Identity's copy is still a Wall (CR 707.9b)" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    clone <- S.printingOf s registry "Clone"
-    wall <- S.printingOf s registry "Wall of Stolen Identity"
-    counterpart <- S.printingOf s registry "Cackling Counterpart"
-    charm <- S.printingOf s registry "Chaos Charm"
-    let (giantId, board0) = S.addPermanent hillGiant S.alice (S.landsFor mountain S.alice 1 (S.landsInPlay island 3))
-        (_, stagedClone) = S.spellOnStack clone S.alice board0
-        withClone = resolveAndSettle (copyNamed giantId) stagedClone
-        (_, stagedWall) = S.spellOnStack wall S.alice withClone
-        entered = resolveAndSettle (copyNamed giantId) stagedWall
-    case (cloneOnBattlefield entered, newest (printedOnBattlefield "Wall of Stolen Identity" entered)) of
-      (Just cloneId, Just wallId) -> do
-        let minted = castAndResolve (targeting wallId) counterpart entered
-        case tokensOnBattlefield minted of
-          [tokenId] -> do
-            let charmed = castAndResolve (aimByFiltering tokenId) charm minted
-            -- THE GAMEPLAY ASSERTION, ahead of every diagnostic: "destroy target
-            -- Wall" found the token and took it, where the damage mode it would
-            -- otherwise have taken leaves a 3/3 standing.
-            Spec.assertBool s (not (onBattlefield tokenId charmed)) "the token copy was a legal Wall and the charm destroyed it"
-            -- The control on the same board: the copy WITHOUT the exception is
-            -- the Giant and nothing more.
-            Spec.assertBool s (not (Set.member Subtype.Wall (Projection.subtypesOf cloneId charmed))) "the copy without the exception is no Wall"
-            Spec.assertBool s (onBattlefield cloneId charmed) "and it is still on the battlefield"
-            -- Diagnostics, after the behaviour: CR 707.2 ran and CR 205.3's part
-            -- of the type line was joined rather than replaced.
-            Spec.assertEqWith s "the token is the Giant by name (CR 707.2)" (Projection.namesOf tokenId minted) . Set.singleton . CardName.MkCardName $ Text.pack "Hill Giant"
-            Spec.assertEqWith s "and its 3/3" (S.powerToughnessOf tokenId minted) $ Just (3, 3)
-            Spec.assertBool s (Set.member Subtype.Giant (Projection.subtypesOf tokenId minted)) "and keeps the Giant's own subtype"
-            Spec.assertBool s (Set.member Subtype.Wall (Projection.subtypesOf tokenId minted)) "beside the one the exception added"
-            Spec.assertBool s (Set.member Subtype.Wall (Projection.subtypesOf wallId minted)) "as does the copy the token was made from"
-          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-      _ -> Spec.assertFailure s "the Clone and the Wall should both be on the battlefield"
 
   -- THE PROVING TEST for CR 707.9b's ADDITIVE SUPERTYPE arm and for the arm that
   -- sets the copy's NAME. Sakashima the Impostor {2}{U}{U} Legendary Creature --
@@ -1412,57 +1244,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "and so is the Evangel it copied first" (Projection.colorsOf evangelId after) (Set.singleton Color.Black)
       others -> Spec.assertFailure s ("expected exactly one Doppelganger, got " <> show (length others))
 
-  -- THE PROVING TEST for CR 707.9e, the exception that is an ADDITIONAL EFFECT
-  -- rather than a modification of a characteristic -- AsCopy's `counters`.
-  -- Altered Ego {X}{2}{G}{U} Creature -- Shapeshifter 0/0: "This spell can't be
-  -- countered. You may have this creature enter as a copy of any creature on the
-  -- battlefield, except it enters with X additional +1/+1 counters on it."
-  -- (Oracle text checked against api.scryfall.com, 2026-09-12. Scryfall
-  -- o:"except it enters", 2026-09-12, returns this card, Spark Double,
-  -- Undercover Operative and Littjara Mirrorlake, and the last three all
-  -- condition the clause or write it over a token mint.)
-  --
-  -- CAST rather than staged onto the stack, which the X is what forces: CR
-  -- 107.3m reads the value announced for the SPELL at CR 601.2b, and a permanent
-  -- put onto the battlefield by hand announced none. Six lands in two colours pay
-  -- {2}{G}{U} with X = 2.
-  --
-  -- Three distinct sizes, so no reading of the board is a coincidence: the Hill
-  -- Giant's 3/3 is what was copied, the copy is 5/5, and Altered Ego's own
-  -- printed body is 0/0.
-  --
-  -- The control differs in ONE decision: the same spell, the same X, the same
-  -- board, with the copy DECLINED. CR 707.9 makes the exception a modification of
-  -- the copying process, so no copy is no counters -- and the 0/0 that arrives
-  -- is buried by CR 704.5f, where two +1/+1 counters would have left a 2/2
-  -- standing. That is what makes the control an assertion rather than a shrug.
-  --
-  -- A Clone of the copy is the copiable-values tripwire (CR 707.2): CR 122.1's
-  -- counter is a marker on the object and not one of its copiable values, so the
-  -- Clone is the Giant's 3/3 and not the 5/5 it is standing next to.
-  Spec.it s "CR 707.9e Altered Ego's copy enters with the announced X in +1/+1 counters, and declining the copy places none" $ do
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    clone <- S.printingOf s registry "Clone"
-    alteredEgo <- S.printingOf s registry "Altered Ego"
-    let (giantId, board0) = S.addPermanent hillGiant S.alice (S.landsFor forest S.alice 3 (S.landsInPlay island 3))
-        copied = castAndResolve (copyNamedAnnouncing 2 giantId) alteredEgo board0
-        declined = castAndResolve (declineAnnouncing 2) alteredEgo board0
-    case printedOnBattlefield "Altered Ego" copied of
-      [egoId] -> do
-        -- THE GAMEPLAY ASSERTIONS, ahead of every diagnostic.
-        Spec.assertEqWith s "CR 707.9e the copy is the Giant's 3/3 with the announced X = 2 in +1/+1 counters on top" (S.powerToughnessOf egoId copied) (Just (5, 5))
-        Spec.assertEqWith s "where declining the copy places no counters, so the 0/0 dies (CR 704.5f)" (length (printedOnBattlefield "Altered Ego" declined)) 0
-        let cloned = resolveAndSettle (copyNamed egoId) (snd (S.spellOnStack clone S.alice copied))
-        case clonesOnBattlefield cloned of
-          [cloneId] -> Spec.assertEqWith s "CR 707.2 a Clone of the copy is the copiable 3/3, the counters being no part of the copiable values" (S.powerToughnessOf cloneId cloned) (Just (3, 3))
-          _ -> Spec.assertFailure s "expected one Clone of Altered Ego's copy"
-        -- Diagnostics, after the behaviour: the copy really is the Giant, and the
-        -- counters really are on it.
-        Spec.assertEqWith s "the copy is the Giant by name (CR 707.2)" (Projection.namesOf egoId copied) . Set.singleton . CardName.MkCardName $ Text.pack "Hill Giant"
-        Spec.assertEqWith s "and the Giant it copied is still its printed 3/3" (S.powerToughnessOf giantId copied) (Just (3, 3))
-      others -> Spec.assertFailure s ("expected exactly one Altered Ego, got " <> show (length others))
 
   -- CR 707.9a's quoted arm over a TRIGGERED ability. Copycrook {2}{U}{U}
   -- Creature -- Shapeshifter Rogue 0/0: "You may have this creature enter as a
@@ -1507,28 +1288,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "and the Hill Giant is what alice discarded" (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid (attacked crookId excepted))) (Game.zoneMembers Zone.Graveyard S.alice (attacked crookId excepted))) [CardName.MkCardName (Text.pack "Hill Giant")]
       _ -> Spec.assertFailure s "expected one Copycrook and one Clone"
 
-  -- THE PROVING TEST for the copiable stamp. The target is itself a copy, so
-  -- its printed card (Clone, a 0/0 with an as-enters copy ability) and its
-  -- copiable values (the Piker's) disagree -- and CR 707.2's "as modified by
-  -- other copy effects" says the token takes the latter. Under declineCopy a
-  -- token that fell back on the printed card is a 0/0 that CR 704.5f buries.
-  Spec.it s "a token copy of a Clone copies what the Clone copies (CR 707.2)" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let (_, board) = S.addPermanent piker S.bob (S.landsInPlay island 3)
-        (_, staged) = S.spellOnStack clone S.alice board
-        -- alice's Clone is now her only creature, so it is the Counterpart's
-        -- only legal target ("target creature you control").
-        withClone = resolveAndSettle copyNewest staged
-        resolved = castAndResolve declineCopy counterpart withClone
-    case tokensOnBattlefield resolved of
-      [tokenId] -> do
-        Spec.assertEqWith s "the token is named for the Piker, not the Clone" (Projection.namesOf tokenId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
-        Spec.assertEqWith s "the token is a 2, not a 0" (Projection.powerOf tokenId resolved) $ Just 2
-        Spec.assertEqWith s "the token is a 1, not a 0" (Projection.toughnessOf tokenId resolved) $ Just 1
-      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
   -- THE PROVING TEST for CR 122.6 on the COPY opcode: "except it enters with an
   -- additional +1/+1 counter on it" is a rider the effect states, not something
@@ -1807,128 +1566,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "carrying one triggered ability (CR 707.9a)" (length (Projection.triggeredAbilitiesOf tokenId minted)) 1
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
-  -- THE PROVING TEST for CR 611.2a's duration on a COPY effect. Mirrorweave
-  -- {2}{W/U}{W/U} Instant: "Each other creature becomes a copy of target
-  -- nonlegendary creature until end of turn."
-  --
-  -- Three readings of one board, each of which a different implementation gets
-  -- wrong:
-  --
-  --   * DURING the turn the copy is real -- the Piker is the Giant, by P/T and
-  --     by name (CR 707.2).
-  --   * At CLEANUP it ends (CR 514.2 / 611.2a), which a stamped copy cannot do:
-  --     the Piker is its printed 2/1 again.
-  --   * A token copy taken WHILE it stood keeps the copied values afterwards
-  --     (CR 707.2b, "changing the copiable values of the original object won't
-  --     cause the copy to change"), the token's own stamp being a value.
-  --
-  -- THE CLONE is the tripwire for the stamp underneath. It is a copy of the
-  -- Piker already, so the stored row has to outrank a stamp while it stands and
-  -- REVEAL that same stamp when it ends: a Clone that came back as the printed
-  -- Clone would be a 0/0 the CR 704.5f state-based action buries, and one that
-  -- stayed the Giant never ended. Read through Game.cardOf rather than the
-  -- projection it answers "Clone" throughout.
-  --
-  -- Three distinct printed pairs, so no reading is reached by a coincidence: the
-  -- Piker's 2/1, the Blind-Spot Giant's 4/3, the Clone's own 0/0.
-  Spec.it s "CR 611.2a Mirrorweave's copy ends at cleanup, and the token copy taken under it does not" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
-    clone <- S.printingOf s registry "Clone"
-    counterpart <- S.printingOf s registry "Cackling Counterpart"
-    mirrorweave <- S.printingOf s registry "Mirrorweave"
-    let (pikerId, board0) = S.addPermanent piker S.alice (S.landsInPlay island 7)
-        (giantId, board1) = S.addPermanent blindSpotGiant S.alice board0
-        (_, stagedClone) = S.spellOnStack clone S.alice board1
-        withClone = resolveAndSettle (copyNamed pikerId) stagedClone
-        woven = castAndResolve (aimByFiltering giantId) mirrorweave withClone
-        minted = castAndResolve (aimByFiltering pikerId) counterpart woven
-        toCleanup =
-          minted
-            { GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
-            }
-        afterMain = S.runPure S.identityAnswer toCleanup Engine.runStep
-        afterEnd = S.runPure S.identityAnswer afterMain Engine.runStep
-        afterCleanup = S.runPure S.identityAnswer afterEnd Engine.runStep
-        giantName = Set.singleton . CardName.MkCardName $ Text.pack "Blind-Spot Giant"
-        pikerName = Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
-    case (cloneOnBattlefield withClone, tokensOnBattlefield minted) of
-      (Just cloneId, [tokenId]) -> do
-        -- 1. The precondition, not the behaviour: the copy happened at all.
-        Spec.assertEqWith s "CR 707.2 under Mirrorweave the Piker is the Giant's 4/3" (S.powerToughnessOf pikerId minted) $ Just (4, 3)
-        Spec.assertEqWith s "and the Giant by name" (Projection.namesOf pikerId minted) giantName
-        -- 2. THE GAMEPLAY ASSERTION, and the one the duration exists for: the
-        -- cleanup step ends it and the permanent is itself again.
-        Spec.assertEqWith s "CR 514.2 / 611.2a after cleanup the Piker is its printed 2/1 again" (S.powerToughnessOf pikerId afterCleanup) $ Just (2, 1)
-        Spec.assertEqWith s "and the Piker by name (CR 707.3)" (Projection.namesOf pikerId afterCleanup) pikerName
-        -- 3. CR 707.2b: the token copied a value, so the ending does not reach it.
-        Spec.assertEqWith s "CR 707.2b the token copy is still the Giant's 4/3 after cleanup" (S.powerToughnessOf tokenId afterCleanup) $ Just (4, 3)
-        Spec.assertEqWith s "and the Giant by name still" (Projection.namesOf tokenId afterCleanup) giantName
-        -- 4. The stamp underneath, revealed rather than lost: the Clone is the
-        -- Piker again and not the printed Clone.
-        Spec.assertEqWith s "CR 707.3 the Clone falls back to the copy it already was" (S.powerToughnessOf cloneId afterCleanup) $ Just (2, 1)
-        Spec.assertEqWith s "the Piker by name, not Clone" (Projection.namesOf cloneId afterCleanup) pikerName
-        -- Diagnostics, after the behaviour.
-        Spec.assertEqWith s "the Clone was the Giant under Mirrorweave too" (S.powerToughnessOf cloneId minted) $ Just (4, 3)
-        Spec.assertEqWith s "the token entered as the Giant (CR 707.2)" (S.powerToughnessOf tokenId minted) $ Just (4, 3)
-        Spec.assertEqWith s "the target itself is the Giant throughout" (S.powerToughnessOf giantId afterCleanup) $ Just (4, 3)
-        Spec.assertEqWith s "the cleanup step ran" (GameState.phase afterEnd) (Phase.Ending EndingStep.Cleanup)
-      (found, tokens) -> Spec.assertFailure s ("expected a Clone and exactly one token, got " <> show (found, length tokens))
 
-  -- THE PROVING TEST for CR 613.7 ordering a stored copy effect against a later
-  -- stamped one. Alice activates Dimir Doppelganger at a Hill Giant card and, in
-  -- response, casts Mirrorweave at her Goblin Piker: Mirrorweave's copy (until
-  -- end of turn) is stored first, and the ability's copy (no duration) is made
-  -- after it, so layer 1a leaves the Hill Giant -- now, not just after cleanup.
-  --
-  -- THE CLONE is the tripwire for every other reader of layer 1a: entering after
-  -- both, it copies the Doppelganger's copiable values (CR 707.2), which are the
-  -- Hill Giant's.
-  --
-  -- Distinct printed pairs: the Doppelganger's 0/2, the Piker's 2/1, the Hill
-  -- Giant's 3/3, the Clone's 0/0.
-  Spec.it s "CR 613.7 a copy effect made after Mirrorweave's outranks it (Dimir Doppelganger)" $ do
-    island <- S.printingOf s registry "Island"
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    doppelganger <- S.printingOf s registry "Dimir Doppelganger"
-    clone <- S.printingOf s registry "Clone"
-    mirrorweave <- S.printingOf s registry "Mirrorweave"
-    case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace doppelganger)) of
-      Nothing -> Spec.assertFailure s "Dimir Doppelganger prints no activated ability"
-      Just ability -> do
-        let (giantCardId, g1) = S.addGraveyardCard hillGiant S.alice (S.landsFor swamp S.alice 2 (S.landsInPlay island 5))
-            (pikerId, g2) = S.addPermanent piker S.alice g1
-            (doppelId, board) = S.addPermanent doppelganger S.alice g2
-            activated = S.runPure (aimByFiltering giantCardId) board (Activate.activateAbility S.alice doppelId ability)
-            (staged, weaveId) = S.handOne mirrorweave activated
-            woven = resolveAndSettle (aimByFiltering pikerId) (S.runPure (aimByFiltering pikerId) staged (S.cast S.alice weaveId))
-            copied = resolveAndSettle S.identityAnswer woven
-            (_, stagedClone) = S.spellOnStack clone S.alice copied
-            withClone = resolveAndSettle (copyNamed doppelId) stagedClone
-            toCleanup =
-              withClone
-                { GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
-                }
-            step g = S.runPure S.identityAnswer g Engine.runStep
-            afterEnd = step (step toCleanup)
-            afterCleanup = step afterEnd
-            giantName = Set.singleton . CardName.MkCardName $ Text.pack "Hill Giant"
-        -- THE GAMEPLAY ASSERTION: the later copy effect is what layer 1a leaves
-        -- while Mirrorweave's still stands.
-        Spec.assertEqWith s "CR 613.7 the Doppelganger is the Hill Giant under Mirrorweave" (S.powerToughnessOf doppelId copied) $ Just (3, 3)
-        Spec.assertEqWith s "and the Hill Giant by name" (Projection.namesOf doppelId copied) giantName
-        case cloneOnBattlefield withClone of
-          Nothing -> Spec.assertFailure s "the Clone did not enter"
-          Just cloneId -> do
-            Spec.assertEqWith s "CR 707.2 a Clone of the Doppelganger is the Hill Giant" (S.powerToughnessOf cloneId withClone) $ Just (3, 3)
-            Spec.assertEqWith s "and the Clone is still the Hill Giant after cleanup" (S.powerToughnessOf cloneId afterCleanup) $ Just (3, 3)
-        Spec.assertEqWith s "the Doppelganger is still the Hill Giant after cleanup" (S.powerToughnessOf doppelId afterCleanup) $ Just (3, 3)
-        -- Diagnostics, after the behaviour: Mirrorweave's copy happened first.
-        Spec.assertEqWith s "under Mirrorweave alone the Doppelganger was the Piker" (S.powerToughnessOf doppelId woven) $ Just (2, 1)
-        Spec.assertEqWith s "the cleanup step ran" (GameState.phase afterEnd) (Phase.Ending EndingStep.Cleanup)
 
   -- THE PROVING TEST for CR 305.7's THIRD clause: a land whose subtype is set to a
   -- basic type "loses all abilities generated from its rules text, its old land
@@ -3700,25 +3338,6 @@ faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "setup: the printed Arbiter is gone, so the bound on the face-up board is the copy's" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.alice up) 0
         Spec.assertBool s (Maybe.isJust (Binding.copyOf . Object.bindings =<< Game.lookupObject cloneId down)) "CR 708.8 the copy stamp rides through underneath the listing, ready to be reverted to"
 
-  -- The same fork one field over: the Conversion's listed 2/2 and CR 708.2's "no
-  -- name" against the Arbiter's copied 1/5 and its copied name. Here because the
-  -- fork lives at Projection.copiableSnapshotOf rather than at the thirteen families'
-  -- reader, so a fix confined to ruleAbilitiesOf leaves this case red.
-  Spec.it s "CR 708.2 a face-down copy projects the listed 2/2 and no name" $ do
-    island <- S.printingOf s registry "Island"
-    arbiter <- S.printingOf s registry "Silent Arbiter"
-    clone <- S.printingOf s registry "Clone"
-    piker <- S.printingOf s registry "Goblin Piker"
-    cyber <- S.printingOf s registry "Cyber Conversion"
-    case faceDownCopyBoard island arbiter clone piker cyber of
-      Nothing -> Spec.assertFailure s "the Clone should be on the battlefield as a copy of the Arbiter"
-      Just (board, spell, cloneId, _, _) -> do
-        Spec.assertEqWith s "the copied 1/5 before" (S.powerToughnessOf cloneId board) (Just (1, 5))
-        Spec.assertEqWith s "and the copied name before" (Projection.namesOf cloneId board) (Set.singleton (S.printingName arbiter))
-        let down = S.runPure (aimByFiltering cloneId) board (S.cast S.bob spell >> Stack.resolveTop)
-        Spec.assertEqWith s "CR 708.2 the listed 2/2, not the copied 1/5" (S.powerToughnessOf cloneId down) (Just (2, 2))
-        Spec.assertEqWith s "CR 708.2 no name, not the copied one" (Projection.namesOf cloneId down) Set.empty
-        Spec.assertEqWith s "CR 708.2 the listed subtype, not the copied Construct" (Projection.subtypesOf cloneId down) (Set.singleton Subtype.Cyberman)
 
 -- alice with one copy of `card` in her graveyard and `lands` untapped, holding
 -- priority in her main phase with an empty stack, so CR 602.5d's sorcery timing

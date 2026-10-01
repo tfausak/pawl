@@ -815,17 +815,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
           (namedOut "Benalish Hero" (S.runPure castOrPassAnswer played Engine.priorityLoop))
           0
       other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
-  Spec.it s "CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f)" $ do
-    island <- S.printingOf s registry "Island"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    let base = S.landsInPlay island 4
-        (_, withPiker) = S.addPermanent pikerPrinting S.alice base
-        (gs, cloneId) = S.handOne clone withPiker
-        -- S.identityAnswer declines ChooseCopyTarget (Clone's own "may").
-        resolved = S.runPure S.identityAnswer gs (S.cast S.alice cloneId >> Stack.resolveTop >> Engine.settleForPriority)
-        named = filter (\oid -> fmap Face.name (Game.faceOf oid resolved) == Just (CardName.MkCardName $ Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
-    Spec.assertEqWith s "the 0/0 Clone is gone" named []
   Spec.it s "CR 614.12a the copy choice is locked in BEFORE the enters event exists" $ do
     island <- S.printingOf s registry "Island"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -1708,14 +1697,6 @@ voltaicSurgeSpec s registry =
           Spec.assertEqWith s "setup: the row was installed though its clause was false" (length (GameState.replacements armed)) 1
         _ -> Spec.assertFailure s "fixture should hold two Firebolts"
 
--- How many battlefield permanents `pid` CONTROLS are printed with this name. NOT
--- S.countOnBattlefieldByName, which counts by OWNER (Game.zoneMembers filters the
--- shared battlefield by Object.owner) -- the whole point of a CR 616.1b rewrite
--- is that the owner and the controller have come apart.
-controlledNamed :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
-controlledNamed wanted pid gs =
-  length (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just wanted) (Projection.controls pid gs))
-
 -- alice controls six untapped Islands (Gather Specimens is {3}{U}{U}{U}) and one
 -- Goblin Piker for a Clone to copy; bob controls ten, enough for a Gather
 -- Specimens of his own plus a Clone at {3}{U}, or for two Clones, with no untap
@@ -1815,25 +1796,6 @@ copyIfAskedOf who wanted p = case p of
 gatherSpecimensSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gatherSpecimensSpec s registry =
   Spec.describe s "Gather Specimens (CR 616.1b)" $ do
-    Spec.it s "CR 616.1b an opponent's entering creature enters under YOUR control instead" $ do
-      island <- S.printingOf s registry "Island"
-      pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
-      clonePrinting <- S.printingOf s registry "Clone"
-      let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting]
-      case bobs of
-        cloneId : _ ->
-          let armed = S.runPure S.identityAnswer gs (S.cast S.alice gatherId >> Stack.resolveTop)
-              after = S.runPure (copyIfAskedOf S.alice piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
-              -- The DISCRIMINATING TWIN: the same cast on the same board with no
-              -- Gather Specimens resolved first.
-              alone = S.runPure (copyIfAskedOf S.alice piker) gs (S.cast S.bob cloneId >> Stack.resolveTop)
-           in case (newestNamed (CardName.MkCardName $ Text.pack "Clone") after, newestNamed (CardName.MkCardName $ Text.pack "Clone") alone) of
-                (Just taken, Just untaken) -> do
-                  Spec.assertEqWith s "bob's Clone entered under alice's control" (Projection.controllerOf taken after) (Just S.alice)
-                  Spec.assertEqWith s "without the Gather Specimens it is bob's" (Projection.controllerOf untaken alone) (Just S.bob)
-                _ -> Spec.assertFailure s "a Clone did not reach the battlefield"
-        _ -> Spec.assertFailure s "fixture did not deal bob a card"
     -- CR 616.1b BEFORE CR 616.1c, and the two orders disagree about WHO IS ASKED
     -- -- which is what makes this an assertion rather than a coincidence:
     --
@@ -1892,80 +1854,6 @@ gatherSpecimensSpec s registry =
                 Nothing -> Spec.assertFailure s "the Coating did not reach the battlefield"
                 Just coatingObj -> Spec.assertEqWith s "an artifact is not a creature" (Projection.controllerOf coatingObj after) (Just S.bob)
         _ -> Spec.assertFailure s "fixture did not deal bob a card"
-    -- CR 614.3's "until they're used up": Gather Specimens states no count, so
-    -- its row is Uses.Unlimited and every creature an opponent plays for the rest
-    -- of the turn comes over. A Uses.Once row would take the first and leave the
-    -- second, which is the difference this pins.
-    Spec.it s "CR 614.3 the effect lasts the turn: bob's SECOND creature comes over too" $ do
-      island <- S.printingOf s registry "Island"
-      pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
-      clonePrinting <- S.printingOf s registry "Clone"
-      let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting, clonePrinting]
-      case bobs of
-        firstClone : secondClone : _ ->
-          let armed = S.runPure S.identityAnswer gs (S.cast S.alice gatherId >> Stack.resolveTop)
-              one = S.runPure (copyIfAskedOf S.alice piker) armed (S.cast S.bob firstClone >> Stack.resolveTop)
-              two = S.runPure (copyIfAskedOf S.alice piker) one (S.cast S.bob secondClone >> Stack.resolveTop)
-           in Spec.assertEqWith s "both of bob's Clones are alice's" (controlledNamed (CardName.MkCardName $ Text.pack "Clone") S.alice two) 2
-        _ -> Spec.assertFailure s "fixture did not deal bob two cards"
-    -- DUELLING GATHER SPECIMENS, and the only board where the filter's
-    -- "under an OPPONENT's control" is observable at all.
-    --
-    -- alice resolves one, bob resolves one, and then BOB's Clone enters. The
-    -- entering side is what makes this discriminate; alice's own creature does
-    -- not, for the reason the two orders below converge on it.
-    --
-    -- With the relation, CR 616.1f drives a forced two-step -- "this process is
-    -- repeated (taking into account only replacement or prevention effects that
-    -- would now be applicable) until there are no more left to apply":
-    --
-    --   1. bob's creature would enter under bob's control. alice's row applies
-    --      (bob is her opponent); bob's does not (bob is not his own opponent).
-    --      One candidate in CR 616.1b's bucket, so nothing is chosen and nothing
-    --      is asked. It enters under alice's control.
-    --   2. Re-collected, bob's row is NOW applicable -- alice is his opponent --
-    --      and alice's is spent by CR 614.5's "only one opportunity". One
-    --      candidate again. It enters under BOB's control.
-    --   3. Nothing is left in that bucket, so CR 616.1c's copy choice follows,
-    --      offered to bob.
-    --
-    -- Without the relation both rows are applicable at step 1, and CR 616.1b's
-    -- "one of them must be chosen" would have something to choose between: they
-    -- are equal in `effect` (one card, one filter) but differ in the baked CR
-    -- 109.5 controller, which Replacement.readsApplier makes a distinguishing
-    -- field for this rewrite. So bob would be ASKED, take the canonical first --
-    -- his own, the newest floating row -- as a no-op, and alice's would apply at
-    -- step 2, leaving the creature HERS. The assertion is therefore
-    -- bob-not-alice, and the prompt assertion below discriminates too: with the
-    -- relation each step has one candidate and nothing is asked.
-    Spec.it s "CR 614.1d/616.1f duelling Gather Specimens: alice takes it, then bob takes it back" $ do
-      island <- S.printingOf s registry "Island"
-      pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
-      clonePrinting <- S.printingOf s registry "Clone"
-      let (gs, aliceGather, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [gatherSpecimens, clonePrinting]
-      case bobs of
-        bobGather : cloneId : _ ->
-          let armed = S.runPure S.identityAnswer gs (S.cast S.alice aliceGather >> Stack.resolveTop)
-              duelling = S.runPure S.identityAnswer armed (S.cast S.bob bobGather >> Stack.resolveTop)
-              after = S.runPure (copyIfAskedOf S.bob piker) duelling (S.cast S.bob cloneId >> Stack.resolveTop)
-              asked = answersFor (copyIfAskedOf S.bob piker) duelling (S.cast S.bob cloneId >> Stack.resolveTop)
-           in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
-                Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
-                Just clone -> do
-                  -- Both rows really are on the board: without bob's, this is
-                  -- the first case in this group and the answer is alice.
-                  Spec.assertEqWith s "two floating replacements are live" (length (GameState.replacements duelling)) 2
-                  Spec.assertEqWith s "alice took it, and bob took it back" (Projection.controllerOf clone after) (Just S.bob)
-                  -- And the copy choice landed on bob, the controller CR 616.1b
-                  -- left the object with.
-                  Spec.assertEqWith s "bob was offered the copy, and took it" (Projection.powerOf clone after) (Just 2)
-                  -- Each step of CR 616.1f had ONE applicable control rewrite,
-                  -- so there was never anything for CR 616.1b's "one of them
-                  -- must be chosen" to choose between.
-                  Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
-        _ -> Spec.assertFailure s "fixture did not deal bob two cards"
     -- THREE SEATS, where CR 616.1b's "one of them must be chosen" finally has
     -- something to choose between -- the case the duelling leg above cannot
     -- reach. alice and bob each resolve a Gather Specimens and CAROL casts a
@@ -2115,27 +2003,6 @@ kismetBoard land pikerPrinting kismet spell =
 kismetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kismetSpec s registry =
   Spec.describe s "Kismet (CR 616.1c/616.1d)" $ do
-    -- THE PROVING CASE. Collapse CopyOnEntry into Other and the same board raises
-    -- a CR 616.1e race the rules do not have.
-    --
-    -- The two board assertions beside it are the non-vacuity check, not the
-    -- proof: they show Kismet really was a second candidate, so "no prompt" is
-    -- not "no second effect".
-    Spec.it s "CR 616.1c the copy bucket outranks Kismet's, so no order is asked" $ do
-      island <- S.printingOf s registry "Island"
-      pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      kismet <- S.printingOf s registry "Kismet"
-      clonePrinting <- S.printingOf s registry "Clone"
-      let (gs, pikerId, cloneId) = kismetBoard island pikerPrinting kismet clonePrinting
-          cast = S.cast S.alice cloneId >> Stack.resolveTop
-          after = S.runPure (copyIfAskedOf S.alice pikerId) gs cast
-          asked = answersFor (copyIfAskedOf S.alice pikerId) gs cast
-      case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
-        Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
-        Just cloneOid -> do
-          Spec.assertEqWith s "CR 616.1c the Clone copied the Piker" (Projection.powerOf cloneOid after) (Just 2)
-          Spec.assertBool s (Game.isTapped cloneOid after) "CR 614.1d and Kismet tapped it too"
-          Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
     -- The DISCRIMINATING TWIN: the same fixture and the same recorder, a spell
     -- whose own entry rewrites are both CR 616.1e's. Coldsteel Heart is an
     -- artifact, so Kismet's row joins its two in one bucket and the race really

@@ -85,12 +85,13 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `check:colors`: an object's colors
 - `check:priority`: who holds priority
 - `move:ChooseCardInHand`: the `ChooseCardInHand` prompt
-- `move:ChooseCopyTarget`: the `ChooseCopyTarget` prompt
 - `check:legal-targets`: the legal targets for a slot
 - `check:card-types`: an object's card types
 - `board:player-startingdeck`
 - `board:object-bindings`
 - `move:ChooseManaSource`: the `ChooseManaSource` prompt
+- `move:action-UnlockDoor`: the Room unlock special action
+- `check:bindings`: an object's linked bindings
 - `move:ChooseManaYield`: the `ChooseManaYield` prompt
 - `move:OrderManaActivations`: the `OrderManaActivations` prompt
 - `move:ChooseBasicLandType`: the `ChooseBasicLandType` prompt
@@ -201,7 +202,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `move:OrderTriggers:unmatchable`: an order between two triggers of one source the move cannot name
 - `check:playable-from-exile`: an exiled card someone may play
 - `move:action-TurnFaceUp`: the turn-face-up special action
-- `check:names`: an object's names, or that it has none
 - `check:phasing`: whether a permanent is phased out, and how
 - `check:mana-types`: the mana types a permanent can produce
 - `check:block-requirements`: the block requirements in force
@@ -393,7 +393,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.181a three 1/1 red Warrior tokens enter tapped and attacking | `check:colors`
 - CR 702.83a an opponent's Squire does not pump the attacker | `check:helper-atDamage` `check:helper-only`
 - CR 702.83a the bearer attacking alone pumps itself | `check:helper-atDamage`
-- CR 707.2 a Clone of the Patrol has myriad and mints a copy of the Patrol | `move:ChooseCopyTarget` `move:ChooseLoopMembers` `check:names` `board:sickness`
+- CR 707.2 a Clone of the Patrol has myriad and mints a copy of the Patrol | `move:ChooseLoopMembers` `board:sickness`
 
 ### `AttractionSpec`
 
@@ -404,7 +404,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.52a the roll to visit is a die roll: Pixie Guide adds a die and CR 706.6 ignores the lower | `board:continuous-effect`
 - CR 702.159a a result lit up on the Attraction triggers its visit ability | `board:continuous-effect`
 - CR 703.4g the turn machinery itself rolls as the precombat main phase begins | `move:RollDie`
-- CR 707.2 a copy of an Attraction rolls but lights nothing, and is no Astrotorium card | `move:ChooseCopyTarget` `move:RollDie` `check:offered-actions` `check:names`
+- CR 707.2 a copy of an Attraction rolls but lights nothing, and is no Astrotorium card | `move:RollDie` `check:offered-actions` `check:events`
 - CR 717.1 the lights are the printing's | `board:continuous-effect`
 - CR 717.2 the Attraction deck is in the command zone, not the library or the starting deck | `check:other-Attraction.deckOf` `check:other-Game.zoneOf` `check:other-GameState.command` `check:zone-contents`
 
@@ -697,8 +697,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.1f The Eighth Doctor's quoted replacement exiles the permanent it was granted to | `board:continuous-effect` `board:controller` `board:mana-pool`
 - CR 701.6a / 113.9 with Spider-Punk the ability survives the Stifle and resolves | `ref:stack-ability`
 - CR 702.138a an escaped Chimera takes neither Serra Paragon's use nor its rider | `check:offered-actions` `move:ChooseExilesFromGraveyard`
-- CR 707.2 a Clone of Serra Paragon grants the permission and the rider | `move:ChooseCopyTarget`
-- CR 707.2 a Clone of The Eighth Doctor grants the quoted replacement | `move:ChooseCopyTarget`
 - CR 708.2a a face-down cast spends the grant off the face the gate read | `board:library-order` `board:mana-pool` `board:player-effect`
 - CR 725.2 with no restriction standing, combat damage to the monarch hands alice the crown | `ready`
 
@@ -842,7 +840,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.174i the promised opponent creates the 8/8 Octopus | `move:ChooseKicker` `move:ChooseOpponent`
 - CR 702.175a offspring paid makes a 1/1 token copy; unpaid, none | `move:ChooseKicker`
 - CR 702.175a paying offspring TWICE rejects the cast; once, one token | `move:ChooseKicker`
-- CR 702.176a cast for impending, the Overlord is not a creature until alice's fourth end step removes its last time counter | `move:ChooseCopyTarget` `move:ChooseMovedCounters`
+- CR 702.176a cast for impending, the Overlord is not a creature until alice's fourth end step removes its last time counter | `move:ChooseMovedCounters`
 - CR 702.180a the harmonize cost is reduced by the tapped creature's power, and the spell is exiled from the stack | `check:helper-handSize` `check:helper-namedInGraveyard` `check:helper-tapStateOf` `check:offered-actions` `check:zone-contents`
 - CR 702.180b tapping the chosen creature for mana reverses the cast | `move:ChooseCost:unmatchable` `move:ReverseManaAbilities`
 - CR 702.185c a spell warped this turn makes Insatiable Skittermaw's end step trigger; the same Colossus cast for {9} does not | `move:OrderTriggers-departed-source`
@@ -874,7 +872,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.10 a Double Major copy of a dashed Scout attacks and is returned | `move:OrderTriggers-departed-source`
 - CR 707.10 a Double Major copy of a squadded Brigade makes its own token | `move:ChooseKicker`
 - CR 707.2 / 400.7 a Clone of a dashed Scout and the Scout flickered neither have haste nor return | `board:controller` `board:delayed-trigger` `board:mana-pool` `board:object-castusing`
-- CR 707.2 a Clone of a paid Mage makes no token | `move:ChooseCopyTarget` `move:ChooseKicker`
+- CR 707.2 a Clone of a paid Mage makes no token | `move:ChooseKicker`
 - CR 707.2 a copy of a spliced spell does not have the spliced text | `move:ChooseSplice`
 - CR 707.2 a graveyard card that is a copy is priced at the copy's mana cost | `check:offered-actions`
 - CR 707.2 a token copy of the escaped Chimera did not escape | `move:ChooseExilesFromGraveyard`
@@ -896,9 +894,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `ClassSpec`
 
-- CR 604.2 a copy's own as-long-as clause is still gated once the original is exiled | `move:ChooseCopyTarget` `check:designations`
-- CR 707.2a a copy acquires the copied object's player abilities | `move:ChooseCopyTarget` `check:mana-pool`
-- CR 707.2a a copy acquires the copied object's static abilities | `move:ChooseCopyTarget` `check:designations`
+- CR 604.2 a copy's own as-long-as clause is still gated once the original is exiled | `check:designations`
+- CR 707.2a a copy acquires the copied object's player abilities | `check:mana-pool`
+- CR 707.2a a copy acquires the copied object's static abilities | `check:designations`
 - CR 716.2a / CR 120.1 the level-3 trigger has the spell deal damage by instants and sorceries cast | `board:object-classlevel`
 - CR 716.2a / CR 508.3d the level-3 trigger pumps by each OTHER attacker and grants double strike | `board:object-classlevel`
 - CR 716.2a / CR 603.10 the level-2 section's trigger fires on the very activation that grants it | `board:object-classlevel`
@@ -906,7 +904,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 716.2a the level-2 trigger does not fire again when the Class goes from 2 to 3 | `board:object-classlevel`
 - CR 716.2a the level-3 section is off while the Class is level 2 | `board:object-classlevel`
 - CR 716.2b a Class retains its level even if it stops being a Class | `board:mana-pool` `board:object-classlevel`
-- CR 716.2b levels are not a copiable characteristic | `move:ChooseCopyTarget` `check:designations` `check:offered-actions`
+- CR 716.2b levels are not a copiable characteristic | `check:designations` `check:offered-actions`
 - CR 716.2c Sorcerer Class's mana pays to gain a Class level | `board:object-classlevel`
 
 ### `CodecIntegrationSpec`
@@ -1050,7 +1048,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.13b a COLOURLESS creature with intimidate may be blocked only by artifact creatures | `check:colors` `move:expect-rejected`
 - CR 702.16k True-Name Nemesis can't be blocked by the chosen player's creature, and can by another's | `board:object-chosenplayer`
 - CR 702.19b a trampling Tapestry Warden spills the excess over its toughness | `board:continuous-effect`
-- CR 707.2 a Clone of Brassclaw Orcs can't block the Piker either | `move:ChooseCopyTarget` `check:names`
 - CR 723.1 a controlled active player's choice of defender routes to their controller | `board:control`
 - CR 802.3a the announcement, not the creature, is what the row refuses | `check:offered-actions` `check:other-GameState.attackProhibitions` `move:expect-rejected`
 
@@ -1095,26 +1092,22 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.140e a duplicate of a mutated Headless Skaab owes the Skaab's additional cost | `board:source-ofmerge`
 - CR 702.178a at max speed the Smasher returns the duplicate with haste, and the end step sacrifices it | `board:exile-linked` `board:player-speed`
 - CR 702.178a one short of max speed, the duplicate stays in exile | `board:exile-linked` `board:player-speed`
-- CR 707.2 a duplicate of a Clone costs what the Clone copies | `move:ChooseCopyTarget` `check:offered-actions` `check:names`
-- CR 707.2 a duplicate of a Clone is a duplicate of what the Clone copies | `move:ChooseCopyTarget` `check:names`
-- CR 707.2/118.9 a duplicate of a Clone offers the alternative cost of what the Clone copies | `move:ChooseCopyTarget` `check:offered-actions`
-- CR 707.2/305.1 a duplicate of a Clone of Dryad Arbor is played as a land | `move:ChooseCopyTarget` `check:offered-actions` `check:names`
-- CR 707.2/601.2b a duplicate of a Clone owes the additional cost of what the Clone copies | `move:ChooseCopyTarget` `check:offered-actions`
-- CR 707.2/601.2f a duplicate of a Clone takes the cost reduction of what the Clone copies | `move:ChooseCopyTarget` `check:offered-actions`
-- CR 707.2/702.143a a duplicate of a Clone has the foretell of what the Clone copies | `move:ChooseCopyTarget` `check:offered-actions`
-- CR 707.2/702.37e a duplicate of a Clone of Ainok Tracker is cast face down and turned up for its morph cost | `move:ChooseCopyTarget` `check:offered-actions` `check:tapped-count` `check:names`
-- CR 707.2/702.41a a duplicate of a Clone has the affinity of what the Clone copies | `move:ChooseCopyTarget` `check:offered-actions`
-- CR 707.2/702.51a a duplicate of a Clone has the convoke of what the Clone copies | `move:ChooseCopyTarget` `check:offered-actions`
-- CR 707.2/709.5b a duplicate of a copied Room is cast as a door | `move:ChooseCopyTarget` `check:offered-actions` `check:names`
-- CR 707.2/715.2b a duplicate of a Clone of Flaxen Intruder is cast as Welcome Home | `move:ChooseCopyTarget` `check:offered-actions` `check:tapped-count` `check:stack` `check:names`
+- CR 707.2/118.9 a duplicate of a Clone offers the alternative cost of what the Clone copies | `check:offered-actions`
+- CR 707.2/601.2b a duplicate of a Clone owes the additional cost of what the Clone copies | `check:offered-actions`
+- CR 707.2/601.2f a duplicate of a Clone takes the cost reduction of what the Clone copies | `check:offered-actions`
+- CR 707.2/702.143a a duplicate of a Clone has the foretell of what the Clone copies | `check:offered-actions`
+- CR 707.2/702.37e a duplicate of a Clone of Ainok Tracker is cast face down and turned up for its morph cost | `check:offered-actions` `check:tapped-count`
+- CR 707.2/702.41a a duplicate of a Clone has the affinity of what the Clone copies | `check:offered-actions`
+- CR 707.2/702.51a a duplicate of a Clone has the convoke of what the Clone copies | `check:offered-actions`
+- CR 707.2/709.5b a duplicate of a copied Room is cast as a door | `check:offered-actions` `move:cast-face` `move:action-UnlockDoor`
+- CR 707.2/715.2b a duplicate of a Clone of Flaxen Intruder is cast as Welcome Home | `check:offered-actions` `move:cast-face` `check:tapped-count` `check:stack`
 - CR 715.3a a duplicate of Flaxen Intruder cast as Welcome Home costs Welcome Home's cost | `check:offered-actions` `move:expect-rejected`
-- CR 727.2/707.2 a duplicate of a Clone rebuilt out of a merge by a restart is the Piker again | `move:ChooseCopyTarget` `move:ChooseMutateSide` `check:names` `check:zone-contents`
-- CR 730.2/730.3 a duplicate of a Clone that merged as the spell is the Cubwarden again | `move:ChooseCopyTarget` `move:ChooseMutateSide` `check:names` `board:source-ofmerge`
-- CR 730.3/707.2 a duplicate of a Clone split out of a merge is the Piker again | `move:ChooseCopyTarget` `move:ChooseMutateSide` `check:names` `board:source-ofmerge`
+- CR 727.2/707.2 a duplicate of a Clone rebuilt out of a merge by a restart is the Piker again | `move:ChooseMutateSide` `check:zone-contents`
+- CR 730.2/730.3 a duplicate of a Clone that merged as the spell is the Cubwarden again | `move:ChooseMutateSide` `board:source-ofmerge`
+- CR 730.3/707.2 a duplicate of a Clone split out of a merge is the Piker again | `move:ChooseMutateSide` `board:source-ofmerge`
 - Gate to Seatower's seek puts the nonland card randomness named into the hand, leaving the library's order | `board:stage-no-card-named-gate-to-seatower`
 - Kari Zev's Ragavan attacks without being declared and goes home at the next end step | `board:stage-no-card-named-ragavan-nimble-pilferer`
 - a conjure from the file registry's reference never conjures a synthetic card | `move:LookUpCard` `move:RandomCard` `move:ReferenceCards`
-- a duplicate of a Clone cast and resolved is the Piker | `move:ChooseCopyTarget` `check:names`
 - a printed spellbook is offered whole, and the card randomness named is the one conjured | `move:RandomCard`
 - a printed spellbook picked by choice is offered whole, and the card its controller named is the one conjured | `move:ChooseConjuredCard`
 - conjure four into a library puts four drawable, castable Lightning Bolts there | `board:library-order`
@@ -1122,13 +1115,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `CopySpec`
 
-- CR 115.1 the copy's NEW target becomes a target, and ward fires | `check:stack` `move:ChooseCopyTarget`
+- CR 115.1 the copy's NEW target becomes a target, and ward fires | `check:stack`
 - CR 305.7 Blood Moon strips the abilities Vesuva copied from another land | `board:controller` `board:hand-order` `board:object-bindings`
 - CR 400.11 casting the copy moves nothing out of a graveyard, so Kishla Skimmer does not trigger | `move:ChooseCardName` `move:LookUpCard` `move:OfferedCast`
 - CR 400.11 the copy is cast under Grafdigger's Cage and Aven Interrupter, and not under Drannith Magistrate | `move:ChooseCardName` `move:LookUpCard` `move:OfferedCast`
 - CR 400.4a Flicker of Fate exiles the face-down Divination and it stays in exile | `board:mana-pool`
-- CR 611.2a Mirrorweave's copy ends at cleanup, and the token copy taken under it does not | `move:ChooseCopyTarget` `check:names`
-- CR 613.7 a copy effect made after Mirrorweave's outranks it (Dimir Doppelganger) | `move:ChooseCopyTarget` `check:names`
 - CR 614.12 a Vesuva entering under Blood Moon has no copy ability left to apply | `check:other-Mana.manaTypesOf` `check:other-Projection.namesOf`
 - CR 614.1a the face-down permanent and a Clone of it are exiled instead of dying | `board:mana-pool`
 - CR 702.103c a copy of a bestowed Rollicker resolves as a token Aura attached to the same host | `check:attached-to` `check:helper-rollickersOn` `check:other-Game.isToken`
@@ -1138,7 +1129,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.99a Last Thoughts is encoded on the chosen Piker, which casts a copy when it connects | `move:ChooseEncode` `move:OfferedCast`
 - CR 702.99c a flickered Piker is no longer encoded and offers nothing | `move:ChooseEncode` `board:sickness`
 - CR 707.10 a copied activated ability was not activated, so no mana was spent to activate it | `ref:stack-ability`
-- CR 707.10 a target the copy KEPT becomes a target of the copy too | `check:stack` `move:ChooseCopyTarget`
+- CR 707.10 a target the copy KEPT becomes a target of the copy too | `check:stack`
 - CR 707.10 a triggered ability is copied, and its copy takes a new target | `move:ChooseDiscard`
 - CR 707.10/702.150a a copy of a compleated planeswalker spell enters with the printed loyalty | `move:AnnouncePhyrexianPayment`
 - CR 707.10b a copied activated ability keeps its source, and the copy is not activated | `ref:stack-ability`
@@ -1164,29 +1155,23 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.2 a graveyard card offers the authored abilities of what it is a copy of | `check:offered-actions`
 - CR 707.2 a graveyard card offers the embalm of what it is a copy of, not its printed one | `check:offered-actions`
 - CR 707.2 an Adventure that becomes a copy of a Bolt goes to the graveyard | `move:cast-face`
-- CR 707.2a a copy of Blood Moon goes on setting land subtypes once the original is exiled | `move:ChooseCopyTarget` `check:abilities` `check:mana-types`
-- CR 707.9e Altered Ego's copy enters with the announced X in +1/+1 counters, and declining the copy places none | `move:ChooseCopyTarget`
-- CR 708.2 a face-down copy of Silent Arbiter no longer bounds the attack | `move:ChooseCopyTarget` `check:face-down`
-- CR 708.2 a face-down copy projects the listed 2/2 and no name | `move:ChooseCopyTarget` `check:names`
+- CR 707.2a a copy of Blood Moon goes on setting land subtypes once the original is exiled | `check:mana-types` `check:abilities`
+- CR 708.2 a face-down copy of Silent Arbiter no longer bounds the attack | `check:face-down` `check:bindings`
 - CR 708.2 the face-down permanent is a nameless 3/3 creature with the two listed abilities | `board:mana-pool`
 - CR 708.2 the rulings: an effect turning the face-down Divination face up leaves it face down | `board:mana-pool`
 - CR 712.15 Magar puts a modal double-faced card with a sorcery front onto the battlefield face down | `board:mana-pool`
 - Cackling Counterpart mints a token copy of the targeted creature (CR 707.2, CR 111.3) | `check:other-Projection.namesOf`
-- Copycrook's copy connives when it attacks, and a Clone of the same creature does not (CR 707.9a, CR 701.50a) | `move:ChooseCopyTarget` `move:ChooseDiscard` `check:zone-contents`
-- Dack's Duplicate copies a creature and gains haste and dethrone (CR 707.9a) | `move:ChooseCopyTarget` `check:names`
+- Copycrook's copy connives when it attacks, and a Clone of the same creature does not (CR 707.9a, CR 701.50a) | `move:ChooseDiscard` `check:zone-contents`
 - Littjara Mirrorlake's copy token enters with the counter the effect states (CR 122.6, CR 707.2) | `check:helper-plusOnesOn` `check:other-Projection.namesOf`
-- Mercurial Pretender's copy has the quoted ability, and so does a Clone of it (CR 707.9a) | `move:ChooseCopyTarget` `check:offered-actions`
+- Mercurial Pretender's copy has the quoted ability, and so does a Clone of it (CR 707.9a) | `check:offered-actions`
 - Multiversal Recruitment's token copy is not legendary, and neither is a copy of it (CR 707.9b) | `check:supertypes` `move:ChooseLegend`
-- Omni-Changeling's copy is every creature type, and so is a token copy of it (CR 604.3a) | `move:ChooseCopyTarget` `check:names`
+- Omni-Changeling's copy is every creature type, and so is a token copy of it (CR 604.3a) | `check:subtype-member`
 - Unstable Shapeshifter becomes a copy and keeps a noncopy effect (CR 707.4) | `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- a Vesuva that declines the copy enters untapped and taps for nothing (CR 614.1c) | `move:ChooseCopyTarget`
-- a token copy of Wall of Stolen Identity's copy is still a Wall (CR 707.9b) | `move:ChooseCopyTarget` `check:names` `check:on-battlefield`
-- a token copy of a Clone copies what the Clone copies (CR 707.2) | `move:ChooseCopyTarget` `check:names`
-- a token copy of an excepted copy keeps the exception (CR 707.9b) | `move:ChooseCopyTarget` `check:names`
+- a Vesuva that declines the copy enters untapped and taps for nothing (CR 614.1c) | `check:offered-actions`
 - a token copy of the Shapeshifter carries the ability it kept (CR 707.2) | `board:object-bindings`
-- five token Clones enter at once, each choosing, and none may copy a sibling (CR 614.12, CR 616.1g) | `move:ChooseCopyTarget` `move:ChooseKicker`
+- five token Clones enter at once, each choosing, and none may copy a sibling (CR 614.12, CR 616.1g) | `move:ChooseKicker`
 - kicked Rite of Replication mints five instead (CR 702.33d, CR 707.1) | `move:ChooseKicker`
-- two Sakashimas copying different creatures are one legend rule apart (CR 707.9b) | `move:ChooseCopyTarget` `move:ChooseLegend` `check:names`
+- two Sakashimas copying different creatures are one legend rule apart (CR 707.9b) | `move:ChooseLegend` `check:supertypes`
 - unkicked Rite of Replication mints one token copy (CR 707.1) | `move:ChooseKicker`
 
 ### `CostSpec`
@@ -1313,7 +1298,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.51c the entry trigger grows the creatures that convoked the Loxodon, and nothing else | `move:ChooseTaps`
 - CR 702.66a delve pays seven of a Treasure Cruise's eight mana by exiling seven cards | `move:ChooseExilesFromGraveyard`
 - CR 704.5a paying the last 2 life is legal and loses the game | `check:other-GameState.players` `check:other-Player.status`
-- CR 707.2 the power read is the copy's, not the printed Clone's | `move:ChooseCopyTarget`
 - CR 733.1 a caster who keeps the mana ability has the spell back in hand and the mana floating | `board:mana-pool`
 - CR 733.1 a nested window's mana abilities are the payer's to keep | `move:ReverseManaAbilities`
 - CR 733.1 a refused assisted cast asks the helper too, and each keeps only their own | `move:ChooseAssistAmount` `move:ChooseAssistant` `move:ReverseManaAbilities`
@@ -1807,7 +1791,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ExileSpec`
 
 - CR 305.9 a hidden Forest is played as the turn's land and never cast for free | `board:exile-linked` `board:face-down` `check:lands-played` `move:OfferedCast`
-- CR 406.3 the look bob had while he controlled the land survives losing it, and a land that exiled nothing gives him none | `board:exile-linked` `board:face-down` `check:controller` `check:legal-targets` `move:ChooseCopyTarget`
+- CR 406.3 the look bob had while he controlled the land survives losing it, and a land that exiled nothing gives him none | `move:ChooseCardFromAmong` `move:Shuffle` `check:legal-targets` `check:controller`
 - CR 406.3 the player the exiling instruction let look names both cards, and the owner who was shown nothing gets their pile | `check:helper-faceDownExiled` `check:helper-offerTo` `check:helper-pilesIn` `check:other-Object.owner`
 - CR 406.3 the same two cards exiled face up leave the flashback one targetable, and it returns to her hand | `check:legal-targets`
 - CR 406.3a a Grist card exiled FACE DOWN has no characteristics to function from | `check:helper-namesOf`
@@ -1823,7 +1807,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2h the play ability reads the turn's declarations as it resolves, so two attackers is one short and three is not | `board:exile-linked` `board:face-down` `move:OfferedCast`
 - CR 702.75a hideaway 4 hides the card its controller named and bottoms the other three, and only she may name it afterwards | `move:ChooseCardFromAmong` `move:Shuffle`
 - CR 702.75a the look follows control of the land that exiled the card, and CR 406.3's does not | `board:exile-linked` `board:face-down` `check:legal-targets`
-- CR 707.2 a land that entered as a copy of Windbrisk Heights hides a card of its own | `move:ChooseCardFromAmong` `move:ChooseCopyTarget` `move:Shuffle`
+- CR 707.2 a land that entered as a copy of Windbrisk Heights hides a card of its own | `move:ChooseCardFromAmong` `move:Shuffle` `check:zone-contents`
 - CR 707.2 the look follows the copy that exiled the card, not the Windbrisk Heights it copied | `board:exile-linked` `board:face-down` `check:legal-targets`
 
 ### `ExpirySpec`
@@ -1849,7 +1833,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 611.2b it ends when the crown moves to the third player | `board:continuous-effect`
 - CR 614.10a the skipped end step defers the sacrifice to alice's next one | `board:turn-number`
 - CR 614.1b a Bell aimed at carol leaves alice's own ending phase alone | `board:turn-number`
-- CR 707.2a a copy of Titania's Song hands over its own effect | `move:ChooseCopyTarget` `check:continuous-effects`
+- CR 707.2a a copy of Titania's Song hands over its own effect | `check:continuous-effects`
 - CR 725.2 combat damage to the monarch hands the crown to the damager's controller | `ready`
 - CR 725.2 noncombat damage to the monarch does not hand over the crown | `ready`
 - CR 725.2 the end-step draw fires only on the monarch's own end step | `check:zone-contents`
@@ -1861,7 +1845,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 109.5 alice's own face-down creature is not a legal target | `board:controller` `board:face-down`
 - CR 110.5 Break Open turns the opponent's face-down creature face up | `board:controller` `board:face-down`
 - CR 110.5 a face-up creature the opponent controls is not a legal target | `board:controller` `board:face-down`
-- CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once | `check:face-down` `check:names` `check:offered-actions` `move:action-TurnFaceUp` `move:cast-face`
+- CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once | `check:face-down` `check:offered-actions` `move:action-TurnFaceUp` `move:cast-face`
 - CR 601.2c the offer is every OTHER morph creature, and all three turn over | `check:face-down` `check:prompt-offers` `move:action-TurnFaceUp` `move:cast-face`
 - CR 608.2d the engine does not pick, and CR 708.3 the manifested card's enters ability does not trigger | `move:ChooseCardFromAmong`
 - CR 613.4c turning one face up drops the Whisperer by two | `board:controller` `board:face-down`
@@ -1898,9 +1882,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 603.2 Akki flips on the NONCOMBAT damage Soul's Fire makes it deal to bob | `check:events` `check:face`
 - CR 603.2 Harm's Way sends Akki's combat damage to alice, and Akki does not flip | `move:ChooseDamageSource`
 - CR 603.2 the same noncombat damage aimed at alice does not flip Akki | `check:events` `check:face`
-- CR 707.2 a Clone of a flipped Tok-Tok is an unflipped Akki Lavarunner | `move:ChooseCopyTarget` `check:names`
-- CR 707.3 a Clone of Akki Lavarunner flips into Tok-Tok, and a Clone of that is Akki | `move:ChooseCopyTarget` `check:names`
-- CR 707.9b a Sakashima that copied Akki flips into Tok-Tok named Sakashima | `move:ChooseCopyTarget` `check:names`
+- CR 707.2 a Clone of a flipped Tok-Tok is an unflipped Akki Lavarunner | `check:supertypes`
+- CR 707.3 a Clone of Akki Lavarunner flips into Tok-Tok, and a Clone of that is Akki | `check:supertypes` `check:colors` `check:mana-value`
+- CR 707.9b a Sakashima that copied Akki flips into Tok-Tok named Sakashima | `check:supertypes`
 - CR 710.2 Akki flips into Tok-Tok, keeping CR 710.1c's mana value and colour | `check:helper-costReadings` `check:helper-halfReadings` `check:helper-isLegendary` `check:other-Object.flipped` `check:other-Staged.state`
 
 ### `ForageSpec`
@@ -2040,9 +2024,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.153a Light 'Em Up with its casualty paid deals its damage twice; unpaid, once | `move:ChooseKicker`
 - CR 702.153a a creature under casualty's power floor cannot pay it | `ready`
 - CR 702.165a the backed-up creature can't be blocked by a creature with power 2 or less | `board:continuous-effect` `board:hand-order`
-- CR 702.165b a Clone of Chomping Kavu grants the restriction it copied | `move:ChooseCopyTarget` `check:offered-actions`
-- CR 702.165b a Clone of Streetwise Negotiator grants the static ability it copied | `move:ChooseCopyTarget`
-- CR 702.165b a Clone of the Archpriest grants what it copied | `move:ChooseCopyTarget`
 - CR 702.191a three mana is not GREATER than the 3 power | `check:helper-sizeOf` `check:zone-contents`
 - CR 702.191a whole card: a four-mana spell grows Hungry Graffalon | `check:helper-sizeOf`
 - CR 702.30a control coming back re-opens the window it closed | `board:continuous-effect` `board:hand-order` `board:mana-pool`
@@ -2054,7 +2035,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.85a casting Bloodbraid Elf exiles down to the Goblin Piker, casts it free and bottoms the rest | `move:OfferedCast` `move:Shuffle`
 - CR 702.85c each of Apex Devastator's four printed cascades triggers | `move:OfferedCast`
 - CR 702.86a the attacked player sacrifices one permanent of their own choosing | `move:ChooseSacrifices`
-- CR 707.2 a Clone of Apex Devastator copies all four instances | `move:ChooseCopyTarget`
 
 ### `LearnSpec`
 
@@ -2443,7 +2423,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.140e a static ability under the topmost component still applies | `move:ChooseMutateSide`
 - CR 702.140e an Exalted Dragon under a Cubwarden still charges a land to attack | `board:source-ofmerge`
 - CR 730.2/707.10 a copy of a mutating creature spell merges, as a copy and not as a card | `board:hand-order` `board:objects-ids`
-- CR 730.2a/613.2a the merge outranks a copy effect already on the target | `move:ChooseCopyTarget` `move:ChooseMutateSide` `check:names`
+- CR 730.2a/613.2a the merge outranks a copy effect already on the target | `move:ChooseMutateSide`
 - CR 730.2a/613.7 a merge outranks Mirrorweave's copy at once and is recomputed when it ends | `board:copyeffects` `board:mana-pool`
 - CR 730.2a/702.140e mutating over: the topmost component's name, types and box, plus the abilities from under it | `move:ChooseMutateSide`
 - CR 730.2a/712.8g Cubwarden merges with a melded permanent, over and under | `board:source-ofmeld`
@@ -2654,7 +2634,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `PreparationSpec`
 
 - CR 702.26b Reality Ripple phases the Aviator out and the copy ceases to exist | `check:helper-aliasOrFail` `check:helper-namesOffered` `check:helper-prepareCopies` `check:on-battlefield` `check:other-Cast.castable` `check:other-GameState.exile` `check:other-Phasing.isPhasedOut`
-- CR 722.2b a Clone of the Aviator becomes prepared and mints a Jump copy | `move:ChooseCopyTarget`
+- CR 722.2b a Clone of the Aviator becomes prepared and mints a Jump copy | `check:designations` `check:offered-actions` `check:zone-contents`
 - CR 722.3a a second attack while already prepared mints no second copy | `check:designations`
 - CR 722.3c the Aviator phases in prepared and mints a fresh Jump copy | `check:zone-contents`
 
@@ -2806,7 +2786,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 614.1 Doubling Season's OTHER clause doubles counters, not tokens | `check:helper-countersOn` `check:helper-raceAnswer`
 - CR 614.1 Vorinclex DOES double the same blight | `move:ChooseBlight`
 - CR 614.1 a row installed while its clause was false applies once the clause turns true | `board:mana-pool` `board:replacement`
-- CR 614.12a the copy choice is locked in BEFORE the enters event exists | `move:ChooseCopyTarget`
+- CR 614.12a the copy choice is locked in BEFORE the enters event exists | `check:intermediate-state`
 - CR 614.12a/701.21a Shimatsu is not among the permanents it may sacrifice | `move:ChooseAnyNumberToSacrifice`
 - CR 614.15 with two artifacts metalcraft is off, so the Blast deals its printed 2 | `check:other-GameState.replacements`
 - CR 614.16 Doubling Season does NOT double a blight paid to cast the spell | `check:helper-blightAnswer` `check:helper-countersOn`
@@ -2824,8 +2804,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 614.1c unkicked, the rewrite does not apply: nothing is milled and the Leech is a 1/1 | `move:ChooseKicker`
 - CR 614.1c with NO Kithkin card in hand it enters tapped, unasked | `check:events` `check:helper-answersFor` `check:helper-namedOut` `check:helper-revealAsks` `check:helper-revealOnEntryAnswer` `check:other-Engine.priorityLoop`
 - CR 614.1d Zof Bloodbog's own text makes it enter TAPPED | `board:controller` `board:face`
-- CR 614.1d/616.1f duelling Gather Specimens: alice takes it, then bob takes it back | `move:ChooseCopyTarget`
-- CR 614.3 the effect lasts the turn: bob's SECOND creature comes over too | `move:ChooseCopyTarget`
 - CR 614.5 two Hardened Scales are two instances: 1 -> 2 -> 3, unprompted | `check:helper-countersOn` `check:helper-wasAskedToReplace`
 - CR 614.7 an Aura the same pass buries is never offered to a regeneration shield | `board:continuous-effect` `board:mana-pool`
 - CR 615.10 Fog prevents both attackers' damage in one batch | `check:events`
@@ -2834,13 +2812,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 616.1 Scales first, then Corpsejack: 1 -> 2 -> 4 | `move:ChooseReplacement`
 - CR 616.1 one Hardened Scales alone is not asked about (nothing to choose) | `check:helper-countersOn` `check:helper-wasAskedToReplace`
 - CR 616.1a the self-replacement is applied BEFORE Furnace of Rath: 2 -> 4 -> 8 | `check:helper-wasAskedToReplace`
-- CR 616.1b an opponent's entering creature enters under YOUR control instead | `move:ChooseCopyTarget` `move:ChooseManaSource`
 - CR 616.1b before CR 616.1c: the NEW controller chooses the copy | `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 616.1b three seats: carol is asked WHICH Gather Specimens takes her creature | `board:hand-order` `board:mana-pool` `board:replacement`
-- CR 616.1c the copy bucket outranks Kismet's, so no order is asked | `move:ChooseCopyTarget`
 - CR 616.1d the back-face bucket outranks Kismet's, so no order is asked | `board:daytime`
-- CR 616.2 a Clone of a 2/2-flying Plasma that picks 1/6 is 1/6 with flying AND defender | `move:ChooseCopyTarget` `move:ChooseEntryOption`
-- CR 616.2 the same Clone picking 3/3 is a 3/3 with flying | `move:ChooseCopyTarget` `move:ChooseEntryOption`
+- CR 616.2 a Clone of a 2/2-flying Plasma that picks 1/6 is 1/6 with flying AND defender | `move:ChooseEntryOption`
+- CR 616.2 the same Clone picking 3/3 is a 3/3 with flying | `move:ChooseEntryOption`
 - CR 701.19a Uses=Once: the first destruction is replaced, the second is not | `board:combat` `board:mana-pool` `board:replacement`
 - CR 701.19c whole cards: Terror kills an Uthden Troll that just regenerated | `board:mana-pool` `board:replacement`
 - CR 701.3a a creature the Blade could not be attached to is not offered | `check:helper-answersFor` `check:helper-wasAskedForAttachment` `check:other-Stack.resolveTop`
@@ -2856,9 +2832,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 704.5f with every graveyard empty it enters 0/0 and dies | `check:helper-newestNamed`
 - CR 705.2 nobody wins Molten Sentry's flip, so its heads face mints no Treasure | `move:FlipCoin`
 - CR 705.2 the same flip coming up tails is the 2/5 with defender | `move:FlipCoin`
-- CR 707.2 a Clone of that Clone copies 1/6-flying-defender and then chooses again | `move:ChooseCopyTarget` `move:ChooseEntryOption`
+- CR 707.2 a Clone of that Clone copies 1/6-flying-defender and then chooses again | `move:ChooseEntryOption`
 - CR 707.2 a token copy of the kicked Squadron has neither the flying nor the counters | `move:ChooseKicker`
-- CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f) | `move:ChooseCopyTarget`
 - CR 800.4a a control-on-entry row ends when its controller leaves the game | `board:hand-order` `board:mana-pool` `board:replacement`
 - a greedy first choice leaves the four entering beside it nothing (CR 614.12b, CR 614.13b) | `move:ChooseAnyNumberToSacrifice` `move:ChooseKicker`
 - each later choice sees only what the earlier ones left (CR 614.12b) | `move:ChooseAnyNumberToSacrifice` `move:ChooseKicker`
@@ -2940,7 +2915,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `RestampSpec`
 
 - CR 613.7m / 608.2f the controller orders every card one conjure loop made | `move:LookUpCard` `move:ReferenceCards`
-- CR 613.7m the seat's own answer decides which simultaneous token is stamped later | `move:ChooseCopyTarget` `move:ChooseKicker`
+- CR 613.7m the seat's own answer decides which simultaneous token is stamped later | `move:ChooseKicker`
 - CR 614.12 / 608.2f a card one conjure loop made later enters beside the earlier ones, not after them | `move:ChooseLegend` `move:LookUpCard` `move:ReferenceCards`
 - CR 614.12 / 608.2f a token one loop made later enters beside the earlier ones, not after them | `move:OrderForEach`
 
@@ -2955,7 +2930,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.54a a second designation lifts the first | `move:ChooseRingBearer`
 - CR 701.54a another player gaining control ends the designation, and it does not return | `board:command`
 - CR 701.54a two players each keep their own Ring-bearer | `board:command`
-- CR 701.54b a Clone of the Ring-bearer is not a Ring-bearer | `move:ChooseCopyTarget`
+- CR 701.54b a Clone of the Ring-bearer is not a Ring-bearer | `check:designations`
 - CR 701.54c a bigger creature can't block the Ring-bearer, an equal or smaller one can | `board:command`
 - CR 701.54c four temptations drain each opponent when the Ring-bearer connects | `board:command`
 - CR 701.54c one temptation does not | `board:command`
@@ -3229,7 +3204,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2h counting first means the token is still alive and is not counted | `move:OrderTriggers-departed-source`
 - CR 608.2h sacrificing first makes the Ghoul count the token | `move:OrderTriggers-departed-source`
 - CR 608.2h the watcher reads the dead Saga's last known information | `move:ChooseProliferate`
-- CR 707.2 a COPY of the Saga answers with the copy's chapters | `move:ChooseCopyTarget` `move:ChooseProliferate`
+- CR 707.2 a COPY of the Saga answers with the copy's chapters | `move:ChooseProliferate` `check:intermediate-state`
 - CR 800.4d a departed player's delayed ability triggers, is consumed, and is not put on the stack | `board:delayed-trigger` `board:graveyard` `board:hand-order` `board:mana-pool` `board:player-status`
 - a graveyard-bound event yields no enters trigger | `check:helper-gathered`
 - advance settles before handing off, so no unscanned event is discarded | `check:events` `check:other-Object.source` `check:stack`
@@ -3357,7 +3332,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 121.3 drawing from an empty library records the failed draw | `check:other-GameState.drewFromEmpty`
 - CR 121.4 a Draw that outruns the library records the loss | `check:other-GameState.drewFromEmpty`
 - CR 202.3 One with the Machine draws the GREATEST mana value, not the count, the sum or the least | `check:hand-size`
-- CR 202.3b a Clone copying a TRANSFORMED Stonewing Antagonizer has mana value 0, not the front face's 1 | `move:ChooseCopyTarget` `board:face` `check:mana-value`
+- CR 202.3b a Clone copying a TRANSFORMED Stonewing Antagonizer has mana value 0, not the front face's 1 | `check:mana-value` `board:face`
 - CR 205.2a Rowdy Crew gets no counters when no two cards discarded share a card type | `move:RandomObject`
 - CR 205.2a Rowdy Crew gets two counters when the two cards discarded share a card type | `move:RandomObject`
 - CR 205.2a a larger NONARTIFACT permanent does not raise "ARTIFACTS you control" | `check:hand-size`
@@ -3422,8 +3397,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.9c a land discarded into a library revealed still returns Psychic Miasma | `check:hand-size` `check:helper-namesIn`
 - CR 701.9c a land discarded into a library unrevealed does not return Psychic Miasma | `move:ChooseRedirect`
 - CR 704.5a Sign in Blood's life loss can take a player to 0 and lose them the game | `check:game-result`
-- CR 707.2 a Clone copying Darksteel Myr counts as mana value 3, not its own printed 4 | `move:ChooseCopyTarget`
-- CR 707.2 a Clone copying the UNTRANSFORMED Thraben Gargoyle keeps that face's mana value | `move:ChooseCopyTarget` `check:mana-value`
+- CR 707.2 a Clone copying the UNTRANSFORMED Thraben Gargoyle keeps that face's mana value | `check:mana-value`
 - CR 724.1e Psychic Theft's card cast before a Time Stop triggers nothing at the next turn's end step | `board:delayed-trigger` `board:mana-pool`
 - CR 800.4a Vision Skeins does not draw for a player who has left the game | `check:helper-drawersOf` `check:other-GameState.drewFromEmpty`
 - Reverse the Sands whole card: the controller's permutation is what happens, seat by seat | `move:ChooseRedistribution`
