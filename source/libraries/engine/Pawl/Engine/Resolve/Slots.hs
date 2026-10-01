@@ -729,7 +729,7 @@ effectObjectRefs effect = case effect of
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
   -- One ref, and never optional: CR 615.8's shield always names its recipient.
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _) -> [ref]
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _ _) -> [ref]
   -- CR 614.9's two sides, the damage's old recipient -- absent where the card
   -- describes it instead -- and its new one.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from _ _ to _) -> Maybe.maybeToList from <> [to]
@@ -1269,8 +1269,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
     joinSlots [durationSlots duration, joinSlots (fmap conditionSlots (Maybe.maybeToList condition)), replacementRowSlots re]
   Effect.SkipNextPhase {} -> Map.empty
   -- CR 615.5's rider reads slots of its own, so its reads join this effect's,
-  -- LESS the reserved amount slot: the prevention binds that one itself
-  -- (Event.eventBindingSlots), and Resolve.runPreventionRider is the writer.
+  -- LESS the reserved amount and source slots: the prevention binds those
+  -- itself, and Resolve.runPreventionRider is the writer.
   --
   -- The card-authored FILTERS are reads too, replacementRowSlots' answer for
   -- the same DamageR row one carrier over: the recipient description rides the
@@ -1284,22 +1284,21 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
       [ durationSlots duration,
         quantitySlots quantity,
         joinSlots (fmap filterSlotsOf (Maybe.maybeToList whatRecipient <> Maybe.maybeToList chosenSource)),
-        Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
+        riderSlotsOf rider
       ]
   -- The same reads, minus the shield size this opcode does not carry and plus CR
   -- 609.7b's printed source properties, the one field only this opcode spells
   -- out; they ride the row and are rechecked at the damage event (CR 615.9).
-  -- The two arms above's reads, minus every field this opcode does not carry:
-  -- a duration and CR 609.7a's chosen-source predicate, and no rider to descend
-  -- into.
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ chosenSource) ->
-    joinSlots [durationSlots duration, filterSlotsOf chosenSource]
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ whatRecipient _ chosenSource whatSource rider) ->
     joinSlots
       [ durationSlots duration,
         joinSlots (fmap filterSlotsOf (Maybe.maybeToList whatRecipient <> Maybe.maybeToList chosenSource <> [whatSource])),
-        Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
+        riderSlotsOf rider
       ]
+  -- The two arms above's reads, minus every field this opcode does not carry: a
+  -- duration, CR 609.7a's chosen-source predicate, and the rider.
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ chosenSource rider) ->
+    joinSlots [durationSlots duration, filterSlotsOf chosenSource, riderSlotsOf rider]
   -- CR 614.9's redirection reads what PreventNextDamage reads, minus a rider it
   -- cannot carry: the recipient description rides the row, CR 609.7a's
   -- chosen-source predicate is asked once here, and the counted amount is
@@ -1830,6 +1829,14 @@ damageRewriteFilters rewrite = case rewrite of
 filterSlotsOf :: Filter.Type.Filter Keyword.Type.Keyword -> Map.Map SlotName SlotArity
 filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
 
+-- A CR 615.5 rider's slot reads, less the reserved amount and source slots that
+-- Pawl.Engine.Resolve.Effect.runPreventionRider binds as the rider runs.
+riderSlotsOf :: Seq.Seq (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
+riderSlotsOf rider =
+  Map.withoutKeys
+    (joinSlots (fmap slotsOf (Foldable.toList rider)))
+    (Set.fromList [Binding.eventAmount, Binding.preventedDamageSource])
+
 -- CR 603.3b: is slotsOf's answer the WHOLE of what applying this effect reads off
 -- the resolving object's bindings? A classification of effect SHAPE, never of
 -- which effect it is; Engine.orderInert may elide CR 603.3b's ordering prompt
@@ -1957,7 +1964,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- reports them through replacementRowSlots: its Filters name no target slot, and
   -- the Quantities a counter rewrite counts with are asked here. The effects a
   -- rewrite or a CR 615.5 rider nests are asked through their own recursion, the
-  -- posture the two prevention opcodes below take with their riders.
+  -- posture the three prevention opcodes below take with their riders.
   Effect.Replace (Replace.MkReplace duration _ _ condition re) ->
     durationSlotsAreExhaustive duration
       && all conditionSlotsAreExhaustive condition
@@ -1968,7 +1975,8 @@ ownSlotsAreExhaustive effect = case effect of
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) ->
     durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _) -> durationSlotsAreExhaustive duration
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _ rider) ->
+    durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> durationSlotsAreExhaustive duration && all Quantity.slotsAreExhaustive amount
   Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -2222,14 +2230,13 @@ readsX =
         Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
         Effect.BecomeCopy {} -> False
         -- CR 601.2b's X reaches the effects a rewrite or a CR 615.5 rider nests,
-        -- the two prevention opcodes' posture with their own riders.
+        -- the three prevention opcodes' posture with their own riders.
         Effect.Replace (Replace.MkReplace _ _ _ _ re) -> readsX (replacementRowEffects re)
         Effect.SkipNextPhase {} -> False
         -- CR 601.2b's X reaches the rider too.
         Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
         Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
-        -- No quantity and no rider, so CR 601.2b's X cannot reach it.
-        Effect.PreventNextDamageInstance {} -> False
+        Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ _ _ rider) -> readsX (Foldable.toList rider)
         Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ amount _ _ _ _ _) -> any Quantity.readsX amount
         Effect.Counter {} -> False
         Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
@@ -2469,16 +2476,15 @@ boundSlots effect = case effect of
   Effect.RedistributeLifeTotals -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.DecreaseSpeed {} -> Set.empty
-  -- A name the nested effects author, the two prevention opcodes' posture with
+  -- A name the nested effects author, the three prevention opcodes' posture with
   -- their own riders.
   Effect.Replace (Replace.MkReplace _ _ _ _ re) -> foldMap boundSlots (replacementRowEffects re)
   Effect.SkipNextPhase {} -> Set.empty
   -- The shield itself binds nothing; CR 615.5's rider is an effect list, so a
-  -- name IT authors is a name this card authors. Both shields.
+  -- name IT authors is a name this card authors. All three shields.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
-  -- The third shield binds nothing at all, having no rider to author a name.
-  Effect.PreventNextDamageInstance {} -> Set.empty
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ _ _ rider) -> foldMap boundSlots rider
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
   -- countered this way", and the permanents whose abilities were (CR 113.7).

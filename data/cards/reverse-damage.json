@@ -3,11 +3,15 @@
     {
       "manaCost": [
         {
+          "type": "Generic",
+          "value": 1
+        },
+        {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Red"
+              "type": "White"
             }
           }
         },
@@ -21,7 +25,7 @@
           }
         }
       ],
-      "name": "Deflecting Palm",
+      "name": "Reverse Damage",
       "spell": {
         "modes": [
           {
@@ -40,23 +44,18 @@
                       },
                       "riders": [
                         {
-                          "type": "DealDamage",
+                          "type": "GainLife",
                           "value": {
-                            "parts": [
-                              {
-                                "quantity": {
-                                  "type": "InSlot",
-                                  "value": "thatMuch"
-                                },
-                                "ref": {
-                                  "type": "Players",
-                                  "value": {
-                                    "type": "ControllerOfBound",
-                                    "value": "thatDamageSource"
-                                  }
-                                }
+                            "player": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
                               }
-                            ]
+                            },
+                            "quantity": {
+                              "type": "InSlot",
+                              "value": "thatMuch"
+                            }
                           }
                         }
                       ]

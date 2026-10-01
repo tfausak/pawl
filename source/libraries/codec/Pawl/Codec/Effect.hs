@@ -125,6 +125,7 @@ codec cardCodec abilityCodec =
       replaceCodec = Replace.codec cardCodec abilityCodec (codec cardCodec abilityCodec)
       preventCodec = PreventNextDamage.codec (codec cardCodec abilityCodec)
       preventAllCodec = PreventAllDamage.codec (codec cardCodec abilityCodec)
+      preventInstanceCodec = PreventNextDamageInstance.codec (codec cardCodec abilityCodec)
       forEachCodec = ForEach.codec (codec cardCodec abilityCodec)
       forEachNumberCodec = ForEachNumber.codec (codec cardCodec abilityCodec)
       repeatCodec = Repeat.codec (codec cardCodec abilityCodec)
@@ -210,7 +211,7 @@ codec cardCodec abilityCodec =
           Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
           Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage (\x -> case x of Effect.PreventNextDamage y -> Just y; _ -> Nothing),
           Arm.payload "PreventAllDamage" preventAllCodec Effect.PreventAllDamage (\x -> case x of Effect.PreventAllDamage y -> Just y; _ -> Nothing),
-          Arm.payload "PreventNextDamageInstance" PreventNextDamageInstance.codec Effect.PreventNextDamageInstance (\x -> case x of Effect.PreventNextDamageInstance y -> Just y; _ -> Nothing),
+          Arm.payload "PreventNextDamageInstance" preventInstanceCodec Effect.PreventNextDamageInstance (\x -> case x of Effect.PreventNextDamageInstance y -> Just y; _ -> Nothing),
           Arm.payload "RedirectDamage" RedirectDamage.codec Effect.RedirectDamage (\x -> case x of Effect.RedirectDamage y -> Just y; _ -> Nothing),
           Arm.payload "PutCounters" PutCounters.codec Effect.PutCounters (\x -> case x of Effect.PutCounters y -> Just y; _ -> Nothing),
           Arm.payload "MoveCounters" MoveCounters.codec Effect.MoveCounters (\x -> case x of Effect.MoveCounters y -> Just y; _ -> Nothing),
