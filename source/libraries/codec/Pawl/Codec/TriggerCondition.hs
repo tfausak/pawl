@@ -55,6 +55,8 @@ codec =
           Arm.payload "StepBegins" StepBegins.codec TriggerCondition.StepBegins (\x -> case x of TriggerCondition.StepBegins y -> Just y; _ -> Nothing),
           Arm.payload "StateIs" Condition.codec TriggerCondition.StateIs (\x -> case x of TriggerCondition.StateIs y -> Just y; _ -> Nothing),
           Arm.payload "SelfDealsCombatDamageToPlayer" PlayerRelation.codec TriggerCondition.SelfDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.SelfDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
+          Arm.nullary "SelfDealsCombatDamageToPlayerOrBattle" TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle,
+          Arm.nullary "SelfDealsCombatDamage" TriggerCondition.SelfDealsCombatDamage,
           Arm.payload "SelfDealsDamageToPlayer" PlayerRelation.codec TriggerCondition.SelfDealsDamageToPlayer (\x -> case x of TriggerCondition.SelfDealsDamageToPlayer y -> Just y; _ -> Nothing),
           Arm.nullary "SelfDealsDamageToCreature" TriggerCondition.SelfDealsDamageToCreature,
           Arm.nullary "SelfIsDealtDamage" TriggerCondition.SelfIsDealtDamage,
@@ -214,6 +216,8 @@ tagOf x = case x of
   TriggerCondition.StepBegins {} -> "StepBegins"
   TriggerCondition.StateIs {} -> "StateIs"
   TriggerCondition.SelfDealsCombatDamageToPlayer {} -> "SelfDealsCombatDamageToPlayer"
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle {} -> "SelfDealsCombatDamageToPlayerOrBattle"
+  TriggerCondition.SelfDealsCombatDamage {} -> "SelfDealsCombatDamage"
   TriggerCondition.SelfDealsDamageToPlayer {} -> "SelfDealsDamageToPlayer"
   TriggerCondition.SelfDealsDamageToCreature {} -> "SelfDealsDamageToCreature"
   TriggerCondition.SelfIsDealtDamage {} -> "SelfIsDealtDamage"

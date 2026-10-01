@@ -627,6 +627,8 @@ looksBack condition = case condition of
   TriggerCondition.StepBegins {} -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> False
+  TriggerCondition.SelfDealsCombatDamage -> False
   TriggerCondition.SelfDealsDamageToPlayer _ -> False
   TriggerCondition.SelfDealsDamageToCreature -> False
   TriggerCondition.SelfIsDealtDamage -> False
@@ -874,6 +876,13 @@ batchScoped condition = case condition of
   TriggerCondition.StepBegins {} -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
+  -- Per recipient, like the arm above: CR 510.1b sends an unblocked attacker's
+  -- damage to the one player or battle it attacks.
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> False
+  -- A True for the reason PermanentsDealCombatDamageToPlayer's below gives: CR
+  -- 510.2 deals a step's combat damage as one event, so damage to two blockers,
+  -- or to a blocker and a trampled-over player, is one trigger event, not two.
+  TriggerCondition.SelfDealsCombatDamage -> True
   TriggerCondition.SelfDealsDamageToPlayer _ -> False
   TriggerCondition.SelfDealsDamageToCreature -> False
   TriggerCondition.SelfIsDealtDamage -> False
@@ -2715,6 +2724,8 @@ zonesTriggeredFrom cond =
         -- and, for CR 113.6p's objects, the command zone.
         TriggerCondition.StateIs _ -> battlefield
         TriggerCondition.SelfDealsCombatDamageToPlayer _ -> battlefield
+        TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> battlefield
+        TriggerCondition.SelfDealsCombatDamage -> battlefield
         -- CR 113.6's default once more, and for the arm above's reason: the bearer
         -- is the damage's SOURCE, and a noncombat source on the stack or in a
         -- graveyard is a different object from this permanent.
@@ -3078,6 +3089,8 @@ stateTriggers gs
             TriggerCondition.PermanentEnters _ -> False
             TriggerCondition.StepBegins {} -> False
             TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
+            TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> False
+            TriggerCondition.SelfDealsCombatDamage -> False
             TriggerCondition.SelfDealsDamageToPlayer _ -> False
             TriggerCondition.SelfDealsDamageToCreature -> False
             TriggerCondition.SelfIsDealtDamage -> False

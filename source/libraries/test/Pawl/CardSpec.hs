@@ -1026,6 +1026,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> []
+  TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
   TriggerCondition.SelfIsDealtDamage -> []
@@ -4227,6 +4229,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> []
+  TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   -- Nullary as well: the printed form qualifies the damaged creature in no way,
   -- so a text change has nothing here to rewrite.
@@ -4441,6 +4445,8 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- and Filters -- no SlotName of its own.
   TriggerCondition.StateIs _ -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> []
+  TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
   TriggerCondition.SelfIsDealtDamage -> []
