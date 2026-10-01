@@ -25,7 +25,10 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "HasProtectionFromChosenName"
+            "type": "HasProtectionFrom",
+            "value": {
+              "type": "HasChosenName"
+            }
           },
           "scope": {
             "type": "You"

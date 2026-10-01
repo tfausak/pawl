@@ -995,7 +995,6 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- fold is exact only while EachPlayer is the one scope a card may write.
   PlayerEffect.DamageCantBeRedirected _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
   PlayerEffect.CantSearchLibraries _ -> False
-  PlayerEffect.HasProtectionFromChosenName -> False
   PlayerEffect.HasProtectionFrom _ -> False
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.CantSetSchemesInMotion -> False
@@ -1014,8 +1013,6 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities _ -> False
   PlayerEffect.CantCastMoreThan _ -> False
-  PlayerEffect.CantCastChosenName -> False
-  PlayerEffect.CantPlayLandChosenName -> False
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
@@ -1073,7 +1070,6 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_) || Maybe.isJust (DamagePattern.whichSource pattern_)
   PlayerEffect.DamageCantBeRedirected pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_) || Maybe.isJust (DamagePattern.whichSource pattern_)
   PlayerEffect.CantSearchLibraries _ -> False
-  PlayerEffect.HasProtectionFromChosenName -> False
   PlayerEffect.HasProtectionFrom _ -> False
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.CantSetSchemesInMotion -> False
@@ -1088,8 +1084,6 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities _ -> False
   PlayerEffect.CantCastMoreThan _ -> False
-  PlayerEffect.CantCastChosenName -> False
-  PlayerEffect.CantPlayLandChosenName -> False
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
