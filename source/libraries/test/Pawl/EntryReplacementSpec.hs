@@ -2107,7 +2107,7 @@ ordersEntry seasonFirst seasonId p = case p of
 --
 -- THE COUNTS ARE UNEQUAL, one and two, so an arbitrary survivor is caught
 -- whichever row it kept: the merged tally is three and neither printed count is.
-wardingBeaconSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wardingBeaconSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 wardingBeaconSpec s registry = Spec.describe s "Synthetic Warding Beacon (CR 612.2)" $ do
   let wardFrom subtype = CounterKind.Keyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype subtype)))
       -- Both kinds the row names, read off the creature that entered.
@@ -2119,13 +2119,6 @@ wardingBeaconSpec s registry = Spec.describe s "Synthetic Warding Beacon (CR 612
     case entered of
       Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
       Just pikerId -> Spec.assertEqWith s "one hexproof from Islands counter and two hexproof from Swamps counters" (wardsOn pikerId after) (1, 2)
-  -- The rule. Hacked Island -> Swamp, both kinds map onto one key and CR 122.1
-  -- makes that one tally of three.
-  Spec.it s "CR 612.2/122.1 hacked Island -> Swamp, the two rows merge into one tally of three" $ do
-    (after, entered) <- beaconChain s registry True
-    case entered of
-      Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
-      Just pikerId -> Spec.assertEqWith s "no hexproof from Islands counter left, and all three counters on hexproof from Swamps" (wardsOn pikerId after) (0, 3)
 
 -- globeChain's board with Magical Hack ({U}) in place of Artificial Evolution:
 -- alice controls the Beacon, an Island and six Mountains, and holds the Hack and

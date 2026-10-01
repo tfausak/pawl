@@ -324,6 +324,7 @@ import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LabelSpec
 import qualified Pawl.Codec.LastKnownSpec
 import qualified Pawl.Codec.LayoutSpec
+import qualified Pawl.Codec.LibraryArrivalSpec
 import qualified Pawl.Codec.LibraryDepthSpec
 import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
@@ -587,6 +588,7 @@ import qualified Pawl.Codec.TurnUpRewriteSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TurnedFaceUpSpec
 import qualified Pawl.Codec.TypeLineSpec
+import qualified Pawl.Codec.TypeSwapSpec
 import qualified Pawl.Codec.TypesAreSpec
 import qualified Pawl.Codec.UntapRSpec
 import qualified Pawl.Codec.UntapRestrictionSpec
@@ -1123,6 +1125,7 @@ spec s registry = do
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LastKnownSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
+  Pawl.Codec.LibraryArrivalSpec.spec s
   Pawl.Codec.LibraryDepthSpec.spec s
   Pawl.Codec.LibraryPlacementSpec.spec s
   Pawl.Codec.LibraryPositionSpec.spec s
@@ -1393,6 +1396,7 @@ spec s registry = do
   Pawl.Codec.TurnWindowSpec.spec s
   Pawl.Codec.TurnedFaceUpSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
+  Pawl.Codec.TypeSwapSpec.spec s
   Pawl.Codec.UntapRestrictionSpec.spec s
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.VanguardSpec.spec s

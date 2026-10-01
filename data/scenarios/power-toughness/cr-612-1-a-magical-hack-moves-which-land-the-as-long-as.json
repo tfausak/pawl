@@ -1,0 +1,34 @@
+{
+  "description": "CR 612.1 a Magical Hack moves which land the 'as long as' clause names",
+  "note": "Kird Ape's CR 604.2 'as long as you control a Forest' clause is printed in its text box, so a Magical Hack naming Forest rewrites it (CR 612.1, 612.2): the hacked Ape asks after a Swamp. Forest -> Swamp rather than Island, since the Island paying the Hack's {U} would read 2/3 for the wrong reason. Both halves are asserted: 1/1 alone passes for an engine that dropped the ability, and a Swamp played afterwards restores 2/3.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Forest", "label": "forest", "ready": true },
+          { "card": "Kird Ape", "label": "ape", "ready": true }
+        ],
+        "hand": [
+          { "card": "Magical Hack", "label": "hack" },
+          { "card": "Swamp", "label": "swamp" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@ape", "power": 2, "toughness": 3 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@ape"], "mana": ["@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Forest" }, "to": { "type": "Swamp" } } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@ape", "power": 1, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "PlayLand": "@swamp" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@ape", "power": 2, "toughness": 3 } } }
+  ]
+}

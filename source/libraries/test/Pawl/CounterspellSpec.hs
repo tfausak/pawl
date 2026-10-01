@@ -1590,12 +1590,6 @@ magicalHackDurationSpec s registry = Spec.describe s "MagicalHackDuration" $ do
     (pikerId, after) <- theftChain s registry 2 0 False
     Spec.assertEqWith s "bob keeps the Piker" (Projection.controllerOf pikerId after) (Just S.bob)
     Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
-  -- And the point: the same Swamp-less board, with the word the duration names
-  -- swapped for one alice does control.
-  Spec.it s "CR 612.1 a Magical Hack on the theft rewrites the duration's own word" $ do
-    (pikerId, after) <- theftChain s registry 3 0 True
-    Spec.assertEqWith s "alice controls the Piker" (Projection.controllerOf pikerId after) (Just S.alice)
-    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
 
 -- Aims every target slot at `oid` as an object (the SpellsAndPermanents pool's
 -- recipient shape), and swaps `from` for `to` when the text-changer asks. Every
@@ -2450,18 +2444,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "3/1 plus 2/2" (S.powerToughnessOf soldierId after) (Just (5, 3))
     Spec.assertEqWith s "and the Goblin beside it is untouched" (S.powerToughnessOf gobId after) (Just (2, 1))
 
-  Spec.it s "CR 608.2b an evolved Piety Charm finds its target illegal and fizzles" $ do
-    (soldierId, gobId, after) <- pietyCharmChain s registry (Just (Subtype.Soldier, Subtype.Goblin))
-    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "the Soldier is its printed 3/1" (S.powerToughnessOf soldierId after) (Just (3, 1))
-    Spec.assertEqWith s "and the Goblin the clause now names got nothing either" (S.powerToughnessOf gobId after) (Just (2, 1))
-
-  Spec.it s "CR 612.2 an Evolution naming a word the charm lacks leaves it resolving" $ do
-    (soldierId, gobId, after) <- pietyCharmChain s registry (Just (Subtype.Elf, Subtype.Goblin))
-    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "still 5/3" (S.powerToughnessOf soldierId after) (Just (5, 3))
-    Spec.assertEqWith s "and the Goblin is untouched" (S.powerToughnessOf gobId after) (Just (2, 1))
-
   -- The falsifier for a word-blind rewrite, on the same board with one word
   -- changed: Human is printed on the Ministrant and nowhere in rule 702.135a, so
   -- an Evolution naming it moves the Ministrant's own type line and leaves the
@@ -2511,16 +2493,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "the Spider-Punk got the counter" (S.counterOf CounterKind.PlusOnePlusOne punkId after) 1
     Spec.assertEqWith s "the Goblin Piker got none" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 0
 
-  -- And the point: CR 612.2's creature-type swap reaches the ObjectRef inside
-  -- PutCounters, so "each other Hero you control" becomes "each other Goblin you
-  -- control" and the two counts trade places. The Coulson itself is a Goblin by
-  -- then and still takes nothing, because "other" is a Not IsSource the swap
-  -- does not touch.
-  Spec.it s "CR 612.2 an evolved Coulson counters the Goblin and not the Hero" $ do
-    (punkId, pikerId, after) <- coulsonChain s registry (Just (Subtype.Hero, Subtype.Goblin))
-    Spec.assertEqWith s "the Goblin Piker got the counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
-    Spec.assertEqWith s "the Spider-Punk got none" (S.counterOf CounterKind.PlusOnePlusOne punkId after) 0
-
   -- CR 612.1's "any words or symbols printed on that object" reaches a word held
   -- inside a NUMBER the effect computes, not only the ones naming an object.
   -- Goblin War Strike {R} Sorcery -- "Goblin War Strike deals damage to target
@@ -2536,13 +2508,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
   Spec.it s "CR 120.1 an unevolved Goblin War Strike counts Goblins" $ do
     after <- goblinWarStrikeChain s registry Nothing
     Spec.assertEqWith s "bob took 2, one per Goblin alice controls" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
-
-  -- And the point: the swap reaches the Count inside the damage clause, so the
-  -- resolving Strike counts alice's four Elves instead of her two Goblins.
-  Spec.it s "CR 612.1 an evolved Goblin War Strike counts Elves instead" $ do
-    after <- goblinWarStrikeChain s registry (Just (Subtype.Goblin, Subtype.Elf))
-    Spec.assertEqWith s "bob took 4, one per Elf alice controls" (S.lifeOf S.bob after) (Just 16)
     Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
 
   -- CR 612.1 into a quoted ability a RESOLUTION grants: the words are printed on
@@ -2819,18 +2784,6 @@ counterKindTextChangeSpec s registry = Spec.describe s "CounterKindTextChange" $
         Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire may NOT target it" reaches (Just False)
         Spec.assertEqWith s "one hexproof from Goblins counter" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 1
         Spec.assertEqWith s "and none of the printed hexproof from Zombies" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 0
-  -- CR 122.1's last sentence -- "counters with the same name or description are
-  -- interchangeable" -- through the same rewrite: a swap that collides two rider
-  -- keys must MERGE their tallies rather than keep an arbitrary survivor. Read
-  -- off the counter map, which is what the merge IS; the targeting reader above
-  -- cannot tell three counters of a kind from one.
-  Spec.it s "CR 122.1 hacked Zombie -> Skeleton, the two colliding riders merge into one tally of three" $ do
-    (entered, after) <- homecomingChain s registry "Synthetic Twinward Homecoming" (Just (Subtype.Zombie, Subtype.Skeleton))
-    case entered of
-      Nothing -> Spec.assertFailure s "the Goblin Piker did not return to the battlefield"
-      Just pikerId -> do
-        Spec.assertEqWith s "all three counters on hexproof from Skeletons" (S.counterOf (counterKindWard Subtype.Skeleton) pikerId after) 3
-        Spec.assertEqWith s "and no hexproof from Zombies counter left" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 0
   -- The control: unhacked, the two qualities stay two kinds at their printed
   -- counts, so the merge above is the swap's doing and not the card's.
   Spec.it s "CR 122.6 unhacked, the two riders stay two kinds at one and two" $ do
@@ -2859,11 +2812,6 @@ counterKindTextChangeSpec s registry = Spec.describe s "CounterKindTextChange" $
     reaches <- tarfireReaches s registry pikerId after
     Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire still may NOT target it" reaches (Just False)
     Spec.assertEqWith s "the hexproof from Goblins counter is still there" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 1
-  Spec.it s "CR 612.1 hacked Zombie -> Goblin, RemoveCounters takes the hexproof from Goblins counter off" $ do
-    (pikerId, after) <- erodeTheWardingChain s registry (Just (Subtype.Zombie, Subtype.Goblin))
-    reaches <- tarfireReaches s registry pikerId after
-    Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire may target it once more" reaches (Just True)
-    Spec.assertEqWith s "no hexproof from Goblins counter left" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 0
 
 -- CR 701.6a covers "a spell or ability", and Stifle ({U} Instant, "Counter
 -- target activated or triggered ability. (Mana abilities can't be targeted.)")

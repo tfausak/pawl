@@ -42,7 +42,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   redirect too, its `source` the object whose replacement it is. `ChooseToPay`
   answers a cost a resolving object offers (CR 118.12a), keyed the same way:
   its `decision` is `Pays` or `Declines`, and paying takes a cast's choices,
-  such as `mana`. `ChooseTargets` names each slot's
+  such as `mana`. `ChooseTypeSwap` answers a text change's swap (CR 612.1),
+  `{ "from": { "type": "Island" }, "to": { "type": "Swamp" } }`, keyed
+  the same way. `ChooseTargets` names each slot's
   targets, `{ "target": ["@moon"] }`, for a target prompt no cast or activation
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`

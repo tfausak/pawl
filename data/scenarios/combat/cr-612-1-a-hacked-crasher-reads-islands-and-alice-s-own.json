@@ -1,0 +1,29 @@
+{
+  "description": "CR 612.1 a hacked Crasher reads ISLANDS and alice's own Island frees it",
+  "note": "Glacial Crasher \"can't attack unless there is a Mountain on the battlefield\" names a basic land type in its CR 508.1c gate, and the gate reads the whole battlefield, so the swap is the only thing under test. alice holds a Magical Hack and the Island that pays for it; bob has no creature. With no Mountain anywhere, Mountain -> Island on the Crasher makes alice's own Island satisfy the rewritten gate, so the Crasher is offered and attacks.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Glacial Crasher", "label": "crasher", "ready": true },
+          { "card": "Island", "label": "island", "ready": true }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": []
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@hack", "targets": ["@crasher"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": { "ChooseTypeSwap": { "from": { "type": "Mountain" }, "to": { "type": "Island" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@crasher"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@crasher": "@bob" } } } }
+  ]
+}

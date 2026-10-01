@@ -1,0 +1,28 @@
+{
+  "description": "CR 612.1 whole cards: the rewritten affected sets decide a real combat phase",
+  "note": "Kormus Bell animates alice's Swamp into a 1/1, and the printed Synthetic Wetland Frenzy requires Swamps to attack each combat if able. alice tries to declare no attackers; CR 508.1d rejects that whole, so the Swamp attacks an empty board and bob goes to 19. Synthetic because no printing names a basic land type as the subject of a combat requirement. The hacked file is the same board with Swamp swapped for Forest on the Frenzy.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kormus Bell" },
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Island", "label": "island" },
+          { "card": "Synthetic Wetland Frenzy", "label": "frenzy" }
+        ],
+        "hand": [{ "card": "Magical Hack", "label": "hack" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@swamp"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } }
+  ]
+}

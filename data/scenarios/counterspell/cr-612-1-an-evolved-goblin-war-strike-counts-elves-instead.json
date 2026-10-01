@@ -1,0 +1,40 @@
+{
+  "description": "CR 612.1 an evolved Goblin War Strike counts Elves instead",
+  "note": "Goblin War Strike deals damage to target player equal to the number of Goblins you control. An Artificial Evolution resolved at the Strike on the stack swaps Goblin for Elf inside that count, so it counts alice's four Glistener Elves rather than her two Goblin Pikers and bob goes to 16. The counts are unequal and neither is the number of creatures, so counting everything or nothing is a different total. Both spells in the graveyard is the emptied stack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Island", "label": "island" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Glistener Elf" },
+          { "card": "Glistener Elf" },
+          { "card": "Glistener Elf" },
+          { "card": "Glistener Elf" }
+        ],
+        "hand": [
+          { "card": "Goblin War Strike", "label": "strike" },
+          { "card": "Artificial Evolution", "label": "evolution" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@strike", "targets": ["@bob"], "mana": ["@mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@evolution", "targets": ["Goblin War Strike"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTypeSwap": { "from": { "type": "Goblin" }, "to": { "type": "Elf" } } }, "source": "Artificial Evolution" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin War Strike", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Artificial Evolution", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } }
+  ]
+}

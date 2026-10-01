@@ -31,7 +31,8 @@ data Clause card ability = MkClause
     -- hangs off, so that declining that one skips this one too. Tweeze's "you
     -- may discard a card. If you do, draw a card" is the witness -- the draw is
     -- a clause of its own naming the "may" clause's ordinal. Nothing is the
-    -- unmarked case every other card in the corpus takes.
+    -- unmarked case every other card in the corpus takes. The clause named is
+    -- CR 118.12's cost, paid on resolution (Pawl.Engine.Resolve.asCostWhenNamed).
     --
     -- CR 608.2c is the whole authority: the controller "follows its instructions
     -- in the order written", and later text may modify the meaning of earlier

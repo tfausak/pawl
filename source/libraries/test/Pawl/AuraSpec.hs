@@ -1229,9 +1229,8 @@ replenishSpec s registry =
         -- completed move deletes the old id and mints a new one (CR 400.7), so an
         -- Aura that entered and was buried has NO object under its original id while
         -- one that never moved still does. The rule's TOKEN clause is asked in the
-        -- AuraToken group below, over Preston Garvey, Minuteman. Not implemented:
-        -- CR 303.4g's remaining branch, an Aura whose current zone is the STACK
-        -- (gap #1734).
+        -- AuraToken group below, over Preston Garvey, Minuteman, and its STACK
+        -- branch in Pawl.CopySpec, over Copy Enchantment copying Betrayal.
         Spec.it s "CR 303.4g an Aura with nothing to enchant never leaves the graveyard" $ do
           plains <- S.printingOf s registry "Plains"
           replenish <- S.printingOf s registry "Replenish"
@@ -3920,15 +3919,13 @@ licidBoard island piker licid =
 -- THE TWO COUNTS ARE UNEQUAL AND ODD -- three Forests and seven Islands -- so
 -- each leg exercises both roundings and no pair of numbers coincides: +1/+2 on a
 -- 2/1 Piker is 3/3, and +3/+4 is 5/5.
-auraTextChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+auraTextChangeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraTextChangeSpec s registry = Spec.describe s "AuraTextChange" $ do
-  -- The control: the same board and the same Aura, no Magical Hack.
+  -- The control for data/scenarios/aura/cr-400-7a-hacking-the-aura-spell-leaves-the-permanent.json:
+  -- the same board and the same Aura, no Magical Hack.
   Spec.it s "unhacked, the Aura counts the Forests its printed text names" $ do
     (creature, after) <- aspectChain s registry False
     Spec.assertEqWith s "three Forests, so +1/+2 on the 2/1 Piker" (S.powerToughnessOf creature after) (Just (3, 3))
-  Spec.it s "CR 400.7a hacking the Aura SPELL leaves the permanent counting Islands" $ do
-    (creature, after) <- aspectChain s registry True
-    Spec.assertEqWith s "seven Islands, so +3/+4 on the 2/1 Piker" (S.powerToughnessOf creature after) (Just (5, 5))
 
 -- alice controls three Forests, seven Islands and a Goblin Piker (2/1), and holds
 -- Aspect of Wolf and Magical Hack. The Aura is cast at the Piker and left ON THE
