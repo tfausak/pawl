@@ -1,0 +1,76 @@
+{
+  "description": "CR 509.3e one admitted blocker among two is enough",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Serra Inquisitors",
+            "label": "serra-inquisitors",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "bog-wraith",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$serra-inquisitors"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$bog-wraith": [
+            "$serra-inquisitors"
+          ],
+          "$hill-giant": [
+            "$serra-inquisitors"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$serra-inquisitors",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$serra-inquisitors",
+        "power": 5,
+        "toughness": 3
+      }
+    }
+  ]
+}
