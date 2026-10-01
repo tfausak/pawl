@@ -1,0 +1,84 @@
+{
+  "description": "CR 702.134c attacking is not mentoring: nothing was mentored",
+  "note": "The Haskell asserts no counters of any kind; mentor puts only +1/+1 counters, so that kind is the one checked.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Aegis of the Legion",
+            "ready": true,
+            "attached": "hill-giant"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$hill-giant"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Goblin Piker",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$hill-giant",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Goblin Piker",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "description": "CR 608.2c whole card: only carol's Bad Moon is destroyed",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Trygon Predator",
+            "label": "trygon-predator",
+            "ready": true
+          },
+          {
+            "card": "Bad Moon",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Bad Moon",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Bad Moon",
+            "label": "bad-moon",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$trygon-predator"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$trygon-predator",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "target",
+              [
+                [
+                  "Object",
+                  "$bad-moon"
+                ]
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseOptional",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "carol",
+        "life": 18
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Battlefield",
+        "card": "Bad Moon",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Graveyard",
+        "card": "Bad Moon",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$trygon-predator",
+        "tapped": true
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Bad Moon",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Bad Moon",
+        "count": 1
+      }
+    }
+  ]
+}

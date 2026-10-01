@@ -1,0 +1,94 @@
+{
+  "description": "CR 307.5 whole card: the Augur pumps in its controller's upkeep",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Llanowar Augur",
+            "label": "llanowar-augur",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$llanowar-augur",
+          "targets": [
+            "$goblin-piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Llanowar Augur",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Llanowar Augur",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$goblin-piker",
+          "power": 5,
+          "toughness": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DrawStep",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$goblin-piker",
+          "keyword": {
+            "type": "Trample"
+          },
+          "count": 1
+        }
+      }
+    }
+  ]
+}
