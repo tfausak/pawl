@@ -2129,6 +2129,7 @@ library types
     Pawl.Types.EntryFlip
     Pawl.Types.EntryOption
     Pawl.Types.EntryR
+    Pawl.Types.EntryRefusal
     Pawl.Types.EntryRestriction
     Pawl.Types.EntryRewrite
     Pawl.Types.EntryRiders

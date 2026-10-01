@@ -572,7 +572,7 @@ Card-driven unless noted.
    answers `Nothing` for CR 303.4g's "remains in its current zone". CR 303.4g's
    token clause and CR 303.4i landed with Preston Garvey, Minuteman, whose Create
    names the host its Aura token arrives attached to; CR 303.4g's stack branch
-   still has no producer (#1734).
+   landed with Copy Enchantment copying an Aura (`Event.seatEnteringAura`).
 3. **CR 702.5c** — multiple `enchant` instances. `Card.enchant` is a `Maybe`, so
    the pool cannot express a second one.
 4. **CR 702.5d "enchant player"** — a *modelling* limit, not a missing producer.
