@@ -1,0 +1,62 @@
+{
+  "description": "CR 508.3c a teammate's attack-with-two counts only his creatures",
+  "note": "Shared team turns, alice and bob against carol and dave. bob's Military Intelligence (\"Whenever you attack with two or more creatures, draw a card.\") counts only the creatures he controls (CR 805.10c / 508.3c): one Piker of his beside alice's draws nothing. The sibling file gives him two and he draws.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ],
+        "battlefield": [{ "card": "Goblin Piker", "label": "alices-piker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ],
+        "battlefield": [
+          { "card": "Military Intelligence", "label": "intelligence" },
+          { "card": "Goblin Piker", "label": "bobs-piker-1", "ready": true }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "library": [
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" },
+          { "card": "Island" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@alices-piker", "@bobs-piker-1"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@alices-piker", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@bobs-piker-1", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Island", "count": 0 } } }
+  ]
+}

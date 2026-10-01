@@ -1,0 +1,44 @@
+{
+  "description": "CR 801.7 a triggered ability does not trigger on a player outside its controller's range",
+  "note": "Four seats at range 1, so carol sits two seats from alice. carol pays 2 life to Greed on alice's turn; alice's Exquisite Blood would gain her that much, but CR 801.7 keeps a player outside alice's range from triggering it. The sibling files run the same payment at an unlimited range, bob's in-range payment, and bob paying his last 2 life.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "range": 1,
+        "battlefield": [{ "card": "Exquisite Blood", "label": "blood" }]
+      },
+      {
+        "name": "bob",
+        "range": 1,
+        "battlefield": [
+          { "card": "Swamp", "label": "bobs-swamp", "ready": true },
+          { "card": "Greed", "label": "bobs-greed" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "carol",
+        "range": 1,
+        "battlefield": [
+          { "card": "Swamp", "label": "carols-swamp", "ready": true },
+          { "card": "Greed", "label": "carols-greed" }
+        ],
+        "library": [{ "card": "Swamp" }]
+      },
+      {
+        "name": "dave",
+        "range": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "Activate": { "object": "@carols-greed", "mana": ["@carols-swamp"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "carol", "life": 18 } },
+    { "Life": { "player": "alice", "life": 20 } }
+  ]
+}

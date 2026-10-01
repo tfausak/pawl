@@ -1,0 +1,34 @@
+{
+  "description": "CR 508.3d a teammate's whenever-you-attack trigger fires",
+  "note": "Shared team turns, alice and bob against carol and dave: bob is an attacking player on alice's turn (CR 805.10a), so his Boggart Prankster's \"whenever you attack\" triggers, pumps the attacking Prankster itself and it deals carol 2. The control drops the option, nothing attacks and carol stays at 20.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Boggart Prankster", "label": "prankster", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@prankster"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@prankster", "do": { "ChooseAttackTarget": "@carol" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "ChooseTargets": { "target": ["@prankster"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } }
+  ]
+}

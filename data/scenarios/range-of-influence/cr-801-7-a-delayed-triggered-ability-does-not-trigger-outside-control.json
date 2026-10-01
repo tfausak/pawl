@@ -1,0 +1,37 @@
+{
+  "description": "CR 801.7 a delayed triggered ability does not trigger outside its controller's range",
+  "note": "The control for the range-1 file: at an unlimited range alice's False Cure trigger sees carol gain 2 and she loses 4 for them.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true }
+        ],
+        "hand": [{ "card": "False Cure", "label": "false-cure" }]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol",
+        "hand": [{ "card": "Radiant Fountain", "label": "fountain" }]
+      },
+      {
+        "name": "dave"
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@false-cure", "mana": ["@swamp", "@swamp-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": { "PlayLand": "@fountain" } }
+  ],
+  "final": [
+    { "Life": { "player": "carol", "life": 18 } }
+  ]
+}

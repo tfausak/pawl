@@ -1,0 +1,33 @@
+{
+  "description": "CR 805.10b a teammate's creature attacks on the team's turn",
+  "note": "CR 805.10b: the active team makes one combined attack, so bob's Goblin Piker attacks carol on alice's turn.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "ChooseAttackTarget": "@carol" }, "source": "@piker" },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 18 } } }
+  ]
+}
