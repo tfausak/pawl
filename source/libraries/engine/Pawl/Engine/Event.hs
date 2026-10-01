@@ -144,6 +144,7 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.LibraryArrival as LibraryArrival
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LifeGainR as LifeGainR
@@ -358,12 +359,77 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
 -- each source's gain an event of its own.
+--
+-- The body is also one arrivingTogether scope, so CR 401.4 is settled before the
+-- group closes.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
-  result <- body
+  result <- arrivingTogether body
   State.modify' closeEventGroup
   pure result
+
+-- CR 401.4's scope: the cards a replacement redirects into a library while
+-- `body` runs are put there "at the same time", and their owners arrange them as
+-- it ends (arrangeLibraryArrivals). `simultaneously` opens one; so do the
+-- one-at-a-time moves that are one instruction without being one event group --
+-- a mill (millFromReturningTaken) and a surveil's graveyard half. The OUTERMOST
+-- scope wins, `simultaneously`'s posture.
+arrivingTogether :: Game a -> Game a
+arrivingTogether body = do
+  open <- State.gets (Maybe.isJust . GameState.libraryArrivals)
+  if open
+    then body
+    else do
+      State.modify' (\g -> g {GameState.libraryArrivals = Just Seq.empty})
+      result <- body
+      arrangeLibraryArrivals
+      pure result
+
+-- CR 401.4: "if an effect puts two or more cards in a specific position in a
+-- library at the same time, the owner of those cards may arrange them in any
+-- order". The redirected arrivals the scope recorded (noteLibraryArrival),
+-- grouped by owner and end; a group of two or more MOVES is asked of its owner
+-- with Prompt.ArrangeLibraryArrivals, and the cards are rewritten into the slots
+-- they already hold. A lone move is one order -- a melded permanent's two cards
+-- were arranged by CR 712.21a as they moved.
+--
+-- After the fact rather than before each move, which no reader can tell apart:
+-- nothing inside the scope reads a library's order.
+--
+-- Pawl.ZoneChangeSpec's Library of Leng and Wheel of Sun and Moon CR 401.4 cases
+-- prove it.
+arrangeLibraryArrivals :: Game ()
+arrangeLibraryArrivals = do
+  pending <- State.gets (Maybe.fromMaybe Seq.empty . GameState.libraryArrivals)
+  State.modify' (\g -> g {GameState.libraryArrivals = Nothing})
+  Monad.unless (Seq.null pending) $ do
+    gs0 <- State.get
+    let movesAt owner position = filter (\arrival -> LibraryArrival.owner arrival == owner && LibraryArrival.position arrival == position) (Foldable.toList pending)
+    Monad.forM_ (Game.apnapOrder gs0) $ \owner -> Monad.forM_ [minBound .. maxBound] $ \position -> do
+      let moves = movesAt owner position
+      Monad.when (length moves >= 2) $ do
+        gs <- State.get
+        let library = Map.findWithDefault Seq.empty owner (GameState.library gs)
+            members = Set.fromList (concatMap (Foldable.toList . LibraryArrival.cards) moves)
+            held = [i | (i, oid) <- zip [0 :: Int ..] (Foldable.toList library), Set.member oid members]
+            -- From the arrival end inward, the prompt's reading.
+            slots = case position of
+              LibraryPosition.Top -> held
+              LibraryPosition.Bottom -> reverse held
+            batch = fmap (Seq.index library) slots
+        Monad.when (length batch >= 2) $ do
+          answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+          let arranged = Game.permute batch answer
+              rewrite lib = List.foldl' (\acc (slot, oid) -> Seq.update slot oid acc) lib (zip slots arranged)
+          State.modify' (\g -> g {GameState.library = Map.adjust rewrite owner (GameState.library g)})
+
+-- CR 401.4's record: inside an arrivingTogether scope, note a move a
+-- replacement redirected to an end of `owner`'s library. Outside one the move is
+-- alone, and one move is one order.
+noteLibraryArrival :: PlayerId -> LibraryPosition.LibraryPosition -> Seq.Seq ObjectId -> GameState -> GameState
+noteLibraryArrival owner position cards gs =
+  gs {GameState.libraryArrivals = fmap (Seq.|> LibraryArrival.MkLibraryArrival owner position cards) (GameState.libraryArrivals gs)}
 
 -- CR 613.7m over CR 608.2f's action: run `body` so that everything it puts onto
 -- the battlefield is one batch, settled by Restamp.settle once it ends rather
@@ -5553,7 +5619,9 @@ millFromReturningTaken pid n
           -- Pawl.Engine.Replacement.stocked) had already measured against the
           -- printed one.
           let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
-          arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
+          -- One CR 401.4 scope and not one event group: the moves stay
+          -- separately recorded, as before.
+          arrived <- arrivingTogether (fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards))
           pure (cards, arrived)
 
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
@@ -6430,6 +6498,13 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
               -- The OWNER's library, CR 400.3: every zone this funnel places into
               -- is keyed by owner, and `pid` is the id placeObject was handed.
               Monad.when shuffling (shuffleLibrary pid)
+              -- CR 401.4: a redirect INTO a library at a stated end, for the
+              -- scope's owner to arrange (arrangeLibraryArrivals). A move
+              -- headed for a library already had its order settled by its
+              -- instruction (Pawl.Engine.Resolve.Effect.settleArrivals), and a
+              -- shuffle leaves no position to arrange.
+              Monad.when (dest == Zone.Library && requestedDest /= Zone.Library && not shuffling) $
+                State.modify' (noteLibraryArrival pid position (newId Seq.<| trailingIds0))
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
@@ -8428,6 +8503,27 @@ offerMiracleReveal pid drawn = do
 -- MINTED, since CR 702.29c's abilities trigger from wherever the card winds up.
 discard :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game ()
 discard cause pid oid = Monad.void (discardReturning cause pid oid)
+
+-- CR 118.12: run `body` as the "[do something]" of a resolving "If [a player]
+-- does": "the action [do something] is a cost, paid when the spell or ability
+-- resolves". Saved and restored, so nothing outside the body is a cost.
+payingOnResolution :: Game a -> Game a
+payingOnResolution body = do
+  saved <- State.gets GameState.payingOnResolution
+  State.modify' (\g -> g {GameState.payingOnResolution = True})
+  result <- body
+  State.modify' (\g -> g {GameState.payingOnResolution = saved})
+  pure result
+
+-- Why a resolving instruction's discard happens: ByEffect (CR 609.1), unless
+-- it is CR 118.12's cost (payingOnResolution) -- Library of Leng's ruling,
+-- "costs aren't effects". Pawl.ZoneChangeSpec's Tweeze case proves it.
+-- Pawl.Engine.Cost.counterCause still reads such a cost as an effect for
+-- counters (#4544).
+resolvingDiscardCause :: GameState -> DiscardCause.DiscardCause
+resolvingDiscardCause gs
+  | GameState.payingOnResolution gs = DiscardCause.Ordinary
+  | otherwise = DiscardCause.ByEffect
 
 -- A second door rather than a return type on `discard`, the changeZoneReturning
 -- and destroyReturning shape: the ~dozen callers that only perform the discard

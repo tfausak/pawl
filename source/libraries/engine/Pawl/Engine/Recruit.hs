@@ -37,7 +37,6 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Counterability as Counterability
-import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.Layout as Layout
@@ -170,7 +169,8 @@ recruit pid = do
       let valid = ListUtils.nubOrd (filter (\c -> List.elem c offered) answer)
           filler = filter (\c -> List.notElem c valid) offered
       pure (take 1 (valid <> filler))
-  moved <- fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect pid) chosen)
+  cause <- State.gets Event.resolvingDiscardCause
+  moved <- fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning cause pid) chosen)
   after <- State.get
   let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
   -- CR 701.70a's second sentence: one token, and only where a nonland card was
