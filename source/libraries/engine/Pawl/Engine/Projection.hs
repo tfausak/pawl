@@ -1276,9 +1276,10 @@ applySubtypeDefining pc =
 -- source-liveness, which must not recurse into the projection it feeds). BASE
 -- here is the layer-1 value, copiableCharacteristics, never the printed card: CR
 -- 613.1a applies copy effects before every layer these gates decide for, so a
--- land that became a copy of a nonland creature is no land to them. Proved by
--- the scenario "CR 613.1 Blood Moon spares a land Mirrorweave made a Lord of
--- Atlantis".
+-- land that became a copy of a nonland creature is no land to them. A
+-- regression fence on its own: the scenario "CR 613.1 Blood Moon spares a land
+-- Mirrorweave made a Lord of Atlantis" reddens only when liveGiven's land test
+-- reads the printed card too.
 affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
 affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (copiableCharacteristics oid gs) gs
 
@@ -1590,6 +1591,9 @@ setLandSubtypeEffectsGiven functioning gs =
 -- The one exception is a layer-4 effect that takes the permanent OUT of the
 -- setter's set: CR 613.8a makes the setter depend on it (escapes). Pawl.ProjectionSpec's
 -- Rootpath Purifier and Synthetic Primeval Claim cases prove both limbs.
+--
+-- The land test reads layer 1 (see affectsBase). The scenario "CR 613.1 an
+-- Island Mirrorweave made a Lord of Atlantis keeps its lord ability" proves it.
 liveGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveGiven functioning setEffs oid gs =
   not
