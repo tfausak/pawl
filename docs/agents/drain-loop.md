@@ -113,9 +113,9 @@ every audit. A 2026-09-22/23 sonnet trial over four engine units was no
 cheaper in tokens than opus on the same shapes, and both audited units
 carried a CR divergence.
 
-**Dispatch on ready, not on merge.** The moment a unit's PR is marked ready,
-dispatch the next one. The lane is agent-bound, so an idle build lane is the
-loop's only outright waste; never hold a dispatch waiting on a merge. Two
+**Dispatch on report, not on merge.** The moment a unit's agent reports its
+draft PR, dispatch the next one. The lane is agent-bound, so an idle build lane
+is the loop's only outright waste; never hold a dispatch waiting on a merge. Two
 guards make this safe: the next brief must be FILE-DISJOINT from the PR still
 in flight (see "Scheduling"), and it derives against `origin/main`, so a later
 `git merge origin/main` brings the in-flight PR in cleanly. If the in-flight
@@ -197,7 +197,7 @@ has the context for.
 armed.** Measured 2026-09-06/07 over 33 units: every unit past ~300k subagent
 tokens or ~300 tool uses carried a defect the audit found, and no unit under
 it did. The recurring class was a read of the printed card where the copiable
-values were owed (`CLAUDE.md` item 4 now names it). Arming on ready and
+values were owed (`CLAUDE.md` item 4 now names it). Arming on report and
 auditing in parallel turns each finding into a second PR, a second CI cycle
 and a window where `main` is wrong; the focused round takes about ten minutes,
 so hold the arm and the worktree until it reports. Cut subsystem "first
@@ -294,9 +294,12 @@ Reaping a worktree also makes its agent unresumable, so the send-back path in
 the audit section above no longer reaches it. When an audit round is about to
 run over a unit, reap it only once the audit has reported.
 
-**Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
-be up to date, so every merge invalidates every other armed PR and the queue
-drains at exactly one per CI cycle however many are open. Since PR #2794 that
+**Merging.** Implementers leave their PRs drafts (`implementing.md`), so ready
+means armed: when a PR has cleared any audit and send-back, `gh pr ready` it and
+arm auto-merge (squash) in the same step. A send-back after that turns it back
+into a draft first (`gh pr ready --undo`). The ruleset requires branches be up
+to date, so every merge invalidates every other armed PR and the queue drains
+at exactly one per CI cycle however many are open. Since PR #2794 that
 cycle is minutes, so the old cap of two open PRs neither costs nor buys
 anything: do not pause a dispatch for it. The rest holds whenever several PRs
 are open at once. When several sit green and `BEHIND`, do NOT update them all:
@@ -305,7 +308,7 @@ already up to date, wait for it; if none is, update the OLDEST one only and
 wait for it to merge. Poll `mergeStateStatus` and run `gh pr update-branch`.
 That adds a merge commit to the agent's branch, which is why agents must not
 force-push. Arming does not
-stick: a push to the branch can drop it, and a PR reported ready is not an
+stick: a push to the branch can drop it, and a reported PR is not an
 armed one --- re-check `autoMergeRequest` after arming and after every push,
 including the one that resolves a conflict. On a conflict, send the agent back
 to merge `origin/main`, resolve by taking both sides, and **re-run its
