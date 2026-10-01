@@ -49,6 +49,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
@@ -1604,13 +1605,13 @@ matchesZoneOwner gs src you rel oid = relationHolds gs src you rel (fmap Object.
 -- Treasures you control" names the payer -- and Nothing for a counter pattern,
 -- which names whose permanent through its own field.
 --
--- The source's entry choices ride along (Projection.withChoicesOf), CR 607.2d's
+-- The source's entry choices ride along (SourceContext.withChoicesOf), CR 607.2d's
 -- link from "choose a creature type" to a cost printed beside it: Doom Cannon's
 -- "Sacrifice a creature of the chosen type" (Pawl.CostSpec's Doom Cannon group).
 matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Maybe PlayerId -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent viewOf gs you slots source filter_ oid =
   let base = Filter.contextWithSlots (Game.teams gs) you source slots
-      context = maybe base (\asking -> Projection.withChoicesOf asking gs base) source
+      context = maybe base (\asking -> SourceContext.withChoicesOf asking gs base) source
    in Filter.matches context (viewOf oid) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --

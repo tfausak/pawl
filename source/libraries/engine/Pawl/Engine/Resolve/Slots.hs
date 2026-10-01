@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
@@ -3171,8 +3172,17 @@ resolvingBindings resolving gs = case Game.lookupObject resolving gs of
 effectContext :: GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Filter.Context
 effectContext gs controller source legal bindings =
   let objects = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf bindings)
-   in (Filter.contextWithSlots (Game.teams gs) (Just controller) (Just source) objects)
-        { -- CR 608.2c: the numbers earlier clauses of THIS resolution stamped on
+   in -- CR 607.2d: the SOURCE's choices (CR 113.7), read LIVE for the group
+      -- half's reason: CR 608.2c has the clauses carried out in order, so the
+      -- name an earlier clause chose is part of the state a later one is read
+      -- against -- Petra Sphinx's "if that card has the chosen name" over the
+      -- card its own reveal bound. CR 608.2h's last-known reader is inside
+      -- withChoicesOf, for the source that has already left (Conjurer's Ban).
+      -- Brass Herald's "creature cards of the chosen type revealed this way" is
+      -- the chosen subtype's proof (Pawl.ResolveSpec).
+      (SourceContext.sourceContext gs (Just controller) source)
+        { Filter.slotObjects = objects,
+          -- CR 608.2c: the numbers earlier clauses of THIS resolution stamped on
           -- slots, for the one Filter atom that compares a candidate against one
           -- (Filter.PowerIsAmountInSlot) -- Localized Destruction's "power equal to
           -- the amount of {E} paid this way". Live off the resolving object, the
@@ -3233,13 +3243,6 @@ effectContext gs controller source legal bindings =
           -- graveyard" proves the activated road and Price of Knowledge's "that
           -- player's hand" the triggered one (Pawl.CountSpec).
           Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) legal,
-          -- CR 201.4's names off the SOURCE (CR 113.7), read LIVE for the group
-          -- half's reason: CR 608.2c has the clauses carried out in order, so the
-          -- name an earlier clause chose is part of the state a later one is read
-          -- against -- Petra Sphinx's "if that card has the chosen name" over the
-          -- card its own reveal bound. CR 608.2h's last-known reader is inside
-          -- chosenNamesOf, for the source that has already left (Conjurer's Ban).
-          Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs,
           -- CR 202.3 off the SOURCE, for the two atoms that compare a candidate
           -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade;
           -- Filter.ManaValueEqualToSource, CR 702.53a's transmute and CR 702.71a's

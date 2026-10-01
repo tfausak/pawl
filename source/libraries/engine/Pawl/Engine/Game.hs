@@ -567,6 +567,13 @@ chosenSubtypeWithLastKnown oid gs = case lookupObject oid gs of
   Just obj -> Object.chosenSubtype obj
   Nothing -> LastKnown.chosenSubtype =<< Map.lookup oid (GameState.lastKnown gs)
 
+-- chosenColorWithLastKnown for CR 201.4's chosen names (Object.chosenNames). The
+-- empty set where neither the object nor its last known information exists.
+chosenNamesWithLastKnown :: ObjectId -> GameState -> Set.Set CardName.CardName
+chosenNamesWithLastKnown oid gs = case lookupObject oid gs of
+  Just obj -> Object.chosenNames obj
+  Nothing -> maybe Set.empty LastKnown.chosenNames (Map.lookup oid (GameState.lastKnown gs))
+
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.
 --

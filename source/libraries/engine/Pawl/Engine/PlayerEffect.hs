@@ -75,7 +75,6 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
-import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -1208,11 +1207,7 @@ prohibitsAttackingWithCreatures pid gs =
 -- which is the shape CR 201.2a describes for an object with no name: having no
 -- name is not sharing one.
 chosenNamesOf :: Maybe ObjectId -> GameState -> Set.Set CardName
-chosenNamesOf source gs = case source of
-  Nothing -> Set.empty
-  Just oid -> case Game.lookupObject oid gs of
-    Just object -> Object.chosenNames object
-    Nothing -> maybe Set.empty LastKnown.chosenNames (Map.lookup oid (GameState.lastKnown gs))
+chosenNamesOf source gs = maybe Set.empty (`Game.chosenNamesWithLastKnown` gs) source
 
 -- Does this OBJECT match a player effect's Filter? Shared by the four questions
 -- that carry one -- CR 601.2f's cost adjustments in both of their moments, CR

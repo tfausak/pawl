@@ -12,7 +12,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (ActivationCostFramed, AffectedSetFramed, AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, ManaRestrictionFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardCounts, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, modalFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (ActivationCostFramed, AffectedSetFramed, AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, ManaRestrictionFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, TriggerConditionFramed, Unframed), anyFace, cardCounts, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, modalFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
@@ -385,6 +385,8 @@ hostFramed framing = case framing of
   AffectedSetFramed -> False
   ActivationCostFramed -> False
   ManaRestrictionFramed -> False
+  -- Pawl.Engine.SourceContext.sourceContext overlays no host either.
+  TriggerConditionFramed -> False
 
 -- How many CR 701.3a atoms this card carries in a position framed by an attach
 -- -- Effect.AttachTarget's destination, Effect.AttachTargetToEach's,
@@ -685,30 +687,47 @@ hasChosenSubtypeTag = Text.pack "HasChosenSubtype"
 -- How many atoms carrying `tag` this card holds in one of the `admitted`
 -- positions, and how many anywhere else. The second number is the offence.
 --
--- A SPELL's target slot is moved to the second number although InTargetSlot is
--- admitted: Pawl.Engine.Target.slotContext reads the choice off the source, and
--- a spell is never the object CR 614.1c's "as this enters" choice was made for,
--- so the atom there would be a silent False.
+-- A SPELL's own positions are moved to the second number although they are
+-- admitted: the context reads the choice off the source, and a spell is never
+-- the object CR 614.1c's "as this enters" choice was made for, so the atom there
+-- would be a silent False.
 chosenValueCounts :: [Framing] -> Text.Text -> Face.Face Card.Type.Card -> (Int, Int)
 chosenValueCounts admitted tag card =
   let total keep pairs = sum (fmap (\(_, f) -> filterAtoms tag f) (filter (keep . fst) pairs))
-      inSpellSlots = total (== InTargetSlot) (modalFilters (Face.spell card))
-   in (total (`elem` admitted) (cardFilters card) - inSpellSlots, total (`notElem` admitted) (cardFilters card) + inSpellSlots)
+      inSpell = total (`elem` admitted) (modalFilters (Face.spell card))
+   in (total (`elem` admitted) (cardFilters card) - inSpell, total (`notElem` admitted) (cardFilters card) + inSpell)
 
 -- CR 105.2's chosen colour is answerable only where Filter.Context.sourceChosenColor
 -- is filled: a static ability's affected set (Pawl.Engine.Projection.affectsWith),
--- an ability's target slot (Pawl.Engine.Target.slotContext) and an activated
+-- an ability's target slot (Pawl.Engine.Target.slotContext), an activated
 -- ability's cost (Pawl.Engine.Cost's pools and
--- Pawl.Engine.Replacement.matchesPermanent). Everywhere else -- a trigger
--- condition, a resolution's filters, a CR 604.2 clause -- it is a silent False.
+-- Pawl.Engine.Replacement.matchesPermanent), a trigger condition
+-- (Pawl.Engine.Event.Match) and every position of a resolution
+-- (Pawl.Engine.Resolve.Slots.effectContext). Everywhere else -- a CR 604.2 or
+-- CR 603.4 clause, an attach destination -- it is a silent False.
 hasChosenColorCounts :: Face.Face Card.Type.Card -> (Int, Int)
-hasChosenColorCounts = chosenValueCounts [AffectedSetFramed, InTargetSlot, ActivationCostFramed] hasChosenColorTag
+hasChosenColorCounts = chosenValueCounts chosenValuePositions hasChosenColorTag
+
+-- The positions both chosen-value lints admit.
+chosenValuePositions :: [Framing]
+chosenValuePositions =
+  [ AffectedSetFramed,
+    InTargetSlot,
+    ActivationCostFramed,
+    TriggerConditionFramed,
+    SourceHostFramed,
+    SearchFramed,
+    MillTallyFramed,
+    HandSweepFramed,
+    ClauseGateFramed,
+    LifeLossAmountFramed
+  ]
 
 -- CR 205.3's chosen subtype in the same positions, plus CR 106.6's restriction,
 -- which Pawl.Engine.Mana.admitsUnder answers off the mana unit (Pillar of
 -- Origins). The colour has no such reading, so the two lists differ.
 hasChosenSubtypeCounts :: Face.Face Card.Type.Card -> (Int, Int)
-hasChosenSubtypeCounts = chosenValueCounts [AffectedSetFramed, InTargetSlot, ActivationCostFramed, ManaRestrictionFramed] hasChosenSubtypeTag
+hasChosenSubtypeCounts = chosenValueCounts (ManaRestrictionFramed : chosenValuePositions) hasChosenSubtypeTag
 
 -- Two offences under one name, hasChosenNameOffends' two: an atom outside the
 -- admitted positions, or the traversal and the codec disagreeing about how many
@@ -2329,7 +2348,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (LifeLossAmountFramed, [bound]),
         (AffectedSetFramed, [bound]),
         (ActivationCostFramed, [bound]),
-        (ManaRestrictionFramed, [bound])
+        (ManaRestrictionFramed, [bound]),
+        (TriggerConditionFramed, [bound])
       ]
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
@@ -3162,7 +3182,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         ("From the Rubble", hasChosenSubtypeCounts, "a triggered ability's target slot", (1, 0)),
         ("Kindred Boon", hasChosenSubtypeCounts, "an activated ability's target slot", (1, 0)),
         ("Etchings of the Chosen", hasChosenSubtypeCounts, "an affected set and an activated ability's cost", (2, 0)),
-        ("Pillar of Origins", hasChosenSubtypeCounts, "a mana restriction", (1, 0))
+        ("Pillar of Origins", hasChosenSubtypeCounts, "a mana restriction", (1, 0)),
+        ("Kindred Discovery", hasChosenSubtypeCounts, "two trigger conditions", (2, 0)),
+        ("Brass Herald", hasChosenSubtypeCounts, "an affected set and a resolution's own filter", (2, 0))
       ]
       $ \(name, counts, position, expected) -> do
         printing <- S.printingOf s registry name
@@ -3194,16 +3216,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
         rejected f =
           [ ("a spell's target slot", base {Face.spell = spellOf [] (aimed f)}),
-            ( "CR 603.6a's trigger condition",
-              base {Face.triggeredAbilities = [oneEffectTrigger (TriggerCondition.PermanentEnters f) (Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1) Nothing))]}
-            ),
-            ("an effect's own filter", base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching f) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty})
+            ("a spell's own filter", base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching f) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}),
+            ( "CR 603.4's intervening clause",
+              base {Face.triggeredAbilities = [(oneEffectTrigger TriggerCondition.SelfEnters draw) {TriggeredAbility.intervening = Just (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Count (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) f Aggregation.Members)) Comparison.AtLeast (Quantity.Type.Literal 1)))}]}
+            )
           ]
         accepted f =
           [ ("a static ability's affected set", affecting f),
             ("an activated ability's target slot", withAbility (\a -> a {ActivatedAbility.modal = spellOf [] (aimed f)})),
-            ("an activated ability's sacrifice cost", withAbility (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 f)]}}))
+            ("an activated ability's sacrifice cost", withAbility (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 f)]}})),
+            ("CR 603.6a's trigger condition", base {Face.triggeredAbilities = [oneEffectTrigger (TriggerCondition.PermanentEnters f) draw]}),
+            ("a triggered ability's own filter", base {Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfEnters (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching f) Regenerability.Regenerable Nothing Nothing Nothing))]})
           ]
+        draw = Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1) Nothing)
     Monad.forM_
       [ (Filter.Type.HasChosenColor, hasChosenColorCounts, hasChosenColorTag),
         (Filter.Type.HasChosenSubtype, hasChosenSubtypeCounts, hasChosenSubtypeTag)

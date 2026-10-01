@@ -27,6 +27,7 @@ import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, re
 import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilityFaceOf, abilityFaceOfId, abilitySources, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -967,34 +968,14 @@ affectsWith grants peers source oid a partial gs = case a of
     inReach = inSourceRangeGiven grants source oid gs
 
 -- The Filter.Context an affected set is matched through: CR 109.5's "you" is the
--- source's controller, and CR 607.2d's link puts the SOURCE's entry choice (CR
--- 614.1c) beside it, since the ability that chose and the affected clause that
--- reads the choice are printed on the one permanent. Read off the OBJECT and not
--- its card: Object.chosenColor is per-incarnation, and CR 707.6 leaves a copy to
--- make its own choice, so two permanents of the one printing answer differently.
---
--- BOTH of CR 614.1c's chosen characteristics, filled the same way and by the same
--- sentence of rule 607.2d: Gauntlet of Power reads the colour and Obelisk of Urd
--- the creature type. Filling only one would leave the other's atom silently False
--- here. withChoicesOf below fills the same two for the other positions.
+-- source's controller, and CR 607.2d's link puts the SOURCE's choices beside it
+-- (SourceContext.sourceContext), since the ability that chose and the affected
+-- clause that reads the choice are printed on the one permanent. Read off the
+-- OBJECT and not its card: Object.chosenColor is per-incarnation, and CR 707.6
+-- leaves a copy to make its own choice, so two permanents of the one printing
+-- answer differently.
 affectedContext :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Filter.Context
-affectedContext source perspective gs =
-  (Filter.contextFor (Game.teams gs) perspective (Just source))
-    { Filter.sourceChosenColor = Game.lookupObject source gs >>= Object.chosenColor,
-      Filter.sourceChosenSubtype = Game.lookupObject source gs >>= Object.chosenSubtype
-    }
-
--- CR 607.2d: `context` with the entry choices (CR 614.1c) of `source`, the
--- object whose own ability is asking -- a cost's criterion (Doom Cannon) and,
--- by hand in Pawl.Engine.Target.slotContext, a target slot's filter. Read
--- through CR 608.2h's last known information, the reading CR 113.7a gives an
--- ability whose source has left.
-withChoicesOf :: ObjectId -> GameState -> Filter.Context -> Filter.Context
-withChoicesOf source gs context =
-  context
-    { Filter.sourceChosenColor = Game.chosenColorWithLastKnown source gs,
-      Filter.sourceChosenSubtype = Game.chosenSubtypeWithLastKnown source gs
-    }
+affectedContext source perspective gs = SourceContext.sourceContext gs perspective source
 
 -- The characteristics view of an object: its CR 613 projection and its projected
 -- controller (CR 613.1b; Nothing when the id is unknown). Rule 613.1 names no
