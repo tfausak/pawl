@@ -807,7 +807,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     -- colored object become colorless" is SetColor with no colours, so the
     -- attacker is the printed Ghoul with its colour taken away at CR 613 layer
     -- 5. CR 105.2c: it now has no colour, so it shares one with nobody -- the
-    -- black Typhoid Rats that blocked it legally in the case above may not, and
+    -- black Typhoid Rats that blocks the printed Ghoul legally
+    -- (cr-702-13b-a-black-creature-may-block-a-creature-with.json) may not, and
     -- only the artifact creature may.
     highbornGhoul <- S.printingOf s registry "Highborn Ghoul"
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
@@ -821,8 +822,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
               Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton a)) gs)) "the black creature may not block"
               Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton artifact (Set.singleton a)) gs) "the artifact creature may"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
-
-
 
   Spec.it s "CR 702.118b a skulker may block an attacker of any power" $ do
     -- THE ASYMMETRY, 702.9b's for skulk: 702.118b restricts being BLOCKED and
@@ -844,10 +843,10 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (blocks hillGiant, blocks elves)
       (Just True, Just True)
 
-
   Spec.it s "CR 702.14c a swampwalker is blocked normally when the defending player's land is an Island" $ do
-    -- THE FALSIFIER, and the reason the case above cannot pass vacuously:
-    -- the same board with the wrong land. The declaration is legal AND the
+    -- THE FALSIFIER, and the reason
+    -- cr-702-14c-a-swampwalker-may-not-be-blocked-while-the.json cannot pass
+    -- vacuously: the same board with the wrong land. The declaration is legal AND the
     -- block survives a real declare blockers step.
     bogWraith <- S.printingOf s registry "Bog Wraith"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -860,8 +859,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
-
 
   Spec.it s "CR 702.14c a snow swampwalker does NOT walk on an ordinary Swamp" $ do
     -- THE DISCRIMINATOR for the supertype half. A plain Swamp satisfies the
@@ -898,7 +895,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
-
   Spec.it s "CR 702.14c a nonbasic landwalker is blocked normally when every land is basic" $ do
     -- THE FALSIFIER for the negation, and the case that separates it from every
     -- positive test: a basic Swamp is a land the criterion must REJECT. An
@@ -921,7 +917,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-
 
   Spec.it s "CR 702.14c an artifact landwalker does NOT walk on a plain land" $ do
     -- The other discriminator: Seat of the Synod is an Artifact Land, and an
@@ -1417,7 +1412,9 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty withAura) "no blocks is legal"
   Spec.it s "CR 509.1c two requirements on ONE pair count twice" $ do
     -- CR 509.1c counts REQUIREMENTS being obeyed, not the (blocker, attacker)
-    -- pairs they name. The board above, plus a Lure on the SECOND attacker:
+    -- pairs they name. The board of
+    -- cr-509-1a-two-attackers-one-screen-blocking-either-attains.json, plus a
+    -- Lure on the SECOND attacker:
     --
     --   Screen's "blocks each combat if able"  -> (Screen, first), (Screen, second)
     --   Lure on the second attacker            -> (Screen, second)
