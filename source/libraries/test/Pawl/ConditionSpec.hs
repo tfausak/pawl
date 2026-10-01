@@ -603,7 +603,6 @@ lastKnownBlockingSpec s registry =
             Spec.assertEqWith s "and it really did die" (Set.member prowlerId (GameState.battlefield killed)) False
             Spec.assertEqWith s "so nothing was gathered onto the stack" (length (GameState.stack (settle killed))) 0
 
-
 -- Declares exactly `victim` as an attacker, or nobody at all: the ONE thing the
 -- two legs of lastKnownAttackingSpec differ in. Filters the offered set rather
 -- than naming the id, so a board that never offers it fails rather than passing
@@ -649,7 +648,6 @@ lastKnownAttackingSpec s registry =
            in k giantId killed (S.runPure S.identityAnswer onStack Stack.resolveTop)
         _ -> Spec.assertFailure s "combatBoardOf should place Garna and one Hill Giant"
    in Spec.describe s "LastKnownAttacking" $ do
-
         -- The twin of cr-608-2h-an-attacking-hill-giant-that-dies-draws-garna-a.json,
         -- and the control it is read against: alice declines
         -- the attack and the same kill takes bob's life instead of filling her hand.
@@ -794,7 +792,6 @@ wasBlockedThisTurnSpec s registry =
             Spec.assertEqWith s "off a Druid nothing had blocked" (unblockedIn declared druidId) True
             Spec.assertEqWith s "which died the same way" (Set.member druidId (GameState.battlefield killed)) False
             Spec.assertEqWith s "and nothing was gathered onto the stack" (length (GameState.stack onStack)) 0
-
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do

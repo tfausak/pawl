@@ -820,12 +820,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (blocks hillGiant, blocks elves)
       (Just True, Just True)
 
-
-
-
-
-
-
 -- CR 612.1's word swap, cast for real: alice pays {U} out of her own Island and
 -- resolves a Magical Hack aimed at `target`, replacing `from` with `to`.
 --

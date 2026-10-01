@@ -372,7 +372,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (not (Game.inRangeOf S.alice S.carol shielded)) "carol is outside alice's range"
     Spec.assertEqWith s "CR 801.13b carol's Piker deals alice nothing" (S.lifeOf S.alice (strike S.carol [carols] S.alice shielded)) (Just 20)
 
-
   -- CR 801.13a for a zone change: alice's Leyline of the Void ("If a card would
   -- be put into an opponent's graveyard from anywhere, exile it instead.") while
   -- a Goblin Piker dies under carol, two seats away, and one under bob, one seat

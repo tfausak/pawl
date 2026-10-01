@@ -4672,8 +4672,6 @@ sneakSpec s registry = Spec.describe s "Sneak" $ do
       (not (any (S.isCastOf techniqueId) (Action.legalActions S.alice noAttack)))
       "the control: the same step and the same mana with nothing attacking offer no cast, so the window alone is not what carried the case above"
 
-
-
 -- Donatello's Technique's printed {2}{U} and its sneak {U}.
 techniqueCost, sneakCost :: [ManaSymbol.ManaSymbol]
 techniqueCost = [ManaSymbol.Generic 2, theBlue]

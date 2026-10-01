@@ -1922,7 +1922,6 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     Spec.assertEqWith s "no untap-step action happened" (GameState.landsPlayed after) (Map.singleton S.alice 1)
     Spec.assertEqWith s "a playing active player's land play IS cleared" (GameState.landsPlayed control) Map.empty
 
-
   Spec.it s "CR 800.4j/703.4i the declare-attackers guard is load-bearing at two seats, where the game loop cannot reach this state" $ do
     -- At two seats Departure.continuesAfterDeparture is False (CR 800.1's
     -- "more than two players"), so NONE of CR 800.4a's four clauses run:

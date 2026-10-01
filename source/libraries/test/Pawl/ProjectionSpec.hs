@@ -2745,7 +2745,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (not (Set.member Subtype.Type.Island subtypes)) "and not a land type"
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId after) "and flying"
 
-
   -- THE TWO ROUTES, ONE BOARD. CR 604.3a(2) gives CDA status only to an ability
   -- printed on the card it affects (or on a token's creating effect, or acquired
   -- by copy or text change), so a changeling another object's static ability
@@ -5147,7 +5146,6 @@ textChangeDependencySpec s registry = Spec.describe s "TextChangeDependency" $ d
     -- The anti-vacuity check, after the behaviour: the Hack really resolved
     -- on the Galleon.
     Spec.assertEqWith s "the Hack resolved onto the Galleon" (Projection.textChangesAffecting galleonId hacked) [(Subtype.Type.Island, Subtype.Type.Swamp)]
-
 
   -- The exchange FIRST, between two Kird Apes (same check), and a Magical Hack
   -- (Forest -> Island) on one of them afterwards, with alice controlling an
