@@ -1003,7 +1003,10 @@ spellAdjustments targets pid oid gs =
 -- projection: it is the half Cast.asProposed already stamped (CR 709.3b), with
 -- its copy stamp's costs laid over it (Game.castingFaceOf, CR 707.2). The
 -- GRANTED ones (CR 613.1f) are read off the projection, which is where layer 6
--- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. Not
+-- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. The
+-- KEYWORDS are the projection's too, printed and granted alike (CR 702.41a, CR
+-- 702.125a), so a spell given affinity is reduced by it -- Pawl.CostSpec's
+-- Mycosynth Golem group proves it. Not
 -- implemented: an effect removing a printed reduction from a card off the
 -- battlefield (#1859).
 selfReductions :: Set.Set ObjectId -> PlayerId -> ObjectId -> GameState -> [(CostDirection.CostDirection, ManaCost.ManaCost)]
@@ -1030,8 +1033,8 @@ selfSentences :: ObjectId -> GameState -> [CostReduction.CostReduction]
 selfSentences oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
   (Just obj, Just card, Just printedFace) ->
     let face = Game.castingFaceOf obj card printedFace
-        granted = PC.grantedCostReductions (Projection.project oid gs)
-     in Face.costReductions face <> granted <> Keyword.selfCostReductionsOf (Face.keywordSet face)
+        projected = Projection.project oid gs
+     in Face.costReductions face <> PC.grantedCostReductions projected <> Keyword.selfCostReductionsOf (PC.keywords projected)
   _ -> []
 
 -- Whether any of the spell's own cost sentences reads CR 601.2c's targets, so a

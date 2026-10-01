@@ -3205,6 +3205,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   richlauSpec s registry
   targetCostSpec s registry
   frogmiteSpec s registry
+  mycosynthGolemSpec s registry
   exhalationSpec s registry
   omniscienceSpec s registry
   springleafDrumSpec s registry
@@ -3854,6 +3855,67 @@ frogmiteSpec s registry =
           cast = S.runPure S.identityAnswer gs (S.cast S.alice frogmite)
           resolved = S.runPure S.identityAnswer cast Stack.resolveTop
       Spec.assertBool s (S.castable S.alice frogmite gs) "a landless alice can still cast it"
+      Spec.assertEqWith s "nothing was tapped to pay {0}" (S.tappedCount S.alice resolved) 0
+      Spec.assertEqWith
+        s
+        "and Frogmite resolved onto the battlefield"
+        (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Frogmite")) S.alice resolved)
+        1
+
+-- alice holds `spell` and controls four untapped Forests, two Icehide Golems
+-- and `third`, with priority in her own precombat main phase. `third` is
+-- Mycosynth Golem or a third Icehide Golem, the one thing the boards differ in:
+-- three artifacts either way.
+mycosynthBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+mycosynthBoard forest icehideGolem third spellPrinting =
+  let (spell, gs1) = frogmiteBoard forest icehideGolem spellPrinting 4 2
+      (_, gs2) = S.addPermanent third S.alice gs1
+   in (spell, gs2)
+
+-- CR 702.41a / 613.1f: Mycosynth Golem's "artifact creature spells you cast have
+-- affinity for artifacts" is a keyword the spell HAS, so its total is reduced
+-- like Frogmite's printed one -- at the gate (CR 601.2a has the card on the
+-- stack when CR 601.2f totals it) and at the payment alike. Venser's Sliver is a
+-- {5} artifact creature with no affinity of its own.
+--
+-- The Forests tapped separate the readings: 2 for three artifacts' {3}, 4 for a
+-- flat {1}, and no cast at all for no reduction.
+mycosynthGolemSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mycosynthGolemSpec s registry =
+  Spec.describe s "Mycosynth Golem" $ do
+    Spec.it s "CR 702.41a a granted affinity takes {3} off a {5} artifact creature spell" $ do
+      forest <- S.printingOf s registry "Forest"
+      icehideGolem <- S.printingOf s registry "Icehide Golem"
+      golem <- S.printingOf s registry "Mycosynth Golem"
+      sliver <- S.printingOf s registry "Venser's Sliver"
+      let (spell, gs) = mycosynthBoard forest icehideGolem golem sliver
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertEqWith s "exactly two Forests paid the reduced {2}" (S.tappedCount S.alice resolved) 2
+      Spec.assertBool s (S.castable S.alice spell gs) "and the gate offered it"
+      Spec.assertEqWith
+        s
+        "and Venser's Sliver resolved onto the battlefield"
+        (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Venser's Sliver")) S.alice resolved)
+        1
+    -- The negative: the same three artifacts with no grant among them.
+    Spec.it s "CR 702.41a with no grant the printed {5} is out of reach of four Forests" $ do
+      forest <- S.printingOf s registry "Forest"
+      icehideGolem <- S.printingOf s registry "Icehide Golem"
+      sliver <- S.printingOf s registry "Venser's Sliver"
+      let (spell, gs) = mycosynthBoard forest icehideGolem icehideGolem sliver
+      Spec.assertBool s (not (S.castable S.alice spell gs)) "the unreduced {5} is not castable"
+    -- CR 702.41b: Frogmite's printed affinity and the granted one each apply, so
+    -- three artifacts take {6} off its {4} and nothing is tapped; one instance
+    -- would leave {1}.
+    Spec.it s "CR 702.41b a printed and a granted affinity both apply" $ do
+      forest <- S.printingOf s registry "Forest"
+      icehideGolem <- S.printingOf s registry "Icehide Golem"
+      golem <- S.printingOf s registry "Mycosynth Golem"
+      frogmitePrinting <- S.printingOf s registry "Frogmite"
+      let (spell, gs) = mycosynthBoard forest icehideGolem golem frogmitePrinting
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
       Spec.assertEqWith s "nothing was tapped to pay {0}" (S.tappedCount S.alice resolved) 0
       Spec.assertEqWith
         s
