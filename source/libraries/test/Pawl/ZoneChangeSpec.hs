@@ -2456,7 +2456,8 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
   -- face of a nonmodal double-faced object (even if the card representing that
   -- copy is itself a double-faced card), the mana value of the copy is 0."
   --
-  -- The NUMBER is the whole of what this adds to the Darksteel Myr case above.
+  -- The NUMBER is the whole of what this adds to
+  -- cr-707-2-a-clone-copying-darksteel-myr-counts-as-mana-value.json.
   -- CR 707.2 already makes the Clone read the copied object's mana value rather
   -- than its own printed {3}{U}, and CR 712.8e already makes the copied object
   -- -- a transformed Thraben Gargoyle // Stonewing Antagonizer -- read its FRONT

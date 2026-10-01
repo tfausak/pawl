@@ -1855,7 +1855,8 @@ gatherSpecimensSpec s registry =
                 Just coatingObj -> Spec.assertEqWith s "an artifact is not a creature" (Projection.controllerOf coatingObj after) (Just S.bob)
         _ -> Spec.assertFailure s "fixture did not deal bob a card"
     -- THREE SEATS, where CR 616.1b's "one of them must be chosen" finally has
-    -- something to choose between -- the case the duelling leg above cannot
+    -- something to choose between -- the case
+    -- cr-614-1d-616-1f-duelling-gather-specimens-alice-takes-it.json cannot
     -- reach. alice and bob each resolve a Gather Specimens and CAROL casts a
     -- creature: it would enter under carol's control, carol is an opponent of
     -- both, so BOTH rows are applicable in the SAME iteration of CR 616.1f. Two
@@ -1998,16 +1999,17 @@ kismetBoard land pikerPrinting kismet spell =
 -- up both a copy and tapped whichever is applied first (Kismet's row is not on
 -- the copied Piker, so unlike CR 616.1f's Essence of the Wild example the copy
 -- does not take the tap clause away). The absence of the prompt is therefore the
--- only observable the split has, which is why it is what the first case asserts;
--- the second case is the discriminating twin that shows the recorder can see one.
+-- only observable the split has, which is why it is what
+-- cr-616-1c-the-copy-bucket-outranks-kismet-s-so-no-order-is.json asserts; the
+-- case below is the discriminating twin that shows the recorder can see one.
 kismetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kismetSpec s registry =
   Spec.describe s "Kismet (CR 616.1c/616.1d)" $ do
     -- The DISCRIMINATING TWIN: the same fixture and the same recorder, a spell
     -- whose own entry rewrites are both CR 616.1e's. Coldsteel Heart is an
     -- artifact, so Kismet's row joins its two in one bucket and the race really
-    -- is raised. Without this, "no prompt" above would pass under a recorder that
-    -- never sees a ChooseReplacement on any board.
+    -- is raised. Without this, that scenario's "no prompt" would pass under a
+    -- recorder that never sees a ChooseReplacement on any board.
     Spec.it s "CR 616.1e rewrites sharing one bucket ARE raced" $ do
       island <- S.printingOf s registry "Island"
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
