@@ -307,8 +307,8 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- fold knows; the copiable ones are gated outside it
               -- (abilityRemoval).
               PC.grantedPlayerAbilities = [],
-              -- The same for a granted cost reduction. Unproven: nothing in the
-              -- pool wipes the abilities of a card off the battlefield.
+              -- The same for a granted cost reduction. Unproven: no test wipes
+              -- a card carrying a granted one.
               PC.grantedCostReductions = [],
               -- The same for a granted static ability: only an EARLIER grant is
               -- gone. Unproven: no card in data/cards/ grants a static ability
