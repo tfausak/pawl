@@ -614,6 +614,27 @@ worldVictims pcs gs =
            in ts /= newest || length (filter (== newest) (t : rest)) > 1
    in fmap snd (filter buried worlds)
 
+-- CR 704.5z / 303.7a: of the Roles one player controls attached to one
+-- permanent, all but the one with the most recent timestamp go to their owners'
+-- graveyards. Object.timestamp is that clock: CR 613.7d stamps entry and CR
+-- 613.7e restamps every attachment (Event.attach). CR 613.7m makes timestamps
+-- distinct (Pawl.Engine.Restamp); the object id only makes the order total.
+--
+-- Read off the projection, so the Role subtype and the controller are the
+-- current ones. A put-into-graveyard, not a destruction.
+roleVictims :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> GameState -> [ObjectId]
+roleVictims pcs grants gs =
+  let keyed oid = do
+        pc <- Map.lookup oid pcs
+        Monad.guard (Set.member Subtype.Role (PC.subtypes pc))
+        obj <- Game.lookupObject oid gs
+        host <- Recipient.objectOf =<< Object.attachedTo obj
+        controller <- Projection.controllerOfGiven grants oid gs
+        pure ((host, controller), [(Object.timestamp obj, oid)])
+      groups = Map.fromListWith (<>) (Maybe.mapMaybe keyed (Set.toList (GameState.battlefield gs)))
+      older members = fmap snd (List.delete (List.maximum members) members)
+   in concatMap older (Map.elems groups)
+
 -- CR 704.3: repeat until no state-based action is performed. ONE pass here, with
 -- the repeat living in Engine's CR 117.5 settle loop (settleForPriority). A
 -- single pass is NOT sufficient IN GENERAL -- CR 704.5m's Aura falls off, and CR
@@ -730,6 +751,8 @@ checkOnce = do
       -- CR 704.5k, from the SAME pre-pass state, for the same CR 704.3 reason.
       -- Unlike the legend rule this one asks nobody.
       worldLosers = worldVictims pcs gs
+      -- CR 704.5z, from the SAME pre-pass state. Asks nobody either.
+      supersededRoles = roleVictims pcs grants gs
       -- CR 704.5aa, from the SAME pre-pass state again. Lives in
       -- Pawl.Engine.Speed with the rest of rule 702.179 rather than here, the way
       -- Pawl.Engine.Monarch keeps rule 725's settle-loop work: this module owns
@@ -850,9 +873,10 @@ checkOnce = do
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
   -- rule's losers), CR 704.5k (the world rule's), CR 704.5m (an Aura attached to
-  -- nothing), CR 704.5v/704.5w (a battle at defense 0) and CR 704.5x/704.5y (a
-  -- battle no player can protect). None of them is a destruction, so none consults
-  -- indestructible or a regeneration shield.
+  -- nothing), CR 704.5z (a superseded Role), CR 704.5v/704.5w (a battle at
+  -- defense 0) and CR 704.5x/704.5y (a battle no player can protect). None of
+  -- them is a destruction, so none consults indestructible or a regeneration
+  -- shield.
   --
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
   -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
@@ -866,7 +890,7 @@ checkOnce = do
   -- from the board the pass began in, so an animated Rest in Peace this pass is
   -- itself burying still exiles the cards the rest of the batch would put into
   -- graveyards. See Pawl.Engine.Replacement's applyReplacementsIn.
-  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (ListUtils.nubOrd (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (ListUtils.nubOrd (toGraveyard <> legendVictims <> worldLosers <> supersededRoles <> unattachedAuras <> undefendable <> routed))
   -- CR 903.9a's ACTION half: "its owner may put it into the command zone". A real
   -- zone change (CR 400.7 mints a fresh incarnation), so it goes through the same
   -- batch funnel as the buries above rather than editing the zone sets -- a
@@ -904,10 +928,10 @@ checkOnce = do
   -- anything here, so CR 122.1c's shield counter does not save a permanent whose
   -- marked damage is lethal.
   --
-  -- A permanent the legend rule or the world rule already buried is excluded
-  -- rather than left to no-op on a dead id: CR 704.5j and CR 704.5k are
-  -- put-into-graveyards, not destructions, so neither offers the shield an
-  -- opportunity nor may consume one here.
+  -- A permanent the legend rule, the world rule or the Role rule already buried
+  -- is excluded rather than left to no-op on a dead id: CR 704.5j, 704.5k and
+  -- 704.5z are put-into-graveyards, not destructions, so none offers the shield
+  -- an opportunity nor may consume one here.
   --
   -- ONE batch, not one call per victim, and on the SAME pre-pass board as the
   -- put-into-graveyard batch above, because CR 704.3 makes the two halves one
@@ -923,7 +947,7 @@ checkOnce = do
   -- that filter rather than excluded by name here: CR 704.5m's Aura, and CR
   -- 310.11's undefendable battle -- an animated Siege with lethal damage whose
   -- protector has just left is in both `toDestroy` and `undefendable`.
-  Event.destroyInBatch gs DestructionCause.ByRule Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
+  Event.destroyInBatch gs DestructionCause.ByRule Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers && List.notElem oid supersededRoles) toDestroy)
   -- CR 704.5s / 714.4: the Saga's controller SACRIFICES it. Neither a
   -- put-into-graveyard nor a destruction, so it joins neither batch above -- CR
   -- 701.21a is its own game action, ungated by indestructible and offering
