@@ -3,6 +3,7 @@ module Pawl.Codec.MonarchWatchSpec where
 import qualified Pawl.Codec.MonarchWatch as MonarchWatch
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.PlayerId as PlayerId
 
@@ -15,9 +16,9 @@ spec s = Spec.describe s "Pawl.Codec.MonarchWatch" $ do
       MonarchWatch.codec
       MonarchWatch.MkMonarchWatch
         { MonarchWatch.controller = PlayerId.MkPlayerId 1,
-          MonarchWatch.due = False
+          MonarchWatch.due = Nothing
         }
-      " {\"controller\":1,\"due\":false} "
+      " {\"controller\":1} "
   -- The recorded EVENT, which is what the field is: a crown that went to an
   -- opponent and back inside one resolution still frees the prisoner (#208), so
   -- a state written between the crowning and the settle has to carry the true.
@@ -27,8 +28,8 @@ spec s = Spec.describe s "Pawl.Codec.MonarchWatch" $ do
       MonarchWatch.codec
       MonarchWatch.MkMonarchWatch
         { MonarchWatch.controller = PlayerId.MkPlayerId 2,
-          MonarchWatch.due = True
+          MonarchWatch.due = Just (EventGroup.MkEventGroup 7)
         }
-      " {\"controller\":2,\"due\":true} "
+      " {\"controller\":2,\"due\":7} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s MonarchWatch.codec

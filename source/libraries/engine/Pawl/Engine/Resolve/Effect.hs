@@ -4117,7 +4117,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- skip itself is a REGRESSION FENCE, since that card exiles and the
           -- move of a ceased object (CR 400.7) already does nothing, so
           -- removing it reddens nothing.
-          arrivals <- fmap concat . Monad.forM decisions $ \(searcher, owner, chosenZones, found, foundOutside) -> do
+          --
+          -- Every card found moves as ONE event (CR 608.2f), so the cards
+          -- entering together see each other (CR 603.6a) and take CR 613.7m's
+          -- order as one batch (Event.together). A REGRESSION FENCE: no board
+          -- in the suite finds two cards that could observe each other, so
+          -- removing the bracket reddens nothing.
+          arrivals <- Event.simultaneously . Event.together . fmap concat . Monad.forM decisions $ \(searcher, owner, chosenZones, found, foundOutside) -> do
             -- Read HERE rather than when the arm was entered, the reason the
             -- context above is a function of the board: CR 608.2c carries the
             -- clauses out in order, so the slot an earlier clause bound is read
@@ -4157,14 +4163,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             [] -> pure ()
             [only] -> State.modify' (bindSlot resolving slot only)
             several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
-  -- Exile every card in every graveyard (CR 400.7: each move funnels through
-  -- changeZone). "Every graveyard" is CR 102.1's players still in the game, not
-  -- the keys of GameState.players, which keep a departed seat's row -- and CR
-  -- 801.10's within the controller's range.
+  -- Exile every card in every graveyard as ONE event (CR 608.2f), so "one or
+  -- more cards leave your graveyard" fires once (CR 603.2c). "Every graveyard"
+  -- is CR 102.1's players still in the game, not the keys of
+  -- GameState.players, which keep a departed seat's row -- and CR 801.10's
+  -- within the controller's range.
   Effect.ExileAllGraveyards -> do
     gs <- State.get
     let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.reachableBy controller gs)
-    Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) gyCards
+    Monad.void (Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) gyCards))
   -- CR 103.5b (Serum Powder): the count is the hand size BEFORE the exile, which
   -- is why this is one opcode rather than an exile followed by a Draw. Both
   -- halves go through the usual funnels, so a short deck still loses at the first
@@ -4172,7 +4179,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.ExileHandThenDraw -> do
     gs <- State.get
     let handIds = Game.zoneMembers Zone.Hand controller gs
-    Monad.mapM_ (\oid -> Event.changeZone oid Zone.Exile) handIds
+    Monad.void (Event.changeZonesTogether (fmap (\oid -> (oid, Zone.Exile)) handIds))
     Monad.replicateM_ (length handIds) (Event.drawCard controller)
   -- CR 727.1/727.1a: restart the game, with this ability's controller as the new
   -- starting player; the rebuild lives in Setup, reached through a generic opcode
@@ -5308,7 +5315,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           concatMap
             (\pid -> fmap (\oid -> (oid, other)) (Game.zoneMembers one pid before) <> fmap (\oid -> (oid, one)) (Game.zoneMembers other pid before))
             exchanging
-    Event.simultaneously (Monad.forM_ moves (uncurry (Event.changeZoneInBatch before)))
+    Monad.void (Event.changeZonesTogether moves)
   -- CR 702.65a's exchange of this permanent with a card in hand, CR 701.12d's
   -- cross-zone exchange. The card is chosen from every card the filter admits,
   -- not only those that could enchant the host: an unattachable pick is a legal
@@ -5363,7 +5370,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         owners =
           Set.fromList (Maybe.mapMaybe (\target -> fmap Object.owner (Game.lookupObject target gs)) targets)
             <> Set.fromList (foldMap (playerRefPlayers legal controller gs) named)
-    Event.simultaneously (Monad.forM_ targets (\target -> Event.changeZoneInBatch gs target Zone.Library))
+    Monad.void (Event.changeZonesTogether (fmap (\target -> (target, Zone.Library)) targets))
     -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle calls
     -- a fact about the rules rather than about PlayerId's Ord.
     Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Event.shuffleLibrary
@@ -8382,7 +8389,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             let watch =
                   MonarchWatch.MkMonarchWatch
                     { MonarchWatch.controller = controller,
-                      MonarchWatch.due = False
+                      MonarchWatch.due = Nothing
                     }
             State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
       _ -> pure ()
@@ -11099,8 +11106,9 @@ applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
   -- Order-independent: Game.removeFromZones takes each mover out of the library
   -- by identity rather than by position.
   State.modify' (reorderLibrary pid kept)
-  -- One CR 401.4 scope, for a redirect into a library (Event.arrivingTogether).
-  Event.arrivingTogether $ do
+  -- ONE event (CR 608.2f), and one CR 401.4 scope for a redirect into a
+  -- library.
+  Event.simultaneously $ do
     arrived <- Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) toGraveyard
     State.modify' (Event.arrangedAlready (Foldable.fold arrived))
 

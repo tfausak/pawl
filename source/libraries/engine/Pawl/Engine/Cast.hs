@@ -499,7 +499,7 @@ payableCostAtGiven pcs sources x extra spending pid oid gs cost =
         let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems slots)) pid oid gs)
             totalled = Cost.plusComponents adjustments substituted
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
-   in if Cost.readsBoundSlot substituted || Cost.selfReadsTargets oid gs
+   in if Cost.readsBoundSlot substituted || Cost.selfReadsTargets pid oid gs
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
 
@@ -1587,12 +1587,14 @@ restrictionMet pid gs restriction = case restriction of
 -- from no zone at all.
 --
 -- The object's own ZONE still differs -- Filter.zone says Graveyard at the gate
--- and Stack at the payment -- and no card in data/cards reads it from a cost
--- position, the four that spell IsInZone at all being the CR 601.3 prohibitions
--- (Grafdigger's Cage, Drannith Magistrate, Lier and Synthetic Entry
--- Interdiction), which are asked before the move. Projection.viewOfObject applies
--- no zone gate either way -- projectGiven falls through to the full layer fold
--- off the battlefield (see Pawl.Types.Affected's MatchingAnywhere).
+-- and Stack at the payment. The CR 601.3 prohibitions (Grafdigger's Cage,
+-- Drannith Magistrate, Synthetic Entry Interdiction) are asked before the move
+-- and want the old zone; the abilities that reduce the spell's own cost are
+-- projected off Cost.asSpell's board, where the move has happened, so an effect
+-- confined to the old zone (Yixlid Jailer) does not reach them.
+-- Projection.viewOfObject applies no zone gate either way -- projectGiven falls
+-- through to the full layer fold off the battlefield (see Pawl.Types.Affected's
+-- MatchingAnywhere).
 --
 -- CR 708.4 rides the same stamp: a cast proposed face down is measured against
 -- the face-down characteristics, and the rule puts that turning-over BEFORE the

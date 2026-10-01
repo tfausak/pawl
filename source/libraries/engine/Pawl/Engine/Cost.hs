@@ -1003,7 +1003,10 @@ spellAdjustments targets pid oid gs =
 -- projection: it is the half Cast.asProposed already stamped (CR 709.3b), with
 -- its copy stamp's costs laid over it (Game.castingFaceOf, CR 707.2). The
 -- GRANTED ones (CR 613.1f) are read off the projection, which is where layer 6
--- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. Not
+-- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. The
+-- KEYWORDS are the projection's too, printed and granted alike (CR 702.41a, CR
+-- 702.125a), so a spell given affinity is reduced by it -- Pawl.CostSpec's
+-- Mycosynth Golem group proves it. Not
 -- implemented: an effect removing a printed reduction from a card off the
 -- battlefield (#1859).
 selfReductions :: Set.Set ObjectId -> PlayerId -> ObjectId -> GameState -> [(CostDirection.CostDirection, ManaCost.ManaCost)]
@@ -1023,22 +1026,37 @@ selfReductions targets pid oid gs =
             -- A negative saturates to 0, the floor the header states.
             times n = concat (replicate (max 0 (Integer.toIntSaturating n)) (ManaCost.unwrap (CostReduction.amount reduction)))
          in fmap ((,) (CostReduction.direction reduction) . ManaCost.MkManaCost . times) copies
-   in Maybe.mapMaybe scaled (filter applies (selfSentences oid gs))
+   in Maybe.mapMaybe scaled (filter applies (selfSentences pid oid gs))
 
--- The sentences selfReductions reads, printed, granted and keyword alike.
-selfSentences :: ObjectId -> GameState -> [CostReduction.CostReduction]
-selfSentences oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
+-- The sentences selfReductions reads, printed, granted and keyword alike. The
+-- granted and keyword ones are projected off `asSpell`'s board.
+selfSentences :: PlayerId -> ObjectId -> GameState -> [CostReduction.CostReduction]
+selfSentences pid oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
   (Just obj, Just card, Just printedFace) ->
     let face = Game.castingFaceOf obj card printedFace
-        granted = PC.grantedCostReductions (Projection.project oid gs)
-     in Face.costReductions face <> granted <> Keyword.selfCostReductionsOf (Face.keywordSet face)
+        projected = Projection.project oid (asSpell pid oid gs)
+     in Face.costReductions face <> PC.grantedCostReductions projected <> Keyword.selfCostReductionsOf (PC.keywords projected)
   _ -> []
+
+-- CR 601.2a / 601.2f: a card whose cast is being proposed (Game.beingCast) is
+-- still in its old zone on a gate's board, but its total is determined with it
+-- on the stack under its caster, so its abilities are projected there: an
+-- effect confined to the old zone no longer reaches it. Pawl.CostSpec's "CR
+-- 601.2f undaunted the graveyard card lost applies to the spell" (Yixlid
+-- Jailer) proves it. Every other board, the payment's among them, is returned
+-- unchanged.
+asSpell :: PlayerId -> ObjectId -> GameState -> GameState
+asSpell pid oid gs
+  | Game.beingCast gs oid =
+      let moved = Game.withoutBeingCast gs
+       in moved {GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Stack, Object.enteredUnder = Just pid}) oid (GameState.objects moved)}
+  | otherwise = gs
 
 -- Whether any of the spell's own cost sentences reads CR 601.2c's targets, so a
 -- gate measuring the cost before them has to search the aimings
 -- (Pawl.Engine.Cast.payableCostAt).
-selfReadsTargets :: ObjectId -> GameState -> Bool
-selfReadsTargets oid gs = any (Maybe.isJust . CostReduction.whichTargets) (selfSentences oid gs)
+selfReadsTargets :: PlayerId -> ObjectId -> GameState -> Bool
+selfReadsTargets pid oid gs = any (Maybe.isJust . CostReduction.whichTargets) (selfSentences pid oid gs)
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
 -- through rule 601.2b-i like a spell's. No commander tax: CR 903.8 taxes
@@ -1207,9 +1225,8 @@ totalManas adjustments =
 -- offers three entries rather than nine.
 --
 -- The keywords are read off the object's own face rather than through the
--- projection, selfReductions' posture and for its reason (#1859): this is the
--- half Cast.asProposed stamped, under any copy stamp's keywords
--- (Game.castingKeywordsOf, CR 707.2).
+-- projection (#1859, #4522): this is the half Cast.asProposed stamped, under
+-- any copy stamp's keywords (Game.castingKeywordsOf, CR 707.2).
 --
 -- The OFFERS come in two provenances and this function holds only the keywords'.
 -- CR 701.67a's waterbend is the other, and it rides the COST (CostComponent.Waterbend)
