@@ -2137,7 +2137,6 @@ eighthDoctorSpec s registry =
               Spec.assertBool s (elem "Ornithopter" (namesIn Zone.Graveyard S.alice fromHand)) "and is in alice's graveyard"
             _ -> Spec.assertFailure s "expected both Ornithopters to resolve"
 
-
 -- Serra Paragon {2}{W}{W} Creature -- Angel 3/4: "Flying / Once during each of
 -- your turns, you may play a land from your graveyard or cast a permanent spell
 -- with mana value 3 or less from your graveyard. If you do, it gains 'When this
@@ -2271,7 +2270,6 @@ serraParagonSpec s registry =
               Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
               Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
             (arrived, _) -> Spec.assertFailure s ("expected one arrival and a Paragon, got " <> show arrived)
-
 
         -- CR 702.138a: Loathsome Chimera {2}{G} escapes for {4}{G} and three
         -- other graveyard cards, a permission of its own. Paid for its escape

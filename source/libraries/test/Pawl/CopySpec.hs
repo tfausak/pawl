@@ -817,8 +817,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the excepted copy does not" (S.powerToughnessOf gargantuanId later) $ Just (7, 7)
       _ -> Spec.assertFailure s "the Clone and the Gargantuan should both be on the battlefield"
 
-
-
   -- THE PROVING TEST for CR 604.3a's third criterion: an ability acquired
   -- through a copy effect is CHARACTERISTIC-DEFINING. Omni-Changeling {3}{U}{U}
   -- Creature -- Shapeshifter 0/0: "Changeling / Convoke / You may have this
@@ -1048,7 +1046,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "where Azusa herself is still legendary" (PC.supertypes (Projection.project azusaId excepted)) (Set.singleton Supertype.Legendary)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
-
   -- THE PROVING TEST for CR 707.9b's ADDITIVE SUPERTYPE arm and for the arm that
   -- sets the copy's NAME. Sakashima the Impostor {2}{U}{U} Legendary Creature --
   -- Human Rogue 3/1: "You may have Sakashima the Impostor enter as a copy of any
@@ -1243,7 +1240,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "and so is the Evangel it copied first" (Projection.colorsOf evangelId after) (Set.singleton Color.Black)
       others -> Spec.assertFailure s ("expected exactly one Doppelganger, got " <> show (length others))
 
-
   -- CR 707.9a's quoted arm over a TRIGGERED ability. Copycrook {2}{U}{U}
   -- Creature -- Shapeshifter Rogue 0/0: "You may have this creature enter as a
   -- copy of any creature on the battlefield, except it has \"Whenever this
@@ -1286,7 +1282,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "Copycrook entered as the Piker's 2/1" (S.powerToughnessOf crookId excepted) (Just (2, 1))
         Spec.assertEqWith s "and the Hill Giant is what alice discarded" (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid (attacked crookId excepted))) (Game.zoneMembers Zone.Graveyard S.alice (attacked crookId excepted))) [CardName.MkCardName (Text.pack "Hill Giant")]
       _ -> Spec.assertFailure s "expected one Copycrook and one Clone"
-
 
   -- THE PROVING TEST for CR 122.6 on the COPY opcode: "except it enters with an
   -- additional +1/+1 counter on it" is a rider the effect states, not something
@@ -1564,8 +1559,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the token entered as the Hill Giant's 3/3" (S.powerToughnessOf tokenId minted) $ Just (3, 3)
         Spec.assertEqWith s "carrying one triggered ability (CR 707.9a)" (length (Projection.triggeredAbilitiesOf tokenId minted)) 1
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-
-
 
   -- THE PROVING TEST for CR 305.7's THIRD clause: a land whose subtype is set to a
   -- basic type "loses all abilities generated from its rules text, its old land
@@ -3336,7 +3329,6 @@ faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "setup: and it is still face up on the other leg" (fmap Object.facing (Game.lookupObject cloneId up)) (Just Facing.FaceUp)
         Spec.assertEqWith s "setup: the printed Arbiter is gone, so the bound on the face-up board is the copy's" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.alice up) 0
         Spec.assertBool s (Maybe.isJust (Binding.copyOf . Object.bindings =<< Game.lookupObject cloneId down)) "CR 708.8 the copy stamp rides through underneath the listing, ready to be reverted to"
-
 
 -- alice with one copy of `card` in her graveyard and `lands` untapped, holding
 -- priority in her main phase with an empty stack, so CR 602.5d's sorcery timing

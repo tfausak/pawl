@@ -1891,7 +1891,6 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
     Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
     Spec.assertEqWith s "ten lands paid the {8}{G}{G} and nothing paid the four free spells" (S.tappedCount S.alice after) 10
 
-
 -- CR 702.60a's ripple, cascade's neighbour on the stack roster: "When you cast
 -- this spell, you may reveal the top N cards of your library, or, if there are
 -- fewer than N cards in your library, you may reveal all the cards in your
