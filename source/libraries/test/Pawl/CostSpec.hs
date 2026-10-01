@@ -3232,6 +3232,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   reversalRigSpec s registry
   announcedReversalSpec s registry
   siegeWurmSpec s registry
+  chiefEngineerSpec s registry
   veneratedLoxodonSpec s registry
   convokeWindowSpec s registry
   assistSpec s registry
@@ -6591,6 +6592,34 @@ siegeWurmSpec s registry = Spec.describe s "Siege Wurm" $ do
         (allRed, _, redBoard) = convokeBoard piker spider wurm 7 0
     Spec.assertBool s (S.castable S.alice withGreens greenBoard) "five Pikers and two Spiders pay {5}{G}{G}"
     Spec.assertBool s (not (S.castable S.alice allRed redBoard)) "seven Pikers and no green creature do not"
+
+-- CR 702.51a / 613.1f: Chief Engineer's "artifact spells you cast have convoke"
+-- is a keyword the spell HAS, so Venser's Sliver, a {5} artifact creature with
+-- no convoke of its own, is paid by tapping creatures as a Siege Wurm is -- at
+-- the gate and at the payment alike (Cost.spellKeywords). No land on either
+-- board, convokeBoard's posture: five creatures either way, and the one thing
+-- the boards differ in is whether the fifth is Chief Engineer or a Goblin Piker.
+chiefEngineerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chiefEngineerSpec s registry = Spec.describe s "Chief Engineer" $ do
+  Spec.it s "CR 702.51a a granted convoke pays a {5} artifact spell by tapping five creatures" $ do
+    sliver <- S.printingOf s registry "Venser's Sliver"
+    piker <- S.printingOf s registry "Goblin Piker"
+    spider <- S.printingOf s registry "Giant Spider"
+    chief <- S.printingOf s registry "Chief Engineer"
+    let (spell, pikerIds, board) = convokeBoard piker spider sliver 4 0
+        (chiefId, gs) = S.addPermanent chief S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer = convoking (ManaCost.MkManaCost []) (chiefId : pikerIds)
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "Venser's Sliver resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Venser's Sliver")) S.alice resolved) 1
+    Spec.assertEqWith s "and every one of the five creatures is tapped" (S.tappedCount S.alice resolved) 5
+  Spec.it s "CR 702.51a with no grant five creatures cannot pay a {5} artifact spell" $ do
+    sliver <- S.printingOf s registry "Venser's Sliver"
+    piker <- S.printingOf s registry "Goblin Piker"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (spell, _, gs) = convokeBoard piker spider sliver 5 0
+    Spec.assertBool s (not (S.castable S.alice spell gs)) "five Pikers alone do not cast it"
 
 -- CR 601.2g and convoke's reminder text ("Each creature you tap while casting
 -- this spell pays for {1} or one mana of that creature's color"): the mana

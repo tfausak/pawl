@@ -2166,6 +2166,38 @@ casualtySpec s registry = Spec.describe s "Casualty" $ do
       (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob after, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dryad Arbor")) S.alice after)
       (1, 1)
 
+  -- CR 702.153a / 613.1f: Silverquill, the Disputant's "each instant and sorcery
+  -- spell you cast has casualty 1" is a keyword the spell HAS, so Lightning Bolt,
+  -- which prints none, is offered the sacrifice at CR 601.2b and copied by the
+  -- cast trigger (Cost.spellKeywords). Two boards differing in ONE answer: alice
+  -- sacrifices Jedit Ojanen, a 5/5, and bob takes the copy's 3 beside the
+  -- original's; unpaid, the original's 3 alone.
+  Spec.it s "CR 702.153a a granted casualty copies Lightning Bolt when paid; unpaid, it resolves once" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    silverquill <- S.printingOf s registry "Silverquill, the Disputant"
+    let (_, withSilverquill) = S.addPermanent silverquill S.alice (S.landsFor mountain S.alice 1 (Setup.emptyGame S.bothPlayers))
+        (jeditId, withJedit) = S.addPermanent jedit S.alice withSilverquill
+        (spellId, g1) = S.addHandCard bolt S.alice withJedit
+        board =
+          g1
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        answer :: Natural.Natural -> Prompt.Prompt r -> r
+        answer times p = case p of
+          Prompt.ChooseSacrifices _ _ _ candidates _ _ -> Set.fromList (filter (== jeditId) candidates)
+          _ -> paidTimesAt times (Recipient.ToPlayer S.bob) p
+        step times gs action = snd (Engine.runGamePure (answer times) gs (action >> Engine.settleForPriority))
+        resolveAll times gs = if null (GameState.stack gs) then gs else resolveAll times (step times gs Stack.resolveTop)
+        after :: Natural.Natural -> GameState.GameState
+        after times = resolveAll times (step times board (S.cast S.alice spellId))
+    Spec.assertEqWith s "bob took the original's 3 and the copy's 3" (S.lifeOf S.bob (after 1)) (Just 14)
+    Spec.assertEqWith s "and Jedit was the sacrifice, Silverquill still standing" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice (after 1), S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silverquill, the Disputant")) S.alice (after 1)) (0, 1)
+    Spec.assertEqWith s "CR 603.4 unpaid, the original's 3 alone beside Jedit" (S.lifeOf S.bob (after 0), S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice (after 0)) (Just 17, 1)
+
 -- CR 702.69a's gravestorm: "When you cast this spell, copy it for each permanent
 -- that was put into a graveyard from the battlefield this turn."
 --

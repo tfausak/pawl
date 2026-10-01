@@ -47,7 +47,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -1134,13 +1133,6 @@ faceUpCastingFaceOf oid gs = do
   card <- cardOf oid gs
   face <- faceUpFaceOf oid gs
   pure (castingFaceOf obj card face)
-
--- castingFaceOf's keywords for a caller that holds only the id: the printed
--- face's (faceOf, so the half CR 709.3b stamped) under any copy stamp's.
-castingKeywordsOf :: ObjectId -> GameState -> Set.Set Keyword.Keyword
-castingKeywordsOf oid gs = case (lookupObject oid gs, cardOf oid gs, faceOf oid gs) of
-  (Just obj, Just card, Just face) -> Face.keywordSet (castingFaceOf obj card face)
-  _ -> Set.empty
 
 -- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
 -- when the object is copying something, and its own printed card's otherwise.
