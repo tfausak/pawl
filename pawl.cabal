@@ -1233,6 +1233,8 @@ library codec
     Pawl.Codec.TypeLineSpec
     Pawl.Codec.TypesAre
     Pawl.Codec.TypesAreSpec
+    Pawl.Codec.TypeSwap
+    Pawl.Codec.TypeSwapSpec
     Pawl.Codec.UntapR
     Pawl.Codec.UntapRestriction
     Pawl.Codec.UntapRestrictionSpec
@@ -2509,6 +2511,7 @@ library types
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
     Pawl.Types.TypesAre
+    Pawl.Types.TypeSwap
     Pawl.Types.UntapR
     Pawl.Types.UntapRestriction
     Pawl.Types.UntapRewrite
