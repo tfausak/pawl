@@ -235,10 +235,9 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- stack (CR 113.6), and the graveyard reads go through the projection
 -- (Cost.costsFor, Cast.projectedKeywords).
 --
--- Not implemented: beyond the cast scan's triggered abilities and the
--- cost-reducing keywords (Cost.selfReductions), which go through the
--- projection, what is read while the object is on the STACK stays printed
--- (#1859).
+-- Not implemented: beyond the cast scan's triggered abilities and the keywords
+-- the cast itself reads (Cost.spellKeywords), which go through the projection,
+-- what is read while the object is on the STACK stays printed (#1859).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and two
@@ -8491,7 +8490,8 @@ recover cost =
 -- cascades are four abilities (Pawl.KeywordTriggerSpec's Cascade group). The PARAMETERIZED
 -- members already got one trigger per distinct PAYLOAD, which is CR 702.56b's
 -- and CR 702.153b's "each is paid separately and triggers based on the payments
--- made for it"; counting adds the repeats of one payload to that.
+-- made for it"; counting adds the repeats of one payload to that, except for
+-- the copy triggers reading a payment, below.
 stackTriggeredAbilitiesOf :: Map Keyword Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 stackTriggeredAbilitiesOf counts =
   concatMap (uncurry stackAbilitiesFor) (Map.toAscList counts)
@@ -8506,7 +8506,12 @@ stackAbilitiesFor keyword count = case keyword of
   Keyword.Storm -> List.genericReplicate count storm
   Keyword.Gravestorm -> List.genericReplicate count gravestorm
   Keyword.Demonstrate -> List.genericReplicate count demonstrate
-  _ -> List.genericReplicate count =<< Maybe.maybeToList (stackCopyTrigger keyword)
+  -- One per distinct keyword, squad's and offspring's reason in abilitiesFor:
+  -- Object.paidCosts keys a payment by the keyword, so a second instance would
+  -- copy again off the same payment. Not implemented: CR 702.56b's and CR
+  -- 702.153b's identical instances, each paid separately and triggering on its
+  -- own payments (#3635).
+  _ -> List.genericReplicate (min 1 count) =<< Maybe.maybeToList (stackCopyTrigger keyword)
 
 -- The arm of `stackTriggeredAbilitiesOf` above that reads a keyword's PAYLOAD,
 -- so it cannot be a membership test: rule 702.56a counts the payments made for

@@ -1,0 +1,112 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Chief Engineer",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingOffBattlefield",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Library"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Hand"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Graveyard"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Exile"
+                      }
+                    },
+                    {
+                      "type": "WasCastFrom",
+                      "value": {
+                        "type": "Command"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Convoke"
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Artificer"
+          },
+          {
+            "type": "Vedalken"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

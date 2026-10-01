@@ -479,7 +479,7 @@ payableCost extra spending pid oid gs = payableCostAt (maybe 0 Face.minimumX (Ga
 -- CR 702.132a's assisting player is counted the same way, after the totalling
 -- and ahead of the substitutes, which is where castProposed pays them
 -- (Cost.assistable): a caster with one Forest may propose Charging Binox beside a
--- player holding seven Plains. Off the FACE being cast, as castProposed reads it.
+-- player holding seven Plains. Off Cost.spellKeywords, as castProposed reads it.
 payableCostAt :: Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x extra spending pid oid gs =
   let pcs = Projection.projectAll gs
@@ -494,7 +494,7 @@ payableCostGiven pcs sources extra spending pid oid gs = payableCostAtGiven pcs 
 payableCostAtGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven pcs sources x extra spending pid oid gs cost =
   let substituted = Cost.substituteX x cost
-      assisted = Cost.assistable (Game.castingKeywordsOf oid gs) (PaymentSubject.Casting oid) pid oid gs
+      assisted = Cost.assistable (PaymentSubject.Casting oid) pid oid gs
       ask slots =
         let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems slots)) pid oid gs)
             totalled = Cost.plusComponents adjustments substituted
@@ -621,7 +621,7 @@ costTotal costs = case costs of
   cost : rest -> Just (List.foldl' Cost.plus cost rest)
 
 -- CR 702.120a: the additional cost this modal spell's escalate abilities levy for
--- a selection of `chosen` modes -- every escalate cost the card prints, taken
+-- a selection of `chosen` modes -- every escalate cost the spell has, taken
 -- once for each mode chosen BEYOND THE FIRST -- or Nothing when there is nothing
 -- extra to pay.
 --
@@ -662,13 +662,12 @@ modeCostTotal costs chosen =
 --
 -- Three conditions, and each is a different rule:
 --
---   1. The card HAS entwine, at costTotal's combined price above. CR 702.42a
---      is a static ability of the spell itself, so it is read off the card's
---      printed keywords and not through the CR 613 projection of the stack
---      object CR 601.2a has already made. Game.faceOf, because the half being
---      cast is stamped on that object before this is asked, so CR 709.3b's
---      "only the characteristics of the half being cast" already narrows the
---      keywords read here.
+--   1. The spell HAS entwine, at costTotal's combined price above. CR 702.42a
+--      is a static ability of the spell itself, so it is read through the CR 613
+--      projection of the stack object CR 601.2a has already made
+--      (Cost.spellKeywords), printed and granted alike. The half being cast is
+--      stamped on that object before this is asked, so CR 709.3b's "only the
+--      characteristics of the half being cast" already narrows it.
 --   2. Every printed mode is LEGAL (CR 700.2a), so choosing ALL modes is not open
 --      when one of them cannot be chosen. Unobservable for both of the entwine
 --      cards in data/cards/ -- Dream's Grip and Synthetic Twofold Braid, which
@@ -693,7 +692,7 @@ entwineOffer :: ManaSpending -> PlayerId -> ObjectId -> [([ManaCost.ManaCost], C
 entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
   Just face -> do
-    cost <- costTotal (Keyword.entwineCosts (Face.keywordSet face))
+    cost <- costTotal (Keyword.entwineCosts (Map.keysSet (Cost.spellKeywords pid oid gs)))
     let modal = Face.spell face
         legal = Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
@@ -718,11 +717,11 @@ withOptionalPayments paid candidate =
 --
 -- Two conditions per cost, and each is entwineOffer's above:
 --
---   1. The card HAS that keyword: `offers` is Keyword.optionalCosts over the
---      printed keywords of the half being cast, handed in rather than re-read here
---      so the announcement and castProposed's limit check cannot disagree about
---      which half's costs those are. Each rule's first ability is a static ability
---      of the spell itself (CR 702.33a, CR 702.157a).
+--   1. The spell HAS that keyword: `offers` is Keyword.optionalCosts over its
+--      keywords (Cost.spellKeywords), handed in rather than re-read here so the
+--      announcement and castProposed's limit check cannot disagree about them.
+--      Each rule's first ability is a static ability of the spell itself (CR
+--      702.33a, CR 702.157a).
 --   2. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
 --      additional costs", at CR 601.2b's least X and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is not
@@ -2743,6 +2742,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
   gs <- State.get
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
+      -- CR 601.2a: the spell's keywords as it stands on the stack, printed and
+      -- granted (Cost.spellKeywords), which every announcement below reads.
+      keywords = Map.keysSet (Cost.spellKeywords pid sid gs)
       modal = Face.spell face
       fillable m = Target.fillableModes (Just pid) Map.empty sid (Card.enchantSlotMap face) m gs
       -- CR 700.2a asked one step before CR 601.2b's cost is announced, which is
@@ -2854,7 +2856,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
       -- candidate, and the cast rewinds under CR 601.2e to the moment before it
       -- was proposed, leaving the spell castable again for fewer modes. That is
       -- rule 601.2e's own process, not a divergence from it.
-      let escalated = escalateTotal (Keyword.escalateCosts (Face.keywordSet face)) (Natural.length chosenModes)
+      let escalated = escalateTotal (Keyword.escalateCosts keywords) (Natural.length chosenModes)
           withEscalate candidate = maybe candidate (Cost.plus candidate) escalated
           -- CR 700.2h: the chosen modes' own printed costs, levied HERE for
           -- escalate's reason -- they are a function of the answer just given,
@@ -2864,12 +2866,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
           withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
           announcedCandidates = fmap (fmap (withModeCost . withEscalate . withEntwine)) candidates
           -- CR 702.33a/b/c's, CR 702.157a's and CR 702.175a's costs, read ONCE off
-          -- the half being cast: the announcement below and the limit it is
+          -- the spell's keywords: the announcement below and the limit it is
           -- judged against are the same list.
-          --
-          -- Not implemented: such a keyword granted to the spell as it is cast,
-          -- which the printed face does not carry (#3635).
-          optionalOffers = Keyword.optionalCosts (Face.keywordSet face)
+          optionalOffers = Keyword.optionalCosts keywords
       -- CR 702.33a: kicker, asked HERE -- after the modes and before the cost, the
       -- variable and the targets -- because that is where CR 601.2b puts the
       -- announcement of an additional cost, and rule 702.33a bundles nothing else
@@ -2877,7 +2876,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
       -- offspring ride the same question (CR 702.157a, CR 702.175a).
       --
       -- The choice is never made for them: announceOptionalCosts asks about every
-      -- such cost the card prints and skips one only where there is no payable
+      -- such cost the spell has and skips one only where there is no payable
       -- route, and where there IS one, every answer goes to the player.
       --
       -- Offered against the ENTWINED and ESCALATED candidates, so a player already
@@ -2901,7 +2900,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
       -- into the question the way rule 702.42a bundles a mode choice.
       --
       -- The choice is never made for them: the offer is skipped only where the
-      -- card has no buyback or where no candidate can pay for it, and where there
+      -- spell has no buyback or where no candidate can pay for it, and where there
       -- IS a route both answers go to the player.
       --
       -- Offered against the candidates the entwine, escalate and kicker
@@ -2914,7 +2913,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
       -- reason: the candidate costs below and the CR 702.27a stamp read one value.
       let buybackAffordable extra =
             any (\(reduced, candidate) -> payableCost reduced spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) extra)) announcedCandidates
-      boughtBack <- case Keyword.buybackCost (Face.keywordSet face) of
+      boughtBack <- case Keyword.buybackCost keywords of
         Nothing -> pure Nothing
         Just extra
           | buybackAffordable extra -> do
@@ -3199,7 +3198,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- to cast if it targets").
                   let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments Set.empty pid sid announcedBoard)
                   let totalledCost = Cost.plusComponents gathered announcedAtX
-                      assistedTotal = Cost.assistable (Game.castingKeywordsOf sid announcedBoard) (PaymentSubject.Casting sid) pid sid announcedBoard
+                      assistedTotal = Cost.assistable (PaymentSubject.Casting sid) pid sid announcedBoard
                   (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid announcedBoard) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
@@ -3370,11 +3369,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- keyword:assist, 2026-09-20, sixteen cards, none of them
                       -- also stating one of the three), so no card can tell the
                       -- two orders apart.
-                      --
-                      -- Off the FACE being cast, every other keyword read in
-                      -- this announcement's reason: a card in a hand is the
-                      -- printed card.
-                      assist <- Cost.offerAssist perform (Face.keywordSet face) (PaymentSubject.Casting sid) pid sid paidCost
+                      assist <- Cost.offerAssist perform (PaymentSubject.Casting sid) pid sid paidCost
                       let assisting c = do
                             assisted <- maybe (pure c) (\(h, _) -> Cost.payAssist h (PaymentSubject.Casting sid) sid c) assist
                             Cost.announceSubstitutions Cost.manaSubstitutions pid sid assisted
@@ -3417,18 +3412,21 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- GameEvent.Crewed and for its reason. A case on the
                           -- rule-702 keyword stamp, never on an effect.
                           --
-                          -- The taps CONVOKE only where the face states convoke:
+                          -- The taps CONVOKE only where the spell has convoke:
                           -- CR 702.126a's improvise substitutes through the same
                           -- component and rule 702.126 names no relation at all.
                           -- No printing states both (Scryfall keyword:convoke
-                          -- keyword:improvise, 2026-09-13, no hit), so nothing in
-                          -- the pool mixes the two pools of taps.
+                          -- keyword:improvise, 2026-09-13, no hit), but a grant
+                          -- can give a spell both (Chief Engineer's convoke on
+                          -- Foundry Assembler). Not implemented: telling the taps
+                          -- apart then, so an artifact tapped for improvise is
+                          -- recorded as convoking (#4586).
                           --
                           -- Off the SUBSTITUTION's own bindings rather than the
                           -- whole payment's, which Binding.tappedPermanent would
                           -- have shared with a tap the printed cost demanded.
                           Monad.when
-                            (Set.member Keyword.Type.Convoke (Game.castingKeywordsOf sid pricedGs))
+                            (Map.member Keyword.Type.Convoke (Cost.spellKeywords pid sid pricedGs))
                             ( let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent (Binding.targetsOf substitutedBindings))))
                                in Monad.unless
                                     (Set.null convokers)
