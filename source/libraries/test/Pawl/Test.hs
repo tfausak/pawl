@@ -411,6 +411,7 @@ import qualified Pawl.Codec.PastActivationSpec
 import qualified Pawl.Codec.PayBranchSpec
 import qualified Pawl.Codec.PayGateSpec
 import qualified Pawl.Codec.PayObligationSpec
+import qualified Pawl.Codec.PayingSpec
 import qualified Pawl.Codec.PaymentDecisionSpec
 import qualified Pawl.Codec.PendingDamageEffectSpec
 import qualified Pawl.Codec.PendingEntryEffectSpec
@@ -1236,6 +1237,7 @@ spec s registry = do
   Pawl.Codec.CountIsSpec.spec s
   Pawl.Codec.TypesAreSpec.spec s
   Pawl.Codec.MonarchIsSpec.spec s
+  Pawl.Codec.PayingSpec.spec s
   Pawl.Codec.PaymentDecisionSpec.spec s
   Pawl.Codec.PlayerCountersAreSpec.spec s
   Pawl.Codec.PowerToughnessIsSpec.spec s
