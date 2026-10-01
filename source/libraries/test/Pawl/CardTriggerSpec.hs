@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -4243,6 +4244,36 @@ fireLordZukoSpec s registry =
             (S.powerToughnessOf zukoId after, fmap (`S.powerToughnessOf` after) (named "Doomed Traveler" after))
             (Just (3, 5), [Just (2, 2)])
 
+-- Leyline Phantom ({4}{U} Creature -- Illusion 5/5, "When this creature deals
+-- combat damage, return it to its owner's hand.", Oracle text checked against
+-- Scryfall 2026-09-30): CR 510.1c sends a blocked attacker's damage to its
+-- blockers, and CR 510.2 deals the step's damage as one event, so damage to two
+-- blockers is one trigger event (CR 603.2c), never one per recipient. Two Goblin
+-- Pikers block it, so no player is dealt anything.
+leylinePhantomSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+leylinePhantomSpec s registry = Spec.describe s "Leyline Phantom" $ do
+  Spec.it s "CR 510.2 / 603.2c combat damage to two blockers triggers it once" $ do
+    phantom <- S.printingOf s registry "Leyline Phantom"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case S.combatBoardOf [phantom] [piker, piker] of
+      (gs0, [phantomId], [first, second]) -> do
+        let blocked = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer gs0
+            -- One damage to each blocker but the first, the rest to the first:
+            -- CR 510.1c's division, so both are dealt damage.
+            dividing :: Prompt.Prompt r -> r
+            dividing p = case p of
+              Prompt.AssignCombatDamage _ _ _ thresholds n -> case Map.keys thresholds of
+                k : rest -> Map.fromList ((k, n - List.genericLength rest) : fmap (\r -> (r, 1)) rest)
+                [] -> thresholds
+              _ -> S.identityAnswer p
+            dealt = S.runPure dividing blocked (Monad.void Damage.dealCombatDamage >> Engine.settleForPriority)
+            resolved = S.runPure S.identityAnswer dealt Stack.resolveTop
+        Spec.assertEqWith s "CR 603.2c one trigger for the step, not one per blocker" (length (GameState.stack dealt)) 1
+        Spec.assertEqWith s "CR 510.1c both blockers were dealt combat damage" (S.onBattlefield first dealt, S.onBattlefield second dealt) (False, False)
+        Spec.assertBool s (not (S.onBattlefield phantomId resolved)) "the Phantom left the battlefield"
+        Spec.assertEqWith s "and is in alice's hand" (S.handSize S.alice resolved) 1
+      _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   fireLordZukoSpec s registry
@@ -4290,3 +4321,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   betrayalSpec s registry
   deeprootPilgrimageSpec s registry
   marduSkullhunterSpec s registry
+  leylinePhantomSpec s registry

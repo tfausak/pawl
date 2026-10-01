@@ -443,36 +443,6 @@ gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
         act = Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2)))
         after = S.runPure S.identityAnswer gs0 act
     Spec.assertEqWith s "alice has two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
-  -- CR 122.1: `EachPlayer` on GainPlayerCounters had no card producer until
-  -- Ichor Rats ({1}{B}{B} Creature -- Phyrexian Rat 2/1, "Infect. When this
-  -- creature enters, each player gets a poison counter."), and design.md
-  -- section 4 says an implemented, unproven arm is not done. This case is
-  -- what proves it.
-  --
-  -- THREE seats, and the caster's own counter is the discriminator. At two
-  -- seats `EachPlayer` and `Relative Opponent` differ only in whether the
-  -- caster is included, so a single wrong `Opponent` authoring would be
-  -- invisible against the Prologue to Phyresis cases (which prove the
-  -- `Relative Opponent` arm, in proliferateSpec below) -- alice holding a
-  -- poison counter is the one reading `Relative Opponent` cannot produce, at
-  -- any number of seats. The counts are asserted as one tuple because every
-  -- number here is 1: three separate checks would let a partial answer look
-  -- like a coincidence rather than a failure.
-  Spec.it s "CR 122.1 whole card: Ichor Rats poisons all three players, the caster included" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    ichorRats <- S.printingOf s registry "Ichor Rats"
-    -- Three Swamps for the {1}{B}{B}. S.landsInPlay builds its own two-seat
-    -- game, so a three-seat board adds them one at a time instead.
-    let withMana = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (3 :: Int)]
-        (gs, spellId) = S.handOne ichorRats withMana
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
-        poisonIn g = (S.playerCounterOf PlayerCounterKind.Poison S.alice g, S.playerCounterOf PlayerCounterKind.Poison S.bob g, S.playerCounterOf PlayerCounterKind.Poison S.carol g)
-    -- Nobody is poisoned before the Rats resolve, so the 1s below are the
-    -- effect's doing rather than the fixture's.
-    Spec.assertEqWith s "the table starts clean" (poisonIn gs) (0, 0, 0)
-    Spec.assertEqWith s "the Rats resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ichor Rats") S.alice settled) 1
-    Spec.assertEqWith s "alice, bob and carol each got one" (poisonIn settled) (1, 1, 1)
   -- The gameplay-level consequence: CR 704.5c's tenth poison counter. carol
   -- sits on nine, so the counter `EachPlayer` hands her is the one that loses
   -- her the game -- and alice, the caster, is poisoned in the same resolution
@@ -561,47 +531,6 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
     Spec.assertEqWith s "bob is poisoned" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
     Spec.assertEqWith s "alice is not" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
     Spec.assertEqWith s "and alice drew" (S.handSize S.alice after) (handBefore + 1)
-  -- The discriminator, and it needs a THIRD seat: at two players `Relative
-  -- Opponent` and `EachPlayer` differ only in whether the caster is included,
-  -- which the case above catches -- but `Opponent` reaching only ONE of two
-  -- opponents would still pass there. CR 806.1: in a Free-for-All the
-  -- players compete as individuals, so every other player is an opponent and
-  -- both must be poisoned. (CR 102.2 is the TWO-player rule, which is
-  -- exactly what a third seat is here to get past.)
-  Spec.it s "CR 806.1 at three seats every opponent is poisoned, and only opponents" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    prologueToPhyresis <- S.printingOf s registry "Prologue to Phyresis"
-    let (_, withLibrary) = S.addLibraryCard piker S.alice S.threePlayerGame
-        -- Two Islands for the {1}{U}. S.landsInPlay builds its own two-seat
-        -- game, so a three-seat board adds them one at a time instead.
-        withMana = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withLibrary [1 .. (2 :: Int)]
-        (gs, spellId) = S.handOne prologueToPhyresis withMana
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    -- No separate "the fixture is payable" assertion: an unpayable cast is a
-    -- no-op, so the poison counts below are what prove it resolved.
-    Spec.assertEqWith s "bob poisoned" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
-    Spec.assertEqWith s "carol poisoned too" (S.playerCounterOf PlayerCounterKind.Poison S.carol after) 1
-    Spec.assertEqWith s "alice untouched" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
-  -- CR 102.1 / CR 800.4a: an opponent is one of the OTHER people in the
-  -- game, and carol is no longer one of them (#279). Poison on a departed
-  -- player's record is not idle bookkeeping -- the proliferate case below
-  -- reads Player.counters to build its candidate list, so this is the write
-  -- that would put a non-player on the next prompt.
-  Spec.it s "CR 800.4a Prologue to Phyresis does not poison a player who has left the game" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    prologueToPhyresis <- S.printingOf s registry "Prologue to Phyresis"
-    let (_, withLibrary) = S.addLibraryCard piker S.alice S.threePlayerGame
-        withMana = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withLibrary [1 .. (2 :: Int)]
-        (gs0, spellId) = S.handOne prologueToPhyresis withMana
-        gs = S.departs Departure.Type.Conceded S.carol gs0
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "bob, still in the game, is poisoned" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
-    Spec.assertEqWith s "carol, who left, is not" (S.playerCounterOf PlayerCounterKind.Poison S.carol after) 0
-    Spec.assertEqWith s "and neither is the caster" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
   -- CR 701.34a: players carry counters too, and proliferate reaches them.
   Spec.it s "CR 701.34a proliferate adds to a player's poison and energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"

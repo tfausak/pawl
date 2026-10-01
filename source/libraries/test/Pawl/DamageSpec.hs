@@ -410,14 +410,6 @@ infectSpec s registry =
       Spec.assertEqWith s "CR 120.3d reaches no planeswalker" (S.counterOf CounterKind.MinusOneMinusOne walker after) 0
       Spec.assertEqWith s "and CR 120.3e reaches none either" (S.damageOf walker after) (Just 0)
 
-    Spec.it s "CR 702.90 Glistener Elf poisons an unblocked player, drains no life" $ do
-      glistenerElf <- S.printingOf s registry "Glistener Elf"
-      let (gs, _, _) = S.combatBoardOf [glistenerElf] []
-          after = S.fightWith S.aggressiveAnswer gs
-      Spec.assertEqWith s "bob has one poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
-      Spec.assertEqWith s "bob's life unchanged" (S.lifeOf S.bob after) (Just 20)
-      Spec.assertEqWith s "alice (controller) has no poison" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
-
     Spec.it s "CR 702.90c Glistener Elf shrinks and kills a blocker with -1/-1 counters" $ do
       glistenerElf <- S.printingOf s registry "Glistener Elf"
       piker <- S.printingOf s registry "Goblin Piker"

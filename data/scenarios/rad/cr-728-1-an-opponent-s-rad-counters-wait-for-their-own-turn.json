@@ -1,0 +1,28 @@
+{
+  "description": "CR 728.1 an opponent's rad counters wait for their own turn",
+  "note": "CR 505.1a: only the active player has a precombat main phase, so rule 728.1's \"that player\" is never an opponent of the turn's. Bob's three counters sit through alice's precombat main phase; the checks wait for her postcombat main so a wrongly fired mill would have resolved by then.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice"
+      },
+      {
+        "name": "bob",
+        "counters": [{ "key": { "type": "Rad" }, "value": 3 }],
+        "library": [
+          { "card": "Lightning Bolt" },
+          { "card": "Lightning Bolt" },
+          { "card": "Lightning Bolt" },
+          { "card": "Lightning Bolt" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Library", "card": "Lightning Bolt", "count": 4 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PlayerCounters": { "player": "bob", "kind": { "type": "Rad" }, "count": 3 } } }
+  ]
+}

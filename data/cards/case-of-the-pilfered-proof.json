@@ -46,67 +46,70 @@
                 }
               },
               "plus": {
-                "faces": [
-                  {
-                    "activatedAbilities": [
-                      {
-                        "cost": {
-                          "components": [
-                            {
-                              "type": "SacrificeThis"
-                            }
-                          ],
-                          "mana": [
-                            {
-                              "type": "Generic",
-                              "value": 2
-                            }
-                          ]
-                        },
-                        "modal": {
-                          "modes": [
-                            {
-                              "clauses": [
-                                {
-                                  "effects": [
-                                    {
-                                      "type": "Draw",
-                                      "value": {
-                                        "player": {
-                                          "type": "Relative",
-                                          "value": {
-                                            "type": "You"
+                "type": "One",
+                "value": {
+                  "faces": [
+                    {
+                      "activatedAbilities": [
+                        {
+                          "cost": {
+                            "components": [
+                              {
+                                "type": "SacrificeThis"
+                              }
+                            ],
+                            "mana": [
+                              {
+                                "type": "Generic",
+                                "value": 2
+                              }
+                            ]
+                          },
+                          "modal": {
+                            "modes": [
+                              {
+                                "clauses": [
+                                  {
+                                    "effects": [
+                                      {
+                                        "type": "Draw",
+                                        "value": {
+                                          "player": {
+                                            "type": "Relative",
+                                            "value": {
+                                              "type": "You"
+                                            }
+                                          },
+                                          "quantity": {
+                                            "type": "Literal",
+                                            "value": 1
                                           }
-                                        },
-                                        "quantity": {
-                                          "type": "Literal",
-                                          "value": 1
                                         }
                                       }
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    ],
-                    "name": "Clue Token",
-                    "typeLine": {
-                      "subtypes": [
-                        {
-                          "type": "Clue"
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
                         }
                       ],
-                      "types": [
-                        {
-                          "type": "Artifact"
-                        }
-                      ]
+                      "name": "Clue Token",
+                      "typeLine": {
+                        "subtypes": [
+                          {
+                            "type": "Clue"
+                          }
+                        ],
+                        "types": [
+                          {
+                            "type": "Artifact"
+                          }
+                        ]
+                      }
                     }
-                  }
-                ]
+                  ]
+                }
               }
             }
           }

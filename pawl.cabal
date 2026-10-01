@@ -924,6 +924,8 @@ library codec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerCounters
+    Pawl.Codec.PlayerCountersAre
+    Pawl.Codec.PlayerCountersAreSpec
     Pawl.Codec.PlayerCountersSpec
     Pawl.Codec.PlayerCounterTally
     Pawl.Codec.PlayerCounterTallySpec
@@ -1186,6 +1188,7 @@ library codec
     Pawl.Codec.TimestampSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
+    Pawl.Codec.TokenPlus
     Pawl.Codec.TokenR
     Pawl.Codec.TokenRSpec
     Pawl.Codec.TopOfLibrary
@@ -2331,6 +2334,7 @@ library types
     Pawl.Types.PlayerControl
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerCounters
+    Pawl.Types.PlayerCountersAre
     Pawl.Types.PlayerCounterTally
     Pawl.Types.PlayerDesignation
     Pawl.Types.PlayerDesignationTally
@@ -2478,6 +2482,7 @@ library types
     Pawl.Types.TimeTravelChoice
     Pawl.Types.TokenLot
     Pawl.Types.TokenPattern
+    Pawl.Types.TokenPlus
     Pawl.Types.TokenR
     Pawl.Types.TopOfLibrary
     Pawl.Types.TopOfLibraryUntil

@@ -1026,6 +1026,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> []
+  TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
   TriggerCondition.SelfIsDealtDamage -> []
@@ -1565,6 +1567,8 @@ sacrificesAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 sacrificesAsCost =
   let isSacrifice component = case component of
         CostComponent.Sacrifice {} -> True
+        -- Paid as a Sacrifice once X is announced (Cost.substituteX).
+        CostComponent.SacrificeX {} -> True
         _ -> False
    in any isSacrifice . Cost.Type.components
 
@@ -2198,7 +2202,7 @@ replacementEffectRiders replacement = case replacement of
 -- card-bearing arm must be classified here.
 replacementMintedCards :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Card.Type.Card]
 replacementMintedCards replacement = case replacement of
-  ReplacementEffect.TokenR (TokenR.MkTokenR _ _ plus) -> Maybe.maybeToList plus
+  ReplacementEffect.TokenR (TokenR.MkTokenR _ _ plus) -> foldMap Foldable.toList plus
   ReplacementEffect.DamageR {} -> []
   ReplacementEffect.CounterR {} -> []
   ReplacementEffect.ZoneChangeR {} -> []
@@ -3664,6 +3668,7 @@ costComponentFilters component = case component of
   -- Retribution of the Ancients' "creatures you control", X counters from among
   -- them.
   CostComponent.RemovePlusOneCountersX f -> [f]
+  CostComponent.SacrificeX f -> [f]
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
@@ -4224,6 +4229,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> []
+  TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   -- Nullary as well: the printed form qualifies the damaged creature in no way,
   -- so a text change has nothing here to rewrite.
@@ -4438,6 +4445,8 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- and Filters -- no SlotName of its own.
   TriggerCondition.StateIs _ -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayerOrBattle -> []
+  TriggerCondition.SelfDealsCombatDamage -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToCreature -> []
   TriggerCondition.SelfIsDealtDamage -> []

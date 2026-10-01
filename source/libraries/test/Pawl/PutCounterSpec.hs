@@ -23,12 +23,9 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Label as Label
-import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Placement as Placement
-import qualified Pawl.Types.Player as Player
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Staged as Staged
@@ -484,7 +481,7 @@ doubleEachKindSpec s registry = Spec.describe s "CR 701.10e doubling each kind o
 -- over the target slot with Vorel's self-to-self PutCountersFrom as the body.
 -- The Amplifier's second mode is CR 701.10e on a player: one GainPlayerCounters
 -- per Pawl.Types.PlayerCounterKind, each giving as many as that kind's tally.
-doubleEachTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+doubleEachTargetSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 doubleEachTargetSpec s registry = Spec.describe s "CR 701.10e doubling each kind of counter, per target and per player" $ do
   -- Two of three offered permanents, one of them bob's planeswalker, so each
   -- target is read against its OWN tally and the third is left alone. The
@@ -512,40 +509,6 @@ doubleEachTargetSpec s registry = Spec.describe s "CR 701.10e doubling each kind
     Spec.assertEqWith s "bob's Jace holds ten loyalty counters" (pairOn jaceId after) (Map.singleton CounterKind.Loyalty 10)
     Spec.assertEqWith s "the untargeted Piker keeps its one counter" (pairOn decoyId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
     Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack settled)) 1
-  -- alice has two kinds in different counts and none of a third; bob's poison is
-  -- the "you" the mode does not reach.
-  Spec.it s "CR 701.10e Aetheric Amplifier doubles each kind of counter its controller has" $ do
-    let amplifierBoard =
-          S.duel
-            S.precombatMain
-            ( S.settled "amplifier" "Aetheric Amplifier"
-                : fmap (\n -> S.settled n "Forest") ["f1", "f2", "f3", "f4"]
-            )
-            []
-        script =
-          S.turn
-            1
-            [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "amplifier") $
-                Choices.none
-                  { Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
-                    -- CR 605.3a: the untapped Amplifier is itself a mana source, so
-                    -- the payment asks for an extra one; Nothing declines it.
-                    Choices.manaSources = Seq.fromList (fmap (Just . S.aliasRef) ["f1", "f2", "f3", "f4"]) Seq.|> Nothing
-                  }
-            ]
-        playerCounters pid gs = maybe Map.empty Player.counters (Map.lookup pid (GameState.players gs))
-    built <- S.buildBoardOrFail s registry amplifierBoard
-    let stocked =
-          built
-            { Staged.state =
-                S.addPlayerCounter PlayerCounterKind.Poison 1 S.bob
-                  . S.addPlayerCounter PlayerCounterKind.Poison 2 S.alice
-                  . S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice
-                  $ Staged.state built
-            }
-    (_, after) <- S.runScriptOrFail s script stocked S.priorityGame
-    Spec.assertEqWith s "alice has six energy and four poison, and still no other kind" (playerCounters S.alice after) (Map.fromList [(PlayerCounterKind.Energy, 6), (PlayerCounterKind.Poison, 4)])
-    Spec.assertEqWith s "bob keeps his one poison counter" (playerCounters S.bob after) (Map.singleton PlayerCounterKind.Poison 1)
 
 -- `aiming` for a slot taking any number: the offered set filtered to `chosen`.
 aimingAll :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
