@@ -389,8 +389,9 @@ data Effect card ability
   | -- | CR 615.8: install a shield that stops ONE instance of damage from the
     -- source CR 609.7a had its controller choose, whatever that instance's size,
     -- and is then used up (Deflecting Palm). Between the two above: no counted
-    -- amount, and no second application.
-    PreventNextDamageInstance PreventNextDamageInstance.PreventNextDamageInstance
+    -- amount, and no second application. PreventNextDamageInstance.riders is CR
+    -- 615.5's additional effect.
+    PreventNextDamageInstance (PreventNextDamageInstance.PreventNextDamageInstance (Effect card ability))
   | -- | CR 614.9: install a floating redirection effect (Turn the Tables); the
     -- Maybe DamageKind is printed rather than assumed.
     RedirectDamage RedirectDamage.RedirectDamage
