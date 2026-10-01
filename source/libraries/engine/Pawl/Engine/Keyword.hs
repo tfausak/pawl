@@ -2550,7 +2550,7 @@ reconfigureTarget = SlotName.MkSlotName (Text.pack "reconfigured")
 --
 -- "Attached to a creature" is a count of the source among the battlefield's
 -- permanents attached to one, boast's spelling of a self-test below, so the
--- host's creature-ness is read off the projection at activation (CR 602.5b).
+-- host's creature-ness is read off the projection as it is activated (CR 602.5).
 reconfigureOff :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 reconfigureOff cost =
   ActivatedAbility.MkActivatedAbility

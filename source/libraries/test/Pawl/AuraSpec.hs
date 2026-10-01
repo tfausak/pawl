@@ -359,6 +359,33 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
           _ -> False
     Spec.assertBool s (offered attached) "attached to the Piker, it can be unattached"
     Spec.assertBool s (not (offered loose)) "loose, it cannot"
+  -- Tamiyo's Compleation ({3}{U} Aura, Flash: "Enchant artifact, creature, or
+  -- planeswalker / When this Aura enters, tap enchanted permanent. If it's an
+  -- Equipment, unattach it. / Enchanted permanent loses all abilities and
+  -- doesn't untap during its controller's untap step.", Scryfall 2026-10-01).
+  -- Losing all abilities already takes the Bonesplitter's bonus away, so the
+  -- unattach is read off Object.attachedTo, on a pair differing only in the
+  -- target: on the Bonesplitter it comes off; on the Piker, the Bonesplitter
+  -- stays, since "it" is the enchanted permanent and not what is attached to it.
+  --
+  -- The card's "if it's an Equipment" is a regression fence: only an enchanted
+  -- permanent that is itself attached to something and is no Equipment observes
+  -- it, and neither board builds one.
+  Spec.it s "CR 701.3d Tamiyo's Compleation unattaches the Equipment it enchants, not a creature's Equipment" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    compleation <- S.printingOf s registry "Tamiyo's Compleation"
+    let (creature, g1) = S.addPermanent piker S.alice (S.landsInPlay island 4)
+        (equip, g2) = S.addPermanent bonesplitter S.alice g1
+        (withSpell, spellId) = S.handOne compleation (S.attach equip creature g2)
+        triggeredOn target = S.runPure S.identityAnswer (S.runPure S.identityAnswer (S.runPure (aimedAtObject target) withSpell (S.cast S.alice spellId)) Stack.resolveTop) Engine.settleForPriority
+        enchanting target = S.runPure S.identityAnswer (triggeredOn target) Stack.resolveTop
+        hostOf g = fmap Object.attachedTo (Game.lookupObject equip g)
+    Spec.assertEqWith s "on the Bonesplitter, it comes off the Piker" (hostOf (enchanting equip)) (Just Nothing)
+    Spec.assertEqWith s "on the Piker, its Bonesplitter stays on" (hostOf (enchanting creature)) (Just (Just (Recipient.ToCreature creature)))
+    Spec.assertEqWith s "each enchanted permanent is tapped" (fmap Object.tapped (Game.lookupObject equip (enchanting equip)), fmap Object.tapped (Game.lookupObject creature (enchanting creature))) (Just TapState.Tapped, Just TapState.Tapped)
+    Spec.assertBool s (not (any (null . GameState.stack . triggeredOn) [equip, creature])) "the enters trigger really was on the stack both times"
   -- CR 301.5c's RESTRICTION, the arm the case above is the exception to. One
   -- board, one move, and the only difference is a Humility on the battlefield:
   -- CR 613.1f strips the Battery's reconfigure (it is a creature while
