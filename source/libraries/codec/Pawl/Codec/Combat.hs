@@ -42,6 +42,7 @@ codec = Fields.object $ do
   declaredBlockers <- Fields.defaulted "declaredBlockers" Set.empty (Common.set ObjectId.codec) Combat.declaredBlockers
   blockersDeclared <- Fields.defaulted "blockersDeclared" False Common.boolean Combat.blockersDeclared
   attackingNothing <- Fields.defaulted "attackingNothing" Set.empty (Common.set ObjectId.codec) Combat.attackingNothing
+  blockingNothing <- Fields.defaulted "blockingNothing" Set.empty (Common.set ObjectId.codec) Combat.blockingNothing
   removedDefending <- Fields.defaulted "removedDefending" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) Combat.removedDefending
   defenders <- Fields.defaulted "defenders" [] (Common.list PlayerId.codec) Combat.defenders
   pure
@@ -60,6 +61,7 @@ codec = Fields.object $ do
         Combat.declaredBlockers = declaredBlockers,
         Combat.blockersDeclared = blockersDeclared,
         Combat.attackingNothing = attackingNothing,
+        Combat.blockingNothing = blockingNothing,
         Combat.removedDefending = removedDefending,
         Combat.defenders = defenders
       }

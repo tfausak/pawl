@@ -186,6 +186,7 @@ noCombat =
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.attackingNothing = Set.empty,
+      Combat.blockingNothing = Set.empty,
       Combat.removedDefending = Map.empty,
       Combat.defenders = []
     }
