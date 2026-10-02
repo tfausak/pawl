@@ -142,7 +142,6 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Battle" $ do
   entrySpec s registry
-  protectorSpec s registry
   candidateSpec s registry
   repairSpec s registry
   attackSpec s registry
@@ -169,28 +168,14 @@ entrySpec s registry = Spec.describe s "Entry" $ do
   Spec.it s "CR 310.12a its protector is an opponent of its controller" $ do
     (after, oid) <- castInvasion s registry
     -- Two seats leave exactly one legal protector, so this asserts CR 310.12a's
-    -- restriction rather than a choice; protectorSpec below is where the choice
-    -- is made observable.
+    -- restriction rather than a choice; data/scenarios/battle is where the
+    -- choice is made observable.
     Spec.assertEqWith s "bob protects it" (protectorOf oid after) (Just S.bob)
   Spec.it s "CR 616.1e entering a battle orders no replacement effects" $ do
     (after, oid) <- castInvasionRefusingToOrder s registry
     -- Both halves still landed, so this is not passing by never entering.
     Spec.assertEqWith s "five defense counters" (S.counterOf CounterKind.Defense oid after) 5
     Spec.assertEqWith s "and a protector" (protectorOf oid after) (Just S.bob)
-
--- CR 310.9a's choice, made observable. Three seats, because CR 102.2's two-player
--- game leaves a Siege exactly one legal protector and a one-candidate ask decides
--- nothing.
-protectorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-protectorSpec s registry = Spec.describe s "Protector" $ do
-  Spec.it s "CR 310.9a the controller chooses which opponent protects it" $ do
-    (toBob, oidB) <- castInvasionThreeSeated s registry (protectTo S.bob)
-    (toCarol, oidC) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    -- Every input the same but the answer to one prompt, the shape M5.6d's
-    -- defending-player proof takes: this is what a two-seat board could not
-    -- distinguish from an elision.
-    Spec.assertEqWith s "bob when bob is named" (protectorOf oidB toBob) (Just S.bob)
-    Spec.assertEqWith s "carol when carol is named" (protectorOf oidC toCarol) (Just S.carol)
 
 -- CR 310.9a's candidate rule at the level Pawl.Engine.Battle states it, which is
 -- the arithmetic the entry choice and the CR 704.5x re-choice SHARE -- so a drift
@@ -296,18 +281,6 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     -- CR 704.5y repairs the designation rather than burying the battle: its own
     -- last clause is reached only where no player can be chosen.
     Spec.assertBool s (S.onBattlefield battle stolen) "the Siege is still on the battlefield"
-  Spec.it s "CR 400.7 a battle that leaves the battlefield forgets its protector" $ do
-    (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    Spec.assertEqWith s "carol protects it while it is on the battlefield" (protectorOf oid entered) (Just S.carol)
-    -- CR 400.7 makes the object that reaches the graveyard a new one with no
-    -- memory of this existence, so the designation may not ride along; a battle
-    -- that returns chooses afresh (CR 310.9a). Asserted over the WHOLE object map
-    -- rather than over `oid`, because the move mints a new id -- and the old
-    -- incarnation lingering with a stale protector is exactly the failure this
-    -- rules out.
-    let killed = S.runPure S.identityAnswer entered (Event.destroy Regenerability.Regenerable [oid])
-        designations = Maybe.mapMaybe Object.protector (Map.elems (GameState.objects killed))
-    Spec.assertEqWith s "nobody protects anything now" designations []
 
 -- CR 310.5: battles can be attacked, and everything that follows from WHOM they
 -- are attacked through -- CR 310.9b's protector rule, CR 310.9c's blocking, CR

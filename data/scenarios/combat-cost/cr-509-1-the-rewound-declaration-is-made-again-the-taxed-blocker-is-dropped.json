@@ -1,0 +1,155 @@
+{
+  "description": "CR 509.1 the rewound declaration is made again: the taxed blocker is dropped and the free one blocks",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "attacker",
+            "ready": true
+          },
+          {
+            "card": "Oppressive Rays",
+            "attached": "taxed"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "taxed",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "free",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-1"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$attacker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$taxed": [
+            "$attacker"
+          ],
+          "$free": [
+            "$attacker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseManaSource",
+          "with": "$forest-1"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseManaSource",
+          "with": "$forest-2"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ReverseManaAbilities",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$free": [
+            "$attacker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$attacker",
+          "blockers": [
+            "$free"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$forest-1",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$forest-2",
+          "tapped": false
+        }
+      }
+    }
+  ]
+}

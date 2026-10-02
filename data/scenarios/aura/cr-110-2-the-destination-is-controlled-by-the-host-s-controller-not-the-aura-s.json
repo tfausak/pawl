@@ -1,0 +1,166 @@
+{
+  "description": "CR 110.2 the destination is controlled by the host's controller, not the Aura's",
+  "note": "The main leg's Answer names alice's own Guildmage, which the correct reading never offers; CR 608.2d then sends the Aura to the first destination offered (the case 'naming a permanent that was never offered' pins that fallback), so the Aura landing on bob's Hill Giant shows the Giant heads the offer and the Guildmage is not in it. The control file answers the Berserkers, the other offered destination.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Simic Guildmage",
+            "label": "mage"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "decoy"
+          },
+          {
+            "card": "Unholy Strength",
+            "label": "aura",
+            "attached": "host"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Foriysian Brigade",
+            "label": "host"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "giant"
+          },
+          {
+            "card": "Berserkers of Blood Ridge",
+            "label": "berserkers"
+          },
+          {
+            "card": "Island",
+            "label": "bi"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$host",
+          "power": 4,
+          "toughness": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$mage",
+          "ability": 1,
+          "targets": [
+            "$aura"
+          ],
+          "mana": [
+            "$i1",
+            "$i2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseAttachment",
+          "with": "$mage"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "AttachedTo",
+          "object": "$aura",
+          "is": "$giant"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$giant",
+          "power": 5,
+          "toughness": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$host",
+          "power": 2,
+          "toughness": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$decoy",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$mage",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    }
+  ]
+}

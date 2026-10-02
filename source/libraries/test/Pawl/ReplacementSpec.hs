@@ -35,7 +35,7 @@ import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
-import Pawl.PreventionSpec (aimObject, answersFor, blueBoard, castAndResolve, castOrPassAnswer, clachanBoard, copyOf, counterBoard, countersOn, enteringAs, leylineShape, lostLife, namedOut, newestNamed, payLifeOnEntryAnswer, raceAnswer, razorgrassBoard, revealAsks, revealOnEntryAnswer, seaGateBoard, theAbility, wardenOut, warriorOut, wasAskedForEntryOption, wasAskedToReplace)
+import Pawl.PreventionSpec (aimObject, answersFor, castAndResolve, castOrPassAnswer, clachanBoard, copyOf, counterBoard, countersOn, leylineShape, lostLife, namedOut, newestNamed, payLifeOnEntryAnswer, raceAnswer, revealAsks, revealOnEntryAnswer, seaGateBoard, theAbility, warriorOut, wasAskedForEntryOption, wasAskedToReplace)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -522,137 +522,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
           (ratsOut (S.runPure castOrPassAnswer (untap permId played) Engine.priorityLoop))
           1
       other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
-  -- CR 614.1c: "Effects that read ... 'As [this permanent] enters . . .' ... are
-  -- replacement effects." Razorgrass Field -- the land face of the modal
-  -- double-faced Razorgrass Ambush // Razorgrass Field -- prints one of exactly
-  -- that shape with a PRICE in it: "As this land enters, you may pay 3 life. If
-  -- you don't, it enters tapped."
-  --
-  -- The pair of cases below is one fixture answered two ways, so nothing but the
-  -- answer differs between them. Played through the real priority loop, the whole
-  -- path a player takes to CR 305.1, exactly as the Zof Bloodbog case above is.
-  --
-  -- What each case measures is not the tap-state field this same code just wrote
-  -- but what a PLAYER gets for the 3 life: Soul Warden, a {W} creature, sits in
-  -- the hand beside the land, and the land's "{T}: Add {W}" is the only mana in
-  -- the game. So declining leaves the Warden uncast and paying gets it onto the
-  -- battlefield -- Activatable.activatable is deliberately NOT asked, since CR
-  -- 605.3b keeps a mana ability off the stack and it answers False for one on
-  -- every board.
-  --
-  -- The life is asserted twice over: the total, and CR 119.4's "in other words,
-  -- the player loses that much life" as a recorded GameEvent.LifeLost. The second
-  -- is the channel every life-loss trigger in the pool reads -- Mindcrank's and
-  -- Exquisite Blood's "whenever an opponent loses life" watch this same
-  -- GameEvent -- so a payment that quietly subtracted from the total instead of
-  -- going through the CR 119.4 door would pass the first assertion and fail this
-  -- one.
-  --
-  -- Soul Warden's own "whenever ANOTHER creature enters" cannot move the total:
-  -- it is the only creature in the fixture, and both life assertions are read off
-  -- the board the land play left, before it is ever cast.
-  Spec.it s "CR 614.1c Razorgrass Field DECLINED enters tapped and costs no life" $ do
-    razorgrass <- S.printingOf s registry "Razorgrass Ambush"
-    warden <- S.printingOf s registry "Soul Warden"
-    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Declines) (razorgrassBoard razorgrass warden) Engine.priorityLoop
-    case Set.toList (GameState.battlefield played) of
-      [permId] -> do
-        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
-        Spec.assertEqWith s "and cost nothing" (S.lifeOf S.alice played) (Just 20)
-        Spec.assertBool s (not (lostLife S.alice 3 played)) "no life loss was recorded"
-        Spec.assertEqWith
-          s
-          "so the {W} creature in hand stays there -- no mana to cast it with"
-          (wardenOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
-          0
-      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
-  Spec.it s "CR 614.1c Razorgrass Field PAID FOR enters untapped, for exactly 3 life" $ do
-    razorgrass <- S.printingOf s registry "Razorgrass Ambush"
-    warden <- S.printingOf s registry "Soul Warden"
-    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Exercises) (razorgrassBoard razorgrass warden) Engine.priorityLoop
-    case Set.toList (GameState.battlefield played) of
-      [permId] -> do
-        Spec.assertEqWith s "the land entered untapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Untapped)
-        Spec.assertEqWith s "20 - 3" (S.lifeOf S.alice played) (Just 17)
-        Spec.assertBool s (lostLife S.alice 3 played) "the payment was recorded as a life loss (CR 119.4)"
-        Spec.assertEqWith
-          s
-          "and the untapped land pays for the {W} creature"
-          (wardenOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
-          1
-      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
-  -- The pool's other printing of the same CR 614.1c sentence: Sea Gate, Reborn,
-  -- the land face of Sea Gate Restoration // Sea Gate, Reborn ("As this land
-  -- enters, you may pay 3 life. If you don't, it enters tapped." -- oracle checked
-  -- on Scryfall). Razorgrass Field's pair above proves the rewrite; this pair
-  -- proves the CARD reaches it, which it did not while the face was transcribed as
-  -- a bare EntryRewrite.Tapped.
-  --
-  -- The PAID case is the one that carries that, and it is the only one that can:
-  -- a bare Tapped leaves exactly the board declining leaves, so the DECLINED case
-  -- below passes either way and is a regression fence rather than a proof.
-  --
-  -- Tidal Warrior, a {U} creature with no enters trigger, plays Soul Warden's part
-  -- above: the land's "{T}: Add {U}" is the only mana in the game, so what the
-  -- 3 life buys is read off whether the Warrior gets cast.
-  Spec.it s "CR 614.1c Sea Gate, Reborn DECLINED enters tapped and costs no life" $ do
-    seaGate <- S.printingOf s registry "Sea Gate Restoration"
-    warrior <- S.printingOf s registry "Tidal Warrior"
-    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Declines) (seaGateBoard seaGate warrior 20) Engine.priorityLoop
-    case Set.toList (GameState.battlefield played) of
-      [permId] -> do
-        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
-        Spec.assertEqWith s "and cost nothing" (S.lifeOf S.alice played) (Just 20)
-        Spec.assertBool s (not (lostLife S.alice 3 played)) "no life loss was recorded"
-        Spec.assertEqWith
-          s
-          "so the {U} creature in hand stays there -- no mana to cast it with"
-          (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
-          0
-      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
-  Spec.it s "CR 614.1c Sea Gate, Reborn PAID FOR enters untapped, for exactly 3 life" $ do
-    seaGate <- S.printingOf s registry "Sea Gate Restoration"
-    warrior <- S.printingOf s registry "Tidal Warrior"
-    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Exercises) (seaGateBoard seaGate warrior 20) Engine.priorityLoop
-    case Set.toList (GameState.battlefield played) of
-      [permId] -> do
-        Spec.assertEqWith s "the land entered untapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Untapped)
-        Spec.assertEqWith s "20 - 3" (S.lifeOf S.alice played) (Just 17)
-        Spec.assertBool s (lostLife S.alice 3 played) "the payment was recorded as a life loss (CR 119.4)"
-        Spec.assertEqWith
-          s
-          "and the untapped land pays for the {U} creature"
-          (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
-          1
-      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
-  -- CR 119.4: a player may pay an amount of life greater than 0 only if their
-  -- life total is at least that amount. So a tapped Sea Gate, Reborn has TWO
-  -- causes -- the controller declined, or the controller could not pay -- and the
-  -- pair below is what tells them apart.
-  --
-  -- The answerer is pinned to Exercises in BOTH cases, so the ANSWER is held
-  -- fixed and the only difference between the two boards is alice's life total:
-  -- 4, where paying 3 is legal, against 2, where it is not. The engine's own
-  -- CR 119.4 gate is therefore the only thing that can move the outcome. Were
-  -- the gate dropped, the 2-life board would pay anyway and enter untapped; were
-  -- the prompt never raised at all, the 4-life board would enter tapped.
-  --
-  -- 4 and 2 rather than 3 and 2, because paying 3 at 3 life leaves 0 and CR
-  -- 704.5a ends the game before the assertions run.
-  Spec.it s "CR 119.4 at 4 life the payment is legal, so Sea Gate, Reborn enters untapped" $ do
-    seaGate <- S.printingOf s registry "Sea Gate Restoration"
-    warrior <- S.printingOf s registry "Tidal Warrior"
-    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Exercises) (seaGateBoard seaGate warrior 4) Engine.priorityLoop
-    case Set.toList (GameState.battlefield played) of
-      [permId] -> do
-        Spec.assertEqWith s "untapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Untapped)
-        Spec.assertEqWith s "4 - 3" (S.lifeOf S.alice played) (Just 1)
-        Spec.assertEqWith
-          s
-          "and the untapped land pays for the {U} creature"
-          (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
-          1
-      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
   Spec.it s "CR 119.4 at 2 life the payment is ILLEGAL, so it enters tapped with no life paid" $ do
     seaGate <- S.printingOf s registry "Sea Gate Restoration"
     warrior <- S.printingOf s registry "Tidal Warrior"
@@ -761,61 +630,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     case named of
       [] -> Spec.assertFailure s "Clone did not reach the battlefield"
       clone : _ -> Spec.assertEqWith s "already a 2/1, with no settle run" (Projection.powerOf clone resolved) (Just 2)
-  Spec.it s "CR 616.2 a Clone of a 2/2-flying Plasma that picks 1/6 is 1/6 with flying AND defender" $ do
-    -- THE CENTERPIECE, and the Gatherer ruling verbatim: "it copies the values
-    -- determined by its enters-the-battlefield replacement effect, but its
-    -- power and toughness are determined by the copy's own
-    -- enters-the-battlefield replacement effect."
-    island <- S.printingOf s registry "Island"
-    primalPlasma <- S.printingOf s registry "Primal Plasma"
-    clonePrinting <- S.printingOf s registry "Clone"
-    let (gs, held) = blueBoard island 8 [primalPlasma, clonePrinting]
-    case held of
-      plasmaCard : cloneCard : _ ->
-        let withPlasma = S.runPure (enteringAs 1) gs (S.cast S.alice plasmaCard >> Stack.resolveTop)
-            after = S.runPure (enteringAs 2) withPlasma (S.cast S.alice cloneCard >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
-              Nothing -> Spec.assertFailure s "Clone did not reach the battlefield"
-              Just clone -> do
-                Spec.assertEqWith s "power is the CLONE's own choice" (Projection.powerOf clone after) (Just 1)
-                Spec.assertEqWith s "toughness is the CLONE's own choice" (Projection.toughnessOf clone after) (Just 6)
-                Spec.assertBool s (Projection.hasKeyword Keyword.Flying clone after) "flying came from the COPY"
-                Spec.assertBool s (Projection.hasKeyword Keyword.Defender clone after) "defender came from the CHOICE"
-      _ -> Spec.assertFailure s "fixture did not deal two cards"
-  Spec.it s "CR 616.2 the same Clone picking 3/3 is a 3/3 with flying" $ do
-    island <- S.printingOf s registry "Island"
-    primalPlasma <- S.printingOf s registry "Primal Plasma"
-    clonePrinting <- S.printingOf s registry "Clone"
-    let (gs, held) = blueBoard island 8 [primalPlasma, clonePrinting]
-    case held of
-      plasmaCard : cloneCard : _ ->
-        let withPlasma = S.runPure (enteringAs 1) gs (S.cast S.alice plasmaCard >> Stack.resolveTop)
-            after = S.runPure (enteringAs 0) withPlasma (S.cast S.alice cloneCard >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
-              Nothing -> Spec.assertFailure s "Clone did not reach the battlefield"
-              Just clone -> do
-                Spec.assertEqWith s "3/3" (Projection.powerOf clone after) (Just 3)
-                Spec.assertEqWith s "3/3" (Projection.toughnessOf clone after) (Just 3)
-                Spec.assertBool s (Projection.hasKeyword Keyword.Flying clone after) "still flying (keywords UNION, never assign)"
-                Spec.assertBool s (not (Projection.hasKeyword Keyword.Defender clone after)) "no defender"
-      _ -> Spec.assertFailure s "fixture did not deal two cards"
-  Spec.it s "CR 707.2 a Clone of that Clone copies 1/6-flying-defender and then chooses again" $ do
-    island <- S.printingOf s registry "Island"
-    primalPlasma <- S.printingOf s registry "Primal Plasma"
-    clonePrinting <- S.printingOf s registry "Clone"
-    let (gs, held) = blueBoard island 12 [primalPlasma, clonePrinting, clonePrinting]
-    case held of
-      plasmaCard : cloneA : cloneB : _ ->
-        let s1 = S.runPure (enteringAs 1) gs (S.cast S.alice plasmaCard >> Stack.resolveTop)
-            s2 = S.runPure (enteringAs 2) s1 (S.cast S.alice cloneA >> Stack.resolveTop)
-            s3 = S.runPure (enteringAs 0) s2 (S.cast S.alice cloneB >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Clone") s3 of
-              Nothing -> Spec.assertFailure s "the second Clone did not reach the battlefield"
-              Just clone -> do
-                Spec.assertEqWith s "its OWN choice wins on P/T" (Projection.powerOf clone s3) (Just 3)
-                Spec.assertEqWith s "its OWN choice wins on P/T" (Projection.toughnessOf clone s3) (Just 3)
-                Spec.assertBool s (Projection.hasKeyword Keyword.Flying clone s3 && Projection.hasKeyword Keyword.Defender clone s3) "flying and defender rode the copy chain"
-      _ -> Spec.assertFailure s "fixture did not deal three cards"
   -- CR 208.2b's own elision, at the ChoiceOf boundary: such an ability
   -- "lists two or more specific power and toughness values", so a
   -- single-option as-enters choice is not a 208.2b choice at all and
@@ -879,21 +693,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         after = S.runPure S.identityAnswer g3 (Event.runEntry Set.empty piker)
     Spec.assertBool s (not (wasAskedForEntryOption asked)) "no ChooseEntryOption was raised"
     Spec.assertEqWith s "the sole option applied anyway" (Projection.powerOf piker after) (Just 3)
-  Spec.it s "CR 616.1 Doubling Season racing Hardened Scales: 4 or 3, by the prompt" $ do
-    forest <- S.printingOf s registry "Forest"
-    battlegrowth <- S.printingOf s registry "Battlegrowth"
-    doublingSeason <- S.printingOf s registry "Doubling Season"
-    hardenedScales <- S.printingOf s registry "Hardened Scales"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (gs, spellId, mine, _) = counterBoard forest battlegrowth [doublingSeason, hardenedScales, pikerPrinting] []
-    case mine of
-      season : scales : piker : _ ->
-        let seasonFirst = castAndResolve (raceAnswer season piker) gs spellId
-            scalesFirst = castAndResolve (raceAnswer scales piker) gs spellId
-         in do
-              Spec.assertEqWith s "(1 * 2) + 1" (countersOn CounterKind.PlusOnePlusOne piker seasonFirst) 3
-              Spec.assertEqWith s "(1 + 1) * 2" (countersOn CounterKind.PlusOnePlusOne piker scalesFirst) 4
-      _ -> Spec.assertFailure s "fixture did not build three permanents"
   -- #79: resolveDestruction answers with the SETTLED object, not a Bool. The
   -- identity of what the CR 616.1 loop hands back is what Event.destroy must
   -- put into the graveyard; collapsing it to a predicate is what made a
@@ -921,44 +720,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   caprichromeSpec s registry
   undergrowthScavengerSpec s registry
   fixedEntryCostSpec s registry
-  faerieSquadronSpec s registry
   degavolverSpec s registry
   grifterBladeSpec s registry
   hyenaUmbraSpec s registry
   darkblastSpec s registry
-
--- Faerie Squadron {U} Creature -- Faerie 1/1, whole text: "Kicker {3}{U} (You may
--- pay an additional {3}{U} as you cast this spell.) / If this creature was
--- kicked, it enters with two +1/+1 counters on it and with flying." (oracle
--- checked on Scryfall)
---
--- The card whose second clause CR 614.1c's keyword grant exists for (#2323): an
--- "enters with" naming a keyword rather than a counter. Both halves ride ONE row
--- under CR 604.2's "if this creature was kicked", so the entry has one candidate
--- and CR 616.1 asks nobody anything -- which the kicked case reads off the count
--- of orders (see #3288).
---
--- THE BOARD: nine Islands, the Squadron in hand and a Rite of Replication beside
--- it. Nine is the two casts added up -- {U} plus the kicker {3}{U} is five, and
--- the Rite unkicked is four -- so the kicked and unkicked cases below differ in
--- the kicker answer and in nothing else.
-squadronBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
-squadronBoard island squadron rite =
-  let (gs1, squadronId) = S.handOne squadron (S.landsInPlay island 9)
-      (riteId, gs2) = S.addHandCard rite S.alice gs1
-   in (gs2, squadronId, riteId)
-
--- The battlefield's Faerie Squadrons, by name: CR 400.7 gives the permanent a new
--- id, so the one the cast was handed names nothing here.
-squadronsOut :: GameState.GameState -> [ObjectId.ObjectId]
-squadronsOut gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack "Faerie Squadron")) o gs) (Set.toList (GameState.battlefield gs))
-
--- Cast the Squadron with this kicker answer and settle. `kicks` answers CR
--- 702.33a and defers the rest.
-castSquadron :: KickerDecision.KickerDecision -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-castSquadron decision gs squadronId =
-  let cast = snd (Engine.runGamePure (kicks decision) gs (S.cast S.alice squadronId))
-   in snd (Engine.runGamePure (kicks decision) cast (Stack.resolveTop >> Engine.settleForPriority))
 
 -- Rite of Replication unkicked, aimed at `victim` -- PINNED to that id rather
 -- than searched for, so a mutation cannot be repaired by an answerer that finds
@@ -968,38 +733,6 @@ riteAt victim p = case p of
   Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
   Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> S.identityAnswer p
-
-faerieSquadronSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-faerieSquadronSpec s registry = Spec.describe s "Faerie Squadron" $ do
-  -- WHERE THE GRANT LIVES, which the two cases above cannot see: CR 707.2 copies
-  -- an "as . . . enters" ability's values only where it SETS POWER AND TOUGHNESS,
-  -- and "with flying" sets neither, so the keyword is not a copiable value. A
-  -- token copy of the kicked Squadron is a printed 1/1 with no flying -- and an
-  -- implementation writing the keyword into the copiable snapshot the way
-  -- Pawl.Engine.Replacement.applyEntryOption does for CR 208.2b's options would
-  -- hand the token flying instead.
-  --
-  -- The counters are the control beside it: CR 707.2's last sentence keeps them
-  -- off the copy too, so a token that arrived at 3/3 would say the whole snapshot
-  -- was written rather than only the keyword.
-  Spec.it s "CR 707.2 a token copy of the kicked Squadron has neither the flying nor the counters" $ do
-    island <- S.printingOf s registry "Island"
-    squadron <- S.printingOf s registry "Faerie Squadron"
-    rite <- S.printingOf s registry "Rite of Replication"
-    let (board, squadronId, riteId) = squadronBoard island squadron rite
-        entered = castSquadron (KickerDecision.MkKickerDecision 1) board squadronId
-    case squadronsOut entered of
-      [origId] -> do
-        let cast = snd (Engine.runGamePure (riteAt origId) entered (S.cast S.alice riteId))
-            after = snd (Engine.runGamePure (riteAt origId) cast (Stack.resolveTop >> Engine.settleForPriority))
-        case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield entered)) of
-          [tokenId] -> do
-            Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying tokenId after)) "CR 707.2 the token copy does not have flying"
-            Spec.assertEqWith s "it is a Faerie Squadron all the same" (Projection.namesOf tokenId after) (Set.singleton (CardName.MkCardName (Text.pack "Faerie Squadron")))
-            Spec.assertEqWith s "at its printed 1/1, the counters not being copied either" (S.powerToughnessOf tokenId after) (Just (1, 1))
-            Spec.assertBool s (Projection.hasKeyword Keyword.Flying origId after) "and the original still has the flying it entered with"
-          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-      other -> Spec.assertFailure s ("expected one Squadron, got " <> show (length other))
 
 -- Degavolver {1}{W} Creature -- Volver 1/1, whole text: "Kicker {1}{B} and/or {R}
 -- ... If this creature was kicked with its {1}{B} kicker, it enters with two
@@ -1102,13 +835,6 @@ degavolverSpec s registry = Spec.describe s "Degavolver" $ do
             Spec.assertEqWith s "and the original still has the one it entered with" (length (activatedOf origId after)) 1
           tokens -> Spec.assertFailure s ("expected exactly one token copy, got " <> show (length tokens))
       other -> Spec.assertFailure s ("expected one Degavolver, got " <> show (length other))
-
--- Answers CR 702.33a's kicker question with `decision` and defers everything else,
--- so the two boards below differ in this one answer and nothing else.
-kicks :: KickerDecision.KickerDecision -> Prompt.Prompt r -> r
-kicks decision p = case p of
-  Prompt.ChooseKicker {} -> decision
-  _ -> S.identityAnswer p
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.

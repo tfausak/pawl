@@ -104,7 +104,6 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
@@ -4940,28 +4939,6 @@ copyNamed wanted p = case p of
   Prompt.ChooseCopyTarget {} -> Just wanted
   _ -> S.identityAnswer p
 
--- Resourceful Defense's two target slots are both Pool.Permanents over the same
--- board, so no predicate could tell them apart and the slot NAME settles which
--- is which; the offered set is FILTERED rather than a recipient hand-built, so CR
--- 608.2b's re-read at resolution still finds what was named. The counter answer
--- is verbatim, so an answerer cannot re-derive a legal one after a mutation.
--- Pawl.MoveCounterSpec's defenseAnswer is the same shape, duplicated rather than
--- hoisted into Pawl.Support.
-honeMoveAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-honeMoveAnswer giver taker p = case p of
-  Prompt.ChooseTargets _ _ _ asked ->
-    Map.mapWithKey
-      ( \slot (_, offered) ->
-          let target
-                | slot == SlotName.MkSlotName (Text.pack "from") = Just giver
-                | slot == SlotName.MkSlotName (Text.pack "to") = Just taker
-                | otherwise = Nothing
-           in Set.filter ((==) target . Recipient.objectOf) offered
-      )
-      asked
-  Prompt.ChooseMovedCounters {} -> Map.singleton CounterKind.Hone 1
-  _ -> S.identityAnswer p
-
 -- CR 122.1j: "A hone counter on an Equipment gives +1/+0 to any creature that
 -- Equipment is attached to." CR 613.1g's layer 7, and CR 613.4c's 7c within it,
 -- exactly where CR 122.1a's +1/+1 counters land -- but the counter is on the
@@ -5076,35 +5053,6 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     Spec.assertEqWith s "CR 208.3 masks the P/T half on the same host: the Bonesplitter's +2/+0 reads Nothing either way" (Projection.powerOf vehicle onVehicle) Nothing
     Spec.assertEqWith s "the Collar is attached in the window this board reads" (Projection.hostOf collarId onVehicle) (Just vehicle)
     Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Projection.hostOf collarId (S.settleSba onVehicle)) Nothing
-
-  -- CR 122.1j's BEARER clause: "a hone counter on an Equipment". Regular
-  -- printings throughout -- Resourceful Defense's "{4}{W}: Move any number of
-  -- counters from target permanent you control onto a second target permanent
-  -- you control" (CR 122.5 permits the move, and rule 122.1j does not forbid the
-  -- destination) carries the counter off the Bonesplitter and onto an Unholy
-  -- Strength enchanting the same creature.
-  --
-  -- Two boards ONE move apart: the same single counter on the Equipment and on
-  -- the Aura, with both attached to the same Piker either way.
-  Spec.it s "CR 122.1j whole card: a hone counter moved onto an Aura gives the enchanted creature nothing" $ do
-    plains <- S.printingOf s registry "Plains"
-    defense <- S.printingOf s registry "Resourceful Defense"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    strength <- S.printingOf s registry "Unholy Strength"
-    let (defenseId, g1) = S.addPermanent defense S.alice (S.landsInPlay plains 5)
-        (pikerId, g2) = S.addPermanent piker S.alice g1
-        (equip, g3) = S.addPermanent bonesplitter S.alice g2
-        (aura, g4) = S.addPermanent strength S.alice g3
-        onEquip = (S.addCounter CounterKind.Hone 1 equip (S.attach aura pikerId (S.attach equip pikerId g4))) {GameState.priority = Just S.alice}
-    case Activatable.abilitiesFor defenseId onEquip of
-      [only] -> do
-        let onAura = S.runPure (honeMoveAnswer equip aura) onEquip (Activate.activateAbility S.alice defenseId only >> Stack.resolveTop)
-        Spec.assertEqWith s "on the Aura the counter gives nothing: 2 printed + the Bonesplitter's 2 + Unholy Strength's 2" (Projection.powerOf pikerId onAura) (Just 6)
-        Spec.assertEqWith s "on the Equipment it was the +1 it would have been" (Projection.powerOf pikerId onEquip) (Just 7)
-        Spec.assertEqWith s "the counter did move onto the Aura" (S.counterOf CounterKind.Hone aura onAura) 1
-        Spec.assertEqWith s "and off the Equipment" (S.counterOf CounterKind.Hone equip onAura) 0
-      _ -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
 
   -- The whole card. Dwalin, Weaponmaster {1}{R/W} Legendary Creature -- Dwarf
   -- Warrior 2/1, "First strike" / "Whenever Dwalin enters or attacks, put a hone
@@ -5619,32 +5567,6 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
 -- hidden zone or in exile, or a spell on the stack, below.
 hiddenZoneStaticSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
-  -- CR 113.6b/c: gatherGiven walks the two HIDDEN zones (CR 400.2) and exile,
-  -- none of which any default in CR 113.6 reaches. Grist, the Hunger Tide's "as long as Grist
-  -- isn't on the battlefield, it's a 1/1 Insect creature in addition to its
-  -- other types" is CR 113.6c's negative form, and rule 400.1's zone list being
-  -- finite makes it a stated set holding every zone but the battlefield -- so a
-  -- Grist CARD is a creature card in a library and in a hand, and a Grist SPELL
-  -- is a creature spell.
-  --
-  -- Jace Beleren is the control on all three boards, and each pair differs in
-  -- exactly one thing: which legendary planeswalker card is in the zone. It is
-  -- cast and searched for on the same mana and out of the same fixture, so a
-  -- board that admits it admits Grist for a reason other than the ability.
-  Spec.it s "CR 113.6c a Grist card in a library is a creature card a search offers" $ do
-    withGrist <- hiddenZoneSearchCandidates s registry "Grist, the Hunger Tide"
-    withJace <- hiddenZoneSearchCandidates s registry "Jace Beleren"
-    Spec.assertEqWith
-      s
-      "the Grist is a search candidate beside the Piker"
-      withGrist
-      [Set.fromList (fmap Text.pack ["Grist, the Hunger Tide", "Goblin Piker"])]
-    Spec.assertEqWith
-      s
-      "an ordinary planeswalker card in the same slot is not"
-      withJace
-      [Set.singleton (Text.pack "Goblin Piker")]
-
   -- The HAND walk, through Selhoff Entomber's "{T}, Discard a creature card:
   -- Draw a card". Cost.discardCandidates projects each card in the hand, so the
   -- cost is payable only if the projection reaches a card sitting in a hand.
@@ -5692,29 +5614,6 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
       "and CR 205.1b keeps its printed Grist type beside the granted Insect"
       (Projection.subtypesOf gristHandId gristBoard)
       (Set.fromList [Subtype.Type.Grist, Subtype.Type.Insect])
-
-  -- The STACK, where CR 113.6b's stated set overrides CR 113.6's own first
-  -- sentence rather than a hidden zone's absence of one: a planeswalker spell's
-  -- static abilities do not function on the stack by default, and this one says
-  -- it does. Essence Scatter's "counter target creature spell" is the reader.
-  Spec.it s "CR 113.6c a Grist spell on the stack is a creature spell Essence Scatter counters" $ do
-    grist <- S.printingOf s registry "Grist, the Hunger Tide"
-    jace <- S.printingOf s registry "Jace Beleren"
-    (gristScatter, gristBoard) <- spellAndScatter s registry grist
-    (jaceScatter, jaceBoard) <- spellAndScatter s registry jace
-    let afterScatter = S.runPure S.identityAnswer gristBoard (do S.cast S.bob gristScatter; Stack.resolveTop)
-    -- Named for the hand case's reason: CR 400.7 gives the countered spell a new
-    -- id as CR 701.6a puts it into its owner's graveyard.
-    Spec.assertEqWith
-      s
-      "the Grist spell was countered and put into its owner's graveyard"
-      (namesOf afterScatter (Game.zoneMembers Zone.Graveyard S.alice afterScatter))
-      (Set.singleton (Text.pack "Grist, the Hunger Tide"))
-    Spec.assertEqWith
-      s
-      "targetable as a creature spell, where an ordinary planeswalker spell is not"
-      (S.castable S.bob gristScatter gristBoard, S.castable S.bob jaceScatter jaceBoard)
-      (True, False)
 
   -- EXILE, which is a PUBLIC zone (CR 400.2) but which CR 113.6 gives no default
   -- reaching either, so gatherGiven's arm asks CR 113.6b's stated set exactly as
@@ -5789,49 +5688,6 @@ soleActivatedAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility C
 soleActivatedAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
   [ability] -> ability
   _ -> error "Pawl.ProjectionSpec: expected exactly one activated ability"
-
--- Imperial Recruiter's search candidates, by card name, over a library holding
--- `subject` beside a fixed cast. Alice's library is a Goblin Piker (printed 2,
--- a candidate on both boards, so the prompt is never short-circuited down to the
--- one card it had to offer), a Hill Giant (printed 3, out on both) and a
--- Mountain (out on the creature clause). The Piker is what the answerer takes,
--- so neither search fails for want of a legal pick and the candidate SET is the
--- only thing that moves.
-hiddenZoneSearchCandidates :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m [Set.Set Text.Text]
-hiddenZoneSearchCandidates s registry subject = do
-  mountain <- S.printingOf s registry "Mountain"
-  recruiter <- S.printingOf s registry "Imperial Recruiter"
-  piker <- S.printingOf s registry "Goblin Piker"
-  giant <- S.printingOf s registry "Hill Giant"
-  card <- S.printingOf s registry subject
-  let base0 = S.landsInPlay mountain 3
-      (_, base1) = S.addLibraryCard mountain S.alice base0
-      (_, base2) = S.addLibraryCard giant S.alice base1
-      (_, base3) = S.addLibraryCard card S.alice base2
-      (pikerId, base4) = S.addLibraryCard piker S.alice base3
-      (gs, spellId) = S.handOne recruiter base4
-      (_, (searches, _)) =
-        State.runState
-          (Engine.runGame (searchRecordingAnswer pikerId) gs (do S.cast S.alice spellId; Engine.priorityLoop))
-          ([], [])
-  pure (fmap (namesOf gs) searches)
-
--- Alice casts `printing`, leaving it on the stack, with an Essence Scatter in
--- bob's hand and the mana for it under him. Alice's lands cover {1}{B}{G} and
--- {1}{U}{U} both, so the two boards this builds differ in the spell alone.
-spellAndScatter :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> m (ObjectId.ObjectId, GameState.GameState)
-spellAndScatter s registry printing = do
-  swamp <- S.printingOf s registry "Swamp"
-  forest <- S.printingOf s registry "Forest"
-  island <- S.printingOf s registry "Island"
-  scatter <- S.printingOf s registry "Essence Scatter"
-  let base0 = S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers)
-      base1 = S.landsFor forest S.alice 1 base0
-      base2 = S.landsFor island S.alice 2 base1
-      base3 = S.landsFor island S.bob 2 base2
-      (scatterId, base4) = S.addHandCard scatter S.bob base3
-      (base5, spellId) = S.handOne printing base4
-   in pure (scatterId, S.runPure S.identityAnswer base5 (S.cast S.alice spellId))
 
 -- CR 613.1f / 613.7a / 113.7: a quoted static ability granted by another static
 -- ability, whose recipients only the layer fold knows. Rune of Flight on

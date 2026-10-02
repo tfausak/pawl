@@ -236,13 +236,6 @@ blueBoard island n hand =
         held
       )
 
--- Pick entry option `which`, and copy the highest-id legal creature when offered.
-enteringAs :: Natural.Natural -> Prompt.Prompt r -> r
-enteringAs which p = case p of
-  Prompt.ChooseEntryOption {} -> which
-  Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe (List.sortOn Ord.Down legal)
-  _ -> S.identityAnswer p
-
 -- The newest battlefield object whose printed card has this name.
 newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
 newestNamed wanted gs =
@@ -543,26 +536,6 @@ payLifeOnEntryAnswer decision p = case p of
   Prompt.ChoosePayLifeOnEntry {} -> decision
   _ -> S.playLandAnswer p
 
--- alice's precombat main phase with the stack empty, the modal double-faced card
--- and the {W} creature in hand, and NOTHING else in the game: the land face is
--- the only mana source there will be, which is what makes the creature's fate
--- read the land's tap state.
-razorgrassBoard :: Printing.Printing -> Printing.Printing -> GameState.GameState
-razorgrassBoard razorgrass warden =
-  let (_, withField) = S.addHandCard razorgrass S.alice (Setup.emptyGame S.bothPlayers)
-      (_, filled) = S.addHandCard warden S.alice withField
-   in filled
-        { GameState.phase = Phase.PrecombatMain,
-          GameState.activePlayer = S.alice,
-          GameState.priority = Just S.alice
-        }
-
--- How many Soul Wardens made it to the battlefield.
-wardenOut :: GameState.GameState -> Int
-wardenOut gs =
-  let wardenName = CardName.MkCardName (Text.pack "Soul Warden")
-   in length (filter (\o -> Projection.hasName wardenName o gs) (Set.toList (GameState.battlefield gs)))
-
 -- razorgrassBoard's sibling for Sea Gate, Reborn, parameterized by alice's life
 -- total: the modal double-faced card and the {U} creature in hand, and NOTHING
 -- else in the game. The life total is the ONLY axis, so a pair of boards built
@@ -605,9 +578,9 @@ revealAsks responses =
 -- alice's precombat main phase with the stack empty, Rustic Clachan and ONE {W}
 -- creature in hand, and NOTHING else in the game: the land's "{T}: Add {W}" is
 -- the only mana there will be, so the creature's fate reads the land's tap state
--- as Soul Warden's does for razorgrassBoard above. The creature is the only axis
--- a pair of boards from here differ on -- Mosquito Guard and Benalish Hero are
--- both {W} 1/1 Soldiers, and one is a Kithkin.
+-- as Soul Warden's does for Razorgrass Ambush (data/scenarios/replacement). The
+-- creature is the only axis a pair of boards from here differ on -- Mosquito
+-- Guard and Benalish Hero are both {W} 1/1 Soldiers, and one is a Kithkin.
 clachanBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 clachanBoard clachan creature =
   let (_, withLand) = S.addHandCard clachan S.alice (Setup.emptyGame S.bothPlayers)

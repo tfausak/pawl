@@ -1,0 +1,297 @@
+{
+  "description": "CR 701.40e the second card manifested counts the first, so it enters tapped and the first does not",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "gp1"
+          },
+          {
+            "card": "Forest",
+            "label": "xf1"
+          },
+          {
+            "card": "Forest",
+            "label": "xf2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ethereal Ambush",
+            "label": "ethereal-ambush",
+            "ready": true
+          },
+          {
+            "card": "Synthetic Encircling Net",
+            "label": "synthetic-encircling-net",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Thragtusk"
+          },
+          {
+            "card": "Thragtusk"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$synthetic-encircling-net",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseManaToSpend",
+          "with": {
+            "manaType": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            },
+            "tags": [],
+            "retention": {
+              "type": "Ordinary"
+            },
+            "restriction": null,
+            "rider": null,
+            "sourceChosenSubtype": null
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ethereal-ambush",
+          "mana": [
+            "$plains-4",
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            "$island",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Thragtusk",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Thragtusk#2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Thragtusk",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Thragtusk#2",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "Thragtusk",
+          "names": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "Thragtusk#2",
+          "names": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "TurnFaceUp Thragtusk Manifest",
+            "TurnFaceUp Thragtusk#2 Manifest",
+            "ActivateManaAbility Island#2",
+            "ActivateManaAbility Island#3",
+            "ActivateManaAbility Island#4",
+            "ActivateManaAbility $xf1",
+            "ActivateManaAbility $xf2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    }
+  ],
+  "note": "Synthetic Encircling Net resolves first, then Ethereal Ambush manifests the two Thragtusks one at a time over one Goblin Piker. Two extra Forests (with the three Islands left) make each Thragtusk's manifest procedure affordable, so the Offered view shows both are face down and manifested."
+}

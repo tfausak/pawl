@@ -1,0 +1,141 @@
+{
+  "description": "CR 601.3 beside Garruk's Horde the player chooses whether the Dragon's rider applies",
+  "note": "Nothing alice controls can attack here (the Dragon and the Horde entered this turn), so a Cindermaw that could would raise a declare-attackers prompt no entry answers and fail the run; the check confirms nothing attacked.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          },
+          {
+            "card": "Mountain",
+            "label": "m3"
+          },
+          {
+            "card": "Thundermane Dragon",
+            "label": "dragon"
+          },
+          {
+            "card": "Garruk's Horde",
+            "label": "horde"
+          }
+        ],
+        "library": [
+          {
+            "card": "Giant Cindermaw",
+            "label": "cindermaw"
+          },
+          {
+            "card": "Forest"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ],
+        "library": [
+          {
+            "card": "Forest"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChoosePlayPermission",
+          "with": [
+            "$horde",
+            {
+              "from": {
+                "player": {
+                  "type": "Relative",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                "zone": {
+                  "type": "Library"
+                }
+              },
+              "matching": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$cindermaw",
+          "mana": [
+            "$m1",
+            "$m2",
+            "$m3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Giant Cindermaw",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {}
+        }
+      }
+    }
+  ]
+}

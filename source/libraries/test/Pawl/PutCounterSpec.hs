@@ -66,8 +66,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
 
 -- CR 603.3d's target, chosen as the trigger goes on the stack. FILTERS the
 -- offered set rather than building a recipient, so CR 608.2b's re-read at
--- resolution still finds what was named -- Pawl.MoveCounterSpec's aimingTransfer
--- posture. alice controls a second Goblin Piker so the choice is a real one:
+-- resolution still finds what was named -- Fate Transfer's posture
+-- (data/scenarios/move-counter). alice controls a second Goblin Piker so the choice is a real one:
 -- with one candidate the prompt short-circuits and the answer below would never
 -- be consulted.
 aiming :: ObjectId.ObjectId -> Prompt.Prompt r -> r

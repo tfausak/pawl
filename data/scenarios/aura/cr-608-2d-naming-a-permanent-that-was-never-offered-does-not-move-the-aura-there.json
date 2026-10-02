@@ -1,0 +1,117 @@
+{
+  "description": "CR 608.2d naming a permanent that was never offered does not move the Aura there",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Simic Guildmage",
+            "label": "mage"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "decoy"
+          },
+          {
+            "card": "Unholy Strength",
+            "label": "aura",
+            "attached": "host"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Foriysian Brigade",
+            "label": "host"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "giant"
+          },
+          {
+            "card": "Berserkers of Blood Ridge",
+            "label": "berserkers"
+          },
+          {
+            "card": "Island",
+            "label": "bi"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$mage",
+          "ability": 1,
+          "targets": [
+            "$aura"
+          ],
+          "mana": [
+            "$i1",
+            "$i2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseAttachment",
+          "with": "$decoy"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "AttachedTo",
+          "object": "$aura",
+          "is": "$giant"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$decoy",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    }
+  ]
+}

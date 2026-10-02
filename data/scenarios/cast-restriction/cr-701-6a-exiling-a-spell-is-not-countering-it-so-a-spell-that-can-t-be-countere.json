@@ -1,0 +1,130 @@
+{
+  "description": "CR 701.6a exiling a spell is not countering it, so a spell that can't be countered is exiled anyway",
+  "note": "bob casts his spell in his own main phase and alice answers with the flashed Aven Interrupter, whose enters trigger exiles it. The control file answers the same spell with Cancel instead.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "a1"
+          },
+          {
+            "card": "Plains",
+            "label": "a2"
+          },
+          {
+            "card": "Plains",
+            "label": "a3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Aven Interrupter",
+            "label": "answer"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "b1"
+          },
+          {
+            "card": "Forest",
+            "label": "b2"
+          },
+          {
+            "card": "Forest",
+            "label": "b3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Prowling Serpopard",
+            "label": "victim"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$victim",
+          "mana": [
+            "$b1",
+            "$b2",
+            "$b3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$answer",
+          "mana": [
+            "$a1",
+            "$a2",
+            "$a3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "spell": [
+            "Prowling Serpopard"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Prowling Serpopard",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Exile",
+        "card": "Prowling Serpopard",
+        "count": 1
+      }
+    }
+  ]
+}

@@ -22,7 +22,6 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
-import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -43,7 +42,6 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -59,7 +57,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1340,21 +1337,6 @@ voidWinnowerBoard mountain piker bolt disaster extra =
         (List.foldl' put gs4 extra) {GameState.phase = Phase.PrecombatMain}
       )
 
--- CR 107.3b's board: bob holds a Molten Disaster and controls Omniscience, so
--- the grant's {0} is among his candidates; `lands` Mountains of his decide
--- whether the printed {X}{R}{R} is another. alice's `extra` go onto her
--- battlefield beside her nine Mountains, the Winnower or nothing.
---
--- Returns (bob's Disaster, board).
-omniscientBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
-omniscientBoard mountain disaster omniscience lands extra =
-  let base = S.landsInPlay mountain 9
-      withBobsLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.bob g)) base [1 .. lands]
-      withGrant = snd (S.addPermanent omniscience S.bob withBobsLands)
-      (bobsDisaster, gs) = S.addHandCard disaster S.bob withGrant
-      put g printing = snd (S.addPermanent printing S.alice g)
-   in (bobsDisaster, (List.foldl' put gs extra) {GameState.phase = Phase.PrecombatMain})
-
 -- Whatever that player may do, asked in their own precombat main phase with an
 -- empty stack -- so a sorcery, a creature spell and an instant are all inside CR
 -- 307.1's window and timing is never the reason one is missing.
@@ -1413,44 +1395,6 @@ voidWinnowerSpec s registry =
       Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
       Spec.assertBool s (PlayerEffect.choiceCouldEscape S.bob Nothing cheap bobsDisaster VariableChoice.Announced board) "and a large enough X takes it out"
       Spec.assertBool s (not (PlayerEffect.choiceCouldEscape S.bob Nothing cheap bobsPiker VariableChoice.Announced board)) "while the fixed spell beside it has no choice to make"
-
-    -- CR 107.3b puts a floor under that search: a spell cast "without paying its
-    -- mana cost" has 0 as its only legal X, so the choice CR 601.3a lets bob
-    -- consider is not his to make and the mana value the prohibition judges is
-    -- the printed one. Omniscience is bob's, the Winnower alice's, and bob has no
-    -- lands, so the grant's {0} is the only candidate he can announce.
-    --
-    -- THREE boards off one builder, each one thing apart from its neighbour:
-    -- the Winnower gone shows the free cast is otherwise offered, and nine
-    -- Mountains under the Winnower show the printed {X}{R}{R} still escapes --
-    -- the clamp reaches the free candidate and not the search itself.
-    Spec.it s "CR 107.3b a free cast fixes X at 0, so the {X} spell is refused as even" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      disaster <- S.printingOf s registry "Molten Disaster"
-      omniscience <- S.printingOf s registry "Omniscience"
-      winnower <- S.printingOf s registry "Void Winnower"
-      let (refused, board) = omniscientBoard mountain disaster omniscience 0 [winnower]
-          (offered, bare) = omniscientBoard mountain disaster omniscience 0 []
-          (escaping, funded) = omniscientBoard mountain disaster omniscience 9 [winnower]
-          -- An X of 3 wherever one is asked, so a cast that reached CR 601.2b's
-          -- announcement would show in the life totals; the grant's {0} names
-          -- no X, so a free Disaster deals nothing.
-          answering :: Prompt.Prompt r -> r
-          answering p = case p of
-            Prompt.ChooseCost _ _ _ candidates ->
-              Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost [])) . Cost.Type.mana) candidates)
-            Prompt.ChooseX {} -> 3
-            _ -> S.identityAnswer p
-          resolvedFree = S.runPure answering (S.runPure answering bare (S.cast S.bob offered)) Stack.resolveTop
-          resolvedFunded = S.runPure answering (S.runPure answering funded (S.cast S.bob escaping)) Stack.resolveTop
-      Spec.assertBool s (not (any (S.isCastOf refused) (askedOf S.bob board))) "the free {X} spell is refused under the Winnower"
-      Spec.assertBool s (not (S.castable S.bob refused board)) "and is not castable"
-      Spec.assertBool s (any (S.isCastOf offered) (askedOf S.bob bare)) "with the Winnower gone the free cast is offered"
-      Spec.assertEqWith s "and resolves at X = 0: alice takes nothing" (S.lifeOf S.alice resolvedFree) (Just 20)
-      Spec.assertEqWith s "and neither does bob" (S.lifeOf S.bob resolvedFree) (Just 20)
-      Spec.assertBool s (any (S.isCastOf escaping) (askedOf S.bob funded)) "with nine Mountains the printed cost is still offered under the Winnower"
-      Spec.assertEqWith s "and only the printed cost: the grant's even route is withheld, so the Disaster is cast at X = 3 and alice takes 3" (S.lifeOf S.alice resolvedFunded) (Just 17)
-      Spec.assertEqWith s "and so does bob" (S.lifeOf S.bob resolvedFunded) (Just 17)
 
     -- CR 601.2e with CR 202.3e's second half: CR 601.3a let bob BEGIN, and the X
     -- he announces is then judged. X = 2 leaves {X}{R}{R} at mana value 4, even,
@@ -1751,15 +1695,6 @@ takeFirst wanted p = case p of
     [] -> Action.Type.Pass
   _ -> S.identityAnswer p
 
--- takeFirst casting `oid`, paying for it with a cost carrying components (an
--- escape cost's exile) when `escape` holds and with a bare mana cost otherwise.
-payingFor :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-payingFor escape oid p = case p of
-  Prompt.ChooseCost _ _ _ costs -> case filter ((== escape) . not . null . Cost.Type.components) costs of
-    c : _ -> c
-    [] -> S.identityAnswer p
-  _ -> takeFirst [S.isCastOf oid] p
-
 -- The objects that arrived on the battlefield between two boards.
 arrivedBetween :: GameState.GameState -> GameState.GameState -> [ObjectId.ObjectId]
 arrivedBetween before after = Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before))
@@ -1930,34 +1865,6 @@ serraParagonSpec s registry =
               Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
             (arrived, _) -> Spec.assertFailure s ("expected one arrival and a Paragon, got " <> show arrived)
 
-        -- CR 702.138a: Loathsome Chimera {2}{G} escapes for {4}{G} and three
-        -- other graveyard cards, a permission of its own. Paid for its escape
-        -- cost, the cast is made under escape and not under the Paragon: no
-        -- rider, and the Paragon's use is left for a graveyard land. Paid for
-        -- its mana cost on the same board, it is the Paragon's cast, and takes
-        -- both.
-        Spec.it s "CR 702.138a an escaped Chimera takes neither Serra Paragon's use nor its rider" $ do
-          b <- board "Loathsome Chimera" "Forest" True
-          forest <- S.printingOf s registry "Forest"
-          let fodder g _ = snd (S.addGraveyardCard forest S.alice g)
-              gs = S.landsFor forest S.alice 2 (List.foldl' fodder (pbState b) [1 :: Int .. 4])
-              chimera = pbBuried b
-              outcome escape =
-                let cast = S.runPure (payingFor escape chimera) gs Engine.priorityLoop
-                 in case arrivedBetween gs cast of
-                      [permanent] -> Just (cast, diesAndResolves permanent cast)
-                      _ -> Nothing
-              graveLandPlayable g = any (\oid -> elem (oid, Nothing) (Action.playableLands S.alice g)) (Game.zoneMembers Zone.Graveyard S.alice g)
-          case (outcome True, outcome False) of
-            (Just (escaped, escapedDied), Just (hard, hardDied)) -> do
-              Spec.assertBool s (notElem "Loathsome Chimera" (namesIn Zone.Exile S.alice escapedDied)) "the escaped Chimera was not exiled as it died"
-              Spec.assertEqWith s "and alice gained no life" (S.lifeOf S.alice escapedDied) (S.lifeOf S.alice gs)
-              Spec.assertBool s (graveLandPlayable escaped) "and a graveyard Forest is still playable under the Paragon"
-              Spec.assertEqWith s "the escape cost exiled three cards" (length (namesIn Zone.Exile S.alice escaped)) 3
-              Spec.assertBool s (elem "Loathsome Chimera" (namesIn Zone.Exile S.alice hardDied)) "cast for its mana cost, the Chimera took the rider"
-              Spec.assertBool s (not (graveLandPlayable hard)) "and spent the Paragon's use"
-            _ -> Spec.assertFailure s "expected the Chimera to resolve on both boards"
-
         -- The linkage: the same Elves cast from her HAND, with the Paragon on
         -- the battlefield, were not cast "this way" and gain nothing.
         Spec.it s "CR 611.3d a spell cast from the hand is not given the rider" $ do
@@ -1982,31 +1889,6 @@ serraParagonSpec s registry =
               Spec.assertEqWith s "the Forest was exiled" (namesIn Zone.Exile S.alice after) ["Forest"]
               Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
             arrived -> Spec.assertFailure s ("expected one arrival, got " <> show arrived)
-
-        -- CR 601.3 / 400.7h: Yawgmoth's Will and the Paragon both admit the
-        -- graveyard Elves, and alice picks which one she casts them under. The
-        -- pair differs in her answer and nothing else, and only the Paragon's
-        -- cast gives the rider -- observed on her next turn, once the Will's
-        -- own "exile that card instead" has ended at cleanup.
-        Spec.it s "CR 601.3 beside Yawgmoth's Will the player chooses Serra Paragon's permission and its rider" $ do
-          b <- board "Llanowar Elves" "Yawgmoth's Will" True
-          swamp <- S.printingOf s registry "Swamp"
-          let resolved = willResolved (pbHeld b) (S.landsFor swamp S.alice 3 (pbState b))
-              ready = resolved {GameState.priority = Just S.alice, GameState.passed = Set.empty}
-              outcome pick =
-                let cast = S.runPure (underPermission pick [S.isCastOf (pbBuried b)]) ready Engine.priorityLoop
-                    ended = S.runPure S.identityAnswer cast (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
-                 in case arrivedBetween ready cast of
-                      [permanent] -> Just (diesAndResolves permanent ended)
-                      _ -> Nothing
-              will = Maybe.listToMaybe (fmap ActivePlayerEffect.source (GameState.playerEffects ready))
-          case (outcome (pbParagon b), outcome will) of
-            (Just underParagon, Just underWill) -> do
-              Spec.assertEqWith s "under the Paragon alice gained 2 life as the Elves died" (S.lifeOf S.alice underParagon) (fmap (+ 2) (S.lifeOf S.alice ready))
-              Spec.assertBool s (elem "Llanowar Elves" (namesIn Zone.Exile S.alice underParagon)) "and the Elves were exiled"
-              Spec.assertEqWith s "under the Will she gained nothing" (S.lifeOf S.alice underWill) (S.lifeOf S.alice ready)
-              Spec.assertEqWith s "and the Elves went to her graveyard" (filter (== "Llanowar Elves") (namesIn Zone.Graveyard S.alice underWill)) ["Llanowar Elves"]
-            _ -> Spec.assertFailure s "expected the Elves to resolve under both permissions"
 
         -- CR 305.1 / 400.7i: Crucible of Worlds opens the graveyard for a land
         -- at no cost, so the Forest there needs no Paragon -- and alice may
@@ -2094,7 +1976,7 @@ thundermaneBoard mountain cindermaw filler granting =
 -- CR 611.3d's own sentence, and the rider with a stated duration. The look
 -- clause is omitted under johannSpec's precedent (#1412). Garruk's Horde grants
 -- the same cast with no rider, so the pair differs in the haste alone.
-thundermaneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+thundermaneSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 thundermaneSpec s registry =
   let board granting = do
         mountain <- S.printingOf s registry "Mountain"
@@ -2117,23 +1999,6 @@ thundermaneSpec s registry =
               Spec.assertBool s (Projection.hasKeyword Keyword.Haste cindermaw after) "CR 611.3d the Cindermaw has haste this turn"
               Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste cindermaw ended)) "CR 514.2 and loses it at cleanup, the rider's stated duration"
             _ -> Spec.assertFailure s ("expected one arrival on each board, got " <> show (arrived, arrivedH))
-
-        -- CR 601.3 / 400.7h: Garruk's Horde beside the Dragon admits the same
-        -- Cindermaw, and alice picks which permission she casts it under; only
-        -- the Dragon's gives haste. The pair differs in her answer alone.
-        Spec.it s "CR 601.3 beside Garruk's Horde the player chooses whether the Dragon's rider applies" $ do
-          (top, gs) <- board "Thundermane Dragon"
-          horde <- S.printingOf s registry "Garruk's Horde"
-          let dragon = List.find (\oid -> namesOf oid == ["Thundermane Dragon"]) (Game.zoneMembers Zone.Battlefield S.alice gs)
-              namesOf oid = Maybe.maybeToList (fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs))
-              (hordeId, withHorde) = S.addPermanent horde S.alice gs
-              underDragon = S.runPure (underPermission dragon [S.isCastOf top]) withHorde Engine.priorityLoop
-              underHorde = S.runPure (underPermission (Just hordeId) [S.isCastOf top]) withHorde Engine.priorityLoop
-          case (arrivedBetween withHorde underDragon, arrivedBetween withHorde underHorde) of
-            ([cindermaw], [cindermawH]) -> do
-              Spec.assertBool s (Combat.canAttack S.alice cindermaw underDragon) "under the Dragon the Cindermaw can attack"
-              Spec.assertBool s (not (Combat.canAttack S.alice cindermawH underHorde)) "under the Horde it is summoning sick"
-            arrivals -> Spec.assertFailure s ("expected one arrival under each answer, got " <> show arrivals)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do

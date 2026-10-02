@@ -1283,80 +1283,6 @@ savantiRomeroSpec s registry =
           Spec.assertEqWith s "six cards drawn, not three" (S.handSize S.alice after, librarySize S.alice after) (6, 1)
           Spec.assertEqWith s "and six life lost" (S.lifeOf S.alice after) (Just 14)
 
--- CR 601.2i's cast trigger with a payload aimed at a TARGET PLAYER: the pool's
--- first card to hand out poison counters (CR 122.1f, whose tenth loses the game
--- under CR 704.5c) to a player who was CHOSEN rather than derived from the
--- ability's controller (#120).
---
--- Hand of the Praetors, {3}{B} Creature -- Phyrexian Zombie 3/2: "Infect. Other
--- creatures you control with infect get +1/+1. Whenever you cast a creature
--- spell with infect, target player gets a poison counter." Only the third line
--- is this group's subject. The anthem is Pawl.PowerToughnessSpec's, and what the
--- printed infect keyword does to damage is Pawl.DamageSpec's ground already (CR
--- 702.90b).
---
--- The printed condition narrows THREE things in one sentence -- who cast it (CR
--- 109.5's "you", which for a triggered ability is CR 603.3a's controller of the
--- source at the trigger moment), that it was a creature spell, and that it had
--- infect (CR 702.90) -- and the Filter carries all three. Each case below moves
--- exactly one of them, so a Filter that always answered True is distinguishable
--- from one that reads each half.
---
--- THREE SEATS, which the PAYLOAD wants as much as the condition does. On a
--- two-seat board with alice casting, "target player" answered as bob and "an
--- opponent" put the counter in the same place. carol is the seat that separates
--- them: she is a legal target that was not chosen, so an effect that poisoned
--- every opponent fails here too. She serves the condition's "you cast" case for
--- Young Pyromancer's reason as well -- "bob cast it" is not "an opponent cast
--- it" until someone else is sitting there.
-handOfThePraetorsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-handOfThePraetorsSpec s registry =
-  let poisonOf = S.playerCounterOf PlayerCounterKind.Poison
-      -- The trigger's one target slot, answered with `who` rather than left to
-      -- S.identityAnswer, whose lowest-sorting candidate on this board is alice
-      -- -- the caster, and so the wrong answer to prove anything with.
-      aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-      aimAt who p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
-        _ -> S.identityAnswer p
-      -- alice bears the Hand; alice and bob each get two Forests (Glistener
-      -- Elf's {G}) and two Mountains (Goblin Piker's {1}{R}). carol gets no
-      -- land: she never casts, and is only ever a seat the counter must miss.
-      board forest mountain hand =
-        let addLands pid n printing g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
-            withLands =
-              addLands S.bob 2 mountain
-                . addLands S.bob 2 forest
-                . addLands S.alice 2 mountain
-                $ addLands S.alice 2 forest S.threePlayerGame
-            (_, withHand) = S.addPermanent hand S.alice withLands
-         in withHand
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-      castAndResolve who caster oid gs = S.runPure (aimAt who) (S.runPure (aimAt who) gs (S.cast caster oid)) Engine.priorityLoop
-   in Spec.describe s "Hand of the Praetors" $ do
-        -- The "you cast" half, moved on its own: the same infect creature spell,
-        -- cast from the seat to alice's left. carol makes "bob cast it" a
-        -- different statement from "an opponent cast it".
-        Spec.it s "CR 109.5 'you cast': an OPPONENT's infect creature spell fires nothing" $ do
-          forest <- S.printingOf s registry "Forest"
-          mountain <- S.printingOf s registry "Mountain"
-          hand <- S.printingOf s registry "Hand of the Praetors"
-          elf <- S.printingOf s registry "Glistener Elf"
-          let base = board forest mountain hand
-              (bobsElf, withBobs) = S.addHandCard elf S.bob base
-              (alicesElf, gs) = S.addHandCard elf S.alice withBobs
-              byBob = castAndResolve S.bob S.bob bobsElf gs
-              byAlice = castAndResolve S.bob S.alice alicesElf gs
-          Spec.assertEqWith s "bob's own cast poisons nobody" (poisonOf S.bob byBob) 0
-          Spec.assertEqWith s "not alice" (poisonOf S.alice byBob) 0
-          Spec.assertEqWith s "and not carol" (poisonOf S.carol byBob) 0
-          -- The same board, one caster apart: alice casting her own copy is what
-          -- proves the seat is the only thing the silence above turns on.
-          Spec.assertEqWith s "the same board poisons bob for alice's own cast" (poisonOf S.bob byAlice) 1
-
 -- Custodi Lich, {3}{B}{B} Creature -- Zombie Cleric 4/2: "When this creature
 -- enters, you become the monarch. Whenever you become the monarch, target player
 -- sacrifices a creature of their choice." Both printed sentences are in
@@ -1660,7 +1586,7 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
 -- HAND SIZE is the reading throughout, and always against a PAIRED board that
 -- differs only in whether Matoya is on the battlefield. Curate draws a card of
 -- its own, so an absolute number would prove nothing about the trigger.
-matoyaTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+matoyaTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 matoyaTriggerSpec s registry =
   let -- alice's board: four Islands, a Crystal Ball, `stock` cards on her
       -- library (top-first Goblin Piker then Bird Maiden), and Matoya only when
@@ -1694,42 +1620,7 @@ matoyaTriggerSpec s registry =
         Prompt.ChooseScry _ _ looked -> ([], looked)
         Prompt.ChooseSurveil _ _ looked -> ([], looked)
         _ -> S.identityAnswer p
-      -- alice's board for the surveil half: two Islands, Curate in hand, four
-      -- cards on her library, Matoya only when asked for.
-      surveilBoardFor withMatoya = do
-        island <- S.printingOf s registry "Island"
-        curate <- S.printingOf s registry "Curate"
-        matoya <- S.printingOf s registry "Matoya, Archon Elder"
-        piker <- S.printingOf s registry "Goblin Piker"
-        maiden <- S.printingOf s registry "Bird Maiden"
-        mountain <- S.printingOf s registry "Mountain"
-        forest <- S.printingOf s registry "Forest"
-        let watched =
-              if withMatoya
-                then snd (S.addPermanent matoya S.alice (S.landsInPlay island 2))
-                else S.landsInPlay island 2
-            deal g p = snd (S.addLibraryCard p S.alice g)
-            stocked = List.foldl' deal watched [forest, mountain, maiden, piker]
-            (board, spellId) = S.handOne curate stocked
-        pure (spellId, board {GameState.priority = Just S.alice})
-      runCurate spellId gs =
-        let cast = S.runPure keepAll gs (S.cast S.alice spellId)
-         in S.runPure keepAll cast Engine.priorityLoop
    in Spec.describe s "MatoyaKeywordActionTrigger" $ do
-        -- CR 701.22d, the whole card on the scry side. The pair differs in
-        -- Matoya and in nothing else, so the one extra card in hand is the
-        -- trigger and cannot be Crystal Ball's doing -- rule 701.22a moves no
-        -- card out of the library at all.
-        Spec.it s "CR 701.22d Crystal Ball's scry draws Matoya's card" $ do
-          (ballId, board) <- scryBoardFor True 2
-          (bareBall, bare) <- scryBoardFor False 2
-          let after = runBall S.alice ballId board
-              baseline = runBall S.alice bareBall bare
-          Spec.assertEqWith s "alice's hand started empty" (S.handSize S.alice board) 0
-          Spec.assertBool s (elem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 701.22d the scry recorded its event"
-          Spec.assertEqWith s "Matoya drew her one card" (S.handSize S.alice after) 1
-          Spec.assertEqWith s "and without Matoya the same scry draws nothing" (S.handSize S.alice baseline) 0
-          Spec.assertEqWith s "the stack is empty, so the trigger really resolved" (GameState.stack after) []
         -- CR 701.22d's "even if some or all of those actions were impossible",
         -- and the case that discriminates WHERE the event is recorded: a library
         -- of exactly one card gives scry 2 nothing to decide -- top and bottom
@@ -1748,46 +1639,6 @@ matoyaTriggerSpec s registry =
           Spec.assertEqWith s "so alice's library is empty" (length (Game.zoneMembers Zone.Library S.alice after)) 0
           Spec.assertEqWith s "and without Matoya nothing was drawn" (S.handSize S.alice baseline) 0
           Spec.assertEqWith s "the card stayed on the library instead" (length (Game.zoneMembers Zone.Library S.alice baseline)) 1
-        -- CR 603.3a / 109.5: the relation is read against the ABILITY'S
-        -- CONTROLLER, so an opponent's scry is silence. The same Crystal Ball
-        -- activation as the first case, moved one seat over and nothing else.
-        Spec.it s "CR 109.5 bob's scry does not draw for alice's Matoya" $ do
-          island <- S.printingOf s registry "Island"
-          crystalBall <- S.printingOf s registry "Crystal Ball"
-          matoya <- S.printingOf s registry "Matoya, Archon Elder"
-          piker <- S.printingOf s registry "Goblin Piker"
-          maiden <- S.printingOf s registry "Bird Maiden"
-          let (_, withMatoya) = S.addPermanent matoya S.alice (S.landsInPlay island 4)
-              lands = S.landsFor island S.bob 4 withMatoya
-              (ballId, placed) = S.addPermanent crystalBall S.bob lands
-              deal who g p = snd (S.addLibraryCard p who g)
-              -- ALICE's library is stocked too, and that is not decoration: an
-              -- inverted relation fires Matoya here, and a draw off an empty
-              -- library (CR 121.4) moves no card -- so without these two the
-              -- assertion below would pass for a reason this case did not choose.
-              stocked = List.foldl' (deal S.alice) (List.foldl' (deal S.bob) placed [maiden, piker]) [maiden, piker]
-              board = stocked {GameState.priority = Just S.bob}
-              after = runBall S.bob ballId board
-          Spec.assertBool s (elem (GameEvent.Scried S.bob) (S.eventsOf after)) "bob really scried, so there was an event to match"
-          Spec.assertEqWith s "alice, whose Matoya it is, drew nothing" (S.handSize S.alice after) 0
-          Spec.assertEqWith s "and bob drew nothing either, his scry moving no card out of his library" (S.handSize S.bob after) 0
-        -- CR 701.25d, the whole card on the surveil side. Curate draws a card
-        -- itself, which is exactly why the baseline board is here: two cards in
-        -- hand against one is the trigger.
-        Spec.it s "CR 701.25d Curate's surveil draws Matoya's card on top of its own" $ do
-          (spellId, board) <- surveilBoardFor True
-          (bareSpell, bare) <- surveilBoardFor False
-          let after = runCurate spellId board
-              baseline = runCurate bareSpell bare
-          Spec.assertBool s (elem (GameEvent.Surveiled S.alice) (S.eventsOf after)) "CR 701.25d the surveil recorded its event"
-          Spec.assertBool s (notElem (GameEvent.Scried S.alice) (S.eventsOf after)) "and a surveil is not a scry"
-          Spec.assertEqWith s "Curate's draw plus Matoya's" (S.handSize S.alice after) 2
-          Spec.assertEqWith s "against Curate's alone" (S.handSize S.alice baseline) 1
-          -- The answerer kept both looked-at cards, so nothing but Curate itself
-          -- is in the graveyard: this is #1342's own requirement that a surveil
-          -- which binned NOTHING still fires, and the assertion a trigger built
-          -- on CR 701.25a's zone changes would fail.
-          Spec.assertEqWith s "and nothing was binned, so the trigger is not counting cards moved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
 -- Feywild Trickster {2}{U} Creature -- Gnome Warlock 2/2, "Whenever you roll one
 -- or more dice, create a 1/1 blue Faerie Dragon creature token with flying" --
@@ -1913,138 +1764,6 @@ feywildTricksterSpec s registry =
             (S.countOnBattlefieldByName faerieDragon S.alice after)
             0
 
--- Tavern Scoundrel {1}{R} Creature -- Human Rogue 1/3, "Whenever you win a coin
--- flip, create two Treasure tokens. / {1}, {T}, Sacrifice another permanent:
--- Flip a coin." -- one of the pool's two producers for
--- TriggerCondition.PlayerWinsCoinFlip (CR 705.2); Karplusan Minotaur below
--- prints the same condition beside its losing twin.
---
--- ONE CARD carries both halves, which is why no second producer is on the board:
--- the activated ability is the only flipper and the triggered ability is the
--- only watcher.
---
--- THE BOARD is deliberately TWO permanents a seat -- the Scoundrel and one
--- untapped Mountain -- and that count is load-bearing twice over. The Mountain
--- pays the {1}, CR 602.2b's window over CR 601.2g running before the
--- components, and it is then the ONLY candidate CR 701.21a's cost has, so
--- Prompt.ChooseSacrifices is
--- elided and no answerer stands between the card's Filter and what dies. The
--- printed word "another" is Not IsSource: under a bare IsSource the Scoundrel
--- itself would be the only candidate, so WHICH permanent left the battlefield
--- reads that Filter directly.
---
--- THE ASSERTED QUANTITY is how many permanents NAMED "Treasure Token" a seat
--- has. By name rather than by token total for feywildTricksterSpec's reason: it
--- says WHICH ability resolved rather than that something did.
---
--- THREE LEGS, with randomness pinned by CONSTANT in both directions --
--- Replay.defaultAnswer would supply Heads to both prompts unasked, and so a win,
--- which is exactly the leg a run that asked nothing could fake.
---
---   * WON (call Heads, face Heads): two Treasures.
---   * LOST (call Heads, face Tails): none. Not decoration -- it is the only leg
---     separating "triggers on a WIN" from "triggers on any flip at all", and the
---     flip really happened, which the log assertion beside it pins.
---   * BOB'S WIN with a Scoundrel on BOTH seats: one event, two watchers, and
---     only the flipper's fires. AnyPlayer, Opponent and a condition ignoring its
---     relation each differ from You here.
---
--- CR 603.3 IS THE SEQUENCING. The flip happens during the resolution of the
--- activated ability, so the trigger reaches the stack only the next time a player
--- would receive priority -- one place/resolve cycle short of the tokens.
--- `runFlip` runs the cycle twice.
-tavernScoundrelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-tavernScoundrelSpec s registry =
-  let treasure = CardName.MkCardName (Text.pack "Treasure Token")
-      mountainName = CardName.MkCardName (Text.pack "Mountain")
-      -- A Scoundrel and one Mountain for each named seat, and nothing else.
-      flipBoard seats = do
-        scoundrel <- S.printingOf s registry "Tavern Scoundrel"
-        mountain <- S.printingOf s registry "Mountain"
-        let step (ids, gs) who =
-              let (oid, withCreature) = S.addPermanent scoundrel who gs
-               in (ids <> [oid], S.landsFor mountain who 1 withCreature)
-        pure (List.foldl' step ([], Setup.emptyGame S.bothPlayers) seats)
-      -- Pins CR 705.2's two questions by constant, never by anything derived from
-      -- the prompt, so the engine cannot repair either answer after a mutation.
-      flipAnswer :: CoinFace.CoinFace -> CoinFace.CoinFace -> Prompt.Prompt r -> r
-      flipAnswer face called p = case p of
-        Prompt.FlipCoin -> face
-        Prompt.CallCoin {} -> called
-        _ -> S.identityAnswer p
-      runFlip face called who scoundrelId gs =
-        let drain n g =
-              if n <= (0 :: Int) || null (GameState.stack g)
-                then g
-                else drain (n - 1) (S.runPure (flipAnswer face called) g Stack.resolveTop)
-            cycleOnce g = drain 8 (S.runPure (flipAnswer face called) g Engine.placePendingTriggers)
-         in case Activatable.abilitiesFor scoundrelId gs of
-              [ability] -> Right (cycleOnce (cycleOnce (S.runPure (flipAnswer face called) gs (Activate.activateAbility who scoundrelId ability))))
-              other -> Left (length other)
-      oneAbility n = "expected exactly one activated ability, got " <> show n
-   in Spec.describe s "PlayerWinsCoinFlip" $ do
-        -- CR 705.2: the call matched the face, so alice won her own flip and her
-        -- own Scoundrel fires.
-        Spec.it s "CR 705.2 a won flip creates two Treasures" $ do
-          (ids, board) <- flipBoard [S.alice]
-          case ids of
-            [scoundrelId] -> case runFlip CoinFace.Heads CoinFace.Heads S.alice scoundrelId board of
-              Left n -> Spec.assertFailure s (oneAbility n)
-              Right after -> do
-                Spec.assertEqWith
-                  s
-                  "CR 705.2: two Treasure tokens for the won flip"
-                  (S.countOnBattlefieldByName treasure S.alice after)
-                  2
-                -- The printed "another", read off the board rather than off the
-                -- Filter: the land paid CR 701.21a's cost and the Scoundrel did
-                -- not.
-                Spec.assertBool s (S.onBattlefield scoundrelId after) "CR 701.21a the Scoundrel did not sacrifice itself (another)"
-                Spec.assertEqWith s "and the Mountain it sacrificed instead is gone" (S.countOnBattlefieldByName mountainName S.alice after) 0
-                Spec.assertEqWith s "the stack is empty, so the trigger really resolved" (GameState.stack after) []
-            _ -> Spec.assertFailure s "expected exactly one Scoundrel"
-        -- CR 705.2's other half, on the SAME board: the call did not match, so the
-        -- flip was lost and nothing fires. A condition matching the flip rather
-        -- than the win mints two Treasures here.
-        Spec.it s "CR 705.2 a lost flip creates none" $ do
-          (ids, board) <- flipBoard [S.alice]
-          case ids of
-            [scoundrelId] -> case runFlip CoinFace.Tails CoinFace.Heads S.alice scoundrelId board of
-              Left n -> Spec.assertFailure s (oneAbility n)
-              Right after -> do
-                Spec.assertEqWith
-                  s
-                  "CR 705.2: a lost flip mints no Treasure"
-                  (S.countOnBattlefieldByName treasure S.alice after)
-                  0
-                -- The flip HAPPENED, which keeps the zero above from passing for
-                -- an ability that never activated at all.
-                Spec.assertBool
-                  s
-                  (elem (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Just False}) (S.eventsOf after))
-                  "CR 705.1 the flip is recorded even though CR 705.2 lost it"
-            _ -> Spec.assertFailure s "expected exactly one Scoundrel"
-        -- CR 109.5 / 603.3a: the relation is read against the ABILITY'S
-        -- CONTROLLER. Both seats hold a Scoundrel and bob flips, so the two
-        -- readings of "you" fall on different seats over one event.
-        Spec.it s "CR 109.5 with a Scoundrel on each side only the flipper's fires" $ do
-          (ids, board) <- flipBoard [S.alice, S.bob]
-          case ids of
-            [_, bobsScoundrelId] -> case runFlip CoinFace.Heads CoinFace.Heads S.bob bobsScoundrelId board of
-              Left n -> Spec.assertFailure s (oneAbility n)
-              Right after -> do
-                Spec.assertEqWith
-                  s
-                  "CR 705.2: bob won the flip, so bob's Scoundrel made the Treasures"
-                  (S.countOnBattlefieldByName treasure S.bob after)
-                  2
-                Spec.assertEqWith
-                  s
-                  "and alice's Scoundrel, watching the same event, made none"
-                  (S.countOnBattlefieldByName treasure S.alice after)
-                  0
-            _ -> Spec.assertFailure s "expected a Scoundrel on each side"
-
 -- Karplusan Minotaur {2}{R}{R} Creature -- Minotaur Warrior 3/3, "Cumulative
 -- upkeep--Flip a coin. / Whenever you win a coin flip, this creature deals 1
 -- damage to any target. / Whenever you lose a coin flip, this creature deals 1
@@ -2116,24 +1835,6 @@ karplusanMinotaurSpec s registry =
           Spec.assertEqWith s "CR 705.2 carol, whom alice named off her won flip, took the damage" (S.lifeOf S.carol after) (Just 19)
           Spec.assertEqWith s "CR 705.2 and alice, whom the losing trigger would have hit, took none" (S.lifeOf S.alice after) (Just 20)
           Spec.assertEqWith s "CR 705.1 one flip, and CR 705.2 won it" (flips after) [CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Just True}]
-        -- CR 705.2's first sentence, the flip nobody wins or loses. Molten Sentry
-        -- {3}{R} enters under alice with the Minotaur already out; its as-enters
-        -- flip records CoinFlipped.won = Nothing, which is neither a win nor a
-        -- loss, so no damage is dealt at all.
-        Spec.it s "CR 705.2 a winnerless flip fires neither trigger" $ do
-          (_, gs) <- board
-          mountain <- S.printingOf s registry "Mountain"
-          sentry <- S.printingOf s registry "Molten Sentry"
-          let (held, staged) = S.addHandCard sentry S.alice (S.landsFor mountain S.alice 4 gs)
-              cast = S.runPure (minotaurAnswer CoinFace.Heads) (staged {GameState.priority = Just S.alice}) (S.cast S.alice held Monad.>> Stack.resolveTop)
-              after = snd (Engine.runGamePure (minotaurAnswer CoinFace.Heads) cast Engine.priorityLoop)
-          -- The behaviour first: a winnerless flip is not a lost one, so nobody
-          -- is damaged. A losing condition reading `won /= Just True` hits alice
-          -- here.
-          Spec.assertEqWith s "CR 705.2 alice took nothing off a flip she did not lose" (S.lifeOf S.alice after) (Just 20)
-          Spec.assertEqWith s "and carol took nothing off a flip alice did not win" (S.lifeOf S.carol after) (Just 20)
-          Spec.assertEqWith s "CR 705.1 the flip happened, and CR 705.2 left it with no outcome" (flips after) [CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Nothing}]
-          Spec.assertEqWith s "and the stack is empty, so nothing was left unresolved" (GameState.stack after) []
 
 -- alice pays rule 702.24a's cumulative upkeep and calls heads; the coin shows
 -- `face`. Both questions are pinned by CONSTANT so the engine cannot repair
@@ -3377,11 +3078,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   archnemesisSpec s registry
   ezuriExperienceSpec s registry
   savantiRomeroSpec s registry
-  handOfThePraetorsSpec s registry
   monarchTriggerSpec s registry
   matoyaTriggerSpec s registry
   feywildTricksterSpec s registry
-  tavernScoundrelSpec s registry
   karplusanMinotaurSpec s registry
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry

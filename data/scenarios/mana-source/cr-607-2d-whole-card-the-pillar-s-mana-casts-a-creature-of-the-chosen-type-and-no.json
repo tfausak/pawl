@@ -1,0 +1,93 @@
+{
+  "description": "CR 607.2d whole card: the Pillar's mana casts a creature of the chosen type and no other",
+  "note": "One board, two answers: alice casts the Pillar off both Reliquary Towers and names Goblin; the control names Elf. The Pillar's one mana is all that is left, so Offered shows which of Goblin Grappler and Llanowar Elves it can cast.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Reliquary Tower",
+            "label": "t1",
+            "ready": true
+          },
+          {
+            "card": "Reliquary Tower",
+            "label": "t2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Pillar of Origins",
+            "label": "pillar"
+          },
+          {
+            "card": "Goblin Grappler",
+            "label": "grappler"
+          },
+          {
+            "card": "Llanowar Elves",
+            "label": "elves"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$pillar",
+          "mana": [
+            "$t1",
+            "$t2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCreatureType",
+          "with": {
+            "type": "Goblin"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $grappler",
+            "ActivateManaAbility Pillar of Origins"
+          ]
+        }
+      }
+    }
+  ]
+}

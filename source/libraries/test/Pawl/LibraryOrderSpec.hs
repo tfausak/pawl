@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -88,7 +87,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
-import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Revealed as Revealed
@@ -523,51 +521,6 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         (after, asked) = State.runState (Engine.runGame counting gs (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.Proliferate)) 0
     Spec.assertEqWith s "CR 701.34a: one counter became five" (S.counterOf CounterKind.PlusOnePlusOne src (snd after)) 5
     Spec.assertEqWith s "four proliferate choices" asked 4
-  -- CR 701.34a: Scheming Aspirant ("Whenever you proliferate, each opponent
-  -- loses 2 life and you gain 2 life.") triggers once per proliferate, so
-  -- beside Tekuthal it triggers twice.
-  Spec.it s "CR 701.34a Scheming Aspirant triggers on each of Tekuthal's two proliferates" $ do
-    (board, _) <- tekuthalBoard s registry [("Tekuthal, Inquiry Dominus", S.alice), ("Scheming Aspirant", S.alice)]
-    (bare, _) <- tekuthalBoard s registry [("Scheming Aspirant", S.alice)]
-    let (after, _) = proliferateTwiceRun board
-        (baseline, _) = proliferateTwiceRun bare
-    Spec.assertEqWith s "bob lost 2 life twice" (S.lifeOf S.bob after) (Just 16)
-    Spec.assertEqWith s "alice gained 2 life twice" (S.lifeOf S.alice after) (Just 24)
-    Spec.assertEqWith s "without Tekuthal, once" (S.lifeOf S.bob baseline) (Just 18)
-    Spec.assertEqWith s "the stack is empty, so the triggers resolved" (GameState.stack after) []
-
--- Steady Progress in alice's hand over three Islands and a card to draw, a
--- Goblin Piker of hers with one +1/+1 counter, bob at two poison, and each named
--- card on the battlefield under its seat.
-tekuthalBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [(String, PlayerId.PlayerId)] -> m ((GameState.GameState, ObjectId.ObjectId), ObjectId.ObjectId)
-tekuthalBoard s registry extras = do
-  island <- S.printingOf s registry "Island"
-  piker <- S.printingOf s registry "Goblin Piker"
-  steadyProgress <- S.printingOf s registry "Steady Progress"
-  placed <- traverse (\(name, pid) -> fmap (\printing -> (printing, pid)) (S.printingOf s registry name)) extras
-  let (creature, g1) = S.addPermanent piker S.alice (S.landsInPlay island 3)
-      g2 = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob (S.addCounter CounterKind.PlusOnePlusOne 1 creature g1)
-      (_, g3) = S.addLibraryCard island S.alice g2
-      g4 = List.foldl' (\g (printing, pid) -> snd (S.addPermanent printing pid g)) g3 placed
-      (board, spell) = S.handOne steadyProgress g4
-  pure ((board {GameState.priority = Just S.alice}, spell), creature)
-
--- Cast Steady Progress and run priority until the stack is empty, answering the Nth ChooseProliferate by
--- INDEX -- the first takes only the permanents offered, the second everything --
--- so the engine cannot repair an answer after a mutation. Answers with the
--- settled board and how many proliferate choices were asked.
-proliferateTwiceRun :: (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, Int)
-proliferateTwiceRun (board, spell) =
-  let answering :: Prompt.Prompt r -> State.State Int r
-      answering p = case p of
-        Prompt.ChooseProliferate _ _ oids pids -> do
-          n <- State.get
-          State.put (n + 1)
-          pure (Set.fromList oids, if n == 0 then Set.empty else Set.fromList pids)
-        _ -> pure (S.identityAnswer p)
-      run = Engine.runGame answering board (S.cast S.alice spell >> Engine.priorityLoop)
-      ((_, settled), asked) = State.runState run 0
-   in (S.settleSba settled, asked)
 
 -- CR 701.22a: "to 'scry N' means to look at the top N cards of your library,
 -- then put any number of them on the bottom of your library in any order and
@@ -644,59 +597,8 @@ constructAnswer a = case Asked.prompt a of
 scryLibrary :: GameState.GameState -> [ObjectId.ObjectId]
 scryLibrary = Game.zoneMembers Zone.Library S.alice
 
-scrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scrySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 scrySpec s registry = Spec.describe s "Scry" $ do
-  -- The SPLIT, which scry 1 cannot reach: one looked-at card goes under and the
-  -- other stays on top, so neither "all of them" nor "none of them" produces
-  -- this library.
-  Spec.it s "CR 701.22a whole card: Crystal Ball's scry 2 bottoms one and keeps one" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([piker], [maiden])) ballId board
-        Spec.assertEqWith s "the library started top-first piker, maiden, mountain, forest" (scryLibrary board) [piker, maiden, mountain, forest]
-        Spec.assertEqWith s "the kept card is on top and the bottomed one is last" (scryLibrary after) [maiden, mountain, forest, piker]
-        Spec.assertEqWith s "the ability left the stack" (length (GameState.stack after)) 0
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- CR 701.22a's "the rest on top of your library IN ANY ORDER": both cards stay
-  -- on top, swapped. A scry that put them back in the order it found them
-  -- leaves the library untouched, which is the reading this case rules out.
-  Spec.it s "CR 701.22a the kept cards go back in the CHOSEN order, not the order they were in" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([], [maiden, piker])) ballId board
-        Spec.assertEqWith s "the top two are swapped and the rest is untouched" (scryLibrary after) [maiden, piker, mountain, forest]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- The other "in any order", on the bottom half: both go under, in an order
-  -- that is not the order they were looked at in.
-  Spec.it s "CR 701.22a the bottomed cards go under in the CHOSEN order too" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([maiden, piker], [])) ballId board
-        Spec.assertEqWith s "mountain and forest rose, maiden above piker beneath them" (scryLibrary after) [mountain, forest, maiden, piker]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- A card the answer names in NEITHER list still has to end up somewhere, and
-  -- an effect has no way to reject an answer -- Effect.Discard's completion
-  -- posture. It stays on top, behind the one that was named.
-  Spec.it s "CR 701.22a a looked-at card the answer never names stays on top" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([], [maiden])) ballId board
-        Spec.assertEqWith s "maiden was named and piker fell in behind it" (scryLibrary after) [maiden, piker, mountain, forest]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- Rule 701.22 states no penalty for scrying more cards than there are, unlike
-  -- CR 104.3c's draw: a two-card library is looked at whole and still split.
-  Spec.it s "CR 701.22a a library shorter than the count is looked at as far as it goes" $ do
-    (ids, ballId, board) <- scryBoard s registry 2
-    case ids of
-      [piker, maiden] -> do
-        let after = runScry (scryAnswer ([piker], [maiden])) ballId board
-        Spec.assertEqWith s "the whole library was looked at" (scryLibrary board) [piker, maiden]
-        Spec.assertEqWith s "and the answer swapped it" (scryLibrary after) [maiden, piker]
-      _ -> Spec.assertFailure s "expected two library cards"
   -- Eager Construct -- "{2} Artifact Creature -- Construct 2/2. When this
   -- creature enters, each player may scry 1." -- at three seats, every seat
   -- taking the may and bottoming its top card. The answerer runs through the
@@ -769,17 +671,6 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
     let after = runScry (scryAnswer ([], [])) ballId board
     Spec.assertEqWith s "not asked" (asks ballId board) 0
     Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
-  -- The pair's other half, one card deeper: with something beneath it the top
-  -- card is a real top-or-bottom question, so it IS asked -- and the answer is
-  -- honoured, which is what separates "asked" from "asked and ignored".
-  Spec.it s "CR 701.22a a second card beneath makes it a real choice, and it is asked" $ do
-    (ids, ballId, board) <- scryBoard s registry 2
-    case ids of
-      [piker, maiden] -> do
-        let after = runScry (scryAnswer ([maiden, piker], [])) ballId board
-        Spec.assertEqWith s "asked once" (asks ballId board) 1
-        Spec.assertEqWith s "and both went under, maiden above piker" (scryLibrary after) [maiden, piker]
-      _ -> Spec.assertFailure s "expected two library cards"
   -- CR 701.22b: "if a player is instructed to scry 0, no scry event occurs."
   -- Driven through the opcode rather than a card, no printing scrying zero and
   -- Crystal Ball's count being fixed at two.
@@ -791,30 +682,6 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
         after = S.runPure (scryAnswer ([], [])) board zero
     Spec.assertEqWith s "not asked" asked 0
     Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
-  -- CR 614.1a: Kenessos, Priest of Thassa ("If you would scry a number of cards,
-  -- scry that many cards plus one instead.") makes Crystal Ball's scry 2 look at
-  -- three. Everything looked at goes under, so the library shows how many.
-  Spec.it s "CR 614.1a Kenessos makes Crystal Ball's scry 2 a scry 3" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    withKenessos <- withScryRow s registry ["Kenessos, Priest of Thassa"] board
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let (after, looked) = scryBottomingAll ballId (fst withKenessos)
-            (baseline, _) = scryBottomingAll ballId board
-        Spec.assertEqWith s "CR 701.22a: three cards went under" (scryLibrary after) [forest, piker, maiden, mountain]
-        Spec.assertEqWith s "without Kenessos, two" (scryLibrary baseline) [mountain, forest, piker, maiden]
-        Spec.assertEqWith s "one scry of three cards" looked [[piker, maiden, mountain]]
-        Spec.assertBool s (elem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 701.22d the scry still happened"
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- CR 109.5: "you" is Kenessos's controller, so bob's leaves alice's scry at two.
-  Spec.it s "CR 109.5 an opponent's Kenessos does not enlarge your scry" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    kenessos <- S.printingOf s registry "Kenessos, Priest of Thassa"
-    let (after, _) = scryBottomingAll ballId (snd (S.addPermanent kenessos S.bob board))
-    case ids of
-      [piker, maiden, mountain, forest] ->
-        Spec.assertEqWith s "two cards went under" (scryLibrary after) [mountain, forest, piker, maiden]
-      _ -> Spec.assertFailure s "expected four library cards"
   -- CR 614.6: Eligeth, Crossroads Augur ("If you would scry a number of cards,
   -- draw that many cards instead.") replaces the scry outright: two cards drawn,
   -- nothing looked at, and no CR 701.22d event for "whenever you scry".
@@ -844,19 +711,6 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
            in fmap length (State.execState (Engine.runGame answering withKenessos (scryN n)) [])
     Spec.assertEqWith s "scry 0: nothing looked at" (offered 0) []
     Spec.assertEqWith s "scry 1: two looked at" (offered 1) [2]
-  -- CR 616.1e: with both, the scryer orders them. Kenessos first leaves a scry 3
-  -- for Eligeth to turn into three draws; Eligeth first leaves no scry for
-  -- Kenessos to enlarge, so two.
-  Spec.it s "CR 616.1 Eligeth and Kenessos: the scryer orders them" $ do
-    (_, ballId, board) <- scryBoard s registry 4
-    (both, placed) <- withScryRow s registry ["Eligeth, Crossroads Augur", "Kenessos, Priest of Thassa"] board
-    case placed of
-      [eligeth, kenessos] -> do
-        let first chosen = fst (scryPicking chosen ballId both)
-        Spec.assertEqWith s "Kenessos first: three drawn" (S.handSize S.alice (first kenessos)) 3
-        Spec.assertEqWith s "Eligeth first: two drawn" (S.handSize S.alice (first eligeth)) 2
-        Spec.assertEqWith s "and the scryer was asked" (snd (scryPicking kenessos ballId both)) 1
-      _ -> Spec.assertFailure s "expected two permanents"
 
 -- Each named card on the battlefield under alice, and their ids in order.
 withScryRow :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> GameState.GameState -> m (GameState.GameState, [ObjectId.ObjectId])
@@ -878,23 +732,6 @@ scryBottomingAll ballId gs =
         _ -> pure ()
       ((_, after), looked) = State.runState (Engine.runGame answering gs run) []
    in (after, looked)
-
--- Crystal Ball's scry with CR 616.1's choice answered by the entry whose source
--- is `chosen`, pinned by identity. Answers with the board and how many times the
--- choice was asked.
-scryPicking :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
-scryPicking chosen ballId gs =
-  let answering :: Prompt.Prompt r -> State.State Int r
-      answering p = case p of
-        Prompt.ChooseReplacement _ _ entries -> do
-          State.modify' (+ 1)
-          pure (maybe 0 Int.toNaturalSaturating (List.findIndex ((== chosen) . ReplacementEntry.source) entries))
-        _ -> pure (S.identityAnswer p)
-      run = case Activatable.abilitiesFor ballId gs of
-        [ability] -> Activate.activateAbility S.alice ballId ability >> Stack.resolveTop
-        _ -> pure ()
-      ((_, after), asked) = State.runState (Engine.runGame answering gs run) 0
-   in (after, asked)
 
 -- Answers Prompt.ChooseSurveil with a FIXED pair of lists, scryAnswer's posture
 -- and for its reason: an answerer that searched the offered list for a legal
@@ -1048,10 +885,6 @@ fatesealSpec s registry = Spec.describe s "Fateseal" $ do
         Prompt.ChooseOpponent {} -> victim
         Prompt.ChooseFateseal {} -> split
         _ -> S.identityAnswer p
-      castSpin :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-      castSpin answer spellId board = S.runPure answer board $ do
-        S.cast S.alice spellId
-        Stack.resolveTop
   -- WHO is asked and about WHOSE library -- the half a board cannot show by its
   -- final state. The fatesealer is shown the cards; the library's owner is shown
   -- nothing and asked nothing.
@@ -1074,35 +907,6 @@ fatesealSpec s registry = Spec.describe s "Fateseal" $ do
                 []
         Spec.assertEqWith s "alice asked, about carol's library, showing its top two" asked [(S.alice, S.carol, [carolTop, carolMiddle])]
       _ -> Spec.assertFailure s "expected three library cards for carol"
-  -- The elision pair for the OPPONENT choice, two boards differing in seat count
-  -- alone: CR 102.2's two-player game leaves exactly one opponent and nothing to
-  -- ask, and a third seat makes it a real question.
-  Spec.it s "CR 102.2 the opponent is chosen only when there are two of them" $ do
-    let counting :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
-        counting creatureId p = case p of
-          Prompt.ChooseOpponent {} -> do
-            State.modify (+ 1)
-            pure (aimAt creatureId S.carol ([], []) p)
-          _ -> pure (aimAt creatureId S.carol ([], []) p)
-        asks (_, _, _, creatureId, spellId, board) =
-          State.execState
-            ( Engine.runGame (counting creatureId) board $ do
-                S.cast S.alice spellId
-                Stack.resolveTop
-            )
-            0
-    two <- fatesealBoard s registry S.bothPlayers
-    three <- fatesealBoard s registry S.threePlayers
-    Spec.assertEqWith s "one opponent, not asked" (asks two) 0
-    Spec.assertEqWith s "two opponents, asked once" (asks three) 1
-    -- And the two-seat board still fateseals: the elision skips the question,
-    -- not the action.
-    case two of
-      (_, bobIds, _, creatureId, spellId, board) -> case bobIds of
-        [bobTop, bobDeep] -> do
-          let after = castSpin (aimAt creatureId S.carol ([bobTop], [])) spellId board
-          Spec.assertEqWith s "bob's only opponent fatesealed him" (Game.zoneMembers Zone.Library S.bob after) [bobDeep, bobTop]
-        _ -> Spec.assertFailure s "expected two library cards for bob"
   -- The elision pair for the SPLIT question, two boards differing in one card:
   -- a lone card that is the whole library has its top and its bottom at the same
   -- position, so both answers give the same library and there is nothing to ask

@@ -73,7 +73,6 @@ module Pawl.TargetSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -135,7 +134,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -246,45 +244,6 @@ aimingDwellShuffling :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 aimingDwellShuffling oids p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> aimingDwell oids p
-
--- CR 700.2d's whole announcement for Synthetic Recurring Reclamation with its
--- first mode chosen twice: occurrence 0 names bob and `his`, occurrence 1 names
--- `other` and `hisOther`. The two runs differ only in `other`.
---
--- Synthetic Reclamation Engine's case shares it, that card printing the same two
--- modes on an activated ability. What `hisOther` is differs with the fixture: a
--- card in BOB's graveyard for the spell case whichever player `other` is, and a
--- card in CAROL's for the ability case.
---
--- Pinned per slot NAME rather than searched, and the suffixed names are
--- Modal.instanceSlot's. CR 601.2c offers occurrence 1 the union over every
--- player its own slot could still take, so bob's second card is offered for
--- carol's occurrence either way -- what the rename decides is whether the JOINT
--- CHECK still admits it.
-aimingReclamation :: PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimingReclamation other his hisOther p = case p of
-  Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 0]
-  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
-  Prompt.ChooseTargets _ _ _ asked ->
-    Map.mapWithKey
-      ( \slot (n, _) ->
-          let named name = slot == SlotName.MkSlotName (Text.pack name)
-              wanted
-                | named "player" = [Recipient.ToPlayer S.bob]
-                | named "player#1" = [Recipient.ToPlayer other]
-                | named "cards" = [Recipient.ToObject his]
-                | otherwise = [Recipient.ToObject hisOther]
-           in Set.fromList (take (Natural.toIntSaturating n) wanted)
-      )
-      asked
-  _ -> S.identityAnswer p
-
--- The printed names of the cards in one player's copy of a zone (CR 400.1),
--- sorted so the assertion does not depend on object-id order. Names rather than
--- ids because a card that changes zones is a NEW object (CR 400.7).
-namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
-namesIn zone pid gs =
-  List.sort (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
 
 -- CR 601.2c's whole announcement for Fall of the Hammer: `dealerId` in the
 -- dealer slot and `victimId` in the victim slot. Both counts are fixed at one,
@@ -1872,111 +1831,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertBool s (S.castable S.alice togetherId together) "with both cards in bob's graveyard the spell has a coherent announcement"
     Spec.assertBool s (not (S.castable S.alice splitId split)) "split one apiece it has none, though the union still holds two"
 
-  -- CR 700.2d: "If a particular mode is chosen multiple times, the spell is
-  -- treated as if that mode appeared that many times in sequence. If that mode
-  -- requires a target, the same player or object may be chosen as the target for
-  -- each of those modes, or different targets may be chosen." Different targets
-  -- is what Pawl.Engine.Modal.instanceSlot's per-occurrence rename buys, and a
-  -- slot's POOL may name a sibling slot by its printed name -- so occurrence 1's
-  -- graveyard scope has to follow the rename or it reads OCCURRENCE 0's player.
-  --
-  -- Synthetic Recurring Reclamation {2}{G} Sorcery (data/cards/synthetic-recurring-reclamation.json):
-  -- "Choose two. You may choose the same mode more than once. -- Target player
-  -- shuffles up to two target cards from their graveyard into their library. --
-  -- Draw a card." SYNTHETIC because the two printed sets do not intersect:
-  -- Scryfall o:"choose the same mode more than once", 2026-08-31, returns 22
-  -- cards, and no mode of any of them targets a card in another slot's graveyard
-  -- (the graveyard modes of the Confluence and Season cycles say "your
-  -- graveyard", and Unite the Coalition's "exile target player's graveyard" is a
-  -- resolution-time sweep, which reads printed names off Modal.instanceView and
-  -- never this path). CR 700.2d states the shape outright.
-  --
-  -- THE WRONG ANSWER IS WEAKER THAN PRINTED, not stricter, which is what makes
-  -- the case worth a board: an unrenamed scope judges occurrence 1's card against
-  -- whatever OCCURRENCE 0 named, so naming bob for occurrence 0 and carol for
-  -- occurrence 1 admits a card out of BOB's graveyard for her occurrence.
-  --
-  -- The DESTINATION cannot show it. CR 400.3 sends an object that would go to a
-  -- library other than its owner's to its owner's instead, so the misjudged card
-  -- lands in bob's library whichever player occurrence 1 named -- what
-  -- discriminates is that it MOVES AT ALL, the whole announcement being reversed
-  -- when the rename holds.
-  --
-  -- TWO RUNS off one board, differing in exactly one thing -- which player
-  -- occurrence 1 names -- with the same three Forests paying the same {2}{G},
-  -- the same two cards in bob's graveyard and the same modes chosen. The bob run
-  -- is what keeps the carol run from passing off a spell that never worked.
-  --
-  -- THREE SEATS: with alice and bob alone the two occurrences would name one
-  -- player and the rename could not be observed.
-  Spec.it s "CR 700.2d a repeated mode's graveyard scope follows its own occurrence, not the first" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    reclamation <- S.printingOf s registry "Synthetic Recurring Reclamation"
-    let (hisId, g1) = S.addGraveyardCard piker S.bob (S.landsFor forest S.alice 3 S.threePlayerGame)
-        (hisOtherId, g2) = S.addGraveyardCard bolt S.bob g1
-        (board, spellId) = S.handOne reclamation g2
-        run other =
-          let cast = S.runPure (aimingReclamation other hisId hisOtherId) board (S.cast S.alice spellId)
-           in (cast, S.runPure (aimingReclamation other hisId hisOtherId) cast Stack.resolveTop)
-        (castAtCarol, atCarol) = run S.carol
-        (_, atBob) = run S.bob
-    Spec.assertEqWith s "occurrence 1 naming carol, both of bob's cards stay in his graveyard: the announcement is reversed (CR 601.2e)" (namesIn Zone.Graveyard S.bob atCarol) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
-    Spec.assertEqWith s "so nothing reaches his library either" (namesIn Zone.Library S.bob atCarol) []
-    Spec.assertEqWith s "with nothing on the stack" (length (GameState.stack castAtCarol)) 0
-    Spec.assertBool s (elem spellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell back in alice's hand"
-    Spec.assertEqWith s "occurrence 1 naming bob instead, both cards reach his library" (namesIn Zone.Library S.bob atBob) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
-    Spec.assertEqWith s "leaving his graveyard empty" (namesIn Zone.Graveyard S.bob atBob) []
-
-  -- CR 700.2d one object type over: the case above is a SPELL, and an activated
-  -- ability re-checks CR 608.2b's targets down a second path of its own
-  -- (Pawl.Engine.Resolve.resolveModesWith), which built that map without the
-  -- per-occurrence rename the announcement had made; see #2806. The announcement is
-  -- not what is under test -- Pawl.Engine.Activate goes through
-  -- Modal.modesTargetSlots and always renamed -- so the ability reaches the stack
-  -- either way, and what CR 608.2b decides is whether occurrence 1's card is
-  -- still legal. Judged against OCCURRENCE 0's player it is a card in the wrong
-  -- graveyard, dropped with no error.
-  --
-  -- Synthetic Reclamation Engine {3} Artifact
-  -- (data/cards/synthetic-reclamation-engine.json): "{T}: Choose two. You may
-  -- choose the same mode more than once. -- Target player shuffles up to two
-  -- target cards from their graveyard into their library. -- Draw a card."
-  -- SYNTHETIC because no printing puts that instruction on an ability at all:
-  -- Scryfall o:"choose the same mode more than once", 2026-08-31, returns 22
-  -- cards and every one of them is an instant or a sorcery. CR 700.2a states the
-  -- shape outright -- the controller of a modal activated ability chooses the
-  -- modes as part of activating it -- and CR 700.2d's own sentence is about "a
-  -- modal spell or ability", so nothing in the rules forbids the printing.
-  --
-  -- THE WRONG ANSWER IS STRICTER THAN PRINTED here, where the spell case's was
-  -- weaker: the misjudged card is dropped rather than admitted, so what
-  -- discriminates is that carol's card MOVES.
-  --
-  -- THREE SEATS, the case above's reason: with alice and bob alone the two
-  -- occurrences would name one player and the rename could not be observed.
-  Spec.it s "CR 608.2b a repeated mode on an ABILITY re-checks each occurrence against its own binding" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    engine <- S.printingOf s registry "Synthetic Reclamation Engine"
-    case soleActivatedAbility engine of
-      Nothing -> Spec.assertFailure s "Synthetic Reclamation Engine should declare exactly one activated ability"
-      Just ability -> do
-        let (engineId, g1) = S.addPermanent engine S.alice S.threePlayerGame
-            (hisId, g2) = S.addGraveyardCard piker S.bob g1
-            (hersId, board) = S.addGraveyardCard bolt S.carol g2
-            activated = S.runPure (aimingReclamation S.carol hisId hersId) board (Activate.activateAbility S.alice engineId ability)
-            resolved = S.runPure (aimingReclamation S.carol hisId hersId) activated Stack.resolveTop
-        Spec.assertEqWith s "occurrence 1's card reaches CAROL's library, the player her own occurrence named" (namesIn Zone.Library S.carol resolved) [S.nameOf (Printing.card bolt)]
-        Spec.assertEqWith s "leaving her graveyard empty" (namesIn Zone.Graveyard S.carol resolved) []
-        Spec.assertEqWith s "and occurrence 0's card reaches bob's" (namesIn Zone.Library S.bob resolved) [S.nameOf (Printing.card piker)]
-        -- The proxies last: the announcement is not what this case is about, and
-        -- an ability that never reached the stack would leave every graveyard
-        -- alone too.
-        Spec.assertEqWith s "the activation was accepted, so the ability really did resolve" (length (GameState.stack activated)) 1
-        Spec.assertEqWith s "and nothing is left on the stack after it" (length (GameState.stack resolved)) 0
-
   -- CR 601.2c's other sibling-slot reading, and the one the rule states in its
   -- own words: "The same target can't be chosen multiple times for any one
   -- instance of the word 'target' on the spell. However, if the spell uses the
@@ -2566,82 +2420,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- And the conjunct beside it on that road: rule 601.2c's NUMBER, which only an
   -- interpreter ignoring the offer can get wrong.
   ravenousRatsSpec s registry
-  -- And the OBJECT a computed count is read against, on the two ability roads
-  -- where the stack object and CR 113.7's source are not the same thing.
-  -- And the one slot in the corpus its CONTROLLER does not announce.
-  cuombajjSpec s registry
   -- And CR 115.7d, a spell that is already on the stack given new targets.
   -- And its joint half, over a spell whose second slot reads its first.
   redirectBioshiftSpec s registry
-
--- CR 115.1 fixes the ability's controller as the seat that announces its
--- targets. Cuombajj Witches overrides that for one of its two slots -- "{T}:
--- This creature deals 1 damage to any target and 1 damage to any target of an
--- opponent's choice" -- and CR 801.5a's example is the rule text that names the
--- card, and that says the CONTROLLER picks which opponent picks.
---
--- Three seats, because at two the two readings collapse: CR 102.2 leaves "an
--- opponent" one candidate, and nothing on the board can tell "alice chose it"
--- from "bob did" when they would name the same seat.
---
--- Both cases run off one board and one activation, and differ only in which
--- opponent alice names, so the seat that answers is the only thing between them.
-cuombajjSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-cuombajjSpec s registry = Spec.describe s "A slot the controller does not announce (CR 115.1)" $ do
-  Spec.it s "CR 115.1 the opponent alice named picks the second target, and alice picks only the first" $ do
-    witches <- S.printingOf s registry "Cuombajj Witches"
-    case Face.activatedAbilities (S.combinedFace witches) of
-      [] -> Spec.assertFailure s "Cuombajj Witches should print one activated ability"
-      ability : _ -> do
-        let (srcId, board) = witchesBoard witches
-            after = S.runPure (answeringWitches S.bob) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-        -- The gameplay assertions first. alice is the seat BOB named, and alice
-        -- would never have named herself, so her life total is the whole claim.
-        Spec.assertEqWith s "alice, whom bob named, took bob's damage" (S.lifeOf S.alice after) (Just 19)
-        Spec.assertEqWith s "carol, whom alice named, took alice's" (S.lifeOf S.carol after) (Just 19)
-        Spec.assertEqWith s "and bob, who announced but was named by nobody, took none" (S.lifeOf S.bob after) (Just 20)
-        -- The proxy last: the ability really resolved and really tapped.
-        Spec.assertEqWith s "the Witches tapped to pay for it" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Tapped)
-
-  -- CR 801.5a's other half: WHICH opponent announces is alice's to choose, so
-  -- naming carol instead of bob moves the second target with it. The engine may
-  -- not settle that question itself, which is what a three-seat board is for.
-  Spec.it s "CR 801.5a naming carol instead of bob routes the second announcement to carol" $ do
-    witches <- S.printingOf s registry "Cuombajj Witches"
-    case Face.activatedAbilities (S.combinedFace witches) of
-      [] -> Spec.assertFailure s "Cuombajj Witches should print one activated ability"
-      ability : _ -> do
-        let (srcId, board) = witchesBoard witches
-            after = S.runPure (answeringWitches S.carol) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-        Spec.assertEqWith s "bob, whom carol named, took carol's damage" (S.lifeOf S.bob after) (Just 19)
-        Spec.assertEqWith s "carol took alice's, and none of her own" (S.lifeOf S.carol after) (Just 19)
-        Spec.assertEqWith s "and alice, whom bob would have named had bob been asked, took none" (S.lifeOf S.alice after) (Just 20)
-
--- alice's Witches, settled and untapped, at three seats with priority hers.
-witchesBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-witchesBoard witches =
-  let (srcId, gs) = S.addPermanent witches S.alice (Setup.emptyGame S.threePlayers)
-   in (srcId, gs {GameState.priority = Just S.alice})
-
--- `chosen` is the opponent alice names at CR 801.5a's pick. Every announcing
--- seat targets the seat BEFORE it, a rotation rather than a fixed victim, so
--- each of the three possible askers names a different player and no two of them
--- can be told apart by the board alone. Keyed on the ASKING seat, which the
--- prompt carries; a pure answerer that read only the offer would answer both
--- announcements alike. The answer is FILTERED out of the offer rather than
--- built, so it is the recipient the pool actually produced (CR 608.2b).
-answeringWitches :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-answeringWitches chosen p = case p of
-  Prompt.ChooseOpponent _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (chosen ==) (NonEmpty.toList offered))
-  Prompt.ChooseTargets _ asker _ asked -> fmap (\(_, offered) -> Set.filter ((Just (previousSeat asker) ==) . Recipient.playerOf) offered) asked
-  _ -> S.identityAnswer p
-
--- The rotation answeringWitches names its victim by.
-previousSeat :: PlayerId.PlayerId -> PlayerId.PlayerId
-previousSeat pid
-  | pid == S.alice = S.carol
-  | pid == S.bob = S.alice
-  | otherwise = S.bob
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do

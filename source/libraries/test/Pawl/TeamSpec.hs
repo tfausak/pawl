@@ -75,7 +75,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -265,15 +264,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in GameState.spellsCastLastTurn (Engine.beginTurnOf S.carol cast)
     Spec.assertEqWith s "bob's one spell counts for his team" (run sharedTurns) 1
     Spec.assertEqWith s "without the option only alice's none counts" (run id) 0
-  -- CR 805.4 / 514.1: bob is an active player, so his cleanup discard happens on
-  -- alice's turn. He holds eight and draws a ninth; two go.
-  Spec.it s "CR 514.1 each player on the active team discards to hand size" $ do
-    island <- S.printingOf s registry "Island"
-    let run option =
-          let board = List.foldl' (\g _ -> snd (S.addHandCard island S.bob g)) (stockedWith island option) [1 :: Int .. 8]
-           in S.handSize S.bob (fst (TurnSpec.runTurn S.identityAnswer board))
-    Spec.assertEqWith s "bob ends alice's turn at seven" (run sharedTurns) 7
-    Spec.assertEqWith s "without the option he keeps eight" (run id) 8
   -- CR 805.4d's other half: an ability that does not refer to "that player"
   -- triggers once, however many players share the turn.
   --
@@ -490,72 +480,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol, S.dave]
     Spec.assertEqWith s "CR 508.3b one trigger: dave, alice and bob each gained 2" (run sharedTurns) [Just 22, Just 22, Just 16, Just 22]
     Spec.assertEqWith s "without the option only alice attacked" (run id) [Just 22, Just 20, Just 18, Just 22]
-  -- CR 805.10b / 508.1j: each attacking player pays the toll on their own
-  -- creatures. Bob's Forests pay for bob's Piker; alice has no mana, so a toll
-  -- charged to her would rewind the attack.
-  --
-  -- Ghostly Prison, {2}{W} Enchantment: "Creatures can't attack you unless
-  -- their controller pays {2} for each creature they control that's attacking
-  -- you."
-  Spec.it s "CR 805.10b a teammate pays the toll on their own attacker" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    prison <- S.printingOf s registry "Ghostly Prison"
-    forest <- S.printingOf s registry "Forest"
-    let run option =
-          let (_, staged) = S.addPermanent piker S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
-              (_, imprisoned) = S.addPermanent prison S.carol staged
-              board = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) imprisoned [1 :: Int, 2]
-              after = S.runCombat (S.attackTo S.carol) board
-           in (S.lifeOf S.carol after, S.tappedCount S.bob after)
-    Spec.assertEqWith s "bob tapped both Forests and his Piker, which dealt carol 2" (run sharedTurns) (Just 18, 3)
-    Spec.assertEqWith s "without the option nothing attacked or paid" (run id) (Just 20, 0)
-  -- CR 805.10a / 701.43a: bob exerts his own attacker, so it is his next untap
-  -- step that it skips -- his team's next turn, where his tapped Forest untaps
-  -- beside it. The pair differs only in the exert.
-  --
-  -- Glory-Bound Initiate, {1}{W} 3/1 Creature -- Human Warrior: "You may exert
-  -- this creature as it attacks. When you do, it gets +1/+3 and gains lifelink
-  -- until end of turn."
-  Spec.it s "CR 701.43a a teammate's exerted attacker skips his next untap step" $ do
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    initiate <- S.printingOf s registry "Glory-Bound Initiate"
-    let exerting :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
-        exerting decision p = case p of
-          Prompt.ChooseExert {} -> decision
-          _ -> S.attackTo S.carol p
-        tapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
-        run decision =
-          let (mine, staged) = S.addPermanent initiate S.bob (atCombat (stockedWith island sharedTurns))
-              (witness, placed) = S.addPermanent forest S.bob staged
-              after = S.runCombat (exerting decision) (S.tapObject witness placed)
-              -- The rest of alice's turn, carol's, then the untap step of
-              -- alice's team's next one.
-              later = snd (Engine.runGamePure (exerting decision) (fst (TurnSpec.runTurn (exerting decision) (fst (TurnSpec.runTurn (exerting decision) after)))) Engine.runStep)
-           in (S.lifeOf S.carol after, tapped mine later, tapped witness later)
-    Spec.assertEqWith s "the exerted Initiate dealt carol 4 and stayed tapped while bob's Forest untapped" (run OptionalDecision.Exercises) (Just 16, True, False)
-    Spec.assertEqWith s "declined, it dealt 3 and untapped beside the Forest" (run OptionalDecision.Declines) (Just 17, False, False)
-  -- CR 805.10a / 702.154a: bob enlists a creature he controls, which is a
-  -- creature of an attacking player.
-  --
-  -- Yavimaya Steelcrusher, {1}{R} 2/2 Creature -- Ape Warrior: "Enlist (As this
-  -- creature attacks, you may tap a nonattacking creature you control without
-  -- summoning sickness. When you do, add its power to this creature's until end
-  -- of turn.)" Hill Giant, 3/3, stays home to be enlisted.
-  Spec.it s "CR 702.154a a teammate enlists a creature he controls" $ do
-    steelcrusher <- S.printingOf s registry "Yavimaya Steelcrusher"
-    giant <- S.printingOf s registry "Hill Giant"
-    let run option =
-          let (ape, staged) = S.addPermanent steelcrusher S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
-              (_, board) = S.addPermanent giant S.bob staged
-              enlisting :: Prompt.Prompt r -> r
-              enlisting p = case p of
-                Prompt.DeclareAttackers _ _ ids -> filter (== ape) ids
-                Prompt.ChooseEnlist _ _ _ offer -> Just (NonEmpty.head offer)
-                _ -> S.attackTo S.carol p
-           in S.lifeOf S.carol (S.runCombat enlisting board)
-    Spec.assertEqWith s "the Steelcrusher took the Giant's 3 and dealt carol 5" (run sharedTurns) (Just 15)
-    Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
   -- CR 805.10b / 805.2 / 800.4j: with alice gone her team still attacks, and
   -- bob, now its primary player, declares it.
   Spec.it s "CR 805.2 a departed active player's teammate declares the attack" $ do
@@ -638,45 +562,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (fmap (\pid -> Map.member pid (GameState.pendingControl armed)) [S.alice, S.bob], S.lifeOf S.carol after)
     Spec.assertEqWith s "carol controlled alice's attack, so no Piker hit her" (run True) ([True, True], Just 20)
     Spec.assertEqWith s "without Mindslaver alice's Piker dealt carol 2" (run False) ([False, False], Just 18)
-  -- CR 702.22k / 805.9: with bob's banding Hero among the creatures carol's
-  -- Brigade blocks, an active player divides the Brigade's damage, and bob, the
-  -- banding ability's controller, names which. He names himself, then alice.
-  -- Without the option bob's creatures cannot attack on alice's turn, so the
-  -- control gives alice them: she is the one active player, and nobody is asked.
-  -- With a Hero each, the two banding controllers leave the choice to their
-  -- team, and CR 805.2 gives it to alice, the team's primary player.
-  --
-  -- Benalish Hero, {W} 1/1 Creature -- Human Soldier, banding. Foriysian
-  -- Brigade, {3}{W} 2/4 Creature -- Human Soldier, "This creature can block an
-  -- additional creature each combat."
-  Spec.it s "CR 805.9 the banding creature's controller names the active player who divides" $ do
-    hero <- S.printingOf s registry "Benalish Hero"
-    piker <- S.printingOf s registry "Goblin Piker"
-    brigade <- S.printingOf s registry "Foriysian Brigade"
-    let run option owner (other, otherOwner) named =
-          let (heroId, g1) = S.addPermanent hero owner (atCombat (option (twoTeams S.fourPlayerGame)))
-              (otherId, g2) = S.addPermanent other otherOwner g1
-              (_, board) = S.addPermanent brigade S.carol g2
-              blocked = Set.fromList [heroId, otherId]
-              record :: Prompt.Prompt r -> State.State [(Bool, PlayerId.PlayerId)] r
-              record p = case p of
-                Prompt.ChoosePlayer _ pid _ offer -> do
-                  State.modify' (<> [(False, pid)])
-                  pure (Maybe.fromMaybe (NonEmpty.head offer) (List.find (== named) (NonEmpty.toList offer)))
-                Prompt.AssignCombatDamage _ pid _ thresholds n -> do
-                  State.modify' (<> [(True, pid)])
-                  pure $ case filter S.isCreatureRecipient (Map.keys thresholds) of
-                    r : _ -> Map.singleton r n
-                    [] -> Map.empty
-                Prompt.DeclareBlockers _ _ mine _ -> pure (Map.fromList (fmap (\b -> (b, blocked)) mine))
-                _ -> pure (S.attackTo S.carol p)
-           in snd (State.runState (Engine.runGame record board S.combatGame) [])
-    -- Each entry is (was it the division, who was asked); False is CR 805.9's
-    -- choice of active player.
-    Spec.assertEqWith s "bob named himself, so bob divided" (run sharedTurns S.bob (piker, S.bob) S.bob) [(False, S.bob), (True, S.bob)]
-    Spec.assertEqWith s "bob named alice, so alice divided" (run sharedTurns S.bob (piker, S.bob) S.alice) [(False, S.bob), (True, S.alice)]
-    Spec.assertEqWith s "without the option alice divided unasked" (run id S.alice (piker, S.alice) S.bob) [(True, S.alice)]
-    Spec.assertEqWith s "a Hero each, so alice named bob" (run sharedTurns S.bob (hero, S.alice) S.bob) [(False, S.alice), (True, S.bob)]
   -- CR 725.4 / 805.2: carol, the monarch, concedes before alice's team's turn.
   -- No rule names which active player takes the crown, so the team decides and
   -- dave, its primary player, names himself over alice, the turn's seat. He then

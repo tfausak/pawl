@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
-import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
@@ -77,7 +76,6 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Power as Power
@@ -924,105 +922,6 @@ countOnLuckSpec s registry =
           Spec.assertBool s (S.onBattlefield luckId after) "and alice is still in the game with her enchantment"
           Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
 
--- CR 404.1's ordered pile read from ITS end: ObjectRef.TopOfGraveyard, whose top
--- is the NEWEST arrival and so the LAST member -- the opposite end from the
--- library arms above, which is the way this reference is written wrong.
---
--- Soldevi Digger {2} Artifact -- "{2}: Put the top card of your graveyard on the
--- bottom of your library." (name, cost, type line and Oracle text checked against
--- api.scryfall.com). Its whole printed text is that one ability, so nothing else
--- on the card can be what these assertions read.
---
--- The board is built so that the readings of "the top card of your graveyard" are
--- told apart, since a board that cannot distinguish them proves nothing:
---
---   * The NEWEST card versus the oldest. alice's graveyard is stocked with three
---     distinct printings, and both the card that moved and the two left behind
---     are asserted by name, in the pile's order.
---   * The BOTTOM of the library versus its top. Her library already holds a
---     card, so the two ends are different positions and the arriving card is
---     asserted to be under it.
---   * YOUR graveyard versus each player's. bob's graveyard is stocked with a
---     printing alice never has, and it must be untouched.
---   * ONE card versus the pile. Two cards stay, so a sweep of the graveyard
---     would be visible.
-soldeviDiggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-soldeviDiggerSpec s registry =
-  let -- alice controls Soldevi Digger and two Plains, and her graveyard holds
-      -- `buried` OLDEST FIRST -- S.addGraveyardCard puts each card on top, so
-      -- the last name given is the top card. Her library holds one Benalish
-      -- Hero, so the bottom is a position of its own; bob's graveyard holds one
-      -- Ogre Sentry, a printing alice never has.
-      board buried = do
-        digger <- S.printingOf s registry "Soldevi Digger"
-        plains <- S.printingOf s registry "Plains"
-        sentry <- S.printingOf s registry "Ogre Sentry"
-        hero <- S.printingOf s registry "Benalish Hero"
-        stocked <- mapM (S.printingOf s registry) buried
-        let (diggerId, g1) = S.addPermanent digger S.alice (S.landsInPlay plains 2)
-            g2 = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) g1 stocked
-            g3 = snd (S.addGraveyardCard sentry S.bob g2)
-            g4 = snd (S.addLibraryCard hero S.alice g3)
-        pure
-          ( digger,
-            diggerId,
-            g4
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-          )
-      named = Just . CardName.MkCardName . Text.pack
-      -- Both piles in their own stored order: a graveyard reads OLDEST FIRST
-      -- (CR 404.1's arrival end is the last member) and a library TOP FIRST
-      -- (CR 401.2), which is why the arriving card is expected at opposite ends
-      -- of the two lists.
-      piles gs = (namesIn Zone.Graveyard S.alice gs, namesIn Zone.Library S.alice gs)
-   in Spec.describe s "SoldeviDigger" $ do
-        -- CR 404.3's arrangement is what this reference READS: the owner puts
-        -- simultaneous arrivals in an order of their own, and on the surveil path
-        -- that order is the answer's (Pawl.Engine.Resolve.Effect.applySurveil). alice
-        -- surveils two cards into an empty graveyard, and the ability then takes
-        -- the one the ANSWER named last -- the card that went in last is on top
-        -- (CR 404.1). The pair differs in exactly one thing, the order the answer
-        -- names, and a different card comes back for it.
-        Spec.it s "CR 404.3 the top card is the one the owner's own arrangement put there" $ do
-          (digger, diggerId, before) <- board []
-          maiden <- S.printingOf s registry "Bird Maiden"
-          piker <- S.printingOf s registry "Goblin Piker"
-          case soleActivatedAbility digger of
-            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
-            Just ability -> do
-              -- Stocked DEEPEST FIRST, so the surveil looks at piker then maiden;
-              -- the Benalish Hero the fixture put in is beneath both.
-              let (maidenId, g1) = S.addLibraryCard maiden S.alice before
-                  (pikerId, stocked) = S.addLibraryCard piker S.alice g1
-                  surveilTwo = Effect.Surveil (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
-                  -- Answers the surveil with a FIXED order and leaves every other
-                  -- prompt alone: an answerer that picked a legal split for itself
-                  -- would repair the assertion after a mutation.
-                  binning :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-                  binning order p = case p of
-                    Prompt.ChooseSurveil {} -> (order, [])
-                    _ -> S.identityAnswer p
-                  run order =
-                    S.runPure (binning order) stocked $ do
-                      Resolve.applyEffect diggerId diggerId S.alice Map.empty Map.empty surveilTwo
-                      Activate.activateAbility S.alice diggerId ability
-                      Engine.priorityLoop
-                  pikerLast = run [maidenId, pikerId]
-                  maidenLast = run [pikerId, maidenId]
-              Spec.assertEqWith
-                s
-                "named last, the Goblin Piker is on top of the graveyard, so it is the card that goes under the Benalish Hero"
-                (piles pikerLast)
-                ([named "Bird Maiden"], [named "Benalish Hero", named "Goblin Piker"])
-              Spec.assertEqWith
-                s
-                "and with the order swapped the Bird Maiden is the top card instead"
-                (piles maidenLast)
-                ([named "Goblin Piker"], [named "Benalish Hero", named "Bird Maiden"])
-
 -- The DEPTH on ObjectRef.TopOfLibrary, and the group binding a move of several
 -- cards owes its second sentence.
 --
@@ -1554,53 +1453,6 @@ gloriousProtectorSpec s registry =
             "and every creature alice controls is still hers"
             (controlledNames S.alice after)
             (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Glorious Protector", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
-        -- The whole card: what CR 610.3's second one-shot effect returns is what
-        -- the gather exiled, so the subset the chooser named is the subset that
-        -- comes back.
-        Spec.it s "CR 610.3 the departure returns exactly the subset that was exiled" $ do
-          staged <- printings
-          case maidenId (fst staged) of
-            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
-            Just maiden -> do
-              let exiled = cast (namingExactly (Set.singleton maiden)) staged
-                  protectorId =
-                    List.find
-                      (\oid -> fmap S.nameOf (Game.cardOf oid exiled) == Just (named "Glorious Protector"))
-                      (Set.toList (GameState.battlefield exiled))
-              case protectorId of
-                Nothing -> Spec.assertFailure s "the Protector should be on the battlefield"
-                Just oid -> do
-                  let killed = S.runPure S.identityAnswer exiled (Event.destroy Regenerability.Regenerable [oid])
-                      after = S.runPure S.identityAnswer killed Engine.priorityLoop
-                  Spec.assertEqWith s "exile is empty again" (exiledNames after) []
-                  Spec.assertEqWith
-                    s
-                    "and the Bird Maiden is back on alice's battlefield"
-                    (controlledNames S.alice after)
-                    (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
-        -- CR 610.3: the return is a one-shot effect created immediately after the
-        -- departure, so ONE settle brings the creature back and puts nothing on the
-        -- stack. Written as a second triggered ability it would be an object on the
-        -- stack instead, with the creature still in exile through a round of
-        -- priority -- which is the divergence this case exists to hold shut; see #2626.
-        Spec.it s "CR 610.3 the return uses no stack: one settle brings the creature back" $ do
-          staged <- printings
-          case maidenId (fst staged) of
-            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
-            Just maiden -> do
-              let exiled = cast (namingExactly (Set.singleton maiden)) staged
-              case permanentNamed "Glorious Protector" exiled of
-                Nothing -> Spec.assertFailure s "the Protector should be on the battlefield"
-                Just oid -> do
-                  Spec.assertEqWith s "the Bird Maiden is in exile to begin with" (exiledNames exiled) [Just (named "Bird Maiden")]
-                  let killed = S.runPure S.identityAnswer exiled (Event.destroy Regenerability.Regenerable [oid])
-                      settled = S.runPure S.identityAnswer killed Engine.settleForPriority
-                  Spec.assertEqWith
-                    s
-                    "one settle has the Bird Maiden back on alice's battlefield"
-                    (controlledNames S.alice settled)
-                    (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
-                  Spec.assertEqWith s "and nothing was put on the stack to do it" (length (GameState.stack settled)) 0
         -- The same board with the one thing changed: the Protector PHASES OUT
         -- instead of dying. CR 702.26d makes that no zone change, so CR 610.3's
         -- specified event has not happened and the creature stays in exile --
@@ -3496,7 +3348,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   glenElendrasAnswerSpec s registry
   kadenasSilencerSpec s registry
   countOnLuckSpec s registry
-  soldeviDiggerSpec s registry
   actOnImpulseSpec s registry
   galvanicRelaySpec s registry
   communeWithLavaSpec s registry

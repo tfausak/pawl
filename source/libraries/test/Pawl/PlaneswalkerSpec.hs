@@ -1122,8 +1122,7 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 -- one is named, the origin, so the card-versus-token half is the filter's. The CR 111.6 pair below is what
 -- proves it: two boards holding the same objects, differing only in whether the
 -- one permanent exiled that turn was a card.
-ashiokPlusOne, ashiokMinusTwo :: Int
-ashiokPlusOne = 0
+ashiokMinusTwo :: Int
 ashiokMinusTwo = 1
 
 -- Ashiok on the battlefield under alice's control at the printed loyalty 5, with
@@ -1135,14 +1134,6 @@ ashiokBoard ashiok stock =
   let stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) S.threePlayerGame stock
       (oid, placed) = S.addPermanent ashiok S.alice stocked
    in (oid, S.addCounter CounterKind.Loyalty 5 oid placed)
-
--- The +1's one ask, pinned by INDEX into the offered group rather than by a
--- search for a legal option, so a mutation cannot be silently repaired.
-takingNth :: Int -> Prompt.Prompt r -> r
-takingNth n p = case p of
-  Prompt.ChooseCardFromAmong _ _ _ offered ->
-    Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
-  _ -> S.identityAnswer p
 
 -- Whether a logged event is CR 603.2's record that an ability triggered.
 isAbilityTriggered :: GameEvent.GameEvent -> Bool
@@ -1174,37 +1165,6 @@ throughBeginningOfCombat gs =
 
 ashiokLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
-  -- The +1's two destinations are DIFFERENT zones, so which card went where is
-  -- observable. The pair below runs the same board twice and differs in exactly
-  -- one thing -- which of the two the answerer names -- so an implementation that
-  -- exiled the top card regardless would agree with one leg and contradict the
-  -- other.
-  Spec.it s "CR 608.2d the +1 exiles the card that was chosen and the other goes to hand" $ do
-    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
-    maiden <- S.printingOf s registry "Bird Maiden"
-    moon <- S.printingOf s registry "Bad Moon"
-    swamp <- S.printingOf s registry "Swamp"
-    let named = Just . CardName.MkCardName . Text.pack
-        -- Bottom to top: Swamp, Bad Moon, Bird Maiden. The look offers the Bird
-        -- Maiden first and the Bad Moon second; the Swamp is never looked at.
-        (ashiokId, board) = ashiokBoard ashiok [swamp, moon, maiden]
-        after = useLoyaltyAbility (takingNth 1) ashiokPlusOne ashiok ashiokId board
-    Spec.assertEqWith s "the SECOND card the look offered is in exile" (namesIn Zone.Exile S.alice after) [named "Bad Moon"]
-    Spec.assertEqWith s "and the first is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
-    Spec.assertEqWith s "the third card was never looked at" (namesIn Zone.Library S.alice after) [named "Swamp"]
-    Spec.assertEqWith s "CR 606.4: one loyalty counter went on" (S.counterOf CounterKind.Loyalty ashiokId after) 6
-
-  Spec.it s "CR 400.7 the +1's remainder read finds the chosen card gone, so the other answer exiles the other card" $ do
-    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
-    maiden <- S.printingOf s registry "Bird Maiden"
-    moon <- S.printingOf s registry "Bad Moon"
-    swamp <- S.printingOf s registry "Swamp"
-    let named = Just . CardName.MkCardName . Text.pack
-        (ashiokId, board) = ashiokBoard ashiok [swamp, moon, maiden]
-        after = useLoyaltyAbility (takingNth 0) ashiokPlusOne ashiok ashiokId board
-    Spec.assertEqWith s "the FIRST card the look offered is in exile" (namesIn Zone.Exile S.alice after) [named "Bird Maiden"]
-    Spec.assertEqWith s "and the second is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bad Moon"]
-
   -- The token's own trigger. The exile is out of alice's HAND, which is what makes
   -- this a claim about "put into exile" rather than about the library-to-exile
   -- move the rest of the card makes: a condition that pinned the ORIGIN would find

@@ -1,0 +1,159 @@
+{
+  "description": "CR 608.2d gameplay: Karn's +4 exiles the card its target chose out of their own hand",
+  "board": {
+    "seats": [
+      {
+        "name": "alice"
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Karn Liberated",
+            "label": "karn",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 6
+              }
+            ]
+          }
+        ],
+        "hand": [
+          {
+            "card": "Pacifism",
+            "label": "pac"
+          },
+          {
+            "card": "Mountain",
+            "label": "mtn"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          },
+          {
+            "card": "Giant Growth",
+            "label": "growth"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$karn",
+          "ability": 0,
+          "targets": [
+            "$carol"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCardInHand",
+          "with": "$piker"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "carol",
+          "zone": "Exile",
+          "is": [
+            "Goblin Piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "carol",
+          "zone": "Hand",
+          "is": [
+            "$growth"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Hand",
+          "is": [
+            "$pac",
+            "$mtn"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Hand",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Counters": {
+          "object": "$karn",
+          "kind": {
+            "type": "Loyalty"
+          },
+          "count": 10
+        }
+      }
+    }
+  ],
+  "note": "Bob's Karn +4 at carol; carol's ChooseCardInHand answer (keyed to carol, so a prompt put to bob would be unscheduled) names her Piker. --control has her name the Giant Growth instead."
+}

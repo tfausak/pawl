@@ -1,0 +1,89 @@
+{
+  "description": "CR 605.3a Silent Arbiter is cast off two activations of one Altar",
+  "note": "One Piker is one Altar activation, {2} and not {4}: the Arbiter's cast is refused and the Piker stays.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker1",
+            "ready": true
+          },
+          {
+            "card": "Ashnod's Altar",
+            "label": "altar",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Silent Arbiter",
+            "label": "arbiter"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$arbiter",
+          "mana": [
+            "$altar",
+            "$altar"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Silent Arbiter",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Silent Arbiter",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

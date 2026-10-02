@@ -2567,7 +2567,7 @@ delayedSecondClassSpec s registry =
 -- vocabulary for Prompt.ChooseProliferate. Both choices FILTER the offered set
 -- rather than building a recipient, so a mutation cannot be repaired by an
 -- answerer that goes looking for a legal option.
-sagaDiesBeforeScanSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sagaDiesBeforeScanSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 sagaDiesBeforeScanSpec s registry =
   let angelToken = CardName.MkCardName (Text.pack "Angel Token")
       aiming :: Recipient.Recipient -> ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -2586,51 +2586,7 @@ sagaDiesBeforeScanSpec s registry =
       printedOnBattlefield name gs =
         let isIt oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))
          in List.find isIt (Set.toList (GameState.battlefield gs))
-      -- (the Saga's id, the board after Volt Charge resolved, the board after the
-      -- CR 117.5 scan, the board after everything resolved).
-      boardOf victimOf = do
-        choco <- S.printingOf s registry "Summon: Choco/Mog"
-        boon <- S.printingOf s registry "Historian's Boon"
-        volt <- S.printingOf s registry "Volt Charge"
-        mountain <- S.printingOf s registry "Mountain"
-        let (sagaId, base) = S.addPermanent choco S.alice (S.landsFor mountain S.alice 3 (Setup.emptyGame S.bothPlayers))
-            (_, withBoon) = S.addPermanent boon S.alice base
-            withCounters = S.addCounter CounterKind.Lore 3 sagaId withBoon
-            (voltId, withVolt) = S.addHandCard volt S.alice withCounters
-            ready =
-              withVolt
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            victim = victimOf sagaId
-            onStack = S.runPure (aiming victim sagaId) ready (S.cast S.alice voltId)
-            burned = S.runPure (aiming victim sagaId) onStack Stack.resolveTop
-            scanned = S.runPure (aiming victim sagaId) burned Engine.settleForPriority
-            finished = S.runPure (aiming victim sagaId) scanned Engine.priorityLoop
-        pure (sagaId, burned, scanned, finished)
    in Spec.describe s "CR 603.3b a Saga that dies before its final chapter is gathered" $ do
-        Spec.it s "CR 608.2h the watcher reads the dead Saga's last known information" $ do
-          (sagaId, burned, scanned, finished) <- boardOf Recipient.ToCreature
-          -- THE BEHAVIOUR: the Boon's ability triggered off chapter IV triggering
-          -- and resolved, though the Saga it names was already in the graveyard
-          -- when CR 117.5 looked for it.
-          Spec.assertEqWith s "alice still gets the Boon's Angel" (S.countOnBattlefieldByName angelToken S.alice finished) 1
-          -- The precondition the behaviour rests on, read off the board the scan
-          -- actually saw: CR 704.5g had already destroyed the Saga.
-          Spec.assertBool s (not (S.onBattlefield sagaId scanned)) "CR 704.5g destroyed the Saga before the trigger was placed"
-          -- And the two halves of the one resolution that made that window, so
-          -- neither can drift: three damage on a 3/3, and the fourth lore counter.
-          Spec.assertEqWith s "Volt Charge marked lethal damage" (S.damageOf sagaId burned) (Just 3)
-          Spec.assertEqWith s "and proliferate put the fourth lore counter on" (S.counterOf CounterKind.Lore sagaId burned) 4
-        Spec.it s "CR 603.10 the same board with the Saga still standing gives the same Angel" $ do
-          (sagaId, burned, scanned, finished) <- boardOf (const (Recipient.ToPlayer S.bob))
-          Spec.assertEqWith s "alice gets the Boon's Angel" (S.countOnBattlefieldByName angelToken S.alice finished) 1
-          -- The one thing this board differs in: the Saga took no damage, so it
-          -- was still on the battlefield for the live read.
-          Spec.assertBool s (S.onBattlefield sagaId scanned) "the Saga was still on the battlefield at the scan"
-          Spec.assertEqWith s "bob took the 3 damage instead" (S.lifeOf S.bob finished) (Just 17)
-          Spec.assertEqWith s "and proliferate put the fourth lore counter on" (S.counterOf CounterKind.Lore sagaId burned) 4
         -- The CLONE board: the dying Saga is a Copy Enchantment, whose PRINTED
         -- card has no chapter ability at all. CR 707.2 puts Choco/Mog's four in
         -- its copiable values, and Pawl.Types.LastKnown.characteristics is the

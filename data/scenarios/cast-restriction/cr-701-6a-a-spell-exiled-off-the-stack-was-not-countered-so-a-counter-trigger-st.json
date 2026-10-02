@@ -1,0 +1,150 @@
+{
+  "description": "CR 701.6a a spell exiled off the stack was not countered, so a counter trigger stays silent",
+  "note": "bob casts his spell in his own main phase and alice answers with the flashed Aven Interrupter, whose enters trigger exiles it. The control file answers the same spell with Cancel instead. alice's library holds two cards, so Baral's draw would show as one fewer.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "a1"
+          },
+          {
+            "card": "Plains",
+            "label": "a2"
+          },
+          {
+            "card": "Plains",
+            "label": "a3"
+          },
+          {
+            "card": "Baral, Chief of Compliance",
+            "label": "baral"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Aven Interrupter",
+            "label": "answer"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "b1"
+          },
+          {
+            "card": "Mountain",
+            "label": "b2"
+          },
+          {
+            "card": "Mountain",
+            "label": "b3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "victim"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$victim",
+          "mana": [
+            "$b1",
+            "$b2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$answer",
+          "mana": [
+            "$a1",
+            "$a2",
+            "$a3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "spell": [
+            "Goblin Piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Mountain",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Exile",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    }
+  ]
+}

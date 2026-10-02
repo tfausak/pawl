@@ -50,7 +50,6 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
-import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -1863,41 +1862,9 @@ activateCoffin coffinId gs = case Projection.abilitiesOf coffinId gs of
   [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice coffinId ability >> Stack.resolveTop)
   _ -> gs
 
--- Every recipient offered to every target slot of `game`, in offer order. The
--- offered SET and not the answer, which is what rule 702.16b is about: a
--- protected player is out of the candidates CR 601.2c draws from, and an answerer
--- that picked a legal one for itself would hide that.
-offeredRecipients :: GameState.GameState -> Game.Type.Game a -> [Recipient.Recipient]
-offeredRecipients gs game =
-  let answer :: Prompt.Prompt r -> State.State [Recipient.Recipient] r
-      answer p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> do
-          State.modify' (<> concatMap (Set.toList . snd) (Map.elems sets))
-          pure (S.preferring (const True) sets)
-        _ -> pure (S.identityAnswer p)
-   in State.execState (Engine.runGame answer gs game) []
-
-stasisCoffinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stasisCoffinSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 stasisCoffinSpec s registry =
   Spec.describe s "TheStasisCoffin" $ do
-    -- CR 702.16j with CR 702.16b: "such a permanent or player can't be targeted
-    -- by spells or abilities." Read at the OFFER, since that is where CR 601.2c
-    -- draws its candidates.
-    --
-    -- Two boards differing in one thing -- whether the ability resolved -- and
-    -- carol on both, so "alice is gone from the offer" is told apart from "the
-    -- offer collapsed".
-    Spec.it s "CR 702.16j / 702.16b a player with protection from everything is not offered to an enchant-player Aura" $ do
-      plains <- S.printingOf s registry "Plains"
-      coffin <- S.printingOf s registry "The Stasis Coffin"
-      curse <- S.printingOf s registry "Curse of Vitality"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (coffinId, curseId, _, base) = stasisCoffinBoard plains coffin curse piker
-          offered gs = offeredRecipients gs (S.cast S.bob curseId)
-          protected = offered (activateCoffin coffinId base)
-      Spec.assertBool s (notElem (Recipient.ToPlayer S.alice) protected) "alice is out of the Curse's offered players"
-      Spec.assertBool s (elem (Recipient.ToPlayer S.carol) protected) "carol, who has no protection, is still in it"
-      Spec.assertBool s (elem (Recipient.ToPlayer S.alice) (offered base)) "and on the same board without the ability she is in it"
     -- CR 702.16j with CR 702.16c's second sentence: "such Auras attached to the
     -- permanent or player with protection will be put into their owners'
     -- graveyards as a state-based action" (CR 704.5m), which

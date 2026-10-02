@@ -1082,14 +1082,6 @@ piaNalaarSpec s registry =
               Spec.assertEqWith s "CR 208.3 and uncrewed it had none, whatever its box said" (S.powerToughnessOf jet resolved) Nothing
             other -> Spec.assertFailure s ("expected exactly one Aetherjet, got " <> show (length other))
           Spec.assertEqWith s "and the three really left her pool" (energy resolved) 2
-        -- The discriminating twin, differing in the ANSWER alone: paying nothing
-        -- is how the printed "may" is declined (CR 107.14), so CR 118.12's "if
-        -- you do" gate fails and no token is created at all.
-        Spec.it s "CR 107.14 paying no energy declines the ability, so no Aetherjet is created" $ do
-          after <- board ["Pia Nalaar, Chief Mechanic", "Palladium Myr", "Spined Thopter"]
-          let resolved = payAtEndStep 0 (S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice after)
-          Spec.assertEqWith s "no Aetherjet" (aetherjetIds resolved) []
-          Spec.assertEqWith s "and every {E} she held is still hers" (energy resolved) 5
         -- The twin, differing in the two {E} alone: the same trigger on the same
         -- board is a real choice, so it IS raised, and the amount it binds is the
         -- token's box. Whether the box reads the energy paid or the energy held

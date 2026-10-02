@@ -1,0 +1,155 @@
+{
+  "description": "CR 101.2 whole card: Ashiok, Dream Render stops the opponent's own spell searching his own library",
+  "note": "bob, alice's opponent, casts Fertilid's Favor at himself while alice controls Ashiok, Dream Render, which says spells and abilities her opponents control can't cause their controller to search their library. The Favor resolves (it is in bob's graveyard) but no search is asked (an unscheduled Search would fail the run) and the Swamp stays in his library.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "af1"
+          },
+          {
+            "card": "Forest",
+            "label": "af2"
+          },
+          {
+            "card": "Forest",
+            "label": "af3"
+          },
+          {
+            "card": "Forest",
+            "label": "af4"
+          },
+          {
+            "card": "Ashiok, Dream Render",
+            "label": "ashiok",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "bf1"
+          },
+          {
+            "card": "Forest",
+            "label": "bf2"
+          },
+          {
+            "card": "Forest",
+            "label": "bf3"
+          },
+          {
+            "card": "Forest",
+            "label": "bf4"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp",
+            "label": "swamp"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fertilid's Favor",
+            "label": "favor"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$favor",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$bf1",
+            "$bf2",
+            "$bf3",
+            "$bf4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
+            "$swamp"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Library",
+          "card": "Swamp",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Swamp",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Fertilid's Favor",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

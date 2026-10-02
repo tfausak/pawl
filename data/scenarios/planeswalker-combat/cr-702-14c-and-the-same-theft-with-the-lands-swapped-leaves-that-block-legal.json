@@ -1,0 +1,233 @@
+{
+  "description": "CR 702.14c and the same theft with the lands swapped leaves that block legal",
+  "note": "The same theft with bob holding the Swamp and carol an Island: the Wraith still reads carol's seat, so her Goblin Piker's block stands however many Swamps bob holds.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "wraith",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "bobs",
+            "ready": true
+          },
+          {
+            "card": "Swamp"
+          },
+          {
+            "card": "Island",
+            "label": "bi1"
+          },
+          {
+            "card": "Island",
+            "label": "bi2"
+          },
+          {
+            "card": "Island",
+            "label": "bi3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Aura Graft",
+            "label": "graft"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Jace Beleren",
+            "label": "jace",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Bonesplitter",
+            "label": "splitter"
+          },
+          {
+            "card": "Confiscate",
+            "label": "confiscate",
+            "attached": "splitter"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "carols",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$wraith"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$wraith",
+      "do": {
+        "ChooseAttackTarget": "$jace"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$graft",
+          "targets": [
+            "$confiscate"
+          ],
+          "mana": [
+            "$bi1",
+            "$bi2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseAttachment",
+          "with": "$jace"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$jace",
+          "is": "bob"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$wraith": "$jace"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Defenders": {
+          "players": [
+            "bob",
+            "carol"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {
+          "$carols": [
+            "$wraith"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$wraith",
+          "blockers": [
+            "$carols"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -62,7 +62,6 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -1211,30 +1210,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         Spec.assertEqWith s "CR 608.2d the possible branch ran and its sibling did not: the Piker is tapped" (twiddleTapState pikerId after) (Just TapState.Tapped)
         Spec.assertEqWith s "and no branch question was put at all" (branchesAnnounced asked) []
         Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the surviving branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
-  -- CR 701.55a: facing a villainous choice is a choice between two named
-  -- options made by the player who faces it -- an OPPONENT -- after which "all
-  -- actions in the chosen option are performed". Great Intelligence's Plan --
-  -- "Draw three cards. Then target opponent faces a villainous choice -- They
-  -- discard three cards, or you may cast a spell from your hand without paying
-  -- its mana cost." -- is the producer.
-  --
-  -- The landing site is the CR 608.2d pair the two limbs already are
-  -- (Clause.orElse), announced by somebody other than the resolving controller
-  -- (OrElse.chooser) and marked OrElse.villainous for rule 701.55b below.
-  --
-  -- THREE SEATS, because two collapse every reading of "who is asked" onto one
-  -- opponent: carol is an opponent too, is offered as a target alongside bob,
-  -- and holds a hand of her own that an engine asking the wrong seat would
-  -- empty. Bob holds FOUR cards against a discard of three, so the discard is a
-  -- real choice and leaves one card behind.
-  Spec.it s "CR 701.55a Great Intelligence's Plan puts both limbs to the opponent it targeted" $ do
-    board <- planBoard s registry 4
-    let (asks, after) = planResolved (ClauseIndex.MkClauseIndex 1) board
-    Spec.assertEqWith s "CR 701.55a the limb bob announced was performed: three of his four cards are in his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 3
-    Spec.assertEqWith s "and the fourth is still in his hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 1
-    Spec.assertEqWith s "CR 701.55a bob was asked once, and over BOTH limbs" asks [(S.bob, [ClauseIndex.MkClauseIndex 1, ClauseIndex.MkClauseIndex 2])]
-    Spec.assertEqWith s "CR 608.2d the sibling limb did not also run: alice cast nothing and still holds the three cards she drew" (length (Game.zoneMembers Zone.Hand S.alice after)) 3
-    Spec.assertEqWith s "and carol, the opponent alice did not target, was neither asked nor emptied" (length (Game.zoneMembers Zone.Hand S.carol after)) 2
   -- The other limb off the same board, one answer changed: rule 701.55a's second
   -- option is bob's to take even though it is alice who acts on it, which is
   -- what a villainous choice is for. This is also what stops the case above
@@ -1450,64 +1425,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "CR 101.4b told alice declined, bob declined" (namesIn Zone.Hand S.bob declined) []
     Spec.assertEqWith s "CR 101.4b each seat was told the answers before its own" toldTook [(S.alice, []), (S.bob, [(S.alice, exercises)]), (S.carol, [(S.alice, exercises), (S.bob, exercises)])]
     Spec.assertEqWith s "CR 101.4b and so when alice declined" toldDeclined [(S.alice, []), (S.bob, [(S.alice, declines)]), (S.carol, [(S.alice, declines), (S.bob, declines)])]
-  -- Ashiok, Dream Render -- "{1}{U/B}{U/B} Legendary Planeswalker -- Ashiok.
-  -- Spells and abilities your opponents control can't cause their controller to
-  -- search their library. -1: Target player mills four cards. Then exile each
-  -- opponent's graveyard." The whole-card proof that CR 101.2's prohibition is
-  -- narrowed on BOTH of the axes Leonin Arbiter leaves open: whose library is
-  -- searched, and who controls the spell that causes the search.
-  --
-  -- The first two cases share one board and differ in exactly the CASTER of
-  -- Fertilid's Favor, whose "target player searches their library" makes the
-  -- searcher the TARGET rather than the controller -- so the cause changes hands
-  -- while the searcher and the library stay bob's.
-  Spec.it s "CR 101.2 whole card: Ashiok, Dream Render stops the opponent's own spell searching his own library" $ do
-    board <- favorBoard s registry S.bob
-    let after = resolveFavor board S.bob
-    Spec.assertEqWith
-      s
-      "bob's own Favor caused the search, so the Swamp is still in his library"
-      (Game.zoneMembers Zone.Library S.bob after)
-      [favorSwamp board]
-    Spec.assertEqWith s "and nothing reached the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Swamp")) S.bob after) 0
-    -- The precondition the case above rests on, asserted AFTER it: bob's Favor
-    -- was cast and did resolve, so "the Swamp stayed put" is CR 101.2's answer
-    -- rather than a cast that never happened.
-    Spec.assertEqWith
-      s
-      "and the Favor bob cast resolved -- the prohibition is what stopped the find"
-      (namesIn Zone.Graveyard S.bob after)
-      [Just (CardName.MkCardName (Text.pack "Fertilid's Favor"))]
-  -- The cause axis, on the board above with alice casting the same Favor at the
-  -- same bob. Ashiok says "spells and abilities your OPPONENTS control", and
-  -- alice's own spell is not one -- so bob searches, and an engine reading the
-  -- prohibition without its cause leaves the Swamp where the case above does.
-  Spec.it s "CR 101.2 whole card: Ashiok, Dream Render lets its own controller's spell make an opponent search" $ do
-    board <- favorBoard s registry S.alice
-    let after = resolveFavor board S.alice
-    Spec.assertEqWith
-      s
-      "alice's Favor is not a spell bob controls, so the search happened and the Swamp left his library"
-      (Game.zoneMembers Zone.Library S.bob after)
-      []
-    Spec.assertEqWith s "and the Favor's own instruction put it onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Swamp")) S.bob after) 1
-  -- The library axis, which needs a search whose owner is not its searcher:
-  -- Extract's "search target player's library". Bob's own spell causes it, so
-  -- Ashiok's cause half is satisfied and only "THEIR library" is left to stop
-  -- it -- and alice's library is not bob's.
-  Spec.it s "CR 101.2 whole card: Ashiok, Dream Render leaves another player's library searchable" $ do
-    board <- ashiokExtractBoard s registry
-    let after = resolveAshiokExtract board
-    Spec.assertEqWith
-      s
-      "Ashiok reaches only bob's own library, so his Extract still searched alice's"
-      (Game.zoneMembers Zone.Library S.alice after)
-      []
-    Spec.assertEqWith
-      s
-      "and the card it found is in exile"
-      (namesIn Zone.Exile S.alice after)
-      [Just (CardName.MkCardName (Text.pack "Crucible of Worlds"))]
   -- Ancient Vendetta -- "{3}{B} Sorcery: Choose a card name. Search target
   -- opponent's graveyard, hand, and library for up to four cards with that name
   -- and exile them. Then that player shuffles." The whole-card proof of CR 201.4
@@ -2803,94 +2720,6 @@ copyingWayfinderAnswer hers p = case p of
   Prompt.Search _ _ matches cap -> pure (List.genericTake cap matches)
   _ -> pure (S.identityAnswer p)
 
--- Ashiok, Dream Render's board for Fertilid's Favor -- "{3}{G} Instant. Target
--- player searches their library for a basic land card, puts it onto the
--- battlefield tapped, then shuffles. Put two +1/+1 counters on up to one target
--- artifact or creature." The Favor is the one printing whose SEARCHER is a
--- target slot, which is what lets the cause change hands while the searcher does
--- not.
---
--- Four Forests apiece pay the {3}{G} whichever seat casts it, and bob's library
--- holds one Swamp -- a basic land, so the filter admits it, and the only card
--- there, so "still in the library" and "onto the battlefield" are the same fact
--- read twice. Nothing on the battlefield is an artifact or a creature, so the
--- Favor's second target slot offers nothing and its "up to one" takes none.
---
--- Parameterised on the CASTER alone.
-data FavorBoard = MkFavorBoard
-  { favorState :: GameState.GameState,
-    favorSpell :: ObjectId.ObjectId,
-    favorSwamp :: ObjectId.ObjectId
-  }
-
-favorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> PlayerId.PlayerId -> m FavorBoard
-favorBoard s registry caster = do
-  forest <- S.printingOf s registry "Forest"
-  swamp <- S.printingOf s registry "Swamp"
-  ashiok <- S.printingOf s registry "Ashiok, Dream Render"
-  favor <- S.printingOf s registry "Fertilid's Favor"
-  let g1 = S.landsFor forest S.bob 4 (S.landsInPlay forest 4)
-      (ashiokId, g2) = S.addPermanent ashiok S.alice g1
-      -- CR 306.5b's printed loyalty, which S.addPermanent does not place: a
-      -- planeswalker at zero loyalty is gone to CR 704.5i before the search, and
-      -- the prohibition with it.
-      g3 = S.addCounter CounterKind.Loyalty 5 ashiokId g2
-      (swampId, g4) = S.addLibraryCard swamp S.bob g3
-      (favorId, g5) = S.addHandCard favor caster g4
-   in pure (MkFavorBoard g5 favorId swampId)
-
--- CR 601.2c's answer FILTERED out of the offer rather than built, so a slot the
--- engine never offered cannot be smuggled in; the find is pinned to the Swamp by
--- id, so a prohibited search cannot repair itself with another card. The shuffle
--- reverses whatever it is offered, which is what makes a shuffle visible.
-favorAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-favorAnswer swamp p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
-  Prompt.Search {} -> [swamp]
-  Prompt.Shuffle offered -> reverse offered
-  _ -> S.identityAnswer p
-
--- The cast and its one resolution, and nothing else: the narrowest path that
--- shows the search.
-resolveFavor :: FavorBoard -> PlayerId.PlayerId -> GameState.GameState
-resolveFavor board caster =
-  S.runPure (favorAnswer (favorSwamp board)) (favorState board) (S.cast caster (favorSpell board) >> Stack.resolveTop)
-
--- The library axis's board: Extract -- "{U} Sorcery. Search target player's
--- library for a card and exile it. That player then shuffles." -- in bob's hand
--- off one Island, Ashiok under alice, and one Crucible of Worlds as the only
--- card in alice's library. Bob controls the spell, so Ashiok's cause half admits
--- it and the library half is the only thing left to answer.
-data AshiokExtractBoard = MkAshiokExtractBoard
-  { ashiokExtractState :: GameState.GameState,
-    ashiokExtractSpell :: ObjectId.ObjectId,
-    ashiokExtractCrucible :: ObjectId.ObjectId
-  }
-
-ashiokExtractBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m AshiokExtractBoard
-ashiokExtractBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  crucible <- S.printingOf s registry "Crucible of Worlds"
-  ashiok <- S.printingOf s registry "Ashiok, Dream Render"
-  extract <- S.printingOf s registry "Extract"
-  let g1 = S.landsFor island S.bob 1 (Setup.emptyGame S.bothPlayers)
-      (ashiokId, g2) = S.addPermanent ashiok S.alice g1
-      g3 = S.addCounter CounterKind.Loyalty 5 ashiokId g2
-      (crucibleId, g4) = S.addLibraryCard crucible S.alice g3
-      (extractId, g5) = S.addHandCard extract S.bob g4
-   in pure (MkAshiokExtractBoard g5 extractId crucibleId)
-
-ashiokExtractAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-ashiokExtractAnswer crucible p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.alice) sets
-  Prompt.Search {} -> [crucible]
-  Prompt.Shuffle offered -> reverse offered
-  _ -> S.identityAnswer p
-
-resolveAshiokExtract :: AshiokExtractBoard -> GameState.GameState
-resolveAshiokExtract board =
-  S.runPure (ashiokExtractAnswer (ashiokExtractCrucible board)) (ashiokExtractState board) (S.cast S.bob (ashiokExtractSpell board) >> Stack.resolveTop)
-
 -- Ancient Vendetta's board. Four Swamps pay alice's {3}{B}; bob's graveyard, hand
 -- and library hold one Chromatic Star apiece, and his library holds a Crucible of
 -- Worlds beside the third -- so the filter has something to reject, and the offer
@@ -3556,7 +3385,7 @@ snagSpec s registry = Spec.describe s "CR 608.2h a bounced target's controller" 
 -- the "when you do" arming at all is CR 603.12's "happened" read off the state
 -- rather than the event log (Pawl.Engine.Resolve.Effect.happenedBetween), and
 -- the fight reaching exactly that player's creature is the bind being read.
-straxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+straxSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 straxSpec s registry =
   let build strax thumb mountain maiden piker giant =
         let g0 = Setup.emptyGame S.threePlayers
@@ -3606,28 +3435,6 @@ straxSpec s registry =
               -- equality is not passing on a board where the prompt was never
               -- raised.
               Spec.assertEqWith s "CR 602.2b Strax paid its own {T}" (fmap Object.tapped (Game.lookupObject straxId after)) (Just TapState.Tapped)
-        -- THE GAMEPLAY ASSERTIONS, the chain run to an empty stack. Bob named:
-        -- Strax's five kill Goblin Piker, and Glory of Battle (the damage Strax
-        -- dealt) adds one counter. Alice named: "another" leaves Bird Maiden as
-        -- the only victim, so she dies beside the sacrificed Thumb and Strax does
-        -- not fight itself.
-        Spec.it s "CR 603.12 a choice that records no event still arms its when you do" $ do
-          (abilities, (straxId, gs)) <- staged
-          case abilities of
-            [] -> Spec.assertFailure s "Strax should print an activated ability"
-            ability : _ -> do
-              let run who = S.runPure (straxAnswer straxId ability who) gs Engine.priorityLoop
-                  graveyardNames pid g = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid g)) (Game.zoneMembers Zone.Graveyard pid g))
-                  named = Set.fromList . fmap (CardName.MkCardName . Text.pack)
-                  bobNamed = run S.bob
-                  aliceNamed = run S.alice
-              Spec.assertEqWith s "bob named: Goblin Piker died fighting Strax" (graveyardNames S.bob bobNamed) (named ["Goblin Piker"])
-              Spec.assertEqWith s "alice named: Bird Maiden died, not Strax" (graveyardNames S.alice aliceNamed) (named ["Bird Maiden", "Krark's Thumb"])
-              Spec.assertEqWith
-                s
-                "CR 701.14a Glory of Battle saw the fight's damage"
-                (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject straxId bobNamed))
-                (Just 1)
 
 -- Activates Strax's "Grenades!" whenever it is offered, pinning WHICH seat
 -- randomness names. STATELESS, unlike Pawl.CombatEffectSpec's mazeAnswer: this

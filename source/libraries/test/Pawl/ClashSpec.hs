@@ -152,18 +152,6 @@ spec s registry = Spec.describe s "Clash" $ do
     -- bottom of her library and bob's stayed where it was.
     Spec.assertEqWith s "CR 701.30a the card alice bottomed is under her library" (fmap (\oid -> [oid] == aliceTop) (Game.zoneMembers Zone.Library S.alice after)) [False, True]
     Spec.assertEqWith s "CR 701.30a and the card bob kept is still on top" (topOf S.bob after) bobTop
-  -- The same board, differing in ONE thing: whose revealed card has the greater
-  -- mana value. A board that lost for another reason would not tell the two
-  -- clauses apart.
-  Spec.it s "CR 701.30d a lower mana value loses it, and the other clause runs" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    teeth <- S.printingOf s registry "Pulling Teeth"
-    giant <- S.printingOf s registry "Hill Giant"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    plains <- S.printingOf s registry "Plains"
-    let (spell, before) = board swamp teeth bolt giant plains
-        (after, _) = resolved spell before
-    Spec.assertEqWith s "CR 701.30d the loser's clause discards one" (length (Game.zoneMembers Zone.Graveyard S.carol after)) 1
   -- A pair of boards differing in ONE thing, alice's answer; bob copies whatever
   -- his prompt says she chose, so where his card ends up is what he was told.
   Spec.it s "CR 101.4b the later clashing player knows the earlier one's decision" $ do

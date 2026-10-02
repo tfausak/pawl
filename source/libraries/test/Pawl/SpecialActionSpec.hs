@@ -1406,22 +1406,6 @@ balothAnswer p = case p of
 
 suspendHaste :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
-  Spec.it s "CR 702.62a cast off its own suspend ability the Baloth attacks the turn it arrives; cast from hand that turn it cannot" $ do
-    forest <- S.printingOf s registry "Forest"
-    baloth <- S.printingOf s registry "Durkwood Baloth"
-    let stop g = GameState.phase g == Phase.PostcombatMain && GameState.activePlayer g == S.alice
-        played = runUntil balothAnswer stop . balothBoard forest baloth
-        suspended = played True
-        hardCast = played False
-    Spec.assertEqWith s "CR 702.62a the suspended Baloth had haste and attacked bob for 5" (S.lifeOf S.bob suspended) (Just 15)
-    Spec.assertEqWith s "CR 302.6 cast from hand for {4}{G}{G} the same turn, it could not attack" (S.lifeOf S.bob hardCast) (Just 20)
-    Spec.assertEqWith
-      s
-      "the control: both roads put one Baloth onto the battlefield, so neither case is a creature that never arrived"
-      ( S.countOnBattlefieldByName (S.printingName baloth) S.alice suspended,
-        S.countOnBattlefieldByName (S.printingName baloth) S.alice hardCast
-      )
-      (1, 1)
   -- CR 702.62a's "until you lose control of the SPELL": Aethersnatch takes the
   -- free cast on the stack, and the haste goes to nobody.
   Spec.it s "CR 702.62a / 110.2b the Baloth bob Aethersnatched off the stack enters under him without haste" $ do

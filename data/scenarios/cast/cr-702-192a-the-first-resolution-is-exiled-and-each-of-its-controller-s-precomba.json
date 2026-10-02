@@ -1,0 +1,300 @@
+{
+  "description": "CR 702.192a the first resolution is exiled and each of its controller's precombat mains casts one free copy, which arms nothing more",
+  "board": {
+    "active": "alice",
+    "step": "PostcombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "s0",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s1",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s4",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Decorum Dissertation",
+            "label": "diss"
+          }
+        ],
+        "library": [
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          },
+          {
+            "card": "Fog"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$diss",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$s0",
+            "$s1",
+            "$s2",
+            "$s3",
+            "$s4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 18
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": [
+            "Decorum Dissertation"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$bob"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseExtraManaSource",
+          "with": null
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 16
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$bob"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseExtraManaSource",
+          "with": null
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 14
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": [
+            "Decorum Dissertation"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": []
+        }
+      }
+    }
+  ]
+}

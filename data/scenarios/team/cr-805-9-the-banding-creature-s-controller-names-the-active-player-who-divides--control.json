@@ -1,0 +1,121 @@
+{
+  "description": "CR 805.9 the banding creature's controller names the active player who divides",
+  "note": "The control without shared team turns: alice controls both attackers and divides unasked, with no ChoosePlayer prompt.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "Benalish Hero",
+            "label": "hero",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "other",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Foriysian Brigade",
+            "label": "brigade",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$hero",
+          "$other"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$hero",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$other",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {
+          "$brigade": [
+            "$hero",
+            "$other"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "AssignCombatDamage",
+          "with": [
+            [
+              [
+                "Creature",
+                "$hero"
+              ],
+              2
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Benalish Hero",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

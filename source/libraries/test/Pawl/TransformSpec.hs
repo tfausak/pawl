@@ -916,25 +916,6 @@ zoneNames zone gs =
 -- that road rather than fencing it.
 transformTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
-  -- CR 701.27e's own case: the permanent turns over, and the ability printed on
-  -- the face it turned INTO triggers.
-  --
-  -- Four Forests pay {3}{G/P} with mana rather than life, and the board is
-  -- alice's own precombat main phase because of the sorcery-speed rider.
-  Spec.it s "CR 701.27e the Thallid's own ability turns it over and the back face's trigger fires" $ do
-    thallid <- S.printingOf s registry "Blightreaper Thallid"
-    forest <- S.printingOf s registry "Forest"
-    let (oid, gs) = thallidBoard thallid forest 4
-    case activateThallid oid gs of
-      Left n -> Spec.assertFailure s ("expected one activated ability, got " <> show n)
-      Right activated -> do
-        let turned = resolveTop activated
-            settled = gather turned
-            after = resolveStack settled
-        Spec.assertEqWith s "the trigger resolved into one Saproling" (S.countOnBattlefieldByName saprolingToken S.alice after) 1
-        Spec.assertEqWith s "no Saproling exists before the trigger resolves" (S.countOnBattlefieldByName saprolingToken S.alice turned) 0
-        Spec.assertEqWith s "the settle put exactly one ability on the stack" (length (GameState.stack settled)) 1
-        Spec.assertEqWith s "and the permanent really did turn over" (faceNameOf oid turned) (Just thallidBack)
   -- CR 701.27f from the event's side: the second resolution is IGNORED, so it is
   -- not an event and nothing triggers on it. Eight Forests put both activations
   -- on the stack before either resolves, TransformSpec's own CR 701.27f board.

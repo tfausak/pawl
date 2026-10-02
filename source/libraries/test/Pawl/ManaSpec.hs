@@ -1724,17 +1724,6 @@ chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2
         Spec.assertEqWith s "untapped, that is what reaches the pool" (tappedFor S.identityAnswer oid (untapObject oid after)) [ManaType.Colored Color.Blue]
       _ -> Spec.assertFailure s "the Coldsteel Heart did not reach the battlefield"
 
-  -- The discriminating half: same card, different answer, different mana. An
-  -- engine picking the colour itself would give one of these the other's mana.
-  Spec.it s "CR 607.2d the colour is the player's, not the engine's" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    coldsteel <- S.printingOf s registry "Coldsteel Heart"
-    let run wanted = case resolvedColdsteel wanted mountain coldsteel of
-          (after, Just oid) -> Mana.manaTypesOf oid after
-          _ -> []
-    Spec.assertEqWith s "naming red" (run Color.Red) [ManaType.Colored Color.Red]
-    Spec.assertEqWith s "naming green" (run Color.Green) [ManaType.Colored Color.Green]
-
   -- No colour chosen yields NO mana rather than a fallback colour (CR 106.5). A
   -- fixture write puts a Coldsteel Heart in that state here; in play, a
   -- permanent becoming a copy of one without entering (Mirrorweave, CR 707.2)
@@ -2018,22 +2007,6 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
     Spec.assertBool s (pays 2) "{2} is what one activation adds"
     Spec.assertBool s (not (pays 3)) "and nothing pays {3}"
 
-  -- The gameplay-level proof (design.md section 4). Silent Arbiter is {4} and
-  -- targets nothing as it is cast, so the whole cast turns on the Altar being
-  -- counted twice -- and both Pikers in the graveyard afterwards is what says
-  -- two activations happened rather than one large one.
-  Spec.it s "CR 605.3a Silent Arbiter is cast off two activations of one Altar" $ do
-    altar <- S.printingOf s registry "Ashnod's Altar"
-    piker <- S.printingOf s registry "Goblin Piker"
-    arbiter <- S.printingOf s registry "Silent Arbiter"
-    let resolved = castOffBoard S.identityAnswer (altar : replicate 2 piker) arbiter
-        short = castOffBoard S.identityAnswer [altar, piker] arbiter
-        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-    Spec.assertEqWith s "the Arbiter resolved" (countOf "Silent Arbiter" resolved) 1
-    Spec.assertEqWith s "both Pikers paid for it" (countOf "Goblin Piker" resolved) 0
-    Spec.assertEqWith s "with one Piker there is no {4} and the cast fails" (countOf "Silent Arbiter" short) 0
-    Spec.assertEqWith s "and CR 601.2h left the Piker alive" (countOf "Goblin Piker" short) 1
-
 -- The Altar and `victims` Pikers, all under alice's control.
 altarBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 altarBoard altar piker victims =
@@ -2142,23 +2115,6 @@ heritageDruidSpec s registry = Spec.describe s "Heritage Druid" $ do
     let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
     Spec.assertBool s (pays 3) "{3} is what one activation adds"
     Spec.assertBool s (not (pays 4)) "and nothing pays {4}"
-
-  -- The gameplay-level proof (design.md section 4). Void Winnower is {9}, all
-  -- generic, and targets nothing as it is cast, so the whole cast turns on the
-  -- component being counted three times. The two boards differ in the Elves and
-  -- in nothing else, so the short one fails for the Elves rather than for want
-  -- of anything else.
-  Spec.it s "CR 605.3a Void Winnower is cast off three activations of one Druid" $ do
-    winnower <- S.printingOf s registry "Void Winnower"
-    nine <- heritageDruidBoard s registry 9
-    six <- heritageDruidBoard s registry 6
-    let resolved = castFrom S.identityAnswer nine winnower
-        short = castFrom S.identityAnswer six winnower
-        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-    Spec.assertEqWith s "the Winnower resolved" (countOf "Void Winnower" resolved) 1
-    Spec.assertEqWith s "with six Elves there is no {9} and the cast fails" (countOf "Void Winnower" short) 0
-    Spec.assertEqWith s "CR 601.2h all nine Elves paid for it, the Winnower itself arriving untapped" (S.tappedCount S.alice resolved) 9
-    Spec.assertEqWith s "and CR 601.2h left the short board's Elves untapped" (S.tappedCount S.alice short) 0
 
 -- Alice's Heritage Druid and as many Glistener Elves as make `elves` untapped
 -- Elves in all, the Druid counted among them, and nothing else on the board.

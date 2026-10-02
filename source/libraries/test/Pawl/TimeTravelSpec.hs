@@ -21,7 +21,6 @@ module Pawl.TimeTravelSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -108,33 +107,8 @@ travelled setup =
       ((_, after), offers) = State.runState (Engine.runGame answer (state setup) game) []
    in (offers, after)
 
--- How many time counters an object carries, the one question every assertion
--- below asks.
-timeOn :: ObjectId.ObjectId -> GameState.GameState -> Natural
-timeOn = S.counterOf CounterKind.Time
-
-spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "TimeTravel" $ do
-  Spec.it s "CR 701.56a a counter goes onto the chosen permanent and comes off the chosen suspended card" $ do
-    island <- S.printingOf s registry "Island"
-    wibbly <- S.printingOf s registry "Wibbly-wobbly, Timey-wimey"
-    giantP <- S.printingOf s registry "Hill Giant"
-    thopterP <- S.printingOf s registry "Ornithopter"
-    pikerP <- S.printingOf s registry "Goblin Piker"
-    balothP <- S.printingOf s registry "Durkwood Baloth"
-    escapeP <- S.printingOf s registry "Chronomantic Escape"
-    let setup = board island wibbly giantP thopterP pikerP balothP escapeP
-        (_, after) = travelled setup
-    -- THE gameplay reading, and first: rule 701.56a's two directions, one of them
-    -- on a permanent and the other on a suspended card in exile.
-    Spec.assertEqWith s "CR 701.56a the chosen permanent went from three time counters to four" (timeOn (giant setup) after) 4
-    Spec.assertEqWith s "CR 701.56a the chosen suspended card went from seven to six" (timeOn (baloth setup) after) 6
-    -- The four non-candidates, on the SAME board: each is one clause of rule
-    -- 701.56a's candidate set failing.
-    Spec.assertEqWith s "the permanent with no time counter gained none" (timeOn (thopter setup) after) 0
-    Spec.assertEqWith s "CR 701.56a's \"you control\": the opponent's permanent kept its five" (timeOn (piker setup) after) 5
-    Spec.assertEqWith s "CR 702.62b an exiled card without suspend is not suspended, and kept its nine" (timeOn (landInExile setup) after) 9
-    Spec.assertEqWith s "CR 701.56a's \"you own\": the opponent's suspended card kept its eleven" (timeOn (escape setup) after) 11
   Spec.it s "CR 701.56a the choice is offered over the whole candidate set, and over nothing else" $ do
     island <- S.printingOf s registry "Island"
     wibbly <- S.printingOf s registry "Wibbly-wobbly, Timey-wimey"

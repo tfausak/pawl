@@ -1,0 +1,126 @@
+{
+  "description": "CR 113.6b a stated row functions from exile, so the pulled card lands in the library",
+  "note": "The ordinary-card control: the pulled Goblin Piker lands in alice's graveyard beside the Pull, and her library stays empty.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Pull from Eternity",
+            "label": "pull"
+          }
+        ],
+        "exile": [
+          {
+            "card": "Goblin Piker",
+            "label": "victim"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "exile": [
+          {
+            "card": "Ogre Sentry",
+            "label": "sentry"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$pull",
+          "targets": [
+            "$victim"
+          ],
+          "mana": [
+            "$p1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Library",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Exile",
+          "is": [
+            "$sentry"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": [
+            "Goblin Piker",
+            "Pull from Eternity"
+          ]
+        }
+      }
+    }
+  ]
+}

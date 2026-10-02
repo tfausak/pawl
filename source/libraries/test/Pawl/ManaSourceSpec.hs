@@ -65,7 +65,6 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -73,7 +72,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
@@ -637,21 +635,6 @@ burningTreeSpec s registry = Spec.describe s "Burning-Tree Emissary" $ do
     Spec.assertEqWith s "alice's Emissary pays alice" (poolSize S.alice alices, poolSize S.bob alices) (2, 0)
     Spec.assertEqWith s "bob's Emissary pays bob" (poolSize S.alice bobs, poolSize S.bob bobs) (0, 2)
 
-  -- Gameplay level: the floating {R}{G} is ordinary mana, so it pays for a second
-  -- Emissary ({R/G}{R/G}) off a board holding no land and no other mana source.
-  -- The negative board differs in ONE thing -- the Emissary was arranged onto the
-  -- battlefield rather than entering -- so no trigger fired, nothing was added,
-  -- and the cast is not offered.
-  Spec.it s "CR 106.4 the added mana pays for a second Emissary, and without it the cast is not offered" $ do
-    bte <- S.printingOf s registry "Burning-Tree Emissary"
-    let (handId, after) = burningTreeResolved bte S.alice
-        (noTriggerHandId, noTrigger) = burningTreeArranged bte S.alice
-        cast = snd (Engine.runGamePure S.identityAnswer after (S.cast S.alice handId))
-    Spec.assertBool s (any (S.isCastOf handId) (Action.legalActions S.alice after)) "the second Emissary is castable off the trigger's mana"
-    Spec.assertBool s (not (any (S.isCastOf noTriggerHandId) (Action.legalActions S.alice noTrigger))) "and is not castable when no trigger added any"
-    Spec.assertEqWith s "the cast spent the whole pool" (poolSize S.alice cast) 0
-    Spec.assertEqWith s "and the second Emissary is on the stack" (length (GameState.stack cast)) 1
-
 -- One Burning-Tree Emissary entering under `pid` with its CR 603.6a enters event,
 -- that trigger placed and resolved, plus a second copy in alice's hand -- alice
 -- being active with priority in her precombat main phase (S.handOne). No land and
@@ -663,15 +646,6 @@ burningTreeResolved bte pid =
       (_, entered) = S.entersWithTrigger bte pid base
       placed = snd (Engine.runGamePure S.identityAnswer entered Engine.placePendingTriggers)
    in (handId, snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop))
-
--- The same board with the Emissary ARRANGED onto the battlefield instead of
--- entering (S.addPermanent emits no event), so nothing triggers and no mana is
--- added. Everything else -- seats, phase, priority, the copy in hand, the empty
--- stack -- is burningTreeResolved's.
-burningTreeArranged :: Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
-burningTreeArranged bte pid =
-  let (base, handId) = S.handOne bte (Setup.emptyGame S.bothPlayers)
-   in (handId, snd (S.addPermanent bte pid base))
 
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
@@ -1091,45 +1065,6 @@ castingOnly spell p = case p of
 retainedRed :: ManaUnit.ManaUnit
 retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
 
--- CR 702.189a's N restated as a player's counters, and a cast trigger narrowed
--- to CR 506's combat phase: Zuko, Firebending Master {1}{R} Legendary Creature
--- -- Ally Human Noble 2/2, "First strike / Firebending X, where X is the number
--- of experience counters you have. / Whenever you cast a spell during combat,
--- you get an experience counter." Nothing is omitted, so pawl's Zuko is neither
--- stricter nor weaker than printed.
---
--- alice starts with THREE experience counters, distinct from Zuko's power of
--- two. Two Blessed Reversals ({1}{W} Instant, no target, so nothing can hit
--- Zuko) are the pair of casts: one in the declare blockers step, one in the
--- postcombat main phase, on one timeline, off four Plains.
-zukoFirebendingMasterSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-zukoFirebendingMasterSpec s registry =
-  let passing :: Prompt.Prompt r -> r
-      passing = S.aggressiveAnswer
-      withPriority gs = gs {GameState.priority = Just S.alice}
-      experience = S.playerCounterOf PlayerCounterKind.Experience S.alice
-      spent = length . Game.zoneMembers Zone.Graveyard S.alice
-   in Spec.describe s "Zuko, Firebending Master" $ do
-        Spec.it s "CR 603.2 a spell cast during combat gives an experience counter, one cast after combat none" $ do
-          zuko <- S.printingOf s registry "Zuko, Firebending Master"
-          plains <- S.printingOf s registry "Plains"
-          reversal <- S.printingOf s registry "Blessed Reversal"
-          case S.combatBoardOf [zuko] [] of
-            (gs, [zukoId], _) -> do
-              let (inCombat, withOne) = S.addHandCard reversal S.alice (S.landsFor plains S.alice 4 (S.addPlayerCounter PlayerCounterKind.Experience 3 S.alice gs))
-                  (afterCombat, staged) = S.addHandCard reversal S.alice withOne
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
-                  castInCombat = S.runPure (castingOnly inCombat) blockers Engine.runStep
-                  postcombat = withPriority (S.runToStep Phase.PostcombatMain passing castInCombat)
-                  castAfter = S.runPure (castingOnly afterCombat) postcombat Engine.runStep
-              -- THE gameplay assertion: four after the combat cast, and still
-              -- four after the postcombat one.
-              Spec.assertEqWith s "CR 603.2 the combat cast adds one, the postcombat cast none" (experience castInCombat, experience castAfter) (4, 4)
-              Spec.assertEqWith s "and each Reversal was cast and resolved" (spent castInCombat, spent castAfter) (1, 2)
-              Spec.assertBool s (S.onBattlefield zukoId castAfter) "while Zuko is still there to see the second cast"
-              Spec.assertEqWith s "the second cast was in the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
-            _ -> Spec.assertFailure s "fixture should give alice a Zuko"
-
 -- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
 -- artifact or creature spells") is the printing, and the whole card is that one
@@ -1256,63 +1191,6 @@ workshopSpec s registry = Spec.describe s "Mishra's Workshop" $ do
            in (S.castable S.alice ringId withBoth, S.castable S.alice pikerId withBoth)
     Spec.assertEqWith s "three unrestricted colourless and a Mountain cast either one" (castables (S.landsFor tower S.alice 3 (S.landsInPlay mountain 1))) (True, True)
     Spec.assertEqWith s "the Workshop's three cast the artifact spell and not the creature spell" (castables (S.landsFor workshop S.alice 1 (S.landsInPlay mountain 1))) (True, False)
-
--- CR 106.6 with CR 607.2d: a restriction whose predicate reads a CHOICE the
--- SOURCE made rather than a word printed on the card. Pillar of Origins ({2}
--- Artifact, "As this artifact enters, choose a creature type. {T}: Add one mana of
--- any color. Spend this mana only to cast a creature spell of the chosen type")
--- is the printing, and the whole card is those two sentences -- the cheapest
--- member of the Cavern of Souls family.
---
--- Nothing is omitted from the card, so pawl's Pillar is neither stricter nor
--- weaker than printed.
---
--- The choice cannot be looked up at payment: Pawl.Types.ManaUnit carries no source
--- id, so Mana.sourceChosenSubtypeOf bakes the answer onto every unit the Pillar
--- adds and Mana.admitsUnder hands it to Filter.HasChosenSubtype.
-pillarSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-pillarSpec s registry = Spec.describe s "Pillar of Origins" $ do
-  -- The gameplay-level proof docs/design.md section 4 asks for: cast the Pillar,
-  -- answer its as-enters prompt for real, let it resolve, and ask what its one
-  -- mana can pay for.
-  --
-  -- Run TWICE with different answers on ONE board, Pawl.AuraSpec's Convincing
-  -- Mirage arrangement and for its reason: one half alone would pass for an
-  -- implementation that conjured a fixed type, and two halves that disagree can
-  -- only be told apart by reading the choice.
-  --
-  -- The two spells are Goblin Grappler ({R} Goblin) and Llanowar Elves ({G} Elf
-  -- Druid): one mana each, different colours, different creature types. The
-  -- Pillar's mana is of ANY colour, so neither refusal can be a colour the board
-  -- cannot make, and the two runs are each other's control -- the boards are
-  -- identical and only the answer differs. Each run casts ONE of the two, so
-  -- neither pair can be two refusals.
-  --
-  -- The two lands are Reliquary Towers, which the Pillar's {2} taps: nothing
-  -- untapped is left once it has resolved, and a Tower's colourless could not pay
-  -- either coloured pip in any case.
-  Spec.it s "CR 607.2d whole card: the Pillar's mana casts a creature of the chosen type and no other" $ do
-    pillar <- S.printingOf s registry "Pillar of Origins"
-    tower <- S.printingOf s registry "Reliquary Tower"
-    grappler <- S.printingOf s registry "Goblin Grappler"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    let (withPillar, pillarSpell) = S.handOne pillar (S.landsInPlay tower 2)
-        run pick =
-          let cast_ = S.runPure (pillarChoosing pick) withPillar (S.cast S.alice pillarSpell)
-           in S.runPure (pillarChoosing pick) cast_ Stack.resolveTop
-        castables gs =
-          let (grapplerId, withGoblin) = S.addHandCard grappler S.alice gs
-              (elvesId, withBoth) = S.addHandCard elves S.alice withGoblin
-           in (S.castable S.alice grapplerId withBoth, S.castable S.alice elvesId withBoth)
-    Spec.assertEqWith s "CR 106.6 choosing Goblin, the Pillar's mana casts the Goblin and refuses the Elf" (castables (run Subtype.Goblin)) (True, False)
-    Spec.assertEqWith s "CR 106.6 choosing Elf, the same board and the pair flips" (castables (run Subtype.Elf)) (False, True)
-
--- Pillar of Origins' CR 614.1c as-enters creature type, and nothing else: the
--- card raises no other prompt this case has to steer.
-pillarChoosing :: Subtype.Subtype -> Prompt.Prompt r -> r
-pillarChoosing subtype p = case p of
-  Prompt.ChooseCreatureType {} -> subtype
-  _ -> S.identityAnswer p
 
 -- CR 106.4's retention on the INLINE road (CR 605.3b), the third clause a mana
 -- ability's ManaAddition carries onto the units it adds -- the restriction above
@@ -2236,10 +2114,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   stadiumVendorsSpec s registry
   shizukoSpec s registry
   avatarRokuSpec s registry
-  zukoFirebendingMasterSpec s registry
   geosurgeSpec s registry
   workshopSpec s registry
-  pillarSpec s registry
   lastingSpringSpec s registry
   omenHawkerSpec s registry
   boseijuSpec s registry

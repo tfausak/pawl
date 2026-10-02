@@ -52,7 +52,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
@@ -65,7 +64,6 @@ spec s registry = Spec.describe s "SplitSecond" $ do
   activateSpec s registry
   stillAllowedSpec s registry
   durationSpec s registry
-  grantedSpec s registry
   grantedFromOutsideSpec s registry
 
 -- alice: eight Mountains, the `subject` spell and two Lightning Bolts in hand.
@@ -287,80 +285,6 @@ durationSpec s registry =
       Spec.assertEqWith s "with the Sudden Shock card in a graveyard -- CR 400.7 gives it a new id, so it is named rather than compared" (fmap (\oid -> S.soleFaceName oid resolved) (Game.zoneMembers Zone.Graveyard S.alice resolved)) [S.printingName suddenShock]
       Spec.assertBool s (elem (castOf (bobBolt b) lightningBolt) (Action.legalActions S.bob resolved)) "and bob may cast again"
 
--- Answers CR 702.33a's kicker question with `decision` and CR 601.2b's X with 1,
--- deferring everywhere else. Pinned answers rather than searched ones, so a
--- mutation cannot be repaired by an interpreter that finds another legal reply.
-disaster :: KickerDecision.KickerDecision -> Prompt.Prompt r -> r
-disaster decision p = case p of
-  Prompt.ChooseKicker {} -> decision
-  Prompt.ChooseX {} -> 1
-  _ -> S.identityAnswer p
-
-grantedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-grantedSpec s registry =
-  -- CR 702.61a read off the CR 613 projection rather than the printed face.
-  -- Molten Disaster prints no keyword; a static ability of its own grants it one
-  -- while it is on the stack (CR 113.6), gated on CR 702.33d's kicked
-  -- designation.
-  Spec.describe s "granted by a continuous effect" $ do
-    -- THE PROVING CASE. One board, one hand, one spell on the stack, the same
-    -- X=1; the kicker answer is the only difference, and it is what the whole
-    -- pair turns on. A printed read of the stack cannot tell the two apart, so
-    -- this case fails on origin/main.
-    Spec.it s "CR 702.61a a KICKED Molten Disaster stops an opponent's cast, and an unkicked one does not" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      moltenDisaster <- S.printingOf s registry "Molten Disaster"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      prodigal <- S.printingOf s registry "Prodigal Sorcerer"
-      let b = board mountain moltenDisaster lightningBolt prodigal
-          declined = castDisaster (KickerDecision.MkKickerDecision 0) b
-          kicked = castDisaster (KickerDecision.MkKickerDecision 1) b
-      Spec.assertEqWith s "control: the unkicked spell is on the stack" (length (GameState.stack declined)) 1
-      Spec.assertEqWith s "and so is the kicked one, so neither board is empty-handed" (length (GameState.stack kicked)) 1
-      Spec.assertBool s (elem (castOf (bobBolt b) lightningBolt) (Action.legalActions S.bob declined)) "control: unkicked, bob's Bolt is offered"
-      Spec.assertEqWith s "kicked, split second takes every cast of his away" (filter isCast (Action.legalActions S.bob kicked)) []
-    -- CR 702.61a's second limb, off the same pair. Prodigal Sorcerer's ability is
-    -- not a mana ability (CR 605.1a).
-    Spec.it s "CR 702.61a a kicked Molten Disaster stops an ability that isn't a mana ability" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      moltenDisaster <- S.printingOf s registry "Molten Disaster"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      prodigal <- S.printingOf s registry "Prodigal Sorcerer"
-      let b = board mountain moltenDisaster lightningBolt prodigal
-          declined = castDisaster (KickerDecision.MkKickerDecision 0) b
-          kicked = castDisaster (KickerDecision.MkKickerDecision 1) b
-          activationsOf gs = filter isActivate (Action.legalActions S.bob gs)
-      Spec.assertEqWith s "control: unkicked, the Sorcerer's ability is offered" (length (activationsOf declined)) 1
-      Spec.assertEqWith s "kicked, it is gone" (activationsOf kicked) []
-      -- CR 702.61b, asked at gameplay level off the MENU rather than through
-      -- Activatable.activatable, which answers False for a mana ability on every
-      -- board (CR 605.3b).
-      Spec.assertEqWith s "and CR 702.61b leaves bob all eight Mountains" (length (filter isManaAbility (Action.legalActions S.bob kicked))) 8
-    -- The card as printed, so the grant above is not the only thing the file
-    -- says. X=1 into Goblin Piker (2/1, no flying) and Bird Maiden (1/2, which
-    -- prints flying), plus both players -- the caster included, which is what
-    -- separates "each player" from "each opponent".
-    Spec.it s "Molten Disaster deals X to each creature without flying and each player" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      moltenDisaster <- S.printingOf s registry "Molten Disaster"
-      piker <- S.printingOf s registry "Goblin Piker"
-      birdMaiden <- S.printingOf s registry "Bird Maiden"
-      let (pikerId, g1) = S.addPermanent piker S.bob (S.landsInPlay mountain 8)
-          (maidenId, g2) = S.addPermanent birdMaiden S.bob g1
-          (gs, spellId) = S.handOne moltenDisaster g2
-          answer = disaster (KickerDecision.MkKickerDecision 0)
-          cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
-          resolved = snd (Engine.runGamePure answer cast Stack.resolveTop)
-      Spec.assertEqWith s "1 marked on the Goblin Piker, which has no flying" (S.damageOf pikerId resolved) (Just 1)
-      Spec.assertEqWith s "and nothing on the Bird Maiden, which does" (S.damageOf maidenId resolved) (Just 0)
-      Spec.assertEqWith s "each player means the caster too" (S.lifeOf S.alice resolved) (Just 19)
-      Spec.assertEqWith s "and the opponent" (S.lifeOf S.bob resolved) (Just 19)
-
--- alice casts the `subject` spell with the given kicker answer, and the triggers
--- settle. `after`'s body but for the answerer.
-castDisaster :: KickerDecision.KickerDecision -> Board -> GameState.GameState
-castDisaster decision b = S.runPure (disaster decision) (state b) (S.cast S.alice (subject b) >> Engine.settleForPriority)
-
 -- alice controls Shadow the Hedgehog, one Seat of the Synod and one Island, and
 -- holds Ancestral Recall; bob has four Mountains and a Lightning Bolt.
 --
@@ -425,7 +349,8 @@ grantedFromOutsideSpec s registry =
   -- CR 702.61a granted from OUTSIDE the spell: Shadow the Hedgehog's "each spell
   -- you cast has split second if mana from an artifact was spent to cast it" is a
   -- static ability of a permanent on the battlefield reaching a spell on the
-  -- stack (CR 611.1), where Molten Disaster's grant above is the spell's own.
+  -- stack (CR 611.1), where Molten Disaster's grant is the spell's own
+  -- (data/scenarios/split-second).
   Spec.describe s "granted by another permanent" $ do
     -- THE PROVING CASE. One board, one spell, one hand; the only difference is
     -- which of alice's two untapped blue sources paid the {U}, and CR 106.3 makes

@@ -2182,10 +2182,9 @@ castTheCardSpec s registry =
 --
 -- The answerer casts the exiled Lightning Bolt the moment alice is offered it,
 -- so what the permission allows is read off bob's life.
-nextUpkeepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nextUpkeepSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 nextUpkeepSpec s registry =
-  let named n = Just (CardName.MkCardName (Text.pack n))
-      -- alice in her main phase with priority, the rest of her turn scheduled.
+  let -- alice in her main phase with priority, the rest of her turn scheduled.
       mainPhase gs = gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
       stock printing pid g = List.foldl' (\h _ -> snd (S.addLibraryCard printing pid h)) g [1 :: Int .. 4]
       -- Whole steps, stopping BEFORE the first state `stop` holds of.
@@ -2210,25 +2209,6 @@ nextUpkeepSpec s registry =
         [ability] -> Just (S.runPure atBobAnswer (S.runPure atBobAnswer board (Activate.activateAbility S.alice source ability)) Stack.resolveTop)
         _ -> Nothing
    in Spec.describe s "UntilYourNextUpkeep" $ do
-        -- CR 503.1a: the permission ends as alice's upkeep begins, before the
-        -- delayed trigger is put on the stack, so she cannot cast the card in
-        -- response to it.
-        Spec.it s "CR 611.2a Grinning Totem's card is not castable in alice's upkeep, and goes to bob's graveyard" $ do
-          ps <- traverse (S.printingOf s registry) ["Grinning Totem", "Mountain", "Island", "Lightning Bolt"]
-          case ps of
-            [totem, mountain, island, bolt] -> do
-              let (totemId, withTotem) = S.addPermanent totem S.alice (stock island S.bob (stock island S.alice (Setup.emptyGame S.bothPlayers)))
-                  withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withTotem [1 :: Int, 2]
-                  (_, board) = S.addLibraryCard bolt S.bob withLands
-              case activated totemId (mainPhase board) of
-                Just exiled -> case Game.zoneMembers Zone.Exile S.bob exiled of
-                  [boltId] -> do
-                    let upkept = through (castingBolt boltId) (Phase.Beginning BeginningStep.Upkeep) (untilAlicesNextTurn exiled)
-                    Spec.assertEqWith s "alice could not cast the Lightning Bolt in her upkeep" (S.lifeOf S.bob upkept) (Just 20)
-                    Spec.assertEqWith s "the Lightning Bolt is in bob's graveyard" (namesIn Zone.Graveyard S.bob upkept) [named "Lightning Bolt"]
-                  _ -> Spec.assertFailure s "Grinning Totem should exile exactly one card"
-                Nothing -> Spec.assertFailure s "one activated ability"
-            _ -> Spec.assertFailure s "four printings"
         -- CR 500.11: Eon Hub skips every upkeep, so the duration outlasts the
         -- start of alice's next turn and she may still cast the card then.
         Spec.it s "CR 611.2a Elkin Bottle's card stays castable into alice's next turn when Eon Hub skips her upkeep" $ do

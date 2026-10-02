@@ -79,7 +79,6 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
@@ -148,7 +147,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   textChangedAbilitySpec s registry
   textChangedCostSpec s registry
   textChangedTargetSpec s registry
-  textChangedOfferedCostSpec s registry
   graveyardEffectZoneSpec s registry
   unearthSpec s registry
   scavengeSpec s registry
@@ -164,7 +162,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   kiliTheResourcefulSpec s registry
   unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
-  droughtActivationSpec s registry
   goldenEggSpec s registry
   presenceOfGondSpec s registry
   retractionHelixSpec s registry
@@ -310,22 +307,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     let (_, g0) = S.addPermanent llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
         g1 = g0 {GameState.priority = Just S.alice}
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice g1))) "no Activate for the mana ability"
-
-  Spec.it s "CR 701.21/701.23 Evolving Wilds sacrifices itself and fetches a basic land tapped" $ do
-    -- The fetched land gets a NEW id (CR 400.7); assert by count/tapped-count.
-    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
-    forest <- S.printingOf s registry "Forest"
-    let base = Setup.emptyGame S.bothPlayers
-        (wildsId, g1) = S.addPermanent evolvingWilds S.alice base
-        (_, g2) = S.addLibraryCard forest S.alice g1
-        g3 = g2 {GameState.priority = Just S.alice}
-        ability = theAbility evolvingWilds
-        activated = snd (Engine.runGamePure findFirst g3 (Activate.activateAbility S.alice wildsId ability))
-        resolved = snd (Engine.runGamePure findFirst activated Stack.resolveTop)
-    Spec.assertBool s (not (ManaAbility.isManaAbility ability)) "Evolving Wilds' ability is NOT a mana ability"
-    Spec.assertBool s (not (Set.member wildsId (GameState.battlefield resolved))) "Evolving Wilds sacrificed (gone from battlefield)"
-    Spec.assertEqWith s "one permanent on the battlefield (the fetched land)" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
-    Spec.assertEqWith s "the fetched land is tapped" (S.tappedCount S.alice resolved) 1
 
   Spec.it s "CR 302.6 a freshly-added land can tap+sac immediately (no summoning sickness)" $ do
     evolvingWilds <- S.printingOf s registry "Evolving Wilds"
@@ -2561,66 +2542,6 @@ textChangedCostSpec s registry =
           Spec.assertEqWith s "the Forest is gone" (S.countOnBattlefieldByName forestName S.alice after) 0
           Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
 
--- CR 612.1 reaching CR 118.9's STATED alternative cost, on the offer that applies
--- it (Pawl.Types.CastOffer.payingInstead).
---
--- Synthetic Woodland Bargainer {2} Artifact, "{T}: You may cast target creature
--- card from your graveyard by sacrificing a Forest rather than paying its mana
--- cost." SYNTHETIC because no printing states this wording on an offered cast:
--- every Effect.OfferCast in data/cards/ either states no alternative cost or
--- states CR 118.9's "without paying its mana cost", which is a Bool and names no
--- word. CR 118.9 admits both wordings for a cost "applied to it from another
--- effect", so nothing in the CR forbids the card; a printing that states one
--- replaces it.
---
--- textChangedCostSpec above one field over. The same rules make it card text: CR
--- 118.1 puts a cost in the text box CR 612.1 reaches, and CR 608.2g's cast then
--- pays what the projected offer states.
---
--- BOTH readings are payable -- alice has a Forest and an Island -- so the cast
--- happens either way and the only thing that moves is WHICH land dies. A board
--- where one reading could not pay would confuse the swap with an unaffordable
--- offer.
-textChangedOfferedCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-textChangedOfferedCostSpec s registry =
-  let forestName = CardName.MkCardName (Text.pack "Forest")
-      islandName = CardName.MkCardName (Text.pack "Island")
-      -- CR 608.2g's "may", taken. S.identityAnswer bottoms out in
-      -- Replay.defaultAnswer, which DECLINES every offered cast, so a case
-      -- asserting the cast happened would otherwise pass for want of a cast.
-      taking :: Prompt.Prompt r -> r
-      taking p = case p of
-        Prompt.OfferedCast {} -> OptionalDecision.Exercises
-        _ -> S.identityAnswer p
-      run hacked = do
-        bargainer <- S.printingOf s registry "Synthetic Woodland Bargainer"
-        forest <- S.printingOf s registry "Forest"
-        island <- S.printingOf s registry "Island"
-        seat <- S.printingOf s registry "Seat of the Synod"
-        magicalHack <- S.printingOf s registry "Magical Hack"
-        piker <- S.printingOf s registry "Goblin Piker"
-        let (subjectId, _, _, hackId, g0) = textChangeBoard bargainer forest island seat magicalHack
-            (_, g1) = S.addGraveyardCard piker S.alice g0
-            board = withForestHackedToIsland hacked subjectId hackId g1
-        case soleProjectedAbility subjectId board of
-          Nothing -> Spec.assertFailure s "expected the Bargainer to carry exactly one activated ability"
-          Just ability -> pure (piker, S.runPure taking board (do Activate.activateAbility S.alice subjectId ability; Stack.resolveTop; Stack.resolveTop))
-   in Spec.describe s "TextChangedOfferedCost" $ do
-        -- The control: unhacked, the printed word stands and the FOREST is the
-        -- only thing that can pay the offer.
-        Spec.it s "CR 118.9 whole card: an unhacked offer is paid by sacrificing the Forest" $ do
-          (piker, after) <- run False
-          Spec.assertEqWith s "the Piker was cast off the offer" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
-          Spec.assertEqWith s "the Forest is gone" (S.countOnBattlefieldByName forestName S.alice after) 0
-          Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
-        -- The swap. alice's board did not move, but the cost the offer states now
-        -- reads "sacrificing an Island", so the Island is what dies.
-        Spec.it s "CR 612.1 whole card: hacking the Bargainer moves which land its offer demands" $ do
-          (piker, after) <- run True
-          Spec.assertEqWith s "the Piker was still cast off the offer" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
-          Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
-          Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
-
 -- CR 612.1 reaching a mode's TARGET SLOT, end to end.
 --
 -- Arbor Elf {G} Creature -- Elf Druid 1/1, "{T}: Untap target Forest." (checked
@@ -3862,95 +3783,6 @@ activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition"
     Spec.assertBool s (not (null (activationsOf sorcererId actions))) "the nonRebel is untaxed"
     Spec.assertBool s (not (null (activationsOf tokenId actions))) "and so is the token Rebel"
 
--- alice's board: Drudge Skeletons, Saltfield Recluse, `swamps` Swamps, and a
--- Goblin Piker under bob for the Recluse's ability to aim at -- plus Drought
--- under BOB when one is passed. The positive and the negative differ in that
--- Maybe and in nothing else.
---
--- Drought sits with bob for suppressionBoard's reason: its sentence is symmetric
--- (PlayerScope.EachPlayer, no possessive), and the board that proves that is the
--- one where the activating player does not control it.
-droughtActivationBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Int ->
-  Maybe Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-droughtActivationBoard skeletons recluse swamp piker swamps mDrought =
-  let base = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. swamps]
-      (skeletonId, g1) = S.addPermanent skeletons S.alice base
-      (recluseId, g2) = S.addPermanent recluse S.alice g1
-      g3 = snd (S.addPermanent piker S.bob g2)
-      g4 = maybe g3 (\drought -> snd (S.addPermanent drought S.bob g3)) mDrought
-   in (skeletonId, recluseId, g4 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
-
--- CR 601.2f's "plus all additional costs" reaching an ACTIVATION cost by CR
--- 602.2b, now SCALED by the cost it is adjusting (#1417) -- which nothing could
--- do before: AddActivationCost carried a fixed list, so the added cost could not
--- be a function of the cost.
---
--- Drought {2}{W}{W} Enchantment -- "Activated abilities cost an additional
--- \"Sacrifice a Swamp\" to activate for each black mana symbol in their
--- activation costs" (Oracle text checked against Scryfall) -- is the printing.
--- Drudge Skeletons ({B}: Regenerate this creature) is the ability it taxes and
--- Saltfield Recluse ({T}: Target creature gets -2/-0, no mana at all) is the one
--- it does not, on the SAME board.
---
--- ZERO, ONE and TWO, so the multiplier is proven on this side and not only on
--- Pawl.CastSpec's spell side: the two is Port of Karfell's second ability,
--- {3}{U}{B}{B}, {T}, Sacrifice this land (Oracle text checked against Scryfall).
--- A sweep of every `faces[].activatedAbilities[].cost.mana` in `data/cards/`
--- (2026-08-18) is what found it -- it is the only activation cost in the corpus
--- printing more than one black mana symbol, so a later card demoting it should
--- leave this case where it is.
-droughtActivationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-droughtActivationSpec s registry = Spec.describe s "DroughtActivation" $ do
-  Spec.it s "CR 602.2b an activation cost with one black symbol costs a Swamp" $ do
-    skeletons <- S.printingOf s registry "Drudge Skeletons"
-    recluse <- S.printingOf s registry "Saltfield Recluse"
-    drought <- S.printingOf s registry "Drought"
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let name = S.nameOf (Printing.card swamp)
-        ability = theAbility skeletons
-        (taxedId, _, taxed) = droughtActivationBoard skeletons recluse swamp piker 3 (Just drought)
-        (freeId, _, free) = droughtActivationBoard skeletons recluse swamp piker 3 Nothing
-        after = S.runPure S.identityAnswer taxed (Activate.activateAbility S.alice taxedId ability)
-        control = S.runPure S.identityAnswer free (Activate.activateAbility S.alice freeId ability)
-    Spec.assertEqWith s "one of the three Swamps was sacrificed" (S.countOnBattlefieldByName name S.alice after) 2
-    Spec.assertEqWith s "where the same activation without Drought keeps all three" (S.countOnBattlefieldByName name S.alice control) 3
-    Spec.assertEqWith s "and the regenerate is on the stack, not refused" (length (GameState.stack after)) 1
-  -- THE MULTIPLIER on this side: Port of Karfell's second ability is
-  -- {3}{U}{B}{B}, {T}, Sacrifice this land, so CR 602.2b's activation cost holds
-  -- TWO black mana symbols and Drought demands two Swamps where Drudge Skeletons'
-  -- one demanded one. Seven Swamps and two Islands is strictly more mana than the
-  -- six the cost asks for, so no reading of this board is "she could not afford
-  -- it", and the assertion is the survivor count.
-  Spec.it s "CR 602.2b two black symbols in an activation cost cost two Swamps" $ do
-    port <- S.printingOf s registry "Port of Karfell"
-    drought <- S.printingOf s registry "Drought"
-    swamp <- S.printingOf s registry "Swamp"
-    island <- S.printingOf s registry "Island"
-    let name = S.nameOf (Printing.card swamp)
-        ability = case Face.activatedAbilities (S.combinedFace port) of
-          _ : second : _ -> second
-          _ -> theAbility port
-        board mDrought =
-          let swamps = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. 7 :: Int]
-              islands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) swamps [1 .. 2 :: Int]
-              (portId, g1) = S.addPermanent port S.alice islands
-              g2 = maybe g1 (\d -> snd (S.addPermanent d S.bob g1)) mDrought
-           in (portId, g2 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
-        (taxedId, taxed) = board (Just drought)
-        (freeId, free) = board Nothing
-        after = S.runPure S.identityAnswer taxed (Activate.activateAbility S.alice taxedId ability)
-        control = S.runPure S.identityAnswer free (Activate.activateAbility S.alice freeId ability)
-    Spec.assertEqWith s "two of the seven Swamps were sacrificed" (S.countOnBattlefieldByName name S.alice after) 5
-    Spec.assertEqWith s "where the same activation without Drought keeps all seven" (S.countOnBattlefieldByName name S.alice control) 7
-    Spec.assertEqWith s "and the ability is on the stack, not refused" (length (GameState.stack after)) 1
-
 -- Golden Egg ({2} Artifact -- Food): "When this artifact enters, draw a card. /
 -- {1}, {T}, Sacrifice this artifact: Add one mana of any color. / {2}, {T},
 -- Sacrifice this artifact: You gain 3 life." The pool's first permanent with CR
@@ -4705,31 +4537,8 @@ answerBlightAtBound blighted p = case p of
   Prompt.ChooseBlight {} -> pure blighted
   _ -> pure (S.identityAnswer p)
 
--- Answers Prompt.ChooseReturns with the first candidate the engine offered, which
--- is all Tameshi's "return a land you control" needs: WHICH land goes back is
--- Pawl.CostSpec's question (Meloku the Clouded Mirror), not this group's.
-answerXTargetingReturning :: Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-answerXTargetingReturning x wanted p = case p of
-  Prompt.ChooseReturns _ _ _ candidates _ -> Set.fromList (take 1 candidates)
-  _ -> answerXTargeting x wanted p
-
 abilityCeilingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 abilityCeilingSpec s registry = Spec.describe s "AbilityCeilingAndBoundSlot" $ do
-  -- BOTH halves on one board: the announced 3 is what the ceiling permits and
-  -- what the slot's bound measures the graveyard against.
-  Spec.it s "CR 101.1/601.2c whole card: Blighted Nightmare at X=3 returns the mana value 3 card and leaves the 4" $ do
-    (nightmare, srcId, pikerId, tyrantId, _, g1) <- blightedNightmareBoard s registry "Ogre Sentry"
-    tyrant <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
-    giant <- S.printingOf s registry "Hill Giant"
-    let act = do Activate.activateAbility S.alice srcId (theAbility nightmare); Stack.resolveTop
-        after = snd (Engine.runGamePure (answerBlightXTargeting 3 pikerId tyrantId) g1 act)
-    Spec.assertEqWith s "the mana value 3 creature card is on the battlefield, so the announced 3 reached the slot's bound" (S.countOnBattlefieldByName (S.printingName tyrant) S.alice after) 1
-    Spec.assertEqWith s "and the mana value 4 one the bound excluded is all that is left in the graveyard" (graveyardNames S.alice after) [S.printingName giant]
-    Spec.assertEqWith s "the cost's blight put the announced 3 counters on the Piker" (S.counterOf CounterKind.MinusOneMinusOne pikerId after) 3
-    Spec.assertBool s (not (S.onBattlefield srcId after)) "and its other half returned the Nightmare to hand"
-    Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
-    Spec.assertBool s (Activatable.activatable S.alice srcId (theAbility nightmare) g1) "the ability is offered before any X exists"
-
   -- The ceiling is READ, and read off the board: the tallest creature alice
   -- controls is what bounds the prompt, and nothing else on either board is 3 or
   -- 4. Without a ceiling this bound does not exist at all -- CR 701.68b refuses a
@@ -4770,25 +4579,6 @@ abilityCeilingSpec s registry = Spec.describe s "AbilityCeilingAndBoundSlot" $ d
     Spec.assertEqWith s "the mana value 4 card did not come back" (S.countOnBattlefieldByName (S.printingName giant) S.alice after) 0
     Spec.assertEqWith s "both cards are still in the graveyard" (length (graveyardNames S.alice after)) 2
     Spec.assertBool s (S.onBattlefield srcId after) "and the activation reversed, the Nightmare staying put"
-
-  -- The paper printing of the same slot, whose {X}{W} needs no ceiling: Tameshi,
-  -- Reality Architect -- "{X}{W}, Return a land you control to its owner's hand:
-  -- Return target artifact or enchantment card with mana value X or less from
-  -- your graveyard to the battlefield. Activate only as a sorcery." Oracle text
-  -- checked against Scryfall 2026-09-03.
-  Spec.it s "CR 601.2c/602.2b whole card: Tameshi at X=1 returns the mana value 1 artifact card" $ do
-    tameshi <- S.printingOf s registry "Tameshi, Reality Architect"
-    plains <- S.printingOf s registry "Plains"
-    ring <- S.printingOf s registry "Sol Ring"
-    ball <- S.printingOf s registry "Crystal Ball"
-    let (srcId, g0) = S.addPermanent tameshi S.alice (S.landsInPlay plains 3)
-        (ringId, g1) = S.addGraveyardCard ring S.alice g0
-        (_, g2) = S.addGraveyardCard ball S.alice g1
-        g3 = g2 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-        act = do Activate.activateAbility S.alice srcId (theAbility tameshi); Stack.resolveTop
-        after = snd (Engine.runGamePure (answerXTargetingReturning 1 ringId) g3 act)
-    Spec.assertEqWith s "the mana value 1 artifact card is on the battlefield" (S.countOnBattlefieldByName (S.printingName ring) S.alice after) 1
-    Spec.assertEqWith s "and the mana value 3 one the announced 1 excluded is still in the graveyard" (graveyardNames S.alice after) [S.printingName ball]
 
 -- The pool's second producer of the same rider, and the one whose EFFECT the
 -- rider gates rather than a ping: Shellfish Scholar (Alchemy: Bloomburrow,
@@ -5061,19 +4851,6 @@ craftExilingBoth first second p = case p of
   Prompt.ChooseMaterials _ _ _ candidates _ _ -> Set.fromList (filter (\c -> c == first || c == second) candidates)
   _ -> S.identityAnswer p
 
--- The names alice's battlefield shows, read through the projection: the card a
--- craft returns is a NEW object (CR 400.7), so nothing below can name it by the
--- id it had as a Tithing Blade, and CR 712.8a makes the face that is UP the only
--- honest reading of which side came back.
-craftBattlefieldNames :: GameState.GameState -> Set.Set CardName.CardName
-craftBattlefieldNames gs = Set.unions (fmap (\o -> Projection.namesOf o gs) (Game.zoneMembers Zone.Battlefield S.alice gs))
-
--- The printed names of alice's cards in a hidden-from-nobody zone, CR 400.7's
--- new objects again -- a material the cost exiled is not the object it was on
--- the battlefield or in the graveyard.
-craftNamesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
-craftNamesIn zone gs = List.sort (Maybe.mapMaybe (\o -> fmap S.nameOf (Game.cardOf o gs)) (Game.zoneMembers zone S.alice gs))
-
 -- Saheeli's Lattice on alice's battlefield with five Mountains, which is exactly
 -- {4}{R}, and the named printings on her battlefield, in her graveyard and in
 -- exile, their ids answered in that order.
@@ -5099,12 +4876,6 @@ isCraftAbility ability = case ActivatedAbility.keyword ability of
 mastercraftPower :: GameState.GameState -> [Maybe Integer]
 mastercraftPower gs = [Projection.powerOf o gs | o <- Game.zoneMembers Zone.Battlefield S.alice gs, Set.member (CardName.MkCardName (Text.pack "Mastercraft Raptor")) (Projection.namesOf o gs)]
 
-goblinPiker, armoredGalleon, hillGiantName, dinosaurHeaddress :: CardName.CardName
-goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")
-armoredGalleon = CardName.MkCardName (Text.pack "Armored Galleon")
-hillGiantName = CardName.MkCardName (Text.pack "Hill Giant")
-dinosaurHeaddress = CardName.MkCardName (Text.pack "Dinosaur Headdress")
-
 craftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
   -- CR 118.3 and CR 602.5d, on a board differing from the pair above in the two
@@ -5124,53 +4895,6 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
       "CR 602.5d and not in the end step"
       (filter (isActivationOf craftable) (Action.legalActions S.alice (stocked {GameState.phase = Phase.Ending EndingStep.EndStep})))
       []
-
-  -- CR 702.167a's "[materials] is a description of ONE OR MORE objects":
-  -- Paleontologist's Pick-Axe // Dinosaur Headdress {2} Artifact - Equipment,
-  -- "Craft with one or more creatures {5}", whose back face is Dinosaur Headdress
-  -- (Oracle text checked against Scryfall, 2026-09-20). That back face also
-  -- prints "As this Equipment becomes attached to a creature, choose an exiled
-  -- creature card used to craft this Equipment" and "Equipped creature is a copy
-  -- of the last chosen card"; neither clause is transcribed (#4598), which leaves
-  -- pawl's card STRICTER than printed and touches nothing below -- no case here
-  -- attaches the Headdress to anything whose characteristics it would rewrite.
-  --
-  -- THREE candidates against a minimum of one, so the prompt is raised rather
-  -- than elided, and the payer answers with TWO of them: the size the exact
-  -- reading of the count refuses and the minimum admits. One comes off the
-  -- battlefield and one out of the graveyard, so the answer the engine accepts is
-  -- a subset of neither pool alone.
-  --
-  -- Five Swamps, which is exactly {5}.
-  Spec.it s "CR 702.167a one or more materials: the payer exiles more than the minimum" $ do
-    pickAxe <- S.printingOf s registry "Paleontologist's Pick-Axe"
-    piker <- S.printingOf s registry "Goblin Piker"
-    giant <- S.printingOf s registry "Hill Giant"
-    galleon <- S.printingOf s registry "Armored Galleon"
-    swamp <- S.printingOf s registry "Swamp"
-    let (axeId, g0) = S.addPermanent pickAxe S.alice (S.landsInPlay swamp 5)
-        (pikerId, g1) = S.addPermanent piker S.alice g0
-        (_, g2) = S.addPermanent giant S.alice g1
-        (galleonId, g3) = S.addGraveyardCard galleon S.alice g2
-        board =
-          g3
-            { GameState.priority = Just S.alice,
-              GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PostcombatMain
-            }
-        isCraft ability = case ActivatedAbility.keyword ability of
-          Just (Keyword.Craft _) -> True
-          _ -> False
-    case filter isCraft (Activatable.abilitiesFor axeId board) of
-      [ability] -> do
-        let after = S.runPure (craftExilingBoth pikerId galleonId) board (Activate.activateAbility S.alice axeId ability >> Stack.resolveTop)
-        -- THE GAMEPLAY ASSERTION, ahead of every other read: BOTH materials the
-        -- payer named left their zones, which an exact count of one refuses
-        -- outright -- the whole payment is then Unpaid and nothing is exiled.
-        Spec.assertEqWith s "CR 702.167a both materials the payer chose are in exile, a size the exact reading of the count would refuse" (craftNamesIn Zone.Exile after) [armoredGalleon, goblinPiker]
-        Spec.assertBool s (Set.member hillGiantName (craftBattlefieldNames after)) "CR 702.167a and the Hill Giant, which the payer did not choose, is still on the battlefield"
-        Spec.assertBool s (Set.member dinosaurHeaddress (craftBattlefieldNames after)) "CR 702.167a the card the cost exiled came back TRANSFORMED, as Dinosaur Headdress"
-      abilities -> Spec.assertFailure s ("expected one craft ability, got " <> show (length abilities))
 
   -- CR 702.167c: Saheeli's Lattice // Mastercraft Raptor, "Craft with one or
   -- more Dinosaurs {4}{R}", whose back face's power "is equal to the total

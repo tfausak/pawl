@@ -26,7 +26,6 @@
 -- its chapters' CR 611.2b durations do.
 module Pawl.SagaSpec where
 
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -48,8 +47,6 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -61,13 +58,9 @@ spec s registry = Spec.describe s "Saga" $ do
   chapterSpec s registry
   advanceSpec s registry
   sacrificeSpec s registry
-  readAheadSpec s registry
 
 knightToken :: CardName.CardName
 knightToken = CardName.MkCardName (Text.pack "Knight Token")
-
-birdToken :: CardName.CardName
-birdToken = CardName.MkCardName (Text.pack "Bird Token")
 
 -- One lore counter goes on as the Saga enters (CR 714.3a), which fires chapter I
 -- (CR 714.2b). Both halves are visible from a cast, which is what makes this the
@@ -331,36 +324,6 @@ precombatMainOf pid gs =
       GameState.priority = Just pid
     }
 
--- CR 702.155 / 714.3b: read ahead. Love Song of Night and Day is the producer --
--- {2}{W}, read ahead, chapter I "you and target opponent each draw two cards",
--- chapter II a 1\/1 white Bird with flying, chapter III a +1\/+1 counter on each of
--- up to two target creatures.
---
--- The chapter ANSWERED is II, and the choice of board is the whole test. Answering
--- I makes every quantity below identical under the read-ahead reading and the
--- unimplemented one -- one lore counter, chapter I fires, no Bird -- so the prompt
--- would be raised and its answer unobservable.
-readAheadSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-readAheadSpec s registry = Spec.describe s "Read ahead" $ do
-  Spec.it s "CR 704.5s entering on the final chapter still resolves it before the Saga is sacrificed" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    loveSong <- S.printingOf s registry "Love Song of Night and Day"
-    let (pikerId, board) = S.addPermanent piker S.alice (stocked plains)
-        (gs, spellId) = S.handOne loveSong board
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-        resolved = S.runPure (answeringChapter 3) cast Stack.resolveTop
-        after = S.runPure (answeringChapter 3) resolved Engine.priorityLoop
-    -- CR 702.155a again, with the SBA in the way: chapters I and II are skipped,
-    -- and chapter III must reach the stack and resolve before CR 704.5s takes the
-    -- Saga -- Saga.awaitingChapter's exemption.
-    Spec.assertEqWith s "CR 702.155a chapter I did not trigger" (S.handSize S.bob after) 0
-    Spec.assertEqWith s "CR 702.155a chapter II did not trigger, so no Bird" (S.countOnBattlefieldByName birdToken S.alice after) 0
-    Spec.assertEqWith s "CR 714.2b chapter III did, and it resolved" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
-    case sagaOf resolved of
-      Nothing -> Spec.assertFailure s "Love Song of Night and Day did not reach the battlefield"
-      Just oid -> Spec.assertBool s (not (S.onBattlefield oid after)) "and only then did CR 704.5s take the Saga"
-
 -- Two finished Sagas on one settle pass: bob's Summon: Choco/Mog under alice's
 -- control, and alice's own History of Benalia as the control. `prohibited` adds
 -- Garland, Royal Kidnapper, whose "creatures you control but don't own get +2/+2
@@ -379,20 +342,3 @@ prohibitedSagaBoard s registry prohibited = do
       (benaliaId, g2) = S.addPermanent benalia S.alice g1
       gs = S.addCounter CounterKind.Lore 3 benaliaId (S.addCounter CounterKind.Lore 4 chocoId g2)
   pure (chocoId, benaliaId, S.settleSba gs)
-
--- Answers CR 702.155b's chapter choice with `n` and nothing else, so the board
--- below differs from the default-answering one in exactly that.
-answeringChapter :: Natural -> Prompt.Prompt r -> r
-answeringChapter n p = case p of
-  Prompt.ChooseReadAheadChapter {} -> n
-  _ -> S.identityAnswer p
-
--- alice's three Plains, plus two library cards each: chapter I's draw must have
--- somewhere to draw FROM, or CR 104.3c ends the game for the drawing player and
--- the hand-size assertions pass because nobody was left rather than because
--- nothing was drawn.
-stocked :: Printing.Printing -> GameState.GameState
-stocked plains =
-  let base = S.landsInPlay plains 3
-      add gs pid = snd (S.addLibraryCard plains pid gs)
-   in List.foldl' add base [S.alice, S.alice, S.bob, S.bob]

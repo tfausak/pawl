@@ -21,11 +21,10 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
-import Pawl.PlaneswalkerCombatSpec (allTapped, allUntapped, announcesWay, atLife, jaceBoard, stillThere)
+import Pawl.PlaneswalkerCombatSpec (allTapped, allUntapped, atLife, jaceBoard, stillThere)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -41,7 +40,6 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -51,14 +49,11 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -90,37 +85,6 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
         after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith s "the Piker really was declared" (S.attackerDeclarationsOf after) mine
     Spec.assertBool s (allTapped forests after) "CR 508.1j: both Forests paid for it"
-  Spec.it s "CR 508.1j the way the attacker's controller announced is the way the toll is paid" $ do
-    -- The choice rule 118.13 does not state a moment for. Its three moments are a
-    -- cast or an activation (118.13a), a cost paid during a resolution (118.13b)
-    -- and a special action (118.13c); CR 508.1j's toll is none of them, and the
-    -- choice is still the payer's, so Cost.announceToll asks immediately before
-    -- CR 508.1i's window opens.
-    --
-    -- Norn's Annex is the card, {3}{W/P}{W/P} Artifact, "Creatures can't attack
-    -- you or planeswalkers you control unless their controller pays {W/P} for
-    -- each of those creatures" -- the only printing whose attack- or
-    -- block-declaration cost holds a symbol payable in more than one way.
-    --
-    -- ONE Plains and twenty life, so both of CR 107.4f's routes are payable and
-    -- the two legs differ in nothing but the answer. The Plains is what makes it
-    -- a real prompt: with no white source `announcesWay` would fall through to
-    -- the single life offer and both legs would read the same.
-    annex <- S.printingOf s registry "Norn's Annex"
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, lands) = imprisoning annex plains S.bob [piker] 1
-        legOf way = S.runPure (announcesWay way) gs (Combat.declareAttackers S.manaPerformer S.alice)
-        manaLeg = legOf PhyrexianPayment.PaysMana
-        lifeLeg = legOf PhyrexianPayment.PaysLife
-    Spec.assertEqWith s "CR 107.4f the life route was announced, so alice paid 2 life" (S.lifeOf S.alice lifeLeg) (Just 18)
-    Spec.assertBool s (allUntapped lands lifeLeg) "and the Plains is still untapped"
-    Spec.assertEqWith s "CR 107.4f the mana route was announced on the same board, so alice's life is untouched" (S.lifeOf S.alice manaLeg) (Just 20)
-    Spec.assertBool s (allTapped lands manaLeg) "and the Plains paid instead"
-    -- Both legs PAID, so the difference above is the announcement and not one leg
-    -- failing CR 508.1j and rewinding the declaration.
-    Spec.assertEqWith s "CR 508.1k the mana leg's Piker attacks" (S.attackerDeclarationsOf manaLeg) mine
-    Spec.assertEqWith s "and so does the life leg's" (S.attackerDeclarationsOf lifeLeg) mine
   Spec.it s "CR 508.1j Hollow Warrior cannot tap a creature declared alongside it" $ do
     -- The attacking half of Hollow Warrior's criterion. It needs VIGILANCE to be
     -- observable at all: CR 508.1f taps every chosen creature before CR 508.1h-j
@@ -166,20 +130,6 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
         after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith s "both Pikers were declared" (S.attackerDeclarationsOf after) mine
     Spec.assertBool s (allTapped forests after) "CR 508.1h: all four Forests went"
-  Spec.it s "CR 508.1j partial payments are not allowed: three Forests do not buy two attacks" $ do
-    -- The same board one Forest short. CR 508.1's preamble -- "the declaration is
-    -- illegal; the game returns to the moment before the declaration" -- so it is
-    -- not that one Piker attacks and the other does not: NEITHER does, and the
-    -- three Forests that could have paid for one are untapped again.
-    prison <- S.printingOf s registry "Ghostly Prison"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, forests) = imprisoning prison forest S.bob [piker, piker] 3
-        after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "nothing was declared" (S.attackerDeclarationsOf after) []
-    Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
-    Spec.assertBool s (allUntapped forests after) "the Forests are untapped again"
-    Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
   Spec.it s "Ghostly Prison's ruling: a creature that can't attack you can still attack a planeswalker you control" $ do
     -- "Unless some effect explicitly says otherwise, a creature that can't attack
     -- you can still attack a planeswalker you control" (Ghostly Prison, 2014-02-01).
@@ -359,55 +309,6 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "nothing was declared" (S.attackerDeclarationsOf after) []
     Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
-  Spec.it s "CR 508.1j the payer orders the two taxing permanents: Hollow Warrior before Exalted Dragon" $ do
-    -- CR 508.1j's "in any order" read across TAXING PERMANENTS rather than across
-    -- one permanent's parts: an Exalted Dragon ("sacrifice a land") and a Hollow
-    -- Warrior ("tap an untapped creature you control") attacking together owe two
-    -- charges, and the payer says which is paid first.
-    --
-    -- Dryad Arbor is the whole board: alice's ONLY land and, once CR 508.1f has
-    -- tapped the two attackers, her only untapped creature. So each charge has
-    -- exactly one candidate and neither component prompts -- what the payer picks
-    -- is nothing but the order, and no answer to a later prompt can repair it.
-    --
-    -- Warrior first taps the Arbor and the Dragon then sacrifices it, a land being
-    -- no less a land for being tapped. Dragon first sacrifices it and leaves the
-    -- Warrior nothing untapped to tap, so CR 508.1j's "partial payments are not
-    -- allowed" rewinds the whole declaration.
-    dragon <- S.printingOf s registry "Exalted Dragon"
-    warrior <- S.printingOf s registry "Hollow Warrior"
-    arbor <- S.printingOf s registry "Dryad Arbor"
-    let (gs, mine, _) = S.combatBoardOf [dragon, warrior] []
-        (tree, board) = S.addPermanent arbor S.alice gs
-        -- Declares the two taxed creatures and leaves the Arbor home; the Arbor
-        -- is a legal attacker too, and one that attacked would be tapped and so
-        -- out of the Warrior's reach.
-        ordering :: [Natural] -> Prompt.Prompt r -> r
-        ordering order p = case p of
-          Prompt.DeclareAttackers {} -> mine
-          Prompt.OrderCombatTolls {} -> order
-          _ -> S.identityAnswer p
-        warriorFirst = S.runPure (ordering [1, 0]) board (Combat.declareAttackers S.manaPerformer S.alice)
-        dragonFirst = S.runPure (ordering [0, 1]) board (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "the payer's order: both were declared" (S.attackerDeclarationsOf warriorFirst) mine
-    Spec.assertEqWith s "and the Arbor paid both charges" (stillThere [tree] warriorFirst) 0
-    Spec.assertEqWith s "the gathered order: nothing was declared" (S.attackerDeclarationsOf dragonFirst) []
-    Spec.assertEqWith s "and CR 508.1j gave the Arbor back" (stillThere [tree] dragonFirst) 1
-    Spec.assertBool s (allUntapped [tree] dragonFirst) "the Warrior's tap was rewound with it"
-
--- retryAttackAnswer's twin for CR 509.1a: every candidate blocks the first
--- attacker on the first ask, and only `keep` does on the second.
-retryBlockAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Natural r
-retryBlockAnswer keep p = case p of
-  Prompt.DeclareBlockers _ _ mine attackers -> do
-    asked <- State.get
-    State.put (asked + 1)
-    pure $ case attackers of
-      [] -> Map.empty
-      a : _ ->
-        let blocking = if asked == 0 then mine else filter (\oid -> oid == keep) mine
-         in Map.fromList (fmap (\b -> (b, Set.singleton a)) blocking)
-  _ -> pure (S.identityAnswer p)
 
 -- `n` untapped Forests under `who`'s control, ids first. addForests with the
 -- payer as an argument: CR 509.1f's payer is the DEFENDING player, where CR
@@ -461,81 +362,6 @@ blockersOf attacker gs = Map.findWithDefault Set.empty attacker (Combat.Type.blo
 -- Rays group is where it is proved.
 blockCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
-  Spec.it s "CR 509.1d/509.1f blocking under an Oppressive Rays costs {3}, and the mana is paid" $ do
-    rays <- S.printingOf s registry "Oppressive Rays"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker] [piker]
-    case (mine, theirs) of
-      ([attacker], [blocker]) -> do
-        let (forests, board) = addForestsFor S.bob forest 3 (raying rays blocker gs)
-            after = S.runPure S.aggressiveAnswer board (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "the block really was declared" (blockersOf attacker after) (Set.singleton blocker)
-        Spec.assertBool s (allTapped forests after) "CR 509.1f: all three Forests paid for it"
-      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
-  Spec.it s "CR 509.1f partial payments are not allowed: two Forests do not buy the block" $ do
-    -- The same board one Forest short. CR 509.1's preamble -- "the declaration is
-    -- illegal; the game returns to the moment before the declaration" -- so the
-    -- creature does not block at all, and the two Forests that could have paid
-    -- part of the toll are untapped.
-    rays <- S.printingOf s registry "Oppressive Rays"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker] [piker]
-    case (mine, theirs) of
-      ([attacker], [blocker]) -> do
-        let (forests, board) = addForestsFor S.bob forest 2 (raying rays blocker gs)
-            after = S.runPure S.aggressiveAnswer board (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "nothing is blocking the attacker" (blockersOf attacker after) Set.empty
-        Spec.assertBool s (allUntapped forests after) "and the Forests are untapped"
-      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
-  Spec.it s "CR 509.1 the rewound declaration is made again: the taxed blocker is dropped and the free one blocks" $ do
-    -- attackCostSpec's retry case on the blocking side, CR 509.1's preamble being
-    -- word for word CR 508.1's. Two blockers, exactly one of them enchanted, and
-    -- two Forests -- so the pair costs {3} and cannot be paid, while the untaxed
-    -- blocker alone costs nothing.
-    --
-    -- TWO blockers, one untaxed, is load-bearing: with a single taxed blocker
-    -- there is no smaller legal declaration and both readings of the preamble
-    -- agree on Set.empty.
-    rays <- S.printingOf s registry "Oppressive Rays"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker] [piker, piker]
-    case (mine, theirs) of
-      ([attacker], [taxed, free]) -> do
-        let (forests, board) = addForestsFor S.bob forest 2 (raying rays taxed gs)
-            ((_, after), asked) = State.runState (Engine.runGame (retryBlockAnswer free) board (Combat.declareBlockers S.manaPerformer)) 0
-        Spec.assertEqWith s "CR 509.1: the untaxed blocker blocks, where the rewind alone left the attacker unblocked" (blockersOf attacker after) (Set.singleton free)
-        Spec.assertBool s (allUntapped forests after) "CR 509.1f: the second declaration owes nothing, so no Forest was tapped"
-        Spec.assertEqWith s "CR 509.1's preamble asked for a fresh declaration" asked 2
-      _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
-  Spec.it s "CR 509.1d the total is per CREATURE, not per pair: a Palace Guard blocking two owes {3} once" $ do
-    -- CR 509.1d totals the cost over the CHOSEN CREATURES, and Palace Guard blocks
-    -- any number of attackers -- so one taxed creature blocking two attackers owes
-    -- its share once. Three Forests are exactly {3}: an engine that charged per
-    -- PAIR would owe {6}, fail CR 509.1f and block nothing, which is what the
-    -- first assertion reads.
-    rays <- S.printingOf s registry "Oppressive Rays"
-    forest <- S.printingOf s registry "Forest"
-    palaceGuard <- S.printingOf s registry "Palace Guard"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker, piker] [palaceGuard]
-    case (mine, theirs) of
-      ([first, second], [guard]) -> do
-        let (forests, board) = addForestsFor S.bob forest 3 (raying rays guard gs)
-            blockBoth :: Prompt.Prompt r -> r
-            blockBoth p = case p of
-              Prompt.DeclareBlockers _ _ blockers attackers -> Map.fromList (fmap (\b -> (b, Set.fromList attackers)) blockers)
-              _ -> S.aggressiveAnswer p
-            after = S.runPure blockBoth board (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith
-          s
-          "the Guard is blocking both attackers"
-          (blockersOf first after, blockersOf second after)
-          (Set.singleton guard, Set.singleton guard)
-        Spec.assertBool s (allTapped forests after) "and the {3} was paid once"
-      _ -> Spec.assertFailure s "fixture should have two attackers and a Palace Guard"
   Spec.it s "CR 509.1c a Prized Unicorn does not force a block an Oppressive Rays taxes" $ do
     -- THE COST CLAUSE: "if a creature can't block unless a player pays a cost,
     -- that player is not required to pay that cost, even if blocking with that
@@ -584,27 +410,6 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertBool s (allUntapped forests taxedRun) "and no mana was spent"
       _ -> Spec.assertFailure s "fixture should have a Unicorn and a blocker"
 
-  Spec.it s "CR 509.1d a cost to block that is not mana sacrifices a land" $ do
-    -- CR 509.1d's list past its first item, attackCostSpec's Exalted Dragon case
-    -- on the blocking side. SYNTHETIC, and it stays so now that Hollow Warrior is
-    -- in the pool: this case wants a non-mana block toll on an AURA subject, which
-    -- Hollow Warrior (Affected.Matching Filter.IsSource) does not give, and a
-    -- SACRIFICE rather than a tap.
-    --
-    -- bob pays, and bob's lands are the ones that go: CR 509.1a makes every chosen
-    -- blocker one the defending player controls.
-    tithe <- S.printingOf s registry "Synthetic Blocking Tithe"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker] [piker]
-    case (mine, theirs) of
-      ([attacker], [blocker]) -> do
-        let (forests, board) = addForestsFor S.bob forest 2 (raying tithe blocker gs)
-            after = S.runPure S.aggressiveAnswer board (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith s "CR 509.1f: one of the two lands was sacrificed" (stillThere forests after) 1
-        Spec.assertEqWith s "and the block really was declared" (blockersOf attacker after) (Set.singleton blocker)
-        Spec.assertBool s (allUntapped (filter (\oid -> Set.member oid (GameState.battlefield after)) forests) after) "the surviving land was not tapped: this toll is not mana"
-      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 509.1f Hollow Warrior cannot tap itself to pay for its own block" $ do
     -- Hollow Warrior: "This creature can't attack or block unless you tap an
     -- untapped creature you control not declared as an attacking or blocking
@@ -673,28 +478,6 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertBool s (not (allUntapped [second] declared)) "CR 509.1f: the Warrior the rewind released is what paid"
       _ -> Spec.assertFailure s "fixture should have a Piker and two Warriors"
 
--- Block the first attacker with ONE named creature, and pay a tap toll with one
--- named permanent, filtered against what the prompt actually offers.
---
--- Not S.aggressiveAnswer, which blocks with every creature bob controls: that
--- declares the spare a blocker too, and Hollow Warrior's criterion excludes a
--- creature declared as a blocker this combat -- Combat.declaredBlockers is
--- written ahead of CR 509.1f's payment. The toll would then have nobody to tap
--- on any of the four boards below, and the case would read the same under both
--- readings of the gate.
-blockingWith :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-blockingWith who tapping p = case p of
-  Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
-    [] -> Map.empty
-    a : _ -> Map.singleton who (Set.singleton a)
-  -- Ashaya's own text is "NONTOKEN creatures you control", not "other", so on
-  -- the boards that carry it Ashaya is itself an untapped undeclared creature
-  -- bob controls and the count-1 toll has two candidates. Pinned by identity
-  -- rather than by position, so the case reads the same whichever order
-  -- Cost.tapCandidates hands them over in.
-  Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (== tapping) candidates)
-  _ -> S.aggressiveAnswer p
-
 -- CR 305.7 as the SIX readers in this module read it, which is one shared gate:
 -- Pawl.Engine.Projection.liveAfterLayers. Ashaya, Soul of the Wild makes its
 -- controller's nontoken creatures Forest LANDS at layer 4, and Blood Moon then
@@ -729,9 +512,8 @@ blockingWith who tapping p = case p of
 -- one: Glacial Crasher ("this creature can't attack unless you control a
 -- Mountain") is no witness for the restriction reader, since Blood Moon makes
 -- every nonbasic land a Mountain and the gate is satisfied whether or not the
--- Crasher's own sentence survived. The block-cost case has a second such trap of
--- its own, which is why it carries the blockingWith answerer above rather than
--- S.aggressiveAnswer.
+-- Crasher's own sentence survived. The block-cost case
+-- (data/scenarios/combat-cost) has a second such trap of its own.
 landSubtypeStripSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
   Spec.it s "CR 305.7 an animated Bonded Construct set to Mountain may attack alone" $ do
@@ -839,48 +621,6 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
     -- want of mana (CR 508.1's preamble undoes an unpayable declaration whole).
     Spec.assertEqWith s "the Piker attacked anyway" (S.attackerDeclarationsOf (declared stripped)) mine
     Spec.assertBool s (allUntapped forests (declared stripped)) "and not one Forest went"
-  Spec.it s "CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block" $ do
-    -- Pawl.Engine.BlockCost.costsOn, this module's sixth reader of the shared
-    -- gate and the last to get a case. Discriminating it wants a cost to BLOCK
-    -- printed on a nontoken creature, since Ashaya animates nontoken creatures.
-    -- Hollow Warrior {4} 4/4 ("This creature can't attack or block unless you
-    -- tap an untapped creature you control not declared as an attacking or
-    -- blocking creature this combat") is the only such printing in
-    -- data/cards/: the other two files carrying a Face.blockCosts entry,
-    -- oppressive-rays.json and synthetic-blocking-tithe.json, are Auras
-    -- whose subject is the enchanted creature, which Ashaya can never reach.
-    --
-    -- Both extras go under BOB, since CR 509.1a chooses blockers from the
-    -- DEFENDING player's creatures and Ashaya animates its own controller's.
-    --
-    -- The toll is read off the spare Piker's tap state, which is CR 509.1f's
-    -- payment exactly. The spare is part of the fixture rather than one of the
-    -- extras because it has to stand on all four boards: without an eligible
-    -- creature the toll is unpayable and the base leg reads False for the wrong
-    -- reason.
-    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
-    bloodMoon <- S.printingOf s registry "Blood Moon"
-    warrior <- S.printingOf s registry "Hollow Warrior"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (base, mine, theirs) = attacking [piker] [warrior, piker]
-        with extras = withPermanents S.bob extras base
-    case (mine, theirs) of
-      ([attacker], [blocker, spare]) -> do
-        let declared b = S.runPure (blockingWith blocker spare) b (Combat.declareBlockers S.manaPerformer)
-            paid b = allTapped [spare] (declared b)
-            stripped = with [ashaya, bloodMoon]
-        Spec.assertEqWith
-          s
-          "the tap is paid until Ashaya and Blood Moon are both on the battlefield"
-          (paid base, paid (with [ashaya]), paid (with [bloodMoon]), paid stripped)
-          (True, True, True, False)
-        -- Two anti-vacuity legs, and the first is the one that matters: nothing
-        -- was tapped because nothing was owed, not because the declaration was
-        -- refused for want of a creature to tap (CR 509.1's preamble unwrites an
-        -- unpayable declaration whole).
-        Spec.assertEqWith s "the Warrior blocked anyway" (blockersOf attacker (declared stripped)) (Set.singleton blocker)
-        Spec.assertBool s (allUntapped [spare] (declared stripped)) "and the spare never went"
-      _ -> Spec.assertFailure s "fixture should have an attacker, a Warrior and a spare"
 
 -- alice attacks with one creature per printing in `mine`; bob defends with a
 -- Goblin Piker, holds Curtain of Light and the two Plains that pay its {1}{W},
@@ -1033,26 +773,6 @@ soloFoliageBoard forest attacker foliage =
       stocked = snd (S.addLibraryCard forest S.bob withCard)
    in (stocked, ours)
 
--- Attack bob with everything but `carols`, which attacks carol (CR 802.3), and
--- decline every block.
-splitAttack :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-splitAttack carols p = case p of
-  Prompt.ChooseAttackTarget _ _ oid options ->
-    let want = if oid == carols then S.carol else S.bob
-     in Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer want) (NonEmpty.toList options))
-  Prompt.DeclareBlockers {} -> Map.empty
-  _ -> S.aggressiveAnswer p
-
--- splitAttack, casting whatever is castable, and answering CR 509.4's choice
--- with `carols` if offered, else `chosen` -- filtering the offer, so an attacker
--- the engine withholds cannot be picked.
-interpose :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-interpose carols chosen p = case p of
-  Prompt.ChoosePermanent _ _ _ options ->
-    Maybe.fromMaybe (NonEmpty.head options) (List.find (`List.elem` NonEmpty.toList options) [carols, chosen])
-  Prompt.ChooseAction {} -> S.castAnswer p
-  _ -> splitAttack carols p
-
 -- Decline every block -- bob has nothing to declare anyway -- cast whatever is
 -- castable, and aim the target at `victim`. The offered set is FILTERED rather
 -- than replaced, so a leg whose target the card's own slot does not admit takes
@@ -1110,14 +830,6 @@ aetherAnswer plasm golem evangel decide p = case p of
   Prompt.ChooseOptional _ _ _ _ cIdx _ -> decide cIdx
   Prompt.ChooseCardInHand _ _ _ offered ->
     Maybe.fromMaybe (NonEmpty.head offered) (List.find (== evangel) (NonEmpty.toList offered))
-  _ -> S.aggressiveAnswer p
-
--- Declare one blocker against one attacker and answer everything else the
--- default way. The declaration twin of aetherAnswer's own, for the leg that has
--- no trigger to answer.
-declareBlock :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-declareBlock blocker attacker p = case p of
-  Prompt.DeclareBlockers {} -> Map.singleton blocker (Set.singleton attacker)
   _ -> S.aggressiveAnswer p
 
 -- The ids Combat.blockers holds for an attacker, narrowed to the ones still on
@@ -1289,31 +1001,6 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertEqWith s "control: nothing is blocking anything" (Combat.Type.blockers (GameState.combat uncast)) Map.empty
         Spec.assertEqWith s "control: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob uncast)) 1
       _ -> Spec.assertFailure s "fixture should have two attackers"
-  -- CR 509.4's MAIN clause: the effect names no attacker, so the Bear's
-  -- controller chooses one as it enters, among those CR 506.3e leaves it able
-  -- to block. Three seats, so "attacking bob" and "attacking" differ: alice
-  -- sends the Thopter and the Prey at bob and the Piker at carol.
-  --
-  -- The answer prefers the Piker, then the Prey -- never the head of the list.
-  -- Skipping the prompt blocks the Thopter (bob at 19); offering the Piker
-  -- blocks it (bob at 17). Only the filtered, asked road leaves bob at 18.
-  Spec.it s "CR 509.4 whole card: Synthetic Sudden Interposition's Bear blocks the attacker its controller chooses" $ do
-    forest <- S.printingOf s registry "Forest"
-    thopter <- S.printingOf s registry "Spined Thopter"
-    prey <- S.printingOf s registry "Sacred Prey"
-    piker <- S.printingOf s registry "Goblin Piker"
-    interposition <- S.printingOf s registry "Synthetic Sudden Interposition"
-    case S.threePlayerCombat [thopter, prey, piker] [] [] of
-      (gs0, [_, ground, carols], _, _) -> do
-        let lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 [1 :: Int, 2]
-            gs = snd (S.addHandCard interposition S.bob lands)
-            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (splitAttack carols) gs
-            blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) (interpose carols ground) atBlockers
-            atEnd = runToEndOfCombat (interpose carols ground) atBlockers
-        Spec.assertEqWith s "CR 509.4 / 506.3e: bob chose the Prey from the attackers at him, so only the Thopter's 2 connects" (S.lifeOf S.bob atEnd) (Just 18)
-        Spec.assertEqWith s "CR 509.4: the Bear is blocking the Prey" (Combat.blockersOf ground blocking) (Set.fromList (S.tokensOf blocking))
-        Spec.assertEqWith s "and carol's attacker was never offered, so its 2 reaches carol" (S.lifeOf S.carol atEnd) (Just 18)
-      _ -> Spec.assertFailure s "fixture should have three attackers"
   -- CR 509.3d's third sentence -- "In addition, it will trigger if a creature is
   -- put onto the battlefield blocking that creature" -- the one form of CR 509.3
   -- that CR 509.4's "never blocked" leaves standing. Rules 509.3a and 509.3b
@@ -1455,61 +1142,6 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertBool s (List.elem evangel (Game.zoneMembers Zone.Hand S.bob atEnd)) "the declined clause left the Evangel in hand"
         Spec.assertBool s (not (S.onBattlefield plasm atEnd)) "and Aetherplasm did return to hand, so the leg differs from the whole-card one in the second may alone"
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
-  -- CR 509.4's second sentence -- a creature put onto the battlefield blocking
-  -- is "blocking" but "never blocked" -- and CR 509.3b's last sentence, which
-  -- says the same thing from the trigger's side: "It won't trigger if the
-  -- creature is put onto the battlefield blocking."
-  --
-  -- Until Aetherplasm this was a REGRESSION FENCE. The only card that could put
-  -- a creature onto the battlefield blocking minted a vanilla token, which can
-  -- bear no trigger, so deleting matchesTrigger's read of the entry's
-  -- BecameBlocking.producer left the whole suite green. A creature
-  -- CARD arrives with its own text.
-  --
-  -- Loyal Sentry {W} 1/1 -- "Whenever this creature blocks a creature, destroy
-  -- that creature and this creature." It is already in the pool, it already
-  -- reads `thatAttacker` off this very trigger condition, and its effect is
-  -- loud: if the exclusion leaked, the Golem would be DESTROYED outright rather
-  -- than merely taking a 1/1's damage.
-  --
-  -- A PAIR differing in exactly one thing -- how the Sentry came to block the
-  -- Golem. Same card, same attacker, same seats, same 2/2: put onto the
-  -- battlefield blocking on one leg, DECLARED on the other. CR 509.3b's second
-  -- sentence ("It triggers if the creature is declared as a blocker") is what
-  -- makes the control leg the exclusion's opposite rather than an unrelated
-  -- board.
-  Spec.it s "CR 509.3b a creature put onto the battlefield blocking never blocked, so its own blocks trigger stays silent" $ do
-    golemP <- S.printingOf s registry "Icehide Golem"
-    plasmP <- S.printingOf s registry "Aetherplasm"
-    sentryP <- S.printingOf s registry "Loyal Sentry"
-    case (aetherBoard golemP plasmP sentryP, S.combatBoardOf [golemP] [sentryP]) of
-      ((gs, [golem], [plasm], sentry), (declaredGs, [otherGolem], [otherSentry])) -> do
-        let golemName = S.nameOf (Printing.card golemP)
-            sentryName = S.nameOf (Printing.card sentryP)
-            entered =
-              runToEndOfCombat
-                (aetherAnswer plasm golem sentry (const OptionalDecision.Exercises))
-                (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs)
-            declared =
-              runToEndOfCombat
-                (declareBlock otherSentry otherGolem)
-                (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer declaredGs)
-        -- GAMEPLAY FIRST, and the pair reads the same quantity on both legs: is
-        -- the attacker still there. Silent, the Sentry only trades its 1 power
-        -- into a 2/2 and dies to the Golem's 2; leaked, the ability destroys the
-        -- Golem outright.
-        Spec.assertEqWith s "CR 509.3b: the Sentry entered blocking, so it never blocked and the Golem survives its 1 damage" (length (battlefieldNamed golemName S.alice entered)) 1
-        Spec.assertEqWith s "control: the SAME Sentry DECLARED as a blocker does trigger, and the Golem is destroyed" (length (battlefieldNamed golemName S.alice declared)) 0
-        -- Anti-vacuity: the Sentry really did arrive and really did block, so its
-        -- silence is CR 509.3b and not a clause that never ran.
-        Spec.assertBool s (Combat.isBlocked golem entered) "CR 509.1h: the Golem was a blocked creature on the entry leg"
-        Spec.assertEqWith s "and the Sentry is gone, having taken the Golem's 2 as a blocking creature (CR 510.1c)" (length (battlefieldNamed sentryName S.bob entered)) 0
-        Spec.assertBool s (not (S.onBattlefield plasm entered)) "Aetherplasm returned to hand, which is what put the Sentry out"
-        -- CR 509.3b again on the control leg, in the direction it DOES fire: the
-        -- Sentry destroys itself too, which a mere trade would also do, so the
-        -- Golem above is the assertion that separates them.
-        Spec.assertEqWith s "control: and the Sentry destroyed itself, as its own text says" (length (battlefieldNamed sentryName S.bob declared)) 0
-      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker on each board"
   -- CR 509.4 over Effect.CreateCopy rather than Effect.Create, and CR 608.2f's
   -- loop over the whole batch, on one board.
   --
@@ -1560,45 +1192,6 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events atEnd))) "CR 509.4: no blocker was declared on this board"
         Spec.assertBool s (S.onBattlefield guard atEnd && S.onBattlefield brigade atEnd) "and both attackers survived their copy's damage, which is what keeps the tokens alive to be exiled"
       _ -> Spec.assertFailure s "fixture should have two attackers"
-  -- CR 603.6a's "all permanents on the battlefield (including the newcomers) are
-  -- checked for any enters-the-battlefield triggers that match the event", over CR
-  -- 608.2f's batch. Mirror Match's loop is ONE action taken on the attackers, so
-  -- its tokens are put onto the battlefield by one event and each of them is among
-  -- the permanents checked against the others' arrival.
-  --
-  -- THE ATTACKERS ARE SOUL WARDENS {W} Creature -- Human Cleric 1/1, "Whenever
-  -- another creature enters, you gain 1 life" (Scryfall, 2026-09-18), which makes
-  -- the tokens Soul Wardens too and bob's life the count. Three of them, not two:
-  -- the three readings are 6 under the rule (each token sees the other two), 3
-  -- with the tokens entering one after another (the first sees two, the second
-  -- one, the last none) and 0 with no token minted, where at two attackers the
-  -- first two readings are 2 and 1 and an off-by-one anywhere reproduces either.
-  --
-  -- ALICE'S WARDENS ARE THE CONTROL, and they are why the assertion is a
-  -- DIFFERENCE rather than a life total: all three stood on the battlefield before
-  -- the spell resolved, so each sees all three arrivals however they are grouped.
-  -- Their 9 says the tokens really did enter, which is what separates a wrong
-  -- grouping from a loop that minted nothing.
-  Spec.it s "CR 603.6a / 608.2f: every Mirror Match token sees every other one enter" $ do
-    island <- S.printingOf s registry "Island"
-    warden <- S.printingOf s registry "Soul Warden"
-    mirror <- S.printingOf s registry "Mirror Match"
-    let (gs0, attackers, _) = S.combatBoardOf [warden, warden, warden] []
-        lands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) gs0 [1 :: Int, 2, 3, 4, 5, 6]
-        (_, withCard) = S.addHandCard mirror S.bob lands
-        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer withCard
-        -- Stopped at the combat damage step, where the spell has resolved and
-        -- every trigger it set off has, but CR 510.2's damage has not yet traded
-        -- the 1/1 tokens off against the 1/1 attackers they block.
-        blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) castMirrorMatch atBlockers
-        gained pid = (-) <$> S.lifeOf pid blocking <*> S.lifeOf pid atBlockers
-        liveTokens g = filter (`S.onBattlefield` g) (S.tokensOf g)
-    -- GAMEPLAY FIRST, ahead of every count below: bob's gain is one per token per
-    -- OTHER token, which only a batch that enters as one event produces.
-    Spec.assertEqWith s "CR 603.6a / 608.2f: each of the three tokens saw the other two enter, so bob gained 6" (gained S.bob) (Just 6)
-    Spec.assertEqWith s "control: alice's three Wardens were already there, so each saw all three arrivals whatever the grouping" (gained S.alice) (Just 9)
-    Spec.assertEqWith s "CR 707.1: one copy per attacker, all three alive to be counted" (length (liveTokens blocking)) 3
-    Spec.assertEqWith s "and the three Wardens they copied are still attacking" (length (filter (`S.onBattlefield` blocking) attackers)) 3
 
 -- CR 506.7b's window, "only during combat after blockers are declared", proved
 -- step by step on ONE board.
@@ -1673,31 +1266,6 @@ castingWindowSpec s registry = Spec.describe s "CastingWindow" $ do
 -- not.
 exertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exertSpec s registry = Spec.describe s "Exert" $ do
-  Spec.it s "CR 508.1g / 701.43d exerting an attacker fires its linked trigger" $ do
-    initiate <- S.printingOf s registry "Glory-Bound Initiate"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [initiate, piker] []
-        exerted = S.runCombat (exertAnswer OptionalDecision.Exercises) gs
-        declined = S.runCombat (exertAnswer OptionalDecision.Declines) gs
-    case mine of
-      [] -> Spec.assertFailure s "the fixture should have put two attackers on the board"
-      initiateId : _ -> do
-        -- The pair pins BOTH halves of "+1/+3": the misreading +3/+1 would leave a
-        -- 6/2 here and take bob to 12 below, so neither number is a coincidence
-        -- with the other.
-        Spec.assertEqWith s "CR 701.43d the exerted Initiate is 4/4" (S.powerToughnessOf initiateId exerted) (Just (4, 4))
-        Spec.assertEqWith s "the declined Initiate is still 3/1" (S.powerToughnessOf initiateId declined) (Just (3, 1))
-        -- The Piker's 2 damage is in both totals, which is what makes the
-        -- difference between them the Initiate's power alone.
-        Spec.assertEqWith s "bob took 4 from the exerted Initiate and 2 from the Piker" (S.lifeOf S.bob exerted) (Just 14)
-        Spec.assertEqWith s "bob took 3 and 2 without the exert" (S.lifeOf S.bob declined) (Just 15)
-        -- CR 702.15b: the lifelink half of the same trigger, and the second thing
-        -- that separates the two boards.
-        Spec.assertEqWith s "the granted lifelink gained alice 4" (S.lifeOf S.alice exerted) (Just 24)
-        Spec.assertEqWith s "no lifelink without the exert" (S.lifeOf S.alice declined) (Just 20)
-        -- CR 701.43a's own event, which is what the linked trigger matched.
-        Spec.assertBool s (elem (GameEvent.Exerted initiateId) (S.eventsOf exerted)) "CR 701.43a the exert recorded its event"
-        Spec.assertBool s (notElem (GameEvent.Exerted initiateId) (S.eventsOf declined)) "and a declined exert records none"
   Spec.it s "CR 701.43a / 701.43b an exerted attacker misses one untap step, then untaps" $ do
     initiate <- S.printingOf s registry "Glory-Bound Initiate"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1755,117 +1323,6 @@ exertSpec s registry = Spec.describe s "Exert" $ do
         Spec.assertEqWith s "CR 502.3 alice's untap step does not reach a permanent bob controls" (tapStateOf initiateId aliceUntapped) (Just TapState.Tapped)
         Spec.assertEqWith s "CR 701.43b the rider expired at that step all the same" (tapStateOf initiateId (untapFor S.alice handedBack)) (Just TapState.Untapped)
       _ -> Spec.assertFailure s "the fixture should have put two attackers on the board"
-
--- Yavimaya Steelcrusher {1}{R} Creature -- Ape Warrior 2/2, "Enlist" plus "{1},
--- Sacrifice this creature: Destroy target artifact." The pool's producer for
--- Keyword.Enlist, and so for rule 508.1g's second optional cost and for CR
--- 702.154b's linked reflexive ability.
---
--- Every case runs a PAIR of boards differing in exactly one thing -- the answer
--- to Prompt.ChooseEnlist, or one creature's summoning sickness -- so no
--- assertion can pass because the board could not have shown the difference. The
--- numbers are all distinct: a 2/2 Steelcrusher, a 3/3 Hill Giant to enlist and a
--- 2/1 Goblin Piker that stays home, so +3/+0 cannot be confused with the
--- Giant's toughness or with a flat bonus.
-enlistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-enlistSpec s registry = Spec.describe s "Enlist" $ do
-  Spec.it s "CR 702.154a enlisting a 3-power creature gives the attacker +3/+0, and the tapped creature is not attacking" $ do
-    crusher <- S.printingOf s registry "Yavimaya Steelcrusher"
-    giant <- S.printingOf s registry "Hill Giant"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [crusher, giant, piker] []
-    case mine of
-      crusherId : giantId : pikerId : _ -> do
-        let enlisted = S.runCombat (enlistAnswer [crusherId] (Just giantId)) gs
-            declined = S.runCombat (enlistAnswer [crusherId] Nothing) gs
-        -- The gameplay-level assertion this unit exists to prove, ahead of every
-        -- proxy below: rule 702.154a's X is the TAPPED creature's power, so a 2/2
-        -- that enlisted a 3/3 is a 5/2 and not a 5/5.
-        Spec.assertEqWith s "CR 702.154a the enlisting Steelcrusher is 5/2" (S.powerToughnessOf crusherId enlisted) (Just (5, 2))
-        Spec.assertEqWith s "and it is still 2/2 without the enlist" (S.powerToughnessOf crusherId declined) (Just (2, 2))
-        -- The pump reached combat damage, which is what makes the reading above a
-        -- behaviour rather than a characteristic nobody read.
-        Spec.assertEqWith s "bob took 5 from the enlisting Steelcrusher" (S.lifeOf S.bob enlisted) (Just 15)
-        Spec.assertEqWith s "and 2 without the enlist" (S.lifeOf S.bob declined) (Just 18)
-        -- CR 702.154a's cost: the Giant is tapped, and only where the enlist
-        -- happened.
-        Spec.assertEqWith s "CR 702.154a the enlisted creature is tapped" (tapStateOf giantId enlisted) (Just TapState.Tapped)
-        Spec.assertEqWith s "and untapped where the enlist was declined" (tapStateOf giantId declined) (Just TapState.Untapped)
-        -- "that you didn't choose to attack with": the Giant paid a cost, it did
-        -- not join the attack, so bob's life above is the Steelcrusher's alone.
-        Spec.assertBool s (notElem giantId (attackersOf enlisted)) "CR 702.154a the enlisted creature is not an attacker"
-        Spec.assertBool s (notElem pikerId (attackersOf enlisted)) "and neither is the Piker that stayed home"
-      _ -> Spec.assertFailure s "the fixture should have put three creatures on the board"
-  -- CR 702.154a's third conjunct, as a pair of boards differing in exactly one
-  -- thing: the Giant's summoning sickness. Both boards answer ChooseEnlist the
-  -- same way, so a sick Giant that WAS offered would tap and pump exactly as the
-  -- settled one does.
-  Spec.it s "CR 702.154a a summoning-sick creature is not offered, and enlists nothing" $ do
-    crusher <- S.printingOf s registry "Yavimaya Steelcrusher"
-    giant <- S.printingOf s registry "Hill Giant"
-    let (gs, mine, _) = S.combatBoardOf [crusher, giant] []
-    case mine of
-      crusherId : giantId : _ -> do
-        let sickBoard = S.runPure S.identityAnswer gs (State.modify' (makeSick giantId))
-            settled = S.runCombat (enlistAnswer [crusherId] (Just giantId)) gs
-            sick = S.runCombat (enlistAnswer [crusherId] (Just giantId)) sickBoard
-        Spec.assertEqWith s "CR 702.154a the sick creature could not be enlisted, so the attacker is still 2/2" (S.powerToughnessOf crusherId sick) (Just (2, 2))
-        Spec.assertEqWith s "where the settled one pumped it to 5/2" (S.powerToughnessOf crusherId settled) (Just (5, 2))
-        Spec.assertEqWith s "and the sick creature was not tapped" (tapStateOf giantId sick) (Just TapState.Untapped)
-        -- The prompt itself, so the negative above is "never offered" rather than
-        -- "offered and refused".
-        Spec.assertEqWith s "one Prompt.ChooseEnlist was raised for the settled creature" (enlistAsks (answersFor (enlistAnswer [crusherId] (Just giantId)) gs S.combatGame)) 1
-        Spec.assertEqWith s "and none for the sick one" (enlistAsks (answersFor (enlistAnswer [crusherId] (Just giantId)) sickBoard S.combatGame)) 0
-      _ -> Spec.assertFailure s "the fixture should have put two creatures on the board"
-
-  -- CR 702.154a's SECOND conjunct, "that you didn't choose to attack with",
-  -- which only a VIGILANT co-attacker can separate from the first: CR 508.1f
-  -- taps every other attacker before rule 508.1g is reached, so an untapped
-  -- creature that was declared exists only under CR 702.20b. The pair differs in
-  -- exactly one thing -- whether Kemba's Legion was declared as an attacker.
-  Spec.it s "CR 702.154a a vigilant co-attacker is untapped and still cannot be enlisted" $ do
-    crusher <- S.printingOf s registry "Yavimaya Steelcrusher"
-    legion <- S.printingOf s registry "Kemba's Legion"
-    let (gs, mine, _) = S.combatBoardOf [crusher, legion] []
-    case mine of
-      crusherId : legionId : _ -> do
-        let together = S.runCombat (enlistAnswer [crusherId, legionId] (Just legionId)) gs
-            aloneBoard = S.runCombat (enlistAnswer [crusherId] (Just legionId)) gs
-        Spec.assertEqWith s "CR 702.154a a declared attacker cannot be enlisted, so the Steelcrusher is still 2/2" (S.powerToughnessOf crusherId together) (Just (2, 2))
-        Spec.assertEqWith s "and the same Legion left at home pumps it to 6/2" (S.powerToughnessOf crusherId aloneBoard) (Just (6, 2))
-        -- CR 702.20b is what makes the pair a test of the second conjunct rather
-        -- than of the first: the Legion is untapped on BOTH boards.
-        Spec.assertEqWith s "CR 702.20b the vigilant attacker is untapped" (tapStateOf legionId together) (Just TapState.Untapped)
-        Spec.assertEqWith s "and the enlisted one is tapped by the cost" (tapStateOf legionId aloneBoard) (Just TapState.Tapped)
-        Spec.assertEqWith s "no Prompt.ChooseEnlist was raised where the only candidate attacked" (enlistAsks (answersFor (enlistAnswer [crusherId, legionId] (Just legionId)) gs S.combatGame)) 0
-      _ -> Spec.assertFailure s "the fixture should have put two creatures on the board"
-
--- S.aggressiveAnswer with both of the declaration's prompts pinned: which
--- creatures attack, and which one the enlist taps. Pinned EXPLICITLY rather than
--- left to the fallthrough, which is a searching answerer and could repair a
--- mutation; the enlist answer is FILTERED against the offer, so an answer the
--- engine did not offer is never smuggled in.
-enlistAnswer :: [ObjectId.ObjectId] -> Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
-enlistAnswer declared chosen p = case p of
-  Prompt.DeclareAttackers _ _ offered -> filter (`elem` declared) offered
-  Prompt.ChooseEnlist _ _ _ offered -> List.find (\oid -> Just oid == chosen) (NonEmpty.toList offered)
-  _ -> S.aggressiveAnswer p
-
--- CR 302.6: the object as it entered rather than as addPermanent settled it.
-makeSick :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-makeSick oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
-
--- The responses one run recorded, Pawl.PreventionSpec's helper duplicated per
--- this suite's group-local convention.
-answersFor :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> [Response.Response]
-answersFor answer gs game = snd (Replay.record answer gs game)
-
-enlistAsks :: [Response.Response] -> Int
-enlistAsks responses =
-  let isEnlist r = case r of
-        Response.ChoseEnlist _ -> True
-        _ -> False
-   in length (filter isEnlist responses)
 
 -- S.aggressiveAnswer with Prompt.ChooseExert pinned, on Support's `attackTo`
 -- pattern: the rank-1 signature partially applies to the `forall r. Prompt r ->
@@ -2366,57 +1823,8 @@ conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttack
 -- An engine that rolled the head of the offer itself rather than honouring the
 -- answer collapses the pair onto the bob leg, and one that never landed the bind
 -- makes declining legal on both.
-randomPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+randomPlayerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 randomPlayerSpec s registry = Spec.describe s "RandomPlayer" $ do
-  Spec.it s "CR 608.2d the opponent randomness named is the one the requirement makes Ruhan attack" $ do
-    ruhan <- S.printingOf s registry "Ruhan of the Fomori"
-    let (board, mine, _, _) = S.threePlayerCombat [ruhan] [] []
-        atCarol = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (ruhanAnswer S.carol) board
-        atBob = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (ruhanAnswer S.bob) board
-    case mine of
-      [ruhanId] -> do
-        -- THE GAMEPLAY ASSERTION. The requirement names carol, so CR 508.1d
-        -- refuses both the empty declaration and the one aimed at bob -- who
-        -- CR 802.2 makes just as attackable.
-        Spec.assertBool
-          s
-          (not (Combat.legalAttackDeclaration S.alice [] atCarol))
-          "CR 508.1d: with carol named, declining disobeys the requirement randomness bound"
-        Spec.assertBool
-          s
-          (not (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.bob)] atCarol))
-          "and so does attacking bob, whom CR 802.2 leaves attackable"
-        Spec.assertBool
-          s
-          (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.carol)] atCarol)
-          "and attacking carol obeys it"
-        -- The paired board, one thing different: randomness named bob, so the
-        -- three assertions above hold with the seats swapped.
-        Spec.assertBool
-          s
-          (not (Combat.legalAttackDeclaration S.alice [] atBob))
-          "CR 508.1d: with bob named, declining disobeys it too"
-        Spec.assertBool
-          s
-          (not (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.carol)] atBob))
-          "and attacking carol is what is illegal on that board"
-        Spec.assertBool
-          s
-          (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.bob)] atBob)
-          "while attacking bob obeys it"
-        -- Supporting, and LAST so it cannot absorb a mutation the two above
-        -- should catch: the requirement really was stored against carol, not bob.
-        Spec.assertEqWith
-          s
-          "the stored requirement names carol"
-          (fmap ActiveAttackRequirement.defender (GameState.attackRequirements atCarol))
-          [AttackTarget.OfPlayer S.carol]
-        Spec.assertEqWith
-          s
-          "and the attacker is Ruhan"
-          (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements atCarol))
-          [RestrictedCreatures.Named ruhanId]
-      _ -> Spec.assertFailure s "fixture should have one Ruhan"
   Spec.it s "CR 104.3a the offer is the opponents still in the game, and never the controller" $ do
     ruhan <- S.printingOf s registry "Ruhan of the Fomori"
     let (board, _, _, _) = S.threePlayerCombat [ruhan] [] []
@@ -2735,27 +2143,6 @@ oneLandPerWindow decision lands p = case p of
 -- one board differing only in the answer to Prompt.ReverseManaAbilities.
 tollReversalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tollReversalSpec s registry = Spec.describe s "Reversal at a combat toll" $ do
-  -- Two Pikers under a Ghostly Prison owe {4}, and one Forest is tapped before
-  -- the window closes. Each window taps ONE Forest, so the second, smaller
-  -- declaration's {2} is payable only with the first window's {G} still
-  -- floating.
-  Spec.it s "CR 733.2 the kept mana pays the smaller declaration" $ do
-    prison <- S.printingOf s registry "Ghostly Prison"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, forests) = imprisoning prison forest S.bob [piker, piker] 3
-        run decision = State.runState (Engine.runGame (oneLandPerWindow decision forests) gs (Combat.declareAttackers S.manaPerformer S.alice)) noTollAsks
-        ((_, kept), keptAsks) = run OptionalDecision.Declines
-        ((_, reversed), reversedAsks) = run OptionalDecision.Exercises
-    Spec.assertEqWith s "CR 508.1j the second declaration was paid: one Piker attacks" (length (S.attackerDeclarationsOf kept)) 1
-    Spec.assertEqWith s "off the first window's Forest and the second's" (length (filter (\oid -> tapStateOf oid kept == Just TapState.Tapped) forests)) 2
-    Spec.assertEqWith s "with nothing left floating" (floating S.alice kept) 0
-    Spec.assertBool s (all (\oid -> List.elem oid mine) (S.attackerDeclarationsOf kept)) "and the attacker is one of alice's"
-    Spec.assertEqWith s "the payer who reverses cannot pay {2} off one Forest: nothing attacks" (S.attackerDeclarationsOf reversed) []
-    Spec.assertBool s (allUntapped forests reversed) "and every Forest is untapped"
-    Spec.assertEqWith s "alice was asked once, keeping" (tollReversals keptAsks) 1
-    Spec.assertBool s (tollReversals reversedAsks >= 1) "and asked at least once, reversing"
-
   -- Glory-Bound Initiate under Always Watching has vigilance, so CR 508.1f does
   -- not tap it and CR 508.1g exerts it untapped. The toll's window then taps it
   -- for Springleaf Drum's cost: the declaration and the window wrote two
@@ -2831,4 +2218,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   blockCostSpec s registry
   tollReversalSpec s registry
   exertSpec s registry
-  enlistSpec s registry

@@ -1,0 +1,159 @@
+{
+  "description": "CR 109.5 'you cast': an OPPONENT's infect creature spell fires nothing",
+  "note": "bob casts his Glistener Elf in his own main phase, where a creature spell can be cast; the Haskell test casts it on alice's board with timing set aside. The control file is alice casting her own copy, which poisons bob.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "af1"
+          },
+          {
+            "card": "Forest",
+            "label": "af2"
+          },
+          {
+            "card": "Mountain",
+            "label": "am1"
+          },
+          {
+            "card": "Mountain",
+            "label": "am2"
+          },
+          {
+            "card": "Hand of the Praetors",
+            "label": "hand"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Glistener Elf",
+            "label": "aelf"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "bf1"
+          },
+          {
+            "card": "Forest",
+            "label": "bf2"
+          },
+          {
+            "card": "Mountain",
+            "label": "bm1"
+          },
+          {
+            "card": "Mountain",
+            "label": "bm2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Glistener Elf",
+            "label": "belf"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$belf",
+          "mana": [
+            "$bf1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Glistener Elf",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "PlayerCounters": {
+          "player": "bob",
+          "kind": {
+            "type": "Poison"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "PlayerCounters": {
+          "player": "alice",
+          "kind": {
+            "type": "Poison"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "PlayerCounters": {
+          "player": "carol",
+          "kind": {
+            "type": "Poison"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    }
+  ]
+}

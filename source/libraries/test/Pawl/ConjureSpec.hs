@@ -872,23 +872,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           (fmap (\oid -> Set.toList (Projection.namesOf oid died)) (namedIn cubwardenName Zone.Graveyard died))
           [[cubwardenName]]
         Spec.assertEqWith s "setup: the merged permanent held the Cubwarden and the duplicate" (fmap (Seq.length . Game.componentsOf . Object.source) (Game.lookupObject host merged)) (Just 2)
-  -- CR 727.2's rebuild, the other road a merged permanent is split on
-  -- (Pawl.Engine.Setup.splitComponents): the restart shuffles every card into
-  -- its owner's library and draws, so the duplicate is a card among them and is
-  -- still the Piker. Hand and library both, since the draw decides
-  -- which it is in.
-  Spec.it s "CR 727.2/707.2 a duplicate of a Clone rebuilt out of a merge by a restart is the Piker again" $ do
-    fixture <- duplicateFixture s registry
-    case mergedOntoDuplicate fixture of
-      Nothing -> Spec.assertFailure s "the duplicate did not resolve onto the battlefield"
-      Just (_, merged) -> do
-        let restarted = snd (Engine.runGamePure S.identityAnswer merged (Setup.restartGame S.performer Set.empty S.alice))
-            clones = namedIn cloneName Zone.Library restarted <> namedIn cloneName Zone.Hand restarted
-        Spec.assertEqWith
-          s
-          "CR 727.2 the duplicate is a Goblin Piker in the new game, beside the original Clone"
-          (List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid restarted)) clones))
-          (List.sort [[cloneName], [goblinPiker]])
   -- The other side of CR 730.2: the duplicate is the mutating SPELL. A Clone
   -- copies a Cubwarden, Sinister Reflections duplicates it, so the card in hand
   -- is a Cubwarden printed Clone, and it is cast for its mutate cost over a

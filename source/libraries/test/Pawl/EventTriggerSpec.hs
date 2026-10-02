@@ -15,7 +15,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -32,8 +31,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Combat as Combat.Type
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1022,7 +1019,7 @@ auntieOolSpec s registry =
 -- sentence and a Filter that confused them would still answer right. carol is
 -- the seat that is neither the caster nor the ability's controller, and the
 -- opponent case below names all three players in its assertions.
-youngPyromancerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+youngPyromancerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 youngPyromancerSpec s registry =
   let elemental = CardName.MkCardName (Text.pack "Elemental Token")
       elementalsOf = S.countOnBattlefieldByName elemental
@@ -1050,24 +1047,6 @@ youngPyromancerSpec s registry =
               after = castAndResolve S.alice boilId gs
           Spec.assertEqWith s "no Elemental before the cast" (elementalsOf S.alice gs) 0
           Spec.assertEqWith s "exactly one Elemental token afterwards" (elementalsOf S.alice after) 1
-        -- The "you" half, moved on its own: the same instant, cast from the seat
-        -- to alice's left instead of hers. carol makes the board three-handed,
-        -- so "bob cast it" is not the same statement as "an opponent cast it".
-        Spec.it s "CR 109.5 'you cast': an OPPONENT's instant fires nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          pyromancer <- S.printingOf s registry "Young Pyromancer"
-          boil <- S.printingOf s registry "Boil"
-          let base = board mountain pyromancer
-              (bobsBoil, withBobs) = S.addHandCard boil S.bob base
-              (alicesBoil, gs) = S.addHandCard boil S.alice withBobs
-              byBob = castAndResolve S.bob bobsBoil gs
-              byAlice = castAndResolve S.alice alicesBoil gs
-          Spec.assertEqWith s "alice gets no Elemental from bob's cast" (elementalsOf S.alice byBob) 0
-          Spec.assertEqWith s "and neither does bob" (elementalsOf S.bob byBob) 0
-          Spec.assertEqWith s "and neither does carol" (elementalsOf S.carol byBob) 0
-          -- The same board, one caster apart: alice casting her own copy is what
-          -- proves the seat is the only thing the silence above turns on.
-          Spec.assertEqWith s "the same board fires for alice's own cast" (elementalsOf S.alice byAlice) 1
 
 -- The printed rider "This ability triggers only once each turn"
 -- (Pawl.Types.TriggerLimit), on top of the trigger event the group above covers.
@@ -1982,9 +1961,9 @@ blightChroniclerBoard s registry withSolemnity withOwnWatcher = do
 -- beside it. The one printing that watches either act, Avatar Aang, reads only
 -- its own controller's ("whenever YOU waterbend, earthbend, ..."; Scryfall
 -- oracle:earthbend, oracle:waterbend, oracle:airbend and oracle:firebend, every
--- card_faces entry read, 2026-09-19), and avatarAangSpec below is its case. The
--- watchers here read EVERY player's, which no printing does, so they are made
--- up -- data/cards/synthetic-stonelistener-adept.json and
+-- card_faces entry read, 2026-09-19), and data/scenarios/event-trigger holds
+-- its case. The watchers here read EVERY player's, which no printing does, so
+-- they are made up -- data/cards/synthetic-stonelistener-adept.json and
 -- data/cards/synthetic-tidecaller-scribe.json, both "Whenever a player
 -- [bend]s, put a +1/+1 counter on this creature". One trigger condition over
 -- one event, and the counter is an effect the engine already had.
@@ -2048,96 +2027,6 @@ aimedAt victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just victim) . Recipient.objectOf) offered) sets
   _ -> S.castAnswer p
 
--- alice activates the Leaper's sole activated ability, taking the substitution
--- that leaves `wanted` to pay with mana and tapping `tapped` for the rest, and
--- the ability resolves. Both answers are FILTERED against what the engine
--- offered rather than built, so an answer it did not offer fails the payment
--- visibly instead of being repaired.
-activateLeaper :: (Monad m) => Spec.Spec m n -> ManaCost.ManaCost -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
-activateLeaper s wanted tapped leaperId gs = case Projection.abilitiesOf leaperId gs of
-  ability : _ ->
-    let answer :: Prompt.Prompt r -> r
-        answer p = case p of
-          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just wanted) . Cost.Type.mana) candidates)
-          Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (`elem` tapped) candidates)
-          _ -> S.identityAnswer p
-        activated = S.runPure answer gs (Activate.activateAbility S.alice leaperId ability)
-     in pure (S.runPure answer activated Stack.resolveTop)
-  [] -> Spec.assertFailure s "expected the Leaper to carry an activated ability"
-
--- Avatar Aang's front face, "Whenever you waterbend, earthbend, firebend, or
--- airbend, draw a card. Then if you've done all four this turn, transform
--- Avatar Aang": CR 701.65b, CR 701.66b, CR 701.67c and CR 702.189b as one CR
--- 603.1b AnyOf, and the second sentence a CR 608.2c clause over CR 603.1b's
--- "all of those conditions" for the turn.
---
--- A PAIR of turns differing in one thing, the Earthbending Lesson: alice
--- airbends bob's Sol Ring with Airbending Lesson, waterbends through Geyser
--- Leaper, and attacks with Aang, whose own firebending 2 is the fourth verb.
--- Three of four draws three and leaves Aang on his front face; all four draws
--- four and turns him over as the last one resolves.
-avatarAangSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-avatarAangSpec s registry = Spec.describe s "Avatar Aang" $ do
-  Spec.it s "CR 603.1b Aang draws on each bending verb and transforms only once all four were done this turn" $ do
-    (aangId, all4) <- aangTurn s registry True
-    (_, three) <- aangTurn s registry False
-    -- The negative first: a condition that answers early turns Aang over on
-    -- the full turn too, and his back face then stops drawing.
-    Spec.assertEqWith s "CR 603.1b three of four leaves Aang on his front face" (Projection.namesOf aangId three) (Set.singleton (CardName.MkCardName (Text.pack "Avatar Aang")))
-    -- Four of Aang's draws, the Lesson's one and the Leaper's one.
-    Spec.assertEqWith s "CR 701.65b/701.66b/701.67c/702.189b Aang drew once per verb" (libraryDrawn all4) 6
-    Spec.assertEqWith s "CR 603.1b all four this turn transforms Aang" (Projection.namesOf aangId all4) (Set.singleton (CardName.MkCardName (Text.pack "Aang, Master of Elements")))
-    -- The proxy, after the behaviour: the three-verb turn really ran its three.
-    Spec.assertEqWith s "and three of four drew three, the Lesson's and the Leaper's besides" (libraryDrawn three) 5
-
--- How many cards alice's ten-card library has lost.
-libraryDrawn :: GameState.GameState -> Int
-libraryDrawn gs = 10 - length (Game.zoneMembers Zone.Library S.alice gs)
-
--- alice's turn with Avatar Aang, four Forests, three Plains, a Geyser Leaper and
--- three Goblin Pikers, and ten Mountains in her library; bob controls a Sol
--- Ring. When `earthbends`, she first casts Earthbending Lesson on a land; then
--- Airbending Lesson on the Sol Ring, the Leaper's waterbend {4} paid by tapping
--- it and the Pikers, and combat with Aang attacking. Returns Aang and the state
--- at the declare blockers step, each trigger resolved.
-aangTurn :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
-aangTurn s registry earthbends = do
-  aang <- S.printingOf s registry "Avatar Aang"
-  forest <- S.printingOf s registry "Forest"
-  plains <- S.printingOf s registry "Plains"
-  mountain <- S.printingOf s registry "Mountain"
-  leaper <- S.printingOf s registry "Geyser Leaper"
-  piker <- S.printingOf s registry "Goblin Piker"
-  solRing <- S.printingOf s registry "Sol Ring"
-  earthLesson <- S.printingOf s registry "Earthbending Lesson"
-  airLesson <- S.printingOf s registry "Airbending Lesson"
-  let placeTriggers gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-      settle gs = S.runPure S.identityAnswer (placeTriggers gs) Stack.resolveTop
-      castAt target spell gs =
-        let answer :: Prompt.Prompt r -> r
-            answer = aimedAt target
-         in settle (S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop)
-      g0 = S.landsFor plains S.alice 3 (S.landsInPlay forest 4)
-      landId = lastLand g0
-      (aangId, g1) = S.addPermanent aang S.alice g0
-      (leaperId, g2) = S.addPermanent leaper S.alice g1
-      (pikers, g3) = List.foldl' (\(ids, g) _ -> let (oid, next) = S.addPermanent piker S.alice g in (ids <> [oid], next)) ([], g2) [1 :: Int .. 3]
-      (ringId, g4) = S.addPermanent solRing S.bob g3
-      g5 = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g4 [1 :: Int .. 10]
-      (earthId, g6) = S.addHandCard earthLesson S.alice g5
-      (airId, g7) = S.addHandCard airLesson S.alice g6
-      main = g7 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-      earthbent = if earthbends then castAt landId earthId main else main
-      airbent = castAt ringId airId earthbent
-  waterbent <- activateLeaper s (ManaCost.MkManaCost []) (leaperId : pikers) leaperId airbent
-  let combat =
-        (settle waterbent)
-          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
-            GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
-          }
-  pure (aangId, S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer combat)
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   discardTriggerSpec s registry
@@ -2160,4 +2049,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   oreskosSunGuideSpec s registry
   blightChroniclerSpec s registry
   bendTriggerSpec s registry
-  avatarAangSpec s registry

@@ -1,0 +1,159 @@
+{
+  "description": "CR 102.2 the opponent is chosen only when there are two of them",
+  "note": "Two seats: no ChooseOpponent is scheduled, so asking one would fail the run as unscheduled, and bob is still fatesealed. The control adds carol: the scheduled ChooseOpponent is consumed, so it was asked, and only once.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i5",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Spin into Myth",
+            "label": "spin"
+          }
+        ],
+        "library": [
+          {
+            "card": "Forest"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Mountain",
+            "label": "bob-top"
+          },
+          {
+            "card": "Forest",
+            "label": "bob-deep"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Bird Maiden",
+            "label": "c-top"
+          },
+          {
+            "card": "Mountain",
+            "label": "c-mid"
+          },
+          {
+            "card": "Forest",
+            "label": "c-deep"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseOpponent",
+          "with": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseFateseal",
+          "with": [
+            [],
+            [
+              "$c-top",
+              "$c-mid"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$spin",
+          "targets": [
+            "$piker"
+          ],
+          "mana": [
+            "$i1",
+            "$i2",
+            "$i3",
+            "$i4",
+            "$i5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "carol",
+          "zone": "Library",
+          "is": [
+            "$c-top",
+            "$c-mid",
+            "$c-deep"
+          ]
+        }
+      }
+    }
+  ]
+}

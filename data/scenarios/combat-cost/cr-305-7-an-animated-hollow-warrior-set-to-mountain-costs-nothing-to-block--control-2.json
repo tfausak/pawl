@@ -1,0 +1,108 @@
+{
+  "description": "CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block",
+  "note": "Four boards, one file each: neither card (--control), Ashaya alone (--control-2), Blood Moon alone (--control-3) and both (this file). Only both strip the Warrior's block cost, so only here does the spare Piker stay untapped as the Warrior blocks. Ashaya carries a +1/+1 counter so Blood Moon's stripping of its own characteristic-defining ability does not kill it before combat, as in the Palace Guard scenarios.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "attacker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hollow Warrior",
+            "label": "warrior",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "spare",
+            "ready": true
+          },
+          {
+            "card": "Ashaya, Soul of the Wild",
+            "label": "ashaya",
+            "counters": [
+              {
+                "key": {
+                  "type": "PlusOnePlusOne"
+                },
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$attacker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$warrior": [
+            "$attacker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTaps",
+          "with": [
+            "$spare"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$attacker",
+          "blockers": [
+            "$warrior"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$spare",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

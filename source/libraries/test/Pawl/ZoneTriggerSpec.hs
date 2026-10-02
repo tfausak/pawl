@@ -477,8 +477,8 @@ gaeasBlessingSpec s registry =
 -- Drought's FIRST sentence, "At the beginning of your upkeep, sacrifice this
 -- enchantment unless you pay {W}{W}" (Oracle text checked against Scryfall) --
 -- CR 118.12a's gate over a MANA cost, where Circling Vultures' is over a
--- component. The other two sentences are Pawl.CastSpec's droughtSpec and
--- Pawl.ActivateSpec's droughtActivationSpec.
+-- component. The other two sentences are data/scenarios/cast-restriction's and
+-- data/scenarios/activate's.
 --
 -- THREE boards, and the third is what makes the gate a real choice: an
 -- implementation that sacrificed unconditionally passes the first, one that

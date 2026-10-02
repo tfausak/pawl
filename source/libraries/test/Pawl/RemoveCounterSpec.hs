@@ -12,9 +12,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
-import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -28,13 +26,11 @@ import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -150,7 +146,7 @@ lizrogBoard s registry = do
 -- THE BOARD: alice attacks with Spider-Man; bob defends with a Goblin Piker,
 -- which the trigger targets, and a Hill Giant carrying the stun counters given.
 -- alice's library holds five cards.
-spiderManSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spiderManSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 spiderManSpec s registry =
   let stun = CounterKind.Stun
       run answer (board, pikerId) = State.runState (fmap snd (Engine.runGame (recording answer (plan OptionalDecision.Exercises (Just pikerId))) board S.combatGame)) []
@@ -163,23 +159,6 @@ spiderManSpec s registry =
           Spec.assertEqWith s "CR 122.1 the Piker's new stun counter came off" (S.counterOf stun pikerId after) 0
           Spec.assertEqWith s "and both of the Giant's" (S.counterOf stun giantId after) 0
           Spec.assertEqWith s "alice was asked once, capped at three, over both" asked [UpTo 3 (Map.fromList [(pikerId, 1), (giantId, 2)])]
-        -- CR 508.5's second sentence: Spider-Man leaves combat (here, the
-        -- battlefield) with its trigger on the stack, and "defending player" is
-        -- still bob, so the Piker stays a legal target at CR 608.2b's re-check
-        -- and the ability resolves in full.
-        Spec.it s "CR 508.5 bounced with its trigger on the stack, its target is still the defending player's" $ do
-          (board, spiderId, pikerId, giantId) <- spiderManBoard s registry 2
-          let act = do
-                Combat.declareAttackers S.manaPerformer S.alice
-                _ <- Engine.placePendingTriggers
-                Event.changeZone spiderId Zone.Hand
-                Stack.resolveTop
-              division = Map.fromList [(pikerId, 1), (giantId, 2)]
-              (after, _) = State.runState (fmap snd (Engine.runGame (recording division (plan OptionalDecision.Exercises (Just pikerId))) board act)) []
-          let library g = length (Game.zoneMembers Zone.Library S.alice g)
-          Spec.assertEqWith s "CR 608.2b the ability resolved: alice drew three" (library board - library after) 3
-          Spec.assertEqWith s "and the Piker is tapped" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Tapped)
-          Spec.assertEqWith s "and Spider-Man is in alice's hand" (length (Game.zoneMembers Zone.Hand S.alice after) - length (Game.zoneMembers Zone.Hand S.alice board)) 4
 
 -- The board spiderManSpec's cases share, described above it, with the Giant's
 -- stun counters given.

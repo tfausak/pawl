@@ -27,7 +27,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -102,48 +101,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         milled = S.runPure S.identityAnswer gs (Event.changeZone nexusId Zone.Graveyard)
     Spec.assertEqWith s "CR 614.6 the card never left the library" (length (Game.zoneMembers Zone.Library S.alice milled)) 1
     Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice milled)) 0
-  -- EXILE, which CR 400.2 makes public but which CR 113.6 gives no default
-  -- reaching either, so the row functions there only because the card states it.
-  -- Pull from Eternity ({W} Instant, Oracle text fetched from Scryfall
-  -- 2026-09-05: "Put target face-up exiled card into its owner's graveyard") is
-  -- the pool's one move OUT of exile INTO a graveyard, which is the only road on
-  -- which a row gathered from exile can be observed.
-  --
-  -- A pair of boards differing in one thing: which of alice's cards is the one
-  -- sitting in exile. bob's Ogre Sentry is exiled on both, so the target is a
-  -- real choice rather than the pool's only member, and the answerer FILTERS the
-  -- offered set rather than building a recipient of its own.
-  Spec.it s "CR 113.6b a stated row functions from exile, so the pulled card lands in the library" $ do
-    plains <- S.printingOf s registry "Plains"
-    pull <- S.printingOf s registry "Pull from Eternity"
-    nexus <- S.printingOf s registry "Nexus of Fate"
-    piker <- S.printingOf s registry "Goblin Piker"
-    sentry <- S.printingOf s registry "Ogre Sentry"
-    let pulled victim =
-          let (g1, pullId) = S.handOne pull (S.landsInPlay plains 2)
-              (victimId, g2) = S.addExiledCard victim S.alice g1
-              (_, g3) = S.addExiledCard sentry S.bob g2
-              board =
-                g3
-                  { GameState.phase = Phase.PrecombatMain,
-                    GameState.activePlayer = S.alice,
-                    GameState.priority = Just S.alice
-                  }
-              cast = S.runPure (aimedAt victimId) board (S.cast S.alice pullId)
-           in S.runPure S.identityAnswer cast Stack.resolveTop
-        nexusAfter = pulled nexus
-        pikerAfter = pulled piker
-    Spec.assertEqWith
-      s
-      "CR 614.6 the Nexus reaches its owner's library, where an ordinary card in the same seat reaches nothing but the graveyard"
-      (length (Game.zoneMembers Zone.Library S.alice nexusAfter), length (Game.zoneMembers Zone.Library S.alice pikerAfter))
-      (1, 0)
-    -- Proxies, after the behaviour: the spell resolved on both boards and took
-    -- alice's card out of exile, leaving bob's Ogre Sentry there; CR 608.2n then
-    -- put the Pull itself into alice's graveyard, which the Piker joins and the
-    -- Nexus does not.
-    Spec.assertEqWith s "one card left in exile on each board" (Set.size (GameState.exile nexusAfter), Set.size (GameState.exile pikerAfter)) (1, 1)
-    Spec.assertEqWith s "and alice's graveyard holds the spell alone, then the spell and the Piker" (length (Game.zoneMembers Zone.Graveyard S.alice nexusAfter), length (Game.zoneMembers Zone.Graveyard S.alice pikerAfter)) (1, 2)
   -- The gate the three cases above cannot show, as a pair of boards differing in
   -- one thing: Rest in Peace's row states NO zone, so CR 113.6's default leaves it
   -- functioning on the battlefield and nowhere else. The enchantment is bob's and

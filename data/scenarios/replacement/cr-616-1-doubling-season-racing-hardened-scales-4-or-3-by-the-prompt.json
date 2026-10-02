@@ -1,0 +1,87 @@
+{
+  "description": "CR 616.1 Doubling Season racing Hardened Scales: 4 or 3, by the prompt",
+  "note": "Battlegrowth puts one +1/+1 counter on alice's Goblin Piker with Doubling Season and Hardened Scales both applying; CR 616.1 asks which first. Answering 0, the first offered (Doubling Season, the earlier permanent), gives (1 * 2) + 1 = 3.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest"
+          },
+          {
+            "card": "Doubling Season"
+          },
+          {
+            "card": "Hardened Scales"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Battlegrowth",
+            "label": "bg"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseReplacement",
+          "with": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bg",
+          "targets": [
+            "$piker"
+          ],
+          "mana": [
+            "$forest"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$piker",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 3
+        }
+      }
+    }
+  ]
+}

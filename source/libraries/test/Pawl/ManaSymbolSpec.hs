@@ -41,7 +41,6 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRetention as ManaRetention
@@ -51,7 +50,6 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
@@ -453,19 +451,6 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     Spec.assertBool s (not (fst (S.runPureWith S.identityAnswer gs (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice cost)))) "and paying fails"
     Spec.assertEqWith s "two {R/G} alone WOULD be payable from them" (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs) True
 
-  Spec.it s "CR 107.4e whole card: Burning-Tree Emissary casts off RR, GG, or RG" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
-    let castOff reds greens =
-          let (gs, spellId) = S.handOne burningTreeEmissary (mixedLands mountain forest reds greens)
-              cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-           in length (GameState.stack cast)
-    Spec.assertEqWith s "two Mountains" (castOff 2 0) 1
-    Spec.assertEqWith s "two Forests" (castOff 0 2) 1
-    Spec.assertEqWith s "one of each" (castOff 1 1) 1
-    Spec.assertEqWith s "one land is not enough" (castOff 1 0) 0
-
   -- CR 601.2b's announcement for CR 107.4e's COLOUR/COLOUR half, and the board
   -- that makes the answer observable. Gyre Engineer ("{T}: Add {G}{U}") is the
   -- oversupply: one activation puts BOTH of {G/U}'s halves in the pool, so
@@ -514,10 +499,6 @@ greenMana, blueMana :: ManaType.ManaType
 greenMana = ManaType.Colored Color.Green
 blueMana = ManaType.Colored Color.Blue
 
-redMana, whiteMana :: ManaType.ManaType
-redMana = ManaType.Colored Color.Red
-whiteMana = ManaType.Colored Color.White
-
 -- The `announces` shape for CR 107.4e's COLOUR/COLOUR hybrid: answers
 -- Prompt.AnnounceHybridHalf with `half` whenever it is on offer, and defers
 -- everything else to S.identityAnswer.
@@ -535,80 +516,6 @@ halfAnnouncements responses =
         Response.AnnouncedHybridHalf half -> Just half
         _ -> Nothing
    in Maybe.mapMaybe announcement responses
-
--- CR 118.13b: "If a cost paid during the resolution of a spell or ability
--- contains a mana symbol that can be paid in multiple ways, the player paying
--- that cost chooses how to pay for that symbol immediately before they pay that
--- cost." The moment CR 118.13a's two announcements do not cover, reached through
--- Pawl.Engine.Resolve.Effect.payGatePaidBy rather than through a cast or an activation.
---
--- Shu Yun, the Silent Tempest, {2}{U} 3/2 with prowess and "Whenever you cast a
--- noncreature spell, you may pay {R/W}{R/W}. If you do, target creature gains
--- double strike until end of turn." The "you may pay ... if you do" is CR
--- 118.12's pay gate, so the cost is paid while the TRIGGER resolves, and its two
--- {R/W} are CR 107.4e symbols payable two ways each.
---
--- Synthetic Speed Boost, a {0} sorcery, is the noncreature spell that fires the
--- trigger: it costs no mana, so the four lands below are all still untapped when
--- the gate is offered. Prowess fires off the same cast and changes nothing here.
---
--- Two Mountains and two Plains, and the SAME source answers on both legs -- the
--- head of every Prompt.ChooseManaSource, which is a Mountain while one is
--- untapped -- so the only difference between the legs is which half the payer
--- announced. Announcing red is paid by the two Mountains and the window closes;
--- announcing white leaves the cost uncovered until both Plains are down, and the
--- {R}{R} already in the pool is then what floats. Lightning Bolt in hand reads
--- it: with every land tapped, the floating red is the only thing that could pay
--- for it.
---
--- Mutate the announcement away and the cost stays {R/W}{R/W}, which the two
--- Mountains cover on either leg: the pool is empty both times and the Bolt is
--- castable neither time, so the first assertion below is the one that reddens.
-shuYunSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-shuYunSpec s registry = Spec.describe s "Shu Yun, the Silent Tempest" $ do
-  Spec.it s "CR 118.13b the half announced as the trigger resolves is the mana that resolution spends" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    shuYun <- S.printingOf s registry "Shu Yun, the Silent Tempest"
-    boost <- S.printingOf s registry "Synthetic Speed Boost"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let lands = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (shuYunId, withShuYun) = S.addPermanent shuYun S.alice lands
-        (boostId, withBoost) = S.addHandCard boost S.alice withShuYun
-        (boltId, withBolt) = S.addHandCard bolt S.alice withBoost
-        board =
-          withBolt
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        -- Pays the gate, announces `half` wherever it is on offer, and aims the
-        -- trigger at Shu Yun itself. Everything else is S.identityAnswer, whose
-        -- Prompt.ChooseManaSource answer is the head candidate.
-        answering :: ManaType.ManaType -> Prompt.Prompt r -> r
-        answering half p = case p of
-          Prompt.ChooseToPay {} -> PaymentDecision.Pays
-          Prompt.AnnounceHybridHalf _ _ _ _ offers ->
-            if elem half (NonEmpty.toList offers) then half else NonEmpty.head offers
-          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just shuYunId) . Recipient.objectOf) legal) sets
-          _ -> S.identityAnswer p
-        -- Cast, then let the step's priority round put both triggers on the
-        -- stack and resolve them. NOT a step advance: CR 500.5 empties the pool
-        -- as a step ends, and the pool is what the assertions read.
-        legOf half = S.runPure (answering half) (S.runPure (answering half) board (S.cast S.alice boostId)) Engine.priorityLoop
-        redLeg = legOf redMana
-        whiteLeg = legOf whiteMana
-    -- THE assertion, and the one the announcement decides: what the payment left
-    -- behind, read as a cast the player can now make.
-    Spec.assertBool s (S.castable S.alice boltId whiteLeg) "white was announced, so the unspent {R}{R} floats and pays for Lightning Bolt"
-    Spec.assertBool s (not (S.castable S.alice boltId redLeg)) "red was announced, so it was spent and the two untapped Plains cannot pay for it"
-    -- The gate was paid on BOTH legs, so the difference above is the announcement
-    -- and not one leg failing to pay at all.
-    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike shuYunId redLeg) "the red route paid, so CR 118.12's IfPaid branch ran"
-    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike shuYunId whiteLeg) "and the white route paid too"
-    Spec.assertEqWith s "the red route closed the window with the two Mountains down" (S.tappedCount S.alice redLeg) 2
-    Spec.assertEqWith s "the white route kept tapping until both Plains were down" (S.tappedCount S.alice whiteLeg) 4
-    Spec.assertEqWith s "and what floats is exactly the red the white route did not spend" (poolTypes S.alice whiteLeg) [redMana, redMana]
 
 twoOrRed :: ManaSymbol.ManaSymbol
 twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
@@ -2166,7 +2073,6 @@ treasureIn gs =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   hybridSpec s registry
-  shuYunSpec s registry
   monocoloredHybridSpec s registry
   phyrexianSpec s registry
   totalCostSpec s registry

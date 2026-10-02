@@ -2235,7 +2235,7 @@ hauntSpec s registry =
 -- counters the Cry (CR 701.6a) instead of letting it resolve. Both endings put
 -- the card into alice's graveyard from the stack, so the zone pair cannot tell
 -- them apart and the CAUSE is the whole of the difference.
-hauntSpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hauntSpellSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hauntSpellSpec s registry =
   let -- hauntSpec's answerer: every target slot pinned at one recipient, since
       -- two identical Pikers and three legal players would otherwise be settled
@@ -2283,13 +2283,6 @@ hauntSpellSpec s registry =
         let resolved = S.runPure (aimAt (Recipient.ToPlayer S.bob)) (castCry cryId gs) Stack.resolveTop
          in settleAndResolve (aimAt (Recipient.ToCreature victimId)) resolved
    in Spec.describe s "CR 702.55a haunt on an instant or sorcery" $ do
-        -- The proving case for the whole unit.
-        Spec.it s "CR 702.55a/608.2n the resolved sorcery is exiled haunting the targeted creature" $ do
-          fixture@(victimId, _, _, _, _, _) <- board
-          let (_, after) = hauntedBoard fixture
-          Spec.assertEqWith s "CR 702.55b the card haunts bob's Piker and nothing else" (Map.elems (GameState.haunting after)) [victimId]
-          Spec.assertEqWith s "CR 702.55a it is in exile rather than the graveyard CR 608.2n sent it to" (Set.size (GameState.exile after), length (Game.zoneMembers Zone.Graveyard S.alice after)) (1, 0)
-          Spec.assertEqWith s "and the spell's own clause made bob discard" (handSizes after) (1, 1, 2)
         -- CR 702.55c: the exiled card's own printed ability, which is what makes
         -- the haunt worth minting.
         Spec.it s "CR 702.55b/702.55c the haunted creature dying fires the card's rider" $ do

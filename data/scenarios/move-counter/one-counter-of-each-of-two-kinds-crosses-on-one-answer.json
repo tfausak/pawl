@@ -1,0 +1,182 @@
+{
+  "description": "one counter of each of two kinds crosses on one answer",
+  "note": "Resourceful Defense moves any number of counters; the first Piker bears three +1/+1 and two shield counters, and the one ChooseMovedCounters answer takes one of each. The prompt being asked is the Answer entry itself: an unasked entry fails the run.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains-1",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5",
+            "ready": true
+          },
+          {
+            "card": "Resourceful Defense",
+            "label": "defense"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "giver",
+            "counters": [
+              {
+                "key": {
+                  "type": "PlusOnePlusOne"
+                },
+                "value": 3
+              },
+              {
+                "key": {
+                  "type": "Shield"
+                },
+                "value": 2
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "taker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$defense",
+          "targetsBySlot": {
+            "from": [
+              "$giver"
+            ],
+            "to": [
+              "$taker"
+            ]
+          },
+          "mana": [
+            "$plains-1",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            "$plains-5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseMovedCounters",
+          "with": [
+            [
+              {
+                "type": "PlusOnePlusOne"
+              },
+              1
+            ],
+            [
+              {
+                "type": "Shield"
+              },
+              1
+            ]
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "$taker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "$taker",
+        "kind": {
+          "type": "Shield"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "$giver",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$giver",
+        "kind": {
+          "type": "Shield"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "$taker",
+        "kind": {
+          "type": "MinusOneMinusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "$giver",
+        "kind": {
+          "type": "MinusOneMinusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

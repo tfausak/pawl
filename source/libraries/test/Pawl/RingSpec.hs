@@ -325,22 +325,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     Spec.assertEqWith s "one emblem after the first temptation" (length (theRingsOf S.alice once)) 1
     Spec.assertEqWith s "still one emblem after the second" (length (theRingsOf S.alice twice)) 1
     Spec.assertEqWith s "but two temptations" (temptationsOf S.alice twice) (Just 2)
-  -- CR 701.54a's FIRST ending: "until another creature becomes your Ring-bearer".
-  -- The designation MOVES rather than accumulating, so `markedFor` stays a
-  -- singleton and changes which creature it names.
-  Spec.it s "CR 701.54a a second designation lifts the first" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    escape <- S.printingOf s registry "Birthday Escape"
-    let (firstCreature, secondCreature, firstSpell, g1) = twoCreatureBoard island piker escape 2
-        (secondSpell, g2) = S.addHandCard escape S.alice g1
-        -- The first temptation takes the LAST candidate, the second the FIRST, so
-        -- the designation has to move backwards along the list. An implementation
-        -- that only ever added a mark would leave both set.
-        once = castAndResolve lastCandidate S.alice firstSpell g2
-        twice = castAndResolve S.identityAnswer S.alice secondSpell once
-    Spec.assertEqWith s "the second creature was designated first" (markedFor S.alice once) [secondCreature]
-    Spec.assertEqWith s "and the first creature holds it alone afterwards" (markedFor S.alice twice) [firstCreature]
   -- CR 701.54a's "YOUR Ring-bearer", which is what makes the first ending
   -- per-player: alice designating a creature ends alice's previous designation and
   -- must not touch bob's. The guard that does it is `designate`'s `== Just pid`,
