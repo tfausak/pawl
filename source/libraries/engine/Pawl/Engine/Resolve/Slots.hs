@@ -2774,8 +2774,9 @@ battlefieldMatching legal resolving controller source gs filter_ =
 --
 -- The two callers that store a CONTINUOUS effect -- ModifyTarget and GainControl
 -- -- owe CR 611.2c: the set is determined when the effect begins, so those arms
--- freeze this answer as Affected.TheseObjects. Nothing enforces it; a third
--- storing caller must not reach for Affected.Matching, a STATIC ability's set.
+-- freeze this answer as Affected.TheseObjects, less what CR 702.26e leaves out
+-- (Resolve.Effect.frozenAffected). Nothing enforces it; a third storing caller
+-- must not reach for Affected.Matching, a STATIC ability's set.
 --
 -- ORDER, for the arms folding over CR 400.1's per-player zones: APNAP (CR
 -- 608.2f), then ascending ObjectId. The arms over a SHARED zone keep that zone's
