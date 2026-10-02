@@ -268,6 +268,14 @@ data Combat = MkCombat
     -- derivation each already makes: the record is what makes the answer stick
     -- between samples, the derivation is what answers within one.
     attackingNothing :: Set.Set ObjectId.ObjectId,
+    -- | CR 509.1g: the blocking creatures no longer blocking any attacker still
+    -- in combat, because every attacker they blocked was removed from combat --
+    -- still blocking creatures, since only their own removal ends that. Keyed by
+    -- the BLOCKER, for `blockers` is keyed by the attacker whose removal drops
+    -- the key. Written and pruned by Pawl.Engine.Game.removeFromCombat, read by
+    -- Pawl.Engine.Game.isBlocking and Pawl.Engine.Combat.combatants. Nothing
+    -- here deals combat damage (CR 510.1d).
+    blockingNothing :: Set.Set ObjectId.ObjectId,
     -- | CR 508.5's second sentence: for each creature removed from combat this
     -- combat, the defending player it was attacking before it was removed.
     -- Written by Pawl.Engine.Game.removeFromCombat and ceaseAttacking (and CR

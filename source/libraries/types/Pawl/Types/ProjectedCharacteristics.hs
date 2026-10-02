@@ -12,6 +12,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
@@ -370,6 +371,13 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Room enters with its own doors shut (CR 709.5d) and this field says which
     -- doors those are.
     halves :: Maybe Card.Card,
+    -- | CR 707.9a / 707.9b: the copy exceptions folded into these copiable
+    -- values, in the order they applied, settled against the copy effect that
+    -- made them (Pawl.Engine.Replacement.applyCopyExceptions). Empty for values
+    -- no exception touched. Read only where `halves` above is rebuilt against
+    -- an object's own designations, which re-applies them
+    -- (Pawl.Engine.Projection.View.copiableCharacteristics).
+    exceptions :: [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Card)],
     -- | CR 722.2b: the PREPARE SPELL this object has -- "the existence and values
     -- of these alternative characteristics are part of the object's copiable
     -- values" -- and Nothing for an object with no inset frame. `halves` above's
