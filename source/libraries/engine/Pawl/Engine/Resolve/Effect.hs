@@ -2716,10 +2716,11 @@ stackTargetSlots obj oid gs =
 -- recipients by referent, since the pool that offers a permanent tags it
 -- (Recipient.ToCreature) where the ref that named it did not.
 --
--- Not implemented: an original that has left the stack, which CR 608.2h reads
--- through last known information. Nothing is answered for it (#4568).
+-- An original that has left the stack is read as it last existed (CR 608.2h),
+-- through lastKnownOriginal below.
 copyRetargets :: PlayerId -> ObjectId -> GameState -> [Recipient] -> [(Recipient, Map.Map SlotName (Set Recipient))]
-copyRetargets perspective original gs candidates = Maybe.fromMaybe [] $ do
+copyRetargets perspective original live candidates = Maybe.fromMaybe [] $ do
+  let gs = lastKnownOriginal original live
   obj <- Game.lookupObject original gs
   let slots = stackTargetSlots obj original gs
       current = targetsOnStack original gs
@@ -2735,6 +2736,19 @@ copyRetargets perspective original gs candidates = Maybe.fromMaybe [] $ do
               then Just (candidate, chosen)
               else Nothing
   pure (Maybe.mapMaybe pick candidates)
+
+-- CR 608.2h: the board with a copy's ORIGINAL as it last existed. A spell that
+-- has left the stack is put back into the object map off GameState.stackArchive,
+-- in no zone's list, so every live reader of its face, slots, targets and
+-- controller answers its last known information while nothing else on the board
+-- can see it. A live original answers the board unchanged. Pawl.CopySpec's "CR
+-- 608.2h the copy is made even when the Growth was countered first" (Ivy,
+-- Gleeful Spellthief) and "CR 608.2h Zada still copies a Growth countered while
+-- the trigger waited" prove the stated and the for-each roads.
+lastKnownOriginal :: ObjectId -> GameState -> GameState
+lastKnownOriginal original gs = case (Game.lookupObject original gs, Map.lookup original (GameState.stackArchive gs)) of
+  (Nothing, Just obj) -> gs {GameState.objects = Map.insert original obj (GameState.objects gs)}
+  _ -> gs
 
 -- CR 707.10e: ONE copy, every one of whose targets is the player or object the
 -- effect names. Answers the empty list where "the copy isn't created", so the
@@ -2771,11 +2785,11 @@ copyStatedTargets controller copier resolving source legal original newRef = do
 -- trigger still copies anything -- it "exists on the stack independently of its
 -- source".
 --
--- The SOURCE alone, which is CR 608.2h's own scope ("a specific object,
--- including the source of the ability itself"): every other object this opcode
--- can name is a TARGET, which CR 608.2b re-checks and blanks, and a sweep names
--- what is on the stack NOW. So no other ref gains an object here, and the two
--- stack sweeps keep answering live for every other opcode.
+-- The SOURCE alone is added here: every other object this opcode can name is a
+-- TARGET, which CR 608.2b re-checks and blanks, a slot the triggering event
+-- bound (Ivy, Gleeful Spellthief's "that spell"), which objectRefObjects already
+-- answers once the spell has left, or a sweep, which names what is on the stack
+-- NOW. So the two stack sweeps keep answering live for every other opcode.
 --
 -- The ref's own Filter decides, read off the last known view, so a ref naming
 -- anything but the source (Swift Silence's `Not IsSource`) still names nothing.
@@ -2824,15 +2838,16 @@ copyStackSubjects legal resolving controller source gs ref =
 -- Pawl.CopySpec's Precursor Golem and Radiate groups prove all three.
 copyForEachTargets :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> NonEmpty.NonEmpty ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
 copyForEachTargets controller copier resolving source legal original candidateRefs = do
-  gs <- State.get
-  let caster = fmap (\obj -> Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf original gs)) (Game.lookupObject original gs)
+  live <- State.get
+  let gs = lastKnownOriginal original live
+      caster = fmap (\obj -> Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf original gs)) (Game.lookupObject original gs)
       targeted = Foldable.fold (targetsOnStack original gs)
       other candidate = not (any (Recipient.sameReferent candidate) targeted)
-      candidates = ListUtils.nubOrd (concatMap (filter other . objectRefRecipients legal resolving controller source gs) candidateRefs)
+      candidates = ListUtils.nubOrd (concatMap (filter other . objectRefRecipients legal resolving controller source live) candidateRefs)
       picks = foldMap (\seat -> copyRetargets seat original gs candidates) caster
   ordered <- case picks of
     _ : _ : _ -> do
-      answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor copier gs) copier resolving (fmap fst picks))
+      answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor copier live) copier resolving (fmap fst picks))
       pure (Game.permute picks answer)
     _ -> pure picks
   pure (fmap snd ordered)
@@ -7129,11 +7144,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- (CR 702.50a's epic ability, at each of its controller's upkeeps for the
       -- rest of the game), so nothing here cases on which keyword armed it.
       --
-      -- WHICH archived object a ref can name is copyStackSubjects' question, and
-      -- the answer is the ability's own source alone -- so the two roads here are
-      -- rule 702.50a's epic, whose delayed ability names a slot bound to the
-      -- archived id, and a copy-this-spell trigger whose spell left the stack
-      -- (CR 702.40a's storm over a countered Grapeshot).
+      -- WHICH archived object a ref can name is copyStackSubjects' question, so
+      -- the roads here are rule 702.50a's epic, whose delayed ability names a
+      -- slot bound to the archived id, a copy-this-spell trigger whose spell left
+      -- the stack (CR 702.40a's storm over a countered Grapeshot), and a trigger
+      -- whose event bound the spell it copies (Ivy, Gleeful Spellthief's "that
+      -- spell", countered while the trigger waited).
       Monad.forM_ (if Game.isSpell original gs || Game.isAbility original gs then Game.lookupObject original gs else Map.lookup original (GameState.stackArchive gs)) $ \obj ->
         -- CR 707.10's "that player copies it": WHO puts the copy onto the stack,
         -- which is the copy's owner and controller and CR 707.10c's chooser --
