@@ -22,4 +22,14 @@ data View
     Zone
   | -- | CR 105.2: an object's colors.
     Colors
+  | -- | CR 106.4: the mana in a player's pool.
+    ManaPool
+  | -- | CR 730.1: whether it is day or night, if either.
+    Daytime
+  | -- | CR 310.9: a battle's protector.
+    Protector
+  | -- | CR 701 / 702: the designations an object has.
+    Designations
+  | -- | CR 701.54a: whose Ring-bearer an object is, if anyone's.
+    RingBearer
   deriving (Bounded, Enum, Eq, Ord, Show)

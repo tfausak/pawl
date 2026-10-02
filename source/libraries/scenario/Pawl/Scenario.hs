@@ -10,6 +10,7 @@ import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Bifunctor as Bifunctor
+import qualified Data.Either as Either
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -21,6 +22,9 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Codec.Check as Codec.Check
 import qualified Pawl.Codec.Choices as Codec.Choices
+import qualified Pawl.Codec.Daytime as Codec.Daytime
+import qualified Pawl.Codec.Designation as Codec.Designation
+import qualified Pawl.Codec.Mana as Codec.Mana
 import qualified Pawl.Codec.Move as Codec.Move
 import qualified Pawl.Codec.Phase as Codec.Phase
 import qualified Pawl.Codec.Reference as Codec.Reference
@@ -1213,6 +1217,23 @@ renderView gs viewIs =
         View.Colors -> do
           oid <- needObject
           pure (ReplyType.Array (fmap (ReplyType.Text . Text.pack . show) (Set.toList (Projection.colorsOf oid gs))))
+        View.ManaPool -> do
+          pid <- needPlayer
+          pure (encoded Codec.Mana.codec (Map.findWithDefault (Mana.Type.MkMana []) pid (GameState.manaPool gs)))
+        View.Daytime -> pure (maybe ReplyType.Null (encoded Codec.Daytime.codec) (GameState.daytime gs))
+        View.Protector -> do
+          oid <- needObject
+          maybe (pure ReplyType.Null) (named . labelOf) (Game.lookupObject oid gs >>= Object.protector)
+        View.Designations -> do
+          oid <- needObject
+          pure (ReplyType.Array (foldMap (fmap (encoded Codec.Designation.codec) . Set.toList . Object.designations) (Game.lookupObject oid gs)))
+        View.RingBearer -> do
+          oid <- needObject
+          maybe (pure ReplyType.Null) (named . labelOf) (Game.lookupObject oid gs >>= Object.ringBearerFor)
+
+-- | A value as its codec writes it, for a View to compare.
+encoded :: Codec.Codec a -> a -> ReplyType.Reply
+encoded codec = Either.fromRight ReplyType.Null . Codec.Reply.fromValue . Codec.encode codec
 
 describeAll :: GameState.GameState -> [ObjectId.ObjectId] -> Run [Text.Text]
 describeAll gs = mapM (describeObject gs)

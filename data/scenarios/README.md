@@ -88,8 +88,12 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `{ "of": "Stack", "is": ["$bolt"] }`. Its views are `Stack` (top first),
   `Step`, `Offered` (a `player`'s actions at priority, as `"Cast $bolt"`),
   `AttachedTo` and `Controller` (of an `object`), `Result`, `ActivePlayer`,
-  `Priority`, `Zone` (a `player`'s `zone`, in order) and `Colors`; an object
-  is named as the runner's messages name it, by label while it keeps one.
+  `Priority`, `Zone` (a `player`'s `zone`, in order), `Colors`, `ManaPool`
+  (a `player`'s), `Daytime` (`null` before either), and `Protector`,
+  `Designations` and `RingBearer` (of an `object`); an object is named as the
+  runner's messages name it, by label while it keeps one, and an ability on
+  the stack as `"trigger of $source"` or `"ability of $source"`. A seat is
+  named bare: `"player": "alice"`.
   Assert combat at `EndOfCombat` or earlier: it is cleared as that step ends.
 - **Final.** The run plays whole steps until the timeline is spent, the game
   ends, or the turn passes the last one named; `final` checks that state.
