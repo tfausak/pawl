@@ -130,7 +130,7 @@ withoutAnnouncement before entry closed = do
   cardsPlayed <- mapOf GameState.cardsPlayed
   drawsThisTurn <- mapOf GameState.drawsThisTurn
   departedThisTurn <- setOf GameState.departedThisTurn
-  activatedThisTurn <- mapOfSets GameState.activatedThisTurn
+  activatedThisTurn <- mapOfMaps GameState.activatedThisTurn
   -- An append-only log, `events`' shape: the announcement's own activation
   -- goes and the window's mana abilities stand.
   activationsThisTurn <- eventsOf GameState.activationsThisTurn

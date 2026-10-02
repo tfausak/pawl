@@ -312,11 +312,12 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- CR 602.5c: an unnamed ability is named for the material it came from
         -- (Binding.craftMaterialAbility), so two identically worded abilities
         -- from two materials are two to a restriction on their use. A named one
-        -- keeps its name, which its linked twin refers to (CR 607.5). Not
-        -- implemented: two materials' identically NAMED abilities still share
-        -- one restriction (#4607).
+        -- keeps its name, which its linked twin refers to (CR 607.5), and two
+        -- materials' equal copies of it are told apart by count instead
+        -- (ActivationRestriction.unspent).
         --
-        -- Pawl.ActivateSpec's Locus of Enlightenment case proves all three.
+        -- Pawl.ActivateSpec's Locus of Enlightenment case proves all three, and
+        -- its Gliding Licid case the named twins.
         Modification.GainCraftMaterialAbilities extra ->
           let crafted = ExileLink.MkExileLink {ExileLink.source = src, ExileLink.ability = Just Binding.craftLink}
               materials = filter (\o -> Map.lookup o (GameState.exiledWith gs) == Just crafted) (Set.toAscList (GameState.exile gs))

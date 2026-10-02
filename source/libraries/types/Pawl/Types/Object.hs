@@ -818,20 +818,18 @@ data Object = MkObject
     -- THE ABILITY BY VALUE, the grain rule 702.177a's reminder states ("Activate
     -- each exhaust ability only once"): Draconautics Engineer prints two exhaust
     -- abilities and spending one leaves the other, while Greenbelt Guardian's
-    -- other ability carries no rider at all. A Bool, or a count of activations,
-    -- could say neither. The same posture Pawl.Types.Action's Activate arm takes
-    -- -- the ability is carried as a value and matched by equality, never by an
-    -- index into a face's list, since a layer-6 grant and a printed ability are
-    -- members of no one list.
+    -- other ability carries no rider at all. A Bool could say neither. The same
+    -- posture Pawl.Types.Action's Activate arm takes -- the ability is carried as
+    -- a value and matched by equality, never by an index into a face's list,
+    -- since a layer-6 grant and a printed ability are members of no one list.
     --
-    -- CR 602.5c -- an acquired ability's restriction "doesn't apply to other,
-    -- identically worded abilities" -- is what value equality cannot separate: an
-    -- object holding a printed once-only ability and a granted twin of it would
-    -- spend both at once. Locus of Enlightenment acquires abilities from several
-    -- cards, and Pawl.Engine.Projection names each unnamed one for its material
-    -- so twins differ. Not implemented: two materials' identically NAMED
-    -- abilities share one record (#4607).
-    activatedOnce :: Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)),
+    -- COUNTED per value, for CR 602.5c: an acquired ability's restriction
+    -- "doesn't apply to other, identically worded abilities", so an object
+    -- bearing two equal copies (CR 113.2c) -- Locus of Enlightenment crafted with
+    -- two Gliding Licids -- may spend each once.
+    -- Pawl.Engine.ActivationRestriction's OnlyOnce arm compares the count with
+    -- the copies the object bears.
+    activatedOnce :: Map.Map (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) Natural.Natural,
     -- | CR 702.95b: the creature this one is paired with, and the seat the
     -- soulbond ability that paired them was controlled by; Nothing for every
     -- unpaired creature, which is nearly all of them.
@@ -968,7 +966,7 @@ newIncarnation object =
       exertedBy = Set.empty,
       -- CR 400.7 over CR 602.5b: the object that comes back has activated
       -- nothing, so its once-only abilities are available again.
-      activatedOnce = Set.empty,
+      activatedOnce = Map.empty,
       -- CR 702.95e's third ending said for the leaver: a creature that leaves the
       -- battlefield is unpaired, and the object that comes back was never paired
       -- with anything. Pawl.Engine.Soulbond.endWhenBroken supplies the same

@@ -943,7 +943,7 @@ addToken card pid gs =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in ( oid,
         gs2
@@ -1016,7 +1016,7 @@ addLibraryCard printing pid gs =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in ( oid,
         gs2
@@ -1094,7 +1094,7 @@ addGraveyardCard printing pid gs =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in ( oid,
         gs2
@@ -1176,7 +1176,7 @@ addExiledCard printing pid gs =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in ( oid,
         gs2
@@ -1263,7 +1263,7 @@ addHandCard printing pid gs =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in ( oid,
         gs2
@@ -1359,7 +1359,7 @@ landsFor land pid n base =
                   Object.goadedBy = Set.empty,
                   Object.doesNotUntapFor = 0,
                   Object.exertedBy = Set.empty,
-                  Object.activatedOnce = Set.empty
+                  Object.activatedOnce = Map.empty
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1431,7 +1431,7 @@ handOne printing base =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1509,7 +1509,7 @@ pikerInHand land piker n ph =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
       gs3 =
         gs2
@@ -2072,7 +2072,7 @@ oneMountainState mountain ph =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in GameState.MkGameState
         { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none},
@@ -2328,7 +2328,7 @@ spellOnStack printing pid gs =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in ( oid,
         gs2
