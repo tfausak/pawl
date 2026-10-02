@@ -89,8 +89,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   runner judges a chosen card name (CR 201.4): it must be a real card's that
   the prompt's restriction admits, so a `refuse` can carry one. A refused
   `Answer` to a prompt offering a list (players, cards, permanents to
-  sacrifice, cards a search finds, spellbook names) is refused already when it
-  names something the list lacks; a `do` naming one goes to the engine. The engine's card lookups are answered from the card data, for every
+  sacrifice, cards a search finds, spellbook names) or a range (an X, a die,
+  counters a permanent carries) is refused already when it names something
+  the list lacks or leaves the range; a `do` naming one goes to the engine. The engine's card lookups are answered from the card data, for every
   name the board, timeline or final checks mention.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones,
   `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of

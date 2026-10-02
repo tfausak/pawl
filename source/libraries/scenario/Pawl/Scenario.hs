@@ -750,7 +750,7 @@ legalAnswer gs prompt chosen = case prompt of
   _ -> pure True
 
 -- | Whether an answer names only what its prompt offers, for a prompt that
--- offers a list. A refused answer naming more is refused already; an answer
+-- offers a list, and stays within its bounds, for one that offers a range. A refused answer naming more is refused already; an answer
 -- taken goes to the engine, which handles one naming more itself.
 withinOffer :: Prompt.Type.Prompt r -> r -> Bool
 withinOffer prompt chosen = case prompt of
@@ -769,6 +769,10 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseSacrifices _ _ _ objects _ _ -> all (`elem` objects) chosen
   Prompt.Type.ChooseAnyNumberToSacrifice _ _ _ objects -> all (`elem` objects) chosen
   Prompt.Type.ChooseOfferedCastSpell _ _ offers -> chosen `elem` offers
+  Prompt.Type.RollDie sides -> 1 <= chosen && chosen <= sides
+  Prompt.Type.ChooseMixedCounterRemoval _ _ _ _ _ bearers -> Map.isSubmapOfBy (Map.isSubmapOfBy (<=)) chosen bearers
+  Prompt.Type.ChooseLandTypeSwap _ _ _ _ forbidden -> Set.notMember (snd chosen) forbidden
+  Prompt.Type.ChooseCreatureTypeSwap _ _ _ _ forbidden -> Set.notMember (snd chosen) forbidden
   Prompt.Type.RandomFirstPlayer players -> chosen `elem` players
   Prompt.Type.RandomObject objects -> chosen `elem` objects
   Prompt.Type.ChooseDieResult _ _ _ results -> toInteger chosen < toInteger (length results)
@@ -818,9 +822,9 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseTaps _ _ _ objects _ -> all (`elem` objects) chosen
   Prompt.Type.ChooseReturns _ _ _ objects _ -> all (`elem` objects) chosen
   Prompt.Type.ChooseCounterRemoval _ _ _ objects -> chosen `elem` objects
-  Prompt.Type.ChooseCounterRemovalAmong _ _ _ _ bearers -> all (`Map.member` bearers) (Map.keys chosen)
-  Prompt.Type.ChooseCounterRemovalAtLeast _ _ _ _ bearers -> all (`Map.member` bearers) (Map.keys chosen)
-  Prompt.Type.ChooseCounterRemovalUpTo _ _ _ _ bearers -> all (`Map.member` bearers) (Map.keys chosen)
+  Prompt.Type.ChooseCounterRemovalAmong _ _ _ _ bearers -> Map.isSubmapOfBy (<=) chosen bearers
+  Prompt.Type.ChooseCounterRemovalAtLeast _ _ _ _ bearers -> Map.isSubmapOfBy (<=) chosen bearers
+  Prompt.Type.ChooseCounterRemovalUpTo _ _ _ _ bearers -> Map.isSubmapOfBy (<=) chosen bearers
   Prompt.Type.ChooseAttachment _ _ _ objects -> chosen `elem` objects
   Prompt.Type.ChoosePlayPermission _ _ _ permissions -> chosen `elem` permissions
   Prompt.Type.ChooseClause _ _ _ _ clauses _ -> chosen `elem` clauses
