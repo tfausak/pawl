@@ -1,0 +1,36 @@
+{
+  "description": "CR 707.9e a copy effect applied after Altered Ego's takes back its additional counters",
+  "note": "Altered Ego is cast with X = 2 and copies alice's Quicksilver Gargantuan, on the battlefield as its printed self, so it gains the Gargantuan's own \"enter as a copy\" replacement, which CR 616.2 applies to the same entry: Altered Ego becomes a 7/7 copy of bob's Hill Giant. That second copy effect is applied after Altered Ego's, so Altered Ego's two additional +1/+1 counters do not happen and it is 7/7, not 9/9. The scenario beside it declines the second copy and keeps the counters; the two differ in that one answer.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Quicksilver Gargantuan", "label": "gargantuan" },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [{ "card": "Altered Ego", "label": "ego" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$ego", "x": 2, "mana": ["Forest", "Forest#2", "Forest#3", "Island", "Island#2", "Island#3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$gargantuan" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$giant" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Altered Ego", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Altered Ego", "power": 7, "toughness": 7 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Altered Ego", "names": ["Hill Giant"] } } }
+  ]
+}

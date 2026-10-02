@@ -1,0 +1,35 @@
+{
+  "description": "CR 707.9e declining the second copy leaves Altered Ego its additional counters",
+  "note": "The control for the scenario beside it, the same board with the Gargantuan's copied \"may\" declined: no copy effect is applied after Altered Ego's, so its two additional +1/+1 counters happen and it is a 9/9 copy of the Gargantuan.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Quicksilver Gargantuan", "label": "gargantuan" },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Forest", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true }
+        ],
+        "hand": [{ "card": "Altered Ego", "label": "ego" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$ego", "x": 2, "mana": ["Forest", "Forest#2", "Forest#3", "Island", "Island#2", "Island#3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$gargantuan" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": null } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Altered Ego", "kind": { "type": "PlusOnePlusOne" }, "count": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Altered Ego", "power": 9, "toughness": 9 } } }
+  ]
+}
