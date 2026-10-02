@@ -816,6 +816,10 @@ attackCeilingGiven limits alone barred candidates gs =
 -- the cheapest of that value, so the running sums are the answer at each size.
 -- The initial network is acyclic and successive shortest paths never makes a
 -- negative cycle, so Bellman-Ford is sound throughout.
+--
+-- The backward arcs are a fence rather than a proof: dropping them keeps the
+-- Combat subtree green, since Pawl.CombatEffectSpec's Crawlspace board re-aims
+-- its third creature at carol directly rather than along a path moving another.
 heaviestBySize :: (Ord target) => Maybe Integer -> (target -> Maybe Integer) -> [[(target, Natural)]] -> [Natural]
 heaviestBySize whole roomAt creatures =
   let start = 0 :: Int

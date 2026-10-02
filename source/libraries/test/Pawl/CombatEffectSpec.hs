@@ -618,11 +618,11 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
         Spec.assertEqWith s "all three are offered" (Combat.legalAttackers S.alice gs) mine
       _ -> Spec.assertFailure s "fixture should have three creatures"
   Spec.it s "CR 509.1c a Lure under a bound of one: the maximum is ONE blocker" $ do
-    -- The blocking twin of the case above, over blockCeiling's fold. Lure makes
-    -- every creature able to block the enchanted attacker do so, which is all
-    -- three of bob's; the bound allows one. So declining becomes illegal, exactly
-    -- one blocker is legal, and two remain forbidden -- the requirement and the
-    -- restriction each moving one of the three answers.
+    -- The blocking twin of the maximum-is-TWO case above, over blockCeiling's
+    -- fold. Lure makes every creature able to block the enchanted attacker do
+    -- so, which is all three of bob's; the bound allows one. So declining
+    -- becomes illegal, exactly one blocker is legal, and two remain forbidden --
+    -- the requirement and the restriction each moving one of the three answers.
     lure <- S.printingOf s registry "Lure"
     silentArbiter <- S.printingOf s registry "Silent Arbiter"
     piker <- S.printingOf s registry "Goblin Piker"
