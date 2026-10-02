@@ -1097,6 +1097,11 @@ applyCopyException this own snapshot exception = case exception of
     -- spell costs`, no hit).
     GrantedAbility.SelfCostReduction reduction ->
       snapshot {PC.costReductions = PC.costReductions snapshot <> [reduction]}
+    -- Into the COPIABLE list, the Static arm's reason. A regression fence: no
+    -- copy exception grants one (MTGJSON 2026-08-23, `except ... has "You may
+    -- pay`, no hit).
+    GrantedAbility.SelfAlternativeCost alternative ->
+      snapshot {PC.alternativeCosts = PC.alternativeCosts snapshot <> [alternative]}
   -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
   -- copied type line rather than the replacement CR 205.1a's own sentence would
   -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.
@@ -1701,6 +1706,7 @@ noCharacteristics =
       PC.alternativeCosts = [],
       PC.costReductions = [],
       PC.grantedCostReductions = [],
+      PC.grantedAlternativeCosts = [],
       -- CR 709.5: no characteristics, so no halves either.
       PC.halves = Nothing,
       -- CR 707.9: no copy effect, so no exception either.
@@ -1873,6 +1879,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               PC.costReductions = Face.costReductions face,
               -- CR 613.1's starting point, before layer 6 has run.
               PC.grantedCostReductions = [],
+              PC.grantedAlternativeCosts = [],
               -- CR 709.5 / 709.5b: the halves this object has, which -- like the
               -- names above -- `face` cannot carry, a Face being one half's worth
               -- of characteristics. Game.halvesOf decides, and it reads the copy

@@ -12,6 +12,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
@@ -126,4 +127,12 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
       codec
       (GrantedAbility.SelfCostReduction (CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less))
       " {\"type\":\"SelfCostReduction\",\"value\":{\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}} "
+  -- CR 118.9: Mine Security's "You may pay {0} rather than pay this spell's
+  -- mana cost".
+  Spec.it s "SelfAlternativeCost" $
+    Common.assertCodec
+      s
+      codec
+      (GrantedAbility.SelfAlternativeCost (AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])))
+      " {\"type\":\"SelfAlternativeCost\",\"value\":{\"cost\":{\"mana\":[]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

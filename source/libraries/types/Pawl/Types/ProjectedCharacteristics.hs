@@ -357,6 +357,10 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- cast"). Apart from costReductions for grantedPlayerAbilities' reason: that
     -- list is copiable and read off Game.castingFaceOf, and a grant is neither.
     grantedCostReductions :: [CostReduction.CostReduction],
+    -- | CR 613.1f / 118.9: the alternative costs layer 6 GRANTED the object
+    -- (Mine Security's perpetual "You may pay {0} rather than pay this spell's
+    -- mana cost"), apart from alternativeCosts for grantedCostReductions' reason.
+    grantedAlternativeCosts :: [AlternativeCost.AlternativeCost],
     -- | CR 709.5: the card whose HALVES this object has, and Nothing for an
     -- object with no shared type line. The one field here that is not a
     -- characteristic: rule 709.5's last sentence makes the shared type line's

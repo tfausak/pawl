@@ -2,6 +2,7 @@ module Pawl.Codec.GrantedAbility where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.AlternativeCost as AlternativeCost
 import qualified Pawl.Codec.CostReduction as CostReduction
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
@@ -32,7 +33,8 @@ codec cardCodec =
       Arm.payload "Rules" RuleAbilities.codec GrantedAbility.Rules (\x -> case x of GrantedAbility.Rules y -> Just y; _ -> Nothing),
       Arm.payload "Replacement" (PrintedReplacement.codec cardCodec (codec cardCodec) (Effect.codec cardCodec (codec cardCodec))) GrantedAbility.Replacement (\x -> case x of GrantedAbility.Replacement y -> Just y; _ -> Nothing),
       Arm.payload "Player" PlayerStaticAbility.codec GrantedAbility.Player (\x -> case x of GrantedAbility.Player y -> Just y; _ -> Nothing),
-      Arm.payload "SelfCostReduction" CostReduction.codec GrantedAbility.SelfCostReduction (\x -> case x of GrantedAbility.SelfCostReduction y -> Just y; _ -> Nothing)
+      Arm.payload "SelfCostReduction" CostReduction.codec GrantedAbility.SelfCostReduction (\x -> case x of GrantedAbility.SelfCostReduction y -> Just y; _ -> Nothing),
+      Arm.payload "SelfAlternativeCost" AlternativeCost.codec GrantedAbility.SelfAlternativeCost (\x -> case x of GrantedAbility.SelfAlternativeCost y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: GrantedAbility.GrantedAbility card -> String
@@ -44,3 +46,4 @@ tagOf x = case x of
   GrantedAbility.Replacement {} -> "Replacement"
   GrantedAbility.Player {} -> "Player"
   GrantedAbility.SelfCostReduction {} -> "SelfCostReduction"
+  GrantedAbility.SelfAlternativeCost {} -> "SelfAlternativeCost"
