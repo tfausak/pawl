@@ -21,6 +21,7 @@ import qualified Pawl.Codec.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Codec.AlternativeCost as AlternativeCost
 import qualified Pawl.Codec.AttachRestriction as AttachRestriction
 import qualified Pawl.Codec.AttackCost as AttackCost
+import qualified Pawl.Codec.AttackPermission as AttackPermission
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
 import qualified Pawl.Codec.BlockCost as BlockCost
 import qualified Pawl.Codec.BlockPermission as BlockPermission
@@ -139,6 +140,7 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) Face.sacrificeRestrictions
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
   crewRestrictions <- Fields.defaulted "crewRestrictions" [] (Common.list CrewRestriction.codec) Face.crewRestrictions
+  attackPermissions <- Fields.defaulted "attackPermissions" [] (Common.list AttackPermission.codec) Face.attackPermissions
   attachRestrictions <- Fields.defaulted "attachRestrictions" [] (Common.list AttachRestriction.codec) Face.attachRestrictions
   counterRestrictions <- Fields.defaulted "counterRestrictions" [] (Common.list CounterRestriction.codec) Face.counterRestrictions
   activationProhibitions <- Fields.defaulted "activationProhibitions" [] (Common.list ActivationProhibition.codec) Face.activationProhibitions
@@ -210,6 +212,7 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
         Face.sacrificeRestrictions = sacrificeRestrictions,
         Face.untapRestrictions = untapRestrictions,
         Face.crewRestrictions = crewRestrictions,
+        Face.attackPermissions = attackPermissions,
         Face.attachRestrictions = attachRestrictions,
         Face.counterRestrictions = counterRestrictions,
         Face.activationProhibitions = activationProhibitions,

@@ -1198,7 +1198,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "CR 608.2c the rider ran: one Giant" (S.countOnBattlefieldByName giantToken S.alice after) 1
     Spec.assertEqWith s "and the Otherwise branch did not: no Food token" (S.countOnBattlefieldByName foodToken S.alice after) 0
     Spec.assertEqWith s "CR 701.21a two of the three Golden Eggs went" (S.countOnBattlefieldByName goldenEgg S.alice after) 1
-    Spec.assertEqWith s "CR 608.2d the branch was announced once" (clausesAnswered asked) [ClauseIndex.MkClauseIndex 0]
+    Spec.assertEqWith s "CR 608.2d the branch was announced once" (clausesAnswered asked) [Just (ClauseIndex.MkClauseIndex 0)]
   -- CR 608.2f / 603.12: does Effect.ForEach's own body run through the SAME
   -- happened-fold a clause's instructions do, or does every body instruction
   -- run unconditionally regardless of whether the one before it did anything?
@@ -3467,7 +3467,7 @@ twiddleAnswer branch decision target p = case p of
   -- offers ToCreature, and a hand-built recipient of the wrong shape is dropped
   -- by CR 608.2b's re-read with no error.
   Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just target) . Recipient.objectOf) sets
-  Prompt.ChooseClause {} -> branch
+  Prompt.ChooseClause {} -> Just branch
   Prompt.ChooseOptional {} -> decision
   _ -> S.identityAnswer p
 
@@ -3507,9 +3507,9 @@ planResolved branch (gs, planId) =
 planAnswer :: ClauseIndex.ClauseIndex -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])] r
 planAnswer branch p = case p of
   Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring (== Recipient.ToPlayer S.bob) sets)
-  Prompt.ChooseClause _ pid _ _ live _ -> do
+  Prompt.ChooseClause _ pid _ _ live _ _ -> do
     State.modify' ((pid, NonEmpty.toList live) :)
-    pure (if elem branch live then branch else NonEmpty.head live)
+    pure (Just (if elem branch live then branch else NonEmpty.head live))
   Prompt.ChooseDiscard _ _ ids n -> pure (List.genericTake n ids)
   -- CR 608.2g's "may", taken: alice accepts every free cast she is offered, so
   -- a limb that reached her is visible on the stack.
@@ -3581,11 +3581,11 @@ valeyardCombat (gs, _) =
 -- through the offer and pinned, emperorAnswer's posture.
 valeyardAnswer :: Map.Map PlayerId.PlayerId [ClauseIndex.ClauseIndex] -> Prompt.Prompt r -> State.State (Map.Map PlayerId.PlayerId Int) r
 valeyardAnswer queues p = case p of
-  Prompt.ChooseClause _ pid _ _ live _ -> do
+  Prompt.ChooseClause _ pid _ _ live _ _ -> do
     asked <- State.gets (Map.findWithDefault 0 pid)
     State.modify' (Map.insertWith (+) pid 1)
     let wanted = Maybe.fromMaybe (NonEmpty.head live) (Maybe.listToMaybe (drop asked (Map.findWithDefault [] pid queues)))
-    pure (if elem wanted live then wanted else NonEmpty.head live)
+    pure (Just (if elem wanted live then wanted else NonEmpty.head live))
   Prompt.ChooseSacrifices _ _ _ offered _ _ -> pure (Set.fromList (take 1 offered))
   _ -> pure (S.identityAnswer p)
 
@@ -3595,15 +3595,15 @@ valeyardAnswer queues p = case p of
 -- repair a mutation that aimed the sacrifice at the wrong seat.
 emperorAnswer :: Map.Map PlayerId.PlayerId ClauseIndex.ClauseIndex -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])] r
 emperorAnswer picks p = case p of
-  Prompt.ChooseClause _ pid _ _ live _ -> do
+  Prompt.ChooseClause _ pid _ _ live _ _ -> do
     State.modify' ((pid, NonEmpty.toList live) :)
     let wanted = Map.findWithDefault (NonEmpty.head live) pid picks
-    pure (if elem wanted live then wanted else NonEmpty.head live)
+    pure (Just (if elem wanted live then wanted else NonEmpty.head live))
   Prompt.ChooseSacrifices _ _ _ offered _ _ -> pure (Set.fromList (take 1 offered))
   _ -> pure (S.identityAnswer p)
 
 -- Which branches CR 608.2d actually asked about, in the order asked.
-branchesAnnounced :: [Response.Response] -> [ClauseIndex.ClauseIndex]
+branchesAnnounced :: [Response.Response] -> [Maybe ClauseIndex.ClauseIndex]
 branchesAnnounced = Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing)
 
 -- And which "may"s CR 603.5 asked about, so a second offer to the losing branch
@@ -3705,12 +3705,12 @@ opportunityBoard s registry eggs = do
 -- pick is pinned by id.
 opportunityAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 opportunityAnswer pinned p = case p of
-  Prompt.ChooseClause _ _ _ _ live _ -> if elem (ClauseIndex.MkClauseIndex 0) live then ClauseIndex.MkClauseIndex 0 else NonEmpty.head live
+  Prompt.ChooseClause _ _ _ _ live _ _ -> Just (if elem (ClauseIndex.MkClauseIndex 0) live then ClauseIndex.MkClauseIndex 0 else NonEmpty.head live)
   Prompt.ChooseSacrifices _ _ _ offered n _ -> Set.fromList (List.genericTake n (filter (`elem` pinned) offered <> filter (`notElem` pinned) offered))
   _ -> S.identityAnswer p
 
 -- The CR 608.2d announcements a transcript holds.
-clausesAnswered :: [Response.Response] -> [ClauseIndex.ClauseIndex]
+clausesAnswered :: [Response.Response] -> [Maybe ClauseIndex.ClauseIndex]
 clausesAnswered = Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing)
 
 giantToken :: CardName.CardName
@@ -4423,6 +4423,7 @@ subgameSpellOn borrowed name effects gs0 =
             Face.attachRestrictions = [],
             Face.counterRestrictions = [],
             Face.crewRestrictions = [],
+            Face.attackPermissions = [],
             Face.activationProhibitions = [],
             Face.entryRestrictions = [],
             Face.attackCosts = [],
@@ -4519,11 +4520,13 @@ subgameSpellOn borrowed name effects gs0 =
 -- puts on different branches, and a two-seat board could not tell "the seat who
 -- announced the sacrifice" from "the seat who did not announce the damage".
 --
--- The answerer says YES to whichever second question it is asked -- the pay and
--- the "may" alike -- so the ANNOUNCEMENT is the only thing that decides what
--- happens to a seat. That is what makes the exclusivity observable: an engine
--- offering both branches to everybody would have bob sacrifice AND take the
--- damage in the first two cases.
+-- Every branch here carries its own decline, so CR 608.2d's announcement is
+-- among three outcomes and settles the seat's whole answer (Resolve.chosenBranch).
+-- The answerer BACKS OUT of any second question it is asked -- the pay and the
+-- "may" alike -- so a seat's branch happens only if the announcement committed
+-- it, and the ANNOUNCEMENT is the only thing that decides what happens to a
+-- seat. An engine offering both branches to everybody would have bob sacrifice
+-- AND take the damage in the first two cases.
 wormsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 wormsSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
@@ -4540,34 +4543,32 @@ wormsSpec s registry =
       sacrificeBranch = ClauseIndex.MkClauseIndex 0
       damageBranch = ClauseIndex.MkClauseIndex 1
       -- Choice-keyed, and keyed on the SEAT: a seat the map does not name
-      -- announces the sacrifice and then refuses to pay for it, which is the
-      -- decline every printed reading allows.
+      -- announces "neither". Any second question is declined.
       announcing :: Map.Map PlayerId.PlayerId ClauseIndex.ClauseIndex -> Prompt.Prompt r -> r
       announcing choices p = case p of
-        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _ _
-          | d == player -> Map.findWithDefault sacrificeBranch player choices
-        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
-          | d == player -> if Map.member player choices then PaymentDecision.Pays else PaymentDecision.Declines
-        Prompt.ChooseOptional (Decider.MkDecider d) player _ _ _ _
-          | d == player -> if Map.member player choices then OptionalDecision.Exercises else OptionalDecision.Declines
+        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _ _ _
+          | d == player -> Map.lookup player choices
+        _ -> backingOut p
+      backingOut :: Prompt.Prompt r -> r
+      backingOut p = case p of
+        Prompt.ChooseToPay {} -> PaymentDecision.Declines
+        Prompt.ChooseOptional {} -> OptionalDecision.Declines
         _ -> S.identityAnswer p
-      -- CR 101.4b: alice announces `hers`, and each later seat announces what
-      -- its prompt says the seat before it announced -- the sacrifice when told
-      -- nothing. Only bob then goes through with his branch.
+      -- CR 101.4b: alice announces `hers`, bob announces what his prompt says
+      -- the seat before him announced, and carol announces neither.
       copying :: ClauseIndex.ClauseIndex -> Prompt.Prompt r -> r
       copying hers p = case p of
-        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _ earlier
+        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _ _ earlier
           | d == player ->
               if player == S.alice
-                then hers
-                else case Seq.viewr earlier of
-                  _ Seq.:> (_, previous) -> previous
-                  Seq.EmptyR -> sacrificeBranch
-        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
-          | d == player -> if player == S.bob then PaymentDecision.Pays else PaymentDecision.Declines
-        Prompt.ChooseOptional (Decider.MkDecider d) player _ _ _ _
-          | d == player -> if player == S.bob then OptionalDecision.Exercises else OptionalDecision.Declines
-        _ -> S.identityAnswer p
+                then Just hers
+                else
+                  if player == S.bob
+                    then case Seq.viewr earlier of
+                      _ Seq.:> (_, previous) -> previous
+                      Seq.EmptyR -> Nothing
+                    else Nothing
+        _ -> backingOut p
       -- A different basic per seat, so a land count reads one seat's payment and
       -- not the table's, and THREE of them where the cost takes two -- a seat
       -- that paid keeps one, which "sacrificed everything he had" would not.
@@ -4608,28 +4609,37 @@ wormsSpec s registry =
           (_, onStack) <- boardOf 3
           let damaged = S.runPure (copying damageBranch) onStack Stack.resolveTop
               sacrificed = S.runPure (copying sacrificeBranch) onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 101.4b told alice announced the damage, bob took the 5 damage and kept his Forests" (lives damaged, lands damaged) ((Just 20, Just 15, Just 20), (3, 3, 3))
-          Spec.assertEqWith s "CR 101.4b told alice announced the sacrifice, bob sacrificed two Forests" (lives sacrificed, lands sacrificed) ((Just 20, Just 20, Just 20), (3, 1, 3))
+          Spec.assertEqWith s "CR 101.4b told alice announced the damage, bob took the 5 damage beside her and kept his Forests" (lives damaged, lands damaged) ((Just 15, Just 15, Just 20), (3, 3, 3))
+          Spec.assertEqWith s "CR 101.4b told alice announced the sacrifice, bob sacrificed two Forests beside her two Swamps" (lives sacrificed, lands sacrificed) ((Just 20, Just 20, Just 20), (1, 1, 3))
+        -- CR 608.2d / 101.4: alice (the active player) announces the damage and
+        -- bob the sacrifice, and the damage clause comes after the sacrifice
+        -- clause. Asked again at her "may", alice would back out having seen
+        -- bob's lands go; one announcement among three outcomes holds her to it.
+        Spec.it s "CR 608.2d a seat that announced the damage is held to it" $ do
+          (_, onStack) <- boardOf 3
+          let ((_, after), asked) = Replay.record (announcing (Map.fromList [(S.alice, damageBranch), (S.bob, sacrificeBranch)])) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 608.2d alice took the 5 damage she announced, after bob paid with two Forests" (lives after, lands after) ((Just 15, Just 20, Just 20), (3, 1, 3))
+          Spec.assertEqWith s "CR 608.2d nobody was asked a second question to back out with" [r | r <- asked, case r of { Response.ChoseToPay _ -> True; Response.ChoseOptional _ -> True; _ -> False }] []
         Spec.it s "CR 608.2c with every seat declining, the enchantment survives untouched" $ do
           (_, onStack) <- boardOf 3
           let after = S.runPure (announcing Map.empty) onStack Stack.resolveTop
           Spec.assertEqWith s "CR 608.2c nobody did either, so the enchantment stands" (wormsStands after) 1
           Spec.assertEqWith s "no land was sacrificed" (lands after) (3, 3, 3)
           Spec.assertEqWith s "and no seat took the damage" (lives after) (Just 20, Just 20, Just 20)
-        -- The fence on the branch that is a COST: a seat who announces the
-        -- sacrifice but controls one land is never asked to pay it (CR 118.3),
-        -- so the enchantment is not destroyed. Without CR 118.12 carrying that
-        -- branch -- a plain instruction to sacrifice two lands would do as much
-        -- as it could and count as done -- every landless seat would destroy the
-        -- enchantment for free at every upkeep.
-        Spec.it s "CR 118.3 a seat who cannot pay the sacrifice is not offered it" $ do
+        -- CR 608.2d per seat, with CR 118.3 deciding what is impossible: carol
+        -- controls one land, so the sacrifice is not an option for her, and she
+        -- takes the sacrifice whenever she is offered it and the damage
+        -- otherwise. Offered it, she would announce a branch she cannot pay for
+        -- and nothing would happen.
+        Spec.it s "CR 608.2d a seat who cannot pay the sacrifice is offered only the damage" $ do
           (_, onStack) <- boardOf 1
-          let ((_, after), asked) = Replay.record (announcing (Map.singleton S.carol sacrificeBranch)) onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 608.2c nothing was done, so the enchantment stands" (wormsStands after) 1
-          Spec.assertEqWith s "carol's one Mountain is still hers" (lands after) (3, 3, 1)
-          Spec.assertEqWith s "and she took no damage in its place" (lives after) (Just 20, Just 20, Just 20)
-          Spec.assertEqWith s "CR 118.3 the cost was offered to the two seats who could pay it and not to carol" (Maybe.mapMaybe (\r -> case r of Response.ChoseToPay d -> Just d; _ -> Nothing) asked) [PaymentDecision.Declines, PaymentDecision.Declines]
-          Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length (Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing) asked)) 3
+          let preferringSacrifice :: Prompt.Prompt r -> r
+              preferringSacrifice p = case p of
+                Prompt.ChooseClause (Decider.MkDecider d) player _ _ live _ _
+                  | d == player && player == S.carol -> Just (if elem sacrificeBranch live then sacrificeBranch else damageBranch)
+                _ -> announcing Map.empty p
+              after = S.runPure preferringSacrifice onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 608.2d carol took the damage, kept her one Mountain, and the enchantment is gone" (lives after, lands after, wormsStands after) ((Just 20, Just 20, Just 15), (3, 3, 1), 0)
 
 -- CR 608.2d's battlefield choice put to somebody other than the resolving
 -- controller, with Wormfang Crab {3}{U} Creature -- Nightmare Crab 3/6: "When

@@ -10,6 +10,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
+import qualified Pawl.Types.AttackPermission as AttackPermission
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -45,6 +46,7 @@ testRuleAbilities =
     { RuleAbilities.activationProhibitions = [ActivationProhibition.MkActivationProhibition Affected.Attached Nothing Nothing],
       RuleAbilities.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)],
       RuleAbilities.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
+      RuleAbilities.attackPermissions = [AttackPermission.MkAttackPermission Affected.Attached],
       RuleAbilities.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing RequirementArity.EachSubject],
       RuleAbilities.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
       RuleAbilities.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
@@ -62,6 +64,7 @@ testRuleAbilitiesJson =
   "{\"activationProhibitions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attachRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"attachers\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"scope\":{\"type\":\"Controller\"}}],"
+    <> "\"attackPermissions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
     <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}],"
     <> "\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":{\"type\":\"Literal\",\"value\":1}}],"
@@ -75,7 +78,7 @@ testRuleAbilitiesJson =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.RuleAbilities" $ do
-  Spec.it s "MkRuleAbilities, every one of the thirteen lists populated" $
+  Spec.it s "MkRuleAbilities, every one of the fourteen lists populated" $
     Common.assertCodec s RuleAbilities.codec testRuleAbilities testRuleAbilitiesJson
   Spec.it s "an empty bundle omits every key" $
     Common.assertCodec s RuleAbilities.codec mempty " {} "

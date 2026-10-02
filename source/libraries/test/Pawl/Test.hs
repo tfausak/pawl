@@ -72,6 +72,7 @@ import qualified Pawl.Codec.AttachedToBoundSpec
 import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackLimitUnlessSpec
 import qualified Pawl.Codec.AttackOptionSpec
+import qualified Pawl.Codec.AttackPermissionSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.AttackTargetKindSpec
 import qualified Pawl.Codec.AttackTargetRefSpec
@@ -1066,6 +1067,7 @@ spec s registry = do
   Pawl.Codec.EntryRSpec.spec s
   Pawl.Codec.CounterRestrictionSpec.spec s
   Pawl.Codec.CrewRestrictionSpec.spec s
+  Pawl.Codec.AttackPermissionSpec.spec s
   Pawl.Codec.EnteringTogetherSpec.spec s
   Pawl.Codec.EntryRestrictionSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
