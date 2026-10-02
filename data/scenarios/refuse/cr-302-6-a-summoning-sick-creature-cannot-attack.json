@@ -1,0 +1,58 @@
+{
+  "description": "CR 302.6 a creature that came under alice's control this turn cannot attack; the one she has had since the turn began can",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "sick"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "giant",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "refuse": {
+        "Attack": [
+          "$sick",
+          "$giant"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$giant"
+        ]
+      }
+    }
+  ],
+  "final": [
+    {
+      "Attackers": {
+        "attackers": {
+          "$giant": "$bob"
+        }
+      }
+    }
+  ]
+}

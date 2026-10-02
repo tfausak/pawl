@@ -846,8 +846,13 @@ onEntry unscheduled key kind offers select match = do
       Entry.Refuse verb
         | Just action <- match verb -> do
             popAt key index
-            State.modify' (\rehearsal -> rehearsal {refusing = Just (key, verb, kind)})
-            action
+            before <- State.get
+            -- A refused move naming something the prompt did not offer is
+            -- refused already: the prompt takes the next entry instead.
+            case State.runStateT action before {refusing = Just (key, verb, kind)} of
+              Left Failure.MkUnofferedObject {} -> onEntry unscheduled key kind offers select match
+              Left failure -> failWith failure
+              Right (answer, after) -> answer <$ State.put after
       entry -> failWith (Failure.MkUnexpectedPrompt key entry kind offers)
 
 -- Checks -----------------------------------------------------------------------
