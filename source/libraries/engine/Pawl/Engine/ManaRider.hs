@@ -60,8 +60,8 @@ uncounterable oid gs = case Game.lookupObject oid gs of
 -- | CR 106.6a's eager road, and the one CR 611.2 effect in the engine that no
 -- resolution mints: "if the spell or ability creates a continuous effect ... if
 -- the mana is spent, a separate effect is created once for each mana produced".
--- Called by Pawl.Engine.Cost's recordSpent, which is the one place that knows
--- which units went, on the same state CR 400.7d's record is written to.
+-- Called by Pawl.Engine.Cost.recordPayment, for the caster's payment and an
+-- assisting player's alike, on the same state CR 400.7d's record is written to.
 --
 -- ONE effect per matching UNIT rather than one over the payment, which is that
 -- rule's own last clause; each takes its own timestamp, and CR 613.7 orders
