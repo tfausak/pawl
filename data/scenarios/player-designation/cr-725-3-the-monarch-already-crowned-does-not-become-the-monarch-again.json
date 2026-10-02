@@ -1,0 +1,204 @@
+{
+  "description": "CR 725.3 a player already the monarch does not become the monarch again, so Garland triggers once",
+  "note": "Knights of the Black Rose's ruling (2016-08-23): a \"become the monarch\" trigger fires only for a player not already the monarch. carol's two attackers connect at once, so CR 725.2's steal triggers twice; the first crowns carol and alice's Garland takes the Piker that stayed home, and the second finds carol already crowned and records nothing. A second Garland trigger would raise a target prompt between the two attackers, which nothing answers. Garland takes a creature that dealt no damage on purpose: taking an attacker changes its controller before the second steal resolves, and CR 608.2h then crowns its new controller, a real change of monarch.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Garland, Royal Kidnapper",
+            "label": "garland",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "giant",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "homebody",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "carol",
+    "step": "BeginningOfCombat",
+    "monarch": "bob"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "Attack": [
+          "$piker",
+          "$giant"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      },
+      "source": "$piker"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      },
+      "source": "$giant"
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "bob",
+      "do": {
+        "OrderTriggers": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$homebody"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "carol",
+      "check": {
+        "Monarch": {
+          "player": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$homebody",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$piker",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$giant",
+          "is": "carol"
+        }
+      }
+    }
+  ]
+}
