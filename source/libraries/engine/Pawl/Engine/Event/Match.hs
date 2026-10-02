@@ -1723,7 +1723,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- The bearer is the EXILE incarnation, which is the id the CR 400.7 funnel
   -- minted and the id the event carries -- see the arm above.
   TriggerCondition.SelfExiledForMadness -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded _ oid _ madness) -> not (Set.null madness) && oid == bearer
+    GameEvent.Discarded (Discarded.MkDiscarded _ oid _ madness) -> Maybe.isJust madness && oid == bearer
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
