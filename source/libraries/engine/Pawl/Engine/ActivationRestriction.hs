@@ -21,10 +21,12 @@
 -- classification, not an effect's identity.
 module Pawl.Engine.ActivationRestriction where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -189,7 +191,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
     Nothing -> False
     Just this -> case Game.lookupObject srcId gs of
       Nothing -> True
-      Just object -> Set.notMember this (Object.activatedOnce object)
+      Just object -> unspent srcId this (Object.activatedOnce object) gs
   -- CR 602.5b's own example, the same question asked of THIS TURN: has this
   -- ability of this object been activated since the turn began? The record is
   -- GameState.activatedThisTurn, which Engine.beginTurnOf clears -- so the reset
@@ -202,7 +204,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- somewhere it offers abilities from.
   ActivationRestriction.OnlyOnceEachTurn -> case ability of
     Nothing -> False
-    Just this -> Set.notMember this (Map.findWithDefault Set.empty srcId (GameState.activatedThisTurn gs))
+    Just this -> unspent srcId this (Map.findWithDefault Map.empty srcId (GameState.activatedThisTurn gs)) gs
   -- Goblin Bookie's "any time it makes sense", read as CR 706.2's modification
   -- step: open only while Pawl.Engine.Resolve.Effect.throwDice is asking
   -- about a die, so never at priority (CR 117.1b).
@@ -235,6 +237,24 @@ atInstantSpeed restriction = case restriction of
   ActivationRestriction.DuringDieRoll -> restriction
   ActivationRestriction.InstantSpeed -> restriction
 
+-- CR 602.5b / 602.5c: does `srcId` bear a copy of `this` not yet spent? Each
+-- identically worded copy (CR 113.2c) is its own ability to a restriction on
+-- its use, so the counted spends are compared with the copies the source now
+-- bears -- Locus of Enlightenment crafted with two Gliding Licids may activate
+-- each Licid's ability once each turn. At least one copy, so an ability no
+-- projection lists (a rule-702 minted one, off the battlefield) keeps the plain
+-- "not yet" reading. The projection is asked only once something is spent.
+--
+-- Not implemented: the count cannot say WHICH copy spent, so when the spent
+-- copy's grant goes and an unspent twin stays, the twin reads as spent (#4627).
+--
+-- Pawl.ActivateSpec's "CR 602.5c two Gliding Licids give the Locus two
+-- once-each-turn animate abilities" proves the per-turn record.
+unspent :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Map.Map (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) Natural -> GameState -> Bool
+unspent srcId this spent gs = case Map.findWithDefault 0 this spent of
+  0 -> True
+  n -> n < max 1 (List.genericLength (filter (== this) (Projection.abilitiesOf srcId gs)))
+
 -- CR 602.5b: record that THIS ability of this source has now been activated,
 -- for whichever counted rider it prints. The writer both readers above are
 -- served from, so the two roads to an activation cannot disagree:
@@ -255,9 +275,9 @@ recordActivation :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (Gra
 recordActivation srcId ability gs =
   let prints restriction = elem restriction (Keyword.restrictionsOf ability)
       perGame g =
-        g {GameState.objects = Map.adjust (\o -> o {Object.activatedOnce = Set.insert ability (Object.activatedOnce o)}) srcId (GameState.objects g)}
+        g {GameState.objects = Map.adjust (\o -> o {Object.activatedOnce = Map.insertWith (+) ability 1 (Object.activatedOnce o)}) srcId (GameState.objects g)}
       perTurn g =
-        g {GameState.activatedThisTurn = Map.insertWith Set.union srcId (Set.singleton ability) (GameState.activatedThisTurn g)}
+        g {GameState.activatedThisTurn = Map.insertWith (Map.unionWith (+)) srcId (Map.singleton ability 1) (GameState.activatedThisTurn g)}
    in (if prints ActivationRestriction.OnlyOnceEachTurn then perTurn else id)
         ((if prints ActivationRestriction.OnlyOnce then perGame else id) gs)
 

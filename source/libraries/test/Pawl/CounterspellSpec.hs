@@ -179,7 +179,7 @@ twoBoltState piker mountain lightningBolt =
             Object.goadedBy = Set.empty,
             Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
+            Object.activatedOnce = Map.empty
           }
    in gs2
         { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),
