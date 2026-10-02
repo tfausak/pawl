@@ -59,6 +59,7 @@ sampleSnapshot =
       PC.costReductions = [],
       PC.grantedCostReductions = [],
       PC.halves = Nothing,
+      PC.exceptions = [],
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
       PC.spell = Face.defaultSpell,

@@ -46,6 +46,7 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Convoking as Convoking
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.Face as Face
@@ -79,6 +80,7 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.Saddling as Saddling
+import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
@@ -939,11 +941,266 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   -- card's halves against THIS object's doors, which is what baseCharacteristics
   -- does with Game.halvesOf underneath it.
   --
-  -- Not implemented: a CR 707.9 exception applied to a copy of a Room, which
-  -- Replacement.applyCopyExceptions stamps into the snapshot this arm goes
-  -- around (#3249). No card in data/cards/ pairs an exception with a
-  -- Room-eligible copy.
-  Nothing -> baseCharacteristics oid gs
+  -- The stamp's CR 707.9 exceptions are copiable values too (CR 707.9a /
+  -- 707.9b), so they are re-applied over that rebuild rather than lost with the
+  -- snapshot it went around. Pawl.RoomSpec's "CR 707.9a a copy of a Room keeps
+  -- the changeling its copy effect gave it" proves it.
+  Nothing -> withCopyExceptions Nothing Nothing (rebuiltExceptionsOf oid gs) (baseCharacteristics oid gs)
+
+-- CR 707.9: the exceptions `copiableCharacteristics` above owes its rebuild --
+-- the stamp's, when copiableSnapshotOf went around it for its halves, and none
+-- when it answered Nothing for having no stamp or for being face down, since CR
+-- 708.2's listed characteristics replace the exceptions with the rest.
+rebuiltExceptionsOf :: ObjectId -> GameState -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)]
+rebuiltExceptionsOf oid gs
+  | maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs) = []
+  | derivesFromCopiedHalves oid gs = foldMap PC.exceptions (stampedSnapshotOf oid gs)
+  | otherwise = []
+
+-- CR 707.9a / 707.9b: fold a copy effect's exceptions into copiable values and
+-- record them there SETTLED (settleCopyException below), after any the values
+-- already carried, so a rebuild of these values -- or of a copy of them (CR
+-- 707.2) -- re-applies them in the order they first applied. `this` and `own`
+-- are applyCopyException's; a re-application passes Nothing for both, which the
+-- settled list no longer asks about.
+withCopyExceptions :: Maybe Source.Source -> Maybe ProjectedCharacteristics -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)] -> ProjectedCharacteristics -> ProjectedCharacteristics
+withCopyExceptions this own exceptions pc =
+  (List.foldl' (applyCopyException this own) pc exceptions)
+    { PC.exceptions = PC.exceptions pc <> concatMap (settleCopyException this own) exceptions
+    }
+
+-- CR 707.9: an exception with the copy effect's context answered, so it means
+-- the same thing re-applied later with none. GainThisAbility becomes the ability
+-- it pointed at (CR 707.9a) and DontCopyColors the colours it retained (CR
+-- 707.9c); each drops where applyCopyException's own arm does nothing. One arm
+-- per constructor, applyCopyException's reason: a new one that reads the
+-- context has to be decided here.
+--
+-- Those two arms are a regression fence: Vesuvan Doppelganger and Unstable
+-- Shapeshifter would reach them by copying an animated Room, and no test builds
+-- that board.
+settleCopyException :: Maybe Source.Source -> Maybe ProjectedCharacteristics -> CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card) -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)]
+settleCopyException this own exception = case exception of
+  CopyException.GainThisAbility -> case this of
+    Just (Source.OfTrigger triggered) -> [CopyException.GainAbility (GrantedAbility.Triggered (TriggeredAbilitySource.ability triggered))]
+    Just (Source.OfAbility activated) -> [CopyException.GainAbility (GrantedAbility.Activated (ActivatedAbilitySource.ability activated))]
+    _ -> []
+  CopyException.DontCopyColors -> case own of
+    Just mine -> [CopyException.SetColors (PC.colors mine)]
+    Nothing -> []
+  CopyException.SetPowerToughness _ -> [exception]
+  CopyException.GainKeywords _ -> [exception]
+  CopyException.AddCardTypes _ -> [exception]
+  CopyException.AddSubtypes _ -> [exception]
+  CopyException.AddSupertypes _ -> [exception]
+  CopyException.RemoveSupertypes _ -> [exception]
+  CopyException.SetName _ -> [exception]
+  CopyException.SetColors _ -> [exception]
+  CopyException.NoManaCost -> [exception]
+  CopyException.GainAbility _ -> [exception]
+
+-- One arm per CopyException constructor, no wildcard, for Event.apply's reason: a
+-- new exception shape must break the build here rather than silently copy without
+-- it.
+applyCopyException :: Maybe Source.Source -> Maybe PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics -> CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card) -> PC.ProjectedCharacteristics
+applyCopyException this own snapshot exception = case exception of
+  -- CR 707.9b sets the pair; CR 707.9d is the second write -- an exception that
+  -- "provides a specific set of values for a certain characteristic" does not
+  -- copy the characteristic-defining ability that defines it, and leaving the CDA
+  -- in the snapshot would let layer 7a overwrite the pair
+  -- (Projection.applyCharacteristicPT). Not defensive, unlike
+  -- Replacement.applyEntryOption's same write: Quicksilver Gargantuan copying a
+  -- Tarmogoyf is exactly this case.
+  CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness p t) ->
+    snapshot
+      { PC.power = Just p,
+        PC.toughness = Just t,
+        PC.characteristicPT = Nothing
+      }
+  -- CR 707.9a: the gained abilities become part of the copiable values "along
+  -- with any other abilities that were copied", so this ADDS rather than sets.
+  -- unionWith (+) and not a plain union, Replacement.applyEntryOption's reason:
+  -- an instance gained here is a second instance on a copy that already had the
+  -- keyword, and CR 702.105b makes each instance of dethrone trigger separately.
+  --
+  -- Nothing else moves. CR 604.3a(2) makes an ability acquired through a copy
+  -- effect characteristic-defining, and writing it here is what delivers that:
+  -- Projection's layer-4 seed reads these keywords, so an excepted changeling
+  -- reaches applySubtypeDefining (CR 613.3, CR 702.73a) rather than being
+  -- granted in timestamp order. No companion strip either, unlike the arm above
+  -- -- CR 707.9d applies to an exception that provides VALUES for a
+  -- characteristic, and gaining an ability provides none.
+  CopyException.GainKeywords keywords ->
+    snapshot {PC.keywords = Map.unionWith (+) (PC.keywords snapshot) (Map.fromSet (const 1) keywords)}
+  -- CR 707.9a over a whole ability rather than a keyword: "this ability" is
+  -- appended to the copied ones for the arm above's reason.
+  --
+  -- WHICH LIST is CR 113.3's classification of the carrier and never a question
+  -- about which ability it is, so the closed half stays closed: a triggered
+  -- carrier (Unstable Shapeshifter) joins triggeredAbilities and an activated one
+  -- (Dimir Doppelganger) activatedAbilities. Every other arm appends nothing --
+  -- a spell, an emblem and CR 725.2's sourceless trigger have no ability to point
+  -- at, and neither does the CR 707.5 entry road's Nothing.
+  --
+  -- The ability written here still CONTAINS this exception, which is what makes
+  -- the reference self-renewing: the copy's own instance is what resolves next,
+  -- and it points at itself again. Pawl.CopySpec's "the Shapeshifter copies a
+  -- second creature with the ability it kept" and "Dimir Doppelganger's
+  -- activated ability survives the copy it makes" prove it, one road each.
+  --
+  -- CR 604.3a is silent here and that is right: it makes a copy-acquired STATIC
+  -- ability characteristic-defining, and neither a triggered nor an activated
+  -- ability is static or defines a characteristic. CR 707.9d's strip is silent
+  -- for the GainKeywords arm's reason -- an ability provides no values.
+  CopyException.GainThisAbility -> case this of
+    Just (Source.OfTrigger triggered) ->
+      snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> [TriggeredAbilitySource.ability triggered]}
+    Just (Source.OfAbility activated) ->
+      snapshot {PC.activatedAbilities = PC.activatedAbilities snapshot <> [ActivatedAbilitySource.ability activated]}
+    _ -> snapshot
+  -- CR 707.9a over a QUOTED ability (Mercurial Pretender): appended for the arm
+  -- above's reason, into the list CR 113.3's classification of the quotation
+  -- names. In the snapshot, so a Clone of the copy has it too (CR 707.2) and its
+  -- source is whichever permanent carries it (CR 113.7) -- Pawl.CopySpec's
+  -- "Mercurial Pretender's copy has the quoted ability, and so does a Clone of
+  -- it" proves both.
+  CopyException.GainAbility granted -> case granted of
+    GrantedAbility.Activated activated ->
+      snapshot {PC.activatedAbilities = PC.activatedAbilities snapshot <> [activated]}
+    GrantedAbility.Triggered triggered ->
+      snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> [triggered]}
+    GrantedAbility.Static static ->
+      snapshot {PC.staticAbilities = PC.staticAbilities snapshot <> [static]}
+    GrantedAbility.Rules rules ->
+      snapshot {PC.ruleAbilities = PC.ruleAbilities snapshot <> rules}
+    -- A regression fence: no printing's copy exception grants a quoted
+    -- replacement ability (MTGJSON 2026-08-23, `except ... has "If`, no hit).
+    GrantedAbility.Replacement replacement ->
+      snapshot {PC.replacementEffects = PC.replacementEffects snapshot <> [replacement]}
+    -- Into the COPIABLE list, the Static arm's reason. A regression fence: no
+    -- printing's copy exception grants a player ability (MTGJSON 2026-08-23,
+    -- `except ... has "You`, no hit).
+    GrantedAbility.Player player ->
+      snapshot {PC.playerAbilities = PC.playerAbilities snapshot <> [player]}
+    -- Into the COPIABLE list, the Static arm's reason. A regression fence: no
+    -- copy exception grants one (MTGJSON 2026-08-23, `except ... has "This
+    -- spell costs`, no hit).
+    GrantedAbility.SelfCostReduction reduction ->
+      snapshot {PC.costReductions = PC.costReductions snapshot <> [reduction]}
+  -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
+  -- copied type line rather than the replacement CR 205.1a's own sentence would
+  -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.
+  --
+  -- Nothing else moves, and CR 707.9d is why: its strip "does not apply to copy
+  -- effects with exceptions that state the object is a certain card type,
+  -- supertype, and/or subtype 'in addition to its other types'", so unlike the
+  -- SetPowerToughness arm above this one leaves the copied
+  -- characteristic-defining ability in place. A Metamorph copying a Tarmogoyf is
+  -- an artifact and still recomputes its P/T off the graveyards --
+  -- Pawl.CopySpec's "a type exception keeps the copied CDA where a value
+  -- exception does not" is what proves it.
+  CopyException.AddCardTypes types ->
+    snapshot {PC.cardTypes = Set.union (PC.cardTypes snapshot) types}
+  -- CR 707.9b / 205.3: "a Wall in addition to its other types" (Wall of Stolen
+  -- Identity), the same union one part of the type line over. Into the snapshot
+  -- for the arms above's reason, which is what makes the added subtype survive a
+  -- second copy (CR 707.2 / 707.9b): Pawl.CopySpec's "a token copy of Wall of
+  -- Stolen Identity's copy is still a Wall" is what proves it, since a CR 613
+  -- layer-4 write over the Wall copy would be left behind on the token and no
+  -- "destroy target Wall" would find it.
+  --
+  -- Nothing else moves, for AddCardTypes' reason: CR 707.9d's carve-out names
+  -- subtype alongside card type, so the copied characteristic-defining ability
+  -- stays -- a copy of a creature with changeling still has every creature type
+  -- (CR 707.9d's Glasspool Mimic example).
+  CopyException.AddSubtypes subtypes ->
+    snapshot {PC.subtypes = Set.union (PC.subtypes snapshot) subtypes}
+  -- CR 707.9b / 205.1b over CR 205.4a's part of the type line: "it's legendary in
+  -- addition to its other types" (Sakashima the Impostor), so a UNION where the
+  -- arm below takes a difference. CR 205.4b says the same one object at a time --
+  -- one that gains a supertype keeps the ones it had.
+  --
+  -- Into the snapshot for the arms above's reason, and read at gameplay level by
+  -- CR 704.5j: Pawl.CopySpec's "two Sakashimas copying different creatures are one
+  -- legend rule apart" is what proves the supertype arrived, since two copies that
+  -- did not gain it would both stand.
+  --
+  -- Nothing else moves, for AddCardTypes' reason: CR 707.9d's carve-out names
+  -- supertype, and no pawl characteristic-defining ability defines one anyway.
+  CopyException.AddSupertypes supertypes ->
+    snapshot {PC.supertypes = Set.union (PC.supertypes snapshot) supertypes}
+  -- CR 707.9b over CR 205.4a's part of the type line: "except it isn't legendary"
+  -- (Multiversal Recruitment), so a DIFFERENCE rather than an empty set -- the
+  -- clause names one supertype and a copy of a snow legendary permanent is still
+  -- snow.
+  --
+  -- Into the snapshot for the arms above's reason, which is what makes the
+  -- excepted value survive a second copy (CR 707.2 / 707.9b): Pawl.CopySpec's
+  -- "and so is a token copy of that token" is what proves it, since a CR 613
+  -- layer-4 write over the token would be left behind there and CR 704.5j would
+  -- take one of the two legends.
+  --
+  -- Nothing else moves. CR 707.9d's strip would drop a characteristic-defining
+  -- ability that defines the excepted characteristic, and none defines a
+  -- supertype (Pawl.Types.CopyException's arm).
+  CopyException.RemoveSupertypes supertypes ->
+    snapshot {PC.supertypes = Set.difference (PC.supertypes snapshot) supertypes}
+  -- CR 707.9b over CR 201.1's name: "except its name is Sakashima the Impostor",
+  -- so the clause's one name REPLACES whatever the copied object's were (CR
+  -- 709.4a's pair among them).
+  --
+  -- Into the snapshot for the arms above's reason. CR 707.9d has nothing to
+  -- strip: no pawl characteristic-defining ability defines a name.
+  CopyException.SetName name ->
+    snapshot {PC.names = Set.singleton name}
+  -- CR 707.9b over CR 105.2: "except it's white" REPLACES the copied colours,
+  -- colour indicator included, which is CR 707.9d's second sentence. Its first
+  -- strips the colour-defining ability, and devoid (CR 702.114a) is the one
+  -- Projection.applyColorDefining would read off the snapshot at layer 5. That
+  -- strip is a regression fence: no embalm or eternalize card has devoid, and
+  -- Hour of Eternity's "4/4 black Zombie" copy of a devoid creature card is the
+  -- board that would prove it.
+  CopyException.SetColors colors ->
+    snapshot
+      { PC.colors = colors,
+        PC.keywords = Map.filterWithKey (\keyword _ -> not (definesColorless (Set.singleton keyword))) (PC.keywords snapshot)
+      }
+  -- CR 707.9b over CR 202.1: no mana cost, so CR 202.3a's mana value 0. The
+  -- colours stay as copied, since the snapshot carries them apart from the cost;
+  -- a printed clause changes them through SetColors above. No
+  -- characteristic-defining ability defines a mana cost, so CR 707.9d has
+  -- nothing to strip.
+  CopyException.NoManaCost ->
+    snapshot {PC.manaCost = Nothing, PC.manaValue = Just 0}
+  -- CR 707.9c over CR 105.2: "it doesn't copy that creature's color" (Vesuvan
+  -- Doppelganger), so the copy RETAINS its own colours where SetColors above
+  -- states new ones. `own` is the subject's copiable values read off the
+  -- pre-effect board, which on the CR 707.5 entry road is its printed card and
+  -- on CR 707.4's road whatever a previous copy effect left -- and since that
+  -- previous copy took this same exception, a Doppelganger that has copied
+  -- before is still its printed blue.
+  --
+  -- The keyword strip is CR 707.9d's first two sentences, SetColors' reason: an
+  -- effect that "doesn't copy a certain characteristic" does not copy the
+  -- characteristic-defining ability defining it, and for colour the colour
+  -- indicator too. Devoid (CR 702.114a) is the one such ability
+  -- Projection.applyColorDefining would read out of the snapshot at layer 5.
+  --
+  -- The strip is a REGRESSION FENCE rather than a proven behaviour, SetColors'
+  -- reason: no devoid creature is a Doppelganger target any test builds, and a
+  -- board with one is what would prove it.
+  --
+  -- Nothing for `own` is the CR 707.1 token mint, where there is no earlier
+  -- object to retain a value from and so nothing to do. No printed card reaches
+  -- it: every decline-to-copy clause is Vesuvan Doppelganger's, on the two
+  -- roads above.
+  CopyException.DontCopyColors -> case own of
+    Nothing -> snapshot
+    Just mine ->
+      snapshot
+        { PC.colors = PC.colors mine,
+          PC.keywords = Map.filterWithKey (\keyword _ -> not (definesColorless (Set.singleton keyword))) (PC.keywords snapshot)
+        }
 
 -- CR 613.2a / 613.2b: an object's LAYER 1a value -- `copiableCharacteristics`
 -- above with layer 1b's face-down substitution not yet applied. CR 708.8 names
@@ -1434,6 +1691,8 @@ noCharacteristics =
       PC.grantedCostReductions = [],
       -- CR 709.5: no characteristics, so no halves either.
       PC.halves = Nothing,
+      -- CR 707.9: no copy effect, so no exception either.
+      PC.exceptions = [],
       -- CR 722.2b, for the same reason one line up.
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
@@ -1603,6 +1862,10 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- snapshot first, so a copy of a copy of a Room goes on carrying the
               -- doors.
               PC.halves = Game.halvesOf oid gs,
+              -- CR 613.1's starting point, before layer 1 has run: a copy
+              -- effect's exceptions arrive with its stamp, and
+              -- copiableCharacteristics re-applies them over this seed.
+              PC.exceptions = [],
               -- CR 722.2b: the prepare spell this object has, which `face` cannot
               -- carry either -- CR 722.4 leaves the normal half alone in every
               -- zone, so the inset frame is nowhere in it. Game.prepareSpellOf

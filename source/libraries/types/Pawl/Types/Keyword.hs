@@ -981,6 +981,6 @@ data Keyword
 --
 -- CR 702.73a's changeling takes the same routes one layer down, through the
 -- same pair of functions -- plus a third, CR 604.3a's copy-effect clause, which
--- needs no function of its own: Replacement.applyCopyException writes CR 707.9a's
+-- needs no function of its own: Projection.View.applyCopyException writes CR 707.9a's
 -- gained keyword into the copiable snapshot, which is where the printed route
 -- reads from (Omni-Changeling).
