@@ -61,6 +61,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Companion" $ do
   startingDeck s registry
   revealing s registry
+  newGames s registry
   specialAction s registry
 
 -- CR 103.2b: reveal the first companion offered rather than declining, which is
@@ -167,6 +168,68 @@ revealing s registry = Spec.describe s "CR 103.2b the reveal" $ do
         declined = setup S.identityAnswer aliceDeck aliceDeck
     Spec.assertBool s (Maybe.isJust (companionOf S.alice revealed)) "the same deck can reveal"
     Spec.assertEqWith s "CR 103.2b: and declining is an answer" (companionOf S.alice declined) Nothing
+
+-- CR 727.1 / 729.2: a restart and a subgame each start a new game following rule
+-- 103, so CR 103.2a's starting deck is taken again from the cards the new game is
+-- built from and CR 103.2b's reveal is put again.
+--
+-- Every board starts from `setup`'s real CR 103 over alice's Zirda-fulfilling
+-- deck, and the pairs differ in ONE Doomed Traveler: where it sits, or whether it
+-- is there at all.
+newGames :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+newGames s registry = Spec.describe s "CR 727.1 / 729.2 a new game" $ do
+  -- CR 727.2 involves every card alice owns that was in the game, a card a wish
+  -- brought in among them; the Traveler on the battlefield stands for that card.
+  -- So the restarted game's deck holds a permanent card with no activated
+  -- ability, and CR 103.2b no longer lets her reveal Zirda.
+  Spec.it s "CR 727.2 a restart reads its starting deck again and re-asks the reveal" $ do
+    (zirda, aliceDeck, _) <- decks s registry
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let revealed = setup revealingAnswer aliceDeck aliceDeck
+        restart gs = S.runPure revealingAnswer gs (Setup.restartGame S.performer Set.empty S.alice)
+        changed = restart (snd (S.addPermanent traveler S.alice revealed))
+        unchanged = restart revealed
+        idOf gs printing = Map.lookup printing (GameState.printingIds gs)
+    Spec.assertEqWith s "CR 103.2b: the new deck holds the Traveler, so Zirda is not her companion" (companionOf S.alice changed) Nothing
+    Spec.assertEqWith s "CR 103.2b: and without it she reveals Zirda again" (companionOf S.alice unchanged) (idOf unchanged zirda)
+    Spec.assertEqWith s "CR 103.2a: the Traveler is in the new starting deck" (idOf changed traveler >>= \i -> Map.lookup i (startingDeckOf S.alice changed)) (Just 1)
+    Spec.assertEqWith s "CR 103.2a: which is all twenty-nine of her cards" (sum (Map.elems (startingDeckOf S.alice changed))) 29
+
+  -- CR 702.139b counts the commander, which CR 903.6 holds back from the new
+  -- library exactly as it did from the first.
+  Spec.it s "CR 702.139b a restart's starting deck counts the commander" $ do
+    (_, aliceDeck, _) <- decks s registry
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let built = setup S.identityAnswer (aliceDeck {Deck.commander = Set.singleton shimatsu}) aliceDeck
+        restarted = S.runPure S.identityAnswer built (Setup.restartGame S.performer Set.empty S.alice)
+        idOf printing = Map.lookup printing (GameState.printingIds restarted)
+    Spec.assertEqWith s "CR 702.139b: Shimatsu is in the new starting deck" (idOf shimatsu >>= \i -> Map.lookup i (startingDeckOf S.alice restarted)) (Just 1)
+    Spec.assertEqWith s "CR 903.6: having begun the new game in the command zone" (length (Game.zoneMembers Zone.Command S.alice restarted)) 1
+
+  -- CR 103.2b's "if any players WISH to reveal" is asked anew: a player who
+  -- declined in the restarted game may reveal in the new one.
+  Spec.it s "CR 727.1 a player who declined may reveal after a restart" $ do
+    (zirda, aliceDeck, _) <- decks s registry
+    let declined = setup S.identityAnswer aliceDeck aliceDeck
+        restarted = S.runPure revealingAnswer declined (Setup.restartGame S.performer Set.empty S.alice)
+    Spec.assertEqWith s "CR 103.2b: she reveals Zirda in the new game" (companionOf S.alice restarted) (Map.lookup zirda (GameState.printingIds restarted))
+    Spec.assertEqWith s "having revealed nothing in the first" (companionOf S.alice declined) Nothing
+
+  -- CR 729.2: the subgame's deck is the main-game LIBRARY and nothing else, so a
+  -- Traveler in alice's main-game hand stays out of it while one in her library
+  -- is in it. CR 729.1b: the main game's companion is untouched by the subgame.
+  Spec.it s "CR 729.2 a subgame's starting deck is the main-game library" $ do
+    (zirda, aliceDeck, _) <- decks s registry
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let parentOf place = snd (place traveler S.alice (setup revealingAnswer aliceDeck aliceDeck))
+        subOf parent = S.runPure revealingAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty)
+        inLibrary = parentOf S.addLibraryCard
+        inHand = parentOf S.addHandCard
+        idOf gs printing = Map.lookup printing (GameState.printingIds gs)
+        hidden = subOf inLibrary
+    Spec.assertEqWith s "CR 103.2b: a Traveler in her main-game library bars Zirda in the subgame" (companionOf S.alice hidden) Nothing
+    Spec.assertEqWith s "CR 729.2: one in her main-game hand does not" (companionOf S.alice (subOf inHand)) (idOf inHand zirda)
+    Spec.assertEqWith s "CR 729.1b: the main game still has Zirda as her companion afterwards" (companionOf S.alice (Setup.funnelBack hidden inLibrary)) (idOf inLibrary zirda)
 
 -- alice with `lands` Mountains untapped in her precombat main phase holding
 -- priority, TWO Zirdas outside the game, and `chosen` saying whether CR 103.2b's
