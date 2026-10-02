@@ -511,6 +511,7 @@ import qualified Pawl.Codec.RevealSpec
 import qualified Pawl.Codec.RevealedSpec
 import qualified Pawl.Codec.RollDieSpec
 import qualified Pawl.Codec.RollModifierSpec
+import qualified Pawl.Codec.RoomHalfSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
 import qualified Pawl.Codec.RuleAbilitiesSpec
@@ -1331,6 +1332,7 @@ spec s registry = do
   Pawl.Codec.RevealedSpec.spec s
   Pawl.Codec.RollDieSpec.spec s
   Pawl.Codec.RollModifierSpec.spec s
+  Pawl.Codec.RoomHalfSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.RuleAbilitiesSpec.spec s
