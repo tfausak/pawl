@@ -689,13 +689,13 @@ answerGeneric gs key kind index timed prompt = case Timed.entry timed of
     chosen <- decodeAnswer verb answer
     allowed <- legalAnswer gs prompt chosen
     if allowed then pure chosen else failWith (Failure.MkUnexpectedActionChoice key verb (kind <> Text.pack ": the rule refuses it"))
-  -- CR 201.4: the one answer the runner judges, as an interpreter does, so the
+  -- An answer the runner judges, as an interpreter does (legalAnswer), is
   -- one a refused Answer can carry; the prompt then takes the next entry.
   Entry.Refuse verb@(Move.Answer answer) -> do
     popAt key index
     chosen <- decodeAnswer verb answer
     allowed <- legalAnswer gs prompt chosen
-    if allowed
+    if allowed && withinOffer prompt chosen
       then failWith (Failure.MkUnrefusedMove key verb (Just kind))
       else do
         found <- takeAnswer gs (Just (When.player key)) kind
@@ -723,6 +723,28 @@ legalAnswer gs prompt chosen = case prompt of
       Nothing -> False
       Just face -> Filter.matches (Filter.contextFor (Game.teams gs) (Just chooser) Nothing) (Projection.viewOfCard face) restriction
   _ -> pure True
+
+-- | Whether an answer names only what its prompt offers, for a prompt that
+-- offers a list. A refused answer naming more is refused already; an answer
+-- taken goes to the engine, which handles one naming more itself.
+withinOffer :: Prompt.Type.Prompt r -> r -> Bool
+withinOffer prompt chosen = case prompt of
+  Prompt.Type.RandomCard names -> chosen `elem` names
+  Prompt.Type.ChooseConjuredCard _ _ names -> chosen `elem` names
+  Prompt.Type.RandomPlayer players -> chosen `elem` players
+  Prompt.Type.ChooseOpponent _ _ _ players -> chosen `elem` players
+  Prompt.Type.ChoosePlayer _ _ _ players -> chosen `elem` players
+  Prompt.Type.ChooseProliferate _ _ objects players ->
+    all (`elem` objects) (fst chosen) && all (`elem` players) (snd chosen)
+  Prompt.Type.ChooseCardInGraveyard _ _ _ cards _ -> chosen `elem` cards
+  Prompt.Type.ChooseCardFromAmong _ _ _ cards -> chosen `elem` cards
+  Prompt.Type.Search _ _ cards _ -> all (`elem` cards) chosen
+  Prompt.Type.CastWhileSearching _ _ offers -> all (`elem` offers) chosen
+  Prompt.Type.ChooseTimeTravel _ _ _ objects -> all (`elem` objects) (Map.keys chosen)
+  Prompt.Type.ChooseSacrifices _ _ _ objects _ _ -> all (`elem` objects) chosen
+  Prompt.Type.ChooseAnyNumberToSacrifice _ _ _ objects -> all (`elem` objects) chosen
+  Prompt.Type.ChooseOfferedCastSpell _ _ offers -> chosen `elem` offers
+  _ -> True
 
 -- | A priority prompt: first the checks at the head of this moment, in timeline
 -- order, then the first move that takes priority, and a pass when there is
