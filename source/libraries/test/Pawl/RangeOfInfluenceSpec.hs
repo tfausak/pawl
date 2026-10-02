@@ -14,7 +14,8 @@
 -- worldVictims (CR 801.12), Pawl.Engine.Event.Trigger's eventWithinRange (CR
 -- 801.7), Pawl.Engine.Replacement's reaches, preventsInRange and
 -- redirectDestination (CR 801.13), Pawl.Engine.Resolve.Slots'
--- playerRefPlayers, zoneScopePlayers and battlefieldMatching, Pawl.Engine.Count's
+-- playerRefPlayers, zoneScopePlayers and battlefieldMatching,
+-- Pawl.Engine.Resolve.Effect's objectRefRecipients, Pawl.Engine.Count's
 -- playersFor and the choice offers Game.reachableBy feeds (CR 801.5a, 801.10,
 -- 801.11), and Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
 -- 801.15), and Pawl.Engine.Engine's checkMandatoryLoop (CR 801.16); and CR
@@ -416,6 +417,18 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (stillThere carols (enters (S.withRange 1))) "CR 801.10 at range 1 carol's graveyard is untouched"
     Spec.assertBool s (not (stillThere bobs (enters (S.withRange 1)))) "and bob's, in range, is exiled"
     Spec.assertBool s (not (stillThere carols (enters id))) "at an unlimited range carol's is exiled too"
+
+  -- CR 801.10 for damage to each opponent: alice's Fanatic of Mogis ("When this
+  -- creature enters, it deals damage to each opponent equal to your devotion to
+  -- red.") enters at devotion 1.
+  Spec.it s "CR 801.10 damage to each opponent does not reach an opponent outside its controller's range" $ do
+    fanatic <- S.printingOf s registry "Fanatic of Mogis"
+    let enters ranged =
+          let (entrant, placed) = S.addPermanent fanatic S.alice (ranged S.fourPlayerGame)
+           in entering entrant placed
+    Spec.assertEqWith s "CR 801.10 at range 1 carol is untouched" (S.lifeOf S.carol (enters (S.withRange 1))) (Just 20)
+    Spec.assertEqWith s "and bob, in range, takes 1" (S.lifeOf S.bob (enters (S.withRange 1))) (Just 19)
+    Spec.assertEqWith s "at an unlimited range carol takes 1 too" (S.lifeOf S.carol (enters id)) (Just 19)
 
   -- CR 801.11: alice's Malignus ("Malignus's power and toughness are each equal
   -- to half the highest life total among your opponents, rounded up.") while
