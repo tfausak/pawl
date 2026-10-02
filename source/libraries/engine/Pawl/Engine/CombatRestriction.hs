@@ -41,6 +41,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.SourceContext as SourceContext
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -217,7 +218,7 @@ storedSubjects :: [ObjectId] -> GameState -> ActiveAttackProhibition.ActiveAttac
 storedSubjects candidates gs active = case ActiveAttackProhibition.affected active of
   RestrictedCreatures.Named oid -> filter (== oid) candidates
   RestrictedCreatures.Matching f ->
-    let context = Filter.contextFor (Game.teams gs) (Just (ActiveAttackProhibition.controller active)) (Just (ActiveAttackProhibition.source active))
+    let context = SourceContext.sourceContext gs (Just (ActiveAttackProhibition.controller active)) (ActiveAttackProhibition.source active)
      in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) f) candidates
 
 -- CR 509.1b / 611.1: the candidates a stored, resolution-generated restriction
@@ -731,7 +732,7 @@ lifted defending gs (source, changes, restriction) = case gate restriction of
   Just condition ->
     Condition.holds
       (Projection.fullView gs)
-      (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
+      (SourceContext.sourceContext gs (Projection.controllerOf source gs) source)
         { Filter.defendingPlayer = defending
         }
       gs
