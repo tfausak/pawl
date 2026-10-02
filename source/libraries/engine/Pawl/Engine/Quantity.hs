@@ -710,6 +710,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.AttackersDeclaredThisTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (Game.attackersDeclaredThisTurn gs pid))
           _ -> Nothing
+        -- CR 508.1a as a 0/1, PlayedBy's footing: an object related to a player,
+        -- read off GameState.attacksInOwnLastTurn rather than the turn's log.
+        Quantity.AttackedInLastTurnOf ref -> case (playersOf ref, mOid) of
+          (Just [pid], Just oid) -> Just (if Game.attackedInLastTurnOf gs pid oid then 1 else 0)
+          _ -> Nothing
+        -- CR 508.1b / 800.4i: AttackersDeclaredThisTurn's footing, over every
+        -- player's own last turn rather than this one.
+        Quantity.AttackersInTheirLastTurn ref -> case playersOf ref of
+          Just [pid] -> Just (toInteger (Game.attackersInTheirLastTurn gs pid))
+          _ -> Nothing
         -- CR 701.9a / 608.2i: how many cards that player has discarded this turn.
         -- OpponentsAttacked's arm in shape -- live, one player only, resolved through the
         -- same playersOf, and Nothing for a reference naming anything but exactly
@@ -1267,6 +1277,8 @@ objectSlots quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
+  Quantity.AttackedInLastTurnOf _ -> Set.empty
+  Quantity.AttackersInTheirLastTurn _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.CardsDrawnThisTurn _ -> Set.empty
   Quantity.BendingsThisTurn _ -> Set.empty
@@ -1538,6 +1550,8 @@ readsX quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False
+  Quantity.AttackedInLastTurnOf _ -> False
+  Quantity.AttackersInTheirLastTurn _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.CardsDrawnThisTurn _ -> False
   Quantity.BendingsThisTurn _ -> False

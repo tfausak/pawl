@@ -17,7 +17,8 @@ data Protection keyword = MkProtection
     -- 702.16n's all-Auras form -- Scryfall o:"this effect doesn't remove",
     -- 2026-09-08, fifteen cards, of which the rest state rule 702.16n's "this
     -- Aura" or rule 702.16p. White Ward's "this Aura" is a bare Filter.IsSource,
-    -- which Pawl.Engine.Keyword.grantedBy bakes into the granter's id.
+    -- which Pawl.Engine.Keyword.grantedBy bakes into the granter's id, and
+    -- Benevolent Blessing's rule 702.16p spare is baked there too.
     --
     -- On the KEYWORD rather than on the row Pawl.Engine.Keyword mints from it,
     -- because rule 702.16n's last sentence has another instance of protection
@@ -29,9 +30,6 @@ data Protection keyword = MkProtection
     -- becoming-attached one, since rule 702.16n says only that the specified
     -- permanents are not put into their owners' graveyards, where rule 702.16p
     -- states a becoming-attached sentence of its own.
-    --
-    -- Not implemented: rule 702.16p, whose "already attached to" is a moment
-    -- rather than a state (#3046).
     spares :: Maybe (Filter.Filter keyword)
   }
   deriving (Eq, Ord, Show)
