@@ -2632,6 +2632,7 @@ reservedSlots =
       Binding.sacrificedPermanent,
       Binding.returnedPermanent,
       Binding.exiledCard,
+      Binding.craftMaterials,
       Binding.discardedCard,
       Binding.tappedPermanent,
       Binding.copiedObject,

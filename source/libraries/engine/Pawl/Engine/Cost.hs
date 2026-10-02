@@ -6490,8 +6490,9 @@ payPayable moment slots pid oid component = case component of
   -- answer either way, the whole pool, so eliding decides nothing for the payer;
   -- with fewer the check below leaves the component Unpaid.
   --
-  -- Binds nothing. Not implemented: CR 702.167c's "the exiled cards used to craft
-  -- it", which is what would want the materials bound here (#3931).
+  -- BINDS the materials' exile incarnations under Binding.craftMaterials, which
+  -- is CR 702.167c's "the exiled cards used to craft it": the craft ability's
+  -- return links them to the permanent it puts onto the battlefield.
   CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore criterion) -> do
     gs <- State.get
     let candidates = materialCandidates slots pid oid criterion gs
@@ -6503,8 +6504,8 @@ payPayable moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseMaterials decider pid oid candidates n orMore)
     if Set.isSubsetOf chosen (Set.fromList candidates) && enough chosen
       then do
-        Monad.void (Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) (Set.toAscList chosen)))
-        pure bindsNothing
+        arrived <- Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) (Set.toAscList chosen))
+        pure (Payment.Paid (Binding.paidObjects Binding.craftMaterials (Set.fromList (fmap Recipient.ToObject (foldMap Foldable.toList arrived)))))
       else pure Payment.Unpaid
   -- CR 701.59a: the payer chooses WHICH cards and HOW MANY, so this is a prompt,
   -- and it is NEVER elided -- TapForTotalPower's posture, the number being a
