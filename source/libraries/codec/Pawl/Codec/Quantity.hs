@@ -131,6 +131,8 @@ codec =
       -- from anything the card names, and the turn is the log's extent rather than
       -- a window a card could state. Rule 207.2c's raid is this against 1.
       Arm.payload "AttackersDeclaredThisTurn" PlayerRef.codec Quantity.AttackersDeclaredThisTurn (\x -> case x of Quantity.AttackersDeclaredThisTurn y -> Just y; _ -> Nothing),
+      Arm.payload "AttackedInLastTurnOf" PlayerRef.codec Quantity.AttackedInLastTurnOf (\x -> case x of Quantity.AttackedInLastTurnOf y -> Just y; _ -> Nothing),
+      Arm.payload "AttackersInTheirLastTurn" PlayerRef.codec Quantity.AttackersInTheirLastTurn (\x -> case x of Quantity.AttackersInTheirLastTurn y -> Just y; _ -> Nothing),
       -- CR 701.9a's tally, with only a PlayerRef on the wire for
       -- OpponentsAttacked's reason: what is counted comes from the event log
       -- rather than from anything the card names, and the turn is the log's
@@ -207,6 +209,8 @@ codec =
       -- CR 607.2a: no slot to name, so the payload IS the whole arm -- what to
       -- read off each card the source exiled.
       Arm.payload "AgainstCardsExiledWith" codec Quantity.AgainstCardsExiledWith (\x -> case x of Quantity.AgainstCardsExiledWith y -> Just y; _ -> Nothing),
+      -- CR 702.167c: the arm above's shape, over the craft materials alone.
+      Arm.payload "AgainstCraftMaterials" codec Quantity.AgainstCraftMaterials (\x -> case x of Quantity.AgainstCraftMaterials y -> Just y; _ -> Nothing),
       -- CR 702.184c, engine-only: Power's shape, nothing on the wire.
       Arm.nullary "StationMeasure" Quantity.StationMeasure
     ]
@@ -256,6 +260,8 @@ tagOf x = case x of
   Quantity.ClassLevel {} -> "ClassLevel"
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
   Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"
+  Quantity.AttackedInLastTurnOf {} -> "AttackedInLastTurnOf"
+  Quantity.AttackersInTheirLastTurn {} -> "AttackersInTheirLastTurn"
   Quantity.CardsDiscardedThisTurn {} -> "CardsDiscardedThisTurn"
   Quantity.CardsDrawnThisTurn {} -> "CardsDrawnThisTurn"
   Quantity.BendingsThisTurn {} -> "BendingsThisTurn"
@@ -278,4 +284,6 @@ tagOf x = case x of
   Quantity.BlockersBeyondFirst {} -> "BlockersBeyondFirst"
   Quantity.AgainstSlot {} -> "AgainstSlot"
   Quantity.AgainstCardsExiledWith {} -> "AgainstCardsExiledWith"
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.AgainstCraftMaterials {} -> "AgainstCraftMaterials"
   Quantity.StationMeasure {} -> "StationMeasure"

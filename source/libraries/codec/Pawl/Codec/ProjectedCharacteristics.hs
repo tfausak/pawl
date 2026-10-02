@@ -13,6 +13,7 @@ import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.CopyException as CopyException
 import qualified Pawl.Codec.CostChoice as CostChoice
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.CostReduction as CostReduction
@@ -63,6 +64,7 @@ codec = Fields.object $ do
   playerAbilities <- Fields.defaulted "playerAbilities" [] (Common.list PlayerStaticAbility.codec) PC.playerAbilities
   grantedPlayerAbilities <- Fields.defaulted "grantedPlayerAbilities" [] (Common.list (Common.keyValue Timestamp.codec PlayerStaticAbility.codec)) PC.grantedPlayerAbilities
   grantedStaticAbilities <- Fields.defaulted "grantedStaticAbilities" [] (Common.list (Common.keyValue Timestamp.codec (StaticAbility.codec (GrantedAbility.codec Card.codec)))) PC.grantedStaticAbilities
+  grantedRuleAbilities <- Fields.defaulted "grantedRuleAbilities" mempty RuleAbilities.codec PC.grantedRuleAbilities
   specialActions <- Fields.defaulted "specialActions" [] (Common.list SpecialAction.codec) PC.specialActions
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.activatedAbilities
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec Card.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
@@ -82,6 +84,7 @@ codec = Fields.object $ do
   costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) PC.costReductions
   grantedCostReductions <- Fields.defaulted "grantedCostReductions" [] (Common.list CostReduction.codec) PC.grantedCostReductions
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
+  exceptions <- Fields.defaulted "exceptions" [] (Common.list (CopyException.codec (GrantedAbility.codec Card.codec))) PC.exceptions
   prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
   alternativeSpell <- Fields.defaulted "alternativeSpell" Nothing (Common.maybe (Face.codec Card.codec)) PC.alternativeSpell
   spell <- Fields.defaulted "spell" Face.Type.defaultSpell (Modal.codec Card.codec (GrantedAbility.codec Card.codec)) PC.spell
@@ -105,6 +108,7 @@ codec = Fields.object $ do
         PC.playerAbilities = playerAbilities,
         PC.grantedPlayerAbilities = grantedPlayerAbilities,
         PC.grantedStaticAbilities = grantedStaticAbilities,
+        PC.grantedRuleAbilities = grantedRuleAbilities,
         PC.specialActions = specialActions,
         PC.activatedAbilities = activatedAbilities,
         PC.replacementEffects = replacementEffects,
@@ -124,6 +128,7 @@ codec = Fields.object $ do
         PC.costReductions = costReductions,
         PC.grantedCostReductions = grantedCostReductions,
         PC.halves = halves,
+        PC.exceptions = exceptions,
         PC.prepare = prepare,
         PC.alternativeSpell = alternativeSpell,
         PC.spell = spell,

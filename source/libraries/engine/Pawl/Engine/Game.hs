@@ -451,13 +451,22 @@ setGraveyardOrder pid order gs =
 --     it" is spelled, which Combat.isBlocked reads and CR 510.1c applies to.
 --     Filtering the emptied entries away would turn the attacker unblocked and
 --     let its damage through to the defending player.
+--
+-- Dropping an attacker's key must not end its blockers' blocking, which is CR
+-- 509.1g: one left blocking no attacker still in combat moves to
+-- Combat.blockingNothing. The combat-effect scenario
+-- cr-509-1g-a-blocker-stays-blocking-once-its-attacker-is-removed is the proof.
 removeFromCombat :: ObjectId -> GameState -> GameState
 removeFromCombat oid gs =
   let c = GameState.combat gs
+      blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c))
+      stillBlocking = Set.unions (Map.elems blockers)
+      orphaned = Set.difference (Map.findWithDefault Set.empty oid (Combat.blockers c)) stillBlocking
       c1 =
         (recordDefending oid c)
           { Combat.attackers = Map.delete oid (Combat.attackers c),
-            Combat.blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c)),
+            Combat.blockers = blockers,
+            Combat.blockingNothing = Set.delete oid (Set.union orphaned (Combat.blockingNothing c)),
             Combat.joinedUnder = Map.delete oid (Combat.joinedUnder c),
             -- CR 506.4c is about a creature that is STILL attacking, so a
             -- creature that has itself left combat has no place in that record
@@ -575,13 +584,16 @@ chosenNamesWithLastKnown oid gs = case lookupObject oid gs of
   Nothing -> maybe Set.empty LastKnown.chosenNames (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
--- the answer is membership in some attacker's set rather than a key lookup.
+-- the answer is membership in some attacker's set rather than a key lookup, or
+-- in Combat.blockingNothing once every attacker it blocked has left combat.
 --
 -- The ONE fold, so Pawl.Engine.Projection's live Filter.blocking and the
 -- CR 608.2h record Pawl.Types.LastKnown.blocking keeps cannot answer it
 -- differently -- sourceIsToken's posture one field over.
 isBlocking :: ObjectId -> GameState -> Bool
-isBlocking oid gs = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs)))
+isBlocking oid gs =
+  let c = GameState.combat gs
+   in Set.member oid (Combat.blockingNothing c) || any (Set.member oid) (Map.elems (Combat.blockers c))
 
 -- CR 303.4b / 301.5a with the arrow turned round: the permanents attached to
 -- this one. pawl keeps the link on the ATTACHED permanent, so there is nothing
@@ -3217,6 +3229,30 @@ bendingsThisTurn gs pid =
 -- Pawl.Engine.Projection.View.declaredIt reads.
 attackersDeclaredThisTurn :: GameState -> PlayerId -> Natural
 attackersDeclaredThisTurn gs pid = Natural.length (filter (declaredBy pid . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+
+-- CR 508.1a: this turn's attacker declarations, in order, off the log
+-- Engine.beginTurn snapshots into GameState.attacksInOwnLastTurn as it clears it.
+attacksInLog :: GameState -> Seq.Seq AttackerDeclared.AttackerDeclared
+attacksInLog gs = Seq.fromList (Maybe.mapMaybe (attackOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+  where
+    attackOf event = case event of
+      GameEvent.AttackerDeclared x -> Just x
+      _ -> Nothing
+
+-- CR 508.1a: was this object declared as an attacker during this player's own
+-- most recent turn? Giant Turtle's "if it attacked during your last turn".
+attackedInLastTurnOf :: GameState -> PlayerId -> ObjectId -> Bool
+attackedInLastTurnOf gs pid oid =
+  any ((== oid) . AttackerDeclared.attacker) (Map.findWithDefault Seq.empty pid (GameState.attacksInOwnLastTurn gs))
+
+-- CR 508.1b / 800.4i: how many players attacked this player during their OWN
+-- most recent turn -- Avenge's "a player attacked you during their last turn".
+-- Every row counts, a departed player's among them, CR 800.4i's limb on actions
+-- of a player who left the game; the row's own expiry is the seat walk's.
+attackersInTheirLastTurn :: GameState -> PlayerId -> Natural
+attackersInTheirLastTurn gs victim =
+  let attackedVictim attacking row = AttackerDeclared.attackingPlayer row == attacking && AttackerDeclared.target row == AttackTarget.OfPlayer victim
+   in Natural.length (filter (\(attacking, rows) -> any (attackedVictim attacking) rows) (Map.toList (GameState.attacksInOwnLastTurn gs)))
 
 -- CR 509.1h / 608.2i: did this OBJECT become a blocked creature this turn?
 -- attackersDeclaredThisTurn's footing over the other combat log, and its extent

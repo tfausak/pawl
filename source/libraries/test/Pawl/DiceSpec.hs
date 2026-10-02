@@ -812,6 +812,50 @@ costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
       (take 2 (snd (rerollPrompts [3, 6, 2] [OptionalDecision.Declines, OptionalDecision.Exercises] spell withBoth)))
       [3, 3]
 
+  Spec.it s "CR 706.2b the player who rolled picks which modifier applies" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    clam <- S.printingOf s registry "Clam-I-Am"
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (clammer, clammed) = S.addPermanent clam S.alice board
+        (walled, both) = S.addPermanent wall S.bob clammed
+        pickedWall = pickRun [3, 6, 2] [OptionalDecision.Exercises] walled spell both
+        pickedClam = pickRun [3, 6, 2] [OptionalDecision.Exercises] clammer spell both
+    -- THE GAMEPLAY ASSERTION: alice's Clam-I-Am and bob's Wall of Fortune
+    -- both offer to reroll alice's natural 3, and every offer put is taken.
+    -- Alice picks the Wall, so bob is asked first and his Wall pays. An engine
+    -- that put the offers in timestamp order asks alice's Clam first, and the
+    -- Wall stays untapped.
+    Spec.assertBool s (Game.isTapped walled pickedWall) "CR 706.2b: alice picks bob's Wall, so it is the modifier applied"
+    -- The paired run, one answer different: picking her own Clam rerolls the 3
+    -- into a 6, which the Wall is then declined over.
+    Spec.assertBool s (not (Game.isTapped walled pickedClam)) "and picking her own Clam leaves the Wall untapped"
+  Spec.it s "CR 706.2b the roller picks among their own modifiers" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let (_, walled) = S.addPermanent wall S.alice board
+        (clammer, both) = S.addPermanent clam S.alice walled
+    -- THE GAMEPLAY ASSERTION: alice controls both, the Wall first by
+    -- timestamp. She picks the free Clam; its reroll comes up 1, and the Wall,
+    -- still standing, rerolls that into the 6 that is the other result. An
+    -- engine that put her own offers in timestamp order spends the Wall on the
+    -- 3, the 1 stands, and one Knight arrives.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: the Clam first, then the Wall over its 1"
+      (S.countOnBattlefieldByName knight S.alice (pickRun [3, 1, 6, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] clammer spell both))
+      6
+
+-- The Endeavor cast under rerollAnswer, except that the roller's CR 706.2b
+-- pick takes the modifier `wanted` states, pinned by index.
+pickRun :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+pickRun rolls decisions wanted spell board =
+  let answering :: Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision]) r
+      answering p = case p of
+        Prompt.ChooseRollModifier _ _ candidates -> pure (List.genericLength (NonEmpty.takeWhile (/= Just wanted) candidates))
+        _ -> rerollAnswer 1 p
+   in snd (State.evalState (Engine.runGame answering board (S.cast S.alice spell >> Stack.resolveTop)) (rolls, decisions))
+
 -- The same cast under an answerer that records WHICH player each reroll offer
 -- was put to. rerollPrompts' shape, and separate from it because the seat is a
 -- different question from the natural result: the Clam group reads the number
@@ -925,6 +969,16 @@ nightShiftSpec s registry = Spec.describe s "IncreaseOrDecrease" $ do
     -- The paired board, one thing different: no Night Shift.
     let (bare, _) = nightShiftRun [5, 2] [] [Just (0, RollAdjustment.Increase)] 1 spell board
     Spec.assertEqWith s "CR 706.1: without it the 5 stands" (S.countOnBattlefieldByName knight S.alice bare) 5
+  Spec.it s "CR 706.2b a declined shift is offered again once another applies" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.alice (snd (S.addPermanent shift S.alice board)))
+        answers = [Nothing, Just (0 :: Natural.Natural, RollAdjustment.Increase), Just (0, RollAdjustment.Increase)]
+        (after, _) = nightShiftRun [4, 2] [] answers 1 spell shifted
+    -- THE GAMEPLAY ASSERTION: two Night Shifts over a 4. The first is
+    -- declined, the second pushes the 4 to 5, and the first, put again over the
+    -- 5, pushes it to 6. An engine that spent the declined offer stops at 5.
+    Spec.assertEqWith s "CR 706.2b: the declined Night Shift moves the 5 to 6" (S.countOnBattlefieldByName knight S.alice after) 6
   Spec.it s "CR 706.2a the modifier is taken only once each turn" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     shift <- S.printingOf s registry "Night Shift of the Living Dead"

@@ -344,6 +344,19 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
             Just src ->
               let linked = filter (\o -> fmap ExileLink.source (Map.lookup o (GameState.exiledWith gs)) == Just src) (Set.toList (GameState.exile gs))
                in fmap sum (traverse (\o -> evaluateAgainst viewOf context gs announcedOn (Just o) (viewOf o) inner) linked)
+        -- CR 702.167c: the arm above narrowed to the craft link
+        -- (Binding.craftLink), so a card the permanent's own abilities exile is
+        -- not "used to craft it". A REGRESSION FENCE: no board in the suite
+        -- gives a crafted permanent that reads this an exiling ability too.
+        --
+        -- Terminating: the payload is a strictly smaller subterm.
+        Quantity.AgainstCraftMaterials inner ->
+          case Filter.source context of
+            Nothing -> Nothing
+            Just src ->
+              let crafted = ExileLink.MkExileLink {ExileLink.source = src, ExileLink.ability = Just Binding.craftLink}
+                  materials = filter (\o -> Map.lookup o (GameState.exiledWith gs) == Just crafted) (Set.toList (GameState.exile gs))
+               in fmap sum (traverse (\o -> evaluateAgainst viewOf context gs announcedOn (Just o) (viewOf o) inner) materials)
         Quantity.Plus (Plus.MkPlus a b) -> case (recur a, recur b) of
           (Just x, Just y) -> Just (x + y)
           _ -> Nothing
@@ -709,6 +722,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- What is unanswered is only the reference.
         Quantity.AttackersDeclaredThisTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (Game.attackersDeclaredThisTurn gs pid))
+          _ -> Nothing
+        -- CR 508.1a as a 0/1, PlayedBy's footing: an object related to a player,
+        -- read off GameState.attacksInOwnLastTurn rather than the turn's log.
+        Quantity.AttackedInLastTurnOf ref -> case (playersOf ref, mOid) of
+          (Just [pid], Just oid) -> Just (if Game.attackedInLastTurnOf gs pid oid then 1 else 0)
+          _ -> Nothing
+        -- CR 508.1b / 800.4i: AttackersDeclaredThisTurn's footing, over every
+        -- player's own last turn rather than this one.
+        Quantity.AttackersInTheirLastTurn ref -> case playersOf ref of
+          Just [pid] -> Just (toInteger (Game.attackersInTheirLastTurn gs pid))
           _ -> Nothing
         -- CR 701.9a / 608.2i: how many cards that player has discarded this turn.
         -- OpponentsAttacked's arm in shape -- live, one player only, resolved through the
@@ -1267,6 +1290,8 @@ objectSlots quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
+  Quantity.AttackedInLastTurnOf _ -> Set.empty
+  Quantity.AttackersInTheirLastTurn _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.CardsDrawnThisTurn _ -> Set.empty
   Quantity.BendingsThisTurn _ -> Set.empty
@@ -1296,6 +1321,8 @@ objectSlots quantity = case quantity of
   -- rather than from a binding, so this arm names none, and the payload it aims
   -- at them may still name one.
   Quantity.AgainstCardsExiledWith inner -> objectSlots inner
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.AgainstCraftMaterials inner -> objectSlots inner
 
 -- CR 603.3b: is QuantitySlot.slots the WHOLE of what evaluating this quantity
 -- reads off the resolving object's bindings? It is not wherever
@@ -1538,6 +1565,8 @@ readsX quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False
+  Quantity.AttackedInLastTurnOf _ -> False
+  Quantity.AttackersInTheirLastTurn _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.CardsDrawnThisTurn _ -> False
   Quantity.BendingsThisTurn _ -> False
@@ -1566,6 +1595,8 @@ readsX quantity = case quantity of
   -- AgainstSlot's answer: not a leaf, and its payload may read X. It names no
   -- slot at all, so the target/amount distinction above does not arise.
   Quantity.AgainstCardsExiledWith inner -> readsX inner
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.AgainstCraftMaterials inner -> readsX inner
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A

@@ -41,7 +41,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   prompt by naming every object in it, earliest first, and `ChooseOptional`
   answers a "may" with `Exercises` or `Declines`, its `source` the spell
   resolving or the object whose ability is; it answers CR 614.1a's optional
-  redirect too, its `source` the object whose replacement it is. `ChooseToPay`
+  redirect too, its `source` the object whose replacement it is, and CR
+  733.1's question whether a reversed action's mana abilities are reversed
+  too, with no `source`: `Exercises` reverses them. `ChooseToPay`
   answers a cost a resolving object offers (CR 118.12a), keyed the same way:
   its `decision` is `Pays` or `Declines`, and paying takes a cast's choices,
   such as `mana`. `ChooseTypeSwap` answers a text change's swap (CR 612.1),

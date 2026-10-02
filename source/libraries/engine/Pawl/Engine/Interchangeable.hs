@@ -106,7 +106,8 @@ representatives pcs gs candidates =
 --   * GameState.lastKnown is about objects that have LEFT, and so is
 --     GameState.castsBeforeThisTurn: its spells were cast on an earlier turn,
 --     and CR 500.2 ends no step while the stack holds one.
---   * GameState.events, GameState.controlSample and
+--   * GameState.events, GameState.attacksInOwnLastTurn (a snapshot of the log's
+--     attacks), GameState.controlSample and
 --     GameState.battlefieldWhenTriggered are bookkeeping, and pawl has neither a
 --     tap game event nor a tap trigger condition, so nothing scans them because
 --     of a choice made here.
@@ -185,6 +186,7 @@ noCombat =
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.attackingNothing = Set.empty,
+      Combat.blockingNothing = Set.empty,
       Combat.removedDefending = Map.empty,
       Combat.defenders = []
     }

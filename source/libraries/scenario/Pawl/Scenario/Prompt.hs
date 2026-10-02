@@ -45,6 +45,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseExplore decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.RerollDie decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.AdjustDieRoll decider _ _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseRollModifier decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDefender decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseManaSource decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExtraManaSource decider _ _ -> Just (Decider.unwrap decider)
@@ -208,6 +209,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.ChooseExplore {} -> "ChooseExplore"
   Prompt.RerollDie {} -> "RerollDie"
   Prompt.AdjustDieRoll {} -> "AdjustDieRoll"
+  Prompt.ChooseRollModifier {} -> "ChooseRollModifier"
   Prompt.ChooseDefender {} -> "ChooseDefender"
   Prompt.ChooseManaSource {} -> "ChooseManaSource"
   Prompt.ChooseExtraManaSource {} -> "ChooseExtraManaSource"

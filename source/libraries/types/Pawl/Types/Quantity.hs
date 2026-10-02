@@ -212,6 +212,14 @@ data Quantity
     -- turns option each player on the active team is an attacking player (CR
     -- 805.10a).
     AttackersDeclaredThisTurn PlayerRef.PlayerRef
+  | -- | CR 508.1a: 1 if the object this quantity is evaluated against was
+    -- declared as an attacker during that player's own most recent turn
+    -- (GameState.attacksInOwnLastTurn), else 0.
+    AttackedInLastTurnOf PlayerRef.PlayerRef
+  | -- | CR 508.1b / 800.4i: how many players attacked that player during their
+    -- own most recent turn, a departed one included until their next turn
+    -- would have begun.
+    AttackersInTheirLastTurn PlayerRef.PlayerRef
   | -- | CR 701.9a / 608.2i: how many cards that player discarded this turn,
     -- folded from the turn-scoped GameEvent.Discarded log.
     CardsDiscardedThisTurn PlayerRef.PlayerRef
@@ -296,6 +304,10 @@ data Quantity
   | -- | CR 607.2a / 614.14: the inner quantity read against each card this
     -- quantity's source exiled, summed (CR 607.3); an empty pile reads 0.
     AgainstCardsExiledWith Quantity
+  | -- | CR 702.167c: the inner quantity read against each exiled card used to
+    -- craft this quantity's source, summed; AgainstCardsExiledWith narrowed to
+    -- the craft link (Mastercraft Raptor).
+    AgainstCraftMaterials Quantity
   | -- | CR 702.184c: the tapped creature's power, or its toughness where that is
     -- greater and the ability's controller controls a permanent carrying
     -- Modification.GrantsStationToughness. Engine-only, a leaf like Power:

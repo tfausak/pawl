@@ -2433,15 +2433,16 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
 
 -- CR 702.167c: the cards exiled to pay the cost of the craft ability resolving
 -- as `resolving` (Binding.craftMaterials), linked to the permanent it put onto
--- the battlefield as `entered`, so CR 607.2a's readers -- AgainstCardsExiledWith,
--- EachCardExiledWithSource -- find them from that permanent. Only those still in
--- exile, which is the rule's "cards in exile". Pawl.ActivateSpec's Mastercraft
--- Raptor case is the proof.
+-- the battlefield as `entered`, under Binding.craftLink so the craft readers
+-- (Quantity.AgainstCraftMaterials, Modification.GainCraftMaterialAbilities)
+-- tell them from what that permanent's other abilities exile. Only those still
+-- in exile, which is the rule's "cards in exile". Pawl.ActivateSpec's
+-- Mastercraft Raptor case is the proof.
 linkCraftMaterials :: ObjectId -> ObjectId -> GameState -> GameState
 linkCraftMaterials resolving entered gs =
   let paid = foldMap Set.toList (Map.lookup Binding.craftMaterials (Binding.targetsOf (slotBindings resolving gs)))
       materials = filter (`Set.member` GameState.exile gs) (Maybe.mapMaybe Recipient.objectOf paid)
-      link = ExileLink.MkExileLink {ExileLink.source = entered, ExileLink.ability = Nothing}
+      link = ExileLink.MkExileLink {ExileLink.source = entered, ExileLink.ability = Just Binding.craftLink}
    in gs {GameState.exiledWith = foldr (`Map.insert` link) (GameState.exiledWith gs) materials}
 
 -- CR 607.2a's name for the ability resolving as `resolving`: an activated
@@ -3023,7 +3024,7 @@ rearmStackExile subject copied obj gs =
 -- at a source that may have left (CR 113.7a).
 --
 -- The Source itself, unclassified: which of CR 113.3's arms carries an ability,
--- and which list it joins, is Replacement.applyCopyException's to say, and it
+-- and which list it joins, is Projection.View.applyCopyException's to say, and it
 -- says it by casing on the arm rather than on the ability.
 thisAbilitySource :: ObjectId -> GameState -> Maybe Source.Source
 thisAbilitySource resolving gs = fmap Object.source (Game.lookupObject resolving gs)
@@ -8420,20 +8421,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- The card is read LIVE off the resolving object, never out of
           -- `chosen`: rule 702.55a's "it" is the graveyard incarnation the death
           -- minted (CR 400.7e), and CR 115.10a makes it no target.
-          mCard <- State.gets (slotOne card resolving)
-          case mCard of
-            Nothing -> pure ()
-            Just oid -> do
-              -- CR 400.7 mints the exiled incarnation; CR 702.55b's link is filed
-              -- against THAT id, which puts the ability in exile for CR 113.6k. A
-              -- cancelled move (CR 614.6) leaves no link.
-              --
-              -- The link names the object the ability TARGETED, so it goes on
-              -- matching after that object has stopped being a creature, and is
-              -- what TriggerCondition.HauntedCreatureDies compares against.
-              mNew <- Event.changeZoneReturning oid Zone.Exile
-              Monad.forM_ mNew $ \newId ->
-                State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
+          --
+          -- EVERY card the slot holds, group first: a merged or melded creature
+          -- dies as several cards, and CR 730.3c / 712.21c take "the same
+          -- actions ... upon each of them", so each is exiled haunting the one
+          -- target (CR 702.55b's "cards"). Pawl.MutateSpec's "CR 730.3c/702.55b
+          -- a mutated creature with haunt exiles both cards haunting its target"
+          -- proves it.
+          cards <- slotBoundObjects resolving Map.empty card
+          Monad.forM_ (Maybe.fromMaybe [] cards) $ \oid -> do
+            -- CR 400.7 mints the exiled incarnation; CR 702.55b's link is filed
+            -- against THAT id, which puts the ability in exile for CR 113.6k. A
+            -- cancelled move (CR 614.6) leaves no link.
+            --
+            -- The link names the object the ability TARGETED, so it goes on
+            -- matching after that object has stopped being a creature, and is
+            -- what TriggerCondition.HauntedCreatureDies compares against.
+            mNew <- Event.changeZoneReturning oid Zone.Exile
+            Monad.forM_ mNew $ \newId ->
+              State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
       _ -> pure ()
   Effect.Counter (Counter.MkCounter ref mSlot mSources mExiled) -> do
     gs <- State.get
@@ -10302,11 +10308,15 @@ throwDice controller sides named perDie = do
       -- CR 706.6's ignored roll: it happened, and its event stands.
       --
       -- Answers the natural result with the player who THREW it: the roller,
-      -- or whoever activated a reroll in `window` below.
+      -- or whoever activated a reroll in the window below (`windowCandidates`).
+      -- The static offers and those activations compete in the one step, so
+      -- both are candidates for the roller's pick.
       rerolling thrower natural = do
         gs <- State.get
         modifiers <- Dice.modifiersFor controller
-        offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) thrower natural
+        activations <- duringRoll (State.gets windowCandidates)
+        let static = fmap (\(payer, stated, offer) -> (payer, stated, Left offer)) (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers)))
+        offering (static <> activations) thrower natural
       -- CR 109.5's "you" on the modifier, which is the player its "may" and
       -- its CR 706.2a cost belong to -- Clam-I-Am's own controller, who is
       -- also the roller, and Wall of Fortune's, who need not be. The ROLLER
@@ -10325,31 +10335,45 @@ throwDice controller sides named perDie = do
           | Maybe.isJust (ModifiedRoll.cost offer) -> candidate : distinct seen rest
           | Set.member payer seen -> distinct seen rest
           | otherwise -> candidate : distinct (Set.insert payer seen) rest
-      -- Not implemented: CR 706.2b's pick among COMPETING modifiers, which is
-      -- the ROLLER's (#3976). The offers are put to their own payers in
-      -- timestamp order instead, and the first taken is the one applied.
-      offering offers thrower natural = case offers of
-        [] -> window thrower natural
-        (payer, stated, offer) : rest -> do
-          gs <- State.get
-          let mCost = ModifiedRoll.cost offer
-          if not (payable gs payer stated mCost)
-            then offering rest thrower natural
-            else do
-              answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
-              case answer of
-                OptionalDecision.Declines -> offering rest thrower natural
-                OptionalDecision.Exercises -> do
-                  paid <- payModifier payer stated mCost
-                  if not paid
-                    then offering rest thrower natural
-                    else do
-                      again <- Game.ask (Prompt.RollDie sides)
-                      -- The roller throws it: Clam-I-Am's "you may reroll
-                      -- it", Wall of Fortune's "have any player reroll a die
-                      -- that player rolled".
-                      State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
-                      rerolling controller (faceOf again)
+      -- CR 706.2b's pick: the roller chooses which standing offer is put next
+      -- (Dice.pickModifier), and its payer decides whether to take it -- the
+      -- modifier's own "may" (CR 706.2a). A declined offer leaves the rest to
+      -- be re-checked against the board as it then stands.
+      offering offers thrower natural = do
+        standing <- duringRoll (State.gets (\gs -> filter (live gs) offers))
+        picked <- Dice.pickModifier controller standing
+        case picked of
+          Nothing -> pure (thrower, natural)
+          Just ((payer, stated, kind), rest) -> do
+            gs <- State.get
+            let mCost = either ModifiedRoll.cost (Just . ActivatedAbility.cost . snd) kind
+            answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
+            case (answer, kind) of
+              (OptionalDecision.Declines, _) -> offering rest thrower natural
+              (OptionalDecision.Exercises, Left _) -> do
+                paid <- payModifier payer stated mCost
+                if not paid
+                  then offering rest thrower natural
+                  else do
+                    again <- Game.ask (Prompt.RollDie sides)
+                    -- The roller throws it: Clam-I-Am's "you may reroll
+                    -- it", Wall of Fortune's "have any player reroll a die
+                    -- that player rolled".
+                    State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+                    rerolling controller (faceOf again)
+              (OptionalDecision.Exercises, Right (oid, ability)) -> do
+                rerolled <- duringRoll $ do
+                  activated <- activateWhileRolling payer oid ability
+                  after <- State.get
+                  pure (if activated then GameState.rerolledTo after else Nothing)
+                case rerolled of
+                  Nothing -> offering rest thrower natural
+                  Just face -> rerolling payer face
+      -- Whether an offer can still go through: a static offer's cost is
+      -- payable, an activation passes the gate a priority activation takes.
+      live gs (payer, stated, kind) = case kind of
+        Left offer -> payable gs payer stated (ModifiedRoll.cost offer)
+        Right (oid, ability) -> Activatable.activatable payer oid ability gs
       -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
       -- payer has not the resources to pay fully is not offered. A stated
       -- cost with no object behind it cannot be paid at all -- every
@@ -10370,33 +10394,35 @@ throwDice controller sides named perDie = do
       -- the printed ruling's reading of "after you roll a die", and the answer
       -- names the die.
       --
-      -- Each offer is asked AT MOST ONCE per instruction: a modifier applies
-      -- to a roll once, so the list is not re-read after one is taken. The
-      -- budget and the cost are re-read before each question.
-      --
-      -- Not implemented: CR 706.2b's pick among competing modifiers, which is
-      -- the ROLLER's (#3976); the offers go to their payers in timestamp
-      -- order, as `offering`'s do.
+      -- CR 706.2b's pick, `offering`'s: the roller chooses which standing offer
+      -- is put next. An offer TAKEN is spent, since a modifier applies to a
+      -- roll once. One declined, or not standing, waits out the rest of this
+      -- look and is offered again once another modifier applies, over the
+      -- number that left (`waiting`). The budget and the cost are re-read
+      -- before each question.
       adjusting results = do
         modifiers <- Dice.modifiersFor controller
-        adjustingThrough (Dice.adjustOffers sides modifiers) results
-      adjustingThrough offers results = case (offers, NonEmpty.nonEmpty results) of
-        ([], _) -> pure results
-        (_, Nothing) -> pure results
-        ((stated, offer, amount) : rest, Just shown) -> do
+        gs <- State.get
+        adjustingThrough (fmap (\(stated, offer, amount) -> (payerOf gs stated, stated, (offer, amount))) (Dice.adjustOffers sides modifiers)) [] results
+      adjustingThrough offers waiting results = case NonEmpty.nonEmpty results of
+        Nothing -> pure results
+        Just shown -> do
           gs <- State.get
-          let payer = payerOf gs stated
-              mCost = ModifiedRoll.cost offer
-          if not (Dice.withinLimit gs payer stated offer && payable gs payer stated mCost)
-            then adjustingThrough rest results
-            else do
+          let standing (payer, stated, (offer, _)) = Dice.withinLimit gs payer stated offer && payable gs payer stated (ModifiedRoll.cost offer)
+              (up, idle) = List.partition standing offers
+          picked <- Dice.pickModifier controller up
+          case picked of
+            Nothing -> pure results
+            Just (chosen@(payer, stated, (offer, amount)), rest) -> do
+              let mCost = ModifiedRoll.cost offer
+                  passed = adjustingThrough rest (chosen : idle <> waiting) results
               answer <- Game.choose (Prompt.AdjustDieRoll (Decide.deciderFor payer gs) payer shown amount mCost)
               case answer of
-                Nothing -> adjustingThrough rest results
+                Nothing -> passed
                 Just (index, direction) -> do
                   paid <- payModifier payer stated mCost
                   if not paid
-                    then adjustingThrough rest results
+                    then passed
                     else do
                       State.modify' (Dice.spendLimit stated offer)
                       -- FILTERED, NOT TRUSTED: an index past the end shifts
@@ -10405,7 +10431,7 @@ throwDice controller sides named perDie = do
                           shift n = case direction of
                             RollAdjustment.Increase -> n + toInteger amount
                             RollAdjustment.Decrease -> n - toInteger amount
-                      adjustingThrough rest (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
+                      adjustingThrough (rest <> idle <> waiting) [] (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
       -- CR 706.2a's cost, charged between the offer and the modifier's
       -- application: a declined or failed payment leaves the number standing.
       --
@@ -10439,8 +10465,8 @@ throwDice controller sides named perDie = do
         outcome <- Cost.pay performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
         pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
       -- Goblin Bookie's "Activate only any time it makes sense", read as a
-      -- window inside CR 706.2's modification step, once the static offers
-      -- above are spent. No rule grants one: CR 117.1b ties activation to
+      -- window inside CR 706.2's modification step, beside the static offers
+      -- above. No rule grants one: CR 117.1b ties activation to
       -- priority, which CR 117.3b hands out only after a resolution. Each ability
       -- ActivationRestriction.DuringDieRoll marks is offered to the player
       -- who may activate it, through the same gate a priority activation
@@ -10449,45 +10475,16 @@ throwDice controller sides named perDie = do
       -- reaches the die. Pawl.CardSpec keeps such an ability to an untargeted
       -- Effect.Reroll, which is what lets Prompt.RerollDie ask for it.
       --
-      -- The stamp on GameState is what DuringDieRoll reads and what
-      -- Effect.Reroll throws against, restored on the way out so a roll
-      -- nested inside the window's own resolution cannot leave it open.
-      --
-      -- Not implemented: CR 706.2b's pick among competing modifiers, the
-      -- roller's (#3976). Players are asked in APNAP order, and within a
-      -- player in object order.
-      window thrower natural = do
-        previous <- State.get
-        State.modify' (\g -> g {GameState.rollingDie = Just sides, GameState.rerolledTo = Nothing})
-        opened <- State.get
-        let candidates =
-              [ (pid, oid, ability)
-              | pid <- Game.apnapOrder opened,
-                oid <- Activatable.activationSources pid opened,
-                ability <- Activatable.abilitiesFor oid opened,
-                elem ActivationRestriction.Type.DuringDieRoll (ActivatedAbility.restrictions ability)
-              ]
-        rerolled <- windowOffering candidates natural
-        State.modify' (\g -> g {GameState.rollingDie = GameState.rollingDie previous, GameState.rerolledTo = GameState.rerolledTo previous})
-        case rerolled of
-          Nothing -> pure (thrower, natural)
-          Just (pid, face) -> rerolling pid face
-      windowOffering candidates natural = case candidates of
-        [] -> pure Nothing
-        (pid, oid, ability) : rest -> do
-          gs <- State.get
-          if not (Activatable.activatable pid oid ability gs)
-            then windowOffering rest natural
-            else do
-              answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor pid gs) pid natural (Just (ActivatedAbility.cost ability)))
-              case answer of
-                OptionalDecision.Declines -> windowOffering rest natural
-                OptionalDecision.Exercises -> do
-                  activated <- activateWhileRolling pid oid ability
-                  after <- State.get
-                  case (activated, GameState.rerolledTo after) of
-                    (True, Just face) -> pure (Just (pid, face))
-                    _ -> windowOffering rest natural
+      -- In APNAP order, and within a player in object order, behind the static
+      -- offers: the order the roller's pick starts from.
+      windowCandidates opened =
+        [ (pid, Just oid, Right (oid, ability))
+        | pid <- Game.apnapOrder opened,
+          oid <- Activatable.activationSources pid opened,
+          ability <- Activatable.abilitiesFor oid opened,
+          elem ActivationRestriction.Type.DuringDieRoll (ActivatedAbility.restrictions ability)
+        ]
+      duringRoll = withRollingDie sides
       rollOne = do
         rolled <- Game.ask (Prompt.RollDie sides)
         (thrower, natural) <- rerolling controller (faceOf rolled)
@@ -10522,6 +10519,17 @@ throwDice controller sides named perDie = do
       throwers = fmap (\(_, i) -> maybe controller snd (Maybe.listToMaybe (drop i thrown))) kept
   results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (fmap fst kept))
   pure (results, throwers)
+
+-- | The stamp on GameState that ActivationRestriction.DuringDieRoll reads and
+-- Effect.Reroll throws against, open for `act` and restored on the way out so a
+-- roll nested inside the window's own resolution cannot leave it open.
+withRollingDie :: Natural -> Game a -> Game a
+withRollingDie sides act = do
+  previous <- State.get
+  State.modify' (\g -> g {GameState.rollingDie = Just sides, GameState.rerolledTo = Nothing})
+  result <- act
+  State.modify' (\g -> g {GameState.rollingDie = GameState.rollingDie previous, GameState.rerolledTo = GameState.rerolledTo previous})
+  pure result
 
 -- The two halves Pawl.Engine.Cost reaches through the
 -- Pawl.Types.ManaAbilityPerformer parameter: CR 405.6c's other effects of the

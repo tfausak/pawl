@@ -22,6 +22,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -52,6 +53,7 @@ import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -89,6 +91,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -2410,6 +2413,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   longtuskCubSpec s registry
   thrastaSpec s registry
   ertaisScornSpec s registry
+  avengeSpec s registry
   deemInferiorSpec s registry
   synchronizedEvictionSpec s registry
   richlauSpec s registry
@@ -2661,6 +2665,45 @@ ertaisScornSpec s registry =
           (splitScorn, split) = board True
       Spec.assertBool s (S.castable S.alice carolsScorn carols) "carol cast two, so the Scorn costs {1}{U} and is offered"
       Spec.assertBool s (not (S.castable S.alice splitScorn split)) "bob and carol cast one each, so the Scorn keeps its {1}{U}{U} and is refused"
+
+-- CR 601.2f / 800.4i: Avenge ({4}{W}{W}) "costs {2} less to cast if a player
+-- attacked you during their last turn". Three seats; bob attacks carol on turn
+-- 2 and concedes on turn 3. carol's four Plains pay {2}{W}{W} and not
+-- {4}{W}{W}, so castability is the reduction. Asked in carol's main phase on
+-- turn 3 and again on turn 5, after alice's turn and bob's skipped seat (CR
+-- 800.4k); the whole-card discount is
+-- data/scenarios/cost/cr-800-4i-avenge-costs-2-less-after-a-departed-player-attacked.json.
+avengeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+avengeSpec s registry =
+  Spec.describe s "Avenge" $ do
+    Spec.it s "CR 800.4i a departed attacker's last turn counts until their next turn would have begun" $ do
+      let islands = Seq.fromList [S.cardSetup "Island", S.cardSetup "Island"]
+          seat pid = (S.playerSetup pid) {Seat.library = islands}
+          setup =
+            S.board
+              ( seat S.alice
+                  NonEmpty.:| [ (seat S.bob) {Seat.battlefield = Seq.singleton (S.settled "raider" "Goblin Piker")},
+                                (seat S.carol)
+                                  { Seat.battlefield = Seq.fromList (replicate 4 (S.permanent "Plains")),
+                                    Seat.hand = Seq.singleton (S.aliased "avenge" (S.cardSetup "Avenge"))
+                                  }
+                              ]
+              )
+              S.alice
+              S.precombatMain
+          script =
+            S.turn 2 [S.on S.declareAttackers S.bob (S.attack [S.aliasRef "raider"]), S.onSource S.declareAttackers S.bob (S.aliasRef "raider") (S.attackPlayer S.carol)]
+              <> S.turn 3 [S.on (Phase.Beginning BeginningStep.Upkeep) S.bob Move.Concede]
+          untilMain :: Natural.Natural -> Game.Type.Game ()
+          untilMain n = do
+            gs <- State.get
+            Monad.unless (GameState.turnNumber gs == n && GameState.phase gs == Phase.PrecombatMain) (Engine.runStep >> untilMain n)
+      built <- S.buildBoardOrFail s registry setup
+      avenge <- maybe (Spec.assertFailure s "no avenge") pure (Map.lookup (Label.MkLabel (Text.pack "avenge")) (Staged.objects built))
+      (_, third) <- S.runScriptOrFail s script built (untilMain 3)
+      (_, fifth) <- S.runScriptOrFail s script built (untilMain 5)
+      Spec.assertBool s (not (S.castable S.carol avenge fifth {GameState.priority = Just S.carol})) "turn 5, bob's turn having passed: Avenge keeps its {4}{W}{W} and is refused"
+      Spec.assertBool s (S.castable S.carol avenge third {GameState.priority = Just S.carol}) "turn 3, bob gone: Avenge costs {2}{W}{W} and is offered"
 
 -- CR 601.2f / 205.3m: Synchronized Eviction ({4}{U}) "costs {2} less to cast if
 -- you control at least two creatures that share a creature type". alice holds it
@@ -5776,6 +5819,32 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     -- CR 104.4b: the stamp bob's question wrote survives the final restore,
     -- which for two reversals goes back to a state from before the cast.
     Spec.assertEqWith s "CR 104.4b the last question's stamp stands" (fmap GameState.lastChoice seenNeither) [GameState.lastChoice neither]
+  -- CR 106.6a on the HELPER's mana: bob sacrifices Generator Servant ({T},
+  -- Sacrifice: "Add {C}{C}. If any of that mana is spent on a creature spell, it
+  -- gains haste until end of turn.") in his assist window and pays seven with its
+  -- two and five Plains. The control is the same board with two Plains in the
+  -- Servant's place, so the only difference is where two of bob's seven came from.
+  Spec.it s "CR 106.6a the Binox bob's Generator Servant helped pay for attacks the turn it arrives" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    servant <- S.printingOf s registry "Generator Servant"
+    let fought (spell, forestId, sources, gs) =
+          let board = gs {GameState.remaining = S.phasesAfter Phase.PrecombatMain}
+              answer :: Prompt.Prompt r -> r
+              answer = assisting (Just S.bob) 7 forestId sources
+              resolved = S.runPure answer (S.runPure answer board (S.cast S.alice spell)) Stack.resolveTop
+           in (resolved, S.runPure S.aggressiveAnswer resolved (Monad.replicateM_ 6 Engine.runStep))
+        withServant =
+          let (spell, forestId, plainsIds, gs) = assistBoard 0 5 forest mountain plains binox
+              (servantId, gs') = S.addPermanent servant S.bob gs
+           in fought (spell, forestId, servantId : plainsIds, gs')
+        withPlains = fought (assistBoard 0 7 forest mountain plains binox)
+        spentOn gs = sum (fmap (\oid -> maybe 0 (length . Mana.Type.unwrap . Object.manaSpent) (Game.lookupObject oid gs)) (Game.zoneMembers Zone.Battlefield S.alice gs))
+    Spec.assertEqWith s "CR 106.6a bob takes 7 trample from the Binox his Servant's mana helped pay for" (S.lifeOf S.bob (snd withServant)) (Just 13)
+    Spec.assertEqWith s "and none from the one his seven Plains paid for" (S.lifeOf S.bob (snd withPlains)) (Just 20)
+    Spec.assertEqWith s "CR 400.7d the Binox's record holds alice's {G} and bob's seven" (spentOn (fst withServant)) 8
 
 -- Answer CR 702.132a's two prompts with `helper` and `amount`, and each mana
 -- window with the lands that window's player is meant to tap -- alice the one

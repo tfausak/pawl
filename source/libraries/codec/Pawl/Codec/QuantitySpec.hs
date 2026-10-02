@@ -474,6 +474,18 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.AttackersDeclaredThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"AttackersDeclaredThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- Giant Turtle's and Avenge's last-turn reads, each a PlayerRef alone.
+  Spec.it s "AttackedInLastTurnOf and AttackersInTheirLastTurn" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AttackedInLastTurnOf (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"AttackedInLastTurnOf\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AttackersInTheirLastTurn (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"AttackersInTheirLastTurn\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 701.9a, with a PlayerRef and nothing else on the wire: what is counted is
   -- the turn-scoped event log. Asmoranomardicadaistinaculdacar's is the Relative
   -- arm; the InSlot arm beside it is the one a recursive decoder could lose a
@@ -701,6 +713,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstCardsExiledWith Quantity.Toughness)))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"AgainstCardsExiledWith\",\"value\":{\"type\":\"Toughness\"}}}} "
+  -- CR 702.167c: the arm above's shape, over the craft materials alone.
+  Spec.it s "AgainstCraftMaterials" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AgainstCraftMaterials Quantity.Power)
+      " {\"type\":\"AgainstCraftMaterials\",\"value\":{\"type\":\"Power\"}} "
   -- CR 107.1a's direction and the value it applies to, in that order. Nested
   -- once for AgainstSlot's reason -- a recursive decoder is where a payload gets
   -- lost -- and over a Count, which is the shape both producers print.

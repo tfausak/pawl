@@ -943,9 +943,9 @@ candidateCostsGiven permitted pid name oid gs =
 --
 -- CR 601.2f's LOCK-IN is the CALLER's, not this function's: each caller totals
 -- once per announcement and hands the VALUE to `pay`, which never re-reads the
--- state. data/scenarios/cost's Altar's Reap cases prove it -- the creature
--- paying the additional cost is the cost reducer, so a re-read after CR
--- 601.2h's sacrifice costs a mana more.
+-- state. Pawl.CostSpec's Altar's Reap group proves it -- the creature paying the
+-- additional cost is the cost reducer, so a re-read after CR 601.2h's sacrifice
+-- costs a mana more.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
 total pid oid cost gs = totalWith (spellAdjustments Set.empty pid oid gs) cost
 
@@ -4185,7 +4185,8 @@ criteriaOf component = case component of
 -- paid -- rather than against the half-paid state the refusal left, which is
 -- what Pawl.Engine.Game.ask hands the answerer. It also keeps CR 104.4b's
 -- stamp: `Game.choose` writes GameState.lastChoice, and each state an answer
--- leaves is put with the live stamp rather than the one it was composed with.
+-- leaves is put with the live stamp rather than the one it was composed with,
+-- and with the live GameState.nextTimestamp the stamp was drawn from.
 --
 -- Every restore goes through `keepingLibraryActions` rather than a bare
 -- State.put, CR 733.1's last sentence's reason: a shuffle or a reveal one of the
@@ -4212,9 +4213,26 @@ reverseIllegal windows before =
         (askers, Just table) -> do
           -- The flags for the answers given so far, a window not yet answered
           -- still standing; and the state they leave, put with the live CR
-          -- 104.4b stamp so that no answer's is discarded.
+          -- 104.4b stamp so that no answer's is discarded. The stamp was drawn
+          -- from the live GameState.nextTimestamp, so that supply comes across
+          -- with it: a state that goes back past the announcement would
+          -- otherwise hold a stamp ahead of its own supply, which
+          -- Pawl.Engine.Engine.checkMandatoryLoop's gap underflows on. The
+          -- scenario cost/cr-733-1-an-underpaid-curtain-of-light-reverses-its-plains
+          -- is the proof.
           let flags answers = [Maybe.fromMaybe (asks window) (lookup i answers) | (i, window) <- zip [0 :: Int ..] windows]
-              settle answers = Monad.forM_ (lookup (flags answers) table) (\composedState -> State.modify' (\live -> composedState {GameState.lastChoice = GameState.lastChoice live}))
+              settle answers =
+                Monad.forM_
+                  (lookup (flags answers) table)
+                  ( \composedState ->
+                      State.modify'
+                        ( \live ->
+                            composedState
+                              { GameState.lastChoice = GameState.lastChoice live,
+                                GameState.nextTimestamp = max (GameState.nextTimestamp composedState) (GameState.nextTimestamp live)
+                              }
+                        )
+                  )
           settle []
           cancelled <- State.get
           let rank (_, window) = List.elemIndex (ManaWindow.payer window) (Game.apnapOrder cancelled)
@@ -4284,11 +4302,7 @@ composeReversal before windows = case NonEmpty.nonEmpty windows of
 -- rule's "revealed from a library" protects. `nextEventGroup` rides at
 -- `since`'s value, since a carried-over entry may already hold a group
 -- `snapshot`'s own counter would otherwise repeat -- GameState.events' groups
--- are non-decreasing along the log. `nextTimestamp` rides there too, the
--- clock Pawl.Engine.Reversal's `newest` never turns back: a CR 733.1 answer
--- stamps GameState.lastChoice off the live clock (`reverseIllegal`), and CR
--- 104.4b's check (Pawl.Engine.Engine.checkMandatoryLoop) subtracts that stamp
--- from this one.
+-- are non-decreasing along the log.
 keepingLibraryActions :: GameState -> GameState -> GameState
 keepingLibraryActions since snapshot =
   let keep pid held = case Map.lookup pid (GameState.library since) of
@@ -4301,8 +4315,7 @@ keepingLibraryActions since snapshot =
    in snapshot
         { GameState.library = Map.mapWithKey keep (GameState.library snapshot),
           GameState.events = GameState.events snapshot <> Seq.filter revealedFromLibrary (Seq.drop (Seq.length (GameState.events snapshot)) (GameState.events since)),
-          GameState.nextEventGroup = GameState.nextEventGroup since,
-          GameState.nextTimestamp = GameState.nextTimestamp since
+          GameState.nextEventGroup = GameState.nextEventGroup since
         }
 
 -- The restore every caller that reverts a failed payment to its own snapshot
@@ -5191,23 +5204,29 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
       -- combat toll, CR 118.12's resolution-time payment, and a mana ability's own
       -- cost, which CR 605.3b keeps off the stack entirely.
       --
-      -- Written HERE rather than by the caller because this is the one place that
-      -- knows which units went. An unpaid cost writes nothing: `payMana` restores
-      -- the state it entered with, and this line is only reached once the payment
-      -- has settled.
-      --
-      -- CR 106.6a's eagerly created effects go up beside the record and on the
-      -- same state, since this is the same "one place that knows which units
-      -- went": ManaRider.granted mints one continuous effect per unit whose rider
-      -- the paid-for object matches (Generator Servant). AFTER the record, so
-      -- that the condition is matched on the board CR 400.7d has already
-      -- described -- a rider clause reading the payment would otherwise see none.
-      recordSpent spent gs = case record of
-        Nothing -> gs
-        Just sid ->
-          let recorded = gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
-           in ManaRider.granted sid spent recorded
+      -- Written HERE rather than by the caller because this is where the caster's
+      -- units are known (an assisting player's are `payAssist`'s). An unpaid cost
+      -- writes nothing: `payMana` restores the state it entered with, and this
+      -- line is only reached once the payment has settled.
+      recordSpent spent gs = maybe gs (\sid -> recordPayment sid spent gs) record
   window Set.empty []
+
+-- CR 400.7d's record of mana spent on `sid`, ADDED to what is there: CR
+-- 702.132a's assisting player pays ahead of the caster (`payAssist`), and both
+-- payments are "what mana was spent to pay those costs". The record starts
+-- empty, since CR 400.7 makes the spell a new object.
+--
+-- CR 106.6a's eagerly created effects go up beside the record and on the same
+-- state, since this is where the units spent are known:
+-- ManaRider.granted mints one continuous effect per unit whose rider the
+-- paid-for object matches (Generator Servant). AFTER the record, so that the
+-- condition is matched on the board CR 400.7d has already described -- a rider
+-- clause reading the payment would otherwise see none.
+recordPayment :: ObjectId -> Mana.Type.Mana -> GameState -> GameState
+recordPayment sid spent gs =
+  let add o = o {Object.manaSpent = Mana.Type.MkMana (Mana.Type.unwrap (Object.manaSpent o) <> Mana.Type.unwrap spent)}
+      recorded = gs {GameState.objects = Map.adjust add sid (GameState.objects gs)}
+   in ManaRider.granted sid spent recorded
 
 payMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payMana perform = payManaExcept perform Set.empty Nothing
@@ -5350,10 +5369,10 @@ assistable subject pid oid gs manaCost
 -- assisting player is not casting. CR 609.4b's per-player half IS theirs, so
 -- `spendManaAsThough` is read off them.
 --
--- Not implemented: CR 400.7d's record of the mana this payment spent, which the
--- caster's own window writes onto the spell (`payManaWindow`'s recordSpent) and
--- this one does not -- so CR 106.6a's rider on an assisting player's mana never
--- matches the spell it helped pay for (#3958).
+-- The units spent go on CR 400.7d's record of the spell (`recordPayment`), so
+-- CR 106.6a's rider on the helper's mana matches the spell it paid for --
+-- Pawl.CostSpec's "CR 106.6a the Binox bob's Generator Servant helped pay for
+-- attacks the turn it arrives" is the proof.
 payAssist :: PlayerId -> PaymentSubject.PaymentSubject -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
 payAssist helper subject sid cost = case Cost.mana cost of
   Nothing -> pure cost
@@ -5372,8 +5391,9 @@ payAssist helper subject sid cost = case Cost.mana cost of
         case planFor amount of
           Nothing -> pure cost
           Just (steps, _) -> do
-            (Mana.Type.MkMana left, _) <- Mana.spendChosen helper asThough steps (Mana.Type.MkMana available)
+            (Mana.Type.MkMana left, spent) <- Mana.spendChosen helper asThough steps (Mana.Type.MkMana available)
             State.modify' (Mana.setPool helper (Mana.Type.MkMana (withheld <> left)))
+            State.modify' (recordPayment sid spent)
             pure cost {Cost.mana = Just (withoutMana (ManaSymbol.Generic 0) amount manaCost)}
 
 -- CR 106.12's "tap [a permanent] for mana" -- activate one of its mana

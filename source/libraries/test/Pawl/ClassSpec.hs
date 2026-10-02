@@ -395,11 +395,9 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
 -- it of LANDS, Magewright's Stone of a creature, and Zirda, the Dawnwaker of the
 -- CARDS in a starting deck, which Pawl.Engine.Projection.View.viewOfCard answers
 -- off the printed face with no gate to apply, so both readings agree there. The
--- Enigma Jewel's "four or more nonlands with activated abilities" would ask it of
--- a permanent; craft and its lower-bound count are both implemented (CR 702.167),
--- but its back face is "Locus of Enlightenment has each activated ability of the
--- exiled cards used to craft it", a grant of CR 702.167c's linked cards'
--- abilities (gap #4598).
+-- Enigma Jewel's craft, "four or more nonlands with activated abilities", asks
+-- Filter.HasActivatedAbility of a permanent, and is the real card that can
+-- replace this one.
 --
 -- bob owns the Piker so that Paladin Class's own level-2 section -- "Creatures you
 -- control get +1/+1" -- cannot reach it, leaving the audit the only thing that

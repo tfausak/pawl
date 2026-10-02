@@ -1,6 +1,7 @@
 module Pawl.Codec.Condition where
 
 import qualified Pawl.Codec.Compares as Compares
+import qualified Pawl.Codec.DuringPhase as DuringPhase
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -24,7 +25,8 @@ codec =
     tagOf
     [ Arm.payload "Compares" Compares.codec Condition.Compares (\x -> case x of Condition.Compares y -> Just y; _ -> Nothing),
       Arm.payload "Any" (Common.list codec) Condition.Any (\x -> case x of Condition.Any y -> Just y; _ -> Nothing),
-      Arm.payload "All" (Common.list codec) Condition.All (\x -> case x of Condition.All y -> Just y; _ -> Nothing)
+      Arm.payload "All" (Common.list codec) Condition.All (\x -> case x of Condition.All y -> Just y; _ -> Nothing),
+      Arm.payload "During" DuringPhase.codec Condition.During (\x -> case x of Condition.During y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: Condition.Condition -> String
@@ -32,3 +34,4 @@ tagOf x = case x of
   Condition.Compares {} -> "Compares"
   Condition.Any {} -> "Any"
   Condition.All {} -> "All"
+  Condition.During {} -> "During"

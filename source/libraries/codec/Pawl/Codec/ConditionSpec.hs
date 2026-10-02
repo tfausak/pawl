@@ -11,13 +11,18 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.DuringPhase as DuringPhase
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -48,6 +53,14 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
       Condition.codec
       (Condition.All [Condition.Compares (Compares.MkCompares Quantity.Power Comparison.AtLeast (Quantity.Literal 1)), Condition.Compares (Compares.MkCompares Quantity.Toughness Comparison.AtMost (Quantity.Literal 2))])
       " {\"type\":\"All\",\"value\":[{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Power\"},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Toughness\"},\"comparison\":{\"type\":\"AtMost\"},\"threshold\":{\"type\":\"Literal\",\"value\":2}}}]} "
+  -- Zurgo, Thunder's Decree's "during your end step": the window and the scope
+  -- are both kept, as the activation rider's codec keeps them.
+  Spec.it s "During" $
+    Common.assertCodec
+      s
+      Condition.codec
+      (Condition.During (DuringPhase.MkDuringPhase (PhaseSelector.Step (Phase.Ending EndingStep.EndStep)) TurnScope.ControllersTurn))
+      " {\"type\":\"During\",\"value\":{\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}}},\"scope\":{\"type\":\"ControllersTurn\"}}} "
   -- The old untagged shapes are not conditions any more. A comparison's keys
   -- alone decoding would mean a card file written before #1304 kept working
   -- while writing something the schema does not describe.

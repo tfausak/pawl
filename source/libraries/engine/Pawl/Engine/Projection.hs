@@ -18,6 +18,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
@@ -57,6 +58,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -123,6 +125,7 @@ layer m = case m of
   Modification.GainCastingPermission _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
   Modification.GainAbilitiesOfSource _ -> Layer.Ability
+  Modification.GainCraftMaterialAbilities _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
   -- CR 613.1f again, and the same layer as the wipe above: what differs is the
   -- SCOPE of the removal, never when it applies.
@@ -202,12 +205,16 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
         -- keyword count twice. Keyword.grantedBy bakes the granter into CR
-        -- 702.16n's "this Aura" and its entry choice into CR 607.2d's "the
-        -- chosen color"; Pawl.AuraSpec's White Ward and Cho-Manno's Blessing
-        -- cases prove them.
+        -- 702.16n's "this Aura", its entry choice into CR 607.2d's "the chosen
+        -- color", and its controller and the attachments stamped no later than
+        -- it into CR 702.16p's spare; Pawl.AuraSpec's White Ward, Cho-Manno's
+        -- Blessing and Benevolent Blessing cases prove them.
         Modification.GainKeyword k ->
-          let chosen = Game.lookupObject src gs >>= Object.chosenColor
-           in pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src chosen k) 1 (PC.keywords pc)}
+          let granter = Game.lookupObject src gs
+              chosen = granter >>= Object.chosenColor
+              stampedBy limit attacher = maybe False ((<= limit) . Object.timestamp) (Game.lookupObject attacher gs)
+              already = foldMap (\g -> filter (stampedBy (Object.timestamp g)) (Set.toList (Game.attachments oid gs))) granter
+           in pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src chosen (controllerOf src gs) already k) 1 (PC.keywords pc)}
         -- CR 613.1f layer 6 / CR 202.1a: the same grant, with the keyword's
         -- [cost] read off the RECEIVING object rather than written on the granter
         -- -- "the scavenge cost is equal to its mana cost".
@@ -257,13 +264,11 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf. One another
         -- static ability grants is RECORDED, since only this fold knows who it
         -- reaches; withStaticGrants reads the record back to gather its effect.
-        -- A RULE ability, which CR 613.11 applies after the layers, joins none:
-        -- the gatherers read a stored grant of one through grantedRuleAbilities.
+        -- A RULE ability, which CR 613.11 applies after the layers, takes the
+        -- same split: a resolution's grant is read off the stored effect, and a
+        -- static ability's is recorded here; grantedRuleAbilities reads both.
         -- A PLAYER ability, applied after the layers too (CR 613.10), is
         -- recorded here whoever grants it.
-        --
-        -- Not implemented: a rule ability another static ability grants, whose
-        -- recipients only this fold knows (#1942).
         Modification.GainAbility g -> case g of
           GrantedAbility.Activated a ->
             pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
@@ -272,7 +277,10 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           GrantedAbility.Static sa -> case affected of
             Affected.TheseObjects _ -> pc
             _ -> pc {PC.grantedStaticAbilities = PC.grantedStaticAbilities pc <> [(stamp, sa)]}
-          GrantedAbility.Rules _ -> pc
+          -- Pawl.SacrificeRestrictionSpec's Zurgo group proves it.
+          GrantedAbility.Rules rules -> case affected of
+            Affected.TheseObjects _ -> pc
+            _ -> pc {PC.grantedRuleAbilities = PC.grantedRuleAbilities pc <> rules}
           -- CR 614.1 / 113.7: replacementsOf reads this list off the finished
           -- projection, so the row is the receiver's and its IsSource is the
           -- receiver. Pawl.CastPermissionSpec's "CR 613.1f The Eighth Doctor's
@@ -295,6 +303,27 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- put in GameState.continuousEffects. The identity keeps the walk total,
         -- which is the posture SetController's arm below takes.
         Modification.GainAbilitiesOfSource _ -> pc
+        -- CR 613.1f / 702.167c: the activated abilities of each card used to craft
+        -- `src` -- linked under Binding.craftLink, so nothing `src`'s other
+        -- abilities exile (CR 607.2a) -- read off its copiable values (CR 707.2),
+        -- each with the rider's restrictions added. Like GainAbility above, the
+        -- receiver is their source (CR 113.7).
+        --
+        -- CR 602.5c: an unnamed ability is named for the material it came from
+        -- (Binding.craftMaterialAbility), so two identically worded abilities
+        -- from two materials are two to a restriction on their use. A named one
+        -- keeps its name, which its linked twin refers to (CR 607.5). Not
+        -- implemented: two materials' identically NAMED abilities still share
+        -- one restriction (#4607).
+        --
+        -- Pawl.ActivateSpec's Locus of Enlightenment case proves all three.
+        Modification.GainCraftMaterialAbilities extra ->
+          let crafted = ExileLink.MkExileLink {ExileLink.source = src, ExileLink.ability = Just Binding.craftLink}
+              materials = filter (\o -> Map.lookup o (GameState.exiledWith gs) == Just crafted) (Set.toAscList (GameState.exile gs))
+              named material a = a {ActivatedAbility.name = ActivatedAbility.name a Applicative.<|> Just (Binding.craftMaterialAbility material)}
+              gained = foldMap (\material -> fmap (named material) (PC.activatedAbilities (copiableCharacteristics material gs))) materials
+              restricted a = a {ActivatedAbility.restrictions = ActivatedAbility.restrictions a <> extra}
+           in pc {PC.activatedAbilities = PC.activatedAbilities pc <> fmap restricted gained}
         -- CR 604.3: a CDA is a static ability, so this loses it too.
         Modification.LoseAllAbilities ->
           pc
@@ -314,6 +343,9 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- gone. Unproven: no card in data/cards/ grants a static ability
               -- to a permanent an ability wipe reaches.
               PC.grantedStaticAbilities = [],
+              -- The same for a granted rule ability. Unproven: no card in
+              -- data/cards/ grants one to a permanent an ability wipe reaches.
+              PC.grantedRuleAbilities = mempty,
               -- CR 305.6's intrinsic mana ability has no list here to empty, so
               -- the removal is recorded instead and read back by
               -- Pawl.Engine.Subtype.intrinsicManaAbilityOf.
@@ -634,6 +666,7 @@ cardTypesAfter m types = case m of
   Modification.GainCastingPermission _ -> types
   Modification.GainAbility _ -> types
   Modification.GainAbilitiesOfSource _ -> types
+  Modification.GainCraftMaterialAbilities _ -> types
   Modification.LoseAllAbilities -> types
   Modification.LoseNamedAbility _ -> types
   Modification.LoseKeyword _ -> types
@@ -1333,6 +1366,7 @@ freezeQuantities gs announcedOn source context m =
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
         Modification.GainAbilitiesOfSource _ -> Just m
+        Modification.GainCraftMaterialAbilities _ -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.LoseNamedAbility _ -> Just m
         Modification.LoseKeyword _ -> Just m
@@ -1384,6 +1418,7 @@ quantitiesOf m = case m of
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
   Modification.GainAbilitiesOfSource _ -> []
+  Modification.GainCraftMaterialAbilities _ -> []
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
   Modification.LoseKeyword _ -> []
@@ -1432,6 +1467,7 @@ referenceQuery m = case m of
   Modification.GainCastingPermission _ -> Nothing
   Modification.GainAbility _ -> Nothing
   Modification.GainAbilitiesOfSource _ -> Nothing
+  Modification.GainCraftMaterialAbilities _ -> Nothing
   Modification.LoseAllAbilities -> Nothing
   Modification.LoseNamedAbility _ -> Nothing
   Modification.LoseKeyword _ -> Nothing
@@ -1480,6 +1516,7 @@ setsLandSubtype m = case m of
   -- An ability grant is layer 6 and sets no subtype at all.
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainCraftMaterialAbilities _ -> False
   Modification.GainKeyword _ -> False
   Modification.GainKeywordAtManaCost _ -> False
   Modification.GainEnchant _ -> False
@@ -2553,11 +2590,13 @@ abilityRemovalAfter gs =
         then \ts -> abilitiesRemovedBy ((> ts) . gTimestamp) gated gs
         else \_ _ -> False
 
--- CR 613.11 / 613.1f: the rule abilities stored layer-6 grants give `oid`
--- (Chomping Kavu's backup), which each of the thirteen gatherers
--- (Pawl.Engine.CombatRestriction and its siblings) reads next to the object's
--- own (ruleAbilitiesOf). Hoisted over the whole game like abilityRemoval, and no
--- work on a board that stores no such grant.
+-- CR 613.11 / 613.1f: the rule abilities layer-6 grants give `oid`, which each
+-- of the thirteen gatherers (Pawl.Engine.CombatRestriction and its siblings)
+-- reads next to the object's own (ruleAbilitiesOf): a stored grant's (Chomping
+-- Kavu's backup), and a static ability's, which the fold recorded on the
+-- receiver (Zurgo, Thunder's Decree) and only a whole-board projection reads
+-- back. Hoisted over the whole game like abilityRemoval, and no work on a board
+-- with neither.
 --
 -- CR 613.1f's removal is asked in CR 613.7 timestamp order: only a removal
 -- later than the grant takes it (abilityRemovalAfter). Three gates a printed row
@@ -2577,7 +2616,11 @@ grantedRuleAbilities gs =
       removedAfter = abilityRemovalAfter gs
       heldBy oid (ts, holders, rules) =
         if Set.member oid holders && not (removedAfter ts oid) then rules else mempty
-   in if null grants then const mempty else \oid -> foldMap (heldBy oid) grants
+      stored = if null grants then const mempty else \oid -> foldMap (heldBy oid) grants
+      -- The fold already took any grant a later removal reaches (CR 613.7).
+      pcs = projectAll gs
+      recorded oid = PC.grantedRuleAbilities (projectGiven pcs oid gs)
+   in if grantsRuleAbilityAnywhere gs then \oid -> stored oid <> recorded oid else stored
 
 -- CR 613.1f: does this modification remove abilities? Total: a new
 -- ability-removing Modification must break this build rather than silently answer
@@ -2617,6 +2660,7 @@ removesAbilities m = case m of
   -- green.
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainCraftMaterialAbilities _ -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
   -- by setLandSubtypeTo and the two gates beside it, never a layer-6 removal.
   -- setsLandSubtype is the classification; this one answers CR 613.1f.
@@ -3345,6 +3389,7 @@ filterReads f = case f of
   Filter.Type.IsAttachedToEvaluated -> Set.empty
   Filter.Type.IsHostOfSource -> Set.empty
   Filter.Type.EnteredWithSource -> Set.empty
+  Filter.Type.AttachedNoLaterThanSource -> Set.empty
   -- Over-declared deliberately, per the note on Aspect above: the characteristics
   -- behind this atom are the candidate's (CR 301.5) and the subject's (CR
   -- 702.5a), and nothing distinguishes the two here.
@@ -3612,6 +3657,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsAttachedToEvaluated -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.EnteredWithSource -> False
+  Filter.Type.AttachedNoLaterThanSource -> False
   Filter.Type.IsToken -> False
   Filter.Type.IsCommander -> False
   Filter.Type.IsActivatedAbility -> False
@@ -3691,6 +3737,7 @@ modificationWrites m = case m of
   -- creature into the Ascent's set" proves it.
   Modification.GainAbility _ -> Set.singleton Keywords
   Modification.GainAbilitiesOfSource _ -> Set.singleton Keywords
+  Modification.GainCraftMaterialAbilities _ -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
   -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
@@ -3787,6 +3834,7 @@ modificationReads m = case m of
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
   Modification.GainAbilitiesOfSource _ -> Set.empty
+  Modification.GainCraftMaterialAbilities _ -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
   -- Carries a name, which is not a Quantity.
   Modification.LoseNamedAbility _ -> Set.empty
@@ -3865,6 +3913,8 @@ quantityReads q = case q of
   -- here, so the payload's reads are reported even though the cards it reads
   -- them off are in exile and no modification this screen guards writes there.
   Quantity.Type.AgainstCardsExiledWith a -> quantityReads a
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.Type.AgainstCraftMaterials a -> quantityReads a
   Quantity.Type.Literal _ -> Set.empty
   Quantity.Type.ManaValue -> Set.empty
   Quantity.Type.InSlot _ -> Set.empty
@@ -3909,6 +3959,8 @@ quantityReads q = case q of
   Quantity.Type.DamageDealtToThisTurn -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.AttackersDeclaredThisTurn _ -> Set.empty
+  Quantity.Type.AttackedInLastTurnOf _ -> Set.empty
+  Quantity.Type.AttackersInTheirLastTurn _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.Type.CardsDrawnThisTurn _ -> Set.empty
   Quantity.Type.BendingsThisTurn _ -> Set.empty
@@ -5501,6 +5553,7 @@ grantsKeywordWhere p m = case m of
   -- one whose own modifications grant one.
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainCraftMaterialAbilities _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   -- Take keywords AWAY, which is the opposite of what this asks.
@@ -5582,6 +5635,7 @@ grantsMintingType m = case m of
   -- A granted static ability's own parts, grantsKeywordWhere's reason.
   Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainCraftMaterialAbilities _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
@@ -5639,6 +5693,21 @@ grantsPlayerAbilityAnywhere gs =
     || storedWrites grantsPlayerAbility gs
     || elsewhereGrants grantsPlayerAbility gs
 
+-- CR 613.11 / 613.1f: does this modification hand its affected objects a
+-- quoted rule ability? grantsRuleAbilityAnywhere's grantor question.
+grantsRuleAbility :: Modification -> Bool
+grantsRuleAbility = grantsAbilityWhere (\g -> case g of GrantedAbility.Rules _ -> True; _ -> False)
+
+-- CR 613.11: can the layer fold have recorded a rule ability on any permanent
+-- right now? grantsPlayerAbilityAnywhere's short-circuit, asked of the same
+-- grantors, in front of grantedRuleAbilities' read of
+-- ProjectedCharacteristics.grantedRuleAbilities.
+grantsRuleAbilityAnywhere :: GameState -> Bool
+grantsRuleAbilityAnywhere gs =
+  any (any (any grantsRuleAbility . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
+    || storedWrites grantsRuleAbility gs
+    || elsewhereGrants grantsRuleAbility gs
+
 -- Does this modification hand its affected objects a quoted ability `p` holds
 -- of? grantsMintingType's shape, and exhaustive for grantsKeywordWhere's
 -- reason. GainAbilitiesOfSource never reaches a stored effect (Resolve.Effect's
@@ -5659,6 +5728,7 @@ grantsAbilityWhere p m = case m of
   Modification.LoseEnchant _ -> False
   Modification.GainCastingPermission _ -> False
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainCraftMaterialAbilities _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False

@@ -2183,6 +2183,7 @@ departedAttackerSpec s registry =
                       -- Combat.blockers above.
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.attackingNothing = Set.empty,
+                      Combat.Type.blockingNothing = Set.empty,
                       Combat.Type.removedDefending = Map.empty,
                       Combat.Type.defenders = [S.bob]
                     }
@@ -2229,6 +2230,7 @@ departedDefenderSpec s registry =
                       -- which is the moment the comment above describes.
                       Combat.Type.blockersDeclared = False,
                       Combat.Type.attackingNothing = Set.empty,
+                      Combat.Type.blockingNothing = Set.empty,
                       Combat.Type.removedDefending = Map.empty,
                       Combat.Type.defenders = [S.bob]
                     }

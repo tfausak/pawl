@@ -11,6 +11,7 @@
 module Pawl.ReplacementSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -1604,7 +1605,7 @@ undergrowthScavengerSpec s registry =
 onBattlefieldNamed :: String -> GameState.GameState -> Int
 onBattlefieldNamed name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
 
-fixedEntryCostSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+fixedEntryCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fixedEntryCostSpec s registry =
   Spec.describe s "Fixed entry costs across a batch (CR 614.12b)" $ do
     -- CR 614.1a's other branch: played from hand with no Swamp to sacrifice, the
@@ -1617,6 +1618,60 @@ fixedEntryCostSpec s registry =
       Spec.assertEqWith s "no Lake of the Dead entered" (onBattlefieldNamed "Lake of the Dead" after) 0
       Spec.assertEqWith s "it is in alice's graveyard" (graveyardNames S.alice after) [CardName.MkCardName (Text.pack "Lake of the Dead")]
       Spec.assertEqWith s "and the Forest is untouched" (onBattlefieldNamed "Forest" after) 1
+    -- Storm the Festival puts Wood Elemental and Heart of Yavimaya onto the
+    -- battlefield together, the Elemental's entry running first. Its first
+    -- answer takes both Forests, starving the Heart: that answer is refused and
+    -- the question asked again, and the second answer keeps one Forest back.
+    Spec.it s "an any-number answer starving a later member is asked again (CR 614.12b)" $ do
+      after <- festivalAfter s registry ["Wood Elemental", "Heart of Yavimaya"]
+      Spec.assertEqWith s "Heart of Yavimaya entered" (onBattlefieldNamed "Heart of Yavimaya" after) 1
+      Spec.assertEqWith s "Wood Elemental is a 1/1 off the one Forest its second answer named" (woodElementalSize after) (Just (1, 1))
+    -- The control, differing in one thing: Lake of the Dead, owing a Swamp
+    -- alice does not have, in the Heart's place. No answer causes the later cost
+    -- to be unpayable, so the first answer stands and takes both Forests.
+    Spec.it s "with the later cost unpayable anyway, the first answer stands" $ do
+      after <- festivalAfter s registry ["Wood Elemental", "Lake of the Dead"]
+      Spec.assertEqWith s "Wood Elemental is a 2/2 off both Forests" (woodElementalSize after) (Just (2, 2))
+
+-- Storm the Festival {3}{G}{G}{G} Sorcery, "Look at the top five cards of your
+-- library. You may put up to two permanent cards with mana value 5 or less from
+-- among them onto the battlefield. Put the rest on the bottom of your library in
+-- a random order." (Oracle text checked against api.scryfall.com.) alice
+-- casts it off three Llanowar Elves and three Islands; only then are two
+-- untapped Forests put onto the battlefield, so no payment can tap one. Her
+-- library, top first, is `top` followed by four Islands. Resolves the spell and
+-- settles the board, putting `top` onto the battlefield. Wood Elemental's first
+-- answer is every Forest offered and each later one only the first Forest,
+-- pinned by id.
+festivalAfter :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m GameState.GameState
+festivalAfter s registry top = do
+  storm <- S.printingOf s registry "Storm the Festival"
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  elves <- S.printingOf s registry "Llanowar Elves"
+  tops <- Monad.mapM (S.printingOf s registry) top
+  let withElves = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers)) (replicate 3 elves)
+      islands = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) withElves (replicate 4 island)
+      -- Bottom first: S.addLibraryCard puts each new card on top.
+      addTop (ids, g) p = let (oid, g1) = S.addLibraryCard p S.alice g in (oid : ids, g1)
+      (topIds, stocked) = List.foldl' addTop ([], islands) (reverse tops)
+      (withSpell, spell) = S.handOne storm stocked
+      cast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+      (firstForest, board1) = S.addPermanent forest S.alice cast
+      (_, gs) = S.addPermanent forest S.alice board1
+      answer :: Prompt.Prompt r -> State.State Int r
+      answer p = case p of
+        Prompt.ChooseCardsFromAmong _ _ _ offered _ -> pure (Set.fromList (filter (`List.elem` topIds) offered))
+        Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> do
+          asked <- State.get
+          State.put (asked + 1)
+          pure (Set.fromList (if asked == 0 then candidates else filter (== firstForest) candidates))
+        _ -> pure (S.identityAnswer p)
+  pure (snd (State.evalState (Engine.runGame answer gs (Stack.resolveTop >> Engine.settleForPriority)) 0))
+
+-- Wood Elemental's power and toughness, read off the one on alice's battlefield.
+woodElementalSize :: GameState.GameState -> Maybe (Integer, Integer)
+woodElementalSize after = newestNamed (CardName.MkCardName (Text.pack "Wood Elemental")) after >>= \oid -> S.powerToughnessOf oid after
 
 -- alice controls `mountains` untapped Mountains and `forests` untapped Forests
 -- in a precombat main phase with priority, holding one card per printing in

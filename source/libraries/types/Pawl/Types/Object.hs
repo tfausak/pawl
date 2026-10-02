@@ -654,7 +654,8 @@ data Object = MkObject
     -- snow of one of the spell's own colours?" as reads rather than fields --
     -- Pawl.Engine.Filter.View.manaSpentTagColors is where the two are taken.
     --
-    -- Written by Pawl.Engine.Cost.payMana, and only once the payment has
+    -- Written by Pawl.Engine.Cost.recordPayment, for the caster's payment and
+    -- CR 702.132a's assisting player's alike, and only once the payment has
     -- settled: an unpaid cost is unwound to a state older than this write, even
     -- where CR 733.1 lets the payer keep what the mana window did, so a rejected
     -- cast records nothing. An ACTIVATION's units land on the ability object and
@@ -825,10 +826,10 @@ data Object = MkObject
     -- CR 602.5c -- an acquired ability's restriction "doesn't apply to other,
     -- identically worded abilities" -- is what value equality cannot separate: an
     -- object holding a printed once-only ability and a granted twin of it would
-    -- spend both at once. Nothing in the pool can build that object. Scryfall
-    -- `kw:exhaust`, 2026-09-06, 40 printings: none grants its exhaust ability to
-    -- another permanent, and none prints the same exhaust line twice. A card that
-    -- gave another creature "Exhaust -- [cost]: [effect]" would refute it.
+    -- spend both at once. Locus of Enlightenment acquires abilities from several
+    -- cards, and Pawl.Engine.Projection names each unnamed one for its material
+    -- so twins differ. Not implemented: two materials' identically NAMED
+    -- abilities share one record (#4607).
     activatedOnce :: Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     -- | CR 702.95b: the creature this one is paired with, and the seat the
     -- soulbond ability that paired them was controlled by; Nothing for every

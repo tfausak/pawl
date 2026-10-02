@@ -75,6 +75,8 @@ substituteStar star quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.AttackersDeclaredThisTurn _ -> quantity
+  Quantity.AttackedInLastTurnOf _ -> quantity
+  Quantity.AttackersInTheirLastTurn _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.CardsDrawnThisTurn _ -> quantity
   Quantity.BendingsThisTurn _ -> quantity
@@ -104,6 +106,8 @@ substituteStar star quantity = case quantity of
   -- No descent, the Count arm's reason again: the payload is read against the
   -- exiled card, where a star would be THAT card's box and not this one's.
   Quantity.AgainstCardsExiledWith {} -> quantity
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.AgainstCraftMaterials {} -> quantity
 
 -- Does a printed box hold CR 208.2's star anywhere inside it? The three
 -- calculations descend for substituteStar's reason: 1+* is a star box, and the

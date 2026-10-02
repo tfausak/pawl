@@ -6,6 +6,8 @@
 -- resolve, so decoding yields 'Needs' rather than the answer itself.
 module Pawl.Scenario.Reply where
 
+import qualified Control.Monad as Monad
+import qualified Data.Either as Either
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -28,24 +30,24 @@ import qualified Pawl.Codec.OptionalDecision as Codec.OptionalDecision
 import qualified Pawl.Codec.PaymentDecision as Codec.PaymentDecision
 import qualified Pawl.Codec.PrintingId as Codec.PrintingId
 import qualified Pawl.Codec.Reference as Codec.Reference
+import qualified Pawl.Codec.Reply as Codec.Reply
 import qualified Pawl.Codec.SlotName as Codec.SlotName
 import qualified Pawl.Codec.Subtype as Codec.Subtype
-import qualified Pawl.Codec.Reply as Codec.Reply
-import qualified Pawl.Types.Reply as R
+import qualified Pawl.Codec.Zone as Codec.Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
-import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.GraveyardArrangement as GraveyardArrangement
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -57,12 +59,12 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reference as Reference
+import qualified Pawl.Types.Reply as R
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
-import qualified Pawl.Codec.Zone as Codec.Zone
 
 -- | An answer still waiting on the run to name its objects and players.
 data Needs a
@@ -86,8 +88,8 @@ instance Monad Needs where
   needs >>= f = case needs of
     Done a -> f a
     Failed e -> Failed e
-    NeedObject r k -> NeedObject r (\oid -> k oid >>= f)
-    NeedPlayer l k -> NeedPlayer l (\pid -> k pid >>= f)
+    NeedObject r k -> NeedObject r (k Monad.>=> f)
+    NeedPlayer l k -> NeedPlayer l (k Monad.>=> f)
 
 -- | How a recording names what an answer refers to.
 data Namer = MkNamer
@@ -107,18 +109,18 @@ viaCodec :: Codec.Codec a -> Shape a
 viaCodec codec =
   MkShape
     (fromEither . Codec.decode codec . Codec.Reply.toValue)
-    (\_ -> either (const R.Null) id . Codec.Reply.fromValue . Codec.encode codec)
+    (\_ -> Either.fromRight R.Null . Codec.Reply.fromValue . Codec.encode codec)
 
 object :: Shape ObjectId.ObjectId
 object =
   MkShape
-    (\v -> decode reference v >>= \ref -> NeedObject ref Done)
+    (decode reference Monad.>=> (`NeedObject` Done))
     (\namer -> encode reference namer . nameObject namer)
 
 player :: Shape PlayerId.PlayerId
 player =
   MkShape
-    (\v -> decode text v >>= \t -> NeedPlayer (Label.MkLabel t) Done)
+    (decode text Monad.>=> (\t -> NeedPlayer (Label.MkLabel t) Done))
     (\namer -> encode text namer . Label.unwrap . namePlayer namer)
 
 natural :: Shape Natural
@@ -154,7 +156,7 @@ elements v = case v of
   _ -> Failed (Text.pack "expected an array")
 
 list :: Shape a -> Shape [a]
-list shape = MkShape (\v -> elements v >>= traverse (decode shape)) (\namer -> R.Array . fmap (encode shape namer))
+list shape = MkShape (elements Monad.>=> traverse (decode shape)) (\namer -> R.Array . fmap (encode shape namer))
 
 seqOf :: Shape a -> Shape (Seq.Seq a)
 seqOf shape = MkShape (fmap Seq.fromList . decode (list shape)) (\namer -> encode (list shape) namer . Foldable.toList)
@@ -166,23 +168,25 @@ maybeOf :: Shape a -> Shape (Maybe a)
 maybeOf shape =
   MkShape
     (\v -> if v == R.Null then Done Nothing else fmap Just (decode shape v))
-    (\namer -> maybe R.Null (encode shape namer))
+    (maybe R.Null . encode shape)
 
 pairOf :: Shape a -> Shape b -> Shape (a, b)
 pairOf sa sb =
   MkShape
-    ( \v -> elements v >>= \xs -> case xs of
-        [a, b] -> (,) <$> decode sa a <*> decode sb b
-        _ -> Failed (Text.pack "expected a pair")
+    ( elements
+        Monad.>=> \xs -> case xs of
+          [a, b] -> (,) <$> decode sa a <*> decode sb b
+          _ -> Failed (Text.pack "expected a pair")
     )
     (\namer (a, b) -> R.Array [encode sa namer a, encode sb namer b])
 
 tripleOf :: Shape a -> Shape b -> Shape c -> Shape (a, b, c)
 tripleOf sa sb sc =
   MkShape
-    ( \v -> elements v >>= \xs -> case xs of
-        [a, b, c] -> (,,) <$> decode sa a <*> decode sb b <*> decode sc c
-        _ -> Failed (Text.pack "expected a triple")
+    ( elements
+        Monad.>=> \xs -> case xs of
+          [a, b, c] -> (,,) <$> decode sa a <*> decode sb b <*> decode sc c
+          _ -> Failed (Text.pack "expected a triple")
     )
     (\namer (a, b, c) -> R.Array [encode sa namer a, encode sb namer b, encode sc namer c])
 
@@ -196,17 +200,18 @@ mapOf sk sv =
 recipient :: Shape Recipient.Recipient
 recipient =
   MkShape
-    ( \v -> elements v >>= \xs -> case xs of
-        [tag, x] -> do
-          t <- decode text tag
-          case Text.unpack t of
-            "Creature" -> Recipient.ToCreature <$> decode object x
-            "Planeswalker" -> Recipient.ToPlaneswalker <$> decode object x
-            "Battle" -> Recipient.ToBattle <$> decode object x
-            "Player" -> Recipient.ToPlayer <$> decode player x
-            "Object" -> Recipient.ToObject <$> decode object x
-            other -> Failed (Text.pack ("no recipient kind " <> other))
-        _ -> Failed (Text.pack "expected [kind, recipient]")
+    ( elements
+        Monad.>=> \xs -> case xs of
+          [tag, x] -> do
+            t <- decode text tag
+            case Text.unpack t of
+              "Creature" -> Recipient.ToCreature <$> decode object x
+              "Planeswalker" -> Recipient.ToPlaneswalker <$> decode object x
+              "Battle" -> Recipient.ToBattle <$> decode object x
+              "Player" -> Recipient.ToPlayer <$> decode player x
+              "Object" -> Recipient.ToObject <$> decode object x
+              other -> Failed (Text.pack ("no recipient kind " <> other))
+          _ -> Failed (Text.pack "expected [kind, recipient]")
     )
     ( \namer r -> case r of
         Recipient.ToCreature o -> tagged "Creature" (encode object namer o)
@@ -220,15 +225,16 @@ recipient =
 attackTarget :: Shape AttackTarget.AttackTarget
 attackTarget =
   MkShape
-    ( \v -> elements v >>= \xs -> case xs of
-        [tag, x] -> do
-          t <- decode text tag
-          case Text.unpack t of
-            "Player" -> AttackTarget.OfPlayer <$> decode player x
-            "Planeswalker" -> AttackTarget.OfPlaneswalker <$> decode object x
-            "Battle" -> AttackTarget.OfBattle <$> decode object x
-            other -> Failed (Text.pack ("no attack target kind " <> other))
-        _ -> Failed (Text.pack "expected [kind, target]")
+    ( elements
+        Monad.>=> \xs -> case xs of
+          [tag, x] -> do
+            t <- decode text tag
+            case Text.unpack t of
+              "Player" -> AttackTarget.OfPlayer <$> decode player x
+              "Planeswalker" -> AttackTarget.OfPlaneswalker <$> decode object x
+              "Battle" -> AttackTarget.OfBattle <$> decode object x
+              other -> Failed (Text.pack ("no attack target kind " <> other))
+          _ -> Failed (Text.pack "expected [kind, target]")
     )
     ( \namer a -> case a of
         AttackTarget.OfPlayer p -> tagged "Player" (encode player namer p)
@@ -288,6 +294,7 @@ shapeOf prompt = case prompt of
   Prompt.ChooseDieResult {} -> natural
   Prompt.RerollDie {} -> viaCodec Codec.OptionalDecision.codec
   Prompt.AdjustDieRoll {} -> maybeOf (pairOf natural (named [RollAdjustment.Increase, RollAdjustment.Decrease]))
+  Prompt.ChooseRollModifier {} -> natural
   Prompt.CallCoin {} -> viaCodec Codec.CoinFace.codec
   Prompt.ChooseCoinResult {} -> viaCodec Codec.CoinFace.codec
   Prompt.ChooseDiscard {} -> list object
