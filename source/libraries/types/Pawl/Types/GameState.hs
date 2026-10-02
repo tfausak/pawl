@@ -238,6 +238,10 @@ data GameState = MkGameState
     -- enter with, pending until runEntry flushes them onto the object. Empty
     -- outside an entry.
     enteringCounters :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural),
+    -- | CR 707.9e: the share of each entering permanent's enteringCounters that
+    -- the copy effect applied to it last placed as its exception, which a later
+    -- copy effect on the same entry takes back. Empty outside an entry.
+    copyExceptionCounters :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural),
     -- | CR 611.1 / 613.11: stored player- and rules-modifying continuous effects
     -- from resolutions, each with an expiry; printed ones are re-derived live.
     playerEffects :: [ActivePlayerEffect.ActivePlayerEffect],
