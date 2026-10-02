@@ -441,15 +441,19 @@ candidateCostsGiven permitted pid name oid gs =
                     gs
                     oid
                     cond
-              -- CR 113.6d / 613.1f: a printed alternative cost is an ability, so
-              -- a layer-6 wipe takes it from the card wherever it lies. The
-              -- projection is asked only of a face printing one. Pawl.CostSpec's
-              -- "CR 118.9 an Asmoranomardicadaistinaculdacar that perpetually
-              -- lost all abilities has no alternative cost" proves it.
+              -- CR 113.6d / 613.1f: a printed alternative cost is an ability that
+              -- functions on the stack, so a layer-6 wipe takes it only where
+              -- it reaches the SPELL (`spell`): a perpetual one does, one
+              -- confined to graveyards does not. The projection is asked only
+              -- of a face printing one. Pawl.CostSpec's "CR 118.9 an
+              -- Asmoranomardicadaistinaculdacar that perpetually lost all
+              -- abilities has no alternative cost" and "CR 113.6d under Yixlid
+              -- Jailer a Fireblast cast from the graveyard still sacrifices two
+              -- Mountains" prove both.
               alternatives = case Face.alternativeCosts face of
                 [] -> []
                 printedAlternatives ->
-                  if PC.lostAllAbilities (Projection.project oid gs)
+                  if PC.lostAllAbilities spell
                     then []
                     else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
               -- CR 702.103a: bestow, offered from EVERY zone the printed cost is
