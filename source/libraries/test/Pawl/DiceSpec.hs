@@ -1226,8 +1226,8 @@ pickRun wanted spell board =
           let (answer, next) = State.runState (rerollAnswer 1 p) scripted
           State.put (seen, next)
           pure answer
-      ((_, after), (seen, _)) = State.runState (Engine.runGame answering board (S.cast S.alice spell >> Stack.resolveTop)) ([], ([3, 6, 2], [OptionalDecision.Exercises]))
-   in (after, reverse seen)
+      ((_, after), (pickers, _)) = State.runState (Engine.runGame answering board (S.cast S.alice spell >> Stack.resolveTop)) ([], ([3, 6, 2], [OptionalDecision.Exercises]))
+   in (after, reverse pickers)
 
 -- The same cast under an answerer that records WHICH player each reroll offer
 -- was put to. rerollPrompts' shape, and separate from it because the seat is a
