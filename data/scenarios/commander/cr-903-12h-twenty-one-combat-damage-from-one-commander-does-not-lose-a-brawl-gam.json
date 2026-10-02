@@ -1,0 +1,138 @@
+{
+  "description": "CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game",
+  "note": "Brawl is on and both seats start at CR 903.12f's twenty-five, which the board states rather than the deck setup the Haskell test builds. Three of alice's turns, each a 7-point swing by her commander; each library holds Islands for the draws.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "life": 25,
+        "battlefield": [
+          {
+            "card": "Kalakscion, Hunger Tyrant",
+            "label": "kalakscion",
+            "ready": true,
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 25,
+        "command": [
+          {
+            "card": "Jedit Ojanen",
+            "label": "jedit",
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "brawl": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 25
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 5,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 5,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "CommanderDamage",
+          "player": "bob",
+          "is": [
+            [
+              "Kalakscion, Hunger Tyrant",
+              21
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 4
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Result",
+          "is": null
+        }
+      }
+    }
+  ]
+}

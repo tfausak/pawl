@@ -1,0 +1,106 @@
+{
+  "description": "CR 701.54c the Ring-bearer is legendary, which CR 205.4e sees",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "Plains",
+            "label": "p4"
+          },
+          {
+            "card": "Plains",
+            "label": "p5"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "lower"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "higher"
+          },
+          {
+            "card": "Thalia, Guardian of Thraben",
+            "label": "thalia"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Birthday Escape",
+            "label": "e1"
+          },
+          {
+            "card": "Birthday Escape",
+            "label": "e2"
+          },
+          {
+            "card": "Urza's Ruinous Blast",
+            "label": "blast"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $e1",
+            "Cast $e2",
+            "Cast $blast",
+            "ActivateManaAbility $i1",
+            "ActivateManaAbility $i2",
+            "ActivateManaAbility $p1",
+            "ActivateManaAbility $p2",
+            "ActivateManaAbility $p3",
+            "ActivateManaAbility $p4",
+            "ActivateManaAbility $p5"
+          ]
+        }
+      }
+    }
+  ],
+  "note": "The same board with Thalia, Guardian of Thraben, a printed legendary creature, beside the Pikers and no Ring: CR 205.4e lets alice cast Urza's Ruinous Blast, so the main file's refusal is that rule's."
+}

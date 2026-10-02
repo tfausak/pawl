@@ -1,0 +1,210 @@
+{
+  "description": "CR 903.10a damage from two different commanders does not combine",
+  "note": "alice's Kalakscion (7) swings at carol in turns 1 and 4 and bob's Jedit (5) in turns 2 and 5; the Haskell test skips the steps between combats, so each library holds Islands for the draws.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "life": 40,
+        "battlefield": [
+          {
+            "card": "Kalakscion, Hunger Tyrant",
+            "label": "kalakscion",
+            "ready": true,
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 40,
+        "battlefield": [
+          {
+            "card": "Jedit Ojanen",
+            "label": "jedit",
+            "ready": true,
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "life": 40,
+        "command": [
+          {
+            "card": "Shimatsu the Bloodcloaked",
+            "label": "shimatsu",
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$kalakscion",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 2,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$jedit"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "source": "$jedit",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$kalakscion",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 5,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$jedit"
+        ]
+      }
+    },
+    {
+      "turn": 5,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "source": "$jedit",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 5,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "CommanderDamage",
+          "player": "carol",
+          "is": [
+            [
+              "Kalakscion, Hunger Tyrant",
+              14
+            ],
+            [
+              "Jedit Ojanen",
+              10
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "carol",
+          "life": 16
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Result",
+          "is": null
+        }
+      }
+    },
+    {
+      "turn": 6,
+      "step": "Upkeep",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "carol"
+        }
+      }
+    }
+  ]
+}

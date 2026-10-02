@@ -216,26 +216,6 @@ arborColossusSpec s registry =
                 Right twice -> do
                   Spec.assertEqWith s "still three counters, not six" (plusOnes colossus twice) 3
                   Spec.assertBool s (S.onBattlefield second twice) "the second flier survived, nothing having become monstrous"
-        -- The designation is LOAD-BEARING in the CLAUSE CONDITION too, and one board
-        -- can carry two designations at once: Rune-Brand Juggler {2}{B}{R} 3/3,
-        -- "When this creature enters, suspect up to one target creature you control",
-        -- aimed at the Colossus. CR 701.60b's mark is not CR 701.37b's, so CR
-        -- 701.37a's "if this permanent isn't monstrous" still holds and monstrosity
-        -- still does its whole job. A Quantity arm that read "has SOME designation"
-        -- would fail the condition and put nothing on the Colossus at all.
-        Spec.it s "CR 701.37a a suspected Colossus is still not monstrous" $ do
-          jugglerPrinting <- S.printingOf s registry "Rune-Brand Juggler"
-          (colossus, maiden, _, gs) <- board pure
-          let (_, entering) = S.entersWithTrigger jugglerPrinting S.alice gs
-              suspected = snd (Engine.runGamePure (aimed colossus) entering Engine.priorityLoop)
-          Spec.assertBool s (Set.member Designation.Suspected (maybe Set.empty Object.designations (Game.lookupObject colossus suspected))) "the Juggler suspected the Colossus"
-          Spec.assertEqWith s "which leaves it not monstrous" (monstrousness colossus suspected) (Just False)
-          case monstrosity colossus maiden suspected of
-            Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
-            Right after -> do
-              Spec.assertEqWith s "so monstrosity still places its three counters" (plusOnes colossus after) 3
-              Spec.assertEqWith s "and still marks it monstrous" (monstrousness colossus after) (Just True)
-              Spec.assertBool s (not (S.onBattlefield maiden after)) "and its trigger still fired"
         -- The designation is LOAD-BEARING in the match, not just the event's shape.
         -- Valeron Wardens {2}{G} 1/3 watches "whenever a creature you control
         -- becomes renowned" -- the same TriggerCondition constructor with Renowned

@@ -1,0 +1,140 @@
+{
+  "description": "CR 608.2c Make a Wish returns two DISTINCT cards, the same answer given twice",
+  "note": "Both random picks are answered with the Whipstitched Zombie, the head of the first offer. The second offer no longer holds it (it is in alice's hand by then), and an answer outside a random offer falls back to that offer's head, the Lightning Bolt; were the Zombie offered again, only one card would reach the hand.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Make a Wish",
+            "label": "make-a-wish",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Whipstitched Zombie",
+            "label": "whipstitched-zombie"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "lightning-bolt"
+          },
+          {
+            "card": "Highborn Ghoul"
+          },
+          {
+            "card": "Murder"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$make-a-wish",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RandomObject",
+          "with": "Whipstitched Zombie"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "RandomObject",
+          "with": "Whipstitched Zombie"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Hand",
+          "is": [
+            "Whipstitched Zombie",
+            "Lightning Bolt"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": [
+            "Highborn Ghoul",
+            "Murder",
+            "Make a Wish"
+          ]
+        }
+      }
+    }
+  ]
+}

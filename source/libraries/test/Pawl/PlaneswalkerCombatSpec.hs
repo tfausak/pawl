@@ -394,15 +394,6 @@ planeswalkerAttackSpec s registry = Spec.describe s "AttackingAPlaneswalker" $ d
     Spec.assertEqWith s "attacking Jace: two counters gone" (S.counterOf CounterKind.Loyalty jaceId atJace) 1
     Spec.assertEqWith s "attacking bob: he takes two" (S.lifeOf S.bob atBob) (Just 18)
     Spec.assertEqWith s "attacking bob: Jace keeps all three" (S.counterOf CounterKind.Loyalty jaceId atBob) 3
-  Spec.it s "CR 508.1b the prompt is asked once per attacker, over the defending player and their planeswalker" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (gs, mine, jaceId) = jaceBoard jace [piker, piker]
-    Spec.assertEqWith
-      s
-      "two attackers, two announcements, each offering both targets"
-      (announcementsFor gs)
-      (fmap (\oid -> (oid, [AttackTarget.OfPlayer S.bob, AttackTarget.OfPlaneswalker jaceId])) mine)
   -- The regression guard, and the elision: CR 508.1b calls for no announcement
   -- when the defending player controls no planeswalker, so the engine must not
   -- ask -- and the board must play exactly as it did before the prompt existed.

@@ -1455,53 +1455,6 @@ equipSpec s registry = Spec.describe s "Equip" $ do
     Spec.assertEqWith s "while alice's is offered on her own turn" (length (activationsOf aliceSplitter (Action.legalActions S.alice gs))) 1
     Spec.assertEqWith s "and one Swamp of his own does offer it" (length (activationsOf bobSplitter (Action.legalActions S.bob (S.landsFor swamp S.bob 1 bobsTurn)))) 1
 
-  -- CR 601.2f's reductions asked about CR 601.2c's TARGETS. Dwarven Mauler ({R}
-  -- Creature -- Dwarf Warrior 2/1, "Equip abilities you activate that target this
-  -- creature cost {2} less to activate", checked against Scryfall on 2026-08-25)
-  -- is that whole sentence and nothing else, so no other clause of the card can
-  -- be what these assertions read.
-  --
-  -- The ordering is the point: pawl gathers the adjustments once at CR 601.2b's
-  -- position, where no target exists yet, and again after Target.chooseTargets.
-  -- Only the second gather can see this reducer.
-  --
-  -- WHY AEGIS OF THE LEGION AND THREE MOUNTAINS. Its equip is {3}, so the reduced
-  -- cost is {1} -- neither 0 nor the printed 3, which puts every answer out of
-  -- reach of the floor and of a "reduced to nothing" path, and leaves the two
-  -- readings two Mountains apart. Three Mountains pay the PRINTED cost either
-  -- way, so both activations are offered whatever the gates measure and what
-  -- discriminates here is what each PAYS. The case below is the other half: one
-  -- Mountain, where what the gates measure is the whole question.
-  --
-  -- WHY THE MAMMOTH. A reducer that ignored the target criterion applies to both
-  -- activations and both pay {1}; the correct reading pays {1} and {3}. The two
-  -- readings AGREE on the Mauler-targeting run, so the Mammoth run is the one
-  -- that discriminates them -- and the Mauler run catches the third reading, a
-  -- criterion asked against the ability's SOURCE (the Equipment), under which
-  -- neither run is reduced and both pay {3}.
-  Spec.it s "CR 601.2f the reduction reaches only the equip that targets the Mauler" $ do
-    mauler <- S.printingOf s registry "Dwarven Mauler"
-    mammoth <- S.printingOf s registry "War Mammoth"
-    aegis <- S.printingOf s registry "Aegis of the Legion"
-    mountain <- S.printingOf s registry "Mountain"
-    let (maulerId, g0) = S.addPermanent mauler S.alice (Setup.emptyGame S.bothPlayers)
-        (mammothId, g1) = S.addPermanent mammoth S.alice g0
-        (aegisId, g2) = S.addPermanent aegis S.alice g1
-        board = (S.landsFor mountain S.alice 3 g2) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-    case Projection.abilitiesOf aegisId board of
-      [ability] -> do
-        let equipOnto victim = S.runPure (aimAtOffered victim) board (Activate.activateAbility S.alice aegisId ability)
-            resolve victim activated = S.runPure (aimAtOffered victim) activated Stack.resolveTop
-            ontoMauler = equipOnto maulerId
-            ontoMammoth = equipOnto mammothId
-        Spec.assertEqWith s "CR 601.2f the equip aimed at the Mauler pays {3} minus {2}, so one Mountain is tapped" (S.tappedCount S.alice ontoMauler) 1
-        Spec.assertEqWith s "while the same equip aimed at the Mammoth pays the printed {3}" (S.tappedCount S.alice ontoMammoth) 3
-        Spec.assertEqWith s "CR 701.3a and the Aegis really landed on the Mauler" (fmap Object.attachedTo (Game.lookupObject aegisId (resolve maulerId ontoMauler))) (Just (Just (Recipient.ToCreature maulerId)))
-        Spec.assertEqWith s "and on the Mammoth in the other run" (fmap Object.attachedTo (Game.lookupObject aegisId (resolve mammothId ontoMammoth))) (Just (Just (Recipient.ToCreature mammothId)))
-        Spec.assertEqWith s "setup: rule 702.6a minted the Aegis's printed equip {3}" (ActivatedAbility.cost ability) (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])
-        Spec.assertEqWith s "setup: nothing was tapped before either activation" (S.tappedCount S.alice board) 0
-      abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
-
 -- CR 702.77: reinforce, cycling's zone with a TARGET. Mosquito Guard is a {W}
 -- 1/1 whose only other text is first strike, so nothing but rule 702.77a
 -- produces the ability under test.
@@ -2489,7 +2442,7 @@ textChangedCostSpec s registry =
 --
 -- Both lands start TAPPED, so "the ability never resolved" and "it untapped the
 -- other land" are distinguishable board states.
-textChangedTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedTargetSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 textChangedTargetSpec s registry =
   let untapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
       -- The legal recipients of the projected ability's one mode, as CR 601.2c
@@ -2518,14 +2471,6 @@ textChangedTargetSpec s registry =
           Spec.assertEqWith s "only the Forest is a legal target" (candidates elfId board) [[Recipient.ToObject forestId]]
           Spec.assertBool s (untapped forestId after) "the Forest is untapped"
           Spec.assertBool s (not (untapped islandId after)) "the Island is still tapped"
-        -- The swap: the printed "target Forest" now reads "target Island", so the
-        -- Forest drops out of the candidate set entirely and the Island wakes up
-        -- instead.
-        Spec.it s "CR 612.1 whole card: hacking Arbor Elf moves which land its ability may target" $ do
-          (elfId, forestId, islandId, board, after) <- run True
-          Spec.assertEqWith s "only the Island is a legal target" (candidates elfId board) [[Recipient.ToObject islandId]]
-          Spec.assertBool s (untapped islandId after) "the Island is untapped"
-          Spec.assertBool s (not (untapped forestId after)) "the Forest is still tapped"
 
 -- Alice with two untapped Swamps and one Reassembling Skeleton in her graveyard,
 -- holding priority. Returns the graveyard card's id.
@@ -4762,19 +4707,6 @@ craftExilingBoth :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r ->
 craftExilingBoth first second p = case p of
   Prompt.ChooseMaterials _ _ _ candidates _ _ -> Set.fromList (filter (\c -> c == first || c == second) candidates)
   _ -> S.identityAnswer p
-
--- The names alice's battlefield shows, read through the projection: the card a
--- craft returns is a NEW object (CR 400.7), so nothing below can name it by the
--- id it had as a Tithing Blade, and CR 712.8a makes the face that is UP the only
--- honest reading of which side came back.
-craftBattlefieldNames :: GameState.GameState -> Set.Set CardName.CardName
-craftBattlefieldNames gs = Set.unions (fmap (\o -> Projection.namesOf o gs) (Game.zoneMembers Zone.Battlefield S.alice gs))
-
--- The printed names of alice's cards in a hidden-from-nobody zone, CR 400.7's
--- new objects again -- a material the cost exiled is not the object it was on
--- the battlefield or in the graveyard.
-craftNamesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
-craftNamesIn zone gs = List.sort (Maybe.mapMaybe (\o -> fmap S.nameOf (Game.cardOf o gs)) (Game.zoneMembers zone S.alice gs))
 
 -- CR 702.167c / 613.1f: The Enigma Jewel // Locus of Enlightenment, "Craft with
 -- four or more nonlands with activated abilities {8}{U}", whose back face "has

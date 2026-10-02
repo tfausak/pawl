@@ -2228,57 +2228,6 @@ nextUpkeepSpec s registry =
                 Nothing -> Spec.assertFailure s "one activated ability"
             _ -> Spec.assertFailure s "five printings"
 
--- Randomness over CR 400.2's PUBLIC zone, the pair of cards that exercise
--- Pawl.Types.ObjectRef.RandomCardInGraveyard. Ghoulraiser {1}{B}{B} Creature --
--- Zombie 2/2 (Jumpstart) -- "When this creature enters, return a Zombie card at
--- random from your graveyard to your hand." Make a Wish {3}{G} Sorcery
--- (Innistrad) -- "Return two cards at random from your graveyard to your hand."
--- Both checked against api.scryfall.com, 2026-09-19. Neither card elides
--- anything.
---
--- The two halves the ref carries, one card each: Ghoulraiser is the FILTER
--- ("a Zombie card") and Make a Wish is the COUNT ("two cards"), which is why
--- both are here rather than one.
---
--- TWO SEATS, and BOB's graveyard is stocked with Zombies of his own: the scope
--- is "your graveyard", so a scope reading every player's would pick a second
--- card out of his pile, which the assertions on his graveyard and on alice's
--- hand size read directly.
-ghoulraiserSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-ghoulraiserSpec s registry =
-  let -- Pinned by INDEX into the offer rather than read off the prompt's fields:
-      -- an answerer that hunted for "a Zombie" would go on answering legally
-      -- after a mutation broke which card the engine honours.
-      rolling :: Int -> Prompt.Prompt r -> r
-      rolling i p = case p of
-        Prompt.RandomObject offered -> case List.drop (min i (length (NonEmpty.toList offered) - 1)) (NonEmpty.toList offered) of
-          h : _ -> h
-          [] -> NonEmpty.head offered
-        _ -> S.identityAnswer p
-      named n = Just (CardName.MkCardName (Text.pack n))
-   in Spec.describe s "Ghoulraiser" $ do
-        -- The COUNT, and it counts DISTINCT cards: the answerer names the FIRST
-        -- candidate of every offer, so a second ask made over the whole pile
-        -- again would name the card already taken and only one card would move.
-        Spec.it s "CR 608.2c Make a Wish returns two DISTINCT cards, the same answer given twice" $ do
-          wish <- S.printingOf s registry "Make a Wish"
-          forest <- S.printingOf s registry "Forest"
-          printings <- traverse (S.printingOf s registry) ["Whipstitched Zombie", "Lightning Bolt", "Highborn Ghoul", "Murder"]
-          let mana = S.landsInPlay forest 4
-              withGraves = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) mana printings
-              (ready, spell) = S.handOne wish withGraves
-              after = S.runPure (rolling 0) (ready {GameState.priority = Just S.alice}) (S.cast S.alice spell *> Stack.resolveTop)
-          Spec.assertEqWith
-            s
-            "the first candidate of each offer, and the second offer no longer holds the first"
-            (namesIn Zone.Hand S.alice after)
-            [named "Whipstitched Zombie", named "Lightning Bolt"]
-          Spec.assertEqWith
-            s
-            "the other two stay buried, with the sorcery on top of them (CR 608.2n)"
-            (namesIn Zone.Graveyard S.alice after)
-            [named "Highborn Ghoul", named "Murder", named "Make a Wish"]
-
 -- CR 701.9b's two exceptions to the discarding player's own choice, both over
 -- Discard.These. bob holds four distinct cards, so every assertion reads
 -- identity, and the expectations are read off his hand's own order rather than
@@ -2729,7 +2678,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   elkinLairSpec s registry
   castTheCardSpec s registry
   nextUpkeepSpec s registry
-  ghoulraiserSpec s registry
   libraryDepthSpec s registry
   aetherspoutsSpec s registry
   drawCardSpec s registry

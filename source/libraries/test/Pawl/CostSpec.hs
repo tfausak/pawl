@@ -17,7 +17,6 @@ module Pawl.CostSpec where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -2440,8 +2439,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   brittleEffigySpec s registry
   trumpetingCarnosaurSpec s registry
   ashnodsAltarSpec s registry
-  reversalSpec s registry
-  shufflingReversalSpec s registry
   announcedReversalSpec s registry
   siegeWurmSpec s registry
   chiefEngineerSpec s registry
@@ -4033,17 +4030,6 @@ novijenSagesSpec s registry =
       Spec.assertEqWith s "and the Sages, given none of the two, kept all three" (S.counterOf CounterKind.PlusOnePlusOne sagesId after) 3
       Spec.assertEqWith s "CR 121.1 and the ability that cost paid for drew a card" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
       Spec.assertEqWith s "and the payer was asked once, over every counter-bearing creature they control" asked [(2, Map.fromList [(sagesId, 3), (pikerId, 1), (giantId, 2)])]
-    -- The elision: the creatures carry exactly the two counters between them, so
-    -- CR 118.3 leaves one division and performing it decides nothing.
-    Spec.it s "CR 118.3 counters exactly covering the count are one division, so nothing is asked" $ do
-      (sagesId, pikerId, giantId, board) <- sagesBoard s registry [1, 0, 1]
-      sages <- S.printingOf s registry "Novijen Sages"
-      let ((_, paid), asked) = State.runState (Engine.runGame (recordingSpreadRemovals Map.empty) board (Activate.activateAbility S.alice sagesId (theAbility sages))) []
-      Spec.assertEqWith s "the Sages' one counter came off" (S.counterOf CounterKind.PlusOnePlusOne sagesId paid) 0
-      Spec.assertEqWith s "and the Giant's" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 0
-      Spec.assertEqWith s "the Piker had none to lose" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 0
-      Spec.assertEqWith s "the activation completed" (length (GameState.stack paid)) 1
-      Spec.assertEqWith s "and the payer was asked nothing" asked []
     -- CR 118.3 / 602.2b over the pair of boards differing in one counter: two
     -- creatures with ONE counter each pay a removal of two spread among them, where
     -- the one-permanent form would refuse it; one counter in all does not.
@@ -4332,17 +4318,6 @@ tayamSpec s registry =
       Spec.assertEqWith s "CR 701.17a / 400.7 the graveyard's Goblin Piker returned" (fmap (`S.soleFaceName` after) returned) [pikerName]
       Spec.assertEqWith s "CR 614.1c and entered with an additional vigilance counter" (fmap (\oid -> S.counterOf vigilance oid after) returned) [1]
       Spec.assertEqWith s "the payer was asked once, over alice's creatures by kind" asked [(CounterSpread.FromAmong, 3, Map.fromList [(pikerId, Map.fromList [(vigilance, 1), (CounterKind.PlusOnePlusOne, 1)]), (giantId, Map.singleton CounterKind.PlusOnePlusOne 2)])]
-    -- The elision: alice's creatures carry exactly three counters between them,
-    -- so CR 118.3 leaves one division.
-    Spec.it s "CR 118.3 counters exactly covering the count are one division, so nothing is asked" $ do
-      (tayamId, pikerId, giantId, board) <- tayamBoard s registry (1, 1, 1)
-      tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
-      let ((_, paid), asked) = State.runState (Engine.runGame (recordingMixedRemovals Map.empty) board (Activate.activateAbility S.alice tayamId (theAbility tayam))) []
-      Spec.assertEqWith s "the Piker's vigilance counter came off" (S.counterOf vigilance pikerId paid) 0
-      Spec.assertEqWith s "and its +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 0
-      Spec.assertEqWith s "and the Giant's" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 0
-      Spec.assertEqWith s "the activation completed" (length (GameState.stack paid)) 1
-      Spec.assertEqWith s "and the payer was asked nothing" asked []
     -- CR 118.3 / 602.2b over a pair of boards differing in the Piker's one
     -- vigilance counter: with it, three counters of two kinds pay the cost that a
     -- +1/+1-only reading would refuse at two.
@@ -4818,153 +4793,6 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
-
--- alice holds Mana Leak with two Islands to cast it; bob has a Goblin Piker on
--- the stack under it, an Ancient Tomb and one Island. Returns the Tomb and the
--- state after alice has cast the Leak at the Piker.
---
--- Bob's mana is exactly {C}{C} plus {U}, so CR 118.12's {3} IS payable and the
--- gate is really offered (Cost.canPay) -- and paying it needs BOTH sources, so a
--- payer who taps the Tomb alone has made a legal choice that cannot pay.
---
--- The Piker reaches the stack before the Leak, so it holds the lower object id
--- and S.identityAnswer's ChooseTargets aims the Leak at it (CounterspellSpec's
--- manaLeakHand, and the same reason).
-reversalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-reversalBoard island ancientTomb manaLeak piker =
-  let (tombId, withTomb) = S.addPermanent ancientTomb S.bob (S.landsInPlay island 2)
-      (_, withBob) = S.addPermanent island S.bob withTomb
-      (_, onStack) = S.spellOnStack piker S.bob withBob
-      (gs, leakId) = S.handOne manaLeak onStack
-   in (tombId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
-
--- Resolve the Leak with bob paying CR 118.12's {3}, tapping the Tomb when `taps`
--- says so and nothing else either way, and answering CR 733.1's question with
--- `decision`. The Int counts the CR 733.1 questions raised.
---
--- Bob is named on both prompts rather than answered for whoever asks, so an
--- engine that put either question to the wrong player falls through to the
--- declining fallback instead of passing.
-attemptLeak :: Bool -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
-attemptLeak taps decision tombId cast =
-  let answerer :: Prompt.Prompt r -> State.State Int r
-      answerer p = case p of
-        Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
-        Prompt.ChooseManaSource _ player candidates
-          | player == S.bob ->
-              pure (if taps && elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
-        Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
-          State.modify' (+ 1)
-          pure decision
-        _ -> pure (S.identityAnswer p)
-      ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
-   in (after, asked)
-
--- Mana Leak "Counter target spell unless its controller pays {3}", paid off an
--- Ancient Tomb "{T}: Add {C}{C}. This land deals 2 damage to you."
---
--- CR 733.1: an action a player starts and cannot legally complete is reversed
--- and its payments cancelled, but "each player may also reverse any legal mana
--- abilities that player activated while making the illegal play" -- so that half
--- is a question, not the engine's to settle. This is CR 118.12's payment
--- (announcedReversalSpec below has a cast's and an activation's), and Ancient
--- Tomb is the sharpest producer for it: keeping the activation keeps two
--- colorless floating (CR 106.4), the land tapped (CR 107.5) and CR 405.6c's 2
--- damage charged, so all three ride on one answer.
---
--- One board and one cast throughout. The first two cases differ in NOTHING but
--- bob's answer to that question; the third differs only in whether he tapped
--- anything at all.
-reversalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-reversalSpec s registry = Spec.describe s "Reversal" $ do
-  Spec.it s "CR 733.1 the payer may keep the mana ability they activated while making the illegal play" $ do
-    island <- S.printingOf s registry "Island"
-    ancientTomb <- S.printingOf s registry "Ancient Tomb"
-    manaLeak <- S.printingOf s registry "Mana Leak"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (tombId, cast) = reversalBoard island ancientTomb manaLeak piker
-        (after, asked) = attemptLeak True OptionalDecision.Declines tombId cast
-    Spec.assertEqWith s "CR 106.4 the two colorless the Tomb made stay in bob's pool" (poolSize S.bob after) 2
-    Spec.assertEqWith s "CR 107.5 and the Tomb stays tapped, alone" (S.tappedCount S.bob after) 1
-    Spec.assertEqWith s "CR 405.6c and the 2 damage the same activation charged stands" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertEqWith s "CR 118.12a the {3} still went unpaid, so the Piker is countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "CR 608.2n and Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-    Spec.assertEqWith s "bob was asked once whether to reverse it" asked 1
-
-  Spec.it s "CR 733.1 the payer who reverses it gets the mana, the tap and the damage back" $ do
-    island <- S.printingOf s registry "Island"
-    ancientTomb <- S.printingOf s registry "Ancient Tomb"
-    manaLeak <- S.printingOf s registry "Mana Leak"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (tombId, cast) = reversalBoard island ancientTomb manaLeak piker
-        (after, asked) = attemptLeak True OptionalDecision.Exercises tombId cast
-    Spec.assertEqWith s "CR 733.1 nothing of bob's is floating" (poolSize S.bob after) 0
-    Spec.assertEqWith s "the Tomb is untapped again" (S.tappedCount S.bob after) 0
-    Spec.assertEqWith s "and the damage is undone with it" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "CR 118.12a the Piker is countered either way" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "and the same one question was raised" asked 1
-
--- pid's library, top to bottom, as a plain list -- read directly off
--- GameState.library rather than through a zone helper, so the assertion below
--- is about the ORDER and not just the membership.
-libraryOrder :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
-libraryOrder pid gs = Foldable.toList (Map.findWithDefault mempty pid (GameState.library gs))
-
--- reversalBoard's twin: Synthetic Shuffling Tomb (data/cards/synthetic-shuffling-tomb.json)
--- stands in for Ancient Tomb, Ancient Tomb's "{T}: Add {C}{C}" with the damage
--- swapped for CR 733.1's other carve-out, "Shuffle your library." Bob's library
--- is stocked with two distinct cards first so a shuffle is observable in its
--- order.
-shufflingReversalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-shufflingReversalBoard island shufflingTomb manaLeak piker bottomCard topCard =
-  let stocked = snd (S.addLibraryCard topCard S.bob (snd (S.addLibraryCard bottomCard S.bob (S.landsInPlay island 2))))
-      (tombId, withTomb) = S.addPermanent shufflingTomb S.bob stocked
-      (_, withBob) = S.addPermanent island S.bob withTomb
-      (_, onStack) = S.spellOnStack piker S.bob withBob
-      (gs, leakId) = S.handOne manaLeak onStack
-   in (tombId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
-
--- attemptLeak's twin, adding a REVERSED answer to Prompt.Shuffle so the Tomb's
--- own shuffle is observable in bob's library order (DungeonSpec's and
--- TargetSpec's convention, for the same reason -- Game.honourShuffle accepts
--- any permutation of what was offered).
-attemptLeakShuffling :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
-attemptLeakShuffling decision tombId cast =
-  let answerer :: Prompt.Prompt r -> State.State Int r
-      answerer p = case p of
-        Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
-        Prompt.ChooseManaSource _ player candidates
-          | player == S.bob -> pure (if elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
-        Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
-          State.modify' (+ 1)
-          pure decision
-        Prompt.Shuffle ids -> pure (reverse ids)
-        _ -> pure (S.identityAnswer p)
-      ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
-   in (after, asked)
-
--- CR 733.1's last sentence at CR 118.12's moment: reversing bob's illegal
--- payment does not undo the shuffle the mana ability he activated performed,
--- proving the arm of Pawl.Engine.Cost.composeReversal where nothing is kept.
-shufflingReversalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-shufflingReversalSpec s registry = Spec.describe s "Reversal keeps a shuffle" $ do
-  Spec.it s "CR 733.1 reversing the payment does not undo the Tomb's own shuffle" $ do
-    island <- S.printingOf s registry "Island"
-    shufflingTomb <- S.printingOf s registry "Synthetic Shuffling Tomb"
-    manaLeak <- S.printingOf s registry "Mana Leak"
-    piker <- S.printingOf s registry "Goblin Piker"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (tombId, cast) = shufflingReversalBoard island shufflingTomb manaLeak piker hillGiant blindSpot
-        original = libraryOrder S.bob cast
-        (after, asked) = attemptLeakShuffling OptionalDecision.Exercises tombId cast
-    Spec.assertEqWith s "bob was asked once whether to reverse it" asked 1
-    Spec.assertEqWith s "CR 733.1 nothing of bob's is floating, the mana reversed with the rest" (poolSize S.bob after) 0
-    Spec.assertEqWith s "the Tomb is untapped again" (S.tappedCount S.bob after) 0
-    Spec.assertBool s (length original >= 2) "the fixture stocked two cards, so a shuffle is observable"
-    Spec.assertEqWith s "CR 733.1's last sentence: the shuffle stands" (libraryOrder S.bob after) (reverse original)
-    Spec.assertBool s (libraryOrder S.bob after /= original) "which is not the pre-shuffle order the reversed mana still would be"
-    Spec.assertEqWith s "CR 118.12a the Piker is countered either way" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
 
 -- CR 605.3a's window answered with `wanted` in order: each is tapped when the
 -- engine offers it, and the window closes once none of them is left on offer.
@@ -5928,7 +5756,6 @@ targetCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> 
 targetCostSpec s registry =
   Spec.describe s "a cost that reads the spell's targets" $ do
     let named = Just . CardName.MkCardName . Text.pack
-        libraryNames gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Library S.bob gs)
         onBattlefield oid gs = Game.zoneOf oid gs == Just Zone.Battlefield
         -- bob attacks alice with the first Giant when `attacking`; the second
         -- stays home. Declare blockers, alice to act.
@@ -5948,15 +5775,6 @@ targetCostSpec s registry =
                   GameState.combat = Combat.emptyCombat {Combat.Type.attackers = attackers, Combat.Type.defenders = [S.alice]}
                 }
             )
-    Spec.it s "CR 601.2f Bury in Books aimed at the attacking Giant is cast off three Islands" $ do
-      (buryId, giants, gs) <- buryBoard 3 True
-      case giants of
-        [attacker, _] -> do
-          let resolved = S.runPure (aimAt attacker) (S.runPure (aimAt attacker) gs (S.cast S.alice buryId)) Stack.resolveTop
-          Spec.assertEqWith s "the attacker went in second from the top" (libraryNames resolved) (fmap named ["Unsummon", "Hill Giant", "Lightning Bolt"])
-          Spec.assertEqWith s "three Islands paid {2}{U}" (S.tappedCount S.alice resolved) 3
-          Spec.assertBool s (S.castable S.alice buryId gs) "it was offered off three Islands"
-        _ -> Spec.assertFailure s "two Giants"
     Spec.it s "CR 601.2 with no creature attacking, the same three Islands cannot cast it" $ do
       (buryId, giants, gs) <- buryBoard 3 False
       case giants of
@@ -5965,14 +5783,6 @@ targetCostSpec s registry =
           Spec.assertBool s (onBattlefield first attempted) "the Giant is still on the battlefield"
           Spec.assertEqWith s "the spell went back to alice's hand" (Game.zoneOf buryId attempted) (Just Zone.Hand)
           Spec.assertBool s (not (S.castable S.alice buryId gs)) "it is not offered"
-        _ -> Spec.assertFailure s "two Giants"
-    Spec.it s "CR 601.2f on one board, aiming at the Giant at home costs all five Islands and the attacker three" $ do
-      (buryId, giants, gs) <- buryBoard 5 True
-      case giants of
-        [attacker, home] -> do
-          let run aim = S.runPure (aimAt aim) (S.runPure (aimAt aim) gs (S.cast S.alice buryId)) Stack.resolveTop
-          Spec.assertEqWith s "Islands tapped aiming at the Giant at home, then at the attacker" (S.tappedCount S.alice (run home), S.tappedCount S.alice (run attacker)) (5, 3)
-          Spec.assertBool s (not (onBattlefield home (run home))) "the Giant at home was put into the library"
         _ -> Spec.assertFailure s "two Giants"
     let vanishBoard lands victims = do
           plains <- S.printingOf s registry "Plains"

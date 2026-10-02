@@ -1,0 +1,192 @@
+{
+  "description": "CR 903.10a twenty-one combat damage from one commander loses the game",
+  "note": "Three of alice's turns, each a 7-point swing by her commander; the Haskell test skips the steps between combats, so each library holds Islands for the draws. A run stops once its timeline is spent, so the last swing is joined by alice's Goblin Piker, double-blocked by bob's two Pikers: its damage assignment is an entry in the combat damage step where bob loses. Bob's Pikers block nothing else and never attack.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "life": 40,
+        "battlefield": [
+          {
+            "card": "Kalakscion, Hunger Tyrant",
+            "label": "kalakscion",
+            "ready": true,
+            "commander": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 40,
+        "command": [
+          {
+            "card": "Jedit Ojanen",
+            "label": "jedit",
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "bp1",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "bp2",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {}
+      }
+    },
+    {
+      "turn": 2,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 3,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {}
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 5,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion",
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 5,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$bp1": [
+            "$piker"
+          ],
+          "$bp2": [
+            "$piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "CombatDamage",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "AssignDamage": {
+          "$bp1": 1,
+          "$bp2": 1
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "CommanderDamage",
+        "player": "bob",
+        "is": [
+          [
+            "Kalakscion, Hunger Tyrant",
+            21
+          ]
+        ]
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 19
+      }
+    },
+    {
+      "View": {
+        "of": "Result",
+        "is": {
+          "won": "alice"
+        }
+      }
+    }
+  ]
+}

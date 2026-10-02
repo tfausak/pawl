@@ -114,9 +114,6 @@ crewWith answer vehicleId gs = case crewAbility vehicleId gs of
 isCreature :: ObjectId.ObjectId -> GameState.GameState -> Bool
 isCreature oid gs = Set.member CardType.Creature (Projection.cardTypesOf oid gs)
 
-tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
-tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
-
 -- Can alice activate the Vehicle's crew ability on this board?
 crewable :: ObjectId.ObjectId -> GameState.GameState -> Bool
 crewable vehicleId gs = case crewAbility vehicleId gs of
@@ -334,25 +331,6 @@ cantCrewSpec s registry = Spec.describe s "CantCrew" $ do
         Spec.assertBool s (crewable vehicleId unattached) "and an unattached Revoke Privileges changes nothing"
         Spec.assertBool s (not (crewable vehicleId enchanted)) "with the 4 enchanted, 3 is short of 6"
       _ -> Spec.assertFailure s "fixture should have exactly two crewers"
-  -- The payment (CR 702.122a), and the gameplay-level read of WHICH creatures
-  -- rule 702.122d left as candidates: the answerer taps everything it is
-  -- OFFERED, so a prohibition the pool ignored would show up as the enchanted
-  -- creature tapped.
-  Spec.it s "CR 702.122d a creature Revoke Privileges enchants is not offered to pay" $ do
-    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    revoke <- S.printingOf s registry "Revoke Privileges"
-    let (vehicleId, crewIds, gs) = board dreadnought [blindSpot, blindSpot, hillGiant]
-    case crewIds of
-      [enchantedId, otherBigId, giantId] -> do
-        let (auraId, unattached) = S.addPermanent revoke S.alice gs
-            after = crewWith takesEverythingOffered vehicleId (S.attach auraId enchantedId unattached)
-        Spec.assertBool s (isCreature vehicleId after) "the other two pay crew 6, so the Vehicle is crewed"
-        Spec.assertEqWith s "and the enchanted creature was never offered" (tapStateOf enchantedId after) (Just TapState.Untapped)
-        Spec.assertEqWith s "where the other power-4 creature was" (tapStateOf otherBigId after) (Just TapState.Tapped)
-        Spec.assertEqWith s "and so was the power-3 one" (tapStateOf giantId after) (Just TapState.Tapped)
-      _ -> Spec.assertFailure s "fixture should have exactly three crewers"
   -- CR 702.122d names the CREW cost and nothing else, so the same cost component
   -- printed outside a crew ability is untouched. Synthetic Crewed Battery's "{T},
   -- tap another untapped creature you control, tap any number of other untapped
@@ -375,13 +353,6 @@ cantCrewSpec s registry = Spec.describe s "CantCrew" $ do
     Spec.assertBool s (offersCast drum gs2) "the Battery pays for a {1} spell off the Piker's power 2"
     Spec.assertBool s (offersCast drum enchanted) "and still does with the Piker enchanted"
     Spec.assertBool s (not (offersCast drum gs1)) "where Ornithopter's power 0 alone cannot"
-
--- Taps every crewer CR 702.122a's prompt offers, so what the board shows after is
--- the candidate list itself.
-takesEverythingOffered :: Prompt.Prompt r -> r
-takesEverythingOffered p = case p of
-  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
-  _ -> S.identityAnswer p
 
 -- Would alice be offered a cast of this printing out of her hand? Pawl.ManaSpec's
 -- shape, duplicated rather than hoisted (docs/adding-a-module.md).

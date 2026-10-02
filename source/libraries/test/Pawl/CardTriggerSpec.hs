@@ -1060,34 +1060,6 @@ ezuriExperienceSpec s registry =
             (targetId, gs) = S.addPermanent construct S.alice withEzuri
         pure (ezuriId, targetId, gs)
    in Spec.describe s "Ezuri, Claw of Progress" $ do
-        -- The control at a DIFFERENT count, which is what stops a payload that
-        -- hardcodes three from passing the case above. Same two permanents, five
-        -- counters instead of three, and 2/1 reads 7/6.
-        --
-        -- The offered target set is asserted too, because the outcome alone does
-        -- not discriminate: with only two creatures on the board, an answerer
-        -- taking the first offer reaches the same place whether or not "another"
-        -- rejected Ezuri.
-        Spec.it s "CR 122.1 five experience counters put five, and \"another\" keeps Ezuri off her own trigger" $ do
-          (ezuriId, targetId, board) <- ezuriAndTarget
-          let gs = S.addPlayerCounter PlayerCounterKind.Experience 5 S.alice board
-              recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient)] r
-              recordTargets p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> do
-                  State.modify' (<> [sets])
-                  pure (aimAt targetId p)
-                _ -> pure (aimAt targetId p)
-              ((_, combat), offered) =
-                State.runState (Engine.runGame recordTargets (atBeginningOfCombat S.alice gs) (Engine.runStep >> Engine.priorityLoop)) []
-          Spec.assertEqWith
-            s
-            "the Construct is the only legal target"
-            (fmap (fmap snd . Map.elems) offered)
-            [[Set.singleton (Recipient.ToCreature targetId)]]
-          Spec.assertEqWith s "five counters, not three" (countersOn targetId combat) (Just 5)
-          Spec.assertEqWith s "so its printed 2/1 reads 7/6" (S.powerToughnessOf targetId combat) (Just (7, 6))
-          Spec.assertEqWith s "and Ezuri, whom \"another\" excludes, took none" (countersOn ezuriId combat) (Just 0)
-          Spec.assertEqWith s "leaving her printed 3/3" (S.powerToughnessOf ezuriId combat) (Just (3, 3))
         -- ZERO, the case a "for each" that quietly means "one" would pass. The
         -- ability still triggers and still resolves -- CR 603.2b says nothing
         -- about the count -- so the Construct staying 2/1 has to come from the

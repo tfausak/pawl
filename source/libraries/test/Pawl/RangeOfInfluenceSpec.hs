@@ -34,7 +34,6 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -52,7 +51,6 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
-import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -101,38 +99,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (not (declares S.carol (S.withRange 1 board))) "CR 801.3 at range 1 alice's creature may not attack carol, two seats away"
     Spec.assertBool s (declares S.carol board) "at an unlimited range it may"
     Spec.assertBool s (declares S.dave (S.withRange 1 board)) "CR 801.2 and at range 1 it may attack dave, one seat away the other way round"
-
-  -- CR 801.4 through a target slot's offer. Ravenous Rats, {1}{B} Rat: "When this
-  -- creature enters, target opponent discards a card." The offer is the engine's
-  -- own output, read as Pawl.TeamSpec's teammate case reads it.
-  Spec.it s "CR 801.4 a target opponent slot does not offer an opponent outside the controller's range" $ do
-    rats <- S.printingOf s registry "Ravenous Rats"
-    swamp <- S.printingOf s registry "Swamp"
-    let lands = S.landsFor swamp S.alice 2 S.fourPlayerGame
-        (held, staged) = S.addHandCard rats S.alice lands
-        board =
-          staged
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        recording :: Prompt.Prompt r -> State.State [[Recipient.Recipient]] r
-        recording p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> do
-            State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
-            pure (S.preferring (const True) sets)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer gs (S.cast S.alice held)) Engine.priorityLoop) []
-    Spec.assertEqWith
-      s
-      "CR 801.4 at range 1 only bob and dave are offered"
-      (offered (S.withRange 1 board))
-      [[Recipient.ToPlayer S.bob, Recipient.ToPlayer S.dave]]
-    Spec.assertEqWith
-      s
-      "and at an unlimited range carol is too"
-      (offered board)
-      [[Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol, Recipient.ToPlayer S.dave]]
 
   -- CR 801.2d for objects under CR 801.4: Lightning Bolt's "any target" over a
   -- Goblin Piker and Invasion of Dominaria, both controlled by carol. The Piker is
@@ -279,47 +245,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (S.onBattlefield plane (pass (S.withRange 1 carols))) "CR 801.12 at range 1 alice's Living Plane survives carol's newer Crossroads"
     Spec.assertBool s (not (S.onBattlefield plane (pass carols))) "at an unlimited range it is put into the graveyard"
     Spec.assertBool s (not (S.onBattlefield plane (pass (S.withRange 1 bobs)))) "and at range 1 bob's newer Crossroads, in range, buries it"
-
-  -- CR 801.2c and its example: bob concedes during alice's turn, and carol,
-  -- two seats from alice across bob's emptied seat, stays out of alice's range
-  -- for the rest of that turn, then comes into it as the next turn begins. The
-  -- Ravenous Rats offer is read as the CR 801.4 case above reads it: alice's on
-  -- her own turn, then carol's on hers, which the handoff reaches past bob.
-  Spec.it s "CR 801.2c a seat emptied mid-turn closes up only when the next turn begins" $ do
-    rats <- S.printingOf s registry "Ravenous Rats"
-    swamp <- S.printingOf s registry "Swamp"
-    let lands = S.landsFor swamp S.carol 2 (S.landsFor swamp S.alice 2 S.fourPlayerGame)
-        (alices, g0) = S.addHandCard rats S.alice lands
-        (carols, g1) = S.addHandCard rats S.carol g0
-        board =
-          S.withRange
-            1
-            g1
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-        conceded = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob)
-        carolsTurn = S.runPure S.identityAnswer conceded Engine.handoffTurn
-        carolsMain = carolsTurn {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.carol}
-        recording :: Prompt.Prompt r -> State.State [[Recipient.Recipient]] r
-        recording p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> do
-            State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
-            pure (S.preferring (const True) sets)
-          _ -> pure (S.identityAnswer p)
-        offered pid held gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer gs (S.cast pid held)) Engine.priorityLoop) []
-    Spec.assertEqWith
-      s
-      "CR 801.2c for the rest of alice's turn carol is still two seats away, so only dave is offered"
-      (offered S.alice alices conceded)
-      [[Recipient.ToPlayer S.dave]]
-    Spec.assertEqWith
-      s
-      "CR 801.2c from carol's turn on bob's seat has closed up, so alice is offered beside dave"
-      (offered S.carol carols carolsMain)
-      [[Recipient.ToPlayer S.alice, Recipient.ToPlayer S.dave]]
-    Spec.assertEqWith s "the handoff skipped bob's seat" (GameState.activePlayer carolsTurn) S.carol
 
   -- CR 801.7 for an object the event involves: alice's Soul Warden ("Whenever
   -- another creature enters, you gain 1 life.") sees a Goblin Piker enter under

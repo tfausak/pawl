@@ -103,7 +103,6 @@ import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -304,13 +303,6 @@ aimedAtPlayer pid p = case p of
             $ filter (== Recipient.ToPlayer pid) (Set.toList candidates) <> Set.toList candidates
      in fmap naming sets
   _ -> S.identityAnswer p
-
--- Gather the triggers the log has earned and resolve the top of the stack, with
--- the trigger's own target answered. Two steps and not one: CR 603.3b puts the
--- ability on the stack at the next CR 117.5 boundary, and CR 608.1 resolves it
--- only once a player would receive priority with it there.
-firedTrigger :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-firedTrigger answer gs = S.runPure answer gs (do Engine.settleForPriority; Stack.resolveTop)
 
 isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
@@ -654,58 +646,6 @@ useLoyaltyAbility answer i p oid gs = case abilityAt i p of
   ability : _ -> S.runPure answer gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)
   [] -> gs
 
--- `decision` for the -2's CR 118.12 gate, and a target chosen by PREFERENCE over
--- the set the engine offered -- aimedAt's posture with a ranking instead of one
--- id, so a case can ask for a permanent it expects the pool to withhold and find
--- out. Filtering the offered set rather than building a Recipient is what keeps
--- CR 608.2b's re-read from dropping the choice.
---
--- The whole offered set follows as a fallback, which keeps the answerer total; a
--- board offering none of `prefer` then targets whatever the pool's Ord puts first,
--- and the case's own assertions are what catch it.
-gristAnswer :: PaymentDecision.PaymentDecision -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-gristAnswer decision prefer p = case p of
-  Prompt.ChooseToPay {} -> decision
-  Prompt.ChooseTargets _ _ _ sets ->
-    let ranked candidates = concatMap (\oid -> filter (\r -> Recipient.objectOf r == Just oid) (Set.toList candidates)) prefer
-        naming (n, candidates) =
-          Set.fromList
-            . take (Natural.toIntSaturating n)
-            $ ranked candidates <> Set.toList candidates
-     in fmap naming sets
-  _ -> S.identityAnswer p
-
--- alice holds Grist at 3 loyalty and ONE Goblin Piker; bob holds Jace Beleren at 3
--- loyalty, a Villainous Ogre and a Mountain. Returned as
--- (Grist, alice's Piker, bob's Jace, bob's Mountain).
---
--- One creature for alice because CR 118.12's cost then has exactly its count of
--- candidates and Pawl.Types.Prompt.ChooseSacrifices is elided -- there is nothing
--- to choose. Grist is not among them: its "as long as Grist isn't on the
--- battlefield" ability (CR 113.6c) is switched off exactly here.
---
--- The reflexive ability's slot then has more candidates than its count of one --
--- bob's Ogre and his Jace, and Grist itself, which is a planeswalker on the
--- battlefield and so a legal choice for its own ability -- so a prompt offered
--- exactly its count cannot short-circuit. The Mountain is the permanent the slot
--- must NOT offer, which is how "creature or planeswalker" is read as a
--- restriction rather than assumed.
-gristMinusTwoBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-gristMinusTwoBoard grist piker jace ogre mountain =
-  let (pikerId, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-      (jaceId, withJace) = S.addPermanent jace S.bob withPiker
-      loyal = S.addCounter CounterKind.Loyalty 3 jaceId withJace
-      (_, withOgre) = S.addPermanent ogre S.bob loyal
-      (mountainId, withMountain) = S.addPermanent mountain S.bob withOgre
-      (gristId, board) = gristWith 3 grist withMountain
-   in (gristId, pikerId, jaceId, mountainId, board)
-
 -- Grist, the Hunger Tide -- {1}{B}{G} Legendary Planeswalker -- Grist, printed
 -- loyalty 3 (Oracle text fetched from Scryfall 2026-09-29) -- carries all three
 -- of its loyalty abilities here:
@@ -798,29 +738,6 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
       (Just 20, Just 17, Just 17)
     Spec.assertEqWith s "the fixture's six loyalty" (S.counterOf CounterKind.Loyalty gristId board) 6
     Spec.assertEqWith s "CR 606.4: five of them came off" (S.counterOf CounterKind.Loyalty gristId after) 1
-
-  -- The answerer PREFERS the Mountain and settles for the Jace. So a slot that
-  -- offered every permanent would destroy the land and leave the planeswalker
-  -- standing, which is the reading this case rules out; and one that offered only
-  -- creatures would leave the Jace standing too.
-  Spec.it s "CR 603.12 / 701.8a the -2's reflexive trigger destroys the planeswalker it targets, and no land is offered" $ do
-    grist <- S.printingOf s registry "Grist, the Hunger Tide"
-    piker <- S.printingOf s registry "Goblin Piker"
-    jace <- S.printingOf s registry "Jace Beleren"
-    ogre <- S.printingOf s registry "Villainous Ogre"
-    mountain <- S.printingOf s registry "Mountain"
-    let (gristId, pikerId, jaceId, mountainId, board) = gristMinusTwoBoard grist piker jace ogre mountain
-        answer :: Prompt.Prompt r -> r
-        answer = gristAnswer PaymentDecision.Pays [mountainId, jaceId]
-        after = firedTrigger answer (useLoyaltyAbility answer minusTwo grist gristId board)
-    Spec.assertEqWith
-      s
-      "the Jace died and the Mountain the answerer asked for first did not"
-      (S.onBattlefield jaceId after, S.onBattlefield mountainId after)
-      (False, True)
-    Spec.assertEqWith s "CR 701.8a: into its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.21a: alice's own creature paid for it"
-    Spec.assertEqWith s "CR 606.4: two of the three loyalty came off" (S.counterOf CounterKind.Loyalty gristId after) 1
 
 -- Ashiok, Wicked Manipulator -- {3}{B}{B} Legendary Planeswalker -- Ashiok,
 -- printed loyalty 5 (name, cost, type line, loyalty and Oracle text checked

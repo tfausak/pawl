@@ -39,18 +39,14 @@
 -- reason: Prompt.ChooseCardName offers no candidate list.
 module Pawl.PreparationSpec where
 
-import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Cast as Cast
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -71,7 +67,6 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -103,15 +98,6 @@ prepareCopies gs =
     (\oid -> case Game.lookupObject oid gs of Nothing -> False; Just obj -> Maybe.isJust (Object.preparedCopyOf obj))
     (Set.toList (GameState.exile gs))
 
--- The newest battlefield permanent whose PRINTED card is a Clone -- read off the
--- printing rather than off the projection, which is exactly the name a copy no
--- longer has (CR 707.2). Pawl.PreventionSpec's `newestNamed` reads the projected
--- face for the same job; this one must not, since the object under test is a copy.
-newestClone :: GameState.GameState -> Maybe ObjectId.ObjectId
-newestClone gs =
-  let printed oid = fmap (S.nameOf . Printing.card) (Game.printingOfObject oid gs) == Just cloneName
-   in Maybe.listToMaybe (List.sortOn Ord.Down (filter printed (Set.toList (GameState.battlefield gs))))
-
 isPrepared :: ObjectId.ObjectId -> GameState.GameState -> Bool
 isPrepared oid gs = maybe False (Set.member Designation.Prepared . Object.designations) (Game.lookupObject oid gs)
 
@@ -121,17 +107,6 @@ isPrepared oid gs = maybe False (Set.member Designation.Prepared . Object.design
 jumpAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 jumpAt victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets
-  _ -> S.identityAnswer p
-
--- CR 707.5's as-enters choice, pinned to ONE named permanent rather than
--- searched, which is Pawl.CopySpec's `copyNamed` posture and for its reason: an
--- answerer that looked for a legal creature would find the Aviator again after a
--- mutation and repair the assertion. Trigger batches are ordered as they arrive,
--- since the Clone's own entry and the attack put several on the stack.
-copyNamed :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-copyNamed wanted p = case p of
-  Prompt.ChooseCopyTarget {} -> Just wanted
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   _ -> S.identityAnswer p
 
 -- alice's Aviator and a Goblin Piker against bob, with one Island to pay the
@@ -153,39 +128,6 @@ aviatorDuel =
 -- happen inside the engine rather than being poked in.
 attackScript :: Seq.Seq Timed.Timed
 attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "aviator"])]
-
--- CR 722.2b's board. The printed Aviator is here only to be COPIED: Concordant
--- Crossroads gives every creature haste (CR 702.10b), so the Clone can attack the
--- turn it enters. Six Islands, where the Clone's {2}{U} and then Jump's {U} come
--- to four: the spare mana is what keeps "alice may cast the copy" a claim about
--- CR 722.3c's permission rather than about an empty board.
---
--- The printed Aviator attacks too -- `attackTo` declares every creature -- and
--- mints a copy of its own, which is why every assertion below is keyed to the
--- permanent a copy NAMES rather than to a count of exile.
-cloneDuel :: Board.Board
-cloneDuel =
-  S.duel
-    S.precombatMain
-    [ S.settled "aviator" "Encouraging Aviator",
-      S.settled "piker" "Goblin Piker",
-      S.permanent "Concordant Crossroads",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island"
-    ]
-    []
-
--- The exile copy minted FOR this permanent, by id. Keyed to the permanent rather
--- than to a count, so a board carrying two prepared permanents can name either.
-copyFor :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
-copyFor permanentId gs =
-  filter
-    (\oid -> case Game.lookupObject oid gs of Nothing -> False; Just obj -> Object.preparedCopyOf obj == Just permanentId)
-    (prepareCopies gs)
 
 aliasOrFail :: (Monad m) => Spec.Spec m n -> Staged.Staged -> String -> m ObjectId.ObjectId
 aliasOrFail s built name = case Map.lookup (Label.MkLabel (Text.pack name)) (Staged.objects built) of
@@ -286,49 +228,3 @@ spec s registry = Spec.describe s "Preparation" $ do
         swept = S.runPure S.identityAnswer bounced Sba.checkStateBasedActions
     Spec.assertEqWith s "CR 704.5e: the copy has ceased to exist" (prepareCopies swept) []
     Spec.assertEqWith s "and exile is empty" (Foldable.toList (GameState.exile swept)) []
-  -- CR 722.2b: "the existence and values of these alternative characteristics are
-  -- part of the object's copiable values." So a permanent has a prepare spell
-  -- because of what it COPIES, not because of the card printed underneath it --
-  -- and a Clone that entered as a copy of the Aviator (CR 707.5's as-enters road)
-  -- becomes prepared and mints a Jump copy of its own.
-  --
-  -- The falsifier is reading the printing behind Object.source, which is what the
-  -- first slice did: the Clone's own card is a {2}{U} shapeshifter with no inset
-  -- frame, so CR 722.3a's gate refused the designation and exile stayed empty.
-  --
-  -- The printed Aviator attacks alongside and mints its own copy, which is the
-  -- control: a mint that fired for neither, or one that fired only for the printed
-  -- card, is told apart by WHICH permanent each copy names.
-  Spec.it s "CR 722.2b a Clone of the Aviator becomes prepared and mints a Jump copy" $ do
-    built <- S.buildBoardOrFail s registry cloneDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    pikerId <- aliasOrFail s built "piker"
-    clone <- S.printingOf s registry "Clone"
-    let (cloneHandId, ready) = S.addHandCard clone S.alice (Staged.state built)
-        entered = S.runPure (copyNamed aviatorId) ready (S.cast S.alice cloneHandId *> Stack.resolveTop *> Engine.settleForPriority)
-    case newestClone entered of
-      Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
-      Just cloneId -> do
-        -- Without this the mint below could be the printed Aviator's: the Clone
-        -- has to be a copy at all before CR 722.2b has anything to say.
-        Spec.assertEqWith s "CR 707.5: the Clone entered as a copy of the Aviator" (Projection.namesOf cloneId entered) (Set.singleton aviatorName)
-        Spec.assertBool s (not (isPrepared cloneId entered)) "before: the Clone is not prepared"
-        -- Six steps carry the turn from its precombat main phase, where CR
-        -- 302.1's sorcery timing let the Clone be cast, into and through combat.
-        -- S.runCombat cannot: `combatGame` stops at once when the phase is not a
-        -- combat one, so it would run nothing here and the case would assert
-        -- against a board that never fought.
-        let fought = S.runPure (S.attackTo S.bob) entered (Monad.replicateM_ 6 Engine.runStep)
-        -- THE gameplay assertion, first so no proxy can absorb a mutation.
-        Spec.assertBool s (isPrepared cloneId fought) "CR 722.2b: the Clone became prepared"
-        case copyFor cloneId fought of
-          [copyId] -> do
-            Spec.assertEqWith s "CR 722.3c: the Clone's copy is Jump" (Projection.namesOf copyId fought) (Set.singleton jumpName)
-            Spec.assertBool s (Cast.castable S.alice copyId jumpName Facing.FaceUp fought) "and alice may cast it"
-            let resolved = S.runPure (jumpAt pikerId) fought (Cast.castSpell S.manaPerformer S.alice copyId jumpName Facing.FaceUp *> Stack.resolveTop)
-            Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId resolved) "and casting it gives the Piker flying"
-            Spec.assertBool s (not (isPrepared cloneId resolved)) "CR 601.2i: the Clone is no longer prepared"
-          other -> Spec.assertFailure s ("expected exactly one copy for the Clone, got " <> show (length other))
-        -- The control: the printed Aviator attacked too and minted its own, so a
-        -- mint that never ran at all is caught here rather than passing above.
-        Spec.assertEqWith s "and the printed Aviator minted one of its own" (length (copyFor aviatorId fought)) 1

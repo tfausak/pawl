@@ -14,8 +14,6 @@ import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
-import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Engine as Engine
@@ -79,15 +77,6 @@ castAndResolve answer pid spellId gs =
 lastCandidate :: Prompt.Prompt r -> r
 lastCandidate p = case p of
   Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.last candidates
-  _ -> S.identityAnswer p
-
--- Answers the as-enters copy choice (CR 614.12a) with `wanted` when it is offered,
--- delegating everything else to S.identityAnswer -- which DECLINES to copy, and a
--- Clone that copies nothing is a 0/0 that CR 704.5f removes before anything can be
--- asserted about it.
-copyThe :: ObjectId -> Prompt.Prompt r -> r
-copyThe wanted p = case p of
-  Prompt.ChooseCopyTarget _ _ _ candidates -> if List.elem wanted candidates then Just wanted else Nothing
   _ -> S.identityAnswer p
 
 -- alice controls two creatures, holds one Birthday Escape, has `lands` untapped
@@ -172,95 +161,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     Spec.assertEqWith s "one emblem after the first temptation" (length (theRingsOf S.alice once)) 1
     Spec.assertEqWith s "still one emblem after the second" (length (theRingsOf S.alice twice)) 1
     Spec.assertEqWith s "but two temptations" (temptationsOf S.alice twice) (Just 2)
-  -- CR 701.54b's second sentence: "Being a Ring-bearer is not a copiable value."
-  -- CR 707.2's copiable values are what a Clone acquires, and the designation is
-  -- not among them.
-  Spec.it s "CR 701.54b a Clone of the Ring-bearer is not a Ring-bearer" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    escape <- S.printingOf s registry "Birthday Escape"
-    clone <- S.printingOf s registry "Clone"
-    let (_, withLibrary) = S.addLibraryCard piker S.alice (S.landsInPlay island 5)
-        (bearer, g1) = S.addPermanent piker S.alice withLibrary
-        (g2, escapeId) = S.handOne escape g1
-        (cloneId, g3) = S.addHandCard clone S.alice g2
-        designated = castAndResolve S.identityAnswer S.alice escapeId g3
-        copied = castAndResolve (copyThe bearer) S.alice cloneId designated
-        -- The Clone is the newest object on the battlefield.
-        newest = Maybe.listToMaybe (List.sortOn Ord.Down (Set.toList (GameState.battlefield copied)))
-    -- Anti-vacuity: "only the original is marked" is trivially true of a board
-    -- where the Clone never entered, or entered as a 0/0 and died to CR 704.5f. It
-    -- entered AND copied exactly when a permanent that is not the bearer projects
-    -- the bearer's name (CR 707.2 makes the name copiable; a Clone that copied
-    -- nothing projects "Clone"). Both assertions fail if the copy answer is
-    -- replaced by S.identityAnswer, which declines.
-    Spec.assertBool s (newest /= Just bearer) "the Clone really is a different object"
-    Spec.assertEqWith
-      s
-      "and it really copied the Ring-bearer"
-      (fmap (\oid -> Projection.namesOf oid copied) newest)
-      (Just (Projection.namesOf bearer copied))
-    Spec.assertEqWith s "the original is still the Ring-bearer" (markedFor S.alice copied) [bearer]
-    Spec.assertEqWith s "and nothing else carries the designation" (length (markedFor S.alice copied)) 1
-  -- CR 701.54c's base tier: the emblem has "Your Ring-bearer is legendary and can't
-  -- be blocked by creatures with greater power." The FIRST clause is what this case
-  -- proves -- a layer-4 supertype grant (CR 613.1d, CR 205.4b) whose affected set is
-  -- CR 701.54e's Ring-bearer, carried by an emblem in the command zone (CR 114.4).
-  --
-  -- Observed through CR 205.4e's legendary-spell cast restriction rather than
-  -- through CR 704.5j's legend rule: making ONE creature legendary does not fire the
-  -- legend rule, which needs two same-named legendary permanents under one
-  -- controller, while CR 205.4e reads "controls a legendary creature" off the
-  -- PROJECTION and so sees the grant.
-  --
-  -- Both creatures are Goblin Pikers, which is deliberate on both counts: nothing
-  -- printed here is legendary, so assertion one has nothing else to satisfy it, and
-  -- only one of the two is ever the Ring-bearer, so CR 704.5j never has a pair to
-  -- act on.
-  --
-  -- ANTI-VACUITY. "The legendary sorcery is not castable" is a cast gate, and a cast
-  -- gate reads False for a dozen reasons that have nothing to do with CR 205.4e --
-  -- wrong phase, unpayable cost, a non-empty stack. `withThalia` is the same board
-  -- plus the pool's one printed legendary creature, with no Ring anywhere: it
-  -- asserts True, so the negative below discriminates.
-  --
-  -- The five Plains beside the two Islands are that assertion's mana. Urza's
-  -- Ruinous Blast is {4}{W}, and Thalia taxes it {1} on the `withThalia` board,
-  -- so {5}{W} is the dearest the sorcery ever gets here and seven lands cover it
-  -- -- while the Islands, the only source of Birthday Escape's {U}, are what the
-  -- two temptations spend, leaving the five Plains for the {4}{W} boards.
-  Spec.it s "CR 701.54c the Ring-bearer is legendary, which CR 205.4e sees" $ do
-    island <- S.printingOf s registry "Island"
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    escape <- S.printingOf s registry "Birthday Escape"
-    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
-    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    let withPlains = List.foldl' (\g _ -> snd (S.addPermanent plains S.alice g)) (S.landsInPlay island 2) [1 .. (5 :: Int)]
-        withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withPlains [1 .. (2 :: Int)]
-        (a, g1) = S.addPermanent piker S.alice withLibrary
-        (b, g2) = S.addPermanent piker S.alice g1
-        -- Ring.tempt sorts its candidates, so name them in that order.
-        (lower, higher) = if a < b then (a, b) else (b, a)
-        (g3, firstEscape) = S.handOne escape g2
-        (secondEscape, g4) = S.addHandCard escape S.alice g3
-        (sorceryId, gs) = S.addHandCard sorcery S.alice g4
-        withThalia = snd (S.addPermanent thalia S.alice gs)
-        -- The first temptation takes the LAST candidate, the second the FIRST, so
-        -- the grant has to move backwards along the list.
-        tempted = castAndResolve lastCandidate S.alice firstEscape gs
-        moved = castAndResolve S.identityAnswer S.alice secondEscape tempted
-    Spec.assertBool s (not (S.castable S.alice sorceryId gs)) "CR 205.4e refuses the legendary sorcery before the Ring"
-    Spec.assertBool s (S.castable S.alice sorceryId withThalia) "but allows it beside a printed legendary creature, so the refusal above is CR 205.4e's"
-    Spec.assertEqWith s "the chosen creature is the Ring-bearer" (markedFor S.alice tempted) [higher]
-    Spec.assertBool s (isLegendary higher tempted) "CR 701.54c makes the Ring-bearer legendary"
-    Spec.assertBool s (not (isLegendary lower tempted)) "and reaches nothing else"
-    Spec.assertBool s (S.castable S.alice sorceryId tempted) "so CR 205.4e now allows the legendary sorcery"
-    -- CR 701.54a's first ending, read through the grant: the emblem's affected set is
-    -- re-derived every projection, so moving the designation moves the supertype.
-    Spec.assertEqWith s "the designation moved" (markedFor S.alice moved) [lower]
-    Spec.assertBool s (isLegendary lower moved) "the new Ring-bearer is legendary"
-    Spec.assertBool s (not (isLegendary higher moved)) "and the old one stopped being"
   -- CR 701.54e's SECOND conjunct, "under your control", which
   -- Ring.theRingIsLegendary spells as a ControlledBy You beside the designation
   -- atom. The only window in which that conjunct is observable at all: after the

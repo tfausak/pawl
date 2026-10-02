@@ -2374,25 +2374,7 @@ professorHojoSpec s registry =
           let announced = S.runPure (aiming wanted) gs (Activate.activateAbility S.alice joragaId ability)
            in Just (S.runPure (aiming wanted) (S.runPure (aiming wanted) announced Engine.settleForPriority) drain)
         _ -> Nothing
-      -- The triggered road: cast the Juggler, resolve it so CR 603.6a's entry
-      -- trigger is gathered, and let CR 603.3d choose its target -- which is the
-      -- rule 601.2c announcement this leg is about.
-      triggeredAt wanted jugglerId gs =
-        let cast = S.runPure (aiming wanted) (S.runPure (aiming wanted) gs (S.cast S.alice jugglerId)) Engine.settleForPriority
-         in S.runPure (aiming wanted) cast drain
    in Spec.describe s "CR 601.2c creatures becoming the target of an activated ability" $ do
-        -- CR 113.3c against the case above, and the whole of why
-        -- Pawl.Types.StackObjectKind splits: the SAME board and the SAME Piker
-        -- named, by an ability on the other side of rule 113.3.
-        Spec.it s "CR 113.3c a TRIGGERED ability naming the same creature draws nothing" $ do
-          (_, firstPiker, _, _, jugglerId, gs, _) <- board
-          let after = triggeredAt (Set.singleton (Recipient.ToCreature firstPiker)) jugglerId gs
-          Spec.assertEqWith s "CR 601.2c the Hojo's trigger did not fire" (S.handSize S.alice after) 0
-          -- The controls, which are what stop this leg passing because nothing
-          -- happened at all: the Juggler resolved, and its entry trigger really
-          -- named the Piker.
-          Spec.assertEqWith s "the Juggler reached the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Rune-Brand Juggler")) S.alice after) 1
-          Spec.assertEqWith s "and its trigger suspected the Piker it targeted" (fmap Object.designations (Game.lookupObject firstPiker after)) (Just (Set.singleton Designation.Suspected))
         -- CR 603.10's first sentence at CR 601.2c's moment: the Juggler's
         -- ability names the suspected Piker and sacrifices that same Piker to
         -- pay (CR 601.2h), so the Piker is gone by the CR 117.5 gather. It was

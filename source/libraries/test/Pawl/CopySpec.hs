@@ -222,15 +222,6 @@ copyNamed wanted p = case p of
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   _ -> S.identityAnswer p
 
--- copyNamed, plus CR 704.5j's own prompt answered by keeping the FIRST candidate.
--- Which one is kept does not matter to the Sakashima case, which counts what the
--- legend rule left rather than naming it; the arm is here so that the answer is
--- the spec's rather than Replay.defaultAnswer's.
-copyNamedKeepingFirstLegend :: ObjectId -> Prompt.Prompt r -> r
-copyNamedKeepingFirstLegend wanted p = case p of
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  _ -> copyNamed wanted p
-
 copyNewest :: Prompt.Prompt r -> r
 copyNewest p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> newest legal
@@ -259,14 +250,6 @@ targeting victim p = case p of
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   _ -> S.identityAnswer p
-
--- `targeting`, plus CR 704.5j's own prompt pinned to one named permanent: which
--- of a same-named pair the legend rule leaves standing is then the case's answer
--- rather than Replay.defaultAnswer's.
-targetingKeepingLegend :: ObjectId -> ObjectId -> Prompt.Prompt r -> r
-targetingKeepingLegend victim keep p = case p of
-  Prompt.ChooseLegend {} -> keep
-  _ -> targeting victim p
 
 -- `targeting` answered by FILTERING the offered set down to the named permanent
 -- instead of building a Recipient: the pool decides which constructor the offer
@@ -883,125 +866,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "the type-excepted copy is the Goyf by name (CR 707.2)" (fmap (\o -> Projection.namesOf o entered) metamorphId) . Just . Set.singleton . CardName.MkCardName $ Text.pack "Tarmogoyf"
     Spec.assertEqWith s "and an artifact creature" (projected PC.cardTypes metamorphId entered) . Just $ Set.fromList [CardType.Artifact, CardType.Creature]
     Spec.assertEqWith s "where the value-excepted copy is a creature alone" (projected PC.cardTypes gargantuanId entered) . Just $ Set.singleton CardType.Creature
-
-  -- THE PROVING TEST for CR 707.9b's SUBTRACTIVE arm -- the exception that takes
-  -- a SUPERTYPE off the copy -- and for CR 707.9's exceptions riding CR 707.1's
-  -- token mint rather than only the two copy doors. Multiversal Recruitment
-  -- {3}{U} Sorcery: "Create a token that's a copy of target creature you control,
-  -- except it isn't legendary." Flashback {5}{U}{U}, which nothing below reaches.
-  --
-  -- Read at GAMEPLAY level by CR 704.5j: alice's Azusa, Lost but Seeking is
-  -- legendary, so a token copy that KEPT the supertype would be a second
-  -- legendary permanent with her name under one controller, and the state-based
-  -- action would bury one of the two. Cackling Counterpart on the twin board is
-  -- the control -- CR 707.1's same mint, aimed at the same Azusa, with no
-  -- exception -- and it does lose one, so the two boards differ in the exception
-  -- and nothing else.
-  --
-  -- The Counterpart aimed at the TOKEN is where the copiable claim bites (CR
-  -- 707.2 / 707.9b): the second token reads the first token's copiable values and
-  -- so is not legendary either. Under a CR 613 write over the first token instead
-  -- the second would arrive legendary, clash with Azusa herself, and the count
-  -- would stop at two.
-  Spec.it s "Multiversal Recruitment's token copy is not legendary, and neither is a copy of it (CR 707.9b)" $ do
-    island <- S.printingOf s registry "Island"
-    azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
-    recruitment <- S.printingOf s registry "Multiversal Recruitment"
-    counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let azusaName = CardName.MkCardName (Text.pack "Azusa, Lost but Seeking")
-        named gs = filter (\oid -> Set.member azusaName (Projection.namesOf oid gs)) (Set.toList (GameState.battlefield gs))
-        (azusaId, board) = S.addPermanent azusa S.alice (S.landsInPlay island 7)
-        excepted = castAndResolve (targeting azusaId) recruitment board
-        -- The control: the same board, the same target, the copy effect that
-        -- states no exception.
-        control = castAndResolve (targeting azusaId) counterpart board
-    -- THE GAMEPLAY ASSERTION, ahead of every proxy INCLUDING the token match
-    -- below: a token that kept the supertype is buried by CR 704.5j, so the
-    -- match would report a missing token rather than the count.
-    Spec.assertEqWith s "the legend and her non-legendary token both stay (CR 704.5j)" (length (named excepted)) 2
-    Spec.assertEqWith s "where the copy without the exception loses one to the legend rule" (length (named control)) 1
-    case tokensOnBattlefield excepted of
-      [tokenId] -> do
-        -- CR 707.2 through CR 707.9b: a copy OF the token takes the token's
-        -- copiable values, the missing supertype among them.
-        let twice = castAndResolve (targeting tokenId) counterpart excepted
-        Spec.assertEqWith s "and a copy of that token is not legendary either (CR 707.2)" (length (named twice)) 3
-        -- Diagnostics, after the behaviour: CR 707.2 still ran, and only the
-        -- supertype was excepted.
-        Spec.assertEqWith s "the token is Azusa by name (CR 707.2)" (Projection.namesOf tokenId excepted) (Set.singleton azusaName)
-        Spec.assertEqWith s "and has her 1/2" (S.powerToughnessOf tokenId excepted) $ Just (1, 2)
-        Spec.assertEqWith s "and no supertype at all" (PC.supertypes (Projection.project tokenId excepted)) Set.empty
-        Spec.assertEqWith s "where Azusa herself is still legendary" (PC.supertypes (Projection.project azusaId excepted)) (Set.singleton Supertype.Legendary)
-      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-
-  -- THE PROVING TEST for CR 707.9b's ADDITIVE SUPERTYPE arm and for the arm that
-  -- sets the copy's NAME. Sakashima the Impostor {2}{U}{U} Legendary Creature --
-  -- Human Rogue 3/1: "You may have Sakashima the Impostor enter as a copy of any
-  -- creature on the battlefield, except its name is Sakashima the Impostor, it's
-  -- legendary in addition to its other types, and it has \"{2}{U}{U}: Return
-  -- Sakashima the Impostor to its owner's hand at the beginning of the next end
-  -- step.\""
-  --
-  -- Not implemented: that quoted activated ability. CopyException.GainAbility
-  -- carries a quotation (Mercurial Pretender's case below), but this one arms a
-  -- delayed trigger, and Resolve.Effect.declaredDelayedAbility finds the
-  -- declaration on the source's PRINTED card, which a Clone of the copy is not
-  -- (#3661). Omitting it leaves pawl's card stricter than printed -- the clause
-  -- only ever buys its controller an escape -- and nothing below turns on it.
-  --
-  -- Read at GAMEPLAY level by CR 704.5j: two Sakashimas that copied
-  -- NONLEGENDARY creatures share a name neither copied creature had and a
-  -- supertype neither had either, so the legend rule buries one of them. One
-  -- board discriminates both arms, which no single copy does -- without the
-  -- supertype the pair is named alike and not legendary, without the name it is
-  -- legendary and named apart, and either way both stand.
-  --
-  -- TWO DIFFERENT creatures and not one twice: a pair that both copied the Goblin
-  -- Piker would share the Piker's name whether or not the name arm ran, and the
-  -- legend rule could no longer tell the two arms apart.
-  --
-  -- Two Clones copying the same two creatures on the same board are the control:
-  -- CR 707.5's same entry replacement, stating no exception at all.
-  Spec.it s "two Sakashimas copying different creatures are one legend rule apart (CR 707.9b)" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    clone <- S.printingOf s registry "Clone"
-    counterpart <- S.printingOf s registry "Cackling Counterpart"
-    sakashima <- S.printingOf s registry "Sakashima the Impostor"
-    let sakashimaName = CardName.MkCardName (Text.pack "Sakashima the Impostor")
-        (pikerId, board0) = S.addPermanent piker S.alice (S.landsInPlay island 3)
-        (giantId, board1) = S.addPermanent hillGiant S.alice board0
-        entering printing victim gs = resolveAndSettle (copyNamedKeepingFirstLegend victim) (snd (S.spellOnStack printing S.alice gs))
-        excepted = entering sakashima giantId (entering sakashima pikerId board1)
-        control = entering clone giantId (entering clone pikerId board1)
-        sakashimas = printedOnBattlefield "Sakashima the Impostor"
-    -- THE GAMEPLAY ASSERTION, ahead of every diagnostic: both exceptions ran, so
-    -- the two copies are same-named legends under one controller and CR 704.5j
-    -- takes one.
-    Spec.assertEqWith s "the legend rule buries one of the two Sakashimas (CR 704.5j)" (length (sakashimas excepted)) 1
-    -- The control on the same board: the copies WITHOUT the exceptions are the
-    -- creatures they copied, and nothing makes them clash.
-    Spec.assertEqWith s "where the two copies stating no exception both stand" (length (clonesOnBattlefield control)) 2
-    case sakashimas excepted of
-      [survivorId] -> do
-        -- Diagnostics, after the behaviour: CR 707.2 still ran, and the two arms
-        -- moved the name and the supertype and nothing else.
-        Spec.assertEqWith s "the survivor is Sakashima by name and by that name alone (CR 707.9b)" (Projection.namesOf survivorId excepted) (Set.singleton sakashimaName)
-        Spec.assertBool s (Set.member Supertype.Legendary (PC.supertypes (Projection.project survivorId excepted))) "and is legendary in addition to what it copied"
-        Spec.assertBool s (not (Set.member Subtype.Rogue (Projection.subtypesOf survivorId excepted))) "and is not the Human Rogue its own card prints, so nothing but the two clauses moved"
-        -- CR 707.2 through CR 707.9b: a token copy of the survivor takes both
-        -- excepted values along with the copiable ones, so it is a same-named
-        -- legend and CR 704.5j buries it -- the choice is pinned to the survivor,
-        -- which is what makes the token's absence the assertion. A token that fell
-        -- back on the survivor's printed card, or that was left behind by a CR 613
-        -- layer write, would be the nonlegendary creature the survivor copied and
-        -- would stand, as the token aimed at the Piker below does.
-        let minted = castAndResolve (targetingKeepingLegend survivorId survivorId) counterpart excepted
-            plain = castAndResolve (targetingKeepingLegend pikerId pikerId) counterpart excepted
-        Spec.assertEqWith s "a token copy of the survivor is a same-named legend too, so CR 704.5j takes it (CR 707.2)" (length (tokensOnBattlefield minted)) 0
-        Spec.assertEqWith s "where a token copy of the nonlegendary Piker beside it stands" (length (tokensOnBattlefield plain)) 1
-      others -> Spec.assertFailure s ("expected exactly one Sakashima, got " <> show (length others))
 
   -- THE PROVING TEST for CR 707.9c, CopyException.DontCopyColors. Vesuvan
   -- Doppelganger {3}{U}{U} Creature -- Shapeshifter 0/0: "You may have this

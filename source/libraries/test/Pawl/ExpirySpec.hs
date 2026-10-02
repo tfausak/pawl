@@ -36,7 +36,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -74,7 +73,6 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
-import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
@@ -95,7 +93,6 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
@@ -2046,44 +2043,6 @@ perpetualSpec s registry = Spec.describe s "Perpetual" $ do
         Spec.assertBool s (mineAgain /= mineId && controlAgain /= controlId) "CR 400.7: both round trips minted new objects"
         Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink mineId granted && Projection.hasKeyword Keyword.Lifelink controlId granted) "and both grants applied before either creature moved"
         Spec.assertEqWith s "the ability stored exactly one effect, under the perpetual arm" (fmap ContinuousEffect.expiry (filter ((== collectorId) . ContinuousEffect.source) (GameState.continuousEffects granted))) [Expiry.Type.Perpetual]
-  -- CR 613.1 / 611.2c: a perpetual pump on CARDS IN A GRAVEYARD. Blighted
-  -- Nightmare's "creature cards in your graveyard perpetually get +1/+1" locks
-  -- the Goblin Piker (2/1) and Llanowar Elves (1/1) as they lie, and Graceful
-  -- Restoration's "up to two target creature cards with power 2 or less from
-  -- your graveyard" is the reader: the Piker is 3 power there now and is not
-  -- offered, and the Elves come back still pumped. The control board differs in
-  -- the Nightmare's trigger alone.
-  Spec.it s "Blighted Nightmare's perpetual +1/+1 applies in the graveyard and follows the card out" $ do
-    let restored withNightmare = do
-          nightmare <- S.printingOf s registry "Blighted Nightmare"
-          graceful <- S.printingOf s registry "Graceful Restoration"
-          plains <- S.printingOf s registry "Plains"
-          swamp <- S.printingOf s registry "Swamp"
-          piker <- S.printingOf s registry "Goblin Piker"
-          elves <- S.printingOf s registry "Llanowar Elves"
-          let (g0, spellId) = S.handOne graceful (S.landsFor swamp S.alice 1 (S.landsInPlay plains 4))
-              (_, g1) = S.addGraveyardCard piker S.alice g0
-              (_, g2) = S.addGraveyardCard elves S.alice g1
-              pumped =
-                if withNightmare
-                  then S.runPure S.identityAnswer (snd (S.entersWithTrigger nightmare S.alice g2)) (do _ <- Engine.placePendingTriggers; Stack.resolveTop)
-                  else g2
-              cast = S.runPure restoresBoth pumped (S.cast S.alice spellId)
-          pure (S.runPure restoresBoth cast Stack.resolveTop, S.printingName piker, S.printingName elves)
-    (after, pikerName, elvesName) <- restored True
-    (control, _, _) <- restored False
-    let powerOnBattlefield name gs = [Projection.powerOf oid gs | oid <- Game.zoneMembers Zone.Battlefield S.alice gs, fmap S.nameOf (Game.cardOf oid gs) == Just name]
-    Spec.assertEqWith s "the Piker, 3 power in the graveyard, was not returned" (powerOnBattlefield pikerName after) []
-    Spec.assertEqWith s "the Elves came back, and still 2/2" (powerOnBattlefield elvesName after) [Just 2]
-    Spec.assertEqWith s "without the Nightmare the 2-power Piker is returned too" (powerOnBattlefield pikerName control) [Just 2]
-
--- Graceful Restoration's second mode, aimed at every card its slot offers.
-restoresBoth :: Prompt.Prompt r -> r
-restoresBoth p = case p of
-  Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex 1)
-  Prompt.AnnounceTargets _ _ _ slots -> fmap (\(count, offered) -> TargetCount.ceilingOn (Natural.length offered) count) slots
-  Prompt.ChooseTargets _ _ _ sets -> fmap snd sets
-  _ -> S.identityAnswer p
 
 -- The control grant, and the perpetual one's twin in every respect but its
 -- expiry: same stand-in source, same layer-6 modification, same CR 611.2c

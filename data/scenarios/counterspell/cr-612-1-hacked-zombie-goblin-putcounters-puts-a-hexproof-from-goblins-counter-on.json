@@ -1,0 +1,209 @@
+{
+  "description": "CR 612.1 hacked Zombie -> Goblin, PutCounters puts a hexproof from Goblins counter on",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains"
+          },
+          {
+            "card": "Island",
+            "label": "island"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Warding Sigil",
+            "label": "spell"
+          },
+          {
+            "card": "Artificial Evolution",
+            "label": "evolution"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Tarfire",
+            "label": "tarfire"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$spell",
+          "targets": [
+            "$piker"
+          ],
+          "mana": [
+            "$plains",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$evolution",
+          "targets": [
+            "Synthetic Warding Sigil"
+          ],
+          "mana": [
+            "$island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "source": "Artificial Evolution",
+      "do": {
+        "ChooseTypeSwap": {
+          "from": {
+            "type": "Zombie"
+          },
+          "to": {
+            "type": "Goblin"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$piker",
+          "kind": {
+            "type": "Keyword",
+            "value": {
+              "type": "Hexproof",
+              "value": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Goblin"
+                }
+              }
+            }
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$piker",
+          "kind": {
+            "type": "Keyword",
+            "value": {
+              "type": "Hexproof",
+              "value": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Zombie"
+                }
+              }
+            }
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "refuse": {
+        "Cast": {
+          "object": "$tarfire",
+          "targets": [
+            "$piker"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Tarfire",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    }
+  ],
+  "note": "Synthetic Warding Sigil puts a hexproof from Zombies counter on target creature; Artificial Evolution on the Sigil swaps Zombie for Goblin, so bob's Tarfire (a Goblin spell, CR 702.11d) may not target the Piker. Proven by casting the Sigil unhacked, where the refused Tarfire stands."
+}

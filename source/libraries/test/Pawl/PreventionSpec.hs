@@ -1061,55 +1061,6 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater (after fireEater))) "setup: the cost really did remove the source, so the id names nothing"
     Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements (after fireEater))) 1
     Spec.assertEqWith s "alice was OFFERED the departed source and answered it" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice fireEater) g3 act)) [fireEater]
-  -- CR 609.7a in the other direction, on the same two cards: the rule's second
-  -- class is "a spell on the stack (including a permanent spell)", and an
-  -- ACTIVATED ABILITY sharing that zone is neither a spell nor a permanent nor a
-  -- face-up command-zone object, nor is it referred to by anything. It is not a
-  -- legal choice, and pawl used to offer every object on the stack.
-  --
-  -- OBSERVED AT GAMEPLAY LEVEL rather than by counting the offered set, which the
-  -- lands ordering below is what buys. The answerer names the Fire-Eater's
-  -- ability OBJECT and, per this group's FILTERED-not-trusted posture, falls back
-  -- to the head of the pool when that id is not offered. The Fire-Eater and the
-  -- Replica are placed BEFORE the Plains, so the ascending pool's head is the
-  -- departed Fire-Eater -- the one source whose damage this shield can prevent.
-  -- So an engine that offers the ability installs a shield naming an object no
-  -- damage event ever carries and alice takes the 2; the engine that declines it
-  -- falls back and prevents the 2.
-  Spec.it s "CR 609.7a an activated ability on the stack is not a spell, so it is not offered as a source" $ do
-    plains <- S.printingOf s registry "Plains"
-    replica <- S.printingOf s registry "Auriok Replica"
-    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
-    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (replicaId, g2) = S.addPermanent replica S.alice g1
-        g3 = S.landsFor plains S.alice 1 g2
-        -- The Fire-Eater's ability alone, so its object's id can be read off the
-        -- stack rather than guessed.
-        armed = S.runPure (aimPlayer S.alice) g3 (Activate.activateAbility S.alice fireEater (theAbility ghitu))
-        abilityId = case GameState.stack armed of
-          oid : _ -> oid
-          [] -> fireEater
-        rest =
-          Activate.activateAbility S.alice replicaId (theAbility replica)
-            Monad.>> Stack.resolveTop
-            Monad.>> Stack.resolveTop
-        after src = S.runPure (choosePlayerAndSource S.alice src) armed rest
-        -- The Plains: the battlefield holds it and the Replica, and the lands
-        -- were placed last, so the Plains carries the higher id.
-        plainsId = Set.findMax (GameState.battlefield armed)
-    -- THE gameplay assertion: naming the ability gets alice the FALLBACK, and the
-    -- fallback prevents the 2. An engine offering the ability would shield an
-    -- object that deals no damage and leave alice on 18.
-    Spec.assertEqWith s "the ability was not offered, so the fallback shielded the Fire-Eater it names" (S.lifeOf S.alice (after abilityId)) (Just 20)
-    -- Its twin, differing in the ANSWER alone and naming something the rule DOES
-    -- admit: the Plains is a permanent, is offered, and shields nothing that
-    -- happens here -- so the 20 above is not "everything was prevented".
-    Spec.assertEqWith s "naming the Plains instead, which IS a legal choice, leaves the same 2 landing" (S.lifeOf S.alice (after plainsId)) (Just 18)
-    -- The proxies, after the behaviour.
-    Spec.assertEqWith s "setup: exactly one object is on the stack, and it is not the Fire-Eater's own id" (GameState.stack armed) [abilityId]
-    Spec.assertBool s (abilityId /= fireEater) "setup: CR 602.2a's ability object is not the permanent whose ability it is"
-    Spec.assertBool s (plainsId /= replicaId) "setup: the id the twin names is the Plains and not the Replica"
-    Spec.assertEqWith s "the answer recorded is the fallback, not the ability alice named" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice abilityId) armed rest)) [fireEater]
 
   -- The SAME rule and the same exclusion, reached by CR 609.7a's OTHER
   -- binding-reading carrier: "any object referred to by ... a delayed triggered
@@ -2248,75 +2199,6 @@ turnTheBladeBoard s registry evolve = do
       installed = S.runPure S.identityAnswer (if evolve then evolved else onStack) Stack.resolveTop
   pure (bobHuman, bobGoblin, cat, installed)
 
--- CR 608.2h's LAST KNOWN INFORMATION on the other side of CR 609.7a's chooser:
--- the rule's third class admits an object "no longer in the zone it used to be
--- in", and a card that NARROWS the choice has to read that object's properties
--- off something. Synthetic Turn the Blade supplies the narrowing ("a Human of
--- your choice"), Ghitu Fire-Eater ({2}{R} Creature -- Human Nomad 2/2, "{T},
--- Sacrifice this creature: It deals damage equal to its power to any target")
--- the departed Human, and Prodigal Sorcerer ({2}{U} Creature -- Human Wizard
--- 1/1) the living one.
---
--- The two readings differ in the OFFERED SET, not in the recheck: a departed id
--- projects blank, so under the bare projection the Fire-Eater satisfies no
--- subtype filter and the pool collapses to bob's Sorcerer alone -- one candidate,
--- so CR 609.7a's choice is made with no prompt and the redirection watches a
--- source alice never picked. Read through last known information the pool holds
--- both, alice is asked, and the redirection watches the object whose damage this
--- board is about. Pawl.Engine.Replacement.matchesDamageSource rechecks under CR
--- 609.7b with the same pair, so the choice and the recheck cannot read one source
--- two ways.
---
--- ORDER is the whole of the setup: the Fire-Eater's ability goes on the stack
--- FIRST, so the id is still a referent of an object on the stack when the Blade
--- resolves; what the classes cannot supply is the Human, which only CR 608.2h
--- can. The Blade resolves next and the ability last, so the 2 is dealt with the
--- redirection already waiting.
---
--- Two seats is enough: the card says "you" and "target creature you control" and
--- names no opponent. Alice's redirect destination is a Cat Warrior (Jedit
--- Ojanen), which is neither Human nor a source of anything here.
-turnTheBladeLastKnownSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-turnTheBladeLastKnownSpec s registry = Spec.describe s "Synthetic Turn the Blade (CR 608.2h)" $ do
-  Spec.it s "CR 608.2h a departed source is narrowed by its last known information, so a Human that has left is choosable" $ do
-    plains <- S.printingOf s registry "Plains"
-    blade <- S.printingOf s registry "Synthetic Turn the Blade"
-    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
-    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (bobHuman, g2) = S.addPermanent sorcerer S.bob g1
-        (cat, g3) = S.addPermanent jedit S.alice g2
-        g4 = S.landsFor plains S.alice 2 g3
-        (bladeId, g5) = S.addHandCard blade S.alice g4
-        ready =
-          g5
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        -- The Fire-Eater's ability alone, aimed at alice: the cost has already
-        -- removed the creature, so the Human under test is departed before the
-        -- Blade is even cast.
-        armed = S.runPure (aimPlayer S.alice) ready (Activate.activateAbility S.alice fireEater (theAbility ghitu))
-        rest = S.cast S.alice bladeId Monad.>> Stack.resolveTop Monad.>> Stack.resolveTop
-        after src = S.runPure (aimAndChoose cat src) armed rest
-    -- THE gameplay assertion: the departed Human alice chose is the source the
-    -- redirection watches, so its 2 lands on her Cat. Under the bare projection
-    -- the Fire-Eater is not a Human, is never offered, and the Cat takes nothing.
-    Spec.assertEqWith s "the departed Human alice chose has its 2 redirected onto her Cat" (S.damageOf cat (after fireEater)) (Just 2)
-    Spec.assertEqWith s "so alice loses none of that 2" (S.lifeOf S.alice (after fireEater)) (Just 20)
-    -- Its twin on the same board, differing in the ANSWER alone and naming the
-    -- Human that never left: the redirection then watches a source that deals
-    -- nothing here, so the 2 reaches alice and her Cat is untouched.
-    Spec.assertEqWith s "naming bob's living Human instead leaves that 2 on alice" (S.lifeOf S.alice (after bobHuman)) (Just 18)
-    Spec.assertEqWith s "with her Cat taking none of it" (S.damageOf cat (after bobHuman)) (Just 0)
-    -- The proxies, after the behaviour.
-    Spec.assertEqWith s "alice was OFFERED the departed Human and answered it" (chosenSourcesIn (answersFor (aimAndChoose cat fireEater) armed rest)) [fireEater]
-    Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater armed)) "setup: the cost really did remove the Fire-Eater, so the id names nothing"
-    Spec.assertEqWith s "setup: the Blade installed exactly one redirection" (length (GameState.replacements (after fireEater))) 1
-    Spec.assertBool s (bobHuman /= fireEater && cat /= fireEater) "setup: the two Humans are different objects, and neither is the Cat"
-
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
 -- For each 1 damage prevented this way, put a +1/+1 counter on that creature").
@@ -2763,7 +2645,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   communalBulwarkReferentSpec s registry
   comeBackWrongSpec s registry
   turnTheBladeSpec s registry
-  turnTheBladeLastKnownSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   whippoorwillSpec s registry

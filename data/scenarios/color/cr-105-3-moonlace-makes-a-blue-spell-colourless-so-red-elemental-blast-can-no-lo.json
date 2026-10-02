@@ -1,0 +1,144 @@
+{
+  "description": "CR 105.3 Moonlace makes a blue SPELL colourless, so Red Elemental Blast can no longer counter it",
+  "note": "The Haskell test puts the Recall straight onto the stack and holds Red Elemental Blast's slot up to it; here alice casts the Recall and Moonlace, so she has a second Island, and a Mountain for the Blast. The control shows the Blast does counter the Recall before Moonlace.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ancestral Recall",
+            "label": "recall"
+          },
+          {
+            "card": "Moonlace",
+            "label": "moonlace"
+          },
+          {
+            "card": "Red Elemental Blast",
+            "label": "reb"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$recall",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$i1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Colors",
+          "object": "Ancestral Recall",
+          "is": [
+            "Blue"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$moonlace",
+          "targets": [
+            "Ancestral Recall"
+          ],
+          "mana": [
+            "$i2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Colors",
+          "object": "Ancestral Recall",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Ancestral Recall"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$reb",
+          "targets": [
+            "Ancestral Recall"
+          ],
+          "mana": [
+            "$m1"
+          ]
+        }
+      }
+    }
+  ]
+}

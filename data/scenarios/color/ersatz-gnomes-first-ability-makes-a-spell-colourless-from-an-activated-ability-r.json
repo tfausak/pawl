@@ -1,0 +1,127 @@
+{
+  "description": "Ersatz Gnomes' first ability makes a SPELL colourless, from an activated ability rather than a spell",
+  "note": "The Haskell test puts the Recall straight onto the stack and holds Red Elemental Blast's slot up to it; here alice casts the Recall off an Island, and holds the Blast with a Mountain to try it.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          },
+          {
+            "card": "Ersatz Gnomes",
+            "label": "gnomes",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ancestral Recall",
+            "label": "recall"
+          },
+          {
+            "card": "Red Elemental Blast",
+            "label": "reb"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$recall",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$i1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Colors",
+          "object": "Ancestral Recall",
+          "is": [
+            "Blue"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$gnomes",
+          "ability": 0,
+          "targets": [
+            "Ancestral Recall"
+          ],
+          "mana": [
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Colors",
+          "object": "Ancestral Recall",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$reb",
+          "targets": [
+            "Ancestral Recall"
+          ],
+          "mana": [
+            "$m1"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -67,17 +67,6 @@ import qualified Pawl.Types.Zone as Zone
 namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
 namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
 
--- Answers Prompt.ChooseSacrifices with `wanted`, when it is on offer. A pair of
--- tests differing only in this argument proves the ANSWER decides which permanent
--- is sacrificed, rather than the order the candidates are enumerated in.
-sacrifices :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-sacrifices wanted p = case p of
-  Prompt.ChooseSacrifices _ _ _ candidates _ _ ->
-    if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
-  _ -> S.identityAnswer p
-
 -- CR 701.16a: "'Investigate' means 'Create a Clue token.' See rule 111.10f."
 -- The keyword action is pure shorthand for a Create, which is why Thraben
 -- Inspector needs no opcode of its own: the card data spells CR 111.10f's
@@ -378,30 +367,8 @@ repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
 -- the designation from what CR 701.60c hangs off it: its menace is PRINTED and it
 -- is never suspected, so a criterion reading the menace grant rather than the
 -- designation would offer it as fodder.
-runeBrandJugglerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+runeBrandJugglerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 runeBrandJugglerSpec s registry = Spec.describe s "RuneBrandJuggler" $ do
-  Spec.it s "CR 701.60b the cost takes the suspected creature, and the menace one is not a candidate" $ do
-    (jugglerId, pikerId, bruteId, wallId, gs0) <- jugglerBoard s registry
-    let entered = S.runPure (takingTargets 1 [pikerId]) gs0 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-    -- The board the activation happens on: exactly one of alice's three creatures
-    -- is suspected, so every assertion below has a same-board counterexample.
-    Spec.assertEqWith s "the Piker is suspected, the Brute and the Juggler are not" (fmap (`suspectedOf` entered) [pikerId, bruteId, jugglerId]) [Just True, Just False, Just False]
-    Spec.assertEqWith s "and the Brute's menace is printed rather than the designation's" (Projection.hasKeyword Keyword.Menace bruteId entered, suspectedOf bruteId entered) (True, Just False)
-    case Activatable.abilitiesFor jugglerId entered of
-      [ability] -> do
-        Spec.assertBool s (Activatable.activatable S.alice jugglerId ability entered) "a suspected creature to sacrifice makes it activatable"
-        let after = S.runPure (jugglerAnswer wallId bruteId) entered (Activate.activateAbility S.alice jugglerId ability >> Stack.resolveTop >> Engine.settleForPriority)
-        -- The interpreter asks for the BRUTE whenever a sacrifice is on offer, and
-        -- CR 701.21a's prompt is raised only above one candidate -- so a criterion
-        -- that dropped the designation would sacrifice the Brute here, and a
-        -- criterion that read menace would sacrifice it instead of the Piker.
-        Spec.assertBool s (not (S.onBattlefield pikerId after)) "the suspected creature paid the cost"
-        Spec.assertEqWith s "and reached alice's graveyard (CR 701.21a)" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [CardName.MkCardName $ Text.pack "Goblin Piker"]
-        Spec.assertBool s (S.onBattlefield bruteId after) "the creature with menace and no designation did not"
-        Spec.assertBool s (S.onBattlefield jugglerId after) "and neither did the Juggler"
-        Spec.assertEqWith s "before: the Wall is a 0/8" (S.powerToughnessOf wallId entered) (Just (0, 8))
-        Spec.assertEqWith s "after: the ability resolved for -5/-5" (S.powerToughnessOf wallId after) (Just (-5, 3))
-      other -> Spec.assertFailure s ("expected exactly one activated ability on the Juggler, got " <> show (length other))
   -- The same board, the same lands and the same three creatures; the one
   -- difference is CR 115.6's announcement, which leaves nothing suspected.
   Spec.it s "CR 701.60b with nothing suspected the cost cannot be paid, though the creatures and the mana are the same" $ do
@@ -453,15 +420,6 @@ suspectedOf oid gs = fmap isSuspected (Game.lookupObject oid gs)
 -- CR 701.60b asked of one object, which is Set membership rather than a field.
 isSuspected :: Object.Object -> Bool
 isSuspected = Set.member Designation.Suspected . Object.designations
-
--- Aims the ability at `victim` and asks for `fodder` whenever CR 701.21a offers a
--- sacrifice choice. The fodder is deliberately the permanent the criterion must
--- NOT offer: at one candidate Prompt.ChooseSacrifices is elided, so this half of
--- the interpreter can only ever fire on a criterion that is too wide.
-jugglerAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-jugglerAnswer victim fodder p = case p of
-  Prompt.ChooseSacrifices {} -> sacrifices fodder p
-  _ -> takingTargets 1 [victim] p
 
 -- CR 701.60a's transition read as a TRIGGER EVENT (CR 603.2), proved by Synthetic
 -- Neighborhood Watch {1}{W} Enchantment, "Whenever a permanent becomes suspected,
