@@ -3634,7 +3634,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
       _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
     State.modify' $ \gs ->
-      case affected of
+      case frozenAffected gs affected of
         [] -> gs
         targets -> case Expiry.arm legal controller source duration gs of
           -- CR 611.2b: the duration never started, so nothing is stored.
@@ -11394,6 +11394,15 @@ conniveOne n oid = Monad.when (n > 0) $ do
     -- here, the guard above having returned.
     State.modify' (Event.recordEvent (GameEvent.Connived oid))
 
+-- CR 702.26e: the objects a resolving effect that changes characteristics or
+-- control freezes (CR 611.2c), less every phased-out permanent -- even one it
+-- names specifically, as a `self` group slot does. ModifyTarget's arm and
+-- installControl are the callers. Pawl.PhasingSpec's two "CR 702.26e a
+-- phased-out permanent is left out of a resolving ..." cases are the proof, one
+-- per caller.
+frozenAffected :: GameState -> [ObjectId] -> [ObjectId]
+frozenAffected gs = filter (not . (`Phasing.isPhasedOut` gs))
+
 -- CR 613.1b / 611.2c: install a layer-2 control effect giving `recipient` the
 -- objects `ref` names, for `duration` -- GainControl's arm and GiveControl's,
 -- which differ only in who the recipient is.
@@ -11401,7 +11410,7 @@ installControl :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> Ob
 installControl legal resolving controller source recipient duration ref gs =
   -- Enumerated ONCE by the shared sweep; a player recipient, an illegal slot
   -- (CR 608.2b) and a set that matched nothing all change nothing.
-  case objectRefObjects legal resolving controller source gs ref of
+  case frozenAffected gs (objectRefObjects legal resolving controller source gs ref) of
     [] -> gs
     targets
       -- CR 800.4b: an object doesn't change to the control of a player who has
