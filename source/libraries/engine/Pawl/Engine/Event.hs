@@ -2818,12 +2818,15 @@ apply batch candidate event =
       -- That argument covers the costs no earlier choice can leave unpayable:
       -- this one is "any number", PayLifeOrTapped may be declined, and the exile
       -- (EntryRewrite.ExileFromGraveyard) does as much as it can (CR 101.3).
-      -- EntryRewrite.SacrificeToEnter's fixed count can be starved, and its own
-      -- arm carries the forward check the rule describes.
-      --
-      -- Not implemented: narrowing THIS choice for a SacrificeToEnter member
-      -- still to come -- Wood Elemental's untapped Forests taken ahead of Heart
-      -- of Yavimaya's Forest (#4394).
+      -- EntryRewrite.SacrificeToEnter's fixed count can be starved, so THIS
+      -- answer is judged against the fixed costs of the members still to come
+      -- (Replacement.jointlyPayable, the SacrificeToEnter arm's check). Judged,
+      -- not narrowed: the legal answers are a family of subsets no one candidate
+      -- list describes, so an illegal answer is asked again, and a repeated one
+      -- degrades to the empty set -- always legal, since taking less never
+      -- starves a later member. Combat.attemptBlockDeclaration's rejected-set
+      -- loop is the same shape. Pawl.ReplacementSpec's Storm the Festival case
+      -- proves it.
       EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber criterion kind each) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -2841,6 +2844,26 @@ apply batch candidate event =
             -- exclusion.
             let entering oid2 = oid2 == oid || Set.member oid2 batch
                 offered = filter (not . entering) (Replacement.sacrificeCandidates (Just controller) Map.empty controller (Just oid) criterion gs)
+                -- CR 614.12b: the members still to come, the SacrificeToEnter
+                -- arm's reading. An answer is legal when their costs stay
+                -- jointly payable, or were not payable to begin with -- then the
+                -- answer causes nothing.
+                stillEntering oid2 = entering oid2 || Set.member oid2 (GameState.enteringSubjects gs)
+                owed = fmap (fmap (filter (not . stillEntering))) (pendingSacrifices controller gs)
+                legal chosen = Replacement.jointlyPayable chosen owed || not (Replacement.jointlyPayable Set.empty owed)
+                decider = Decide.deciderFor controller gs
+                ask rejected = do
+                  answer <- Game.choose (Prompt.ChooseAnyNumberToSacrifice decider controller oid offered)
+                  -- FILTERED, NOT TRUSTED (#222): an answer naming a permanent
+                  -- that was never offered would otherwise sacrifice it and pay
+                  -- for a counter with it.
+                  let filtered = Set.intersection answer (Set.fromList offered)
+                  if legal filtered
+                    then pure filtered
+                    else
+                      if Set.member filtered rejected
+                        then pure Set.empty
+                        else ask (Set.insert filtered rejected)
             chosen <-
               -- Where the rules leave nothing to ask, don't prompt: with no
               -- candidate the empty set is the only answer. ONE candidate is
@@ -2848,13 +2871,7 @@ apply batch candidate event =
               -- number" leaves two distinguishable answers there.
               if null offered
                 then pure Set.empty
-                else do
-                  let decider = Decide.deciderFor controller gs
-                  answer <- Game.choose (Prompt.ChooseAnyNumberToSacrifice decider controller oid offered)
-                  -- FILTERED, NOT TRUSTED (#222): an answer naming a permanent
-                  -- that was never offered would otherwise sacrifice it and pay
-                  -- for a counter with it.
-                  pure (Set.intersection answer (Set.fromList offered))
+                else ask Set.empty
             -- ONE batch (CR 608.2f): "sacrifice any number of permanents" is one
             -- action on several objects, so every member's CR 616.1 loop reads the
             -- board the batch began on. Pawl.EventSpec's Shimatsu case is the
@@ -7372,7 +7389,7 @@ counterOne zone source controller oid = do
     -- CR 106.6 through CR 101.2, and ahead of the branch split for CR 613.11's
     -- reason: rule 106.6 says an additional effect "affects the spell or
     -- ability that mana is spent on", so both of CR 701.6a's subjects are in
-    -- reach. Both records exist: Pawl.Engine.Cost's recordSpent writes a cast's
+    -- reach. Both records exist: Pawl.Engine.Cost.recordPayment writes a cast's
     -- units onto the spell and an activation's onto the CR 602.2a ability object.
     --
     -- The typed question again, so this module never sees a ManaRiderEffect
