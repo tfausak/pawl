@@ -1107,7 +1107,7 @@ cardObject pid under printingId dest tapped ts =
       Object.goadedBy = Set.empty,
       Object.doesNotUntapFor = 0,
       Object.exertedBy = Set.empty,
-      Object.activatedOnce = Set.empty
+      Object.activatedOnce = Map.empty
     }
 
 -- Alchemy's conjure keyword action: create the given card out of nothing and put
@@ -1337,7 +1337,7 @@ createEmblem pid card = do
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapFor = 0,
                 Object.exertedBy = Set.empty,
-                Object.activatedOnce = Set.empty
+                Object.activatedOnce = Map.empty
               }
       Just <$> placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -7930,7 +7930,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.goadedBy = Set.empty,
                       Object.doesNotUntapFor = 0,
                       Object.exertedBy = Set.empty,
-                      Object.activatedOnce = Set.empty
+                      Object.activatedOnce = Map.empty
                     }
             Monad.replicateM (Natural.toIntSaturating (TokenLot.count lot)) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           minted <- State.get
@@ -8193,7 +8193,7 @@ meld controller victims resultCard = do
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapFor = 0,
                 Object.exertedBy = Set.empty,
-                Object.activatedOnce = Set.empty
+                Object.activatedOnce = Map.empty
               }
       newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
       -- Alchemy's "perpetually", the ARRIVAL direction of what perpetuate does at

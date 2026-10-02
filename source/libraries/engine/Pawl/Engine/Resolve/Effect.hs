@@ -3634,7 +3634,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
       _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
     State.modify' $ \gs ->
-      case affected of
+      case frozenAffected gs affected of
         [] -> gs
         targets -> case Expiry.arm legal controller source duration gs of
           -- CR 611.2b: the duration never started, so nothing is stored.
@@ -10582,7 +10582,7 @@ performManaAbility =
 performManaPayGate :: ObjectId -> PlayerId -> ClauseIndex.ClauseIndex -> PayGate.PayGate -> Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool) -> Game (Bool, Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool))
 performManaPayGate source controller cIdx gate answers = do
   let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
-  asked <- maybe (payGatePaid source source controller (ModeIndex.MkModeIndex 0) cIdx Map.empty Nothing gate) pure (Map.lookup offerAt answers)
+  asked <- maybe (payGatePaid source source controller (ModeIndex.MkModeIndex 0) cIdx Map.empty Nothing Set.empty gate) pure (Map.lookup offerAt answers)
   pure (not (Set.null (branchSelects (PayGate.branch gate) asked)), Map.insert offerAt asked answers)
 
 -- CR 605.4a: apply one triggered mana ability where it stands. CR 605.1b's
@@ -11394,6 +11394,15 @@ conniveOne n oid = Monad.when (n > 0) $ do
     -- here, the guard above having returned.
     State.modify' (Event.recordEvent (GameEvent.Connived oid))
 
+-- CR 702.26e: the objects a resolving effect that changes characteristics or
+-- control freezes (CR 611.2c), less every phased-out permanent -- even one it
+-- names specifically, as a `self` group slot does. ModifyTarget's arm and
+-- installControl are the callers. Pawl.PhasingSpec's two "CR 702.26e a
+-- phased-out permanent is left out of a resolving ..." cases are the proof, one
+-- per caller.
+frozenAffected :: GameState -> [ObjectId] -> [ObjectId]
+frozenAffected gs = filter (not . (`Phasing.isPhasedOut` gs))
+
 -- CR 613.1b / 611.2c: install a layer-2 control effect giving `recipient` the
 -- objects `ref` names, for `duration` -- GainControl's arm and GiveControl's,
 -- which differ only in who the recipient is.
@@ -11401,7 +11410,7 @@ installControl :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> Ob
 installControl legal resolving controller source recipient duration ref gs =
   -- Enumerated ONCE by the shared sweep; a player recipient, an illegal slot
   -- (CR 608.2b) and a set that matched nothing all change nothing.
-  case objectRefObjects legal resolving controller source gs ref of
+  case frozenAffected gs (objectRefObjects legal resolving controller source gs ref) of
     [] -> gs
     targets
       -- CR 800.4b: an object doesn't change to the control of a player who has
@@ -11478,13 +11487,17 @@ branchSelects branch asked = case branch of
 --
 -- A player the reference names who has LEFT the game stays in this list and is
 -- answered False by payGatePaidBy, CR 800.4f.
-payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
-payGatePaid resolving source controller idx cIdx legal announced gate = do
+payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
+payGatePaid resolving source controller idx cIdx legal announced committed gate = do
   gs <- State.get
+  -- A COMMITTED payer (Pawl.Engine.Resolve.chosenBranch) already chose to pay
+  -- when they announced the branch, so their offer is CR 118.12's mandatory
+  -- limb: paid when CR 118.3 allows, and not asked.
+  let offerTo payer = if Set.member payer committed then gate {PayGate.obligation = PayObligation.Mandatory} else gate
   answered <-
     Monad.foldM
       ( \earlier payer -> do
-          paid <- payGatePaidBy resolving source controller (PayOffer.AtClause idx cIdx) earlier legal payer gate
+          paid <- payGatePaidBy resolving source controller (PayOffer.AtClause idx cIdx) earlier legal payer (offerTo payer)
           pure (earlier Seq.|> (payer, paymentDecisionOf paid))
       )
       Seq.empty
@@ -11611,6 +11624,15 @@ gateCostOf resolving source controller legal gate gs =
       -- Pawl.ConjureSpec's Calim's Breath cases prove it.
       slots = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf (slotBindings resolving gs))
    in (slots, cost)
+
+-- CR 118.3 / 800.4f for one seat, before any offer: could this payer pay this
+-- gate's cost against the board as it stands? Pawl.Engine.Resolve.chosenBranch
+-- asks it per announcing seat, CR 608.2d's "can't choose an option that's ...
+-- impossible" being a question about the player choosing.
+gateAffordable :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> GameState -> Bool
+gateAffordable resolving source controller legal payer gate gs =
+  let (slots, cost) = gateCostOf resolving source controller legal gate gs
+   in elem payer (Game.stillPlaying gs) && Cost.canPayReading slots PaymentSubject.ForNeither payer source cost gs
 
 -- CR 118.12a's question, before anything is paid: does this payer take the
 -- offer? CR 800.4f and CR 118.3 first, as payGatePaidBy says. `owed` is what the

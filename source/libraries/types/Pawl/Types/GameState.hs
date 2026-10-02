@@ -357,10 +357,9 @@ data GameState = MkGameState
     -- turn, read by ActivationRestriction.OnlyOnceEachTurn alone; cleared at turn
     -- handoff, which is the whole of "each turn". Keyed by the SOURCE object and
     -- then by the ability, since a permanent may print the rider on one of two
-    -- abilities (Locust Swarm). The ability BY VALUE, and CR 602.5c's
-    -- identically worded twin is the caveat Object.activatedOnce's haddock states
-    -- about the same key.
-    activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
+    -- abilities (Locust Swarm). The ability BY VALUE and counted, for CR
+    -- 602.5c's identically worded twins, as Object.activatedOnce is.
+    activatedThisTurn :: Map.Map ObjectId.ObjectId (Map.Map (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) Natural.Natural),
     -- | CR 602.2: every activated ability begun this turn, oldest first, as
     -- Pawl.Types.ReduceActivationCost.onlyFirst asks after it; cleared at turn
     -- handoff. Written by Pawl.Engine.ActivationRestriction.logActivation.

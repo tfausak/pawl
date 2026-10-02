@@ -294,7 +294,7 @@ lockOffered keys keysId gs = elem (A.Activate keysId (lockAbility keys)) (Action
 keysAnswer :: ObjectId.ObjectId -> ClauseIndex.ClauseIndex -> CardName.CardName -> Prompt.Prompt r -> r
 keysAnswer room branch door p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter ((==) (Just room) . Recipient.objectOf) . snd) asked
-  Prompt.ChooseClause {} -> branch
+  Prompt.ChooseClause {} -> Just branch
   Prompt.ChooseHalf {} -> door
   _ -> S.identityAnswer p
 

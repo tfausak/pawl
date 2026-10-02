@@ -384,7 +384,7 @@ blankObject zone pid printingId ts =
       Object.goadedBy = Set.empty,
       Object.doesNotUntapFor = 0,
       Object.exertedBy = Set.empty,
-      Object.activatedOnce = Set.empty
+      Object.activatedOnce = Map.empty
     }
 
 -- Build each player's library from their deck's multiset, shuffle, draw.

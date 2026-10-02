@@ -4385,6 +4385,47 @@ locusSpec s registry =
     Spec.assertEqWith s "CR 602.5b and neither is offered a third time this turn, three Mountains still untapped" (fmap fst (offered brothers fired)) []
     Spec.assertEqWith s "CR 607.2a / 702.167c the Ashling the borrowed Wretch exiled gave the Locus nothing" (fmap fst (offered ashling fired)) []
 
+-- CR 602.5c / 113.2c: Gliding Licid's "{U}, {T}: This creature loses this
+-- ability and becomes an Aura enchantment with enchant creature. Attach it to
+-- target creature. You may pay {U} to end this effect." (Oracle text checked
+-- against Scryfall, 2026-10-02) is NAMED, for its own "loses this ability", so
+-- two Licid materials give the Locus two EQUAL abilities. Each is its own to the
+-- Locus's once-each-turn rider, so with the first Licid ability on the stack and
+-- the Locus untapped -- the board edit stands for an untap effect such as
+-- Twiddle -- the second is still offered, and a third is not. The negative is
+-- the same board with a Brothers of Fire for the second Licid, so the Locus
+-- holds one copy and the offer goes after one spend. No material has a mana
+-- ability, which the Locus would otherwise tap to pay the Licid's {U} and so
+-- leave its {T} unpaid.
+locusLicidSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+locusLicidSpec s registry =
+  Spec.it s "CR 602.5c two Gliding Licids give the Locus two once-each-turn animate abilities" $ do
+    jewel <- S.printingOf s registry "The Enigma Jewel"
+    island <- S.printingOf s registry "Island"
+    licid <- S.printingOf s registry "Gliding Licid"
+    giant <- S.printingOf s registry "Hill Giant"
+    twins <- mapM (S.printingOf s registry) ["Gliding Licid", "Gliding Licid", "Withered Wretch", "Brothers of Fire"]
+    single <- mapM (S.printingOf s registry) ["Gliding Licid", "Brothers of Fire", "Withered Wretch", "Brothers of Fire"]
+    let (giantId, g0) = S.addPermanent giant S.bob (S.landsInPlay island 9)
+        (jewelId, g1) = S.addPermanent jewel S.alice g0
+        licidModals = let (o, g) = S.addPermanent licid S.bob g1 in fmap ActivatedAbility.modal (Activatable.abilitiesFor o g)
+        craftWith materials =
+          let board = (List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) g1 materials) {GameState.priority = Just S.alice, GameState.activePlayer = S.alice, GameState.phase = Phase.PostcombatMain}
+              crafted = case filter isCraftAbility (Activatable.abilitiesFor jewelId board) of
+                [ability] -> S.runPure S.identityAnswer board (Activate.activateAbility S.alice jewelId ability >> Stack.resolveTop)
+                _ -> board
+           in List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) crafted [1 .. 3 :: Int]
+        locusIn g = [o | o <- Game.zoneMembers Zone.Battlefield S.alice g, Set.member (CardName.MkCardName (Text.pack "Locus of Enlightenment")) (Projection.namesOf o g)]
+        offered g = [(o, a) | A.Activate o a <- Action.legalActions S.alice g, o `elem` locusIn g, ActivatedAbility.modal a `elem` licidModals]
+        untapLocus g = g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.tapped = TapState.Untapped}))) (GameState.objects g) (locusIn g)}
+        animate g = case offered g of
+          (o, a) : _ -> untapLocus (S.runPure (aimAtOffered giantId) g (Activate.activateAbility S.alice o a))
+          [] -> g
+        once = animate (craftWith twins)
+    Spec.assertEqWith s "CR 602.5c / 113.2c with one Licid ability spent, the Locus's other Licid ability is still offered" (null (offered once)) False
+    Spec.assertEqWith s "CR 602.5b but neither is offered a third time this turn" (fmap fst (offered (animate once))) []
+    Spec.assertEqWith s "CR 602.5b a Locus with one Licid ability is offered it, then not again" (fmap (null . offered) [craftWith single, animate (craftWith single)]) [False, True]
+
 -- Saheeli's Lattice on alice's battlefield with five Mountains, which is exactly
 -- {4}{R}, and the named printings on her battlefield, in her graveyard and in
 -- exile, their ids answered in that order.
@@ -4457,6 +4498,7 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
       _ -> Spec.assertFailure s "expected one craft ability and five extras"
 
   locusSpec s registry
+  locusLicidSpec s registry
 
 -- Leonin Shikari {1}{W} Creature -- Cat Soldier 2/2: "You may activate equip
 -- abilities any time you could cast an instant." Forge Anew {2}{W} Enchantment

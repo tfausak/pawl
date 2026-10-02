@@ -3,6 +3,7 @@ module Pawl.Types.RuleAbilities where
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackCost as AttackCost
+import qualified Pawl.Types.AttackPermission as AttackPermission
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -15,17 +16,17 @@ import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
 
 -- | CR 613.11: the ability families whose continuous effects "affect game rules
--- rather than objects" -- the thirteen lists Pawl.Types.Face carries beside its
+-- rather than objects" -- the fourteen lists Pawl.Types.Face carries beside its
 -- keywords and its static abilities, and which no layer of CR 613 touches.
 --
--- ONE bundle rather than thirteen fields on Pawl.Types.ProjectedCharacteristics,
--- because the thirteen share a single posture down to the line: each is seeded
+-- ONE bundle rather than fourteen fields on Pawl.Types.ProjectedCharacteristics,
+-- because the fourteen share a single posture down to the line: each is seeded
 -- from the printed face, rewritten by no layer, and read by exactly one engine
 -- module outside the layer fold. Grouping them makes CR 702.140e's union one
--- `<>` and CR 707.2a's copy one field, so a fourteenth family cannot be added
+-- `<>` and CR 707.2a's copy one field, so a fifteenth family cannot be added
 -- to the record and left out of either; see #3373.
 --
--- Face keeps the thirteen apart because a card's JSON names each one; nothing
+-- Face keeps the fourteen apart because a card's JSON names each one; nothing
 -- here needs that, since every reader asks for one field by name.
 data RuleAbilities = MkRuleAbilities
   { -- | CR 602.2: "its activated abilities can't be activated" (Arrest).
@@ -34,6 +35,9 @@ data RuleAbilities = MkRuleAbilities
     attachRestrictions :: [AttachRestriction.AttachRestriction],
     -- | CR 508.1h: Ghostly Prison's {2} per attacking creature.
     attackCosts :: [AttackCost.AttackCost],
+    -- | CR 702.3b: "this creature can attack as though it didn't have defender"
+    -- (Prison Barricade kicked).
+    attackPermissions :: [AttackPermission.AttackPermission],
     -- | CR 508.1d: "creatures ... attack each combat if able" (Curse of the
     -- Nightly Hunt).
     attackRequirements :: [AttackRequirement.AttackRequirement],
@@ -64,8 +68,8 @@ data RuleAbilities = MkRuleAbilities
   deriving (Eq, Ord, Show)
 
 -- | CR 702.140e: a merged permanent has all abilities of each card representing
--- it, which for these thirteen families is concatenation. Field by field rather
--- than a derived instance, so a fourteenth field cannot be added without
+-- it, which for these fourteen families is concatenation. Field by field rather
+-- than a derived instance, so a fifteenth field cannot be added without
 -- -Werror naming this site.
 instance Semigroup RuleAbilities where
   left <> right =
@@ -73,6 +77,7 @@ instance Semigroup RuleAbilities where
       { activationProhibitions = activationProhibitions left <> activationProhibitions right,
         attachRestrictions = attachRestrictions left <> attachRestrictions right,
         attackCosts = attackCosts left <> attackCosts right,
+        attackPermissions = attackPermissions left <> attackPermissions right,
         attackRequirements = attackRequirements left <> attackRequirements right,
         blockCosts = blockCosts left <> blockCosts right,
         blockPermissions = blockPermissions left <> blockPermissions right,
@@ -94,6 +99,7 @@ instance Monoid RuleAbilities where
       { activationProhibitions = [],
         attachRestrictions = [],
         attackCosts = [],
+        attackPermissions = [],
         attackRequirements = [],
         blockCosts = [],
         blockPermissions = [],

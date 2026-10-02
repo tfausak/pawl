@@ -78,6 +78,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
+import qualified Pawl.Types.AttackPermission as AttackPermission
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.Backup as Backup
@@ -254,6 +255,7 @@ import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
@@ -409,6 +411,7 @@ vanillaFace name typeLine =
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
       Face.crewRestrictions = [],
+      Face.attackPermissions = [],
       Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
@@ -1993,7 +1996,7 @@ cardCounts card =
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . CostReduction.condition) (Face.costReductions card)
     <> ruleAbilitiesCounts (Projection.ruleAbilitiesOfFace card)
 
--- Every Count reachable from the thirteen CR 613.11 rule-ability families, a
+-- Every Count reachable from the fourteen CR 613.11 rule-ability families, a
 -- printed face's (cardCounts) and a granted bundle's (modificationCounts) alike.
 ruleAbilitiesCounts :: RuleAbilities.RuleAbilities -> [Count.Type.Count Quantity.Type.Quantity]
 ruleAbilitiesCounts rules =
@@ -4270,7 +4273,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries one -- Tovolar's "a Wolf or Werewolf you
   -- control", which the card lint must sweep.
-  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> unframed [f]
+  TriggerCondition.PermanentDealsCombatDamageToPlayer p -> unframed [PermanentDealsCombatDamageToPlayer.filter p]
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- swept the same way for PermanentsDie's reason: answering [] here would exempt
   -- Pia Nalaar's "artifact creatures you control" from every corpus filter lint.
@@ -6143,7 +6146,7 @@ grantedTriggeredAbilities card =
     )
     (grantedModifications card)
 
--- Every Filter the thirteen CR 613.11 rule-ability families carry, a printed
+-- Every Filter the fourteen CR 613.11 rule-ability families carry, a printed
 -- face's (cardFilters) and a granted bundle's alike.
 ruleAbilitiesFilters :: RuleAbilities.RuleAbilities -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 ruleAbilitiesFilters rules =
@@ -6160,6 +6163,7 @@ ruleAbilitiesFilters rules =
         <> concatMap (unframed . affectedFilters . SacrificeRestriction.affected) (RuleAbilities.sacrificeRestrictions rules)
         <> concatMap (unframed . affectedFilters . UntapRestriction.affected) (RuleAbilities.untapRestrictions rules)
         <> concatMap (unframed . affectedFilters . CrewRestriction.affected) (RuleAbilities.crewRestrictions rules)
+        <> concatMap (unframed . affectedFilters . AttackPermission.affected) (RuleAbilities.attackPermissions rules)
         <> concatMap (unframed . attachRestrictionFilters) (RuleAbilities.attachRestrictions rules)
         <> concatMap (unframed . affectedFilters . EntryRestriction.affected) (RuleAbilities.entryRestrictions rules)
         <> concatMap (unframed . affectedFilters . CounterRestriction.affected) (RuleAbilities.counterRestrictions rules)
@@ -6399,6 +6403,7 @@ activatedAbilityFilters ability =
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
 --     `crewRestrictions` (CR 702.122d / 101.2),
+--     `attackPermissions` (CR 702.3b),
 --     `entryRestrictions` (CR 400.4a / 101.2),
 --     `counterRestrictions` (CR 122.6 / 101.2),
 --     `activationProhibitions` (CR 602.2 / 101.2),

@@ -170,7 +170,7 @@ deciderOf prompt = case prompt of
   Prompt.MulliganAction decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OpeningHandAction decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseOptional decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseClause decider _ _ _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseClause decider _ _ _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OfferedCast decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseOfferedCastSpell decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OfferedMiracleReveal decider _ _ _ _ -> Just (Decider.unwrap decider)

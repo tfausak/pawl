@@ -1601,7 +1601,7 @@ copiableRuleAbilitiesOf carrier gs =
         -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
         Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
 
--- The thirteen lists a printed face declares. Its own function so that the seed
+-- The fourteen lists a printed face declares. Its own function so that the seed
 -- above and copiableRuleAbilitiesOf's fallback cannot drift on what a face
 -- contributes.
 ruleAbilitiesOfFace :: Face.Face Card.Type.Card -> RuleAbilities.RuleAbilities
@@ -1610,6 +1610,7 @@ ruleAbilitiesOfFace face =
     { RuleAbilities.activationProhibitions = Face.activationProhibitions face,
       RuleAbilities.attachRestrictions = Face.attachRestrictions face,
       RuleAbilities.attackCosts = Face.attackCosts face,
+      RuleAbilities.attackPermissions = Face.attackPermissions face,
       RuleAbilities.attackRequirements = Face.attackRequirements face,
       RuleAbilities.blockCosts = Face.blockCosts face,
       RuleAbilities.blockPermissions = Face.blockPermissions face,
@@ -2002,7 +2003,7 @@ withMergedAbilities donor base =
       PC.castingPermissions = PC.castingPermissions base <> PC.castingPermissions donor,
       -- CR 613.11's twelve families, whose Semigroup is the same concatenation
       -- the eight fields above are written out with; Pawl.Types.RuleAbilities
-      -- carries it so a thirteenth family cannot be added and left out here.
+      -- carries it so a new family cannot be added and left out here.
       PC.ruleAbilities = PC.ruleAbilities base <> PC.ruleAbilities donor,
       -- CR 702.140e / 118.8 / 118.9: a cost line in a component's rules text is
       -- one of its abilities too, so a duplicate of the merged permanent owes

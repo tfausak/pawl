@@ -248,7 +248,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- objects -- combat, attack, block, untap, entry, sacrifice, counter,
     -- crew, attach and activation restrictions, requirements, costs and
     -- permissions.
-    -- Pawl.Types.RuleAbilities says why the thirteen ride one field.
+    -- Pawl.Types.RuleAbilities says why the fourteen ride one field.
     --
     -- Here for playerAbilities' reason exactly: CR 613.11 applies them outside
     -- the layer system, so no layer but CR 612.5's exchange and CR 612.6's full
@@ -259,7 +259,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- same field (Pawl.Engine.Projection.View.withMergedAbilities), which is
     -- what gives a mutated permanent every component's.
     --
-    -- Read through Pawl.Engine.Projection.ruleAbilitiesOf, which the thirteen
+    -- Read through Pawl.Engine.Projection.ruleAbilitiesOf, which the fourteen
     -- gatherer modules share; Pawl.MutateSpec's "CR 702.140e a Silent Arbiter
     -- under a Cubwarden still holds alice to one attacker" is what proves the
     -- union reaches them.

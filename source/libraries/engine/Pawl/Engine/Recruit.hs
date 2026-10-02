@@ -114,6 +114,7 @@ soldierToken =
               Face.attachRestrictions = [],
               Face.counterRestrictions = [],
               Face.crewRestrictions = [],
+              Face.attackPermissions = [],
               Face.activationProhibitions = [],
               Face.entryRestrictions = [],
               Face.attackCosts = [],

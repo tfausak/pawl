@@ -118,7 +118,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.goadedBy = Set.empty,
           Object.doesNotUntapFor = 0,
           Object.exertedBy = Set.empty,
-          Object.activatedOnce = Set.empty
+          Object.activatedOnce = Map.empty
         }
       ( " {\"owner\":1,\"source\":{\"type\":\"OfCard\",\"value\":2}"
           <> ",\"zone\":{\"type\":\"Hand\"},\"sickness\":{\"type\":\"Sick\"}"
@@ -238,7 +238,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.goadedBy = Set.singleton (PlayerId.MkPlayerId 22),
           Object.doesNotUntapFor = 2,
           Object.exertedBy = Set.singleton (PlayerId.MkPlayerId 23),
-          Object.activatedOnce = Set.singleton ActivatedAbilitySourceSpec.ability
+          Object.activatedOnce = Map.singleton ActivatedAbilitySourceSpec.ability 1
         }
       ( " {\"owner\":1,\"enteredUnder\":2,\"source\":{\"type\":\"OfToken\",\"value\":3}"
           <> ",\"zone\":{\"type\":\"Battlefield\"},\"tapped\":{\"type\":\"Tapped\"}"

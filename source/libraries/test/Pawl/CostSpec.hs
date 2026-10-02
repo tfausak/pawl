@@ -2419,6 +2419,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   announcedReversalSpec s registry
   siegeWurmSpec s registry
   chiefEngineerSpec s registry
+  veneratedLoxodonSpec s registry
   convokeWindowSpec s registry
   assistSpec s registry
   treasureCruiseSpec s registry
@@ -4862,6 +4863,61 @@ convokeWindowSpec s registry = Spec.describe s "Siege Wurm" $ do
     -- And the Birds is NOT among the convokers: the window tapped it, so the
     -- offer made afterwards no longer counts it as an untapped creature.
     Spec.assertEqWith s "every other creature was tapped to convoke the rest" (S.tappedCount S.alice after) 7
+
+-- Venerated Loxodon {4}{W} Creature -- Elephant Cleric 4/4: "Convoke. When this
+-- creature enters, put a +1/+1 counter on each creature that convoked it."
+--
+-- CR 702.51c's relation and the only printing that READS it, which is what makes
+-- the record observable at gameplay level: nothing else in the pool asks which
+-- creatures convoked a spell.
+--
+-- The board separates the two questions the record could be confused with. The
+-- Giant Spider is an untapped creature alice controls that convoked nothing, so
+-- an implementation counting "each creature you control" grows it; the Palace
+-- Guard pays the {W} where the Pikers pay the {4}, so the two substitution
+-- components have to land in the one relation rather than the last one winning.
+veneratedLoxodonSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+veneratedLoxodonSpec s registry = Spec.describe s "Venerated Loxodon" $ do
+  -- Inspiring Statuary {3} Artifact: "Nonartifact spells you cast have
+  -- improvise." The Loxodon then has both keywords, and the payer says how much
+  -- of its {4} each pays: two Goblin Pikers convoke {2}, and the Statuary and a
+  -- Foundry Assembler -- an artifact CREATURE, which either keyword could tap --
+  -- improvise the other {2}.
+  Spec.it s "CR 702.51c an artifact creature tapped for improvise did not convoke the Loxodon" $ do
+    loxodon <- S.printingOf s registry "Venerated Loxodon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    statuary <- S.printingOf s registry "Inspiring Statuary"
+    assembler <- S.printingOf s registry "Foundry Assembler"
+    let (pikerIds, gs1) = addPermanents piker 2 (Setup.emptyGame S.bothPlayers)
+        (guardId, gs2) = S.addPermanent palaceGuard S.alice gs1
+        (statuaryId, gs3) = S.addPermanent statuary S.alice gs2
+        (assemblerId, gs4) = S.addPermanent assembler S.alice gs3
+        (spell, gs5) = S.addHandCard loxodon S.alice gs4
+        gs =
+          gs5
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- The entry naming one colored tap and two generic taps per keyword;
+        -- the improvise prompt is the one offering no Piker.
+        tapCounts candidate = List.sort [TapPermanents.count t | CostComponent.TapPermanents t <- Cost.Type.components candidate]
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter (\c -> Cost.Type.mana c == Just (ManaCost.MkManaCost []) && tapCounts c == [1, 2, 2]) candidates)
+          Prompt.ChooseTaps _ _ _ candidates n
+            | n == 1 -> Set.fromList (filter (== guardId) candidates)
+            | any (`elem` pikerIds) candidates -> Set.fromList (filter (`elem` pikerIds) candidates)
+            | otherwise -> Set.fromList (filter (`elem` [statuaryId, assemblerId]) candidates)
+          _ -> S.identityAnswer p
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        entered = S.runPure answer cast (Stack.resolveTop >> Engine.settleForPriority)
+        grown = S.runPure answer entered Stack.resolveTop
+        counters oid g = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid g)
+    Spec.assertEqWith s "CR 702.51c the Foundry Assembler tapped for improvise grew no counter" (counters assemblerId grown) (Just 0)
+    Spec.assertEqWith s "the two Goblin Pikers tapped for convoke each grew one" (fmap (`counters` grown) pikerIds) (replicate 2 (Just 1))
+    Spec.assertBool s (isTapped assemblerId grown && isTapped statuaryId grown) "the Assembler and the Statuary were tapped to pay for it"
 
 -- alice controls `islands` Islands, her graveyard holds `fuel` Goblin Pikers,
 -- her library holds five more, and she holds `card` with priority in her own

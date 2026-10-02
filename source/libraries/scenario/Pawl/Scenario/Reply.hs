@@ -426,7 +426,7 @@ shapeOf prompt = case prompt of
   Prompt.MulliganAction {} -> maybeOf (pairOf object (wrapped HandActionIndex.MkHandActionIndex HandActionIndex.unwrap))
   Prompt.OpeningHandAction {} -> maybeOf (pairOf object (wrapped HandActionIndex.MkHandActionIndex HandActionIndex.unwrap))
   Prompt.ChooseOptional {} -> viaCodec Codec.OptionalDecision.codec
-  Prompt.ChooseClause {} -> wrapped ClauseIndex.MkClauseIndex ClauseIndex.unwrap
+  Prompt.ChooseClause {} -> maybeOf (wrapped ClauseIndex.MkClauseIndex ClauseIndex.unwrap)
   Prompt.OfferedCast {} -> viaCodec Codec.OptionalDecision.codec
   Prompt.ChooseOfferedCastSpell {} -> pairOf object (viaCodec Codec.CardName.codec)
   Prompt.OfferedMiracleReveal {} -> viaCodec Codec.OptionalDecision.codec

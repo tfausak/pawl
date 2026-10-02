@@ -828,7 +828,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseCounterRemovalUpTo _ _ _ _ bearers -> Map.isSubmapOfBy (<=) chosen bearers
   Prompt.Type.ChooseAttachment _ _ _ objects -> chosen `elem` objects
   Prompt.Type.ChoosePlayPermission _ _ _ permissions -> chosen `elem` permissions
-  Prompt.Type.ChooseClause _ _ _ _ clauses _ -> chosen `elem` clauses
+  Prompt.Type.ChooseClause _ _ _ _ clauses neither _ -> maybe neither (`elem` clauses) chosen
   Prompt.Type.ChooseModes _ _ _ modes _ -> all (`Set.member` modes) chosen
   Prompt.Type.ChooseManaToSpend _ _ units -> chosen `elem` units
   Prompt.Type.AnnouncePhyrexianPayment _ _ _ _ payments -> chosen `elem` payments

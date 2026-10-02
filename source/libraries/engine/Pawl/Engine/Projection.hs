@@ -312,11 +312,12 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- CR 602.5c: an unnamed ability is named for the material it came from
         -- (Binding.craftMaterialAbility), so two identically worded abilities
         -- from two materials are two to a restriction on their use. A named one
-        -- keeps its name, which its linked twin refers to (CR 607.5). Not
-        -- implemented: two materials' identically NAMED abilities still share
-        -- one restriction (#4607).
+        -- keeps its name, which its linked twin refers to (CR 607.5), and two
+        -- materials' equal copies of it are told apart by count instead
+        -- (ActivationRestriction.unspent).
         --
-        -- Pawl.ActivateSpec's Locus of Enlightenment case proves all three.
+        -- Pawl.ActivateSpec's Locus of Enlightenment case proves all three, and
+        -- its Gliding Licid case the named twins.
         Modification.GainCraftMaterialAbilities extra ->
           let crafted = ExileLink.MkExileLink {ExileLink.source = src, ExileLink.ability = Just Binding.craftLink}
               materials = filter (\o -> Map.lookup o (GameState.exiledWith gs) == Just crafted) (Set.toAscList (GameState.exile gs))
@@ -2591,7 +2592,7 @@ abilityRemovalAfter gs =
         else \_ _ -> False
 
 -- CR 613.11 / 613.1f: the rule abilities layer-6 grants give `oid`, which each
--- of the thirteen gatherers (Pawl.Engine.CombatRestriction and its siblings)
+-- of the fourteen gatherers (Pawl.Engine.CombatRestriction and its siblings)
 -- reads next to the object's own (ruleAbilitiesOf): a stored grant's (Chomping
 -- Kavu's backup), and a static ability's, which the fold recorded on the
 -- receiver (Zurgo, Thunder's Decree) and only a whole-board projection reads
@@ -2605,7 +2606,7 @@ abilityRemovalAfter gs =
 -- the host out of a granted ability, and it is read off `oid` itself rather
 -- than textBoxHolderOf, for grantedStaticAbilitiesOf's reason.
 -- Pawl.KeywordTriggerSpec's Backup group proves the removal order and the CR
--- 305.7 exemption, through the combat restriction; the other twelve families
+-- 305.7 exemption, through the combat restriction; the other thirteen families
 -- are regression fences, no printing with backup granting one.
 grantedRuleAbilities :: GameState -> ObjectId -> RuleAbilities.RuleAbilities
 grantedRuleAbilities gs =
