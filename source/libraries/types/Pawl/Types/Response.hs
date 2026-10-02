@@ -675,12 +675,12 @@ data Response
     -- names several (Pawl.Types.Optionality.Optional).
     ChoseOptional OptionalDecision.OptionalDecision
   | -- | CR 608.2d: which branch of an either-or clause pair a player announced
-    -- (Pawl.Types.OrElse), one answer per seat the chooser names. Distinct from
-    -- ChoseOptional, which records whether the branch that WON is then
-    -- exercised: Twiddle asks both, one after the other, so two answers in one
-    -- replay are not a duplicate. Distinct from ChoseModes, which records CR
-    -- 700.2's cast-time modes and names them by ModeIndex.
-    ChoseClause ClauseIndex.ClauseIndex
+    -- (Pawl.Types.OrElse), one answer per seat the chooser names, Nothing for
+    -- "neither". Distinct from ChoseOptional, which records CR 603.5's "may"
+    -- over a branch announced with no "neither" on offer. Distinct from
+    -- ChoseModes, which records CR 700.2's cast-time modes and names them by
+    -- ModeIndex.
+    ChoseClause (Maybe ClauseIndex.ClauseIndex)
   | -- | CR 608.2g: whether a player took a cast a resolving effect offered them.
     -- Distinct from ChoseOptional, which records CR 603.5's "may" over a whole
     -- CLAUSE, and from CastWhileSearched, which records the same rule's

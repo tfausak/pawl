@@ -34,9 +34,11 @@ data OrElse = MkOrElse
     -- exception, and CR 701.55d is why it can be: its per-seat pass re-reads the
     -- bindings after each seat is bound, so `villainous` below does bind a slot.
     --
-    -- Not implemented: a chooser who wants neither branch still announces one
-    -- and declines the rider that follows it, so the decline is a second
-    -- question rather than a third answer to this one (#3088).
+    -- Where every branch carries a decline of its own put to this same
+    -- reference, the announcement offers "neither" too and commits the seats
+    -- that took a branch, so the rider is not asked again (CR 608.2d / 101.4);
+    -- Pawl.ResolveSpec's "CR 608.2d a seat that announced the damage is held to
+    -- it" proves it.
     --
     -- Both halves of a pair must name the SAME chooser, the announcement being
     -- made once at whichever branch the resolution reaches first; Pawl.CardSpec

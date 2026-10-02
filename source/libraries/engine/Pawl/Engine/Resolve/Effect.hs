@@ -10582,7 +10582,7 @@ performManaAbility =
 performManaPayGate :: ObjectId -> PlayerId -> ClauseIndex.ClauseIndex -> PayGate.PayGate -> Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool) -> Game (Bool, Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool))
 performManaPayGate source controller cIdx gate answers = do
   let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
-  asked <- maybe (payGatePaid source source controller (ModeIndex.MkModeIndex 0) cIdx Map.empty Nothing gate) pure (Map.lookup offerAt answers)
+  asked <- maybe (payGatePaid source source controller (ModeIndex.MkModeIndex 0) cIdx Map.empty Nothing Set.empty gate) pure (Map.lookup offerAt answers)
   pure (not (Set.null (branchSelects (PayGate.branch gate) asked)), Map.insert offerAt asked answers)
 
 -- CR 605.4a: apply one triggered mana ability where it stands. CR 605.1b's
@@ -11478,13 +11478,17 @@ branchSelects branch asked = case branch of
 --
 -- A player the reference names who has LEFT the game stays in this list and is
 -- answered False by payGatePaidBy, CR 800.4f.
-payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
-payGatePaid resolving source controller idx cIdx legal announced gate = do
+payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
+payGatePaid resolving source controller idx cIdx legal announced committed gate = do
   gs <- State.get
+  -- A COMMITTED payer (Pawl.Engine.Resolve.chosenBranch) already chose to pay
+  -- when they announced the branch, so their offer is CR 118.12's mandatory
+  -- limb: paid when CR 118.3 allows, and not asked.
+  let offerTo payer = if Set.member payer committed then gate {PayGate.obligation = PayObligation.Mandatory} else gate
   answered <-
     Monad.foldM
       ( \earlier payer -> do
-          paid <- payGatePaidBy resolving source controller (PayOffer.AtClause idx cIdx) earlier legal payer gate
+          paid <- payGatePaidBy resolving source controller (PayOffer.AtClause idx cIdx) earlier legal payer (offerTo payer)
           pure (earlier Seq.|> (payer, paymentDecisionOf paid))
       )
       Seq.empty

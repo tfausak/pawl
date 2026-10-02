@@ -1191,12 +1191,13 @@ defaultAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2d: an either-or has no "decline" -- both branches are instructions --
-  -- so the default is the FIRST branch, which is the one CR 608.2c prints first.
-  -- Deliberate rather than arbitrary: Pawl.Engine.Script.declining routes every
-  -- unattended game and Pawl.Support.identityAnswer most of the suite through
-  -- this, so a Twiddle they never answer taps rather than untaps.
-  Prompt.ChooseClause _ _ _ _ branches _ -> NonEmpty.head branches
+  -- CR 603.5 / 118.12: where "neither" is on offer, declining it is always
+  -- legal and changes nothing, ChooseOptional's default. Otherwise an either-or
+  -- has no "decline" -- both branches are instructions -- so the default is the
+  -- FIRST branch, which is the one CR 608.2c prints first. Deliberate rather
+  -- than arbitrary: Pawl.Engine.Script.declining routes every unattended game
+  -- and Pawl.Support.identityAnswer most of the suite through this.
+  Prompt.ChooseClause _ _ _ _ branches neither _ -> if neither then Nothing else Just (NonEmpty.head branches)
   -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
   -- exactly where the resolving effect put it.
   Prompt.OfferedCast {} -> OptionalDecision.Declines

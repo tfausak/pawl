@@ -67,11 +67,14 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OrElse as OrElse
+import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
@@ -327,10 +330,10 @@ resolveSpellWith runSubgame oid = do
                               legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
                               boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                           gated <- gateHolds effectController oid (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
-                          taken <- if gated then exercises oid oid effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
+                          taken <- if gated then exercises oid oid effectController idx limbIdx boundHere legalHere (Just facing) Set.empty limb else pure False
                           (admitted, answers2) <-
                             if taken
-                              then payGateAdmits oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) answers limb
+                              then payGateAdmits oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) Set.empty answers limb
                               else pure (False, answers)
                           Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects limb))))
                           pure (answers2, recordTaken admitted limbIdx ran)
@@ -379,11 +382,11 @@ resolveSpellWith runSubgame oid = do
                         case facedVillainously picked cIdx clause of
                           Just (orElse, limbs) | gated -> do
                             (answers2, ran2) <- villainousPass oid effectController idx legalNowForMay orElse limbs performLimb (answers, ran)
-                            pure (answers2, Map.insert (NonEmpty.head limbs) Map.empty picked, ran2)
+                            pure (answers2, Map.insert (NonEmpty.head limbs) (False, Map.empty) picked, ran2)
                           _ -> do
-                            (announced, picked2) <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
+                            (announced, committed, picked2) <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay eligible (`lookup` indexedClauses) picked clause else pure (Just Set.empty, Set.empty, picked)
                             let branch = maybe True (not . Set.null) announced
-                            taken <- if branch then exercises oid oid effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
+                            taken <- if branch then exercises oid oid effectController idx cIdx boundNowForMay legalNowForMay announced committed clause else pure False
                             -- CR 118.12: then the cost paid on resolution, against the
                             -- START-of-resolution targets to match CR 608.2b's single
                             -- re-validation. Both maps are projected into THIS
@@ -401,6 +404,7 @@ resolveSpellWith runSubgame oid = do
                                         cIdx
                                         (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
                                         announced
+                                        committed
                                         answers
                                         clause
                                 else pure (False, answers)
@@ -805,8 +809,8 @@ resolveModesWith runSubgame stackId srcId modes = do
                       let legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
                           boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                       gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
-                      taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
-                      (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) answers limb else pure (False, answers)
+                      taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) Set.empty limb else pure False
+                      (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) Set.empty answers limb else pure (False, answers)
                       Monad.when admitted (asCostWhenNamed indexedClauses limbIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects limb))))
                       pure (answers2, recordTaken admitted limbIdx ran)
                in -- CR 608.2e's clause is what each gate covers. Run only when
@@ -859,14 +863,14 @@ resolveModesWith runSubgame stackId srcId modes = do
                         case facedVillainously picked cIdx clause of
                           Just (orElse, limbs) | gated -> do
                             (answers2, ran2) <- villainousPass stackId effectController idx legalNowForMay orElse limbs performLimb (answers, ran)
-                            pure (answers2, Map.insert (NonEmpty.head limbs) Map.empty picked, ran2)
+                            pure (answers2, Map.insert (NonEmpty.head limbs) (False, Map.empty) picked, ran2)
                           _ -> do
-                            (announced, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
+                            (announced, committed, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay eligible (`lookup` indexedClauses) picked clause else pure (Just Set.empty, Set.empty, picked)
                             let branch = maybe True (not . Set.null) announced
-                            taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
+                            taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced committed clause else pure False
                             -- CR 118.12: then the cost paid on resolution, against the
                             -- START-of-resolution slots.
-                            (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
+                            (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced committed answers clause else pure (False, answers)
                             Monad.when admitted (asCostWhenNamed indexedClauses cIdx (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause))))
                             pure (answers2, picked2, recordTaken admitted cIdx ran)
                     )
@@ -992,9 +996,21 @@ gateHolds controller source chosen bindings clause = case Clause.condition claus
 -- slot: both of those read bindings captured before this question was asked, so
 -- a slot bound here would be invisible to them.
 --
+-- CR 608.2d / 101.4: where EVERY branch of the pair carries a decline of its
+-- own, asked of the chooser (`declinesAlone`), the choice is among three
+-- outcomes -- either branch or neither -- and is made once, in APNAP order,
+-- before anything happens. So the prompt offers "neither", and the second set
+-- coming back is the seats this announcement COMMITTED: their branch's own "may"
+-- and cost are taken for them rather than asked again, which is what stops a
+-- player on Worms of the Earth announcing the damage and then backing out after
+-- seeing the next player sacrifice. Pawl.ResolveSpec's "CR 608.2d a seat that
+-- announced the damage is held to it" proves it. A pair answered with no prompt
+-- (one or no branch surviving) commits nobody, and the decline is asked where it
+-- was printed; the memo carries which.
+--
 -- The branches are offered in CR 608.2c's printed order and the answer is
 -- FILTERED back through them rather than trusted, the posture every choose-don't-
--- target prompt takes.
+-- target prompt takes; "neither" where it was not offered is read as the first.
 --
 -- CR 608.2d's other half is `eligible`: "the player can't choose an option
 -- that's illegal or impossible", so the pair is FILTERED before it is offered
@@ -1011,35 +1027,59 @@ gateHolds controller source chosen bindings clause = case Clause.condition claus
 -- sibling's own arrival is turned into the no-op above. Rule 608.2d's filter is
 -- therefore unconditional here, rule 701.55b's exemption from it living at that
 -- pass.
-chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> (ClauseIndex -> Game Bool) -> Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Maybe (Set PlayerId), Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex))
-chosenBranch resolving controller idx cIdx legal eligible picked clause = case Clause.orElse clause of
-  Nothing -> pure (Nothing, picked)
+chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> (ClauseIndex -> Game Bool) -> (ClauseIndex -> Maybe (Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))) -> Map.Map ClauseIndex (Bool, Map.Map PlayerId ClauseIndex) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Maybe (Set PlayerId), Set PlayerId, Map.Map ClauseIndex (Bool, Map.Map PlayerId ClauseIndex))
+chosenBranch resolving controller idx cIdx legal eligible limbOf picked clause = case Clause.orElse clause of
+  Nothing -> pure (Nothing, Set.empty, picked)
   Just orElse ->
     let branches = orElseLimbs cIdx orElse
         key = NonEmpty.head branches
-        won answers = Just (Map.keysSet (Map.filter (== cIdx) answers))
+        won answers = Map.keysSet (Map.filter (== cIdx) answers)
+        settled (committing, answers) = (Just (won answers), if committing then won answers else Set.empty)
+        neither = all (maybe False (declinesAlone (OrElse.chooser orElse)) . limbOf) branches
      in case Map.lookup key picked of
-          Just answers -> pure (won answers, picked)
+          Just memo -> let (announced, committed) = settled memo in pure (announced, committed, picked)
           Nothing -> do
             gs <- State.get
             offered <- Monad.filterM eligible (NonEmpty.toList branches)
-            answers <- case offered of
-              [] -> pure Map.empty
-              [forced] -> pure (Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))
+            memo <- case offered of
+              [] -> pure (False, Map.empty)
+              [forced] -> pure (False, Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))
               first : rest ->
                 let live = first NonEmpty.:| rest
+                    filtered answered = case answered of
+                      Just branch | elem branch live -> Just branch
+                      Nothing | neither -> Nothing
+                      _ -> Just first
                  in -- CR 101.4b: each chooser is told the branches the choosers
                     -- before them announced.
-                    fmap (Map.fromList . Foldable.toList) $
+                    fmap (\made -> (neither, Map.fromList [(chooser, branch) | (chooser, Just branch) <- Foldable.toList made])) $
                       Monad.foldM
                         ( \made chooser -> do
                             gs1 <- State.get
-                            answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live made)
-                            pure (made Seq.|> (chooser, if elem answered live then answered else first))
+                            answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live neither made)
+                            pure (made Seq.|> (chooser, filtered answered))
                         )
                         Seq.empty
                         (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
-            pure (won answers, Map.insert key answers picked)
+            let (announced, committed) = settled memo
+            pure (announced, committed, Map.insert key memo picked)
+
+-- CR 603.5 / 118.12: does this branch of a CR 608.2d pair carry a decline of its
+-- own, put to the pair's chooser? A "may" asked of that reference, or a cost
+-- paid on resolution that the same reference may refuse and that gates the
+-- branch on its being paid. A cost another clause offers (PayGate.offeredAt) is
+-- not this branch's to decline.
+declinesAlone :: PlayerRef.PlayerRef -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+declinesAlone chooser limb = case Clause.optionality limb of
+  Optionality.Optional asker | asker == chooser -> True
+  _ -> case Clause.payGate limb of
+    Just gate ->
+      PayGate.payer gate == chooser
+        && Maybe.isNothing (PayGate.offeredAt gate)
+        && case (PayGate.obligation gate, PayGate.branch gate) of
+          (PayObligation.Optional, PayBranch.IfPaid) -> True
+          _ -> False
+    Nothing -> False
 
 -- CR 608.2d's pair, in CR 608.2c's printed order. A clause naming ITSELF is one
 -- limb rather than two -- Pawl.CardSpec's cardBranchesAreAsymmetric is what
@@ -1054,7 +1094,7 @@ orElseLimbs cIdx orElse =
 -- been performed? An empty answer map filed under the pair's ordinal is what
 -- `villainousPass` leaves behind, so the sibling's arrival answers Nothing here
 -- and falls through to chosenBranch's memo, which skips it.
-facedVillainously :: Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex) -> ClauseIndex -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe (OrElse.OrElse, NonEmpty.NonEmpty ClauseIndex)
+facedVillainously :: Map.Map ClauseIndex (Bool, Map.Map PlayerId ClauseIndex) -> ClauseIndex -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe (OrElse.OrElse, NonEmpty.NonEmpty ClauseIndex)
 facedVillainously picked cIdx clause = case Clause.orElse clause of
   Just orElse
     | OrElse.villainous orElse,
@@ -1125,11 +1165,14 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
   where
     face chooser (acc, made) = do
       gs1 <- State.get
-      answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs made)
-      let chosen = if elem answered limbs then answered else NonEmpty.head limbs
+      -- No "neither": CR 701.55a's chooser performs one option or the other.
+      answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs False made)
+      let chosen = case answered of
+            Just branch | elem branch limbs -> branch
+            _ -> NonEmpty.head limbs
       State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
       performed <- performLimb chosen (Set.singleton chooser) acc
-      pure (performed, made Seq.|> (chooser, chosen))
+      pure (performed, made Seq.|> (chooser, Just chosen))
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
@@ -1161,6 +1204,9 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
 -- "sacrifice two lands of their choice or have this enchantment deal 5 damage to
 -- that player".
 --
+-- `committed` is the seats whose announcement of a three-outcome pair already
+-- answered this "may" (chosenBranch); they accept without being asked again.
+--
 -- `bound` is every slot the live bindings hold and `legal` is CR 608.2b's
 -- surviving recipients, both under the names this mode instance prints (CR
 -- 700.2d); an inert clause is not asked about at all -- see clauseIsInert.
@@ -1176,8 +1222,8 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
 -- handed the controller the free card its "If you do" hangs on -- Pawl.ResolveSpec's
 -- "CR 608.2d Tweeze's discard is not offered with an empty hand" proves it.
 -- Declined silently, so recordTaken stays False and the draw is skipped.
-exercises :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
-exercises resolving source controller idx cIdx bound legal announced clause = do
+exercises :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
+exercises resolving source controller idx cIdx bound legal announced committed clause = do
   impossible <- State.gets (\gs -> clauseIsImpossible resolving source controller legal gs clause)
   case Clause.optionality clause of
     Optionality.Mandatory -> pure True
@@ -1190,7 +1236,10 @@ exercises resolving source controller idx cIdx bound legal announced clause = do
             Monad.foldM
               ( \made pid -> do
                   gs1 <- State.get
-                  decision <- Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx made)
+                  decision <-
+                    if Set.member pid committed
+                      then pure OptionalDecision.Exercises
+                      else Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx made)
                   pure (made Seq.|> (pid, decision))
               )
               Seq.empty
@@ -1281,20 +1330,23 @@ clauseIsInert bound legal clause =
 -- The cost is paid AGAINST `source` rather than the resolving stack object (CR
 -- 113.7a); the two are the same object for a spell.
 --
+-- `committed` is `exercises`' set: a seat whose announcement already took this
+-- branch pays if it can (CR 118.3) and is not asked again.
+--
 -- ONE offer per payment (CR 118.12): a second clause hanging off the same cost
 -- names the first (PayGate.offeredAt) and reuses the recorded answers, `answers`
 -- being keyed on the offering clause's ordinal. A clause naming an offer never
 -- made falls through and makes it, the named clause having failed its own CR
 -- 701.46a "if" or CR 603.5 "may".
-payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
-payGateAdmits resolving source controller idx cIdx legal announced answers clause = case Clause.payGate clause of
+payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> Set PlayerId -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
+payGateAdmits resolving source controller idx cIdx legal announced committed answers clause = case Clause.payGate clause of
   Nothing -> pure (True, answers)
   Just gate -> do
     let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
     (asked, answers2) <- case Map.lookup offerAt answers of
       Just recorded -> pure (recorded, answers)
       Nothing -> do
-        recorded <- payGatePaid resolving source controller idx cIdx legal announced gate
+        recorded <- payGatePaid resolving source controller idx cIdx legal announced committed gate
         pure (recorded, Map.insert offerAt recorded answers)
     let selected = branchSelects (PayGate.branch gate) asked
     State.modify' (bindPlayersSlot resolving Binding.gatePlayers selected)

@@ -845,8 +845,10 @@ data Prompt r where
   -- one seat at a time, its answer performed before the next seat is asked
   -- (Pawl.Engine.Resolve.villainousPass). Not ChooseModes, which CR 700.2 fixes
   -- at cast. The Seq is the branches the choosers before this one already
-  -- announced (CR 101.4b).
-  ChooseClause :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> NonEmpty.NonEmpty ClauseIndex.ClauseIndex -> Seq.Seq (PlayerId.PlayerId, ClauseIndex.ClauseIndex) -> Prompt ClauseIndex.ClauseIndex
+  -- announced (CR 101.4b). The Bool offers "neither" (Nothing) where every
+  -- branch carries a decline of its own (CR 603.5, CR 118.12), so the one
+  -- answer settles all three outcomes (Pawl.Engine.Resolve.chosenBranch).
+  ChooseClause :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> NonEmpty.NonEmpty ClauseIndex.ClauseIndex -> Bool -> Seq.Seq (PlayerId.PlayerId, Maybe ClauseIndex.ClauseIndex) -> Prompt (Maybe ClauseIndex.ClauseIndex)
   -- | CR 608.2g: whether the player casts the card a resolving effect allows
   -- them to (CR 310.12b), the CardName being the half CR 712.11a puts on the
   -- stack; never elided, and not raised for CR 608.2g's "instructs".
