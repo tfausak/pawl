@@ -96,6 +96,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -1101,3 +1102,31 @@ spec s registry = Spec.describe s "Room" $ do
             Spec.assertEqWith s "CR 707.2: Copy Enchantment's copy of that copy has changeling too" (fmap (`changeling` recopied) (newPermanent resolved recopied)) [True]
           other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5b over a STORED copy effect: Mirrorweave's "each other creature
+  -- becomes a copy of target nonlegendary creature until end of turn" keeps its
+  -- copiable values in a row rather than a stamp (CR 611.2a), and the creature
+  -- it covers has the copied Room's halves all the same.
+  --
+  -- Opalescence makes the open Room a 2/2 creature Mirrorweave can target. The
+  -- Hill Giant becomes a copy of it with neither of ITS doors unlocked (CR
+  -- 709.5c), so it has no name and mana value 0, and Opalescence makes it a 0/0
+  -- that its +1/+1 counter (CR 122.1a, no copiable value) keeps on the
+  -- battlefield as a 1/1. The Hill Giant's own card would leave it a named 4/4.
+  Spec.it s "CR 709.5b a creature Mirrorweave makes a copy of an animated Room has its halves" $ do
+    (_, _, gs) <- setUp s registry
+    room <- S.printingOf s registry "Roaring Furnace"
+    opalescence <- S.printingOf s registry "Opalescence"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    let (_, withOpalescence) = S.addPermanent opalescence S.alice gs
+        (giant, withGiant) = S.addPermanent hillGiant S.alice withOpalescence
+        countered = S.addCounter CounterKind.PlusOnePlusOne 1 giant withGiant
+        (roomPerm, withRoom) = S.addPermanent room S.alice countered
+        opened = withRoom {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = Set.singleton furnaceName}) roomPerm (GameState.objects withRoom)}
+        (staged, weaveId) = S.handOne mirrorweave opened
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just roomPerm) . Recipient.objectOf) . snd) sets
+          _ -> S.identityAnswer p
+        woven = S.runPure answer staged (S.cast S.alice weaveId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the Hill Giant is a nameless 1/1 Room" (Projection.namesOf giant woven, S.powerToughnessOf giant woven) (Set.empty, Just (1, 1))
