@@ -1058,7 +1058,10 @@ settleArrivals depthOf zone placement targets =
         -- the position it is handed.
         _ -> pure (fmap (\oid -> (oid, (LibraryPosition.defaultValue, 0))) targets)
 
--- CR 801.10 with CR 800.4a: Game.reachableBy in APNAP order (CR 608.2f).
+-- Game.apnapOrder cut to Game.reachableBy: a departed seat is no longer a player
+-- (CR 102.1), and CR 801.10 keeps an effect off one outside its controller's
+-- range. Pawl.RangeOfInfluenceSpec's and Pawl.DepartureSpec's Fanatic of Mogis
+-- prove both.
 reachableInApnap :: PlayerId -> GameState -> [PlayerId]
 reachableInApnap controller gs =
   let reachable = Game.reachableBy controller gs
@@ -1089,9 +1092,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachAbility _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachOnStack _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
-  -- Game.apnapOrder, cut to Game.reachableBy: CR 800.4a's departed seats and
-  -- CR 801.10's out-of-range ones are not affected. Pawl.RangeOfInfluenceSpec's
-  -- Fanatic of Mogis proves it.
+  -- reachableInApnap.
   ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (reachableInApnap controller gs)
   -- CR 120.3a again, over CR 102.1's opponents alone -- the arm above filtered
   -- by PlayerRelation.holds against CR 109.5's "you", which is the resolving

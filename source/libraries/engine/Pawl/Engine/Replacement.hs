@@ -3005,7 +3005,7 @@ recipientInRange gs you recipient = case (Recipient.objectOf recipient, Recipien
 -- The rule's last sentence, a player destination who has left the game, is
 -- Game.stillPlaying. Proven by Pawl.DamageReplacementSpec's "CR 614.9 the
 -- destination left the game". Its "from" half needs no guard: no damage is dealt
--- to a departed player (CR 800.4a), so none is redirected away from one --
+-- to a departed player (CR 102.1), so none is redirected away from one --
 -- Pawl.DepartureSpec's Fanatic of Mogis proves it for each opponent.
 --
 -- CR 801.13a: a destination outside the redirecting effect's controller's
