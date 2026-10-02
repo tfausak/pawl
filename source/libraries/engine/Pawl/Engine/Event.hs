@@ -658,12 +658,8 @@ lifePayable pid gs =
 payLife :: PlayerId -> Natural -> Game ()
 payLife pid n = do
   settled <- resolveLifeLoss LifeLossCause.ByPayment pid n
-  Monad.when (settled /= 0) . State.modify' $ \gs ->
-    recordEvent (GameEvent.LifeLost (LifeChange.MkLifeChange pid settled)) $
-      gs
-        { GameState.players =
-            Map.adjust (\p -> p {Player.life = Player.life p - toInteger settled}) pid (GameState.players gs)
-        }
+  Monad.when (settled /= 0) . State.modify' $
+    recordEvent (GameEvent.LifeLost (LifeChange.MkLifeChange pid settled)) . Game.adjustLife pid (negate (toInteger settled))
 
 -- CR 110.5b: stamp the tapped status onto an entering permanent, the write shared
 -- by EntryRewrite.Tapped (CR 614.1d), by the declining half of both
@@ -8540,7 +8536,8 @@ forgetObject gs oid = case Game.lookupObject oid gs of
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
 -- event of the matching sign. The write LoseLife, GainLife and
--- ExchangeLifeTotals share, so a life total moves in exactly one place.
+-- ExchangeLifeTotals share; the total itself moves in Game.adjustLife, which
+-- every life write goes through for CR 810.9's shared team total.
 --
 -- In this module rather than beside those opcodes because a REPLACEMENT gains
 -- life too -- Words of Worship's DrawRewrite.GainLife -- and Pawl.Engine.Resolve
@@ -8556,7 +8553,7 @@ changeLife pid delta =
           then GameEvent.LifeGained (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating delta))
           else GameEvent.LifeLost (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating (negate delta)))
       )
-      . (\g -> g {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p + delta}) pid (GameState.players g)})
+      . Game.adjustLife pid delta
 
 -- CR 121.1, one card at a time per CR 121.2, with CR 614's say first (CR 121.6).
 -- An empty library records the failed draw, which CR 704.5b makes a loss at the

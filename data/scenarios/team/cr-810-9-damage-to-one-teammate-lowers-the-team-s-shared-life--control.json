@@ -1,0 +1,88 @@
+{
+  "description": "CR 810.9 damage to one teammate lowers the team's shared life total (control)",
+  "note": "The same Bolt at bob with each player keeping their own life total: bob is on 17 and alice stays on 20.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "alice",
+        "life": 20
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 17
+      }
+    },
+    {
+      "Life": {
+        "player": "carol",
+        "life": 20
+      }
+    },
+    {
+      "Life": {
+        "player": "dave",
+        "life": 20
+      }
+    }
+  ]
+}

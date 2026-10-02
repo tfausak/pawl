@@ -33,6 +33,9 @@ data ScenarioFailure
     MkTokenOffBattlefield CardName.CardName
   | -- | An emperor seat on no team, or a second emperor on one team (CR 809.2).
     MkIllegalEmperor Label.Label
+  | -- | A seat whose life differs from a teammate's on a board whose teams share
+    -- a life total (CR 810.4).
+    MkUnsharedLife Label.Label
   | -- | The monarch names no seat.
     MkUnknownMonarch Label.Label
   | -- | The reference named no live object, with whether the board did label

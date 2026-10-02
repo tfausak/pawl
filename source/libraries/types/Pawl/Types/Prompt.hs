@@ -246,8 +246,8 @@ data Prompt r where
   -- chosen player maps to the player whose previous total they take, a
   -- permutation Pawl.Engine.Resolve checks. Elided below two candidates.
   --
-  -- Not implemented: CR 810.9f's "not more than one member of each team", which
-  -- is a Two-Headed Giant rule (#2849).
+  -- Not implemented: CR 810.9f's "not more than one member of each team"
+  -- (#4493).
   ChooseRedistribution :: Decider.Decider -> PlayerId.PlayerId -> [(PlayerId.PlayerId, Integer)] -> Prompt (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   -- | CR 701.54a: which creature becomes the tempted player's Ring-bearer;
   -- not raised for zero, where CR 701.54d still tempts.

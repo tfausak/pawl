@@ -1227,9 +1227,7 @@ processDamage events = do
   gains <-
     Monad.forM (lifelinkGains survivors) $ \(pid, total) -> do
       settled <- Event.resolveLifeGain pid total
-      Monad.when (settled > 0) . State.modify' $ \gs ->
-        let gain player = player {Player.life = Player.life player + toInteger settled}
-         in gs {GameState.players = Map.adjust gain pid (GameState.players gs)}
+      Monad.when (settled > 0) (State.modify' (Game.adjustLife pid (toInteger settled)))
       pure (pid, settled)
   -- CR 120.4c: "damage that's been dealt is processed into its results, as
   -- modified by replacement effects that interact with those results (such as
@@ -1273,9 +1271,7 @@ processDamage events = do
     Monad.forM survivors $ \ev -> case DamageEvent.target ev of
       Recipient.ToPlayer pid | not (DamageEvent.dealtByInfect ev) -> do
         n <- Event.resolveLifeLoss LifeLossCause.ByDamage pid (DamageEvent.amount ev)
-        Monad.when (n > 0) . State.modify' $ \gs ->
-          let drain player = player {Player.life = Player.life player - toInteger n}
-           in gs {GameState.players = Map.adjust drain pid (GameState.players gs)}
+        Monad.when (n > 0) (State.modify' (Game.adjustLife pid (negate (toInteger n))))
         pure n
       _ -> pure 0
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by

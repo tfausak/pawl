@@ -3286,6 +3286,9 @@ losesLifeForUnspentMana pid gs =
 --
 -- Read LIVE through `applying`, so a Giant Cindermaw that left the battlefield
 -- stops restricting anybody (CR 604.2).
+--
+-- CR 810.9g: asked of every player sharing this one's life total
+-- (Game.lifeSharers), since a teammate who can't gain life stops the team.
 prohibitsGainingLife :: PlayerId -> GameState -> Bool
 prohibitsGainingLife pid gs =
   let prohibits effect = case effect of
@@ -3337,7 +3340,7 @@ prohibitsGainingLife pid gs =
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantLoseLife -> False
-   in any (prohibits . snd) (applying pid gs)
+   in any (\member -> any (prohibits . snd) (applying member gs)) (Game.lifeSharers pid gs)
 
 -- CR 119.8: does an effect say this player can't lose life? prohibitsGainingLife
 -- one direction over, read by Pawl.Engine.Event.resolveLifeLoss ahead of its
@@ -3348,6 +3351,9 @@ prohibitsGainingLife pid gs =
 -- that player to lose life, and it is the RESULT that this stops. The damage is
 -- still dealt, so a lifelink gain, a wither counter and an infect poison counter
 -- all still happen -- Pawl.DamageSpec's Platinum Emperion case is the proof.
+--
+-- CR 810.9h: asked of every player sharing this one's life total, the
+-- prohibitsGainingLife reading; data/scenarios/team/cr-810-9h-* prove it.
 prohibitsLosingLife :: PlayerId -> GameState -> Bool
 prohibitsLosingLife pid gs =
   let prohibits effect = case effect of
@@ -3401,7 +3407,7 @@ prohibitsLosingLife pid gs =
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
-   in any (prohibits . snd) (applying pid gs)
+   in any (\member -> any (prohibits . snd) (applying member gs)) (Game.lifeSharers pid gs)
 
 -- CR 609.4b / 613.11: the clauses saying what this player may spend their mana
 -- as though it were (Celestial Dawn). The typed question Pawl.Engine.Mana asks

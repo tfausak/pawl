@@ -104,6 +104,31 @@ startingLife settings seats commander modifier =
         | otherwise = 20
    in modifier + base
 
+-- CR 810.4 / 904.13b: this player's starting life total -- their team's shared
+-- one (teamStartingLife) when GameSettings.sharedTeamLife is on and they are on
+-- a team, startingLife's otherwise. Every member is written the team's total,
+-- which is what Game.adjustLife keeps them at.
+--
+-- The modifier does not reach a shared total: CR 904.13b's 60 is the
+-- archenemy's whole number, Archenemy.lifeBonus included, and no vanguard card
+-- comes to a Two-Headed Giant or Archenemy Commander game.
+startingLifeOf :: (Foldable f) => GameSettings.GameSettings -> Int -> PlayerId -> f a -> Integer -> Integer
+startingLifeOf settings seats pid commander modifier =
+  let teams = Teams.unwrap (GameSettings.teams settings)
+   in case Map.lookup pid teams of
+        Just team | GameSettings.sharedTeamLife settings -> teamStartingLife commander (length (filter (== team) (Map.elems teams)))
+        _ -> startingLife settings seats commander modifier
+
+-- CR 810.4 / 810.11: a Two-Headed Giant team starts at 30, and 15 more for each
+-- member beyond the second. CR 904.13b: an Archenemy Commander team, the
+-- archenemy's included, starts at 60 whatever its size. A designated commander
+-- tells the two apart, startingLife's posture: no other game the CR describes
+-- shares a team life total.
+teamStartingLife :: (Foldable f) => f a -> Int -> Integer
+teamStartingLife commander members
+  | not (null commander) = 60
+  | otherwise = 30 + 15 * toInteger (max 0 (members - 2))
+
 -- How many cards this deck holds, CR 903.5a's commander included: rule 903.5a
 -- counts the deck at exactly 100 cards "including its commander", so the card
 -- that starts in the command zone is still one of the deck's cards. CR 702.124b
@@ -136,7 +161,7 @@ emptyGame order =
       --
       -- CR 102.4 / CR 808.1: and a game not played between teams, which every
       -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
       newPlayer pid =
         ( pid,
           Player.MkPlayer
@@ -422,9 +447,9 @@ createDeck pid deck = do
   conspiracyIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.conspiracies deck))
   Monad.forM_ conspiracyIds $ \(printingId, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createInCommandZone pid printingId)
-  -- CR 903.7 / CR 103.4 / CR 103.4d / CR 902.4: the starting life total, which is
-  -- the deck's business -- and the settings' and the seat count's and the
-  -- vanguard's -- and so cannot be settled by emptyGame above.
+  -- CR 903.7 / CR 103.4 / CR 103.4d / CR 902.4 / CR 810.4: the starting life
+  -- total, which is the deck's business -- and the settings' and the seat
+  -- count's and the vanguard's -- and so cannot be settled by emptyGame above.
   State.modify' $ \gs ->
     gs
       { GameState.players =
@@ -435,7 +460,7 @@ createDeck pid deck = do
           -- CR 400.11a: the sideboard is recorded on the player for the same
           -- reason and no object is minted for it either. CR 400.11c is what
           -- keeps anything else from reaching these until a card brings one in.
-          Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck) (Vanguard.lifeModifierOf pid gs + (if Map.null (Deck.schemes deck) then 0 else Archenemy.lifeBonus)), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLifeOf (GameState.settings gs) (length (GameState.turnOrder gs)) pid (Deck.commander deck) (Vanguard.lifeModifierOf pid gs + (if Map.null (Deck.schemes deck) then 0 else Archenemy.lifeBonus)), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
   -- CR 717.2: the Attraction deck begins in the command zone, and is neither in
   -- the library nor, below, in the starting deck.
@@ -826,7 +851,7 @@ resetPlayers settings seats lifeModifier players =
               -- 727.2 and CR 729.2 rebuild the game from the cards, and CR 313.2
               -- forbids the vanguard card to leave the command zone, so the card
               -- the modifier is read off is still there to be read.
-              Player.life = startingLife settings seats (Player.commander player) (lifeModifier pid),
+              Player.life = startingLifeOf settings seats pid (Player.commander player) (lifeModifier pid),
               Player.counters = Map.empty,
               -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
               -- it. The command zone this line's callers empty is where the

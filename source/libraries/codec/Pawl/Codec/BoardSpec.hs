@@ -29,6 +29,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
           Board.Type.brawl = False,
           Board.Type.sharedTeamTurns = False,
+          Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"} "
@@ -45,6 +46,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
           Board.Type.brawl = False,
           Board.Type.sharedTeamTurns = False,
+          Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"monarch\":\"bob\"} "
@@ -61,6 +63,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.attackOption = Just AttackOption.Type.Leftward,
           Board.Type.brawl = False,
           Board.Type.sharedTeamTurns = False,
+          Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"attackOption\":\"Leftward\"} "
@@ -76,6 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.attackOption = Nothing,
           Board.Type.brawl = False,
           Board.Type.sharedTeamTurns = False,
+          Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"attackOption\":null} "
@@ -92,9 +96,10 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
           Board.Type.brawl = True,
           Board.Type.sharedTeamTurns = True,
+          Board.Type.sharedTeamLife = True,
           Board.Type.deployCreatures = True
         }
-      " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"brawl\":true,\"sharedTeamTurns\":true,\"deployCreatures\":true} "
+      " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"brawl\":true,\"sharedTeamTurns\":true,\"sharedTeamLife\":true,\"deployCreatures\":true} "
   Spec.it s "a later turn" $
     Common.assertCodec
       s
@@ -108,6 +113,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
           Board.Type.brawl = False,
           Board.Type.sharedTeamTurns = False,
+          Board.Type.sharedTeamLife = False,
           Board.Type.deployCreatures = False
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"bob\",\"turn\":2,\"step\":\"PrecombatMain\"} "

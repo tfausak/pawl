@@ -25,6 +25,7 @@ codec = Fields.object $ do
   attackOption <- Fields.required "attackOption" (Common.maybe AttackOption.codec) GameSettings.attackOption
   teams <- Fields.required "teams" Teams.codec GameSettings.teams
   sharedTeamTurns <- Fields.required "sharedTeamTurns" Common.boolean GameSettings.sharedTeamTurns
+  sharedTeamLife <- Fields.required "sharedTeamLife" Common.boolean GameSettings.sharedTeamLife
   rangeOfInfluence <- Fields.required "rangeOfInfluence" RangeOfInfluence.codec GameSettings.rangeOfInfluence
   deployCreatures <- Fields.required "deployCreatures" Common.boolean GameSettings.deployCreatures
   emperors <- Fields.required "emperors" Emperors.codec GameSettings.emperors
@@ -34,6 +35,7 @@ codec = Fields.object $ do
         GameSettings.attackOption = attackOption,
         GameSettings.teams = teams,
         GameSettings.sharedTeamTurns = sharedTeamTurns,
+        GameSettings.sharedTeamLife = sharedTeamLife,
         GameSettings.rangeOfInfluence = rangeOfInfluence,
         GameSettings.deployCreatures = deployCreatures,
         GameSettings.emperors = emperors
