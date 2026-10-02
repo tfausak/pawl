@@ -2603,8 +2603,8 @@ apply batch candidate event =
             -- CR 102.1 makes a player one of the people IN the game, and CR
             -- 104.3a lets one leave at any time -- so the offer is
             -- Game.stillPlaying and not GameState.turnOrder, which keeps a
-            -- departed seat.
-            let opponents = Game.opponentsOf controller gs
+            -- departed seat -- cut to the controller's range (CR 801.5a).
+            let opponents = Game.opponentsInReach controller gs
             opponent <- case opponents of
               -- CR 102.2: a two-player game leaves exactly one opponent, and
               -- one option is not a choice. The empty case is a game whose
@@ -3312,10 +3312,10 @@ apply batch candidate event =
           -- Unreachable, and defensive for the reason riot's arm gives above.
           Nothing -> pure (Just event)
           Just controller -> do
-            -- CR 102.1's seats still in the game, Game.opponentsOf's own read --
-            -- a player who has left (CR 104.3a) is nobody's opponent and cannot be
-            -- offered the choice.
-            chosen <- case Game.opponentsOf controller gs of
+            -- CR 102.1's seats still in the game, cut to the controller's range
+            -- (CR 801.5a) -- a player who has left (CR 104.3a) is nobody's
+            -- opponent and cannot be offered the choice.
+            chosen <- case Game.opponentsInReach controller gs of
               -- No opponent left to ask, a board CR 104.2a has already ended the
               -- game on. Nobody decides, so tribute is not paid -- the state rule
               -- 702.104b's condition reads as true.

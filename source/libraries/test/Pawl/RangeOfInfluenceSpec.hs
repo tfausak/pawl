@@ -16,8 +16,9 @@
 -- redirectDestination (CR 801.13), Pawl.Engine.Resolve.Slots'
 -- playerRefPlayers, zoneScopePlayers and battlefieldMatching,
 -- Pawl.Engine.Resolve.Effect's objectRefRecipients, Pawl.Engine.Count's
--- playersFor and the choice offers Game.reachableBy feeds (CR 801.5a, 801.10,
--- 801.11), and Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
+-- playersFor and the choice offers Game.reachableBy, Game.opponentsInReach and
+-- Game.inRangeOf feed (CR 801.5a, 801.10, 801.11), and
+-- Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
 -- 801.15), and Pawl.Engine.Engine's checkMandatoryLoop (CR 801.16); and CR
 -- 801.2c's turn-start seating, Pawl.Types.GameState's departedThisTurn.
 --
@@ -468,6 +469,38 @@ spec s registry = Spec.describe s "Range of influence" $ do
         offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
     Spec.assertEqWith s "CR 801.5a at range 1 carol is not offered" (offered (S.withRange 1 board)) [[S.bob, S.dave]]
     Spec.assertEqWith s "at an unlimited range she is" (offered board) [[S.bob, S.carol, S.dave]]
+
+  -- CR 801.5a for a resolving "choose a player": alice's Stadium Vendors ("When
+  -- this creature enters, choose a player. That player adds two mana ...").
+  Spec.it s "CR 801.5a a resolving choice of player offers only players within the controller's range" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vendors <- S.printingOf s registry "Stadium Vendors"
+    let (spellId, board) = S.addHandCard vendors S.alice (S.landsFor mountain S.alice 4 S.fourPlayerGame)
+        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        recording p = case p of
+          Prompt.ChoosePlayer _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
+          _ -> pure (S.identityAnswer p)
+        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
+    Spec.assertEqWith s "CR 801.5a at range 1 the trigger does not offer carol" (offered (S.withRange 1 board)) [[S.alice, S.bob, S.dave]]
+    Spec.assertEqWith s "at an unlimited range it does" (offered board) [[S.alice, S.bob, S.carol, S.dave]]
+
+  -- CR 801.5a for the as-enters opponent choices: Snake of the Golden Grove's
+  -- tribute (CR 702.104a) and Null Chamber's naming opponent.
+  Spec.it s "CR 801.5a tribute and a naming opponent offer only opponents within the controller's range" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    snake <- S.printingOf s registry "Snake of the Golden Grove"
+    chamber <- S.printingOf s registry "Null Chamber"
+    let recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        recording p = case p of
+          Prompt.ChooseOpponent _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
+          _ -> pure (S.identityAnswer p)
+        offeredFor card land lands =
+          let (spellId, board) = S.addHandCard card S.alice (S.landsFor land S.alice lands S.fourPlayerGame)
+              offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
+           in (offered (S.withRange 1 board), offered board)
+    Spec.assertEqWith s "CR 801.5a at range 1 tribute does not offer carol, and does at an unlimited range" (offeredFor snake forest 5) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
+    Spec.assertEqWith s "CR 801.5a at range 1 Null Chamber does not offer carol, and does at an unlimited range" (offeredFor chamber plains 4) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
 
   -- CR 801.10 for proliferate: alice's Steady Progress ("Proliferate. Draw a
   -- card.") while bob, one seat away, and carol, two seats away, each have a
