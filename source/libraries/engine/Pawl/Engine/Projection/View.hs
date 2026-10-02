@@ -1097,9 +1097,8 @@ applyCopyException this own snapshot exception = case exception of
     -- spell costs`, no hit).
     GrantedAbility.SelfCostReduction reduction ->
       snapshot {PC.costReductions = PC.costReductions snapshot <> [reduction]}
-    -- Into the COPIABLE list, the Static arm's reason. A regression fence: no
-    -- copy exception grants one (MTGJSON 2026-08-23, `except ... has "You may
-    -- pay`, no hit).
+    -- Into the COPIABLE list, the Static arm's reason. Unproven: no card in
+    -- data/cards/ writes a copy exception granting one.
     GrantedAbility.SelfAlternativeCost alternative ->
       snapshot {PC.alternativeCosts = PC.alternativeCosts snapshot <> [alternative]}
   -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
