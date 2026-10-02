@@ -28,7 +28,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, noSubgame, payGatePaid, targetSlotsOf)
+import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, gateAffordable, noSubgame, payGatePaid, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -384,7 +384,7 @@ resolveSpellWith runSubgame oid = do
                             (answers2, ran2) <- villainousPass oid effectController idx legalNowForMay orElse limbs performLimb (answers, ran)
                             pure (answers2, Map.insert (NonEmpty.head limbs) (False, Map.empty) picked, ran2)
                           _ -> do
-                            (announced, committed, picked2) <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay eligible (`lookup` indexedClauses) picked clause else pure (Just Set.empty, Set.empty, picked)
+                            (announced, committed, picked2) <- if gated then chosenBranch oid oid effectController idx cIdx legalNowForMay eligible (`lookup` indexedClauses) picked clause else pure (Just Set.empty, Set.empty, picked)
                             let branch = maybe True (not . Set.null) announced
                             taken <- if branch then exercises oid oid effectController idx cIdx boundNowForMay legalNowForMay announced committed clause else pure False
                             -- CR 118.12: then the cost paid on resolution, against the
@@ -865,7 +865,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                             (answers2, ran2) <- villainousPass stackId effectController idx legalNowForMay orElse limbs performLimb (answers, ran)
                             pure (answers2, Map.insert (NonEmpty.head limbs) (False, Map.empty) picked, ran2)
                           _ -> do
-                            (announced, committed, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay eligible (`lookup` indexedClauses) picked clause else pure (Just Set.empty, Set.empty, picked)
+                            (announced, committed, picked2) <- if gated then chosenBranch stackId srcId effectController idx cIdx legalNowForMay eligible (`lookup` indexedClauses) picked clause else pure (Just Set.empty, Set.empty, picked)
                             let branch = maybe True (not . Set.null) announced
                             taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced committed clause else pure False
                             -- CR 118.12: then the cost paid on resolution, against the
@@ -1010,7 +1010,14 @@ gateHolds controller source chosen bindings clause = case Clause.condition claus
 --
 -- The branches are offered in CR 608.2c's printed order and the answer is
 -- FILTERED back through them rather than trusted, the posture every choose-don't-
--- target prompt takes; "neither" where it was not offered is read as the first.
+-- target prompt takes: an answer not on offer reads as "neither" where that is
+-- offered, and as the first branch otherwise.
+--
+-- CR 608.2d's impossibility is also asked PER SEAT, where a branch happens only
+-- if that seat pays its cost (`gatesOnPayment`): a seat that cannot pay it (CR
+-- 118.3) is not offered it, and a seat left one option and no "neither" is
+-- forced with no prompt. Pawl.ResolveSpec's "CR 608.2d a seat who cannot pay
+-- the sacrifice is offered only the damage" proves it.
 --
 -- CR 608.2d's other half is `eligible`: "the player can't choose an option
 -- that's illegal or impossible", so the pair is FILTERED before it is offered
@@ -1027,8 +1034,8 @@ gateHolds controller source chosen bindings clause = case Clause.condition claus
 -- sibling's own arrival is turned into the no-op above. Rule 608.2d's filter is
 -- therefore unconditional here, rule 701.55b's exemption from it living at that
 -- pass.
-chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> (ClauseIndex -> Game Bool) -> (ClauseIndex -> Maybe (Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))) -> Map.Map ClauseIndex (Bool, Map.Map PlayerId ClauseIndex) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Maybe (Set PlayerId), Set PlayerId, Map.Map ClauseIndex (Bool, Map.Map PlayerId ClauseIndex))
-chosenBranch resolving controller idx cIdx legal eligible limbOf picked clause = case Clause.orElse clause of
+chosenBranch :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> (ClauseIndex -> Game Bool) -> (ClauseIndex -> Maybe (Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))) -> Map.Map ClauseIndex (Bool, Map.Map PlayerId ClauseIndex) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Maybe (Set PlayerId), Set PlayerId, Map.Map ClauseIndex (Bool, Map.Map PlayerId ClauseIndex))
+chosenBranch resolving source controller idx cIdx legal eligible limbOf picked clause = case Clause.orElse clause of
   Nothing -> pure (Nothing, Set.empty, picked)
   Just orElse ->
     let branches = orElseLimbs cIdx orElse
@@ -1036,6 +1043,9 @@ chosenBranch resolving controller idx cIdx legal eligible limbOf picked clause =
         won answers = Map.keysSet (Map.filter (== cIdx) answers)
         settled (committing, answers) = (Just (won answers), if committing then won answers else Set.empty)
         neither = all (maybe False (declinesAlone (OrElse.chooser orElse)) . limbOf) branches
+        seatCanTake seat branch gsNow = case limbOf branch >>= Clause.payGate of
+          Just gate | gatesOnPayment (OrElse.chooser orElse) gate -> gateAffordable resolving source controller legal seat gate gsNow
+          _ -> True
      in case Map.lookup key picked of
           Just memo -> let (announced, committed) = settled memo in pure (announced, committed, picked)
           Nothing -> do
@@ -1044,23 +1054,28 @@ chosenBranch resolving controller idx cIdx legal eligible limbOf picked clause =
             memo <- case offered of
               [] -> pure (False, Map.empty)
               [forced] -> pure (False, Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))
-              first : rest ->
-                let live = first NonEmpty.:| rest
-                    filtered answered = case answered of
-                      Just branch | elem branch live -> Just branch
-                      Nothing | neither -> Nothing
-                      _ -> Just first
-                 in -- CR 101.4b: each chooser is told the branches the choosers
-                    -- before them announced.
-                    fmap (\made -> (neither, Map.fromList [(chooser, branch) | (chooser, Just branch) <- Foldable.toList made])) $
-                      Monad.foldM
-                        ( \made chooser -> do
-                            gs1 <- State.get
-                            answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live neither made)
-                            pure (made Seq.|> (chooser, filtered answered))
-                        )
-                        Seq.empty
-                        (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+              _ ->
+                -- CR 101.4b: each chooser is told the branches the choosers
+                -- before them announced.
+                fmap (\made -> (neither, Map.fromList [(chooser, branch) | (chooser, Just branch) <- Foldable.toList made])) $
+                  Monad.foldM
+                    ( \made chooser -> do
+                        gs1 <- State.get
+                        -- CR 608.2d per SEAT: a branch whose cost this seat
+                        -- cannot pay (CR 118.3) is not an option for them.
+                        mine <- Monad.filterM (State.gets . seatCanTake chooser) offered
+                        let fallback opts = if neither then Nothing else Just (NonEmpty.head opts)
+                            filtered opts answered = case answered of
+                              Just branch | elem branch opts -> Just branch
+                              _ -> fallback opts
+                        announcedHere <- case NonEmpty.nonEmpty mine of
+                          Nothing -> pure Nothing
+                          Just (only NonEmpty.:| []) | not neither -> pure (Just only)
+                          Just opts -> fmap (filtered opts) (Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx opts neither made))
+                        pure (made Seq.|> (chooser, announcedHere))
+                    )
+                    Seq.empty
+                    (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
             let (announced, committed) = settled memo
             pure (announced, committed, Map.insert key memo picked)
 
@@ -1073,13 +1088,19 @@ declinesAlone :: PlayerRef.PlayerRef -> Clause.Clause Card.Type.Card (GrantedAbi
 declinesAlone chooser limb = case Clause.optionality limb of
   Optionality.Optional asker | asker == chooser -> True
   _ -> case Clause.payGate limb of
-    Just gate ->
-      PayGate.payer gate == chooser
-        && Maybe.isNothing (PayGate.offeredAt gate)
-        && case (PayGate.obligation gate, PayGate.branch gate) of
-          (PayObligation.Optional, PayBranch.IfPaid) -> True
-          _ -> False
+    Just gate -> gatesOnPayment chooser gate && PayGate.obligation gate == PayObligation.Optional
     Nothing -> False
+
+-- CR 118.12: does this branch happen only for a seat that pays its own cost,
+-- offered here and to the pair's chooser? Then a seat that cannot pay it (CR
+-- 118.3) cannot choose the branch (CR 608.2d).
+gatesOnPayment :: PlayerRef.PlayerRef -> PayGate.PayGate -> Bool
+gatesOnPayment chooser gate =
+  PayGate.payer gate == chooser
+    && Maybe.isNothing (PayGate.offeredAt gate)
+    && case PayGate.branch gate of
+      PayBranch.IfPaid -> True
+      _ -> False
 
 -- CR 608.2d's pair, in CR 608.2c's printed order. A clause naming ITSELF is one
 -- limb rather than two -- Pawl.CardSpec's cardBranchesAreAsymmetric is what

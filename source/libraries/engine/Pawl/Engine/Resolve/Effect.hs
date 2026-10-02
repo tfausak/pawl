@@ -11616,6 +11616,15 @@ gateCostOf resolving source controller legal gate gs =
       slots = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf (slotBindings resolving gs))
    in (slots, cost)
 
+-- CR 118.3 / 800.4f for one seat, before any offer: could this payer pay this
+-- gate's cost against the board as it stands? Pawl.Engine.Resolve.chosenBranch
+-- asks it per announcing seat, CR 608.2d's "can't choose an option that's ...
+-- impossible" being a question about the player choosing.
+gateAffordable :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> GameState -> Bool
+gateAffordable resolving source controller legal payer gate gs =
+  let (slots, cost) = gateCostOf resolving source controller legal gate gs
+   in elem payer (Game.stillPlaying gs) && Cost.canPayReading slots PaymentSubject.ForNeither payer source cost gs
+
 -- CR 118.12a's question, before anything is paid: does this payer take the
 -- offer? CR 800.4f and CR 118.3 first, as payGatePaidBy says. `owed` is what the
 -- payer has already agreed to pay alongside it, so affordability is of the

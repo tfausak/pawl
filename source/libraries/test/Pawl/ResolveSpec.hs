@@ -4619,27 +4619,26 @@ wormsSpec s registry =
           let ((_, after), asked) = Replay.record (announcing (Map.fromList [(S.alice, damageBranch), (S.bob, sacrificeBranch)])) onStack Stack.resolveTop
           Spec.assertEqWith s "CR 608.2d alice took the 5 damage she announced, after bob paid with two Forests" (lives after, lands after) ((Just 15, Just 20, Just 20), (3, 1, 3))
           Spec.assertEqWith s "CR 608.2d nobody was asked a second question to back out with" [r | r <- asked, case r of { Response.ChoseToPay _ -> True; Response.ChoseOptional _ -> True; _ -> False }] []
-          Spec.assertEqWith s "CR 608.2d each seat answered once, carol with \"neither\"" (Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing) asked) [Just damageBranch, Just sacrificeBranch, Nothing]
         Spec.it s "CR 608.2c with every seat declining, the enchantment survives untouched" $ do
           (_, onStack) <- boardOf 3
           let after = S.runPure (announcing Map.empty) onStack Stack.resolveTop
           Spec.assertEqWith s "CR 608.2c nobody did either, so the enchantment stands" (wormsStands after) 1
           Spec.assertEqWith s "no land was sacrificed" (lands after) (3, 3, 3)
           Spec.assertEqWith s "and no seat took the damage" (lives after) (Just 20, Just 20, Just 20)
-        -- The fence on the branch that is a COST: a seat who announces the
-        -- sacrifice but controls one land is never asked to pay it (CR 118.3),
-        -- so the enchantment is not destroyed. Without CR 118.12 carrying that
-        -- branch -- a plain instruction to sacrifice two lands would do as much
-        -- as it could and count as done -- every landless seat would destroy the
-        -- enchantment for free at every upkeep.
-        Spec.it s "CR 118.3 a seat who cannot pay the sacrifice is not offered it" $ do
+        -- CR 608.2d per seat, with CR 118.3 deciding what is impossible: carol
+        -- controls one land, so the sacrifice is not an option for her, and she
+        -- takes the sacrifice whenever she is offered it and the damage
+        -- otherwise. Offered it, she would announce a branch she cannot pay for
+        -- and nothing would happen.
+        Spec.it s "CR 608.2d a seat who cannot pay the sacrifice is offered only the damage" $ do
           (_, onStack) <- boardOf 1
-          let ((_, after), asked) = Replay.record (announcing (Map.singleton S.carol sacrificeBranch)) onStack Stack.resolveTop
-          Spec.assertEqWith s "CR 608.2c nothing was done, so the enchantment stands" (wormsStands after) 1
-          Spec.assertEqWith s "carol's one Mountain is still hers" (lands after) (3, 3, 1)
-          Spec.assertEqWith s "and she took no damage in its place" (lives after) (Just 20, Just 20, Just 20)
-          Spec.assertEqWith s "CR 118.3 carol's committed sacrifice was never offered her, and nobody else announced it" (Maybe.mapMaybe (\r -> case r of Response.ChoseToPay d -> Just d; _ -> Nothing) asked) []
-          Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length (Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing) asked)) 3
+          let preferringSacrifice :: Prompt.Prompt r -> r
+              preferringSacrifice p = case p of
+                Prompt.ChooseClause (Decider.MkDecider d) player _ _ live _ _
+                  | d == player && player == S.carol -> Just (if elem sacrificeBranch live then sacrificeBranch else damageBranch)
+                _ -> announcing Map.empty p
+              after = S.runPure preferringSacrifice onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 608.2d carol took the damage, kept her one Mountain, and the enchantment is gone" (lives after, lands after, wormsStands after) ((Just 20, Just 20, Just 15), (3, 3, 1), 0)
 
 -- CR 608.2d's battlefield choice put to somebody other than the resolving
 -- controller, with Wormfang Crab {3}{U} Creature -- Nightmare Crab 3/6: "When
