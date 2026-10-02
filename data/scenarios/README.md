@@ -81,7 +81,7 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   again too, so turning a `refuse` into `do` proves nothing: a `refuse` is
   proven by changing the board until the move is legal. At priority, a refused
   `Cast`, `PlayLand` or `Activate` the engine does not offer is refused
-  already; one it offers is taken, its targets sent to the engine whether
+  already; one it offers is taken, its targets and `x` sent to the engine whether
   offered or not, and must leave the stack and the player's hand and
   battlefield as they were. At any other prompt, a refused move naming
   something the prompt did not offer (a summoning-sick attacker, a target no

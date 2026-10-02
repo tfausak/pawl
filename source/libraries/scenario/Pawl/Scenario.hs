@@ -987,12 +987,16 @@ answerActionChoice key verb choices asked =
                 updateChoices (\current -> current {Choices.modes = Nothing})
                 pure modes
           _ -> unexpected
-        Prompt.Type.ChooseX _ _ _ minimumX maximumX -> case Choices.x choices of
-          Just x
-            | minimumX <= x && x <= maximumX -> do
-                updateChoices (\current -> current {Choices.x = Nothing})
-                pure x
-          _ -> unexpected
+        Prompt.Type.ChooseX _ _ _ minimumX maximumX -> do
+          undoing <- State.gets reversing
+          case Choices.x choices of
+            Just x
+              -- A refused move's out-of-range X goes to the engine, whose
+              -- CR 601.2b bound is what reverses it.
+              | (minimumX <= x && x <= maximumX) || Maybe.isJust undoing -> do
+                  updateChoices (\current -> current {Choices.x = Nothing})
+                  pure x
+            _ -> unexpected
         Prompt.Type.ChooseCost _ _ _ candidates -> case Choices.cost choices of
           Just wanted -> case filter ((== Just wanted) . Cost.mana) candidates of
             [cost] -> do
