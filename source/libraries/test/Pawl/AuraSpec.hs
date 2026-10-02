@@ -2877,6 +2877,24 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
         standing gs = (S.onBattlefield blessingId gs, S.onBattlefield pacifismId gs, S.onBattlefield strengthId gs)
     Spec.assertEqWith s "CR 607.2d / 704.5m: the Blessing that chose black buries Unholy Strength alone" (standing (chose Color.Black)) (True, True, False)
     Spec.assertEqWith s "CR 702.16n: the one that chose white buries Pacifism and spares itself" (standing (chose Color.White)) (True, False, True)
+  -- CR 702.16p's "already attached" as CR 613.7e's timestamp: four white Auras
+  -- on alice's Piker, placed in stamp order -- alice's Pacifism, bob's, bob's
+  -- Blessing, bob's second Pacifism. Placed by hand, since CR 702.16p keeps the
+  -- last from becoming attached at all. bob's Blessing on alice's creature
+  -- separates "you control" from the host's controller.
+  Spec.it s "CR 702.16p whole cards: Benevolent Blessing spares only its controller's Auras attached before it" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    blessing <- S.printingOf s registry "Benevolent Blessing"
+    pacifism <- S.printingOf s registry "Pacifism"
+    let (host, base1) = S.addPermanent piker S.alice S.threePlayerGame
+        (alices, base2) = S.addPermanent pacifism S.alice base1
+        (earlier, base3) = S.addPermanent pacifism S.bob (S.attach alices host base2)
+        (blessingId, base4) = S.addPermanent blessing S.bob (S.attach earlier host base3)
+        (later, base5) = S.addPermanent pacifism S.bob (S.attach blessingId host base4)
+        wearing = S.attach later host base5
+        after = S.settleSba (wearing {GameState.objects = Map.adjust (\o -> o {Object.chosenColor = Just Color.White}) blessingId (GameState.objects wearing)})
+    Spec.assertEqWith s "CR 702.16p: the Blessing and bob's Pacifism attached before it stay, and the one attached after is buried" (S.onBattlefield blessingId after, S.onBattlefield earlier after, S.onBattlefield later after) (True, True, False)
+    Spec.assertBool s (not (S.onBattlefield alices after)) "and alice's Pacifism is buried, the spare being Auras the Blessing's controller controls"
   -- CR 702.16k's Aura sentence: "Such a permanent or player ... can't be
   -- enchanted by Auras that player controls." True-Name Nemesis, whose quality is
   -- Filter.OfChosenPlayer -- read by Pawl.Engine.AttachRestriction.barredBy

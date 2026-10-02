@@ -472,6 +472,11 @@ data Filter keyword
     -- an effect of the evaluation's SOURCE -- Animate Dead's "creature put onto
     -- the battlefield with this Aura". Read off GameState.enteredWith.
     EnteredWithSource
+  | -- | CR 702.16p / 613.7e: the candidate was attached to what the SOURCE
+    -- enchants when the source's effect started to apply -- Benevolent
+    -- Blessing's "already attached to it". Pawl.Engine.Keyword.grantedBy bakes it
+    -- into the ids it names; vacuously False anywhere else.
+    AttachedNoLaterThanSource
   | -- | CR 701.3a's last sentence: the candidate is one the SUBJECT of the
     -- surrounding attach could legally be attached to -- Aura Graft's "another
     -- permanent IT CAN ENCHANT". Answered by Pawl.Engine.Attach.attachmentFor, so

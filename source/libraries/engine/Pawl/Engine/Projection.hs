@@ -202,12 +202,16 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
         -- keyword count twice. Keyword.grantedBy bakes the granter into CR
-        -- 702.16n's "this Aura" and its entry choice into CR 607.2d's "the
-        -- chosen color"; Pawl.AuraSpec's White Ward and Cho-Manno's Blessing
-        -- cases prove them.
+        -- 702.16n's "this Aura", its entry choice into CR 607.2d's "the chosen
+        -- color", and its controller and the attachments stamped no later than
+        -- it into CR 702.16p's spare; Pawl.AuraSpec's White Ward, Cho-Manno's
+        -- Blessing and Benevolent Blessing cases prove them.
         Modification.GainKeyword k ->
-          let chosen = Game.lookupObject src gs >>= Object.chosenColor
-           in pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src chosen k) 1 (PC.keywords pc)}
+          let granter = Game.lookupObject src gs
+              chosen = granter >>= Object.chosenColor
+              stampedBy limit attacher = maybe False ((<= limit) . Object.timestamp) (Game.lookupObject attacher gs)
+              already = foldMap (\g -> filter (stampedBy (Object.timestamp g)) (Set.toList (Game.attachments oid gs))) granter
+           in pc {PC.keywords = Map.insertWith (+) (Keyword.grantedBy src chosen (controllerOf src gs) already k) 1 (PC.keywords pc)}
         -- CR 613.1f layer 6 / CR 202.1a: the same grant, with the keyword's
         -- [cost] read off the RECEIVING object rather than written on the granter
         -- -- "the scavenge cost is equal to its mana cost".
@@ -3345,6 +3349,7 @@ filterReads f = case f of
   Filter.Type.IsAttachedToEvaluated -> Set.empty
   Filter.Type.IsHostOfSource -> Set.empty
   Filter.Type.EnteredWithSource -> Set.empty
+  Filter.Type.AttachedNoLaterThanSource -> Set.empty
   -- Over-declared deliberately, per the note on Aspect above: the characteristics
   -- behind this atom are the candidate's (CR 301.5) and the subject's (CR
   -- 702.5a), and nothing distinguishes the two here.
@@ -3612,6 +3617,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsAttachedToEvaluated -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.EnteredWithSource -> False
+  Filter.Type.AttachedNoLaterThanSource -> False
   Filter.Type.IsToken -> False
   Filter.Type.IsCommander -> False
   Filter.Type.IsActivatedAbility -> False

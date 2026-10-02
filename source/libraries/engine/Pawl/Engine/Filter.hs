@@ -2138,6 +2138,9 @@ matches context view predicate = case predicate of
     (Just oid, Just host) -> oid == host
     _ -> False
   Filter.EnteredWithSource -> maybe False (`Set.member` sourceEntrants context) (identity view)
+  -- CR 702.16p's moment is not in any view; Pawl.Engine.Keyword.grantedBy
+  -- bakes the atom out of the one position that asks it.
+  Filter.AttachedNoLaterThanSource -> False
   -- CR 701.3a: a live read of the legality of the attach this match is framing,
   -- computed by the caller that knows what is moving. Vacuously False outside one.
   Filter.CanHostSubject -> canHostSubject view
@@ -2412,6 +2415,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsAttachedToEvaluated -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.EnteredWithSource -> predicate
+  Filter.AttachedNoLaterThanSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.HostOfSubjectHasCardType _ -> predicate
@@ -3167,6 +3171,7 @@ bakeBound players predicate = case predicate of
   Filter.IsAttachedToEvaluated -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.EnteredWithSource -> predicate
+  Filter.AttachedNoLaterThanSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.HostOfSubjectHasCardType _ -> predicate
@@ -3338,6 +3343,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsAttachedToEvaluated -> []
   Filter.IsHostOfSource -> []
   Filter.EnteredWithSource -> []
+  Filter.AttachedNoLaterThanSource -> []
   Filter.CanHostSubject -> []
   Filter.CanAttachToSubject -> []
   Filter.HostOfSubjectHasCardType _ -> []
@@ -3511,6 +3517,7 @@ statesAQuality predicate = case predicate of
   Filter.IsAttachedToEvaluated -> True
   Filter.IsHostOfSource -> True
   Filter.EnteredWithSource -> True
+  Filter.AttachedNoLaterThanSource -> True
   Filter.CanHostSubject -> True
   Filter.CanAttachToSubject -> True
   -- True for the two atoms above's reason and not because it describes the
