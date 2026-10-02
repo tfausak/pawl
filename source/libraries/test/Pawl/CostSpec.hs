@@ -22,6 +22,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -52,6 +53,7 @@ import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -90,6 +92,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -3221,6 +3224,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   longtuskCubSpec s registry
   thrastaSpec s registry
   ertaisScornSpec s registry
+  avengeSpec s registry
   deemInferiorSpec s registry
   synchronizedEvictionSpec s registry
   weightOfConscienceSpec s registry
@@ -3502,6 +3506,45 @@ ertaisScornSpec s registry =
           (splitScorn, split) = board True
       Spec.assertBool s (S.castable S.alice carolsScorn carols) "carol cast two, so the Scorn costs {1}{U} and is offered"
       Spec.assertBool s (not (S.castable S.alice splitScorn split)) "bob and carol cast one each, so the Scorn keeps its {1}{U}{U} and is refused"
+
+-- CR 601.2f / 800.4i: Avenge ({4}{W}{W}) "costs {2} less to cast if a player
+-- attacked you during their last turn". Three seats; bob attacks carol on turn
+-- 2 and concedes on turn 3. carol's four Plains pay {2}{W}{W} and not
+-- {4}{W}{W}, so castability is the reduction. Asked in carol's main phase on
+-- turn 3 and again on turn 5, after alice's turn and bob's skipped seat (CR
+-- 800.4k); the whole-card discount is
+-- data/scenarios/cost/cr-800-4i-avenge-costs-2-less-after-a-departed-player-attacked.json.
+avengeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+avengeSpec s registry =
+  Spec.describe s "Avenge" $ do
+    Spec.it s "CR 800.4i a departed attacker's last turn counts until their next turn would have begun" $ do
+      let islands = Seq.fromList [S.cardSetup "Island", S.cardSetup "Island"]
+          seat pid = (S.playerSetup pid) {Seat.library = islands}
+          setup =
+            S.board
+              ( seat S.alice
+                  NonEmpty.:| [ (seat S.bob) {Seat.battlefield = Seq.singleton (S.settled "raider" "Goblin Piker")},
+                                (seat S.carol)
+                                  { Seat.battlefield = Seq.fromList (replicate 4 (S.permanent "Plains")),
+                                    Seat.hand = Seq.singleton (S.aliased "avenge" (S.cardSetup "Avenge"))
+                                  }
+                              ]
+              )
+              S.alice
+              S.precombatMain
+          script =
+            S.turn 2 [S.on S.declareAttackers S.bob (S.attack [S.aliasRef "raider"]), S.onSource S.declareAttackers S.bob (S.aliasRef "raider") (S.attackPlayer S.carol)]
+              <> S.turn 3 [S.on (Phase.Beginning BeginningStep.Upkeep) S.bob Move.Concede]
+          untilMain :: Natural.Natural -> Game.Type.Game ()
+          untilMain n = do
+            gs <- State.get
+            Monad.unless (GameState.turnNumber gs == n && GameState.phase gs == Phase.PrecombatMain) (Engine.runStep >> untilMain n)
+      built <- S.buildBoardOrFail s registry setup
+      avenge <- maybe (Spec.assertFailure s "no avenge") pure (Map.lookup (Label.MkLabel (Text.pack "avenge")) (Staged.objects built))
+      (_, third) <- S.runScriptOrFail s script built (untilMain 3)
+      (_, fifth) <- S.runScriptOrFail s script built (untilMain 5)
+      Spec.assertBool s (not (S.castable S.carol avenge fifth {GameState.priority = Just S.carol})) "turn 5, bob's turn having passed: Avenge keeps its {4}{W}{W} and is refused"
+      Spec.assertBool s (S.castable S.carol avenge third {GameState.priority = Just S.carol}) "turn 3, bob gone: Avenge costs {2}{W}{W} and is offered"
 
 -- CR 601.2h / 205.3m: Weight of Conscience's "Tap two untapped creatures you
 -- control that share a creature type: Exile enchanted creature." alice's Aura

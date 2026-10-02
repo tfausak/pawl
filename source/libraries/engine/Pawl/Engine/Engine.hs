@@ -1585,7 +1585,7 @@ takeNextTurn gs = case GameState.extraTurns gs of
           -- rescheduled here too. No board reaches it, an extra turn for a
           -- departed player needing a phased-out permanent besides, so it is
           -- the rule written out at its second site rather than a proved one.
-            takeNextTurn (Phasing.orphanSchedule pid swept)
+            takeNextTurn (expireLastTurn pid (Phasing.orphanSchedule pid swept))
 
 -- One seat at a time, bounded by the number of seats, so it terminates even when
 -- every seat has departed. The fallback returns the state without beginning a
@@ -1608,7 +1608,7 @@ walkToNextTurn seatsLeft anchor seat gs =
           -- A row keyed to a seat this walk passes is rescheduled and phases in at
           -- the untap step of whichever seat the walk lands on. This branch only:
           -- a seat that does begin a turn is nobody's orphan.
-          orphaned = Phasing.orphanSchedule next swept
+          orphaned = expireLastTurn next (Phasing.orphanSchedule next swept)
        in if next /= anchor && Turn.sharesTurn gs anchor next
             then walkToNextTurn (seatsLeft - 1) anchor next gs
             else
@@ -1617,6 +1617,11 @@ walkToNextTurn seatsLeft anchor seat gs =
                 -- there is nothing left to remember.
                   beginTurnOf next swept {GameState.turnAnchor = Nothing}
                 else walkToNextTurn (seatsLeft - 1) anchor next orphaned
+
+-- CR 800.4i: a departed player's last turn answers "during their last turn"
+-- only until their next turn would have begun, which is here.
+expireLastTurn :: PlayerId -> GameState -> GameState
+expireLastTurn pid gs = gs {GameState.attacksInOwnLastTurn = Map.delete pid (GameState.attacksInOwnLastTurn gs)}
 
 -- CR 611.2a / 800.4m's sweep for a turn that begins or would have begun: every
 -- player who takes it, which under CR 805.4 is the whole team.
@@ -1710,6 +1715,9 @@ beginTurn extra pid gs =
             -- CR 601.2i: the outgoing turn's casts join the game-long record
             -- before the log holding them is cleared above.
             GameState.castsBeforeThisTurn = GameState.castsBeforeThisTurn gs <> Game.castsInLog gs,
+            -- CR 508.1a: the outgoing turn becomes each of its takers' own last
+            -- turn, REPLACING the row, an attackless turn included (CR 805.4).
+            GameState.attacksInOwnLastTurn = List.foldl' (\rows p -> Map.insert p (Game.attacksInLog gs) rows) (GameState.attacksInOwnLastTurn gs) outgoing,
             GameState.scannedThrough = 0,
             -- Cleared with the log it describes: the settle Engine.advance runs
             -- immediately before this leaves nothing unscanned.
