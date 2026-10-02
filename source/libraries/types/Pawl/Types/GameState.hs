@@ -18,6 +18,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Types.Arrival as Arrival
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
@@ -426,6 +427,11 @@ data GameState = MkGameState
     -- clears. Pawl.Engine.Count's EventShape.SpellCastThisGame fold joins it
     -- to the live log.
     castsBeforeThisTurn :: Seq.Seq SpellWasCast.SpellWasCast,
+    -- | CR 508.1a / 608.2i: the attackers declared during each player's OWN most
+    -- recent turn, keyed by that player and replaced as their next turn ends
+    -- (Engine.beginTurn). A departed player's row stands until their next turn
+    -- would have begun (CR 800.4i), where Engine's seat walk removes it.
+    attacksInOwnLastTurn :: Map.Map PlayerId.PlayerId (Seq.Seq AttackerDeclared.AttackerDeclared),
     -- | CR 702.192a: the names of the spells each player controlled that have
     -- resolved this game, as they resolved, written by
     -- Pawl.Engine.Resolve.noteResolved.

@@ -3996,6 +3996,8 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ObjectCountersOfAnyKind -> []
   Quantity.Type.OpponentsAttacked _ -> []
   Quantity.Type.AttackersDeclaredThisTurn _ -> []
+  Quantity.Type.AttackedInLastTurnOf _ -> []
+  Quantity.Type.AttackersInTheirLastTurn _ -> []
   Quantity.Type.CardsDiscardedThisTurn _ -> []
   Quantity.Type.CardsDrawnThisTurn _ -> []
   Quantity.Type.BendingsThisTurn _ -> []
