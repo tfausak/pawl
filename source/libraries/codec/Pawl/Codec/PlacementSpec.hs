@@ -28,9 +28,10 @@ spec s = Spec.describe s "Pawl.Codec.Placement" $ do
           Placement.Type.counters = Map.singleton CounterKind.Type.PlusOnePlusOne 2,
           Placement.Type.token = True,
           Placement.Type.controller = Just (Label.Type.MkLabel (Text.pack "bob")),
-          Placement.Type.attached = Just (Label.Type.MkLabel (Text.pack "bear"))
+          Placement.Type.attached = Just (Label.Type.MkLabel (Text.pack "bear")),
+          Placement.Type.commander = True
         }
-      " {\"card\":\"Goblin Piker\",\"label\":\"piker\",\"tapped\":true,\"ready\":true,\"damage\":1,\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":2}],\"token\":true,\"controller\":\"bob\",\"attached\":\"bear\"} "
+      " {\"card\":\"Goblin Piker\",\"label\":\"piker\",\"tapped\":true,\"ready\":true,\"damage\":1,\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":2}],\"token\":true,\"controller\":\"bob\",\"attached\":\"bear\",\"commander\":true} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Placement.codec
 
@@ -45,5 +46,6 @@ plain name =
       Placement.Type.counters = Map.empty,
       Placement.Type.token = False,
       Placement.Type.controller = Nothing,
-      Placement.Type.attached = Nothing
+      Placement.Type.attached = Nothing,
+      Placement.Type.commander = False
     }

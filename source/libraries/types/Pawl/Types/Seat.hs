@@ -31,6 +31,8 @@ data Seat = MkSeat
     -- | Top card first (CR 401.1).
     library :: Seq.Seq Placement.Placement,
     -- | Face up (CR 406.3), owned by this seat.
-    exile :: Seq.Seq Placement.Placement
+    exile :: Seq.Seq Placement.Placement,
+    -- | CR 408.1: the command zone, owned by this seat.
+    command :: Seq.Seq Placement.Placement
   }
   deriving (Eq, Ord, Show)

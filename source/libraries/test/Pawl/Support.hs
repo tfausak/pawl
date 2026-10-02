@@ -180,7 +180,8 @@ objectSetup name =
       Placement.counters = Map.empty,
       Placement.token = False,
       Placement.controller = Nothing,
-      Placement.attached = Nothing
+      Placement.attached = Nothing,
+      Placement.commander = False
     }
 
 -- Test-source spelling of objectSetup: a Magic card name, never a corpus slug.
@@ -216,7 +217,8 @@ playerSetup pid =
       Seat.hand = Seq.empty,
       Seat.graveyard = Seq.empty,
       Seat.library = Seq.empty,
-      Seat.exile = Seq.empty
+      Seat.exile = Seq.empty,
+      Seat.command = Seq.empty
     }
 
 battlefield :: PlayerId.PlayerId -> [Placement.Placement] -> Seat.Seat

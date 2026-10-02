@@ -33,6 +33,7 @@ codec = Fields.object $ do
   graveyard <- Fields.defaulted "graveyard" Seq.empty (Common.seq Placement.codec) Seat.graveyard
   library <- Fields.defaulted "library" Seq.empty (Common.seq Placement.codec) Seat.library
   exile <- Fields.defaulted "exile" Seq.empty (Common.seq Placement.codec) Seat.exile
+  command <- Fields.defaulted "command" Seq.empty (Common.seq Placement.codec) Seat.command
   pure
     Seat.MkSeat
       { Seat.name = name,
@@ -46,7 +47,8 @@ codec = Fields.object $ do
         Seat.hand = hand,
         Seat.graveyard = graveyard,
         Seat.library = library,
-        Seat.exile = exile
+        Seat.exile = exile,
+        Seat.command = command
       }
 
 -- | A pool as one letter per unit, CR 105.1's W, U, B, R and G and CR 106.1b's

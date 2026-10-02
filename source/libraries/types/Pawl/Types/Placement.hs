@@ -23,6 +23,8 @@ data Placement = MkPlacement
     -- | The seat controlling it, when not its owner.
     controller :: Maybe Label.Label,
     -- | CR 301.5 / 303.4: the labelled object or seat it is attached to.
-    attached :: Maybe Label.Label
+    attached :: Maybe Label.Label,
+    -- | CR 903.3: its owner's commander.
+    commander :: Bool
   }
   deriving (Eq, Ord, Show)

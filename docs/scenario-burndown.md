@@ -37,7 +37,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:face`: a face other than the front
 - `board:delayed-trigger`: a delayed trigger already armed
 - `board:protector`: a battle's protector
-- `board:command`: the command zone
 - `move:expect-rejected`: a move the engine is expected to refuse, such as an illegal block or an untargetable cast
 - `board:objects-ids`
 - `check:prompt-offers`: the options a prompt offers
@@ -68,7 +67,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `check:face-down`: whether an exiled card is face down
 - `check:castable`: whether a card in hand can be cast at all
 - `board:graveyard`
-- `board:player-commander`
 - `board:object-chosencolor`
 - `move:nested`: the `nested` prompt
 - `board:player-speed`
@@ -421,7 +419,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.117a after alice's own Bolt the Salvo is cast for {1}{R}; after nobody's and after bob's, its {4}{R} is unpayable | `move:expect-rejected`
 - CR 702.119c an Ashnod's Altar that eats the chosen creature reverses the cast | `move:ChooseCost:unmatchable`
 - CR 702.152a blitzed, the Requisitioner attacks, is sacrificed at the next end step and draws a card; hard-cast and bolted it draws nothing | `move:OrderTriggers-departed-source`
-- CR 702.173a an Assassin's or a commander's combat damage buys the Vision for {1}{U}; an ordinary creature's does not | `board:player-commander`
+- CR 702.173a an Assassin's or a commander's combat damage buys the Vision for {1}{U}; an ordinary creature's does not | `ready`
 - CR 702.180b tapping the chosen creature for mana reverses the cast | `move:ChooseCost:unmatchable`
 - CR 702.185c a spell warped this turn makes Insatiable Skittermaw's end step trigger; the same Colossus cast for {9} does not | `move:OrderTriggers-departed-source`
 - CR 702.34a a countered flashback spell is exiled too | `move:other-counter`
@@ -545,24 +543,24 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `CommanderSpec`
 
 - CR 616.1 the controller of a stolen commander orders the offer | `board:sickness`
-- CR 616.1e declining the offer first lets the redirect exile it | `board:object-bindings` `board:player-commander` `board:player-commandercasts` `board:player-startingdeck`
-- CR 616.1e/903.9b the owner may apply the offer before a card's redirect | `board:object-bindings` `board:player-commander` `board:player-commandercasts` `board:player-startingdeck`
-- CR 702.124d the other commander ignores this one's casts | `board:command` `board:player-commander` `board:player-commandercasts`
-- CR 903.10a damage from two different commanders does not combine | `board:command`
-- CR 903.10a fourteen does not | `board:command`
-- CR 903.10a only the commander's combat damage is tallied | `board:command`
-- CR 903.10a twenty-one combat damage from one commander loses the game | `board:command`
-- CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game | `board:command` `check:commander-damage`
-- CR 903.8 the second cast from the command zone costs {2} more | `board:command` `board:player-commander`
-- CR 903.9a a commander that dies is offered back to the command zone | `board:command` `board:player-commander`
-- CR 903.9a declining leaves it in the graveyard | `board:command` `board:player-commander`
-- CR 903.9b a commander bounced to its owner's hand may go to the command zone | `board:object-bindings` `board:player-commander` `board:player-commandercasts` `board:player-startingdeck`
-- CR 903.9b a commander put on top of its owner's library may go to the command zone | `board:object-bindings` `board:player-commander` `board:player-commandercasts` `board:player-startingdeck`
+- CR 616.1e declining the offer first lets the redirect exile it | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
+- CR 616.1e/903.9b the owner may apply the offer before a card's redirect | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
+- CR 702.124d the other commander ignores this one's casts | `board:player-commandercasts`
+- CR 903.10a damage from two different commanders does not combine | `ready`
+- CR 903.10a fourteen does not | `ready`
+- CR 903.10a only the commander's combat damage is tallied | `ready`
+- CR 903.10a twenty-one combat damage from one commander loses the game | `ready`
+- CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game | `check:commander-damage`
+- CR 903.8 the second cast from the command zone costs {2} more | `ready`
+- CR 903.9a a commander that dies is offered back to the command zone | `ready`
+- CR 903.9a declining leaves it in the graveyard | `ready`
+- CR 903.9b a commander bounced to its owner's hand may go to the command zone | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
+- CR 903.9b a commander put on top of its owner's library may go to the command zone | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
 - CR 903.9b an ordinary creature is not offered the command zone | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
-- CR 903.9b declining leaves it in her hand | `board:object-bindings` `board:player-commander` `board:player-commandercasts` `board:player-startingdeck`
-- CR 903.9b declining leaves it in her library | `board:object-bindings` `board:player-commander` `board:player-commandercasts` `board:player-startingdeck`
-- CR 903.9b the offer applies once per commander in the same event | `board:player-commander` `board:player-startingdeck`
-- CR 903.9b the owner is asked, not the player who bounced it | `board:object-bindings` `board:player-commander` `board:player-commandercasts` `board:player-startingdeck`
+- CR 903.9b declining leaves it in her hand | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
+- CR 903.9b declining leaves it in her library | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
+- CR 903.9b the offer applies once per commander in the same event | `board:player-startingdeck`
+- CR 903.9b the owner is asked, not the player who bounced it | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
 
 ### `ConjureSpec`
 
@@ -702,7 +700,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 113.3b Squelch counters the activated ability and leaves the trigger, which still kills the Piker | `ref:stack-ability`
 - CR 113.7 the trigger reaches the artifact's ability and not the creature's, and the artifact is destroyed | `ref:stack-ability`
 - CR 113.7a the ability of an artifact sacrificed to activate it is still from an artifact source, and nothing is destroyed | `ref:stack-ability`
-- CR 114.2 an unevolved Ajani's emblem mints three Cat Tokens | `board:command`
+- CR 114.2 an unevolved Ajani's emblem mints three Cat Tokens | `ready`
 - CR 118.12 a graveyard one card smaller demands one mana less | `check:mana-pool`
 - CR 118.12 the offer is {1} for each card in the RESOLVING controller's graveyard | `check:mana-pool`
 - CR 118.12 whole card: an unhacked Lithophage's gate demands the Mountain | `check:helper-namesIn` `check:helper-payResponses`
@@ -715,12 +713,12 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2f a noncreature card in the graveyard cannot pay it either | `check:helper-namesIn` `check:other-Replay.record` `check:other-Stack.resolveTop`
 - CR 612 the Evolution's own restriction reaches the player being asked | `check:prompt-payload`
 - CR 612.1 an Evolution on an Evolution rewrites the restriction itself | `check:prompt-payload`
-- CR 612.1 an evolved Ajani's emblem mints Wurms rather than Cats | `board:command`
+- CR 612.1 an evolved Ajani's emblem mints Wurms rather than Cats | `ready`
 - CR 612.1 an evolved Moonmist's shield spares Goblins instead, so the Werewolf's damage is the prevented one | `check:events` `check:other-Damage.applyDamage` `check:other-GameState.replacements`
 - CR 612.1 hacked Zombie -> Goblin, PutCounters puts a hexproof from Goblins counter on | `check:legal-targets`
 - CR 612.1 hacked Zombie -> Goblin, the entry rider's counter is a hexproof from Goblins counter | `check:legal-targets`
 - CR 612.1 whole card: hacking Lithophage moves which land its CR 118.12 gate demands | `board:continuous-effect`
-- CR 612.2 an Evolution naming a word the emblem lacks leaves the Cats alone | `board:command`
+- CR 612.2 an Evolution naming a word the emblem lacks leaves the Cats alone | `ready`
 - CR 612.2a an evolved Bitterblossom's second name word moves too | `board:continuous-effect`
 - CR 612.2a whole card: an evolved Bitterblossom's trigger mints an Elf Rogue Token | `board:continuous-effect`
 - CR 613.7 whole card: two Evolutions on the Turn to Frog spell compose | `check:text-changes`
@@ -739,7 +737,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `DamageReplacementSpec`
 
 - CR 120.4 a redirect onto the recipient it was already aimed at deals one event, not two | `check:events` `check:helper-countedRedirectRows`
-- CR 120.4 one sentence naming alice twice deals her ONE event, of 6 | `board:command`
+- CR 120.4 one sentence naming alice twice deals her ONE event, of 6 | `ready`
 - CR 608.2f an ability's two halves are one batch | `board:replacement`
 - CR 608.2f creatures and players in a won flip are one batch | `board:replacement`
 - CR 608.2f creatures and players in one sentence are one batch | `board:replacement`
@@ -757,7 +755,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 614.9 a 1-damage event moves whole, and the row is spent by it | `check:events` `check:other-Damage.applyDamage` `check:other-GameState.replacements`
 - CR 614.9 guard: a destination that left the battlefield makes the effect do nothing | `check:helper-redirectRows`
 - CR 614.9 the redirection covers the creature the spell named and not the other | `check:other-Damage.applyDamage` `check:other-GameState.replacements`
-- CR 615.10 the emblem floors damage to alice and to her other planeswalker at 1, and reaches nothing else | `board:command`
+- CR 615.10 the emblem floors damage to alice and to her other planeswalker at 1, and reaches nothing else | `ready`
 - CR 615.12 the same shield still prevents Lava Burst's 3 dealt to a player | `board:objects-ids`
 - CR 615.12 the shield prevents none of Lava Burst's 3 and is not reduced by it | `board:objects-ids`
 - CR 615.12 the unreduced shield still covers the next 2 once Spider-Punk is gone | `board:replacement`
@@ -1342,7 +1340,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 311.5 a departing active player's plane is replaced from the next seat's planar deck | `board:objects-ids` `board:planardecks` `board:player-startingdeck`
 - CR 901.10a a plane leaving the game ends a pending planeswalking ability | `board:objects-ids` `board:planardecks` `board:player-startingdeck`
-- CR 901.6 the chaos ability's you is the planar controller | `board:command`
+- CR 901.6 the chaos ability's you is the planar controller | `ready`
 
 ### `PlaneswalkerCombatSpec`
 
@@ -1461,7 +1459,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ProjectionSpec`
 
 - CR 113.6b a graveyard grant's protection still bars the artifact blocker | `check:other-GameState.continuousEffects` `check:other-GameState.command` `move:expect-rejected`
-- CR 113.6p an emblem's own replacement row floors the life total from the command zone | `board:command`
+- CR 113.6p an emblem's own replacement row floors the life total from the command zone | `ready`
 - CR 208.1/208.2b Imperial Recruiter's search offers the */* card and the 2-power creature, not the 3-power one | `check:prompt-offers` `check:shuffled-set`
 - CR 208.2a Tarmogoyf is a power-0 search candidate with every graveyard empty | `check:prompt-offers`
 - CR 208.2a Tarmogoyf is a search candidate at power 2, off a land and an instant in a graveyard | `check:prompt-offers`
@@ -1490,7 +1488,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.8b a text change waits for the exchange that gives it a word | `board:continuous-effect`
 - CR 613.8b an earlier text change waits for the later one it depends on | `board:objects-ids`
 - CR 701.23a without the Nexus, Goblin Matron's search offers the printed Goblin alone | `check:prompt-offers`
-- CR 702.16e an emblem's granted protection still prevents the damage | `board:command`
+- CR 702.16e an emblem's granted protection still prevents the damage | `ready`
 - CR 702.73a changeling granted by a RESOLUTION makes the creature every creature type | `check:subtype-member`
 
 ### `PrototypeSpec`
@@ -1576,23 +1574,23 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `RingSpec`
 
 - CR 701.54 Birthday Escape draws, mints the emblem, and designates the creature its controller chose | `check:helper-temptationsOf`
-- CR 701.54a another player gaining control ends the designation, and it does not return | `board:command`
-- CR 701.54a two players each keep their own Ring-bearer | `board:command`
+- CR 701.54a another player gaining control ends the designation, and it does not return | `ready`
+- CR 701.54a two players each keep their own Ring-bearer | `ready`
 - CR 701.54b a Clone of the Ring-bearer is not a Ring-bearer | `check:designations`
-- CR 701.54c a bigger creature can't block the Ring-bearer, an equal or smaller one can | `board:command`
-- CR 701.54c four temptations drain each opponent when the Ring-bearer connects | `board:command`
-- CR 701.54c one temptation does not | `board:command`
-- CR 701.54c the Ring-bearer connects past a bigger untapped creature, in a real combat | `board:command`
+- CR 701.54c a bigger creature can't block the Ring-bearer, an equal or smaller one can | `ready`
+- CR 701.54c four temptations drain each opponent when the Ring-bearer connects | `ready`
+- CR 701.54c one temptation does not | `ready`
+- CR 701.54c the Ring-bearer connects past a bigger untapped creature, in a real combat | `ready`
 - CR 701.54c the Ring-bearer is legendary, which CR 205.4e sees | `check:helper-isLegendary`
-- CR 701.54c the clause reaches the Ring-bearer alone | `board:command`
-- CR 701.54c the drain reaches the Ring-bearer alone | `board:command`
-- CR 701.54c the loot reaches the Ring-bearer alone | `board:command`
-- CR 701.54c the powers compared are the PROJECTED ones | `board:command`
-- CR 701.54c three temptations do not | `board:command`
-- CR 701.54c three temptations sacrifice the creature that blocked the Ring-bearer | `board:command`
-- CR 701.54c two temptations loot when the Ring-bearer attacks | `board:command`
+- CR 701.54c the clause reaches the Ring-bearer alone | `ready`
+- CR 701.54c the drain reaches the Ring-bearer alone | `ready`
+- CR 701.54c the loot reaches the Ring-bearer alone | `ready`
+- CR 701.54c the powers compared are the PROJECTED ones | `ready`
+- CR 701.54c three temptations do not | `ready`
+- CR 701.54c three temptations sacrifice the creature that blocked the Ring-bearer | `ready`
+- CR 701.54c two temptations loot when the Ring-bearer attacks | `ready`
 - CR 701.54d a player with no creatures is still tempted | `check:helper-temptationsOf` `check:events`
-- CR 701.54e a stolen Ring-bearer is not legendary while its mark survives | `board:command`
+- CR 701.54e a stolen Ring-bearer is not legendary while its mark survives | `ready`
 
 ### `RoomSpec`
 
@@ -1611,10 +1609,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `SetupSpec`
 
-- CR 727.1 / 103.7 a restarted Planechase game sets a new starting plane | `board:command`
-- CR 727.2 / 103.3a a restart puts a face-up scheme back into the shuffled scheme deck | `board:command`
-- CR 729.2a the planar deck plays the subgame and comes back | `board:command`
-- CR 729.2a the scheme deck plays the subgame and comes back | `board:command`
+- CR 727.1 / 103.7 a restarted Planechase game sets a new starting plane | `ready`
+- CR 727.2 / 103.3a a restart puts a face-up scheme back into the shuffled scheme deck | `ready`
+- CR 729.2a the planar deck plays the subgame and comes back | `ready`
+- CR 729.2a the scheme deck plays the subgame and comes back | `ready`
 - CR 729.5/712.21 a subgame ending with a melded permanent returns both of its cards to the main-game library | `check:helper-componentsOn` `check:helper-sourcesOf` `check:other-Game.componentsOf` `check:other-GameState.objects` `check:other-GameState.nextObjectId`
 - CR 903.6/903.9c a restarted Commander game puts the melded commander's own card into the command zone and its partner into the deck | `board:source-ofmeld`
 
@@ -1804,8 +1802,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `VanguardSpec`
 
-- CR 902.7 a vanguard's activated ability may be activated from the command zone | `board:command`
-- CR 902.7 a vanguard's triggered ability triggers from the command zone | `board:command`
+- CR 902.7 a vanguard's activated ability may be activated from the command zone | `ready`
+- CR 902.7 a vanguard's triggered ability triggers from the command zone | `ready`
 
 ### `VariableEffectSpec`
 
@@ -1888,9 +1886,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 113.6m Squee's upkeep trigger is gathered from the graveyard, on its effect's word alone | `check:helper-gathered` `check:other-PendingTrigger.source`
 - CR 113.6m the same card on the battlefield triggers for nobody | `check:helper-gathered` `check:other-PendingTrigger.source`
 - CR 113.6m the upkeep half does not trigger from the battlefield | `check:helper-beginUpkeep` `check:helper-gathered` `check:other-PendingTrigger.source`
-- CR 114.2 another seat's end step fires nothing | `board:command`
-- CR 114.4 the emblem's trigger is gathered from the command zone | `board:command`
-- CR 114.4 whole card: three Cat tokens arrive at its controller's end step | `board:command`
+- CR 114.2 another seat's end step fires nothing | `ready`
+- CR 114.4 the emblem's trigger is gathered from the command zone | `ready`
+- CR 114.4 whole card: three Cat tokens arrive at its controller's end step | `ready`
 - CR 400.7e a bounce to a HIDDEN zone binds no became slot, though the source slot is still stamped | `check:other-Binding.became` `check:other-Binding.triggerSource`
 - CR 400.7e a death to a PUBLIC zone does bind became, for the same condition | `check:other-Binding.became` `check:other-Binding.triggerSource`
 - CR 603.10 a permanent that arrived after a death and left again does not witness it | `check:events` `check:intermediate-state`

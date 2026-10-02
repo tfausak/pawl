@@ -128,5 +128,6 @@ seat name =
       Seat.Type.hand = Seq.empty,
       Seat.Type.graveyard = Seq.empty,
       Seat.Type.library = Seq.empty,
-      Seat.Type.exile = Seq.empty
+      Seat.Type.exile = Seq.empty,
+      Seat.Type.command = Seq.empty
     }

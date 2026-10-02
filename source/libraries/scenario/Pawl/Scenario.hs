@@ -317,7 +317,8 @@ zonesOf seat =
     (Zone.Hand, Seat.hand seat),
     (Zone.Graveyard, Seat.graveyard seat),
     (Zone.Library, Seat.library seat),
-    (Zone.Exile, Seat.exile seat)
+    (Zone.Exile, Seat.exile seat),
+    (Zone.Command, Seat.command seat)
   ]
 
 boardFailure :: Map.Map Label.Label PlayerId.PlayerId -> Board.Board -> Maybe Failure.ScenarioFailure
@@ -378,7 +379,13 @@ placeAll registry zone owner placements board = case placements of
       Just _ | Placement.token placement && zone /= Zone.Battlefield -> pure (Left (Failure.MkTokenOffBattlefield (Placement.card placement)))
       Just card -> do
         let (printingId, interned) = Game.intern (Printing.ofCard card) (Staged.state board)
-            (oid, placed) = Setup.placeCard zone owner printingId interned
+            (oid, placedCard) = Setup.placeCard zone owner printingId interned
+            -- CR 903.3: a commander is designated by its printing, which every
+            -- object the card becomes carries.
+            placed =
+              if Placement.commander placement
+                then placedCard {GameState.players = Map.adjust (\p -> p {Player.commander = Set.insert printingId (Player.commander p)}) owner (GameState.players placedCard)}
+                else placedCard
             controller = Maybe.fromMaybe owner (Placement.controller placement >>= \label -> Map.lookup label (Staged.seats board))
             adjust obj =
               obj

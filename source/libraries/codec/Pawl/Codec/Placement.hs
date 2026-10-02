@@ -27,6 +27,7 @@ codec = Fields.object $ do
   token <- Fields.defaulted "token" False Common.boolean Placement.token
   controller <- Fields.defaulted "controller" Nothing (Common.maybe Label.codec) Placement.controller
   attached <- Fields.defaulted "attached" Nothing (Common.maybe Label.codec) Placement.attached
+  commander <- Fields.defaulted "commander" False Common.boolean Placement.commander
   pure
     Placement.MkPlacement
       { Placement.card = card,
@@ -37,5 +38,6 @@ codec = Fields.object $ do
         Placement.counters = counters,
         Placement.token = token,
         Placement.controller = controller,
-        Placement.attached = attached
+        Placement.attached = attached,
+        Placement.commander = commander
       }
