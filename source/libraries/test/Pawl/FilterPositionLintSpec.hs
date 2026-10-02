@@ -704,7 +704,8 @@ chosenValueCounts admitted tag card =
    in (total (`elem` admitted) (cardFilters card) - inSpell, total (`notElem` admitted) (cardFilters card) + inSpell)
 
 -- CR 105.2's chosen colour is answerable only where Filter.Context.sourceChosenColor
--- is filled: a static ability's affected set (Pawl.Engine.Projection.affectsWith),
+-- is filled: a static ability's or a combat restriction's affected set
+-- (Pawl.Engine.Projection.affectsWith),
 -- an ability's target slot (Pawl.Engine.Target.slotContext), an activated
 -- ability's cost (Pawl.Engine.Cost's pools and
 -- Pawl.Engine.Replacement.matchesPermanent), a trigger condition
