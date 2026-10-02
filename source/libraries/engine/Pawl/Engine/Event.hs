@@ -208,6 +208,7 @@ import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.ScryR as ScryR
@@ -4695,22 +4696,23 @@ designateProtector oid = do
 unlockHalves :: PlayerId -> ObjectId -> Set.Set CardName.CardName -> Game ()
 unlockHalves actor oid halves = do
   gs <- State.get
-  case Game.lookupObject oid gs of
-    Nothing -> pure ()
-    Just obj -> do
-      let given = Set.difference halves (Object.unlockedHalves obj)
+  -- CR 709.5b: the halves the permanent HAS, which for one that copied a Room
+  -- are the copied Room's (Game.halvesOf) and not the card printed underneath
+  -- it. The chosen names become CR 709.5c's positions against them.
+  case (Game.lookupObject oid gs, Game.halvesOf oid gs) of
+    (Just obj, Just card) -> do
+      let chosen = Set.fromList (Maybe.mapMaybe (`Card.halfPositionOf` card) (Set.toList halves))
+          given = Set.difference chosen (Object.unlockedHalves obj)
           opened = Set.union (Object.unlockedHalves obj) given
       Monad.unless (Set.null given) $ do
         State.modify' $ \g ->
           let open o = o {Object.unlockedHalves = opened}
            in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
-        -- CR 709.5b: the halves the permanent HAS, which for one that copied a
-        -- Room are the copied Room's (Game.halvesOf) and not the card printed
-        -- underneath it. Off the object's own card this answers False for every
-        -- copy, since no copier's printed card has a shared type line.
-        let fully = fullyUnlockedAfter opened (Game.halvesOf oid gs)
-        Monad.forM_ (Set.toAscList given) $ \half ->
-          State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid actor half (fully && Set.lookupMax given == Just half))))
+        let fully = fullyUnlockedAfter opened (Just card)
+        Monad.forM_ (Set.toAscList given) $ \position ->
+          Monad.forM_ (Card.halfNameAt position card) $ \half ->
+            State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid actor half (fully && Set.lookupMax given == Just position))))
+    _ -> pure ()
 
 -- CR 709.5g: take one unlocked designation back away -- "that permanent loses
 -- the appropriate unlocked designation". unlockHalves's inverse and the single
@@ -4728,9 +4730,11 @@ unlockHalves actor oid halves = do
 -- door already shut.
 lockHalf :: ObjectId -> CardName.CardName -> Game ()
 lockHalf oid half =
-  State.modify' $ \g ->
-    let shut o = o {Object.unlockedHalves = Set.delete half (Object.unlockedHalves o)}
-     in g {GameState.objects = Map.adjust shut oid (GameState.objects g)}
+  State.modify' $ \g -> case Game.halvesOf oid g >>= Card.halfPositionOf half of
+    Nothing -> g
+    Just position ->
+      let shut o = o {Object.unlockedHalves = Set.delete position (Object.unlockedHalves o)}
+       in g {GameState.objects = Map.adjust shut oid (GameState.objects g)}
 
 -- CR 709.5i's "fully unlocks", answered about the designations a permanent has
 -- ONCE a write has landed: "such an ability triggers when that permanent has one
@@ -4765,12 +4769,10 @@ lockHalf oid half =
 --
 -- Nothing -- a designation written for an object whose card cannot be found --
 -- answers False, there being no faces to compare against.
-fullyUnlockedAfter :: Set CardName.CardName -> Maybe Card -> Bool
+fullyUnlockedAfter :: Set RoomHalf.RoomHalf -> Maybe Card -> Bool
 fullyUnlockedAfter halves card = case card of
   Nothing -> False
-  Just c ->
-    Card.hasSharedTypeLine c
-      && all (\face -> Set.member (Face.name face) halves) (Card.Type.faces c)
+  Just c -> Card.hasSharedTypeLine c && all fst (Card.withOpenness halves c)
 
 -- CR 615: settle one proposed damage event. Empty means it does not happen; two
 -- or more is CR 614.9's counted redirection having moved part of it (Harm's
@@ -5515,7 +5517,8 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 --
 -- A HALF and not always a face that is up, which is CR 709.5d's use of the same
 -- parameter: a Room permanent shows both halves at once, so changeZoneAttaching
--- spends the name on an unlocked designation and leaves Object.face empty. Every
+-- spends the name on an unlocked designation, placed by position against the
+-- halves (CR 709.5c), and leaves Object.face empty. Every
 -- other caller's half IS the face the object arrives showing.
 --
 -- The name is a MAYBE, because the third rule asking for this door does not
@@ -6123,7 +6126,9 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- between, one of which stops being right the moment the
                     -- second door opens.
                     Object.face = if dest == requestedDest && not unlocking then shown else Nothing,
-                    Object.unlockedHalves = if unlocking then foldMap Set.singleton shown else Set.empty,
+                    -- CR 709.5d's designation is a POSITION (CR 709.5c), so the cast
+                    -- half's name is placed against the halves the permanent has.
+                    Object.unlockedHalves = if unlocking then foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs) else Set.empty,
                     -- CR 708.4 / 708.3: the object is turned face down BEFORE it
                     -- is put onto the stack or enters the battlefield, so this is
                     -- part of the move rather than a stamp on what the move
@@ -6727,7 +6732,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- connects to it -- which is also the player a Room's own "when you
                   -- unlock this door" reads as "you" (CR 109.5).
                   Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
+                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs)) (Game.cardOf oid gs)))))
                   -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
                   -- what an enters trigger scans -- alongside the id it had in `fromZone`,
                   -- which is the key `lastKnown` is filed under and so the only route back

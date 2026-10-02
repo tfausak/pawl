@@ -42,6 +42,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
@@ -1506,9 +1507,9 @@ isDoubleFaced card = case Card.layout card of
 -- faceDownFace uses for CR 708.2a's "no name" -- the same value
 -- Pawl.Engine.Projection.View.baseCharacteristics gives an object with no card behind
 -- it, and one that matches no printing.
-roomFace :: Set.Set CardName.CardName -> Card.Card -> Face.Face Card.Card
+roomFace :: Set.Set RoomHalf.RoomHalf -> Card.Card -> Face.Face Card.Card
 roomFace unlocked card =
-  let folded = foldSplit (fmap (\face -> if Set.member (Face.name face) unlocked then face else subtractHalf face) (Card.faces card))
+  let folded = foldSplit (fmap (\(open, face) -> if open then face else subtractHalf face) (withOpenness unlocked card))
    in folded
         { Face.name = case unlockedFaces unlocked card of
             [] -> CardName.MkCardName Text.empty
@@ -1519,14 +1520,45 @@ roomFace unlocked card =
 -- roomFace above keeps whole, in printed order. Pawl.Engine.Room.lockedHalves is
 -- its complement, and asks the object rather than a designation set because its
 -- caller needs the object anyway.
-unlockedFaces :: Set.Set CardName.CardName -> Card.Card -> [Face.Face Card.Card]
-unlockedFaces unlocked card = filter (\face -> Set.member (Face.name face) unlocked) (NonEmpty.toList (Card.faces card))
+unlockedFaces :: Set.Set RoomHalf.RoomHalf -> Card.Card -> [Face.Face Card.Card]
+unlockedFaces unlocked card = fmap snd (filter fst (NonEmpty.toList (withOpenness unlocked card)))
+
+-- CR 709.5c: each half of the card beside whether its designation is among
+-- `unlocked`, in printed order -- the first half is the left one. A face past
+-- the second has no position CR 709.5c names, so it is never unlocked.
+withOpenness :: Set.Set RoomHalf.RoomHalf -> Card.Card -> NonEmpty.NonEmpty (Bool, Face.Face Card.Card)
+withOpenness unlocked card =
+  NonEmpty.zipWith
+    (\position face -> (maybe False (`Set.member` unlocked) position, face))
+    (NonEmpty.fromList (fmap Just [minBound .. maxBound] <> repeat Nothing))
+    (Card.faces card)
+
+-- CR 709.5c: the name of the half at `position` on this card, halfPositionOf
+-- below's inverse. Nothing for a card with no face there.
+halfNameAt :: RoomHalf.RoomHalf -> Card.Card -> Maybe CardName.CardName
+halfNameAt position card =
+  Maybe.listToMaybe
+    [ Face.name face
+    | (at, face) <- zip [minBound .. maxBound] (NonEmpty.toList (Card.faces card)),
+      at == position
+    ]
+
+-- CR 709.5c: the position of the half named `name` on this card, which is how
+-- an unlock or a lock -- chosen by the half's name (CR 709.4a) -- becomes a
+-- designation. Nothing for a name that is no half the card positions.
+halfPositionOf :: CardName.CardName -> Card.Card -> Maybe RoomHalf.RoomHalf
+halfPositionOf name card =
+  Maybe.listToMaybe
+    [ position
+    | (position, face) <- zip [minBound .. maxBound] (NonEmpty.toList (Card.faces card)),
+      Face.name face == name
+    ]
 
 -- CR 709.4a / 709.5: the names a Room permanent has -- one per UNLOCKED door,
 -- since the shared type line's static abilities take a locked half's name away.
 -- None with both doors shut, which is CR 708.2a's "no name" read off a different
 -- rule: an empty set, and never the empty name Face.name has to fall back on.
-roomNames :: Set.Set CardName.CardName -> Card.Card -> Set.Set CardName.CardName
+roomNames :: Set.Set RoomHalf.RoomHalf -> Card.Card -> Set.Set CardName.CardName
 roomNames unlocked card = Set.fromList (fmap Face.name (unlockedFaces unlocked card))
 
 -- roomFace's per-half half: one LOCKED half of a Room, emptied of everything CR
@@ -1599,8 +1631,8 @@ subtractHalf face =
 -- two-faced cards (Wax // Wane, Roaring Furnace // Steaming Sauna) that lint
 -- compares two names rather than passing vacuously over a pool of one-face cards.
 --
--- CR 709.5 is what raised the stakes on that uniqueness: an unlocked designation
--- (Object.unlockedHalves) and CR 709.5h's trigger both pick a half out by name,
+-- CR 709.5 is what raised the stakes on that uniqueness: an unlock or lock
+-- choice (halfPositionOf) and CR 709.5h's trigger both pick a half out by name,
 -- so two halves sharing one name would open and fire the wrong door rather than
 -- merely reading the wrong characteristics.
 faceNamed :: CardName.CardName -> Card.Card -> Maybe (Face.Face Card.Card)

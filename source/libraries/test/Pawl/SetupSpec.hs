@@ -74,6 +74,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -343,7 +344,7 @@ dirtied pid object =
       Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never ManaSpending.AnyType Nothing Nothing PlayPermissionOrigin.Granted PermissionVerb.Play),
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
-      Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),
+      Object.unlockedHalves = Set.singleton RoomHalf.RightHalf,
       Object.designations = Set.singleton Designation.Renowned,
       Object.designationValues = Map.empty,
       Object.detainedUntil = Set.singleton pid,
