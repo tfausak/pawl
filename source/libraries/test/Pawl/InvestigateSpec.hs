@@ -734,10 +734,9 @@ randomRevealSpec s registry =
           Spec.assertEqWith s "CR 701.20a bob showed them one at a time, in the order randomness named them" (revealed after) [(S.bob, ["Goblin Piker"]), (S.bob, ["Bog Wraith"])]
         -- Lumbering Lightshield is the card: {1}{W} Creature -- Illusion 1/4,
         -- "When Lumbering Lightshield enters, target opponent reveals a nonland
-        -- card at random from their hand." Its printed second sentence -- "It
-        -- perpetually gains 'This spell costs {1} more to cast.'" -- is not
-        -- transcribed, which leaves pawl's card strictly weaker than printed
-        -- (gap #3291).
+        -- card at random from their hand. It perpetually gains ..." The perpetual
+        -- tax is proven by the scenario
+        -- cr-601-2f-the-piker-lightshield-revealed-costs-1-more-and-its-twin-does-not.
         --
         -- The same hand as the Fall case, and the same reason for its order: with
         -- the filter the candidates are the Wraith and the Piker, so `rolling 1`
