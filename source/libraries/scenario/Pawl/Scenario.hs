@@ -126,12 +126,14 @@ import qualified Pawl.Types.Zone as Zone
 -- | What a run carries between prompts: the entries not yet taken, keyed by
 -- their moment, the board's labels, and the cast or activation whose own
 -- prompts are still being answered, and a move answered to be refused, with
--- the kind of prompt it answered.
+-- the kind of prompt it answered, and a refused action taken at priority with
+-- the state it was taken on.
 data Rehearsal = MkRehearsal
   { queues :: Map.Map When.When (Seq.Seq Timed.Timed),
     staged :: Staged.Staged,
     pending :: Maybe (When.When, Move.Move, Choices.Choices),
-    refusing :: Maybe (When.When, Move.Move, Text.Text)
+    refusing :: Maybe (When.When, Move.Move, Text.Text),
+    reversing :: Maybe (When.When, Move.Move, PlayerId.PlayerId, GameState.GameState)
   }
 
 type Run = State.StateT Rehearsal (Either Failure.ScenarioFailure)
@@ -181,15 +183,20 @@ rehearsalOf timeline board =
         { queues = Foldable.foldl' add Map.empty timeline,
           staged = board,
           pending = Nothing,
-          refusing = Nothing
+          refusing = Nothing,
+          reversing = Nothing
         }
 
 -- | What a finished run still owes: choices its last action never used, and
 -- entries whose moment never came, told apart by whether any is a move.
 settle :: Rehearsal -> GameState.GameState -> Either Failure.ScenarioFailure ()
 settle rehearsal final = case (pending rehearsal, refusing rehearsal) of
+  _
+    | Just (key, verb, actor, before) <- reversing rehearsal,
+      not (reversed actor before final) ->
+        Left (Failure.MkUnrefusedMove key verb Nothing)
   (Just (key, verb, choices), _)
-    | choices /= Choices.none -> Left (Failure.MkUnusedActionChoices key verb choices)
+    | choices /= Choices.none && Maybe.isNothing (reversing rehearsal) -> Left (Failure.MkUnusedActionChoices key verb choices)
   (_, Just (key, verb, _)) -> Left (Failure.MkUnrefusedMove key verb Nothing)
   _ ->
     let remaining = foldMap snd (Map.toAscList (queues rehearsal))
@@ -373,9 +380,18 @@ answerPrompt asked = do
               failWith (Failure.MkUnrefusedMove key verb (Just kind))
         _ -> State.modify' (\rehearsal -> rehearsal {refusing = Nothing})
       waiting <- State.gets pending
+      undoing <- State.gets reversing
       case waiting of
         Just (key, verb, choices)
           | subChoiceFor key prompt decider choices -> answerActionChoice key verb choices asked
+          -- CR 733.1: a refused action ends either reversed, the state back
+          -- where it was taken, or standing, which fails the scenario.
+          | Just (_, _, actor, before) <- undoing ->
+              if reversed actor before gs
+                then do
+                  State.modify' (\rehearsal -> rehearsal {pending = Nothing, reversing = Nothing})
+                  answerTopPrompt decider asked
+                else failWith (Failure.MkUnrefusedMove key verb (Just kind))
           -- Any other prompt means the action has finished. A choice it never
           -- asked for is a scenario error, reported here rather than at the
           -- next prompt that happens to want an answer.
@@ -617,6 +633,9 @@ answerActionPrompt gs pid actions = do
         Entry.Do Move.PlayLand {} -> True
         Entry.Do Move.Activate {} -> True
         Entry.Do Move.Pass -> True
+        Entry.Refuse Move.Cast {} -> True
+        Entry.Refuse Move.PlayLand {} -> True
+        Entry.Refuse Move.Activate {} -> True
         _ -> False
   case List.find (takesPriority . snd) (zip [0 ..] (Foldable.toList entries)) of
     Nothing -> pure Action.Pass
@@ -635,7 +654,18 @@ answerActionPrompt gs pid actions = do
         popAt key index
         State.modify' (\rehearsal -> rehearsal {pending = Just (key, verb, choicesOf verb)})
         pure chosen
-      (Nothing, Entry.Refuse _) -> pure Action.Pass
+      -- A refused move the engine does not offer is refused already; one it
+      -- does offer is taken, and must be reversed (CR 733.1).
+      (Nothing, Entry.Refuse verb) -> do
+        offered <- mapM (describeAction gs) actions
+        matching <- actionsMatching gs verb actions
+        popAt key index
+        case matching of
+          [] -> answerActionPrompt gs pid actions
+          [action] -> do
+            State.modify' (\rehearsal -> rehearsal {pending = Just (key, verb, choicesOf verb), reversing = Just (key, verb, pid, gs)})
+            pure action
+          _ -> failWith (Failure.MkAmbiguousAction key verb offered)
       (Nothing, Entry.Expect _) -> pure Action.Pass
 
 -- | The checks at the head of a moment's queue, evaluated and taken in order,
@@ -705,7 +735,13 @@ answerActionChoice key verb choices asked =
         Prompt.Type.ChooseTargets _ _ _ offered -> case (Choices.targets choices, Map.toList offered) of
           (Just targets, [(slot, (count, candidates))])
             | Natural.length targets == count -> do
-                resolved <- mapM (\ref -> resolveRecipient gs ref candidates unexpected) targets
+                undoing <- State.gets reversing
+                let unoffered ref = case undoing of
+                      -- A refused move's illegal target goes to the engine,
+                      -- whose CR 601.2e check is what reverses it.
+                      Just _ -> fmap (either Recipient.ToPlayer Recipient.ToObject) (resolveEither ref gs)
+                      Nothing -> unexpected
+                resolved <- mapM (\ref -> resolveRecipient gs ref candidates (unoffered ref)) targets
                 let selected = Set.fromList resolved
                 if Natural.length selected == count
                   then do
@@ -762,6 +798,13 @@ answerActionChoice key verb choices asked =
               pure option
             _ -> unexpected
         _ -> unexpected
+
+-- | Whether a refused action left the state as it found it: the stack and the
+-- acting player's hand and battlefield unchanged.
+reversed :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState -> Bool
+reversed actor before after =
+  GameState.stack before == GameState.stack after
+    && all (\zone -> Game.zoneMembers zone actor before == Game.zoneMembers zone actor after) [Zone.Hand, Zone.Battlefield]
 
 answerManaSource :: GameState.GameState -> When.When -> Move.Move -> Choices.Choices -> Text.Text -> NonEmpty.NonEmpty ObjectId.ObjectId -> Run (Maybe ObjectId.ObjectId)
 answerManaSource gs key verb choices kind candidates = case Seq.viewl (Choices.manaSources choices) of

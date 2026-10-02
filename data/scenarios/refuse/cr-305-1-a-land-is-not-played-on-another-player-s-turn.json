@@ -1,0 +1,22 @@
+{
+  "description": "CR 305.1 bob cannot play a land during alice's turn, but can during his own",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      { "name": "alice", "library": [ { "card": "Island" } ] },
+      {
+        "name": "bob",
+        "hand": [ { "card": "Forest", "label": "forest" } ],
+        "library": [ { "card": "Island" } ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "refuse": { "PlayLand": "$forest" } },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": { "PlayLand": "$forest" } }
+  ],
+  "final": [
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Forest", "count": 1 } }
+  ]
+}

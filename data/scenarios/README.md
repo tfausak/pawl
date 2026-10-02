@@ -69,7 +69,11 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   block declaration; the move standing fails the scenario, and the prompt
   asked again takes the next entry at that key. An illegal `do` is asked
   again too, so turning a `refuse` into `do` proves nothing: a `refuse` is
-  proven by changing the board until the move is legal.
+  proven by changing the board until the move is legal. At priority, a refused
+  `Cast`, `PlayLand` or `Activate` the engine does not offer is refused
+  already; one it offers is taken, its targets sent to the engine whether
+  offered or not, and must leave the stack and the player's hand and
+  battlefield as they were.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones,
   `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),
