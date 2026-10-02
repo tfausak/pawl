@@ -8,10 +8,13 @@ module Pawl.Engine.Dice where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Game (Game)
@@ -21,6 +24,7 @@ import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RollModifier as RollModifier
 
 -- | The CR 706.2 modifiers in force over the rolls `pid` is making, read fresh
@@ -71,6 +75,26 @@ adjustOffers sides modifiers =
         RollModifier.IncreaseOrDecrease amount ->
           if all (== sides) (ModifiedRoll.sides modifier) then Just (stated, modifier, amount) else Nothing
    in Maybe.mapMaybe amountOf modifiers
+
+-- | CR 706.2b: which of the competing modifiers `roller` applies next, each
+-- tagged with its payer and the object that states it, and the rest. Every
+-- candidate must already be applicable now; Nothing when none is.
+--
+-- Asked whenever two or more stand, the roller's own included (Pawl.DiceSpec's
+-- "CR 706.2b the roller picks among their own modifiers").
+--
+-- FILTERED, NOT TRUSTED: an index past the end takes the first.
+pickModifier :: PlayerId -> [(PlayerId, Maybe ObjectId, a)] -> Game (Maybe ((PlayerId, Maybe ObjectId, a), [(PlayerId, Maybe ObjectId, a)]))
+pickModifier roller candidates = case candidates of
+  [] -> pure Nothing
+  first : rest
+    | null rest -> pure (Just (first, rest))
+    | otherwise -> do
+        gs <- State.get
+        index <- Game.choose (Prompt.ChooseRollModifier (Decide.deciderFor roller gs) roller (fmap (\(_, stated, _) -> stated) (first NonEmpty.:| rest)))
+        pure $ case List.genericSplitAt index candidates of
+          (before, chosen : after) -> Just (chosen, before <> after)
+          _ -> Just (first, rest)
 
 -- | Whether a modifier's printed budget still admits it: Night Shift of the
 -- Living Dead's "Do this only once each turn", read against

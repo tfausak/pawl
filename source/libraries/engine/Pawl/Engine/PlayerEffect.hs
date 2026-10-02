@@ -3801,8 +3801,8 @@ statedFlips pid gs =
 --
 -- In timestamp order, `applying`'s order, so a reader that cares which modifier
 -- came last can have it. Rule 706.2b gives the ROLLER the pick among competing
--- modifiers rather than the timestamps (#3976), which is why nothing here
--- collapses the list.
+-- modifiers rather than the timestamps (Pawl.Engine.Dice.pickModifier), which is
+-- why nothing here collapses the list.
 --
 -- Each modifier is TAGGED with the object that states it, `applying`'s own
 -- answer, because CR 706.2a's cost is owed by the player that object's "you"
