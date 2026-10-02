@@ -5226,6 +5226,14 @@ craftBoard s registry onBattlefield inGraveyard = do
         }
     )
 
+-- The one object the payer exiles as rule 702.167a's [materials], picked out of
+-- the offer BY FILTERING it rather than by building a set of its own, so an
+-- answer naming something the engine never offered cannot repair the assertion.
+craftExiling :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+craftExiling oid p = case p of
+  Prompt.ChooseMaterials _ _ _ candidates _ _ -> Set.fromList (filter (== oid) candidates)
+  _ -> S.identityAnswer p
+
 -- The arm above with TWO objects, for rule 702.167a's "one or more": the answer
 -- is still cut out of the offer rather than built, so an answer the engine never
 -- offered cannot repair the assertion, and it is bigger than the minimum the
