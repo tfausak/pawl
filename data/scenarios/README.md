@@ -10,13 +10,14 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
 - **Board.** `seats` in turn order, each with a `name`, `life` (default 20),
   player `counters` (`[{ "key": { "type": "Energy" }, "value": 3 }]`), a
   `team` number (CR 808.1), a `range` of influence (CR 801.2a, default
-  unlimited), `emperor` (CR 809.2) and
+  unlimited), `emperor` (CR 809.2), a `manaPool` of unrestricted mana one
+  letter per unit (`"RRC"`, CR 106.4) and
   `battlefield`, `hand`, `graveyard`, `library` and `exile` placements (a
   library top card first; an exiled card face up and linked to nothing). A
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
   302.6), `damage`, `counters`, `token` (CR 111.1, battlefield only), a
   `controller` and the label of the object or seat it is `attached` to. `active` names a seat;
-  `step` is where turn 1 starts; `monarch` optionally names a seat;
+  `turn` (default 1) and `step` are where the game starts; `monarch` optionally names a seat;
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent; `brawl` (CR 903.12a),
   `sharedTeamTurns` (CR 805.1) and `deployCreatures` (CR 804.2) are off unless

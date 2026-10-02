@@ -16,6 +16,7 @@ codec :: Codec.Codec Board.Board
 codec = Fields.object $ do
   seats <- Fields.required "seats" (Common.nonEmpty Seat.codec) Board.seats
   active <- Fields.required "active" Label.codec Board.active
+  turn <- Fields.defaulted "turn" 1 Common.natural Board.turn
   phase <- Fields.required "step" Phase.flat Board.phase
   monarch <- Fields.defaulted "monarch" Nothing (Common.maybe Label.codec) Board.monarch
   attackOption <- Fields.defaulted "attackOption" (Just AttackOption.MultiplePlayers) (Common.maybe Arm.keyedEnum) Board.attackOption
@@ -26,6 +27,7 @@ codec = Fields.object $ do
     Board.MkBoard
       { Board.seats = seats,
         Board.active = active,
+        Board.turn = turn,
         Board.phase = phase,
         Board.monarch = monarch,
         Board.attackOption = attackOption,

@@ -211,6 +211,7 @@ playerSetup pid =
       Seat.team = Nothing,
       Seat.range = Nothing,
       Seat.emperor = False,
+      Seat.manaPool = [],
       Seat.battlefield = Seq.empty,
       Seat.hand = Seq.empty,
       Seat.graveyard = Seq.empty,
@@ -237,6 +238,7 @@ board seats active step =
           Board.MkBoard
             { Board.seats = seats,
               Board.active = seatLabel active,
+              Board.turn = 1,
               Board.phase = step,
               Board.monarch = Nothing,
               Board.attackOption = Just AttackOption.MultiplePlayers,

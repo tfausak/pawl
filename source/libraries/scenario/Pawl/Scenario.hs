@@ -84,6 +84,9 @@ import qualified Pawl.Types.KeywordsAre as KeywordsAre
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.ManaRetention as ManaRetention
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.MonarchIs as MonarchIs
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.NamesAre as NamesAre
@@ -235,6 +238,8 @@ stage registry board =
               positioned =
                 base
                   { GameState.activePlayer = active,
+                    GameState.turnNumber = Board.turn board,
+                    GameState.manaPool = Map.fromList [(pid, Mana.Type.MkMana (fmap plainUnit (Seat.manaPool seat))) | (seat, pid) <- NonEmpty.toList seated, not (null (Seat.manaPool seat))],
                     GameState.phase = Board.phase board,
                     GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
                     GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives, Player.counters = Map.findWithDefault (Player.counters p) pid counters}) (GameState.players base),
@@ -252,6 +257,18 @@ stage registry board =
                   }
           placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
           pure (fmap designateDefenders (placed >>= attachAll (placementsOf board)))
+
+-- | One unrestricted unit of a type, as a board floats it (CR 106.4).
+plainUnit :: ManaType.ManaType -> ManaUnit.ManaUnit
+plainUnit manaType =
+  ManaUnit.MkManaUnit
+    { ManaUnit.manaType = manaType,
+      ManaUnit.tags = Set.empty,
+      ManaUnit.retention = ManaRetention.Ordinary,
+      ManaUnit.restriction = Nothing,
+      ManaUnit.rider = Nothing,
+      ManaUnit.sourceChosenSubtype = Nothing
+    }
 
 -- | CR 506.2 / CR 507.1: a board past the beginning of combat has its defending
 -- players settled already, so the turn-based action that step would have taken

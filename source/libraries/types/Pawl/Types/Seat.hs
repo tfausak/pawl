@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
 import qualified Pawl.Types.Label as Label
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.TeamId as TeamId
@@ -21,6 +22,9 @@ data Seat = MkSeat
     range :: Maybe Natural,
     -- | CR 809.2: whether the player is their team's emperor.
     emperor :: Bool,
+    -- | CR 106.4: the unrestricted mana already in the player's pool, one type
+    -- per unit.
+    manaPool :: [ManaType.ManaType],
     battlefield :: Seq.Seq Placement.Placement,
     hand :: Seq.Seq Placement.Placement,
     graveyard :: Seq.Seq Placement.Placement,
