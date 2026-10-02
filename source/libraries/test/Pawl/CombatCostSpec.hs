@@ -122,36 +122,6 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     -- failing CR 508.1j and rewinding the declaration.
     Spec.assertEqWith s "CR 508.1k the mana leg's Piker attacks" (S.attackerDeclarationsOf manaLeg) mine
     Spec.assertEqWith s "and so does the life leg's" (S.attackerDeclarationsOf lifeLeg) mine
-  Spec.it s "CR 508.1h two taxed attackers at 3 life: neither {W/P} may take the life route" $ do
-    -- What makes the announcement a question about the WHOLE toll rather than
-    -- about one charge: CR 508.1h totals the shares, and CR 118.3 makes the total
-    -- one demand on one life total. Two Pikers under Norn's Annex owe {W/P}{W/P},
-    -- and alice has no white source and 3 life -- enough for ONE life route and
-    -- not for two, so neither may be offered and the toll is unpayable.
-    --
-    -- The declaration is then rewound by CR 508.1's preamble and remade, and
-    -- with `aggressiveAnswer` naming the same two creatures every time it ends
-    -- in no attack at all. A per-charge measure would offer each {W/P} its life
-    -- route on the strength of the 3 life the other one is also spending, and
-    -- alice would end the step at -1.
-    annex <- S.printingOf s registry "Norn's Annex"
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = imprisoning annex plains S.bob [piker, piker] 0
-        after = S.runPure (announcesWay PhyrexianPayment.PaysLife) (atLife S.alice 3 gs) (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "CR 118.3 alice's 3 life pays neither symbol, so nothing was spent" (S.lifeOf S.alice after) (Just 3)
-    Spec.assertEqWith s "CR 508.1 and the rewound declaration ends with no attacker" (S.attackerDeclarationsOf after) []
-  Spec.it s "CR 508.1 the same board WITHOUT the Prison pays nothing" $ do
-    -- The control for the test above, and the reason it is not vacuous: attacking
-    -- is free by default (CR 508.1f: "tapping a creature when it's declared as an
-    -- attacker isn't a cost"), so the Prison is what tapped the Forests.
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] []
-        (forests, board) = addForests forest 2 gs
-        after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "the Piker still attacks" (S.attackerDeclarationsOf after) mine
-    Spec.assertBool s (allUntapped forests after) "and no Forest was tapped"
   Spec.it s "CR 508.1j Hollow Warrior cannot tap a creature declared alongside it" $ do
     -- The attacking half of Hollow Warrior's criterion. It needs VIGILANCE to be
     -- observable at all: CR 508.1f taps every chosen creature before CR 508.1h-j
@@ -211,39 +181,6 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertBool s (allUntapped forests after) "the Forests are untapped again"
     Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
-  Spec.it s "CR 508.1 the rewound declaration is made again: two Pikers under a Ghostly Prison become one" $ do
-    -- The case directly above's board, answered by a player rather than by a
-    -- machine that repeats itself. CR 508.1's preamble returns the game to the
-    -- moment before the declaration, and the declaration is still owed -- so the
-    -- active player declares again, normally the smaller attack they can afford.
-    -- Where the case above ends with nothing attacking, this one ends with one
-    -- Piker attacking and one Forest to spare.
-    --
-    -- THREE Forests is load-bearing: at two the leftover Forest cannot be read,
-    -- and at four the first declaration is affordable and the two readings of the
-    -- preamble agree.
-    prison <- S.printingOf s registry "Ghostly Prison"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, forests) = imprisoning prison forest S.bob [piker, piker] 3
-        ((_, after), asked) = State.runState (Engine.runGame retryAttackAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)) 0
-        declared = S.attackerDeclarationsOf after
-    Spec.assertEqWith s "CR 508.1: exactly one Piker attacks, where the rewind alone left none" (length declared) 1
-    Spec.assertBool s (all (\oid -> List.elem oid mine) declared) "and it is one of alice's two"
-    Spec.assertEqWith s "CR 508.1j: the second declaration owes {2}, so one Forest is left" (length (filter (\oid -> tapStateOf oid after == Just TapState.Untapped) forests)) 1
-    Spec.assertEqWith s "CR 508.1's preamble asked for a fresh declaration" asked 2
-  Spec.it s "CR 109.5 a Ghostly Prison its own controller is attacking WITH taxes nothing" $ do
-    -- The direction, which is the whole of the "you": alice controls the Prison
-    -- and attacks bob, so nothing is attacking alice and no cost is owed. An
-    -- engine that taxed every attack while any Prison was on the battlefield
-    -- would tap her Forests here.
-    prison <- S.printingOf s registry "Ghostly Prison"
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, forests) = imprisoning prison forest S.alice [piker] 2
-        after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "the Piker attacks" (S.attackerDeclarationsOf after) mine
-    Spec.assertBool s (allUntapped forests after) "and paid nothing"
   Spec.it s "Ghostly Prison's ruling: a creature that can't attack you can still attack a planeswalker you control" $ do
     -- "Unless some effect explicitly says otherwise, a creature that can't attack
     -- you can still attack a planeswalker you control" (Ghostly Prison, 2014-02-01).
@@ -409,34 +346,6 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
         Spec.assertBool s (allTapped forests atBob) "attacking bob: the {3} was paid"
       _ -> Spec.assertFailure s "fixture should have one attacker"
 
-  Spec.it s "CR 508.1h a cost to attack that is not mana: an Exalted Dragon sacrifices a land" $ do
-    -- CR 508.1h's list past its first item -- "costs may include paying mana,
-    -- tapping permanents, sacrificing permanents, discarding cards, and so on" --
-    -- proved by Exalted Dragon ("This creature can't attack unless you sacrifice a
-    -- land"), the pool's first cost to attack that is not mana.
-    --
-    -- The lands are Forests and are UNTAPPED throughout, which is what separates
-    -- the two kinds of toll on one board: an engine that charged mana here would
-    -- tap one, and an engine that charged nothing would leave both standing.
-    dragon <- S.printingOf s registry "Exalted Dragon"
-    forest <- S.printingOf s registry "Forest"
-    let (gs, mine, _) = S.combatBoardOf [dragon] []
-        (forests, board) = addForests forest 2 gs
-        after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "CR 508.1j: one of the two lands was sacrificed" (stillThere forests after) 1
-    Spec.assertEqWith s "and the Dragon really was declared" (S.attackerDeclarationsOf after) mine
-    Spec.assertBool s (allUntapped (filter (\oid -> Set.member oid (GameState.battlefield after)) forests) after) "the surviving land was not tapped: this toll is not mana"
-  Spec.it s "CR 508.1 the same board with an untaxed attacker sacrifices nothing" $ do
-    -- The control for the case above, differing in the attacking creature alone:
-    -- Exalted Dragon's subject is ITSELF, so a Goblin Piker on the same two-Forest
-    -- board attacks for free.
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] []
-        (forests, board) = addForests forest 2 gs
-        after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith s "both lands are still there" (stillThere forests after) 2
-    Spec.assertEqWith s "and the Piker attacked all the same" (S.attackerDeclarationsOf after) mine
   Spec.it s "CR 508.1j partial payments are not allowed: two Dragons and one land sacrifice nothing" $ do
     -- CR 508.1h totals the whole declaration, so two Dragons owe two lands. One
     -- land cannot pay for both, and CR 508.1j's "partial payments are not allowed"
@@ -486,20 +395,6 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "the gathered order: nothing was declared" (S.attackerDeclarationsOf dragonFirst) []
     Spec.assertEqWith s "and CR 508.1j gave the Arbor back" (stillThere [tree] dragonFirst) 1
     Spec.assertBool s (allUntapped [tree] dragonFirst) "the Warrior's tap was rewound with it"
-
--- Declares every candidate the FIRST time CR 508.1a is asked and the first
--- candidate alone the second, counting the asks in its state. Stateful because a
--- pure `Prompt r -> r` cannot tell the two asks apart: it repeats the answer CR
--- 508.1's preamble just rewound, which is the path the case beside this one's
--- covers. Pinned by position rather than by affordability, so a mutation that
--- breaks the retry cannot be repaired by the answerer looking for a legal answer.
-retryAttackAnswer :: Prompt.Prompt r -> State.State Natural r
-retryAttackAnswer p = case p of
-  Prompt.DeclareAttackers _ _ candidates -> do
-    asked <- State.get
-    State.put (asked + 1)
-    pure (if asked == 0 then candidates else take 1 candidates)
-  _ -> pure (S.identityAnswer p)
 
 -- retryAttackAnswer's twin for CR 509.1a: every candidate blocks the first
 -- attacker on the first ask, and only `keep` does on the second.
@@ -2758,27 +2653,6 @@ switchBlockersSpec s registry = Spec.describe s "SwitchBlockers" $ do
         Spec.assertEqWith s "control: so its trigger never fired" (S.powerToughnessOf net idle) (Just (2, 3))
       _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
 
-  -- CR 509.1b through General Jarkeld's own "if each of those creatures could be
-  -- blocked by all creatures that the other is blocked by". The pair differs from
-  -- the case above in EXACTLY one thing: the creature blocking the Piker is a
-  -- Cabal Evangel rather than a Netcaster Spider, so it could not block the Bird
-  -- Maiden, and the whole reassignment is off. The ability still resolves and
-  -- still costs its {T}.
-  Spec.it s "CR 509.1b a pair the hypothetical refuses moves nobody" $ do
-    maiden <- S.printingOf s registry "Bird Maiden"
-    piker <- S.printingOf s registry "Goblin Piker"
-    evangel <- S.printingOf s registry "Cabal Evangel"
-    giant <- S.printingOf s registry "Giant Spider"
-    jarkeld <- S.printingOf s registry "General Jarkeld"
-    case S.combatBoardOf [maiden, piker] [evangel, giant, jarkeld] of
-      (gs0, [flier, ground], [evangelId, giantId, jarkeldId]) -> do
-        let blocks = Map.fromList [(evangelId, Set.singleton ground), (giantId, Set.singleton flier)]
-            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (switching blocks [flier, ground]) gs0
-        Spec.assertEqWith s "CR 509.1b: the Evangel could not block the Maiden, so nothing moved" (Combat.blockersOf flier used) (Set.singleton giantId)
-        Spec.assertEqWith s "and the Evangel is still blocking the Piker" (Combat.blockersOf ground used) (Set.singleton evangelId)
-        Spec.assertEqWith s "though the ability resolved and paid its {T}" (tapStateOf jarkeldId used) (Just TapState.Tapped)
-      _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
-
   -- CR 509.3a's guard on the same road -- "but only if it wasn't a blocking
   -- creature at that time" -- against CR 509.3d's, which carries none. Every
   -- creature this effect moves WAS a blocking creature, so Pride Guardian
@@ -2831,23 +2705,6 @@ switchBlockersSpec s registry = Spec.describe s "SwitchBlockers" $ do
         Spec.assertEqWith s "control: without the switch the Inquisitors' trigger never fired" (S.powerToughnessOf inq idle) (Just (3, 3))
       _ -> Spec.assertFailure s "fixture should have two attackers and four of bob's creatures"
 
-  -- The same form's CROSSING: an Inquisitors already blocked by a black creature
-  -- does not become blocked by one or more black creatures again when the
-  -- switch trades that Wraith for another. The declaration fires it once, 5/3,
-  -- and the switch adds nothing.
-  Spec.it s "CR 509.3e an Inquisitors already blocked by a black creature does not trigger again on the switch" $ do
-    inquisitors <- S.printingOf s registry "Serra Inquisitors"
-    giant <- S.printingOf s registry "Hill Giant"
-    wraith <- S.printingOf s registry "Bog Wraith"
-    jarkeld <- S.printingOf s registry "General Jarkeld"
-    case S.combatBoardOf [inquisitors, giant] [wraith, wraith, jarkeld] of
-      (gs0, [inq, other], [first, second, _]) -> do
-        let blocks = Map.fromList [(first, Set.singleton inq), (second, Set.singleton other)]
-            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (switching blocks [inq, other]) gs0
-        Spec.assertEqWith s "CR 509.3e: only the declaration fired the Inquisitors' trigger" (S.powerToughnessOf inq used) (Just (5, 3))
-        Spec.assertEqWith s "though the switch really happened" (Combat.blockersOf inq used) (Set.singleton second)
-      _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
-
   -- CR 509.3e's count form on the effect road, read by a bystander: Seifer,
   -- Balamb Rival ("Whenever a creature attacking one of your opponents becomes
   -- blocked by two or more creatures, that attacking creature gains deathtouch
@@ -2874,23 +2731,6 @@ switchBlockersSpec s registry = Spec.describe s "SwitchBlockers" $ do
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch elf idle)) "control: without the switch the Elves never gains deathtouch"
         Spec.assertEqWith s "control: Seifer fired for the Piker's declaration alone" (countFiredBy seiferId idle) 1
       _ -> Spec.assertFailure s "fixture should have three of alice's creatures and four of bob's"
-
-  -- The same form's floor, which a switch must CROSS: two Giants on each
-  -- attacker fire Seifer twice at the declaration, and the switch trading them
-  -- leaves both at two, which crosses nothing.
-  Spec.it s "CR 509.3e a switch that leaves both attackers at two blockers does not fire Seifer again" $ do
-    elves <- S.printingOf s registry "Llanowar Elves"
-    piker <- S.printingOf s registry "Goblin Piker"
-    seifer <- S.printingOf s registry "Seifer, Balamb Rival"
-    giant <- S.printingOf s registry "Hill Giant"
-    jarkeld <- S.printingOf s registry "General Jarkeld"
-    case S.combatBoardOf [elves, piker, seifer] [giant, giant, giant, giant, jarkeld] of
-      (gs0, [elf, pik, seiferId], [a, b, c, d, _]) -> do
-        let blocks = Map.fromList [(a, Set.singleton elf), (b, Set.singleton elf), (c, Set.singleton pik), (d, Set.singleton pik)]
-            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (seiferSwitching True [elf, pik] blocks) gs0
-        Spec.assertEqWith s "CR 509.3e: Seifer fired for the two declarations and not for the switch" (countFiredBy seiferId used) 2
-        Spec.assertEqWith s "though the switch really happened" (Combat.blockersOf elf used) (Set.fromList [c, d])
-      _ -> Spec.assertFailure s "fixture should have three of alice's creatures and five of bob's"
 
 -- Declare exactly `blocks` and otherwise answer as the aggressive interpreter
 -- does. Pinned rather than searched for: the boards above turn on WHICH

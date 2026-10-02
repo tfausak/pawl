@@ -113,13 +113,6 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- Cast `creature` off `nLands` copies of `land`, then resolve it.
-resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
-resolvedCreature land creature nLands =
-  let (base, oid) = S.handOne creature (S.landsInPlay land nLands)
-      afterCast = snd (Engine.runGamePure S.identityAnswer base (S.cast S.alice oid))
-   in snd (Engine.runGamePure S.identityAnswer afterCast Stack.resolveTop)
-
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) wrapping one
 -- ability's effects and target slots -- the fixture shape every pre-M4h
 -- single-mode ActivatedAbility now takes.
@@ -143,24 +136,6 @@ avoidsSource unwanted p = case p of
     h : _ -> h
     [] -> NonEmpty.head candidates
   _ -> S.identityAnswer p
-
-castabilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-castabilitySpec s registry = Spec.describe s "Castability" $ do
-  Spec.it s "War Mammoth is cast off four Forests and resolves onto the battlefield" $ do
-    forest <- S.printingOf s registry "Forest"
-    warMammoth <- S.printingOf s registry "War Mammoth"
-    let gs = resolvedCreature forest warMammoth 4
-    Spec.assertEqWith s "stack empty" (length (GameState.stack gs)) 0
-    Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
-    Spec.assertEqWith s "lands tapped" (S.tappedCount S.alice gs) 4
-
-  Spec.it s "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let gs = resolvedCreature swamp typhoidRats 1
-    Spec.assertEqWith s "stack empty" (length (GameState.stack gs)) 0
-    Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
-    Spec.assertEqWith s "lands tapped" (S.tappedCount S.alice gs) 1
 
 -- The board the three CR 604.2 cases below share: alice controls Zhao, the Moon
 -- Slayer ("As long as Zhao has a conqueror counter on him, nonbasic lands are
@@ -813,16 +788,6 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
       (fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])
     Spec.assertBool s (elem birdsId (Mana.manaSources Cost.manaActivations S.alice gs)) "it is a mana source"
 
-  -- The gameplay-level proof (design.md section 4): a real card, cast end to
-  -- end off a source that produces no black mana until its controller says so.
-  Spec.it s "CR 605.3b Typhoid Rats is cast off a lone Birds of Paradise that taps for black" $ do
-    birds <- S.printingOf s registry "Birds of Paradise"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let resolved = castOffBoard (prefersColor Color.Black) [birds] typhoidRats
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Birds and the Rats" (S.creaturesInPlay S.alice resolved) 2
-    Spec.assertEqWith s "the Birds is tapped" (S.tappedCount S.alice resolved) 1
-
   -- The discriminating half: identical board, identical spell, one different
   -- answer. If the engine picked the colour itself this would pass too.
   Spec.it s "the color is the player's: a Birds tapped for green does not pay {B}" $ do
@@ -1415,60 +1380,6 @@ paysWithWhite p = case p of
       candidates
   _ -> S.identityAnswer p
 
--- CR 612.1 over the CR 602.5 rider itself, which is printed text like the cost
--- and the effect beside it. Magical Hack ({U}, "Change the text of target spell
--- or permanent by replacing all instances of one basic land type with another",
--- oracle checked on Scryfall 2026-09-15) on Nimbus Maze, whose {W} route prints
--- "Activate only if you control an Island".
---
--- TWO LEGS ONE WORD APART: the same board, the same Hack aimed at the same Maze,
--- and the only difference is which basic land type CR 608.2d's announcement
--- names. Island -> Swamp moves the {W} rider onto a land alice does not control
--- and the route dies; Plains -> Swamp moves the Maze's OTHER rider (the {U}
--- route's) and leaves the {W} one still reading Island, which the Island she
--- tapped for the Hack answers -- CR 602.5 asks what she CONTROLS, not what is
--- untapped.
---
--- THE ISLAND IS HER ONLY {U} SOURCE -- the Maze's own {U} route is ridden on a
--- Plains she does not control -- so casting the Hack taps it and leaves the Maze
--- as the only untapped source Luminesce's {W} can come from. Luminesce's printed
--- cost is exactly {W}, so the Maze's unridden {C} route pays nothing here.
-nimbusMazeTextChangeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-nimbusMazeTextChangeSpec s registry = Spec.describe s "Nimbus Maze text change" $ do
-  Spec.it s "CR 612.1 a swap naming the rider's own word moves which land it counts" $ do
-    stuck <- strandedAfterHack s registry Subtype.Island Subtype.Swamp
-    Spec.assertBool s stuck "CR 602.5 the rider now reads Swamp, alice controls none, and Luminesce stays in her hand"
-
--- alice controls a Nimbus Maze and one Island, both untapped, and holds Magical
--- Hack and Luminesce. She casts the Hack at the Maze with the swap under test,
--- resolves it, then casts Luminesce. True when Luminesce is STILL IN HER HAND --
--- CR 601.2h found no {W} to pay with, which on this board means the {W} route's
--- rider refused.
-strandedAfterHack :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Subtype.Subtype -> Subtype.Subtype -> m Bool
-strandedAfterHack s registry from to = do
-  maze <- S.printingOf s registry "Nimbus Maze"
-  island <- S.printingOf s registry "Island"
-  hack <- S.printingOf s registry "Magical Hack"
-  luminesce <- S.printingOf s registry "Luminesce"
-  let (mazeId, g1) = S.addPermanent maze S.alice (S.landsInPlay island 1)
-      (hackId, g2) = S.addHandCard hack S.alice g1
-      (lumId, g3) = S.addHandCard luminesce S.alice g2
-      ready = g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
-      after = snd (Engine.runGamePure (hackingMaze mazeId from to) ready (S.cast S.alice hackId >> Stack.resolveTop >> S.cast S.alice lumId))
-  pure (elem lumId (Game.zoneMembers Zone.Hand S.alice after))
-
--- Magical Hack aimed at one permanent by FILTERING the offer rather than
--- rebuilding it (CR 608.2b would drop a hand-built recipient of the wrong shape
--- with no error), CR 608.2d's swap answered with the pair under test, and the two
--- payments told apart by their sources: the {U} is paid by the one candidate that
--- is not the Maze, and the {W} by the Maze, which is all that is left untapped.
-hackingMaze :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
-hackingMaze mazeId from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just mazeId) . Recipient.objectOf) . snd) sets
-  Prompt.ChooseLandTypeSwap {} -> (from, to)
-  Prompt.ChooseManaSource _ _ candidates -> Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (mazeId /=) (NonEmpty.toList candidates)))
-  _ -> paysWithWhite p
-
 -- CR 601.2a's move against CR 602.5's board condition, in the direction that
 -- REFUSES: Lys Alana Dignitary ("{T}: Add {G}{G}. Activate only if there is an
 -- Elf card in your graveyard") paying for Bloodbraid Challenger's escape, cast
@@ -1620,17 +1531,6 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]) gs) "{2}{R} is affordable"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
 
-  -- The gameplay-level proof (design.md section 4): a real spell cast end to
-  -- end off a single permanent, which no one-mana-per-source engine can do.
-  Spec.it s "CR 601.2g Sapphire Medallion is cast off a lone Sol Ring" $ do
-    solRing <- S.printingOf s registry "Sol Ring"
-    sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
-    let resolved = castOffBoard S.identityAnswer [solRing] sapphireMedallion
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Medallion resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Sapphire Medallion") S.alice resolved) 1
-    Spec.assertEqWith s "the Sol Ring is tapped" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
-
   -- The elision side of the invariant: Sol Ring offers exactly one yield, so
   -- there is nothing to ask -- and NOT because its two mana are the same
   -- type, which would be the engine choosing. "CR 605 a single-yield source
@@ -1646,19 +1546,6 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
           _ -> pure (S.identityAnswer p)
         (solRingId, gs) = S.addPermanent solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (S.tapForMana solRingId)) 0) 0
-
--- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
--- other source's prompt to S.identityAnswer, which takes the head. A payment off
--- several two-yield sources needs a different answer from each, and the prompt
--- carries the object it is about, so keying on that is what lets one answerer
--- send one Palladium Myr to its Forest and the other to its {C}{C}.
-prefersLongYieldFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-prefersLongYieldFrom wanted p = case p of
-  Prompt.ChooseManaYield _ _ oid candidates
-    | oid == wanted ->
-        let size = length . Mana.yieldUnits
-         in List.maximumBy (\a b -> compare (size a) (size b)) (NonEmpty.toList candidates)
-  _ -> S.identityAnswer p
 
 -- CR 405.6c: "mana abilities resolve immediately. If a mana ability both
 -- produces mana and has another effect, the mana is produced and the other
@@ -1800,24 +1687,6 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     Spec.assertBool s (elem (Action.Type.Cast planeId (S.printingName livingPlane) Facing.FaceUp) offered) "{2}{G}{G} is offered"
     Spec.assertBool s (not (any (S.isCastOf towershellId) offered)) "{3}{G}{G} is not"
 
-  -- And the offer is honoured: the same board casts Living Plane end to end,
-  -- which it can only do by tapping one Myr for its Forest's {G} and the other
-  -- for {C}{C} -- the mixed choice the transposing model could not represent.
-  Spec.it s "CR 601.2g Living Plane is cast off Ashaya and two Palladium Myrs" $ do
-    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
-    palladiumMyr <- S.printingOf s registry "Palladium Myr"
-    livingPlane <- S.printingOf s registry "Living Plane"
-    let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
-        (firstMyrId, g2) = S.addPermanent palladiumMyr S.alice g1
-        (_, g3) = S.addPermanent palladiumMyr S.alice g2
-        (withSpell, planeId) = S.handOne livingPlane g3
-        cast = S.runPure (prefersLongYieldFrom firstMyrId) withSpell (S.cast S.alice planeId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "Living Plane resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Living Plane") S.alice resolved) 1
-    Spec.assertEqWith s "all three sources tapped" (S.tappedCount S.alice resolved) 3
-    Spec.assertEqWith s "and nothing was left over" (poolSize S.alice resolved) 0
-
 -- CR 700.2's SELECTION on a mana ability. Synthetic Prismatic Wellspring
 -- (Land, "{T}: Choose two -- * Add {R}. * Add {G}. * Add {W}.") is the pool's
 -- first mana ability whose selection is not "choose exactly one", and it is
@@ -1881,19 +1750,6 @@ wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
       "{R} and {G}, from one activation"
       (tappedFor S.identityAnswer wellspringId gs)
       [ManaType.Colored Color.Red, ManaType.Colored Color.Green]
-
-  -- The gameplay-level proof (design.md section 4): a real spell cast end to
-  -- end off the one synthetic permanent. Liquimetal Coating is a plain {2}
-  -- Artifact -- no colour in the cost and nothing to target -- so quantity is
-  -- the only thing the payment can turn on.
-  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Wellspring" $ do
-    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
-    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
-    let resolved = castOffBoard S.identityAnswer [wellspring] liquimetalCoating
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
-    Spec.assertEqWith s "the Wellspring is tapped" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
 
 -- alice casts a Coldsteel Heart off two Mountains and resolves it, naming
 -- `wanted` at CR 614.1c's colour choice. Returns the board and the permanent
@@ -2202,22 +2058,6 @@ bloodPetSpec s registry = Spec.describe s "Blood Pet" $ do
     Spec.assertBool s (elem petId sources) "CR 302.6 gates a cost with {T} or {Q}, and sacrificing is neither"
     Spec.assertBool s (notElem elfId sources) "where the Elves are gated, as they always were"
 
-  -- The gameplay-level proof (design.md section 4). Typhoid Rats is {B} and
-  -- targets nothing as it is cast, so the whole cast turns on whether the Pet
-  -- could be activated -- on a board where nothing else makes mana and the Pet
-  -- is both tapped and sick, which is to say refused twice over before this.
-  Spec.it s "CR 605.3a a tapped, sick Blood Pet pays for Typhoid Rats" $ do
-    bloodPet <- S.printingOf s registry "Blood Pet"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let (petId, g1) = S.addPermanent bloodPet S.alice (Setup.emptyGame S.bothPlayers)
-        board = S.tapObject petId (sicken petId g1)
-        (withSpell, ratsId) = S.handOne typhoidRats board
-        resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer withSpell (S.cast S.alice ratsId)) Stack.resolveTop
-        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Black)]) board) "the Pet is a {B} supply while tapped and sick"
-    Spec.assertEqWith s "the Rats resolved" (countOf "Typhoid Rats" resolved) 1
-    Spec.assertEqWith s "and the Pet paid for them" (countOf "Blood Pet" resolved) 0
-
 -- CR 118.3 on the supply side, counted rather than merely gated. Ashnod's Altar
 -- ({3} Artifact, "Sacrifice a creature: Add {C}{C}") is the pool's first mana
 -- ability a payment can activate MORE THAN ONCE: its cost holds no {T} for CR
@@ -2263,17 +2103,6 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
     Spec.assertEqWith s "both Pikers paid for it" (countOf "Goblin Piker" resolved) 0
     Spec.assertEqWith s "with one Piker there is no {4} and the cast fails" (countOf "Silent Arbiter" short) 0
     Spec.assertEqWith s "and CR 601.2h left the Piker alive" (countOf "Goblin Piker" short) 1
-
-  -- The prompt-level half, since a board cannot say whether the window CLOSED
-  -- early: the Altar has to be offered a second time, with the cost still
-  -- uncovered, for the second activation to happen at all.
-  Spec.it s "CR 601.2g the mana window offers the Altar twice" $ do
-    altar <- S.printingOf s registry "Ashnod's Altar"
-    piker <- S.printingOf s registry "Goblin Piker"
-    arbiter <- S.printingOf s registry "Silent Arbiter"
-    let (withSpell, oid) = S.handOne arbiter (altarBoard altar piker 2)
-        offers = State.execState (Engine.runGame recordingManaSources withSpell (S.cast S.alice oid)) []
-    Spec.assertEqWith s "asked for a source twice, the Altar the only candidate each time" (fmap length offers) [1, 1]
 
 -- The Altar and `victims` Pikers, all under alice's control.
 altarBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
@@ -4176,7 +4005,6 @@ rhysticCaveSpec s registry =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
-  castabilitySpec s registry
   anyColorSpec s registry
   rhysticCaveSpec s registry
   chosenColorSpec s registry
@@ -4192,7 +4020,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   cabalCoffersSpec s registry
   laviniaTurnRiderSpec s registry
   nimbusMazeSpec s registry
-  nimbusMazeTextChangeSpec s registry
   lysAlanaDignitarySpec s registry
   hollowSpringSpec s registry
   wellspringSpec s registry
@@ -4395,7 +4222,7 @@ confluenceObeliskSpec s registry = Spec.describe s "Synthetic Confluence Obelisk
 -- removed a counter, so the activation that takes the LAST counter sacrifices
 -- the land and the one before it does not. The pair differs only in how many
 -- counters the land starts with.
-hickoryWoodlotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hickoryWoodlotSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hickoryWoodlotSpec s registry = Spec.describe s "Hickory Woodlot" $ do
   Spec.it s "CR 608.2c the sacrifice reads the counter its own cost removed" $ do
     woodlot <- S.printingOf s registry "Hickory Woodlot"
@@ -4411,19 +4238,6 @@ hickoryWoodlotSpec s registry = Spec.describe s "Hickory Woodlot" $ do
       [ ([ManaType.Colored Color.Green, ManaType.Colored Color.Green], True),
         ([ManaType.Colored Color.Green, ManaType.Colored Color.Green], False)
       ]
-
-  -- The card's first line, which the case above sets by hand.
-  Spec.it s "CR 614.1c Hickory Woodlot enters tapped with two depletion counters" $ do
-    woodlot <- S.printingOf s registry "Hickory Woodlot"
-    let (_, inHand) = S.addHandCard woodlot S.alice (Setup.emptyGame S.bothPlayers)
-        board = inHand {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-        played = S.runPure S.playLandAnswer board Engine.priorityLoop
-        depletion = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "depletion"))
-    Spec.assertEqWith
-      s
-      "CR 614.1c the land arrives tapped, carrying two depletion counters"
-      (fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid played), S.counterOf depletion oid played)) (Set.toList (GameState.battlefield played)))
-      [(Just TapState.Tapped, 2)]
 
 -- CR 106.4: "adds that mana" says nothing about whose pool, and CR 106.3's
 -- "instructs a player to add" is the sentence a card fills in. Yurlok of Scorch

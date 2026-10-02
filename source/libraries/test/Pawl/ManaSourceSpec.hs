@@ -1639,31 +1639,6 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
         -- have overwritten it, which is what this pins.
         Spec.assertEqWith s "CR 400.7d the equip records no mana spent on the Bonesplitter" (fmap Object.manaSpent (Game.lookupObject equipId equipped)) (Just (Mana.Type.MkMana []))
 
-  -- The CONTROL, one Island apart. Everything the assertions above rest on that
-  -- is not CR 106.6 -- the Hawker being unsick enough to tap (CR 302.6), the
-  -- equip's sorcery-speed rider (CR 702.6a), a legal equip target, the phase --
-  -- is unchanged here, and both the equip and the cast go through. So the
-  -- refusal above is the restriction and not the board.
-  Spec.it s "CR 106.6 one Island casts the same spell, so the refusal above is the restriction" $ do
-    hawker <- S.printingOf s registry "Omen Hawker"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    recall <- S.printingOf s registry "Ancestral Recall"
-    solRing <- S.printingOf s registry "Sol Ring"
-    island <- S.printingOf s registry "Island"
-    let (hawkerId, g1) = S.addPermanent hawker S.alice (S.landsInPlay island 1)
-        (equipId, g2) = S.addPermanent bonesplitter S.alice g1
-    case Projection.abilitiesOf equipId g2 of
-      [] -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
-      equipAbility : _ -> do
-        let (g3, recallId) = S.handOne recall g2
-            (ringId, board) = S.addHandCard solRing S.alice g3
-            equipped =
-              let activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice equipId equipAbility)
-               in S.runPure S.identityAnswer activated Stack.resolveTop
-        Spec.assertEqWith s "the equip still resolves" (S.powerToughnessOf hawkerId equipped) (Just (3, 1))
-        Spec.assertBool s (S.castable S.alice recallId board) "and the Island casts the instant"
-        Spec.assertBool s (S.castable S.alice ringId board) "and the artifact spell too, so neither demand is what refused above"
-
   -- CR 602.2b's own reading, one level in: paying a mana ability's activation
   -- cost is an activation, so mana restricted to activations may pay it. Omen
   -- Hawker taps for {C}{U}, one of those buys Chromatic Star's "{1}, {T},
@@ -1747,7 +1722,7 @@ hawkerMana manaType =
 -- rider's predicate cannot come out right here by luck; and its rider carries a
 -- real predicate -- "an instant or sorcery spell" -- where the Halfling's
 -- narrows nothing, so the condition field is proven rather than merely present.
-boseijuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boseijuSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 boseijuSpec s registry = Spec.describe s "Boseiju, Who Shelters All" $ do
   -- The pair, one mana source apart. Divination ({2}{U} Sorcery, "Draw two
   -- cards") is the victim, and alice's three lands are exactly its three mana --
@@ -1776,23 +1751,6 @@ boseijuSpec s registry = Spec.describe s "Boseiju, Who Shelters All" $ do
     -- Only now the proxies, both of them behind the assertion above.
     Spec.assertBool s (not (any isSpellCountered (S.eventsOf withBoseiju))) "CR 701.6a nothing was countered"
     Spec.assertBool s (any isSpellCountered (S.eventsOf allIslands)) "and on the control board something was"
-
-  -- The rider's CONDITION, which the case above cannot reach: its board would
-  -- pass with the predicate widened to Pawl.Types.Filter's trivial @And []@.
-  -- Erudite Wizard ({2}{U} Creature) costs what Divination costs and is paid the
-  -- same way off the same three lands, so the boards differ in the victim's card
-  -- type and in nothing else -- and CR 106.6's clause names instants and
-  -- sorceries, so this one IS counterable.
-  Spec.it s "CR 106.6 the same mana leaves a creature spell counterable" $ do
-    boseiju <- S.printingOf s registry "Boseiju, Who Shelters All"
-    island <- S.printingOf s registry "Island"
-    wizard <- S.printingOf s registry "Erudite Wizard"
-    cancel <- S.printingOf s registry "Cancel"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let alicesLands = S.landsFor boseiju S.alice 1 (S.landsInPlay island 2)
-        (_, after) = counteredAfter piker cancel island alicesLands wizard
-    Spec.assertEqWith s "CR 701.6a the creature spell was countered, so no creature reached the battlefield" (S.creaturesInPlay S.alice after) 0
-    Spec.assertEqWith s "and it is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
 -- alice casts `victim` off the lands `alicesLands` already gives her, bob
 -- answers with Cancel, and the stack is then walked all the way down. bob's three

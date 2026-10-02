@@ -44,7 +44,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -73,7 +72,7 @@ birdToken = CardName.MkCardName (Text.pack "Bird Token")
 -- One lore counter goes on as the Saga enters (CR 714.3a), which fires chapter I
 -- (CR 714.2b). Both halves are visible from a cast, which is what makes this the
 -- gameplay-level test rather than a projection one.
-entrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+entrySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 entrySpec s registry = Spec.describe s "Entry" $ do
   -- CR 714.3a's "each Saga" reaching a permanent that is one only because layer 4
   -- says so (CR 613.1d / 205.1b). Synthetic Chronicle Weaving grants the subtype
@@ -100,23 +99,6 @@ entrySpec s registry = Spec.describe s "Entry" $ do
     -- Ground is no Saga and CR 714.3a mints nothing for it.
     let alone = enter gs
     Spec.assertEqWith s "and no Saga at all without the granter" (Maybe.isJust (sagaOf alone)) False
-  Spec.it s "CR 714.2b that counter fires chapter I, which makes a 2/2 Knight with vigilance" $ do
-    plains <- S.printingOf s registry "Plains"
-    benalia <- S.printingOf s registry "History of Benalia"
-    let (gs, spellId) = S.handOne benalia (S.landsInPlay plains 3)
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-        -- The chapter ability is gathered and placed by the settle loop, then
-        -- resolved by the priority round: CR 714.3a's counter goes on inside the
-        -- zone change, so nothing about this is special-cased for entry.
-        after = S.runPure S.identityAnswer resolved Engine.priorityLoop
-    Spec.assertEqWith s "one Knight token" (S.countOnBattlefieldByName knightToken S.alice after) 1
-    case S.tokensOf after of
-      [token] -> do
-        Spec.assertEqWith s "2/2" (S.powerToughnessOf token after) (Just (2, 2))
-        Spec.assertEqWith s "a Knight" (Projection.subtypesOf token after) (Set.singleton Subtype.Knight)
-        Spec.assertBool s (Map.member Keyword.Vigilance (Projection.keywordsOf token after)) "with vigilance"
-      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
 
 -- CR 714.2b's threshold crossing, at the level Pawl.Engine.Saga states it. These
 -- are the arithmetic THE SBA AND THE TRIGGER MATCHER SHARE, so a drift between
@@ -358,34 +340,8 @@ precombatMainOf pid gs =
 -- I makes every quantity below identical under the read-ahead reading and the
 -- unimplemented one -- one lore counter, chapter I fires, no Bird -- so the prompt
 -- would be raised and its answer unobservable.
-readAheadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+readAheadSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 readAheadSpec s registry = Spec.describe s "Read ahead" $ do
-  Spec.it s "CR 714.3b / 702.155a chapter II is chosen, so the Saga enters on II and chapter I never triggers" $ do
-    plains <- S.printingOf s registry "Plains"
-    loveSong <- S.printingOf s registry "Love Song of Night and Day"
-    let (gs, spellId) = S.handOne loveSong (stocked plains)
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-        resolved = S.runPure (answeringChapter 2) cast Stack.resolveTop
-        -- CR 704.5 and the trigger scan both run at the settle, and the priority
-        -- round is what drains whatever the scan placed. Without it "chapter I
-        -- did not trigger" could not be told from "has not resolved yet".
-        after = S.runPure (answeringChapter 2) resolved Engine.priorityLoop
-    case sagaOf after of
-      Nothing -> Spec.assertFailure s "Love Song of Night and Day did not reach the battlefield"
-      Just oid -> Spec.assertEqWith s "CR 714.3b two lore counters, the chosen chapter" (S.counterOf CounterKind.Lore oid after) 2
-    -- CR 702.155a: the 0 -> 2 placement crosses chapter I under rule 714.2b's
-    -- "at least N", and read ahead is what stops it triggering. Asserted BEFORE
-    -- the Bird, so a fix that places the counters but never narrows the matcher
-    -- reddens here rather than being absorbed downstream.
-    Spec.assertEqWith s "CR 702.155a chapter I did not trigger, so alice drew nothing" (S.handSize S.alice after) 0
-    Spec.assertEqWith s "CR 702.155a and neither did bob" (S.handSize S.bob after) 0
-    -- CR 702.155a's "unless it has exactly the number of lore counters ...": the
-    -- chapter that DOES match still triggers, so the narrowing is a narrowing and
-    -- not a blanket suppression.
-    Spec.assertEqWith s "CR 714.2b chapter II did trigger" (S.countOnBattlefieldByName birdToken S.alice after) 1
-    case S.tokensOf after of
-      [token] -> Spec.assertEqWith s "a 1/1 Bird" (S.powerToughnessOf token after) (Just (1, 1))
-      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
   Spec.it s "CR 704.5s entering on the final chapter still resolves it before the Saga is sacrificed" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"

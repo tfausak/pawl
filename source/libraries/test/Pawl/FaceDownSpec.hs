@@ -220,7 +220,6 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnedFaceDownSpec s registry
   manifestSpec s registry
   manifestOrderSpec s registry
-  manifestDreadSpec s registry
   enteringFaceDownSpec s registry
   faceUpEffectSpec s registry
   breakOpenSpec s registry
@@ -1927,41 +1926,6 @@ giftDestinationFilter printing =
 -- passes through the stack, so nothing in castSpec's route touches it.
 manifestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 manifestSpec s registry = Spec.describe s "Manifest" $ do
-  -- THE PROVING TEST, gameplay level: alice casts Soul Summons off two Plains
-  -- and the top card of her library is on the battlefield as CR 708.2a's 2/2.
-  -- The POSITIVE facts are pinned first and deliberately -- a permanent on the
-  -- battlefield, the library one card shorter -- because the CR 708.3 assertion
-  -- below is an ABSENCE, and an absence passes for free on a board where the
-  -- manifest never happened at all.
-  Spec.it s "CR 701.40a manifest puts the top card of the library onto the battlefield as a 2/2" $ do
-    (before, after, topId) <- summonsBoard s registry
-    case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before)) of
-      [permanent] -> do
-        Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
-        Spec.assertEqWith s "CR 708.2a no name, not Thragtusk" (Projection.namesOf permanent after) noNames
-        Spec.assertEqWith s "CR 708.2a no subtypes, not Beast" (Projection.subtypesOf permanent after) Set.empty
-        Spec.assertEqWith s "CR 110.5 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
-        -- CR 400.7: the card that left the library is gone, and the permanent is
-        -- a new incarnation of it rather than the same object relabelled.
-        Spec.assertBool s (permanent /= topId) "the permanent is a new incarnation (CR 400.7)"
-      permanents -> Spec.assertFailure s ("expected exactly one new permanent, got " <> show (length permanents))
-    Spec.assertEqWith s "one card left the library" (length (Game.zoneMembers Zone.Library S.alice after)) (length (Game.zoneMembers Zone.Library S.alice before) - 1)
-    Spec.assertBool s (notElem topId (Game.zoneMembers Zone.Library S.alice after)) "and it was the top one"
-
-  -- CR 708.3, the rule this unit exists for: "objects that are put onto the
-  -- battlefield face down are turned face down before they enter the
-  -- battlefield, so the permanent's enters-the-battlefield abilities won't
-  -- trigger". Thragtusk's is "when this creature enters, you gain 5 life", so
-  -- the rule is a life total that did not move.
-  --
-  -- Read through the whole priority loop, so a trigger that had been placed
-  -- would have resolved by now rather than sitting unresolved on a stack this
-  -- assertion does not look at.
-  Spec.it s "CR 708.3 the manifested card's enters-the-battlefield ability does not trigger" $ do
-    (_, after, _) <- summonsBoard s registry
-    Spec.assertEqWith s "alice gained no life" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith s "and nothing is waiting on the stack" (length (GameState.stack after)) 0
-
   -- THE PAIR. The same board, the same card, the same door -- everything held
   -- fixed but the one rider -- driven through Event.changeZoneEntering rather
   -- than through a cast, because that is the narrowest path the rule is visible
@@ -1983,30 +1947,6 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
         Spec.assertEqWith s "CR 708.2a the 2/2 on the other board" (S.powerToughnessOf faceDown down) (Just (2, 2))
         Spec.assertEqWith s "CR 708.3 whose trigger paid nothing" (S.lifeOf S.alice down) (Just 20)
       _ -> Spec.assertFailure s "the card did not reach the battlefield"
-
-  -- CR 701.40c, the rule the two-procedure shape exists for: "if a card with
-  -- morph is manifested, its controller may turn that card face up using EITHER
-  -- the procedure described in rule 702.37e ... OR the procedure described
-  -- above". Both stand on the menu at once and the engine picks neither
-  -- (docs/design.md's second invariant).
-  --
-  -- Ainok Tracker is the card because the two procedures are DISTINGUISHABLE on
-  -- it and on nothing cheaper: mana cost {5}{R} against morph cost {4}{R}, six
-  -- mana against five. A morph creature whose two costs agreed would leave every
-  -- assertion below passing whichever procedure actually ran.
-  Spec.it s "CR 701.40c a manifested morph card offers both procedures" $ do
-    ainok <- S.printingOf s registry "Ainok Tracker"
-    (after, entered) <- manifestedBoard s registry ainok 6
-    case entered of
-      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
-      Just permanent -> do
-        -- The POSITIVE fixture facts first: this really is a face-down permanent
-        -- alice controls, so neither assertion below can pass for want of one.
-        Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
-        Spec.assertEqWith s "CR 708.2a and a 2/2, not the printed 3/3" (S.powerToughnessOf permanent after) (Just (2, 2))
-        let offered = Action.legalActions S.alice after
-        Spec.assertBool s (elem (Action.Type.TurnFaceUp permanent TurnUpProcedure.Morph) offered) "CR 702.37e the morph procedure is offered"
-        Spec.assertBool s (elem (Action.Type.TurnFaceUp permanent TurnUpProcedure.Manifest) offered) "CR 701.40b the manifest procedure is offered"
 
   -- THE PAIR, and the prices are what tells the procedures apart. One board, two
   -- actions: CR 701.40b charges Ainok Tracker's MANA COST of {5}{R} -- six lands
@@ -2060,24 +2000,6 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
         Spec.assertEqWith s "CR 702.37c it is face down, morphed" (fmap Object.facing (Game.lookupObject permanent gs)) (Just (Facing.faceDown FaceDownReason.Morphed))
         Spec.assertEqWith s "six lands are untapped, enough for {5}{R}" (S.tappedCount S.alice gs) 3
         Spec.assertEqWith s "CR 701.40b only the morph procedure is offered" (FaceDown.turnableFaceUp S.alice gs) [(permanent, TurnUpProcedure.Morph)]
-
-  -- CR 701.40b's parenthesis, first half: "if the card representing that
-  -- permanent ISN'T A CREATURE CARD ... it can't be turned face up this way."
-  --
-  -- Lightning Bolt is the card because it isolates that half and nothing else:
-  -- {R} Instant, so it HAS a mana cost and fails only the card-type guard, and
-  -- the six untapped MOUNTAINS on this board would pay that cost several times
-  -- over. A blue or black noncreature card here would be refused for want of the
-  -- colour instead, and the case would pass whether the guard existed or not.
-  Spec.it s "CR 701.40b a manifested noncreature card offers no procedure at all" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    (after, entered) <- manifestedBoard s registry bolt 6
-    case entered of
-      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
-      Just permanent -> do
-        Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
-        Spec.assertEqWith s "CR 708.2a and a 2/2 like any other" (S.powerToughnessOf permanent after) (Just (2, 2))
-        Spec.assertEqWith s "CR 701.40b no procedure is offered" (FaceDown.turnableFaceUp S.alice after) []
 
   -- CR 702.37b's condition, which CR 701.40c is what makes reachable: "put a
   -- +1/+1 counter on it IF ITS MEGAMORPH COST WAS PAID to turn it face up". A
@@ -2157,14 +2079,6 @@ manifestOrderSpec s registry = Spec.describe s "Manifest one at a time" $ do
         Spec.assertEqWith s "CR 701.40a and both are face down, manifested" (fmap Object.facing (Game.lookupObject first after), fmap Object.facing (Game.lookupObject second after)) (Just (Facing.faceDown FaceDownReason.Manifested), Just (Facing.faceDown FaceDownReason.Manifested))
         Spec.assertEqWith s "setup: one creature was already on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
       permanents -> Spec.assertFailure s ("expected exactly two manifested permanents, got " <> show (length permanents))
-
-  -- THE CONTROL BELOW. The same board with NO creature out: the count is one as
-  -- the second card enters, the clause is false both times, and neither is
-  -- tapped -- so the tapped permanent above is the count reaching two and not the
-  -- second manifest being tapped by construction.
-  Spec.it s "CR 701.40e with no creature out the count never reaches two, so neither is tapped" $ do
-    (after, entered) <- ambushBoard s registry 0
-    Spec.assertEqWith s "both manifested permanents entered untapped" (fmap (fmap Object.tapped . flip Game.lookupObject after) entered) [Just TapState.Untapped, Just TapState.Untapped]
 
   -- THE CONTROL ABOVE, and what stops the first leg's untapped permanent passing
   -- for want of a row that applies at all: two creatures out makes the clause true
@@ -2306,99 +2220,6 @@ surpriseBoard s registry top = do
   let (g1, spell) = S.handOne surprise manifested
       (bystander, g2) = S.addPermanent galleon S.alice g1
   pure (g2, spell, entered, bystander)
-
--- CR 701.62 manifest dread: rule 701.40's manifest over a card CHOSEN from a
--- group an earlier clause looked at, rather than off the top of the library.
---
--- Manifest Dread {1}{G} Sorcery, "Manifest dread." (name, cost, type line and
--- Oracle text checked against api.scryfall.com, 2026-08-26). The whole card is
--- the keyword action; the printed parenthetical is reminder text. CR 701.62a
--- spells it out as three instructions, and the card is transcribed as exactly
--- those three: LookAt the top two binding a group, MoveToZone of
--- ObjectRef.ChosenCardFromAmong onto the battlefield under
--- EntryRiders.faceDown, and MoveToZone of ObjectRef.InSlot on the same slot to
--- the graveyard -- "the cards you looked at that were not manifested this way",
--- which CR 400.7 leaves the chosen card out of.
---
--- What this group proves that Pawl.MassEffectSpec's CommuneWithTheGods group
--- does not: the faceDown RIDER composes with a ChosenCardFromAmong ref. Commune
--- moves the chosen card bare; Soul Summons above rides the rider on a
--- TopOfLibrary ref. Neither pairs the two.
---
--- THE BOARD, top of library down: Thragtusk, Ainok Tracker, Goblin Piker.
---
---   * The two looked-at cards are DIFFERENT and neither is CR 708.2a's 2/2 --
---     Thragtusk a 5/3 Beast, Ainok Tracker a 3/3 Dog Scout. A manifested
---     permanent has no name (CR 708.2a), so which card was manifested is read
---     off the GRAVEYARD, and two identical cards would make both readings agree.
---   * The answers are pinned by INDEX into the offer rather than by a search,
---     since an answerer looking for a legal card would find one under either
---     reading, and the offer is the group's mint order, top of library first.
---   * The Goblin Piker sits THIRD, below the looked-at window, so a look of the
---     wrong depth shows up in the library as well as in the graveyard.
---   * Thragtusk's "when this creature enters, you gain 5 life" is CR 708.3's
---     observable, and it is asserted on the leg where Thragtusk is the card that
---     was MANIFESTED. A rider that failed to apply would put a 5/3 Beast on the
---     battlefield and pay the 5 life.
-manifestDreadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-manifestDreadSpec s registry =
-  let named = Just . CardName.MkCardName . Text.pack
-      -- The offer in the order the group was minted, which for a look at the top
-      -- two is the library's (CR 401.2).
-      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
-      taking :: Int -> Prompt.Prompt r -> r
-      taking n p = case p of
-        Prompt.ChooseCardFromAmong _ _ _ offered -> nth n offered
-        _ -> S.identityAnswer p
-      -- alice with two Forests for the {1}{G} and Manifest Dread in hand, her
-      -- library stocked bottom first (S.addLibraryCard puts each new card on
-      -- top). Resolved and then run to a stable board, so an enters trigger that
-      -- had been placed would have resolved rather than sitting on a stack.
-      board = do
-        forest <- S.printingOf s registry "Forest"
-        dread <- S.printingOf s registry "Manifest Dread"
-        thragtusk <- S.printingOf s registry "Thragtusk"
-        tracker <- S.printingOf s registry "Ainok Tracker"
-        piker <- S.printingOf s registry "Goblin Piker"
-        let stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) (S.landsInPlay forest 2) [piker, tracker, thragtusk]
-            (withSpell, spellId) = S.handOne dread stocked
-        pure (spellId, withSpell)
-      cast :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> (GameState.GameState, GameState.GameState)
-      cast answer (spellId, gs) =
-        let announced = S.runPure answer gs (S.cast S.alice spellId)
-            resolved = S.runPure answer announced Stack.resolveTop
-         in (gs, S.runPure answer resolved Engine.priorityLoop)
-      namesIn zone gs = List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone S.alice gs))
-   in Spec.describe s "ManifestDread" $ do
-        -- THE HEADLINE, and the leg that pairs the rider with the choice: the
-        -- SECOND looked-at card is the one on the battlefield face down, and the
-        -- first is the one in the graveyard.
-        Spec.it s "CR 701.62a the chosen one of the two is manifested and the other is buried" $ do
-          setup <- board
-          let (before, after) = cast (taking 1) setup
-          case enteredOne before after of
-            Just permanent -> do
-              Spec.assertEqWith s "CR 708.2a a 2/2, neither the Tracker's 3/3 nor Thragtusk's 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
-              Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
-              Spec.assertEqWith s "CR 708.2a no name" (Projection.namesOf permanent after) noNames
-            Nothing -> Spec.assertFailure s "expected exactly one new permanent"
-          Spec.assertEqWith s "CR 701.62a the card NOT manifested is in the graveyard, with the spell" (namesIn Zone.Graveyard after) (List.sort [named "Manifest Dread", named "Thragtusk"])
-          Spec.assertEqWith s "and the third card was never looked at" (namesIn Zone.Library after) [named "Goblin Piker"]
-        -- THE PAIRED CONTROL, everything held fixed but the answer. If the
-        -- engine were picking rather than asking, both legs would manifest the
-        -- same card and bury the same one. This leg also carries CR 708.3: the
-        -- card manifested here is the one with the enters trigger.
-        Spec.it s "CR 608.2d the engine does not pick, and CR 708.3 the manifested card's enters ability does not trigger" $ do
-          setup <- board
-          let (before, after) = cast (taking 0) setup
-          Spec.assertEqWith s "CR 701.62a the OTHER card is buried this time" (namesIn Zone.Graveyard after) (List.sort [named "Ainok Tracker", named "Manifest Dread"])
-          Spec.assertEqWith s "CR 708.3 alice gained no life off the manifested Thragtusk" (S.lifeOf S.alice after) (Just 20)
-          case enteredOne before after of
-            Just permanent -> do
-              Spec.assertEqWith s "CR 708.2a a 2/2, not Thragtusk's printed 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
-              Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
-            Nothing -> Spec.assertFailure s "expected exactly one new permanent"
-          Spec.assertEqWith s "and nothing is waiting on the stack" (length (GameState.stack after)) 0
 
 -- CR 708.2a's "unless otherwise specified by the effect that put it onto the
 -- battlefield face down", and CR 708.6's "what ability or rules caused the
@@ -3113,18 +2934,6 @@ disguiseSpec s registry =
               Spec.assertEqWith s "the {1}{W} sorcery tapped two lands and no more" (S.tappedCount S.alice after) 2
               Spec.assertEqWith s "CR 701.40d both roads are open" (FaceDown.turnableFaceUp S.alice after) [(permanent, TurnUpProcedure.Disguise), (permanent, TurnUpProcedure.Manifest)]
 
-        -- The gate, so the six above is the rule's price and not the fixture's:
-        -- five lands left after the sorcery pay {4}{W} and not {4}{W}{W}, so only
-        -- the disguise procedure is offered. Everything else is held fixed.
-        Spec.it s "CR 701.40d five lands buy the disguise procedure alone" $ do
-          plains <- S.printingOf s registry "Plains"
-          phantom <- S.printingOf s registry phantomName
-          (short, shortEntered) <- manifestedWith s registry plains phantom 5
-          case shortEntered of
-            Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
-            Just permanent ->
-              Spec.assertEqWith s "CR 702.168d the disguise procedure alone" (FaceDown.turnableFaceUp S.alice short) [(permanent, TurnUpProcedure.Disguise)]
-
         -- WHAT THE LISTING IS FOR, at gameplay level: an opponent's removal aimed
         -- at the face-down permanent fires CR 702.21a's trigger off the listed
         -- ward, and declining counters the spell.
@@ -3256,7 +3065,7 @@ wardedBoard s registry name facing = do
 -- face-down permanent. If it's a creature card, you may turn it face up." (name,
 -- cost, type line, P/T and Oracle text checked against api.scryfall.com,
 -- 2026-08-28). Both lines are transcribed; the attack trigger is manifest dread's
--- own three clauses, which manifestDreadSpec above already proves, and this group
+-- own three clauses, which data/scenarios/face-down already proves, and this group
 -- reads the activated ability alone.
 --
 -- "If it's a creature card" is Filter.RepresentedByCard, and CR 708.2a is the

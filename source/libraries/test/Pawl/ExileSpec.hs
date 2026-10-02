@@ -621,19 +621,6 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
         Spec.assertEqWith s "exactly one card is in exile face down" (length (faceDownExiled board)) 1
       Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
 
-  -- THE COPY TRIPWIRE. Vesuva enters as a copy of the Windbrisk Heights already
-  -- on the battlefield, so its hideaway is read off CR 707.2's copiable values
-  -- rather than off the printed card -- which Vesuva's own face does not have.
-  -- A read of Game.cardOf anywhere on this path answers "Vesuva", which has no
-  -- keywords at all, and nothing is exiled.
-  Spec.it s "CR 707.2 a land that entered as a copy of Windbrisk Heights hides a card of its own" $ do
-    (_, hidden, _, _, board) <- playHeights s registry (Just "Vesuva")
-    Spec.assertEqWith
-      s
-      "the copy's hideaway ran, and the card its controller named is in exile face down"
-      (namesOf (faceDownExiled board) board)
-      (Set.singleton hidden)
-
   -- CR 702.75a's granted ability names whoever controls the exiling permanent
   -- when the question is ASKED, so a steal moves the look with the land.
   -- Confiscate {4}{U}{U} Enchantment -- Aura -- "Enchant permanent / You control

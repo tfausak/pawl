@@ -102,28 +102,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         milled = S.runPure S.identityAnswer gs (Event.changeZone nexusId Zone.Graveyard)
     Spec.assertEqWith s "CR 614.6 the card never left the library" (length (Game.zoneMembers Zone.Library S.alice milled)) 1
     Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice milled)) 0
-  -- CR 608.2n's trip to the graveyard, replaced from the STACK: the spell is the
-  -- object with the ability, and it is still on the stack as the move is
-  -- proposed. The ruling above is about exactly this road.
-  Spec.it s "CR 113.6b a stated row functions from the stack, so the resolved spell goes to the library" $ do
-    island <- S.printingOf s registry "Island"
-    nexus <- S.printingOf s registry "Nexus of Fate"
-    let base = S.landsInPlay island 7
-        (nexusId, gs1) = S.addHandCard nexus S.alice base
-        gs =
-          gs1
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice nexusId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "CR 614.6 the resolved spell is in its owner's library" (length (Game.zoneMembers Zone.Library S.alice resolved)) 1
-    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
-    -- After the two above, so that neither can be absorbed by a cast that never
-    -- happened: an uncast Nexus would leave the library empty and fail the first.
-    Spec.assertEqWith s "the spell really was cast" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "and really did resolve" (length (GameState.stack resolved)) 0
   -- EXILE, which CR 400.2 makes public but which CR 113.6 gives no default
   -- reaching either, so the row functions there only because the card states it.
   -- Pull from Eternity ({W} Instant, Oracle text fetched from Scryfall
@@ -182,46 +160,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice (binned inGraveyard))) 0
     Spec.assertEqWith s "CR 113.6's default: the same enchantment on the battlefield exiles it instead" (length (Game.zoneMembers Zone.Exile S.alice (binned onBattlefield))) 1
     Spec.assertEqWith s "so that graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (binned onBattlefield))) 0
-  -- The DEFAULT the case above has none of: CR 113.6's first sentence functions
-  -- an instant's or a sorcery's abilities while the object is on the stack, so a
-  -- row that states no zone is gathered there and nowhere else. The stack walk
-  -- asked CR 113.6b's stated set alone until this case; see #2590.
-  --
-  -- Synthetic Fading Counsel is "{1}{U} Instant, you gain 2 life. If this spell
-  -- would be put into a graveyard, exile it instead." SYNTHETIC because no
-  -- printing has the shape: Scryfall's "(t:instant or t:sorcery) o:/would be (put
-  -- into|exiled|countered)/ o:~ -o:'you may cast' -o:'that spell'", 2026-09-01,
-  -- returns Nexus of Fate alone, and Nexus states every zone -- so the stated set
-  -- would decide it and the default would change nothing. The rules shape is
-  -- printed all the same: rule 702.27a's buyback is "put this spell into its
-  -- owner's hand instead of into that player's graveyard as it resolves" and
-  -- says in so many words that it functions while the spell is on the stack.
-  -- pawl's buyback (Elvish Fury) does not reach this walk: rule 702.27a's "as it
-  -- resolves" scopes the rewrite to CR 608.2n's own move, so it is MINTED for
-  -- that one move by Pawl.Engine.Resolve.finishSpell rather than gathered as a
-  -- printed row (Pawl.Engine.Replacement.installBuybackReturn).
-  --
-  -- CR 608.2n's trip to the graveyard is the observer, driven through a real cast
-  -- and a real resolution rather than the zone-change funnel: the card has to be
-  -- on the stack as its own move is proposed, and resolving is how it gets there.
-  Spec.it s "CR 113.6 an instant's row stating no zone functions from the stack" $ do
-    island <- S.printingOf s registry "Island"
-    counsel <- S.printingOf s registry "Synthetic Fading Counsel"
-    let (counselId, gs1) = S.addHandCard counsel S.alice (S.landsInPlay island 2)
-        gs =
-          gs1
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice counselId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "CR 614.6 the resolved spell is in exile" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
-    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
-    -- After the two above, for the Nexus case's reason: an uncast spell would
-    -- leave both zones empty and pass the second on its own.
-    Spec.assertEqWith s "the spell really was cast" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "and really did resolve" (length (GameState.stack resolved)) 0
   -- The other half of that default, as a pair of boards differing in one thing:
   -- CR 113.6's first sentence reaches an INSTANT OR SORCERY spell, and a
   -- permanent spell's abilities are left functioning on the battlefield. Read off

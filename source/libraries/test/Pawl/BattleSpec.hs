@@ -178,11 +178,6 @@ entrySpec s registry = Spec.describe s "Entry" $ do
     -- Both halves still landed, so this is not passing by never entering.
     Spec.assertEqWith s "five defense counters" (S.counterOf CounterKind.Defense oid after) 5
     Spec.assertEqWith s "and a protector" (protectorOf oid after) (Just S.bob)
-  Spec.it s "the printed enters trigger still fires: gain 4 life and draw a card" $ do
-    (after, _) <- castInvasion s registry
-    let settled = S.runPure S.identityAnswer after Engine.priorityLoop
-    Spec.assertEqWith s "alice gained 4" (S.lifeOf S.alice settled) (Just 24)
-    Spec.assertEqWith s "and drew one" (length (Game.zoneMembers Zone.Hand S.alice settled)) 1
 
 -- CR 310.9a's choice, made observable. Three seats, because CR 102.2's two-player
 -- game leaves a Siege exactly one legal protector and a one-candidate ask decides
@@ -1420,21 +1415,6 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
         pcs = Map.adjust (\pc -> pc {PC.subtypes = Set.empty}) battle (Projection.projectAll removed)
     Spec.assertBool s (Battle.awaitingAbility owing removed battle) "an ability has still triggered"
     Spec.assertEqWith s "and CR 704.5w exempts nothing" (Battle.defeated pcs owing removed) [battle]
-  Spec.it s "CR 704.5v whole card: a Siege at defense 0 waits for its own enters ability" $ do
-    -- THE PROVING CASE for the rider's width. Synthetic Hollow Siege prints
-    -- defense 0, so CR 310.4b gives it no counters and none ever comes off: CR
-    -- 310.12b never triggers, and the one ability owed at the first CR 704.5 pass
-    -- is the enters one, still unplaced. Held, the Siege gets its three counters.
-    plains <- S.printingOf s registry "Plains"
-    hollow <- S.printingOf s registry "Synthetic Hollow Siege"
-    let stocked = snd (S.addLibraryCard plains S.alice (S.landsInPlay plains 3))
-        (gs, spellId) = S.handOne hollow stocked
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-        settled = S.runPure S.identityAnswer cast Engine.priorityLoop
-    case battleOf settled of
-      Just oid -> Spec.assertEqWith s "the Siege stands with three defense counters" (S.counterOf CounterKind.Defense oid settled) 3
-      Nothing -> Spec.assertFailure s "the Siege was buried before its enters ability was placed"
-    Spec.assertEqWith s "and it is in nobody's graveyard" (invasionsIn (S.printingName hollow) Zone.Graveyard settled) 0
 
 -- Cast the spell in `caster`'s hand at `battle`, then settle: the spell resolves,
 -- CR 310.6 takes its counters off, and CR 310.12b's ability -- if the last one came

@@ -33,7 +33,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
@@ -44,7 +43,6 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
@@ -62,7 +60,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -75,8 +72,6 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
-import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.Zone as Zone
@@ -94,68 +89,6 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 extraLandDropsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 extraLandDropsSpec s registry =
   Spec.describe s "ExtraLandDrops" $ do
-    -- The control. CR 305.2's "normally one", played through the same loop, so
-    -- every raised number below is measured against a baseline this group
-    -- established rather than an assumed one.
-    Spec.it s "CR 305.2 with no effect a player plays one land and no more" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      let board = landDropBoard mountain [] S.alice
-          after = playEveryLand board
-      Spec.assertEqWith s "the allowance is one" (PlayerEffect.landPlaysAllowed S.alice board) 1
-      Spec.assertEqWith s "one Mountain landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 1
-      Spec.assertEqWith s "and FOUR are still in hand -- the gate refused, an empty hand did not" (S.handSize S.alice after) 4
-      Spec.assertEqWith s "no further land play is offered" (filter isPlay (Action.legalActions S.alice after)) []
-
-    -- Exploration's one extra. A gate that ignored the effect answers one here.
-    Spec.it s "CR 305.2 Exploration raises the allowance to two" $ do
-      let first = S.aliased "first land" (S.cardSetup "Mountain")
-          second = S.aliased "second land" (S.cardSetup "Mountain")
-          alice =
-            (S.battlefield S.alice [S.permanent "Exploration"])
-              { Seat.hand = Seq.fromList [first, second, S.cardSetup "Mountain", S.cardSetup "Mountain", S.cardSetup "Mountain"]
-              }
-          board = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-          script =
-            S.turn
-              1
-              [ S.on S.precombatMain S.alice (S.playLand (S.aliasRef "first land")),
-                S.on S.precombatMain S.alice (S.playLand (S.aliasRef "second land"))
-              ]
-      after <- S.play s registry board script S.priorityGame
-      Spec.assertEqWith s "the allowance is two" (PlayerEffect.landPlaysAllowed S.alice after) 2
-      Spec.assertEqWith s "two Mountains landed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Mountain")) S.alice after) 2
-      Spec.assertEqWith s "three are still in hand" (S.handSize S.alice after) 3
-      Spec.assertEqWith s "and the third is refused" (filter isPlay (Action.legalActions S.alice after)) []
-
-    -- THE DISCRIMINATOR between a count and a boolean. A gate written as "one,
-    -- or two if any effect grants extra lands" passes the Exploration case above
-    -- and stops at two here; only a gate that reads Azusa's NUMBER reaches
-    -- three.
-    Spec.it s "CR 305.2 Azusa's two additional lands make three, not two" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
-      let board = landDropBoard mountain [azusa] S.alice
-          after = playEveryLand board
-      Spec.assertEqWith s "the allowance is three" (PlayerEffect.landPlaysAllowed S.alice board) 3
-      Spec.assertEqWith s "three Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 3
-      Spec.assertEqWith s "two are still in hand" (S.handSize S.alice after) 2
-      Spec.assertEqWith s "and the fourth is refused" (filter isPlay (Action.legalActions S.alice after)) []
-
-    -- CR 305.2 says continuous effects INCREASE the number, so two of them
-    -- compose: one plus one plus two. Nothing here is redundant -- CR 702.18b
-    -- and CR 702.11h make multiple instances redundant for a KEYWORD, and CR
-    -- 305.2 states no such rule. A maximum rather than a sum answers three.
-    Spec.it s "CR 305.2 Exploration and Azusa together add up to four" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      exploration <- S.printingOf s registry "Exploration"
-      azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
-      let board = landDropBoard mountain [exploration, azusa] S.alice
-          after = playEveryLand board
-      Spec.assertEqWith s "the allowance is four" (PlayerEffect.landPlaysAllowed S.alice board) 4
-      Spec.assertEqWith s "four Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 4
-      Spec.assertEqWith s "one is still in hand" (S.handSize S.alice after) 1
-      Spec.assertEqWith s "and the fifth is refused" (filter isPlay (Action.legalActions S.alice after)) []
-
     -- CR 109.5: the You scope. alice's Exploration is alice's, and bob playing
     -- lands on his own turn is still held to CR 305.2's one.
     Spec.it s "CR 109.5 one player's Exploration does not raise another's allowance" $ do
@@ -229,39 +162,6 @@ vedalkenOrrerySpec s registry =
       let (oid, _, board) = flashBoard mountain piker [orrery]
       Spec.assertBool s (S.castable S.alice oid board) "castable"
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
-
-    -- The gameplay half, driven through the priority loop rather than by calling
-    -- Cast.castSpell: the script selects its named cast only when it is OFFERED,
-    -- so the two runs differ in the Orrery and in nothing a test wrote by hand.
-    -- Without it alice is offered no cast at all, and the same script fails as
-    -- MkActionNotOffered rather than passing while proving nothing.
-    Spec.it s "CR 601.3b the offered cast resolves and the creature enters on the opponent's turn" $ do
-      let mana1 = S.aliased "first mana" (S.permanent "Mountain")
-          mana2 = S.aliased "second mana" (S.permanent "Mountain")
-          spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
-          alice extras =
-            (S.battlefield S.alice ([mana1, mana2] <> replicate 7 (S.permanent "Mountain") <> extras))
-              { Seat.hand = Seq.fromList [spell, S.cardSetup "Mountain"]
-              }
-          setup extras = S.board (alice extras NonEmpty.:| [S.playerSetup S.bob]) S.bob S.precombatMain
-          choices =
-            Choices.none
-              { Choices.manaSources =
-                  Seq.fromList
-                    [ Just (S.aliasRef "first mana"),
-                      Just (S.aliasRef "second mana"),
-                      Nothing
-                    ]
-              }
-          script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
-      after <- S.play s registry (setup [S.permanent "Vedalken Orrery"]) script S.priorityGame
-      Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
-      Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-      bare <- S.buildBoardOrFail s registry (setup [])
-      case Scenario.rehearse script bare S.priorityGame of
-        Left (ScenarioFailure.MkActionNotOffered _ (Move.Cast {}) _) -> pure ()
-        Left failure -> Spec.assertFailure s (S.renderFailure failure)
-        Right _ -> Spec.assertFailure s "without the Orrery the cast was offered anyway"
 
     -- CR 702.8a's keyword is untouched: the card the Orrery let through never
     -- gained flash, and nothing was written onto it.
@@ -410,20 +310,6 @@ sigardasAidSpec s registry =
       Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
       Spec.assertEqWith s "and without the Aid it never left her hand" (S.countOnBattlefieldByName (S.printingName rollicker) S.alice (play bare)) 0
 
-    -- CR 601.2e: the lookahead lets the cast BEGIN, and only the bestow cost
-    -- keeps the Aid naming the spell, so that is the cost announced -- the
-    -- Rollicker enters attached to the Piker rather than as a creature.
-    Spec.it s "CR 601.3b / 601.2e under Sigarda's Aid on the opponent's turn only the bestow cost is announced" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
-      aid <- S.printingOf s registry "Sigarda's Aid"
-      let (_, extras, board) = flashBoard mountain rollicker [piker, aid]
-          after = S.runPure S.castAnswer board Engine.priorityLoop
-          named oid = fmap Face.name (Game.faceOf oid after) == Just (S.printingName rollicker)
-          hosts = fmap (\oid -> Game.lookupObject oid after >>= Object.attachedTo) (filter named (Game.zoneMembers Zone.Battlefield S.alice after))
-      Spec.assertEqWith s "the Rollicker is attached to the Piker" hosts [fmap Recipient.ToCreature (Maybe.listToMaybe extras)]
-
     -- CR 702.103b is what the lookahead consults and nothing else: with the
     -- bestow card in hand and NO Aid, the window stays shut, so the choice space
     -- is not a permission of its own.
@@ -454,7 +340,7 @@ sigardasAidSpec s registry =
 -- with mana value 4 or greater as though they had flash." Protean Hydra ({X}{G})
 -- is mana value 1 in hand (CR 202.3e), so only X can bring it under the grant.
 -- flashBoard's ten Forests keep mana from being why a cast fails.
-untimelyAlurenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+untimelyAlurenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 untimelyAlurenSpec s registry =
   let board withAluren = do
         forest <- S.printingOf s registry "Forest"
@@ -469,17 +355,6 @@ untimelyAlurenSpec s registry =
           (bareOid, bare) <- board False
           Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice gs)) "offered under the Aluren"
           Spec.assertBool s (not (any (S.isCastOf bareOid) (Action.legalActions S.alice bare))) "and not without it"
-
-        -- CR 601.2e: the announced X is then judged against "4 or greater".
-        Spec.it s "CR 601.2e Untimely Aluren takes back Protean Hydra at X = 2 and not at X = 3" $ do
-          (oid, gs) <- board True
-          let announcing :: Natural -> Prompt.Prompt r -> r
-              announcing x p = case p of
-                Prompt.ChooseX {} -> x
-                _ -> S.identityAnswer p
-              castAt x = S.runPure (announcing x) gs (S.cast S.alice oid)
-          Spec.assertEqWith s "X = 2: mana value 3, so the cast is taken back and the Hydra stays in hand" (elem oid (Game.zoneMembers Zone.Hand S.alice (castAt 2))) True
-          Spec.assertEqWith s "X = 3: mana value 4, so the Hydra is cast" (length (GameState.stack (castAt 3))) 1
 
 -- CR 601.3's search exception is untimed, so neither CR 601.3b's narrowing nor
 -- its CR 601.2e re-check reaches it. Synthetic Glacial Blessing lets alice cast
@@ -518,27 +393,6 @@ searchIsUntimedSpec s registry =
         Spec.it s "CR 601.3 Nyxborn Rollicker is cast from the library at its printed cost beside Sigarda's Aid" $ do
           gs <- board "Mountain" "Nyxborn Rollicker" "Sigarda's Aid"
           Spec.assertEqWith s "the Rollicker is on the stack" (length (GameState.stack (castThere 0 gs))) 1
-
--- Yeva, Nature's Herald names green creature spells. Rust Goliath is a colourless
--- {10} card whose prototype {3}{G}{G} is green (CR 718.3b), so only the prototype
--- choice brings it under Yeva (CR 601.3b, 601.3e).
-yevaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-yevaSpec s registry =
-  let board withYeva = do
-        forest <- S.printingOf s registry "Forest"
-        goliath <- S.printingOf s registry "Rust Goliath"
-        yeva <- S.printingOf s registry "Yeva, Nature's Herald"
-        let (oid, _, gs) = flashBoard forest goliath [yeva | withYeva]
-        pure (oid, gs)
-   in Spec.describe s "Yeva" $ do
-        Spec.it s "CR 601.3b / 718.3b Yeva lets Rust Goliath begin prototyped on the opponent's turn" $ do
-          (oid, gs) <- board True
-          (bareOid, bare) <- board False
-          let after = S.runPure S.castAnswer gs Engine.priorityLoop
-              goliaths = filter (\o -> fmap Face.name (Game.faceOf o after) == Just (CardName.MkCardName (Text.pack "Rust Goliath"))) (Game.zoneMembers Zone.Battlefield S.alice after)
-          Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice gs)) "offered under Yeva"
-          Spec.assertEqWith s "and it enters prototyped, a 3/5" (fmap (`Projection.powerOf` after) goliaths) [Just 3]
-          Spec.assertBool s (not (any (S.isCastOf bareOid) (Action.legalActions S.alice bare))) "and not without Yeva"
 
 -- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
 -- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
@@ -680,18 +534,6 @@ yawgmothsWillSpec s registry =
           Spec.assertEqWith s "it is not back in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
           Spec.assertEqWith s "it was exiled instead, beside the Will" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 2
 
-        -- The ruling: "It will exile itself since it goes to the graveyard after
-        -- its effect starts." Both sentences of the card in one assertion --
-        -- the replacement is already in force when CR 608.2n moves the Will.
-        Spec.it s "CR 608.2n / 614.1a the Will exiles itself" $ do
-          (willId, hers, _, gs) <- board
-          will <- S.printingOf s registry "Yawgmoth's Will"
-          let after = willResolved willId gs
-          -- By NAME, not by id: CR 400.7 makes the card leaving the stack a new
-          -- object, so `willId` names nothing once it has moved.
-          Spec.assertEqWith s "the graveyard holds only what was already there" (Game.zoneMembers Zone.Graveyard S.alice after) [hers]
-          Spec.assertEqWith s "and the Will is in exile" (fmap (\o -> S.soleFaceName o after) (Game.zoneMembers Zone.Exile S.alice after)) [S.printingName will]
-
         -- CR 109.5 / PlayerScope.You: alice's Will does nothing for bob, whose
         -- board is hers in every other respect. Asked of the typed question as
         -- well as of the gate, because CR 307.1's sorcery window is shut for bob
@@ -750,19 +592,6 @@ yawgmothsWillSpec s registry =
           Spec.assertEqWith s "nothing stored afterwards" (GameState.playerEffects ended) []
           Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Graveyard hers ended)) "the permission is gone"
           Spec.assertBool s (not (S.castable S.alice hers ended)) "and the cast is refused again"
-
-        -- CR 305.1: the play-lands half of the same sentence, on a board that
-        -- differs from its own control in nothing but whether the Will resolved.
-        -- The Swamp is put in the graveyard BEFORE the Will resolves, so the
-        -- card's second sentence never sees it move and it is lying there for
-        -- both readings.
-        Spec.it s "CR 305.1 the play-lands half reaches a land in the graveyard" $ do
-          (willId, _, _, gs) <- board
-          swamp <- S.printingOf s registry "Swamp"
-          let (landId, withLand) = S.addGraveyardCard swamp S.alice gs
-              after = willResolved willId withLand
-          Spec.assertBool s (notElem (Action.Type.Play landId Nothing) (Action.legalActions S.alice withLand)) "not offered before the Will resolves"
-          Spec.assertBool s (elem (Action.Type.Play landId Nothing) (Action.legalActions S.alice after)) "offered once it has"
 
 -- THREE SEATS, each with a Mountain in hand and a Swamp in their own graveyard,
 -- and `present` says whether alice also controls a Crucible of Worlds. It is
@@ -907,16 +736,6 @@ crucibleSpec s registry =
           Spec.assertEqWith s "no land play is offered in her upkeep" (filter isPlay (Action.legalActions S.alice upkeep)) []
           Spec.assertBool s (notElem (Action.Type.Play hers Nothing) (Action.legalActions S.alice upkeep)) "the graveyard Swamp included"
 
-        -- End to end: the special action really moves the card, and CR 305.2a's
-        -- tally counts it exactly as a play from hand does.
-        Spec.it s "CR 305.1 playing it puts the graveyard land onto the battlefield" $ do
-          (hers, _, _, _, _, _, with) <- board True
-          swamp <- S.printingOf s registry "Swamp"
-          let after = S.runPure (playOnly hers) with Engine.priorityLoop
-          Spec.assertEqWith s "the Swamp is on the battlefield" (S.countOnBattlefieldByName (S.printingName swamp) S.alice after) 1
-          Spec.assertEqWith s "her graveyard has only the Sorcerer left" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-          Spec.assertEqWith s "and CR 305.2a's tally counted it" (Map.lookup S.alice (GameState.landsPlayed after)) (Just 1)
-
 -- Cast ONE named object and pass at every other prompt -- playOnly above for a
 -- cast. Pinned to an id rather than to "whichever cast is offered", so a board
 -- that stopped offering it passes rather than repairing the case with some other
@@ -985,21 +804,6 @@ garruksHordeSpec s registry =
         topPrinting <- S.printingOf s registry top
         pure (hordeBoard forest horde elves rampant topPrinting present)
    in Spec.describe s "GarruksHorde" $ do
-        -- The whole card, end to end: library -> stack -> battlefield. Driven
-        -- through Engine.priorityLoop rather than Pawl.Engine.Cast.castSpell,
-        -- which is the difference between proving the permission and proving the
-        -- move: `S.cast` announces whatever it is handed, so a board where the
-        -- cast is never OFFERED still puts the card on the battlefield. The
-        -- answerer is pinned to this id, so an unoffered cast passes instead.
-        Spec.it s "CR 601.3 the top card of the library is cast and resolves" $ do
-          elves <- S.printingOf s registry "Llanowar Elves"
-          (herTop, _, _, _, _, gs) <- board "Llanowar Elves" True
-          let resolved = S.runPure (castOnly herTop) gs Engine.priorityLoop
-          Spec.assertEqWith s "the library's top card is on the battlefield" (S.countOnBattlefieldByName (S.printingName elves) S.alice resolved) 1
-          Spec.assertEqWith s "and the library is one card shorter" (length (Game.zoneMembers Zone.Library S.alice resolved)) 2
-          Spec.assertBool s (S.castable S.alice herTop gs) "it was castable"
-          Spec.assertBool s (any (S.isCastOf herTop) (Action.legalActions S.alice gs)) "and offered"
-
         -- The pair. Two boards differing in the Horde and in nothing else, with
         -- the same Forests and the same hand on both -- so the offer appearing
         -- is the permission and can be nothing else.
@@ -1135,18 +939,6 @@ futureSightSpec s registry =
         sight <- S.printingOf s registry "Future Sight"
         pure (futureSightBoard swamp mountain forest island plains sight present)
    in Spec.describe s "FutureSight" $ do
-        -- The whole play half, end to end: library -> battlefield. Driven
-        -- through Engine.priorityLoop, and the answerer is pinned to this id, so
-        -- a board where the play is never OFFERED plays nothing instead of
-        -- putting the Forest in her hand onto the battlefield.
-        Spec.it s "CR 305.1 the top card of the library is played and enters the battlefield" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          (herTop, _, _, _, _, with) <- board True
-          let after = S.runPure (playOnly herTop) with Engine.priorityLoop
-          Spec.assertEqWith s "the library's top Swamp is on the battlefield" (S.countOnBattlefieldByName (S.printingName swamp) S.alice after) 1
-          Spec.assertEqWith s "her library is one card shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 2
-          Spec.assertEqWith s "and CR 305.2a's tally counted it" (Map.lookup S.alice (GameState.landsPlayed after)) (Just 1)
-
         -- The pair. Two boards differing in Future Sight and in nothing else,
         -- and the hand's Forest is offered on both -- so the Swamp appearing is
         -- the grant and can be nothing else.
@@ -1288,18 +1080,6 @@ johannSpec s registry =
           Spec.assertEqWith s "so exactly one Fog is in her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
           Spec.assertEqWith s "while Future Sight's unlimited permission casts both off the same library" (length (Game.zoneMembers Zone.Graveyard S.alice afterU)) 2
           Spec.assertEqWith s "and leaves it two cards shorter" (length (Game.zoneMembers Zone.Library S.alice afterU)) 2
-
-        -- WHAT was refused: the permission, not the card, the zone or the mana.
-        -- The second Fog is on top by now, so the top-card narrowing admits it;
-        -- Forests are still untapped, so {G} was payable; and the same object on
-        -- the Future Sight board is offered on the same board state.
-        Spec.it s "CR 601.3 the second cast is refused by the budget and by nothing else" $ do
-          (top, deep, budgeted) <- board (Just "Johann, Apprentice Sorcerer")
-          let after = S.runPure (castAnyOf [top]) budgeted Engine.priorityLoop
-          Spec.assertBool s (not (any (S.isCastOf deep) (Action.legalActions S.alice after))) "the second Fog is not offered"
-          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Library deep after)) "and the typed question says the permission is spent"
-          Spec.assertEqWith s "though it is the top card of her library now" (take 1 (Game.zoneMembers Zone.Library S.alice after)) [deep]
-          Spec.assertEqWith s "and two Forests are untapped, so {G} was payable" (S.tappedCount S.alice after) 1
 
         -- The period. The same board, the same spent permission, two handoffs
         -- later: CR 601.3's "once EACH TURN" is back, which is what
@@ -1865,17 +1645,6 @@ scoutsWarningSpec s registry =
       let (_, arborId, board) = scoutsWarningBoard plains warning dryadArbor
       Spec.assertBool s (not (any (playing arborId) (Action.legalActions S.alice (busyStack board)))) "not offered"
 
-    -- CR 601.1a / 601.3b, the whole fix: once Scout's Warning has resolved,
-    -- Dryad Arbor -- a LAND card -- is offered outside the sorcery-speed
-    -- window, which Pawl.Engine.PlayerEffect.CastAsThoughItHadFlash alone
-    -- could never reach (#1938).
-    Spec.it s "CR 601.1a / 601.3b Dryad Arbor is offered once Scout's Warning has resolved" $ do
-      plains <- S.printingOf s registry "Plains"
-      warning <- S.printingOf s registry "Scout's Warning"
-      dryadArbor <- S.printingOf s registry "Dryad Arbor"
-      let (arborId, after) = scoutsWarningResolved plains warning dryadArbor
-      Spec.assertBool s (any (playing arborId) (Action.legalActions S.alice (busyStack after))) "offered"
-
     -- The resolution itself: CR 611.2's stored effect the card installs, and
     -- CR 611.2a's Expiry.WhenUsed the Duration.UntilUsed on the card resolved
     -- into (#3008).
@@ -2156,55 +1925,6 @@ serraParagonSpec s registry =
         pure (paragonBoard forest buriedCard heldCard (if withParagon then Just paragon else Nothing))
       playOf oid = (== Action.Type.Play oid Nothing)
    in Spec.describe s "SerraParagon" $ do
-        -- The shared budget, from the land side. alice plays the graveyard
-        -- Forest whenever it is offered and casts the buried Elves whenever
-        -- THEY are, land first; the one use goes on the land, so the Elves
-        -- never are.
-        Spec.it s "CR 601.3 / 305.1 a land played from the graveyard spends the one use the cast needed" $ do
-          b <- board "Llanowar Elves" "Forest" True
-          let gs = pbState b
-              after = S.runPure (takeFirst [playOf (pbGraveForest b), S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
-          Spec.assertBool s (elem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Llanowar Elves are still in alice's graveyard"
-          Spec.assertBool s (notElem (pbGraveForest b) (Game.zoneMembers Zone.Graveyard S.alice after)) "because the Forest left it"
-          Spec.assertEqWith s "and one land arrived" (length (arrivedBetween gs after)) 1
-
-        -- The pair's other half: WITHOUT the land play the same Elves are cast,
-        -- so the refusal above was the budget and not the mana or the card.
-        Spec.it s "CR 601.3 the same Elves are cast from the graveyard when nothing else spent the use" $ do
-          b <- board "Llanowar Elves" "Forest" True
-          let gs = pbState b
-              after = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
-          Spec.assertBool s (notElem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Elves left alice's graveyard"
-          Spec.assertEqWith s "and one creature arrived" (length (arrivedBetween gs after)) 1
-
-        -- The shared budget, from the cast side: once the Elves are cast, the
-        -- graveyard Forest is not playable, though her land drop is unspent --
-        -- the Forest in her hand still is.
-        Spec.it s "CR 601.3 / 305.1 a spell cast from the graveyard spends the one use the land play needed" $ do
-          b <- board "Llanowar Elves" "Forest" True
-          let gs = pbState b
-              after = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
-          Spec.assertBool s (notElem (pbGraveForest b, Nothing) (Action.playableLands S.alice after)) "the graveyard Forest is not playable once the Elves are cast"
-          Spec.assertBool s (elem (pbHandForest b, Nothing) (Action.playableLands S.alice after)) "while the Forest in her hand is"
-          Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice gs)) "and the graveyard Forest was, before the cast"
-
-        -- CR 601.2e with CR 202.3e: Protean Hydra ({X}{G}) is mana value 1 in
-        -- the graveyard, so the Paragon admits it, and the X alice announces is
-        -- then judged against "mana value 3 or less". Two more Forests make
-        -- five, so X = 3's {3}{G} is payable and mana is never why a cast fails.
-        Spec.it s "CR 601.2e Serra Paragon admits Protean Hydra at X = 2 and not at X = 3" $ do
-          b <- board "Protean Hydra" "Forest" True
-          forest <- S.printingOf s registry "Forest"
-          let gs = S.landsFor forest S.alice 2 (pbState b)
-              announcing :: Natural -> Prompt.Prompt r -> r
-              announcing x p = case p of
-                Prompt.ChooseX {} -> x
-                _ -> S.identityAnswer p
-              castAt x = S.runPure (announcing x) gs (S.cast S.alice (pbBuried b))
-          Spec.assertEqWith s "X = 3: mana value 4, so the cast is taken back and the Hydra stays in the graveyard" (elem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice (castAt 3))) True
-          Spec.assertEqWith s "and the stack is empty" (GameState.stack (castAt 3)) []
-          Spec.assertEqWith s "X = 2: mana value 3, so the Hydra is cast" (length (GameState.stack (castAt 2))) 1
-
         -- The budget comes back at the turn handoff, CR 601.3's "each of your
         -- turns".
         Spec.it s "CR 601.3 the use comes back on her next turn" $ do
@@ -2229,16 +1949,6 @@ serraParagonSpec s registry =
           Spec.assertBool s (elem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Ornithopter is still in alice's graveyard"
           Spec.assertEqWith s "and Heart of Yavimaya went back there rather than entering" (namesIn Zone.Graveyard S.alice after List.\\ namesIn Zone.Graveyard S.alice gs) []
           Spec.assertEqWith s "and nothing arrived" (arrivedBetween gs after) []
-
-        -- The pair: with no Heart played, the same Ornithopter is cast.
-        Spec.it s "CR 601.3 the same Ornithopter is cast when no land play spent the use" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          ornithopter <- S.printingOf s registry "Ornithopter"
-          paragon <- S.printingOf s registry "Serra Paragon"
-          let b = paragonBoard swamp ornithopter swamp (Just paragon)
-              gs = pbState b
-              after = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
-          Spec.assertBool s (notElem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Ornithopter left alice's graveyard"
 
         -- Without the Paragon nothing in the graveyard is playable.
         Spec.it s "CR 305.1 without Serra Paragon the graveyard Forest is not playable" $ do
@@ -2483,7 +2193,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   sigardasAidSpec s registry
   untimelyAlurenSpec s registry
   searchIsUntimedSpec s registry
-  yevaSpec s registry
   yawgmothsWillSpec s registry
   crucibleSpec s registry
   garruksHordeSpec s registry

@@ -180,7 +180,7 @@ saddledDesignationSpec s registry = Spec.describe s "Saddled" $ do
 -- saddled". Two boards differing in the designation and in nothing else -- the
 -- Hill Giant is tapped on both, on the negative board by hand rather than by
 -- paying the cost.
-attacksWhileSaddledSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attacksWhileSaddledSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 attacksWhileSaddledSpec s registry = Spec.describe s "AttacksWhileSaddled" $ do
   Spec.it s "CR 702.171b an attacking Mount that is saddled creates the token" $ do
     bighorn <- S.printingOf s registry "Bridled Bighorn"
@@ -191,15 +191,6 @@ attacksWhileSaddledSpec s registry = Spec.describe s "AttacksWhileSaddled" $ do
             after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackingWith mountId) saddled
         Spec.assertBool s (isSaddled mountId saddled) "the Mount is saddled as it is declared"
         Spec.assertEqWith s "and its trigger made a Sheep" (sheepTokens after) 1
-      _ -> Spec.assertFailure s "fixture should have a Mount and one other creature"
-  Spec.it s "CR 702.171b an attacking Mount that is not saddled creates none" $ do
-    bighorn <- S.printingOf s registry "Bridled Bighorn"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    case S.combatBoardOf [bighorn, hillGiant] [] of
-      (gs, [mountId, giantId], []) -> do
-        let after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackingWith mountId) (tap giantId gs)
-        Spec.assertBool s (not (isSaddled mountId after)) "the Mount was never saddled"
-        Spec.assertEqWith s "so no Sheep was made" (sheepTokens after) 0
       _ -> Spec.assertFailure s "fixture should have a Mount and one other creature"
 
 -- CR 702.171c: "a creature 'saddles' a permanent as it's tapped to pay the cost

@@ -35,7 +35,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Board as Board
@@ -54,13 +53,11 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
@@ -71,7 +68,6 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -83,109 +79,16 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
-import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
 import qualified Pawl.Types.Seat as Seat
-import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timed as Timed
-import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
-
--- Casts every castable spell (targets via lookupMin: creatures first),
--- otherwise passes. Drives the Bolt-vs-Bolt integration falsifier.
-boltAnswer :: Prompt.Prompt r -> r
-boltAnswer p = case p of
-  Prompt.ChooseAction _ _ actions ->
-    let isCast a = case a of
-          A.Cast {} -> True
-          _ -> False
-     in case filter isCast actions of
-          h : _ -> h
-          [] -> A.Pass
-  _ -> S.identityAnswer p
-
--- bob's Piker on the battlefield; alice holds TWO Bolts and two Mountains, in
--- her main phase. boltAnswer casts both (CR 117.3c keeps priority), both
--- target the Piker (the only creature), and the priority loop resolves them
--- LIFO: B kills the Piker, the mid-loop SBA buries it, A fizzles.
-twoBoltState :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
-twoBoltState piker mountain lightningBolt =
-  let (_, withPiker) = S.addPermanent piker S.bob (S.landsInPlay mountain 2)
-      (gs1, _oid1) = S.handOne lightningBolt withPiker
-      (boltPrintingId, gs1b) = Game.intern lightningBolt gs1
-      (oid2, gs2) = Game.freshObjectId gs1b
-      obj =
-        Object.MkObject
-          { Object.owner = S.alice,
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard boltPrintingId,
-            Object.zone = Zone.Hand,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled S.alice,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = Timestamp.MkTimestamp 0,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
-          }
-   in gs2
-        { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),
-          -- handOne already put oid1 in hand; ADD the second Bolt, oid2.
-          GameState.hand = Map.adjust (oid2 Seq.<|) S.alice (GameState.hand gs2)
-        }
 
 -- alice has 3 Islands and Cancel in hand; a `victim` spell (bob's) sits on the
 -- stack. Returns (victimId, state after alice casts Cancel at it and it resolves).
@@ -1234,26 +1137,6 @@ hakbalSpec s registry = Spec.describe s "Hakbal" $ do
     Spec.assertEqWith s "declining never asked WHICH card" (handCardResponses transcript) []
     Spec.assertEqWith s "nothing joined Hakbal on her battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
     Spec.assertEqWith s "and one card left her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
-    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
-  -- CR 118.3: a hand with no land card cannot pay, so there is one possible
-  -- answer and the prompt is not raised -- proved by the transcript, under the
-  -- interpreter that WOULD have paid. The board differs from the two above in
-  -- exactly one thing: the two lands are gone from her hand.
-  Spec.it s "CR 118.3 a controller holding no land card is not asked, and draws" $ do
-    hakbal <- S.printingOf s registry "Hakbal of the Surging Soul"
-    piker <- S.printingOf s registry "Goblin Piker"
-    maiden <- S.printingOf s registry "Bird Maiden"
-    myr <- S.printingOf s registry "Darksteel Myr"
-    let attacking = hakbalAttacking hakbal [piker] [myr, maiden]
-        ((_, after), transcript) = Replay.record (paysFor S.alice) attacking Stack.resolveTop
-    Spec.assertEqWith
-      s
-      "she drew the Bird Maiden"
-      (namesIn Zone.Hand S.alice after)
-      [Just (S.printingName piker), Just (S.printingName maiden)]
-    Spec.assertEqWith s "alice was never asked to pay" (payResponses transcript) []
-    Spec.assertEqWith s "nor asked which card" (handCardResponses transcript) []
-    Spec.assertEqWith s "nothing joined Hakbal on her battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
 
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
@@ -2877,18 +2760,8 @@ rebuffTheWickedSpec s registry = Spec.describe s "Rebuff the Wicked" $ do
     after <- S.play s registry rebuffBoard (rebuffScript "alice's Piker") S.priorityGame
     Spec.assertEqWith s "CR 701.6a the Bolt at alice's Piker was countered, so the Piker lives" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
 
-fizzleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fizzleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
-  Spec.it s "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    mountain <- S.printingOf s registry "Mountain"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let after = snd (Engine.runGamePure boltAnswer (twoBoltState piker mountain lightningBolt) Engine.priorityLoop)
-    Spec.assertEqWith s "stack cleared" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "Piker dead" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "both Bolts in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
-    Spec.assertEqWith s "the Piker in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertEqWith s "bob's life untouched: the fizzled Bolt hit nothing" (S.lifeOf S.bob after) (Just 20)
   -- CR 608.2b pins the `targeted` restriction Task 3 added (Resolve.hs's
   -- resolveEffects/resolveSpell): a reserved slot (Binding.triggerSource)
   -- is vacuously legal, since CR 608.2b is about TARGETS and a reserved
@@ -2926,24 +2799,6 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance 0 (ModeIndex.MkModeIndex 0) 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore
-  Spec.it s "CR 704.5a a Bolt can end the game mid-step" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
-        lowBob =
-          gs {GameState.players = Map.adjust (\pl -> pl {Player.life = 3}) S.bob (GameState.players gs)}
-        atBob :: Prompt.Prompt r -> r
-        atBob p = case p of
-          Prompt.ChooseTargets _ _ _ sets ->
-            fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
-          Prompt.ChooseAction _ _ actions ->
-            case filter (S.isCastOf oid) actions of
-              h : _ -> h
-              [] -> A.Pass
-          _ -> S.identityAnswer p
-        after = snd (Engine.runGamePure atBob lowBob Engine.priorityLoop)
-    Spec.assertEqWith s "alice wins" (GameState.result after) (Just (Result.Won S.alice))
-    Spec.assertEqWith s "the loop released priority" (GameState.priority after) Nothing
 
 indestructibleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 indestructibleSpec s registry = Spec.describe s "Indestructible" $ do

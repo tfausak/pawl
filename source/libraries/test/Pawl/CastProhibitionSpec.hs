@@ -29,7 +29,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Interpreter as Interpreter
-import Pawl.PlayerEffectSpec (anySpell, anySpellId, isCast, isSilenceActivate, silenceAfter, swapAt, threeSeatSilenceBoard)
+import Pawl.PlayerEffectSpec (anySpell, anySpellId, isCast, silenceAfter, swapAt, threeSeatSilenceBoard)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -80,49 +80,6 @@ silenceSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, pikerId, _, before, _) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.bob before)) "offered"
-
-    -- CR 611.2c, THE FALSIFIER: nothing bob owns is a spell when Silence
-    -- resolves -- the stack holds only Silence itself. Freeze the affected
-    -- set and this card does literally nothing.
-    Spec.it s "CR 611.2c the effect reaches a spell that did not exist when it began" $ do
-      plains <- S.printingOf s registry "Plains"
-      silence <- S.printingOf s registry "Silence"
-      mountain <- S.printingOf s registry "Mountain"
-      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects after)) 1
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced after) "bob is prohibited"
-      Spec.assertEqWith
-        s
-        "and no cast is offered"
-        (filter isCast (Action.legalActions S.bob after))
-        []
-
-    -- CR 109.5: "your opponents" is scoped off Silence's controller, which
-    -- is baked into the stored effect because its source is in a graveyard.
-    Spec.it s "CR 109.5 the Opponents scope spares the caster" $ do
-      plains <- S.printingOf s registry "Plains"
-      silence <- S.printingOf s registry "Silence"
-      mountain <- S.printingOf s registry "Mountain"
-      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (_, silence2Id, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced after)) "alice is not prohibited"
-      Spec.assertBool s (S.castable S.alice silence2Id after) "and may cast her second Silence"
-
-    -- Ruling: "The only thing Silence stops is casting spells. Your
-    -- opponents can still activate abilities ... they can still play lands,
-    -- and so on."
-    Spec.it s "CR 601.3 only casting is stopped" $ do
-      plains <- S.printingOf s registry "Plains"
-      silence <- S.printingOf s registry "Silence"
-      mountain <- S.printingOf s registry "Mountain"
-      prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (_, _, _, landId, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (elem (Action.Type.Play landId Nothing) (Action.legalActions S.bob after)) "bob may still play a land"
-      Spec.assertBool s (any isSilenceActivate (Action.legalActions S.bob after)) "and still activate an ability"
 
     Spec.it s "CR 514.2 the prohibition ends at cleanup" $ do
       plains <- S.printingOf s registry "Plains"
@@ -250,10 +207,6 @@ offersCast pid oid printing gs =
     (Action.Type.Cast oid (S.printingName printing) Facing.FaceUp)
     (Action.legalActions pid (gs {GameState.activePlayer = pid}))
 
--- How many cards this seat's library holds.
-librarySize :: PlayerId.PlayerId -> GameState.GameState -> Int
-librarySize pid gs = length (Map.findWithDefault mempty pid (GameState.library gs))
-
 -- Sphinx's Decree {1}{W} Sorcery: "Each opponent can't cast instant or sorcery
 -- spells during that player's next turn." (Oracle checked against Scryfall
 -- 2026-09-25.) CR 611.2a's window, one per opponent: each opponent's next turn
@@ -324,19 +277,6 @@ ceaseFireSpec s registry =
         (fmap ActivePlayerEffect.scope (GameState.playerEffects after))
         [AffectedPlayers.Named S.carol]
 
-    -- The other axis of the same restriction, on the SAME seat and the same
-    -- board: "creature spells" is a Filter over the spell, so carol's instant is
-    -- untouched. Without this the case above would pass for a prohibition that
-    -- stopped carol casting anything at all.
-    Spec.it s "CR 601.3a the targeted seat may still cast a noncreature spell" $ do
-      plains <- S.printingOf s registry "Plains"
-      ceaseFire <- S.printingOf s registry "Cease-Fire"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      let (_, _, _, carolsBolt, _, after) = ceaseFireAfter plains ceaseFire mountain piker lightningBolt
-      Spec.assertBool s (offersCast S.carol carolsBolt lightningBolt after) "carol may still cast her Lightning Bolt"
-
     -- CR 514.2: "this turn" ends at cleanup, so the restriction has to end with
     -- it. Driven through the cleanup step's own turn-based actions rather than
     -- the priority loop -- the narrowest path that ends the effect.
@@ -350,18 +290,6 @@ ceaseFireSpec s registry =
           ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
       Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
       Spec.assertBool s (offersCast S.carol carolsPiker piker ended) "carol may cast her creature again"
-
-    -- The card's second clause. Its control is the two untargeted libraries,
-    -- which the same resolution must leave alone.
-    Spec.it s "the draw is its controller's, not the targeted player's" $ do
-      plains <- S.printingOf s registry "Plains"
-      ceaseFire <- S.printingOf s registry "Cease-Fire"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      let (_, _, _, _, before, after) = ceaseFireAfter plains ceaseFire mountain piker lightningBolt
-      Spec.assertEqWith s "every library starts equal" (fmap (`librarySize` before) [S.alice, S.bob, S.carol]) [2, 2, 2]
-      Spec.assertEqWith s "alice drew one; nobody else drew" (fmap (`librarySize` after) [S.alice, S.bob, S.carol]) [1, 2, 2]
 
 -- CR 611.2a's board: three seats, and the SEAT COUNT is load-bearing twice
 -- over. "Until your next turn" has to pass two other seats before it ends, so a
@@ -879,21 +807,6 @@ activateLoyalty answer n lilianaId gs = case projectedAbility n lilianaId gs of
       Activate.activateAbility S.alice lilianaId ability
       Stack.resolveTop
 
--- alice controls Liliana with four loyalty counters over three untapped Swamps,
--- and her library holds five copies of `stock` -- five rather than three so the
--- +1's mill leaves cards behind and CR 104.3c decides nothing.
-lilianaMillBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-lilianaMillBoard swamp liliana stock =
-  let (lilianaId, g1) = S.addPermanent liliana S.alice (S.landsInPlay swamp 3)
-      g2 = List.foldl' (\g _ -> snd (S.addLibraryCard stock S.alice g)) g1 [1 :: Int .. 5]
-   in ( lilianaId,
-        (S.addCounter CounterKind.Loyalty 4 lilianaId g2)
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      )
-
 -- Liliana, Untouched by Death {2}{B}{B} Legendary Planeswalker -- Liliana,
 -- loyalty 4 (Oracle text checked against Scryfall, 2026-08-27):
 --   +1: Mill three cards. If at least one Zombie card is milled this way, each
@@ -917,7 +830,7 @@ lilianaMillBoard swamp liliana stock =
 -- it is the first card in `data/cards/` to write a MillTally at all: its "if at
 -- least one" is a clause condition comparing Quantity.InSlot against a literal,
 -- and the whole tally-then-gate road had no producer before it.
-lilianaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lilianaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 lilianaSpec s registry =
   let board = do
         island <- S.printingOf s registry "Island"
@@ -927,24 +840,7 @@ lilianaSpec s registry =
         zombie <- S.printingOf s registry "Whipstitched Zombie"
         evangel <- S.printingOf s registry "Cabal Evangel"
         pure (lilianaBoard island swamp liliana evolution zombie evangel)
-      millBoard stockName = do
-        swamp <- S.printingOf s registry "Swamp"
-        liliana <- S.printingOf s registry "Liliana, Untouched by Death"
-        stock <- S.printingOf s registry stockName
-        pure (lilianaMillBoard swamp liliana stock)
    in Spec.describe s "LilianaUntouchedByDeath" $ do
-        -- The control, differing from the case below in the Artificial Evolution
-        -- alone: unhacked, the printed word stands and the ZOMBIE is the card
-        -- that becomes castable.
-        Spec.it s "CR 601.3 unhacked the -3 reaches the Zombie card and not the Cleric" $ do
-          (lilianaId, _, zombieId, evangelId, before) <- board
-          let after = activateLoyalty S.identityAnswer 2 lilianaId before
-          Spec.assertBool s (S.castable S.alice zombieId after) "the Zombie is castable out of the graveyard"
-          Spec.assertBool s (not (S.castable S.alice evangelId after)) "the Cleric is not"
-          Spec.assertBool s (any (S.isCastOf zombieId) (Action.legalActions S.alice after)) "and the Zombie is offered"
-          Spec.assertBool s (not (any (S.isCastOf evangelId) (Action.legalActions S.alice after))) "while the Cleric is not"
-          Spec.assertEqWith s "the ability really did store something" (length (GameState.playerEffects after)) 1
-
         -- THE UNIT'S POINT. The same board with Zombie swapped for Cleric on
         -- Liliana herself. The gameplay assertions lead, and they lead in BOTH
         -- directions: an arm that dropped the descent would leave the restriction
@@ -961,26 +857,6 @@ lilianaSpec s registry =
           Spec.assertBool s (not (any (S.isCastOf zombieId) (Action.legalActions S.alice after))) "while the Zombie is not"
           Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Graveyard evangelId after) "the typed question agrees"
           Spec.assertEqWith s "and exactly one restriction is stored" (length (GameState.playerEffects after)) 1
-
-        -- The +1's tally HIT: three Zombie cards milled, so the clause condition
-        -- comparing Quantity.InSlot against one holds and the drain happens.
-        Spec.it s "CR 701.17 the +1 drains when a Zombie card is milled" $ do
-          (lilianaId, before) <- millBoard "Whipstitched Zombie"
-          let after = activateLoyalty S.identityAnswer 0 lilianaId before
-          Spec.assertEqWith s "bob lost two life" (S.lifeOf S.bob after) (Just 18)
-          Spec.assertEqWith s "alice gained two" (S.lifeOf S.alice after) (Just 22)
-          Spec.assertEqWith s "and three cards were milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
-
-        -- The tally MISS, the same board with the milled cards' subtype the only
-        -- difference: nothing counted, so the gate refuses and neither life total
-        -- moves. Without this the case above would pass on an arm that ignored
-        -- the condition entirely.
-        Spec.it s "CR 701.17 the +1 does not drain when no Zombie card is milled" $ do
-          (lilianaId, before) <- millBoard "Swamp"
-          let after = activateLoyalty S.identityAnswer 0 lilianaId before
-          Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
-          Spec.assertEqWith s "so is alice" (S.lifeOf S.alice after) (Just 20)
-          Spec.assertEqWith s "and three cards were still milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).

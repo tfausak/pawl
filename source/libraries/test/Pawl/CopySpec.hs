@@ -348,12 +348,6 @@ rites decision victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> copyNewest p
 
--- What each token on the battlefield IS -- its name and its projected P/T --
--- rather than how many there are. A batch that minted the right NUMBER of the
--- wrong things fails on this where a length check would not.
-mintedTokens :: GameState.GameState -> [(Set.Set CardName.CardName, Maybe (Integer, Integer))]
-mintedTokens gs = fmap (\oid -> (Projection.namesOf oid gs, S.powerToughnessOf oid gs)) (tokensOnBattlefield gs)
-
 -- Vesuva Land: "You may have this land enter tapped as a copy of any land on the
 -- battlefield" (data/cards/vesuva.json; Oracle text checked against
 -- api.scryfall.com, 2026-08-21). The whole of its printed text, and what makes a
@@ -391,13 +385,6 @@ playsAndCopies wanted p = case p of
   Prompt.ChooseCopyTarget {} -> Just wanted
   _ -> S.playLandAnswer p
 
--- playsAndCopies' opposite: play the land and DECLINE the copy, which is the
--- other half of the printed "may".
-playsAndDeclines :: Prompt.Prompt r -> r
-playsAndDeclines p = case p of
-  Prompt.ChooseCopyTarget {} -> Nothing
-  _ -> S.playLandAnswer p
-
 -- Takes ONE named activated ability of ONE named permanent whenever the priority
 -- loop offers it, and passes otherwise -- so an ability that reaches the stack
 -- did so because the engine offered it, not because this answerer reached past a
@@ -412,55 +399,6 @@ activates srcId ability p = case p of
           h : _ -> h
           [] -> A.Pass
   _ -> S.identityAnswer p
-
--- `activates` with a target slot to fill: the ability Littjara Mirrorlake
--- activates says "target creature you control". FILTERED out of the offered
--- candidates rather than built, so the recipient is the one the engine itself
--- offered for that pool -- a hand-built Recipient of the same permanent is a
--- different recipient, and CR 608.2b's re-read at resolution drops it silently.
--- Named rather than "whatever is legal" for `activates`' reason, even where one
--- board offers a single candidate: an answerer that searched would quietly repair
--- a mutation on a board that later grows a second creature.
-activatesTargeting :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId -> Prompt.Prompt r -> r
-activatesTargeting srcId ability victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just victim) candidates) sets
-  _ -> activates srcId ability p
-
--- The +1/+1 counters on one object. Duplicated from Pawl.ReplacementSpec rather
--- than hoisted into Pawl.Support, which rebuilds every spec in the tree.
-plusOnesOn :: ObjectId -> GameState.GameState -> Natural.Natural
-plusOnesOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
-
--- Littjara Mirrorlake Land: "This land enters tapped. {T}: Add {U}.
--- {2}{G}{G}{U}, {T}, Sacrifice this land: Create a token that's a copy of target
--- creature you control, except it enters with an additional +1/+1 counter on it.
--- Activate only as a sorcery." (data/cards/littjara-mirrorlake.json; Oracle text
--- checked against api.scryfall.com, 2026-08-25.) Its SECOND printed ability is
--- the copy one -- the first is the mana ability CR 605.3b keeps off the stack.
-sacrificeAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-sacrificeAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.combinedFace
-
--- alice controls the Mirrorlake untapped, a Goblin Piker carrying TWO +1/+1
--- counters, and five other lands -- two Forests and three Islands, which is
--- exactly {2}{G}{G}{U} once the Mirrorlake itself is tapped for the cost and so
--- cannot pay for anything. Returns the Mirrorlake and the Piker.
---
--- The Mirrorlake is placed already on the battlefield and UNTAPPED: its own entry
--- rewrite would tap it, and a tapped land cannot pay the {T} in its cost.
-mirrorlakeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, GameState.GameState)
-mirrorlakeBoard forest island piker mirrorlake =
-  let base = S.landsFor island S.alice 3 (S.landsInPlay forest 2)
-      (pikerId, g1) = S.addPermanent piker S.alice base
-      g2 = S.addCounter CounterKind.PlusOnePlusOne 2 pikerId g1
-      (lakeId, g3) = S.addPermanent mirrorlake S.alice g2
-   in ( lakeId,
-        pikerId,
-        g3
-          { GameState.priority = Just S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice
-          }
-      )
 
 -- Mutavault's SECOND printed ability -- "{1}: This land becomes a 2/2 creature
 -- with all creature types until end of turn. It's still a land". The first is the
@@ -985,19 +923,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "and an artifact creature" (projected PC.cardTypes metamorphId entered) . Just $ Set.fromList [CardType.Artifact, CardType.Creature]
     Spec.assertEqWith s "where the value-excepted copy is a creature alone" (projected PC.cardTypes gargantuanId entered) . Just $ Set.singleton CardType.Creature
 
-  Spec.it s "Cackling Counterpart mints a token copy of the targeted creature (CR 707.2, CR 111.3)" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let (_, board) = S.addPermanent piker S.alice (S.landsInPlay island 3)
-        resolved = castAndResolve declineCopy counterpart board
-    case tokensOnBattlefield resolved of
-      [tokenId] -> do
-        Spec.assertEqWith s "the token's name is the copied creature's" (Projection.namesOf tokenId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
-        Spec.assertEqWith s "the token's power is the copied creature's" (Projection.powerOf tokenId resolved) $ Just 2
-        Spec.assertEqWith s "the token's toughness is the copied creature's" (Projection.toughnessOf tokenId resolved) $ Just 1
-      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-
   -- THE PROVING TEST for CR 707.9b's SUBTRACTIVE arm -- the exception that takes
   -- a SUPERTYPE off the copy -- and for CR 707.9's exceptions riding CR 707.1's
   -- token mint rather than only the two copy doors. Multiversal Recruitment
@@ -1285,39 +1210,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "and the Hill Giant is what alice discarded" (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid (attacked crookId excepted))) (Game.zoneMembers Zone.Graveyard S.alice (attacked crookId excepted))) [CardName.MkCardName (Text.pack "Hill Giant")]
       _ -> Spec.assertFailure s "expected one Copycrook and one Clone"
 
-  -- THE PROVING TEST for CR 122.6 on the COPY opcode: "except it enters with an
-  -- additional +1/+1 counter on it" is a rider the effect states, not something
-  -- copied off the original -- CR 707.2 excludes counters from the copiable
-  -- values either way.
-  --
-  -- The Piker carries TWO counters, which is what separates the three readings.
-  -- A rider that never reaches Event.createTokens leaves the token at ZERO. The
-  -- rule's answer is ONE. An implementation that copied the original's counters
-  -- and added the rider's would say THREE. With a bare Piker the second and third
-  -- readings both say one and the board proves nothing.
-  --
-  -- Driven through the priority loop rather than Activate.activateAbility, the
-  -- Vesuva case's reason: the ability reaches the stack because the engine offered
-  -- it under CR 602.5d's sorcery-speed restriction.
-  Spec.it s "Littjara Mirrorlake's copy token enters with the counter the effect states (CR 122.6, CR 707.2)" $ do
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    mirrorlake <- S.printingOf s registry "Littjara Mirrorlake"
-    case sacrificeAbility mirrorlake of
-      Nothing -> Spec.assertFailure s "Littjara Mirrorlake prints no second activated ability"
-      Just ability -> do
-        let (lakeId, pikerId, board) = mirrorlakeBoard forest island piker mirrorlake
-            after = S.runPure (activatesTargeting lakeId ability pikerId) board Engine.priorityLoop
-        case tokensOnBattlefield after of
-          [tokenId] -> do
-            Spec.assertEqWith s "the token enters with the one counter the effect stated" (plusOnesOn tokenId after) 1
-            Spec.assertEqWith s "the original keeps its own two, which were never copied" (plusOnesOn pikerId after) 2
-            Spec.assertEqWith s "the token is a copy of the Piker" (Projection.namesOf tokenId after) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
-            Spec.assertEqWith s "so it is the printed 2/1 plus its one counter" (S.powerToughnessOf tokenId after) $ Just (3, 2)
-            Spec.assertEqWith s "against the original's 2/1 plus two" (S.powerToughnessOf pikerId after) $ Just (4, 3)
-          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-
   -- Watchful Radstag {2}{G} 2/2 Elk Mutant: evolve, plus "whenever this creature
   -- evolves, create a token that's a copy of it". The copied permanent is the
   -- reserved self slot rather than a target, which is the whole reason this card
@@ -1364,55 +1256,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the token is a Radstag all the same" (Projection.namesOf tokenId after) . Set.singleton . CardName.MkCardName $ Text.pack "Watchful Radstag"
         Spec.assertEqWith s "at its copiable 2/2, not the -2/-2 it died at" (S.powerToughnessOf tokenId after) $ Just (2, 2)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-
-  -- CR 707.1's count. Nine Islands is the KICKED cost ({2}{U}{U} plus {5}), and
-  -- the kicked test that follows is the same board, the same answerer and the
-  -- same pinned target but for the one kicker answer -- so the count is the only
-  -- thing the two boards disagree about.
-  Spec.it s "unkicked Rite of Replication mints one token copy (CR 707.1)" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    rite <- S.printingOf s registry "Rite of Replication"
-    let (pikerId, board) = S.addPermanent piker S.alice (S.landsInPlay island 9)
-        resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 0) pikerId) rite board
-    Spec.assertEqWith s "one token, and it is the Piker" (mintedTokens resolved) [(Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1))]
-
-  Spec.it s "kicked Rite of Replication mints five instead (CR 702.33d, CR 707.1)" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    rite <- S.printingOf s registry "Rite of Replication"
-    let (pikerId, board) = S.addPermanent piker S.alice (S.landsInPlay island 9)
-        resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 1) pikerId) rite board
-    Spec.assertEqWith s "five tokens, and every one of them is the Piker" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1)))
-
-  -- THE PROVING TEST for CR 614.12's batch exclusion and for CR 616.1g's
-  -- containment. Five token Clones enter at ONE moment, each with its own
-  -- `EntryR AsCopy`, so each runs an entry loop that finds a real candidate --
-  -- and copyNewest names the highest-id legal creature, which is the Giant only
-  -- while the four siblings entering beside it are kept out of the offer.
-  --
-  -- Both mutations are visible here: dropping Event.createTokens' per-token
-  -- runEntry leaves five 0/0 Clones that CR 704.5f buries, and dropping
-  -- Replacement.legalCopyTargets' batch exclusion has a token name a sibling
-  -- that has not copied anything yet and become a 0/0 in its turn.
-  Spec.it s "five token Clones enter at once, each choosing, and none may copy a sibling (CR 614.12, CR 616.1g)" $ do
-    island <- S.printingOf s registry "Island"
-    clone <- S.printingOf s registry "Clone"
-    giant <- S.printingOf s registry "Hill Giant"
-    rite <- S.printingOf s registry "Rite of Replication"
-    let (cloneId, board0) = S.addPermanent clone S.alice (S.landsInPlay island 9)
-        -- A +1/+1 counter is what keeps a Clone that copied NOTHING alive past
-        -- CR 704.5f, and so leaves an `EntryR AsCopy` on the battlefield for the
-        -- Rite to copy. Counters are not copiable (CR 707.2), so each token is a
-        -- printed 0/0 Clone carrying the copy ability rather than a 1/1.
-        board1 = S.addCounter CounterKind.PlusOnePlusOne 1 cloneId board0
-        -- Added AFTER the Clone, so it is the highest-id creature already on the
-        -- battlefield and copyNewest names it -- unless a sibling token, minted
-        -- later still, is wrongly offered.
-        (_, board) = S.addPermanent giant S.bob board1
-        resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 1) cloneId) rite board
-    Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Hill Giant")), Just (3, 3)))
-    Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))
 
   -- THE PROVING TEST for #313, and it is CR 707.4's own worked example: an
   -- Unstable Shapeshifter under a Giant Growth becomes a copy of a creature that
@@ -1623,57 +1466,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             -- CR 614.1d rides the same printed sentence: Vesuva enters TAPPED as a
             -- copy.
             Spec.assertEqWith s "and it entered tapped, as the printed sentence says" (fmap Object.tapped (Game.lookupObject vesuvaId without)) $ Just TapState.Tapped
-
-  -- The declining half of the printed "may", which is what keeps `tapped` on the
-  -- AsCopy rewrite rather than in a second EntryRewrite.Tapped beside it: Vesuva's
-  -- own ruling (2021-03-19) says that a Vesuva which chooses no land "enters the
-  -- battlefield untapped as itself, and will not be able to tap for mana". Both
-  -- halves are asserted, and a second replacement would falsify the first.
-  Spec.it s "a Vesuva that declines the copy enters untapped and taps for nothing (CR 614.1c)" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    mutavault <- S.printingOf s registry "Mutavault"
-    vesuva <- S.printingOf s registry "Vesuva"
-    let (_, board) = vesuvaBoard mountain mutavault vesuva Nothing
-        played = S.runPure playsAndDeclines board Engine.priorityLoop
-        named = CardName.MkCardName . Text.pack
-    case newest (printedOnBattlefield "Vesuva" played) of
-      Nothing -> Spec.assertFailure s "Vesuva never reached the battlefield"
-      Just vesuvaId -> do
-        Spec.assertEqWith s "it taps for no mana at all -- Vesuva prints no mana ability" (Mana.manaTypesOf vesuvaId played) []
-        Spec.assertEqWith s "and it entered untapped, the tapping having gone with the declined copy" (fmap Object.tapped (Game.lookupObject vesuvaId played)) $ Just TapState.Untapped
-        Spec.assertEqWith s "and it is still itself by name" (Projection.namesOf vesuvaId played) $ Set.singleton (named "Vesuva")
-
-  -- The OTHER order, and the reason the case above adds Blood Moon afterwards: CR
-  -- 614.12 checks the entering permanent's characteristics "as it would exist on
-  -- the battlefield, taking into account ... continuous effects that already exist
-  -- and would apply to the permanent". A Blood Moon already out has stripped
-  -- Vesuva's own copy ability by then (CR 305.7's FIRST clause), so there is no
-  -- copy to make -- Blood Moon's own ruling (2020-08-07) says as much of every
-  -- ability that applies as a land enters.
-  --
-  -- The same answerer, which is what makes this a real refusal: it names
-  -- Mutavault whenever a copy choice is raised, so a Vesuva that still had its
-  -- ability would copy.
-  Spec.it s "CR 614.12 a Vesuva entering under Blood Moon has no copy ability left to apply" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    mutavault <- S.printingOf s registry "Mutavault"
-    vesuva <- S.printingOf s registry "Vesuva"
-    bloodMoon <- S.printingOf s registry "Blood Moon"
-    let (mutavaultId, board) = vesuvaBoard mountain mutavault vesuva (Just bloodMoon)
-        played = S.runPure (playsAndCopies mutavaultId) board Engine.priorityLoop
-        named = CardName.MkCardName . Text.pack
-    case newest (printedOnBattlefield "Vesuva" played) of
-      Nothing -> Spec.assertFailure s "Vesuva never reached the battlefield"
-      Just vesuvaId -> do
-        Spec.assertEqWith s "Vesuva copied nothing and is still itself by name" (Projection.namesOf vesuvaId played) $ Set.singleton (named "Vesuva")
-        -- The tapped half of the printed sentence went with the copy half: both
-        -- are the one ability, and it was stripped before either could apply.
-        Spec.assertEqWith s "and it entered untapped, the ability having gone with the rest" (fmap Object.tapped (Game.lookupObject vesuvaId played)) $ Just TapState.Untapped
-        -- CR 305.6: what a Vesuva with nothing copied taps for is the new Mountain
-        -- type's red, where a Vesuva that copied nothing and kept its printed text
-        -- would tap for nothing at all.
-        Spec.assertEqWith s "and it taps for red as a Mountain" (Mana.manaTypesOf vesuvaId played) [ManaType.Colored Color.Red]
-        Spec.assertBool s (elem Subtype.Mountain (Set.toList (Projection.subtypesOf vesuvaId played))) "Blood Moon made it a Mountain"
 
   -- CR 707.2a from the OTHER side of the same rule: the Blood Moon is the COPY.
   -- Copy Enchantment enters as a copy of a Blood Moon, the original is exiled,
@@ -2026,7 +1818,7 @@ drainStack answer =
         | otherwise = go (fuel - 1) (resolveOne answer gs)
    in go (10 :: Int)
 
-copyTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+copyTargetSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 copyTargetSpec s registry =
   let boardOf = do
         forest <- S.printingOf s registry "Forest"
@@ -2037,29 +1829,6 @@ copyTargetSpec s registry =
         twincast <- S.printingOf s registry "Twincast"
         pure (wardedCopyBoard forest island guard piker growth twincast)
    in Spec.describe s "Pawl.Engine.Copy" $ do
-        -- CR 115.1: "these targets are declared as part of the process of putting
-        -- the spell or ability on the stack", and CR 707.10c puts the copy on the
-        -- stack WITH the targets its controller has just decided on. So the
-        -- Guard becomes a target of the copy, and CR 702.21a's ward fires on it.
-        --
-        -- The Growth's own target is alice's Piker, so nothing but the copy ever
-        -- names the Guard: 3/1 against 6/4 is the copy having been countered,
-        -- and the Piker's 5/4 is the original resolving either way.
-        Spec.it s "CR 115.1 the copy's NEW target becomes a target, and ward fires" $ do
-          (guardId, pikerId, growthId, twincastId, board) <- boardOf
-          let castGrowth = S.runPure (pinTarget (Recipient.ToCreature pikerId)) board (S.cast S.alice growthId)
-          case topOfStack castGrowth of
-            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
-            Just growthSpell -> do
-              let cast = S.runPure (pinTarget (Recipient.ToObject growthSpell)) castGrowth (S.cast S.alice twincastId)
-                  -- Twincast resolves, and CR 707.10c's prompt sends the copy at
-                  -- the Guard instead of the Piker.
-                  copied = resolveOne (pinTarget (Recipient.ToCreature guardId)) cast
-                  after = drainStack S.identityAnswer copied
-              Spec.assertEqWith s "CR 702.21a countered the copy, so the Guard is still a 3/1" (S.powerToughnessOf guardId after) (Just (3, 1))
-              Spec.assertEqWith s "and alice's Piker took the ORIGINAL Growth" (S.powerToughnessOf pikerId after) (Just (5, 4))
-              Spec.assertEqWith s "the ward trigger went on the stack over the copy and the Growth" (length (GameState.stack copied)) 3
-              Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
         -- The same rule for a target the copy KEPT. CR 707.10 copies the
         -- decisions and CR 707.10c leaves an unchanged target unchanged, but the
         -- copy is "itself a spell" and the Guard becomes a target of THAT spell
@@ -2492,86 +2261,6 @@ permanentCopySpec s registry =
         bolt <- S.printingOf s registry "Lightning Bolt"
         pure (rollicker, lithoformBoard mountain engine piker mammoth rollicker bolt)
    in Spec.describe s "Pawl.Engine.Copy" $ do
-        -- CR 707.10f end to end: the copy resolves and a TOKEN Rollicker stands on
-        -- the battlefield before the card's own spell has resolved, then the card
-        -- beside it. The token read is first: an engine that dropped the copy
-        -- reads no Rollicker at all, one that filed it as a card reads a
-        -- non-token, and one that let CR 704.5e remove it reads nothing after
-        -- settling -- resolveOne settles.
-        Spec.it s "CR 707.10f a copy of a creature spell resolves as a token creature beside the card" $ do
-          (rollicker, (engineId, _, host, spellId, _, board)) <- boardOf
-          case copyPermanentSpell (printedRollicker host) engineId spellId board of
-            Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
-            Just copied -> do
-              let afterCopy = resolveOne S.identityAnswer copied
-                  afterBoth = resolveOne S.identityAnswer afterCopy
-              Spec.assertEqWith
-                s
-                "CR 707.10f: the copy resolved into ONE Rollicker, and it is a token"
-                (fmap (\oid -> Game.isToken oid afterCopy) (rollickersOn rollicker afterCopy))
-                [True]
-              Spec.assertEqWith
-                s
-                "CR 111.13: with the spell's characteristics, a 1/1"
-                (fmap (\oid -> S.powerToughnessOf oid afterCopy) (rollickersOn rollicker afterCopy))
-                [Just (1, 1)]
-              Spec.assertEqWith
-                s
-                "CR 707.10: under the copying effect's controller"
-                (fmap (\oid -> Projection.controllerOf oid afterCopy) (rollickersOn rollicker afterCopy))
-                [Just S.alice]
-              Spec.assertEqWith
-                s
-                "CR 608.3a: the card then resolves beside it, one token and one card"
-                (List.sort (fmap (\oid -> Game.isToken oid afterBoth) (rollickersOn rollicker afterBoth)))
-                [False, True]
-              Spec.assertEqWith
-                s
-                "and neither reached a graveyard"
-                (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid afterBoth)) (Game.zoneMembers Zone.Graveyard S.alice afterBoth))
-                []
-              Spec.assertEqWith s "and the stack is empty" (length (GameState.stack afterBoth)) 0
-        -- CR 702.103c: the copy of a bestowed Aura spell is a bestowed Aura
-        -- spell, so CR 608.3c puts it onto the battlefield attached -- to the
-        -- host the ORIGINAL chose, since CR 707.10 copies its target and the
-        -- Engine's third ability chooses no new ones. The board is the case
-        -- above's, differing in ONE thing: the cost CR 601.2b's announcement
-        -- settled on.
-        --
-        -- The host's power is the gameplay-level read and comes first: 4/4 after
-        -- the copy alone is the token pumping it, 5/5 after both is the card
-        -- pumping it too, and the bystander at 2/1 is the choice having been
-        -- carried rather than re-made.
-        Spec.it s "CR 702.103c a copy of a bestowed Rollicker resolves as a token Aura attached to the same host" $ do
-          (rollicker, (engineId, bystander, host, spellId, _, board)) <- boardOf
-          case copyPermanentSpell (bestowingRollicker host) engineId spellId board of
-            Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
-            Just copied -> do
-              let afterCopy = resolveOne S.identityAnswer copied
-                  afterBoth = resolveOne S.identityAnswer afterCopy
-              Spec.assertEqWith s "CR 702.103b: the token Aura pumps the host to 4/4" (S.powerToughnessOf host afterCopy) (Just (4, 4))
-              Spec.assertEqWith s "and the card's Aura makes it 5/5" (S.powerToughnessOf host afterBoth) (Just (5, 5))
-              Spec.assertEqWith s "and the creature nobody chose is untouched" (S.powerToughnessOf bystander afterBoth) (Just (2, 1))
-              Spec.assertEqWith
-                s
-                "CR 303.4: the token entered attached to the host"
-                (fmap (\oid -> Object.attachedTo =<< Game.lookupObject oid afterCopy) (rollickersOn rollicker afterCopy))
-                [Just (Recipient.ToCreature host)]
-              Spec.assertEqWith
-                s
-                "CR 702.103b: and it is an Enchantment, not a Creature"
-                (fmap (\oid -> Projection.cardTypesOf oid afterCopy) (rollickersOn rollicker afterCopy))
-                [Set.singleton CardType.Enchantment]
-              Spec.assertEqWith
-                s
-                "an Aura, with CR 205.1a having taken Satyr"
-                (fmap (\oid -> Projection.subtypesOf oid afterCopy) (rollickersOn rollicker afterCopy))
-                [Set.singleton Subtype.Aura]
-              Spec.assertEqWith
-                s
-                "CR 707.10f: and a token"
-                (fmap (\oid -> Game.isToken oid afterCopy) (rollickersOn rollicker afterCopy))
-                [True]
         -- CR 702.103e on the COPY: its host is killed in response, so as the copy
         -- begins resolving it ceases to be bestowed and resolves as a creature
         -- spell -- a token creature, attached to nothing. The board is the case

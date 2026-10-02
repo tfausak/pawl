@@ -30,7 +30,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -48,7 +47,6 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -214,21 +212,6 @@ resolveOne answer gs spellId =
 -- one history of amasses.
 amassSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 amassSpec s registry = Spec.describe s "Amass" $ do
-  Spec.it s "CR 701.47a amass with no Army creates the 0/0 black Army token the rule prints" $ do
-    (gs, advanceId, _) <- amassBoard s registry
-    let after = resolveOne S.identityAnswer gs advanceId
-    case S.tokensOf after of
-      [army] -> do
-        Spec.assertEqWith s "black, which is the rule's colour and not the card's" (Projection.colorsOf army after) (Set.singleton Color.Black)
-        -- CR 111.4: rule 701.47a names no token, so the name is its subtypes plus
-        -- the word "Token".
-        Spec.assertEqWith s "named for its subtypes" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Zombie Army Token") S.alice after) 1
-        Spec.assertEqWith s "a Zombie Army" (Projection.subtypesOf army after) (Set.fromList [Subtype.Zombie, Subtype.Army])
-        Spec.assertEqWith s "three +1/+1 counters" (plusCountersOn army after) (Just 3)
-        -- CR 704.3: state-based actions are not checked mid-resolution, so the 0/0
-        -- the rule prints lives to take its counters.
-        Spec.assertEqWith s "0/0 plus three counters" (S.powerToughnessOf army after) (Just (3, 3))
-      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
   -- Rule 701.47a's first instruction taken the other way, and its last, on one
   -- board: the second amass finds an Army and so creates nothing, and its subtype
   -- lands on the Army that was already there.
@@ -1207,19 +1190,6 @@ blightCostSpec s registry = Spec.describe s "BlightCost" $ do
     Spec.assertEqWith s "the Wall took nothing" (minusCountersOn wallId after) (Just 0)
     Spec.assertEqWith s "nor did the Piker" (minusCountersOn pikerId after) (Just 0)
     Spec.assertEqWith s "and no token was created" (length (S.tokensOf after)) 0
-  -- CR 701.68b, the whole point of the pair: a player who controls no creature
-  -- "can't choose to blight", so the option is NOT OFFERED rather than offered and
-  -- declined. Proved by the transcript under the interpreter that WOULD have paid,
-  -- on a board that still holds a creature -- bob's Rats -- so nothing here passes
-  -- for want of a creature on the battlefield.
-  Spec.it s "CR 701.68b whole card: a controller with no creature is never offered the blight" $ do
-    (pikerId, wallId, ratsId, onStack) <- mischiefBoard S.bob
-    let ((_, after), transcript) = Replay.record (paysBlighting ratsId) onStack Stack.resolveTop
-    Spec.assertEqWith s "alice was never asked" (payResponses transcript) []
-    Spec.assertEqWith s "bob's Rats, whom the answer named, took nothing" (minusCountersOn ratsId after) (Just 0)
-    Spec.assertEqWith s "nor did his Piker" (minusCountersOn pikerId after) (Just 0)
-    Spec.assertEqWith s "nor his Wall" (minusCountersOn wallId after) (Just 0)
-    Spec.assertEqWith s "and no token was created" (length (S.tokensOf after)) 0
 
 -- Boggart Mischief cast from alice's hand off three Swamps and resolved, with its
 -- CR 603.6a enters trigger settled onto the stack but NOT resolved --
@@ -1587,44 +1557,8 @@ stunCountersOn gs oid = fmap (Map.findWithDefault 0 CounterKind.Stun . Object.co
 --
 -- Three is bolster's own N, and it is distinct from every toughness on the board,
 -- so no assertion can be satisfied by a coincidence.
-bolsterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bolsterSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 bolsterSpec s registry = Spec.describe s "Bolster" $ do
-  Spec.it s "CR 701.39a bolster 3 counters the creature its controller chose" $ do
-    (pikerId, ratsId, wallId, gs, spellId) <- bolsterBoard s registry
-    let after = resolveOne (bolstering ratsId) gs spellId
-    Spec.assertEqWith s "the Rats, whom their controller named, took three" (plusCountersOn ratsId after) (Just 3)
-    Spec.assertEqWith s "the Piker, tied with them, took none" (plusCountersOn pikerId after) (Just 0)
-    Spec.assertEqWith s "nor did the Wall" (plusCountersOn wallId after) (Just 0)
-  -- The same board and the same spell, differing only in the answer: the engine
-  -- makes no choice, so the other half of the tie is equally reachable.
-  Spec.it s "CR 701.39a the same tie answered the other way counters the other creature" $ do
-    (pikerId, ratsId, wallId, gs, spellId) <- bolsterBoard s registry
-    let after = resolveOne (bolstering pikerId) gs spellId
-    Spec.assertEqWith s "the Piker, whom their controller named, took three" (plusCountersOn pikerId after) (Just 3)
-    Spec.assertEqWith s "the Rats took none" (plusCountersOn ratsId after) (Just 0)
-    Spec.assertEqWith s "nor did the Wall" (plusCountersOn wallId after) (Just 0)
-  -- "With the least toughness" is a filter on the candidates rather than advice:
-  -- the Wall is named and still gets nothing, because it was never offered.
-  Spec.it s "CR 701.39a a creature that is not tied for least toughness cannot be chosen" $ do
-    (pikerId, ratsId, wallId, gs, spellId) <- bolsterBoard s registry
-    let after = resolveOne (bolstering wallId) gs spellId
-    Spec.assertEqWith s "the Wall, at toughness 8, took none" (plusCountersOn wallId after) (Just 0)
-    -- One of the tied pair took all three, and the fallback picks which; what is
-    -- under test is that the counters did not follow the answer.
-    Spec.assertEqWith
-      s
-      "the tie took them instead"
-      (fmap (+) (plusCountersOn pikerId after) <*> plusCountersOn ratsId after)
-      (Just 3)
-  -- CR 701.39a's "among creatures you control". The two smallest creatures on the
-  -- battlefield are bob's, and neither is a candidate: alice's own Wall is the
-  -- whole of her pool however large it is.
-  Spec.it s "CR 701.39a bolster looks only at creatures its controller controls" $ do
-    (pikerId, ratsId, wallId, gs, spellId) <- opposedBolsterBoard s registry
-    let after = resolveOne S.identityAnswer gs spellId
-    Spec.assertEqWith s "alice's Wall, her only creature, took three" (plusCountersOn wallId after) (Just 3)
-    Spec.assertEqWith s "bob's Piker, at toughness 1, took none" (plusCountersOn pikerId after) (Just 0)
-    Spec.assertEqWith s "nor did bob's Rats" (plusCountersOn ratsId after) (Just 0)
   -- Where the rules leave nothing to ask, do not ask. The two boards differ in
   -- whether the least toughness is TIED, which is the whole of what makes rule
   -- 701.39a's choice a choice.
@@ -1681,14 +1615,6 @@ opposedBolsterBoard s registry = do
       (wallId, g3) = S.addPermanent wall S.alice g2
       (gs, spellId) = S.handOne defenses g3
   pure (pikerId, ratsId, wallId, gs, spellId)
-
--- Answers Prompt.ChooseBolster with a named creature, deferring everything else to
--- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates,
--- so a mutation to the candidate sweep cannot quietly repair the answer.
-bolstering :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-bolstering oid p = case p of
-  Prompt.ChooseBolster {} -> oid
-  _ -> S.identityAnswer p
 
 -- CR 115.6: declines every optional slot, announcing zero targets. Everything
 -- else is S.identityAnswer's answer, which for ChooseTargets fills what it is
@@ -1859,29 +1785,6 @@ soulfireEruptionSpec s registry =
             "Benalish Hero (1) to alice, Goblin Piker (2) to bob, Hill Giant (4) to carol, Excruciator (8) to dave"
             (lives after, S.lifeOf S.dave after)
             ((Just 19, Just 18, Just 16), Just 12)
-        -- The same card and the same board as the first case, differing in
-        -- exactly one thing: the CR 601.2c announcement is zero rather than
-        -- three. "Any number" includes none, so the low end of an unbounded range
-        -- is announceable, and the sweep runs over an empty set.
-        --
-        -- What this case CANNOT tell apart is resolving from fizzling: CR 608.2b
-        -- puts a fizzled spell in the same graveyard a resolved one reaches, and
-        -- with no targets the effect does nothing either way. That CR 115.6 leaves
-        -- a zero-target spell untargeted, and so not fizzled, is proved by Rat
-        -- Out's token in upToOneTargetSpec above.
-        Spec.it s "CR 601.2c zero announced against an unbounded count: nothing is exiled and nobody is damaged" $ do
-          after <- board 0 S.threePlayerGame ["Sabretooth Tiger", "Bird Maiden", "Hill Giant", "Goblin Piker", "Benalish Hero"]
-          Spec.assertEqWith s "no seat lost life" (lives after) (Just 20, Just 20, Just 20)
-          Spec.assertEqWith
-            s
-            "the library is untouched and nothing was exiled"
-            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
-            ([], [named "Benalish Hero", named "Goblin Piker", named "Hill Giant", named "Bird Maiden", named "Sabretooth Tiger"])
-          Spec.assertEqWith
-            s
-            "and the spell left the stack for its owner's graveyard"
-            (namesIn Zone.Graveyard S.alice after)
-            [named "Soulfire Eruption"]
         -- CR 608.2f's SECONDARY sentence: two of the victims are objects ONE
         -- player controls, so their relative order is the resolving controller's
         -- -- alice's, though bob is the one who controls them, which is the whole
@@ -1954,147 +1857,6 @@ aimingAtEveryPlayer n p =
         Prompt.ChooseTargets _ _ _ sets -> S.preferring isPlayerRecipient sets
         _ -> S.identityAnswer p
 
--- CR 107.14's "you may pay any amount of {E}" (Effect.PayAnyEnergy): the payer
--- names the amount as the spell RESOLVES -- not at CR 601.2b, which is what
--- separates this from CostComponent.PayLifeX's announced X -- and what they paid
--- is what the next effect of the same resolution reads.
---
--- Harnessed Lightning {1}{R} Instant (data/cards/harnessed-lightning.json):
--- "Choose target creature. You get {E}{E}{E} (three energy counters), then you
--- may pay any amount of {E}. Harnessed Lightning deals that much damage to that
--- creature." Name, cost, type line and oracle text checked against Scryfall
--- 2026-08-19.
---
--- WHY HARNESSED LIGHTNING and not Die Young, which #121's body nominates: the
--- two say the same sentence, and this one reads the amount back as damage rather
--- than as a -1/-1 per {E}, so nothing but the payment is under test.
-payAnyEnergySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-payAnyEnergySpec s registry =
-  Spec.describe s "Harnessed Lightning (CR 107.14)" $ do
-    -- The amount is a real read, not a fixed number: alice banks two {E}, the
-    -- spell gives her three more, and she names four of the five. Every number
-    -- on the board is distinct, so no two readings of the rule coincide.
-    Spec.it s "CR 107.14 the {E} its controller pays is the damage it deals" $ do
-      (wallId, cast) <- harnessedBoard s registry
-      let after = S.runPure (paying 4) cast Stack.resolveTop
-      Spec.assertEqWith s "the Wall took the 4 damage alice paid for" (S.damageOf wallId after) (Just 4)
-      Spec.assertEqWith s "and one of her five energy counters is left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
-    -- Zero is one of the "any amount" the card offers, and paying it is what the
-    -- printed "may" declines to. The energy assertion is what tells this apart
-    -- from a spell that never resolved at all -- the three {E} it gives are in
-    -- the total either way, and CR 120.8 makes 0 damage no damage.
-    Spec.it s "CR 107.14 paying nothing deals nothing and keeps the counters" $ do
-      (wallId, cast) <- harnessedBoard s registry
-      let after = S.runPure (paying 0) cast Stack.resolveTop
-      Spec.assertEqWith s "the Wall took no damage" (S.damageOf wallId after) (Just 0)
-      Spec.assertEqWith s "and all five energy counters are still hers" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 5
-    -- CR 118.3: "a player can't pay a cost without having the necessary resources
-    -- to pay it fully". The answer is nine and the board holds five, so a trusted
-    -- answer would deal nine and leave a negative count.
-    Spec.it s "CR 118.3 an answer above the payer's energy is capped at what they have" $ do
-      (wallId, cast) <- harnessedBoard s registry
-      let after = S.runPure (paying 9) cast Stack.resolveTop
-      Spec.assertEqWith s "the Wall took five, not nine" (S.damageOf wallId after) (Just 5)
-      Spec.assertEqWith s "and alice spent every counter she had" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 0
-
--- alice holds Harnessed Lightning with two Mountains untapped for its {1}{R} and
--- two {E} already banked; bob's Wall of Stone (0/8) is the only creature in play,
--- so the cast's one target is determined and survives every amount below. Returns
--- the Wall and the state with the spell cast and waiting on the stack.
-harnessedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
-harnessedBoard s registry = do
-  mountain <- S.printingOf s registry "Mountain"
-  wall <- S.printingOf s registry "Wall of Stone"
-  harnessed <- S.printingOf s registry "Harnessed Lightning"
-  let (wallId, withWall) = S.addPermanent wall S.bob (S.landsInPlay mountain 2)
-      (inHand, spellId) = S.handOne harnessed withWall
-      banked = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice inHand
-  pure (wallId, snd (Engine.runGamePure S.identityAnswer banked (S.cast S.alice spellId)))
-
--- CR 118.12's branch over an amount the payer names as the spell RESOLVES: "you
--- may pay one or more {E}. If you do, [effect]". The floor of one is not a
--- capability of its own -- see Pawl.Types.Effect.PayAnyEnergy -- so the shape is
--- Effect.PayAnyEnergy under a clause whose CR 701.46a-style condition reads the
--- amount back (Quantity.InSlot >= 1), and the number it bound is what the swept
--- filter compares a power against (Filter.PowerIsAmountInSlot).
---
--- Localized Destruction {3}{W}{W} Sorcery (data/cards/localized-destruction.json):
--- "You get {E} (an energy counter), then you may pay one or more {E}. If you do,
--- each creature you control with power equal to the amount of {E} paid this way
--- gains indestructible until end of turn. / Destroy all creatures." Name, cost,
--- type line and oracle text checked against Scryfall 2026-08-31.
---
--- WHY THIS CARD of the five printings (Scryfall o:"one or more {E}",
--- 2026-08-31): Aether Refinery and Pia Nalaar, Chief Mechanic read the amount
--- into an X/X token's power instead, CR 111.3's defined characteristic value --
--- a different position for the same binding, which Pia's own group in
--- Pawl.CounterKeywordTriggerSpec is what proves. Territorial Aetherkite's rider is CR 603.12's "when you do" rather
--- than CR 118.12's, and Rampaging Aetherhood's energy GAIN is a quantity of its
--- own.
-localizedDestructionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-localizedDestructionSpec s registry =
-  Spec.describe s "Localized Destruction (CR 118.12)" $ do
-    -- alice banks two {E}, the spell gives her a third, and she pays two of the
-    -- three. Every creature on the board has a distinct power, so only one
-    -- reading of "power equal to the amount paid" saves the Evangel.
-    Spec.it s "CR 118.12 the creature whose power is the amount paid survives the sweep" $ do
-      cast <- localizedBoard s registry
-      let after = S.runPure (paying 2) cast Stack.resolveTop
-      Spec.assertEqWith s "alice's 2/2 gained indestructible and is still on the battlefield" (S.countOnBattlefieldByName (localizedName "Cabal Evangel") S.alice after) 1
-      Spec.assertEqWith s "her 3/3 did not and is gone" (S.countOnBattlefieldByName (localizedName "Hill Giant") S.alice after) 0
-      Spec.assertEqWith s "nor did her 1/1" (S.countOnBattlefieldByName (localizedName "Gnat Miser") S.alice after) 0
-      Spec.assertEqWith s "nor her 0/8" (S.countOnBattlefieldByName (localizedName "Wall of Stone") S.alice after) 0
-      -- CR 109.5's "you control": bob's 2/4 has the power the clause names and
-      -- not the controller, which two seats are what tell apart.
-      Spec.assertEqWith s "bob's 2/4 shares the power but not the controller, so it is gone" (S.countOnBattlefieldByName (localizedName "Foriysian Brigade") S.bob after) 0
-      Spec.assertEqWith s "and two of alice's three energy counters are spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
-    -- The same board, differing in the answer alone. Paying nothing is how the
-    -- printed "may" is declined, so CR 118.12's "if you do" is not taken -- and
-    -- the Wall's power is the very zero that was paid, so an unbranched clause
-    -- would save it.
-    Spec.it s "CR 118.12 paying nothing declines the offer, so no power matches at all" $ do
-      cast <- localizedBoard s registry
-      let after = S.runPure (paying 0) cast Stack.resolveTop
-      Spec.assertEqWith s "alice's 0/8 is gone although zero is what she paid" (S.countOnBattlefieldByName (localizedName "Wall of Stone") S.alice after) 0
-      Spec.assertEqWith s "her 2/2 is gone with it" (S.countOnBattlefieldByName (localizedName "Cabal Evangel") S.alice after) 0
-      Spec.assertEqWith s "and every energy counter she has is still hers" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
-
--- CR 400.7: the assertions above name printed names rather than object ids, an
--- id being no more the object it started as than a new object is.
-localizedName :: String -> CardName.CardName
-localizedName = CardName.MkCardName . Text.pack
-
--- alice holds Localized Destruction with five Plains untapped for its {3}{W}{W}
--- and two {E} already banked; she controls a Wall of Stone (0/8), a Gnat Miser
--- (1/1), a Cabal Evangel (2/2) and a Hill Giant (3/3), and bob a Foriysian
--- Brigade (2/4). Four distinct powers under one controller and a fifth creature
--- under the other, so the sweep's power test and its controller test cannot be
--- answered by one another. Returns the state with the spell cast and waiting.
-localizedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
-localizedBoard s registry = do
-  plains <- S.printingOf s registry "Plains"
-  wall <- S.printingOf s registry "Wall of Stone"
-  miser <- S.printingOf s registry "Gnat Miser"
-  evangel <- S.printingOf s registry "Cabal Evangel"
-  giant <- S.printingOf s registry "Hill Giant"
-  brigade <- S.printingOf s registry "Foriysian Brigade"
-  destruction <- S.printingOf s registry "Localized Destruction"
-  let placed =
-        snd
-          . S.addPermanent brigade S.bob
-          . snd
-          . S.addPermanent giant S.alice
-          . snd
-          . S.addPermanent evangel S.alice
-          . snd
-          . S.addPermanent miser S.alice
-          . snd
-          . S.addPermanent wall S.alice
-          $ S.landsInPlay plains 5
-      (inHand, spellId) = S.handOne destruction placed
-      banked = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice inHand
-  pure (snd (Engine.runGamePure S.identityAnswer banked (S.cast S.alice spellId)))
-
 -- Answers Prompt.ChoosePaidEnergy with a fixed amount, deferring everything else
 -- to S.identityAnswer. PINNED rather than read off the prompt's own bound, so a
 -- mutation to that bound cannot quietly repair the answer.
@@ -2120,5 +1882,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   sweptCountersSpec s registry
   blightCostSpec s registry
   soulfireEruptionSpec s registry
-  payAnyEnergySpec s registry
-  localizedDestructionSpec s registry

@@ -348,24 +348,6 @@ actionSpec s registry = Spec.describe s "Action" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Flash arborId withTeferi) "the card in hand projects flash"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash arborId bare)) "and does not without Teferi"
 
-  -- CR 305.3: "a player can't play a land, for any reason, if it isn't their
-  -- turn." Flash lifts CR 116.2a's phase-and-stack window and nothing else, so
-  -- the per-player gate keeps this conjunct -- which is what Dryad Arbor's own
-  -- 2021-03-19 ruling says ("you can't play Dryad Arbor during another player's
-  -- turn").
-  --
-  -- The SAME board as the pair above with one thing changed, whose turn it is,
-  -- and the flash assertion is repeated on it so the negative cannot pass by
-  -- the Arbor having lost the keyword.
-  Spec.it s "CR 305.3 flash does not let a land be played on another player's turn" $ do
-    dryadArbor <- S.printingOf s registry "Dryad Arbor"
-    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
-    let (arborId, alices) = arborBoard dryadArbor (Just teferi)
-        bobs = alices {GameState.activePlayer = S.bob}
-        after = S.runPure S.playLandAnswer bobs Engine.priorityLoop
-    Spec.assertEqWith s "the Arbor stayed in her hand" (S.countOnBattlefieldByName (S.printingName dryadArbor) S.alice after) 0
-    Spec.assertBool s (Projection.hasKeyword Keyword.Flash arborId bobs) "and it still has flash there"
-
   -- CR 305.2a/305.2b: flash moves the WINDOW, not the count. The allowance is a
   -- per-player gate the keyword never reaches, so an Arbor with flash is refused
   -- once the turn's one land play is spent -- the same board as the pair above
@@ -472,54 +454,8 @@ deckedOut s registry = scenario s registry $ do
 librarySize :: PlayerId.PlayerId -> GameState.GameState -> Int
 librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
 
--- Records every player asked for an action, in order, and casts when it can.
--- Recording is the point: whether the caster RETAINS priority is only visible in
--- who gets asked next.
-recordingAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
-recordingAnswer p = case p of
-  Prompt.ChooseAction _ pid actions -> do
-    State.modify' (\asked -> asked <> [pid])
-    let isCast a = case a of
-          A.Cast {} -> True
-          _ -> False
-    pure $ case filter isCast actions of
-      h : _ -> h
-      [] -> A.Pass
-  _ -> pure (S.identityAnswer p)
-
--- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
--- [alice, bob] and both players are in the players map.
-askedPlayers :: Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId]
-askedPlayers mountain piker =
-  let (gs, _) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
-   in State.execState
-        (Engine.runGame recordingAnswer gs Engine.priorityLoop)
-        []
-
 ruleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ruleSpec s registry = Spec.describe s "Rules" $ do
-  Spec.it s "CR 117.4 a full round of passes resolves the stack, not the step" $ do
-    -- With a spell on the stack, everyone passing must RESOLVE it and keep
-    -- the step alive. Under M0's rule the step would simply end with the
-    -- spell still sitting on the stack.
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
-        steps = do
-          S.cast S.alice oid
-          Engine.priorityLoop
-        after = snd (Engine.runGamePure S.identityAnswer gs steps)
-    Spec.assertEqWith s "stack emptied" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "piker resolved onto the battlefield" (S.creaturesInPlay S.alice after) 1
-
-  Spec.it s "CR 117.3c the caster is asked again, rather than passing priority on" $ do
-    -- alice is asked, casts, and must be asked AGAIN before bob gets a turn.
-    -- If priority wrongly advanced to the next player, this would be
-    -- [alice, bob, ...] instead.
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    Spec.assertEqWith s "alice twice, then bob" (take 3 (askedPlayers mountain piker)) [S.alice, S.alice, S.bob]
-
   Spec.it s "CR 103.8a starting player skips first draw" $ do
     gs <- aliceFirstDraw s registry
     Spec.assertEqWith s "hand" (S.handSize S.alice gs) 7
@@ -884,79 +820,6 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "CR 305.2a: alice made bob play his Forest" (S.countOnBattlefieldByName (card "Forest") S.bob onBobsTurn) 1
     Spec.assertEqWith s "CR 305.3: not on alice's turn" (S.countOnBattlefieldByName (card "Forest") S.bob onAlicesTurn) 0
     Spec.assertEqWith s "CR 305.2a: the play counts as bob's land for the turn" (Map.lookup S.bob (GameState.landsPlayed onBobsTurn)) (Just 1)
-
-  -- CR 723.2: "if the chosen card is cast as a spell, you control the player
-  -- while that spell is resolving". Duress's choice is made by its controller as
-  -- it resolves, well after Word of Command has finished, so the question put to
-  -- bob there carries alice only if control re-entered for that resolution.
-  Spec.it s "CR 723.2 gameplay: alice controls bob again while the forced spell resolves" $ do
-    wordOfCommand <- S.printingOf s registry "Word of Command"
-    swamp <- S.printingOf s registry "Swamp"
-    duress <- S.printingOf s registry "Duress"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    divination <- S.printingOf s registry "Divination"
-    let g0 = Setup.emptyGame S.bothPlayers
-        (_swampOne, g1) = S.addPermanent swamp S.alice g0
-        (_swampTwo, g2) = S.addPermanent swamp S.alice g1
-        (_bobsSwamp, g3) = S.addPermanent swamp S.bob g2
-        (_wocId, g4) = S.addHandCard wordOfCommand S.alice g3
-        -- Two cards Duress may take, so its choice is a real question.
-        (_bolt, g5) = S.addHandCard lightningBolt S.alice g4
-        (_divination, g6) = S.addHandCard divination S.alice g5
-        (duressId, g7) = S.addHandCard duress S.bob g6
-        (_decoy, g8) = S.addHandCard elves S.bob g7
-        gStart =
-          g8
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        ((_, after), asks) = State.runState (Engine.runGame (retakeAnswer duressId) gStart Engine.priorityLoop) []
-    Spec.assertEqWith s "CR 723.2: alice makes Duress's choice for bob" (askedOf "ChooseCardFromAmong" S.bob asks) [Just (Decider.MkDecider S.alice)]
-    Spec.assertEqWith s "Duress took one of alice's two cards" (S.handSize S.alice after) 1
-    Spec.assertEqWith s "and the control lapses with Duress's resolution" (GameState.control after) Map.empty
-
-  Spec.it s "CR 727.1/727.2/727.4 gameplay: bob activates a restart and the game rebuilds from its own cards" $ do
-    -- bob controls Karn Liberated and owns 8 cards total; alice owns 8. Both
-    -- start with reduced life on a populated board. bob activates Karn's
-    -- ultimate through the priority loop; it resolves, restarts the game, and
-    -- the result is a valid new game with bob as starter. Karn exiled nothing
-    -- here, so CR 727.5 exempts nothing and its rider moves nothing -- which is
-    -- what leaves the battlefield assertion below meaning what it says.
-    karn <- S.printingOf s registry "Karn Liberated"
-    piker <- S.printingOf s registry "Goblin Piker"
-    mountain <- S.printingOf s registry "Mountain"
-    let g0 = Setup.emptyGame S.bothPlayers
-        (karnId, g1a) = S.addPermanent karn S.bob g0
-        -- CR 606.5: the -14 is only activatable with 14 loyalty to remove, and a
-        -- planeswalker a fixture places gets none of CR 306.5b's counters.
-        g1 = S.addCounter CounterKind.Loyalty 14 karnId g1a
-        (_aPiker, g2) = S.addPermanent piker S.alice g1
-        -- fill each owner's pool to >= 7 cards so opening hands draw without a
-        -- CR 727.3 loss (Karn + 7 mountains = 8 for bob).
-        g3 = addManyG mountain 7 S.bob (addManyG mountain 7 S.alice g2)
-        gStart =
-          g3
-            { GameState.activePlayer = S.bob,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.bob,
-              -- Knock both players to 8 life so "both players reset to 20
-              -- life" below is load-bearing: Setup.emptyGame already starts
-              -- players at 20, so without this reduction the assertions
-              -- would pass even if resetPlayer did nothing.
-              GameState.players = Map.adjust (\p -> p {Player.life = 8}) S.alice (Map.adjust (\p -> p {Player.life = 8}) S.bob (GameState.players g3))
-            }
-        after = snd (Engine.runGamePure restartAnswer gStart Engine.priorityLoop)
-    Spec.assertEqWith s "CR 727.1a: bob is the new active player" (GameState.activePlayer after) S.bob
-    Spec.assertEqWith s "CR 727.1a: the turn order begins with bob" (Maybe.listToMaybe (GameState.turnOrder after)) (Just S.bob)
-    Spec.assertEqWith s "both players reset to 20 life (alice)" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith s "both players reset to 20 life (bob)" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "CR 103.5: alice drew a 7-card opening hand" (S.handSize S.alice after) 7
-    Spec.assertEqWith s "CR 103.5: bob drew a 7-card opening hand" (S.handSize S.bob after) 7
-    Spec.assertEqWith s "CR 727.4: settled at the first untap step" (GameState.phase after) Turn.firstPhase
-    Spec.assertEqWith s "CR 727.2: the battlefield is empty (every card returned to a library)" (Set.null (GameState.battlefield after)) True
-    Spec.assertEqWith s "the game did not end -- the new game is live" (GameState.result after) Nothing
 
   Spec.it s "CR 400.7/727.2 gameplay: a restart puts Painter's Servant into a library with its chosen colour forgotten" $ do
     -- The card-driven proof for Setup.startGameFromCards' hand-written zone
@@ -2544,15 +2407,6 @@ wordAnswer pinned p = case p of
     pure (S.identityAnswer p)
   Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring (== Recipient.ToPlayer S.bob) sets)
   _ -> pure (S.identityAnswer p)
-
--- wordAnswer, recording CR 608.2d's resolution-time choice as well, answered by
--- position so the answer cannot depend on who was asked.
-retakeAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [(String, PlayerId.PlayerId, Maybe Decider.Decider)] r
-retakeAnswer pinned p = case p of
-  Prompt.ChooseCardFromAmong decider player _ offered -> do
-    State.modify' (<> [("ChooseCardFromAmong", player, Just decider)])
-    pure (NonEmpty.head offered)
-  _ -> wordAnswer pinned p
 
 -- The deciders recorded for one prompt kind put to one seat, in order.
 askedOf :: String -> PlayerId.PlayerId -> [(String, PlayerId.PlayerId, Maybe Decider.Decider)] -> [Maybe Decider.Decider]

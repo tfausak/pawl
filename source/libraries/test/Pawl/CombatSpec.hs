@@ -697,13 +697,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks chosenAlice) "and with alice chosen instead the same Piker may"
         Spec.assertEqWith s "CR 614.1c and the two boards really differ in the seat the Nemesis chose" (Game.lookupObject a chosenBob >>= Object.chosenPlayer, Game.lookupObject a chosenAlice >>= Object.chosenPlayer) (Just S.bob, Just S.alice)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-  Spec.it s "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $ do
-    -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
-    -- fails if evasion is wrongly implemented as a filter on the candidates.
-    birdMaiden <- S.printingOf s registry "Bird Maiden"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, theirs) = attacking [birdMaiden] [piker]
-    Spec.assertEqWith s "still offered" (Combat.legalBlockers S.bob gs) theirs
   Spec.it s "CR 509.1a a Mountain is not a legal blocker, flier or no flier" $ do
     -- The classification, from the other side: `canBlock` asks
     -- is-it-a-creature, never which card it is. M1b (tests cards) "a land may not
@@ -1655,31 +1648,9 @@ mirageOn landId subtype p = case p of
 -- (CombatRestriction.CantBlockCreatures). Every board attacks with a 2/1 Goblin
 -- Piker AND a 1/1 Llanowar Elves, so each barred pair has a legal twin beside it
 -- and a blocker that could block nothing fails the second leg.
-cantBlockCreaturesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cantBlockCreaturesSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
-  let pair blockerName = do
-        blocker <- S.printingOf s registry blockerName
-        piker <- S.printingOf s registry "Goblin Piker"
-        elves <- S.printingOf s registry "Llanowar Elves"
-        pure (attacking [piker, elves] [blocker])
-      blocks gs b a = Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs
-  Spec.it s "CR 509.1b Brassclaw Orcs can't block a creature with power 2, and can block one with power 1" $ do
-    (gs, mine, theirs) <- pair "Brassclaw Orcs"
-    case (mine, theirs) of
-      ([piker, elves], [orcs]) -> do
-        Spec.assertBool s (not (blocks gs orcs piker)) "the Orcs may not block the 2/1 Piker"
-        Spec.assertBool s (blocks gs orcs elves) "the Orcs may block the 1/1 Elves"
-      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
-  -- The Filter is read in the BLOCKER's context: "greater than this creature's
-  -- power" is the 1/1 Handler's. Read in the attacker's, the Piker would be
-  -- compared against itself and admitted.
-  Spec.it s "CR 509.1b Spitfire Handler can't block a creature with greater power than its own" $ do
-    (gs, mine, theirs) <- pair "Spitfire Handler"
-    case (mine, theirs) of
-      ([piker, elves], [handler]) -> do
-        Spec.assertBool s (not (blocks gs handler piker)) "the 1/1 Handler may not block the 2/1 Piker"
-        Spec.assertBool s (blocks gs handler elves) "the Handler may block the 1/1 Elves"
-      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  let blocks gs b a = Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs
   -- Wan Shi Tong, All-Knowing's Spirit tokens, "This token can't block or be
   -- blocked by non-Spirit creatures": the card's own library trigger makes them,
   -- and each half is proved against a Spirit (Dutiful Knowledge Seeker) and a

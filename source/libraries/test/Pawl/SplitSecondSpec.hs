@@ -252,20 +252,6 @@ stillAllowedSpec s registry =
       Spec.assertEqWith s "control: one per Mountain" (manaOf bolted) 8
       Spec.assertEqWith s "split second leaves all eight" (manaOf shocked) 8
 
-    -- "and take special actions". Circling Vultures' "You may discard this card
-    -- any time you could cast an instant" is CR 116.2e's, which never uses the
-    -- stack.
-    Spec.it s "CR 702.61b special actions are still offered" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      suddenShock <- S.printingOf s registry "Sudden Shock"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      prodigal <- S.printingOf s registry "Prodigal Sorcerer"
-      vultures <- S.printingOf s registry "Circling Vultures"
-      let b = board mountain suddenShock lightningBolt prodigal
-          (v, withVultures) = S.addHandCard vultures S.bob (state b)
-          shocked = after (subject b) withVultures
-      Spec.assertBool s (elem (A.DiscardFromHand v) (Action.legalActions S.bob shocked)) "the discard is still on the menu"
-
     -- "Triggered abilities trigger and are put on the stack as normal."
     -- Monastery Swiftspear's prowess watches a noncreature spell being cast, so
     -- Sudden Shock arms it on the way down and the ability has to land on top.
@@ -434,7 +420,7 @@ paysWith wanted p = case p of
 castRecall :: ObjectId.ObjectId -> ShadowBoard -> GameState.GameState
 castRecall source b = S.runPure (paysWith source) (shadowState b) (S.cast S.alice (recall b) >> Engine.settleForPriority)
 
-grantedFromOutsideSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grantedFromOutsideSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 grantedFromOutsideSpec s registry =
   -- CR 702.61a granted from OUTSIDE the spell: Shadow the Hedgehog's "each spell
   -- you cast has split second if mana from an artifact was spent to cast it" is a
@@ -452,13 +438,3 @@ grantedFromOutsideSpec s registry =
       Spec.assertBool s (elem (castOf (bobsBolt b) boltPrinting) (Action.legalActions S.bob byIsland)) "control: paid off the Island, bob's Bolt is still offered"
       Spec.assertEqWith s "paid off the Seat of the Synod, split second takes every cast of his away" (filter isCast (Action.legalActions S.bob bySeat)) []
       Spec.assertEqWith s "and both boards put exactly one spell on the stack, so neither answer is about an empty stack" (length (GameState.stack byIsland), length (GameState.stack bySeat)) (1, 1)
-
-    -- The other pair, and the one that says the GRANT is what did it: the same
-    -- artifact mana pays on a board with no Shadow the Hedgehog, and bob keeps his
-    -- cast.
-    Spec.it s "CR 702.61a artifact mana alone grants nothing" $ do
-      b <- shadowBoard s registry False
-      boltPrinting <- S.printingOf s registry "Lightning Bolt"
-      let bySeat = castRecall (seat b) b
-      Spec.assertBool s (elem (castOf (bobsBolt b) boltPrinting) (Action.legalActions S.bob bySeat)) "with no Shadow the Hedgehog out, the Seat's mana leaves the cast offered"
-      Spec.assertEqWith s "off a board that still put the spell on the stack" (length (GameState.stack bySeat)) 1

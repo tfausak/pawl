@@ -383,27 +383,6 @@ announcementsFor gs = State.execState (Engine.runGame announcementLog gs (Combat
 
 planeswalkerAttackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 planeswalkerAttackSpec s registry = Spec.describe s "AttackingAPlaneswalker" $ do
-  Spec.it s "CR 508.1b a creature is declared attacking the planeswalker, not its controller" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (gs, mine, jaceId) = jaceBoard jace [piker]
-        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker gs
-    case mine of
-      [attacker] ->
-        Spec.assertEqWith
-          s
-          "the record names the planeswalker (CR 508.1b)"
-          (Map.lookup attacker (Combat.Type.attackers (GameState.combat atBlockers)))
-          (Just (AttackTarget.OfPlaneswalker jaceId))
-      _ -> Spec.assertFailure s "fixture should have one attacker"
-  Spec.it s "CR 306.8 whole cards: a 2/1 attacking Jace takes two loyalty counters and bob takes nothing" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (gs, _, jaceId) = jaceBoard jace [piker]
-        after = S.runCombat attackThePlaneswalker gs
-    Spec.assertEqWith s "CR 306.8: 3 - 2" (S.counterOf CounterKind.Loyalty jaceId after) 1
-    Spec.assertEqWith s "CR 510.1b: the damage did not reach its controller" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "CR 704.5i does not apply at loyalty 1"
   -- The pair that makes the announcement a choice: ONE board, two interpreters,
   -- two different games. An engine that answered CR 508.1b for the player could
   -- not produce both lines.
@@ -579,23 +558,6 @@ trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalk
     Spec.assertEqWith s "the same offer was made" (fmap Map.keys offered) [[Recipient.ToPlaneswalker jaceId, Recipient.ToPlayer S.bob]]
     Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "Jace dies either way"
-  -- CR 702.19f, the negative control: a plain trampler attacking a planeswalker
-  -- can assign the defending player nothing, "even if ... the damage the attacking
-  -- creature could assign is greater than the planeswalker's loyalty".
-  --
-  -- Panglacial Wurm and not War Mammoth, and that is the whole point of the case:
-  -- a 3/3 into 3 loyalty is forced whether or not the keyword is there, so it
-  -- could not tell the two apart. The Wurm is 9/5 with plain trample, so 6 would
-  -- spill past Jace if CR 702.19f were not enforced.
-  Spec.it s "CR 702.19f plain trample offers the defending player nothing" $ do
-    wurm <- S.printingOf s registry "Panglacial Wurm"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (gs, _, jaceId) = jaceBoard jace [wurm]
-        answer = Map.fromList [(Recipient.ToPlaneswalker jaceId, 3), (Recipient.ToPlayer S.bob, 6)]
-        (after, offered) = runCombatLogging (assignmentLog answer) gs
-    Spec.assertEqWith s "no division was ever asked for, so no map held the player" offered []
-    Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "all 9 went to Jace (CR 704.5i)"
   -- CR 702.19c's LAST sentence: "when checking for assigned damage equal to a
   -- planeswalker's loyalty, take into account damage from other creatures that's
   -- being assigned during the same combat damage step". A 2/1 Goblin Piker
@@ -1685,40 +1647,6 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
             Spec.assertEqWith s "and alice still controls it a turn later" (Projection.controllerOf back laterTurn) (Just S.alice)
           other -> Spec.assertFailure s ("expected one returned Towershell, got " <> show (length other))
 
-  Spec.it s "CR 508.8 whole card: it returns attacking with NOTHING declared, and the two steps stay" $ do
-    -- The reason this card was worth adding: the rule's SECOND clause standing
-    -- alone, at gameplay level. alice declares no attacker on the return
-    -- turn -- she has none to declare -- and the declare blockers step happens
-    -- regardless, because a creature was put onto the battlefield attacking.
-    --
-    -- Reaching the declare blockers step at all IS the assertion: had the
-    -- Towershell not joined combat, Combat.skipEmptyCombat would have dropped
-    -- that step and the run would have sailed past it.
-    (gs, _) <- boardOf
-    let atReturn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
-        attackers = Combat.Type.attackers (GameState.combat atReturn)
-    Spec.assertEqWith s "the return turn is alice's" (GameState.activePlayer atReturn) S.alice
-    Spec.assertEqWith s "and the declare blockers step was NOT skipped" (GameState.phase atReturn) (Phase.Combat CombatStep.DeclareBlockers)
-    Spec.assertEqWith s "no creature was declared as an attacker" (S.attackerDeclarationsOf atReturn) []
-    Spec.assertEqWith s "the Towershell is back on the battlefield" (S.countOnBattlefieldByName towershellName S.alice atReturn) 1
-    case Map.toList attackers of
-      [(returned, target)] -> do
-        Spec.assertEqWith s "attacking bob (CR 508.4)" target (AttackTarget.OfPlayer S.bob)
-        Spec.assertEqWith s "and it entered tapped (CR 110.5b)" (tapStateOf returned atReturn) (Just TapState.Tapped)
-        Spec.assertBool s (S.onBattlefield returned atReturn) "the attacker is the returned permanent"
-      other -> Spec.assertFailure s ("exactly one attacking creature expected, got " <> show (length other))
-  Spec.it s "CR 508.3a on the return its OWN attack trigger does not fire" $ do
-    -- The discriminating case. Its ruling: "If Meandering Towershell enters the
-    -- battlefield attacking, it wasn't declared as an attacking creature that
-    -- turn. Abilities that trigger when a creature attacks, INCLUDING ITS OWN
-    -- TRIGGERED ABILITY, won't trigger." An engine that routed the return
-    -- through the declaration would exile it again on the spot and arm a second
-    -- delayed ability, so both halves are asserted.
-    (gs, _) <- boardOf
-    let atReturn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
-    Spec.assertEqWith s "it is still on the battlefield, not exiled again" (S.countOnBattlefieldByName towershellName S.alice atReturn) 1
-    Spec.assertEqWith s "the delayed store is empty: nothing armed a second return" (length (GameState.delayedTriggers atReturn)) 0
-    Spec.assertEqWith s "and no declaration was recorded for it" (S.attackerDeclarationsOf atReturn) []
   -- CR 508.4's CHOICE, which this card is the pool's only producer of: the
   -- Towershell returns attacking on a turn nothing is declared, and its
   -- controller says what it is attacking as it enters. Its own ruling is the

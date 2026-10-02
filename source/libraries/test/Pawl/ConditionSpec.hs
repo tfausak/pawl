@@ -14,7 +14,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
@@ -253,28 +252,6 @@ enteredFromSpec s registry =
           Spec.assertEqWith s "flying" (Map.keysSet (Projection.keywordsOf tok after)) (Set.singleton Keyword.Flying)
         other -> Spec.assertFailure s ("expected exactly one Demon token, got " <> show (length other))
    in Spec.describe s "EnteredFrom" $ do
-        -- ONE BOARD, ONE EVENT. Rise of the Dark Realms puts every creature card
-        -- in EVERY graveyard onto the battlefield under ALICE's control, so the
-        -- two Vessels enter simultaneously, under one controller, off one
-        -- resolution. The only thing that differs is whose graveyard each came
-        -- out of, which CR 400.3 makes its owner's -- so this is the "your" in
-        -- "your graveyard" and nothing else.
-        Spec.it s "CR 400.3 only the Vessel raised from YOUR graveyard triggers" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          vessel <- S.printingOf s registry "Archfiend's Vessel"
-          rise <- S.printingOf s registry "Rise of the Dark Realms"
-          let (start, riseId) = S.handOne rise (S.landsInPlay swamp 9)
-              staged = snd (S.addGraveyardCard vessel S.bob (snd (S.addGraveyardCard vessel S.alice start)))
-              after = play S.alice riseId staged
-          oneDemon after
-          Spec.assertEqWith s "CR 603.4 alice's Vessel exiled itself" (length (vesselsOwnedBy S.alice vessel after)) 0
-          -- The board, recorded after the behaviour: bob's Vessel is alice's
-          -- permanent, so the two abilities had ONE controller and only the
-          -- graveyard each came out of told them apart.
-          case vesselsOwnedBy S.bob vessel after of
-            [bobs] -> Spec.assertEqWith s "and bob's is on the battlefield under alice's control" (Projection.controllerOf bobs after) (Just S.alice)
-            other -> Spec.assertFailure s ("expected exactly one Vessel bob owns on the battlefield, got " <> show (length other))
-
         -- TWO GAMES, ONE DIFFERENCE: the zone the Vessel starts in. Yawgmoth's
         -- Will is resolved first in BOTH, so the same permission, the same mana
         -- and the same cast happen either way -- only the origin differs. The
@@ -338,7 +315,7 @@ enteredFromSpec s registry =
 -- graveyard to the battlefield tapped" is one activation, so the entry comes out
 -- of a graveyard with no reanimation spell in the way, and its 1 toughness is what
 -- lets one marked damage kill it while the trigger waits.
-interveningRecheckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+interveningRecheckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 interveningRecheckSpec s registry =
   let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
       resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
@@ -364,27 +341,7 @@ interveningRecheckSpec s registry =
       -- entrant where it stands, with the Knight's trigger already on the stack
       -- and untouched.
       kill oid gs = S.settleSba (S.markDamage oid 1 gs)
-      -- Activate the Skeleton's graveyard ability, resolve it, and settle so CR
-      -- 603.3 has placed whatever the entry triggered.
-      raiseWith skeleton knight swamp k = do
-        let (knightId, base) = board knight swamp
-            (gyId, staged) = S.addGraveyardCard skeleton S.alice base
-        case Activatable.abilitiesFor gyId staged of
-          [ability] -> k knightId (settle (resolveTop (S.runPure S.identityAnswer staged (Activate.activateAbility S.alice gyId ability))))
-          abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
    in Spec.describe s "InterveningRecheck" $ do
-        -- The control the killed board is read against: the same entry, the same
-        -- trigger, nothing killed. If this were red the case below would prove
-        -- nothing about the second check.
-        Spec.it s "CR 603.4 a creature returning from your graveyard grows the Knight" $ do
-          knight <- S.printingOf s registry "Breathless Knight"
-          skeleton <- S.printingOf s registry "Reassembling Skeleton"
-          swamp <- S.printingOf s registry "Swamp"
-          raiseWith skeleton knight swamp $ \knightId raised -> do
-            Spec.assertEqWith s "the Knight took the +1/+1 counter" (sizeOf knightId (resolveTop raised)) (Just 3, Just 3)
-            Spec.assertEqWith s "off exactly one trigger" (length (GameState.stack raised)) 1
-            Spec.assertEqWith s "and the entrant was still there" (length (skeletonsOn skeleton raised)) 1
-
         -- The negative, one difference from the case above: the Skeleton starts in
         -- alice's HAND, so the same {1}{B} casts it and it enters from the STACK.
         -- Killed the same way, so "no counter" cannot be the kill's doing.

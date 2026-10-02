@@ -54,7 +54,6 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
@@ -419,31 +418,6 @@ spec s registry = Spec.describe s "Preparation" $ do
         -- The control: the printed Aviator attacked too and minted its own, so a
         -- mint that never ran at all is caught here rather than passing above.
         Spec.assertEqWith s "and the printed Aviator minted one of its own" (length (copyFor aviatorId fought)) 1
-  -- CR 702.26b: a phased-out permanent "is treated as though it does not exist",
-  -- and CR 722.3c keeps the copy only "for as long as the prepared permanent
-  -- remains on the battlefield". So phasing the Aviator out ends the copy at the
-  -- next state-based check, which is also what that rule's own "or phases in
-  -- prepared" branch presupposes -- phasing in would otherwise mint a second copy
-  -- beside a first that never left.
-  --
-  -- The falsifier is reading Object.zone, which is what the first slice did: CR
-  -- 702.26d leaves a phased-out permanent's zone at Zone.Battlefield, so the copy
-  -- stayed in exile and stayed castable while the permanent did not exist.
-  Spec.it s "CR 702.26b Reality Ripple phases the Aviator out and the copy ceases to exist" $ do
-    built <- S.buildBoardOrFail s registry rippleDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    rippleId <- aliasOrFail s built "ripple"
-    (_, attacked) <- S.runScriptOrFail s attackScript built S.combatGame
-    -- The control, and what keeps the assertions below from passing vacuously.
-    Spec.assertEqWith s "the copy is there to lose" (length (prepareCopies attacked)) 1
-    Spec.assertBool s (any (\oid -> Cast.castable S.alice oid jumpName Facing.FaceUp attacked) (prepareCopies attacked)) "and alice may cast it"
-    let phased = S.runPure (rippleAt aviatorId) attacked (S.cast S.alice rippleId *> Stack.resolveTop *> Sba.checkStateBasedActions)
-    -- Without this the copy's absence could be a Reality Ripple that fizzled.
-    Spec.assertEqWith s "CR 702.26b: the Aviator left GameState.battlefield, phased out" (Set.member aviatorId (GameState.battlefield phased), Phasing.isPhasedOut aviatorId phased) (False, True)
-    -- THE gameplay assertion.
-    Spec.assertEqWith s "CR 704.5e: the copy has ceased to exist" (prepareCopies phased) []
-    Spec.assertEqWith s "and exile is empty" (Foldable.toList (GameState.exile phased)) []
-    Spec.assertBool s (notElem jumpName (namesOffered phased)) "so no Jump is offered any more"
   -- CR 722.3c's SECOND trigger: "as a permanent with a prepare spell gains the
   -- prepared designation or PHASES IN PREPARED, its controller creates a copy of
   -- that object in exile". The case above takes the prepared Aviator away and CR

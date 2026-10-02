@@ -40,7 +40,6 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -145,19 +144,6 @@ raceAnswer preferred victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> S.identityAnswer p
 
--- Announce X as 3 and pay a blight onto `wall`. The creature is named rather
--- than left to the identity answer: on the Vorinclex board alice controls two
--- creatures, so CR 701.68a raises a real prompt, and the three boards below must
--- blight the SAME creature for their counts to be comparable.
-blightAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-blightAnswer wall p = case p of
-  Prompt.ChooseX {} -> 3
-  Prompt.ChooseBlight {} -> wall
-  -- CR 118.12's offer, taken: the third case below pays Boggart Mischief's
-  -- blight, where the two cast-time cases never raise this prompt at all.
-  Prompt.ChooseToPay {} -> PaymentDecision.Pays
-  _ -> S.identityAnswer p
-
 -- Aim every target slot at one object. Recipient.ToObject, not ToCreature as
 -- raceAnswer above uses: both slots this answers -- Liquimetal Coating's and
 -- Skilled Animator's -- are Pool.Permanents, and a recipient tagged for the wrong
@@ -257,53 +243,6 @@ enteringAs which p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe (List.sortOn Ord.Down legal)
   _ -> S.identityAnswer p
 
--- alice holds a Molten Sentry, with four untapped Mountains and one Tavern
--- Scoundrel already on the battlefield, in her precombat main phase with
--- priority. Four Mountains rather than the printed {3}{R}'s worth exactly --
--- nothing here is testing whether the mana was enough.
-sentryBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
-sentryBoard mountain scoundrel sentry =
-  let (_, withScoundrel) = S.addPermanent scoundrel S.alice (S.landsInPlay mountain 4)
-      (spellId, withSentry) = S.addHandCard sentry S.alice withScoundrel
-   in ( withSentry
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          },
-        spellId
-      )
-
--- Pins BOTH of CR 705.2's questions to the same face, never to anything derived
--- from the prompt: a road that wrongly called the coin therefore MATCHES and
--- wins, which is the reading the Treasure count rules out.
-sentryAnswer :: CoinFace.CoinFace -> Prompt.Prompt r -> r
-sentryAnswer face p = case p of
-  Prompt.FlipCoin -> face
-  Prompt.CallCoin {} -> face
-  _ -> S.identityAnswer p
-
-isFlip :: GameEvent.GameEvent -> Bool
-isFlip e = case e of
-  GameEvent.CoinFlipped _ -> True
-  _ -> False
-
-wasCall :: Response.Response -> Bool
-wasCall r = case r of
-  Response.CalledCoin _ -> True
-  _ -> False
-
--- Cast the Sentry, resolve it, then run CR 603.3's place/resolve cycle twice, so
--- a trigger that the entry's flip wrongly fired has room to resolve and be seen.
-runSentry :: CoinFace.CoinFace -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-runSentry face board spellId =
-  let drain n g =
-        if n <= (0 :: Int) || null (GameState.stack g)
-          then g
-          else drain (n - 1) (S.runPure (sentryAnswer face) g Stack.resolveTop)
-      cycleOnce g = drain 8 (S.runPure (sentryAnswer face) g Engine.placePendingTriggers)
-      resolved = S.runPure (sentryAnswer face) board (S.cast S.alice spellId >> Stack.resolveTop)
-   in cycleOnce (cycleOnce resolved)
-
 -- The newest battlefield object whose printed card has this name.
 newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
 newestNamed wanted gs =
@@ -349,7 +288,7 @@ leylineShape src ts =
 -- Sarcomancy is placed straight onto the battlefield, so its enters-trigger
 -- never resolves and no Zombie token exists: CR 603.4's intervening "if" holds
 -- and the upkeep ability really would fire.
-stepSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stepSkipSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 stepSkipSpec s registry = Spec.describe s "Skip" $ do
   let untap = Phase.Beginning BeginningStep.Untap
       upkeep = Phase.Beginning BeginningStep.Upkeep
@@ -372,15 +311,6 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
         Engine.runStep
       runTwo gs = snd (Engine.runGamePure S.identityAnswer gs twoSteps)
       began step gs = List.elem (GameEvent.StepBegan (StepBegan.MkStepBegan step S.alice)) (S.eventsOf gs)
-  -- The control. Without Eon Hub the upkeep step begins normally, so the
-  -- trigger fires and resolves.
-  Spec.it s "CR 500.6 without a skip the upkeep step begins and its trigger fires" $ do
-    sarcomancy <- S.printingOf s registry "Sarcomancy"
-    let after = runTwo (atUntap [sarcomancy])
-    Spec.assertBool s (began untap after) "the untap step began"
-    Spec.assertBool s (began upkeep after) "the upkeep step began"
-    Spec.assertEqWith s "alice took 1 from the trigger" (S.lifeOf S.alice after) (Just 19)
-    Spec.assertEqWith s "and the draw step is next" (GameState.phase after) drawStep
   -- Eon Hub is BOB's, and it is ALICE's upkeep being skipped: "players
   -- skip THEIR upkeep steps" is symmetric, so the effect is not scoped to
   -- its controller.
@@ -2674,19 +2604,6 @@ attackNoBlock :: Prompt.Prompt r -> r
 attackNoBlock p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers {} -> Map.empty
-  _ -> S.identityAnswer p
-
--- Attack with everything and block ONE named attacker with ONE named creature,
--- so a lifelink blocker's own damage lands in the same CR 510.2 batch as the
--- unblocked attacker's. `attackNoBlock` above is this with the block taken away.
---
--- The pair is filtered out of the OFFERED attackers rather than built, so an
--- attacker that never attacked leaves the blocker absent (CR 509.1) instead of
--- silently becoming a legal block.
-attackAndBlock :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-attackAndBlock blocker attacker p = case p of
-  Prompt.DeclareAttackers _ _ ids -> ids
-  Prompt.DeclareBlockers _ _ _ attackers -> Map.fromList (fmap (\a -> (blocker, Set.singleton a)) (filter (== attacker) attackers))
   _ -> S.identityAnswer p
 
 -- Put a board at declare attackers with BOB active and alice defending -- the

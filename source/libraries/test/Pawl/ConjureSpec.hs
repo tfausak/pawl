@@ -1072,31 +1072,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "the printed rider is spent, so a later second main phase has nothing left to fire"
       (Set.size (GameState.triggeredThisGame fired))
       1
-  -- The control, one cast apart: three life gained is one short of the printed
-  -- four, so CR 603.4 keeps the ability off the stack entirely -- which the
-  -- unspent rider is the second reading of. bob's life is what tells the Theft
-  -- resolving from the Theft being countered on the way: 3 lost there against 3
-  -- gained here.
-  Spec.it s "CR 603.4 and three life is one short, so nothing is conjured" $ do
-    (_, theftId, gs) <- pearlBoard s registry
-    let gained = S.runPure aimedAtBob gs (S.cast S.alice theftId >> Stack.resolveTop)
-        secondMain = postcombatMainOf gained
-        fired = oneStep secondMain
-    Spec.assertEqWith
-      s
-      "no Mox Pearl in hand, and the second main phase really ran"
-      (namedIn moxPearl Zone.Hand fired, GameState.phase secondMain)
-      ([], Phase.PostcombatMain)
-    Spec.assertEqWith
-      s
-      "the Theft gained three and took three"
-      (S.lifeOf S.alice fired, S.lifeOf S.bob fired)
-      (Just 23, Just 17)
-    Spec.assertEqWith
-      s
-      "the intervening if is what held it back: the rider is unspent"
-      (Set.size (GameState.triggeredThisGame fired))
-      0
   -- Fear of Change ({G}{U} Enchantment Creature -- Nightmare, 2/3, "When this
   -- creature enters or dies, exile another creature you control. If you do,
   -- conjure a duplicate of a random creature card with mana value X onto the
@@ -1527,15 +1502,6 @@ postcombatMainOf gs0 =
 
 oneStep :: GameState.GameState -> GameState.GameState
 oneStep g = snd (Engine.runGamePure S.identityAnswer g Engine.runStep)
-
--- Morsel Theft's target. FILTERED out of the offered recipients rather than
--- built, the Toralf's Disciple case's reason: CR 608.2b re-reads the targets at
--- resolution, and a recipient assembled here would be a different one than the
--- prompt offered.
-aimedAtBob :: Prompt.Prompt r -> r
-aimedAtBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) sets
-  _ -> S.identityAnswer p
 
 goblinPiker :: CardName.CardName
 goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")

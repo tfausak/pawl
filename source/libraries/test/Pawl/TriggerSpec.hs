@@ -15,7 +15,6 @@ module Pawl.TriggerSpec where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -103,7 +102,6 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnScope as TurnScope
-import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -341,48 +339,6 @@ scanSpec s registry =
       Spec.assertBool s (ghoul1 < ghoul2) "ghoul1 has the lower id"
       Spec.assertEqWith s "both triggers fired" (length triggers) 2
       Spec.assertEqWith s "sources in ascending ObjectId order" (fmap PendingTrigger.source triggers) (fmap TriggerSource.OfObject [ghoul1, ghoul2])
-    -- CR 603.10, FIRST sentence -- the normal rule, not the "looks back in
-    -- time" exception list that follows it: "objects that exist immediately
-    -- after an event are checked to see if the event matched any trigger
-    -- conditions". Ravenous Rats existed immediately after the event that put
-    -- it onto the battlefield, so its CR 603.6a entry trigger fired -- even
-    -- though CR 704.5f then buried it as a 0/0 before the CR 117.5 boundary's
-    -- trigger scan ran.
-    --
-    -- bob holds TWO cards, so "discarded once" is distinguishable from
-    -- "discarded twice"; the companion test below is the no-double-fire half.
-    Spec.it s "CR 603.10 whole cards: under Night of Souls' Betrayal, Ravenous Rats dies as it enters and STILL makes bob discard" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      piker <- S.printingOf s registry "Goblin Piker"
-      ravenousRats <- S.printingOf s registry "Ravenous Rats"
-      night <- S.printingOf s registry "Night of Souls' Betrayal"
-      let (_, base1) = S.addPermanent night S.alice (S.landsInPlay swamp 2)
-          (_, base2) = S.addHandCard piker S.bob base1
-          (_, base3) = S.addHandCard piker S.bob base2
-          (gs, spellId) = S.handOne ravenousRats base3
-          bobBefore = S.handSize S.bob gs
-          cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-          settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
-      Spec.assertEqWith s "CR 704.5f buried the 0/0" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ravenous Rats") S.alice settled) 0
-      Spec.assertEqWith s "in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
-      Spec.assertEqWith s "and bob still discarded, exactly once" (S.handSize S.bob settled) (bobBefore - 1)
-    -- The no-double-fire half. Same board minus the -1/-1, so the Rats is on
-    -- the battlefield at the CR 117.5 boundary AND named by an unscanned
-    -- entry event -- the two candidate sources the scan draws from. A count,
-    -- not a boolean: a Rats counted twice discards two of bob's two cards.
-    Spec.it s "CR 603.6a whole cards: a Ravenous Rats that survives its entry triggers exactly once" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      piker <- S.printingOf s registry "Goblin Piker"
-      ravenousRats <- S.printingOf s registry "Ravenous Rats"
-      let (_, base1) = S.addHandCard piker S.bob (S.landsInPlay swamp 2)
-          (_, base2) = S.addHandCard piker S.bob base1
-          (gs, spellId) = S.handOne ravenousRats base2
-          bobBefore = S.handSize S.bob gs
-          cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-          settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
-      Spec.assertEqWith s "the Rats survived" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ravenous Rats") S.alice settled) 1
-      Spec.assertEqWith s "nothing in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 0
-      Spec.assertEqWith s "bob discarded exactly one" (S.handSize S.bob settled) (bobBefore - 1)
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
 sacrificeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1177,17 +1133,6 @@ delayedSpec s registry =
               fmap (\entry -> entry {DelayedTrigger.expiry = expiry}) (GameState.delayedTriggers gs)
           }
    in Spec.describe s "DelayedTrigger" $ do
-        Spec.it s "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          let after = castWave tidalWave island
-          case walls after of
-            [wall] -> do
-              Spec.assertEqWith s "5 power" (Projection.powerOf wall after) (Just 5)
-              Spec.assertEqWith s "5 toughness" (Projection.toughnessOf wall after) (Just 5)
-              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Defender wall after) "defender"
-              Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers after)) 1
-            other -> Spec.assertFailure s ("expected exactly one Wall token, got " <> show (length other))
         -- CR 603.7b: "only once, the next time its trigger event occurs".
         Spec.it s "CR 603.7 the token is sacrificed at the beginning of the next end step" $ do
           tidalWave <- S.printingOf s registry "Tidal Wave"
@@ -1210,13 +1155,6 @@ delayedSpec s registry =
           Spec.assertEqWith s "it fired" (length firedOnce) 1
           Spec.assertEqWith s "and stayed armed" (Seq.length survivors) 1
           Spec.assertEqWith s "so the next end step fires it again" (length firedAgain) 1
-        Spec.it s "CR 603.7b without a stated duration firing still spends it" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          let armed = castWave tidalWave island
-              (fired, survivors) = delayedFrom [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)] armed
-          Spec.assertEqWith s "it fired" (length fired) 1
-          Spec.assertEqWith s "and was evicted" (Seq.length survivors) 0
         -- Synthetic Deferred Rally {W} Instant: "At the beginning of the next
         -- end step, if you control a creature, you gain 2 life." A LABELED
         -- CRUTCH: every printed delayed ability with an intervening "if" asks
@@ -1433,16 +1371,6 @@ tokenSetSpec s registry =
       castRevolt revolt base = uncurry castUnderPrompts (S.handOne revolt base)
       boardOf mountain = S.landsInPlay mountain 3
    in Spec.describe s "DelayedTrigger token set" $ do
-        Spec.it s "CR 111.3 the spell mints three 1/1 Humans with haste and arms one delayed ability" $ do
-          revolt <- S.printingOf s registry "Thatcher Revolt"
-          mountain <- S.printingOf s registry "Mountain"
-          let ((_, armed), _) = castRevolt revolt (boardOf mountain)
-          case humans armed of
-            tokens@[_, _, _] -> do
-              Spec.assertEqWith s "each is 1/1" (fmap (`Projection.powerOf` armed) tokens) [Just 1, Just 1, Just 1]
-              Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Haste oid armed) tokens) "each has haste"
-              Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers armed)) 1
-            other -> Spec.assertFailure s ("expected exactly three Human tokens, got " <> show (length other))
         -- Binding one of the three would be the engine choosing; binding all
         -- three is what "those tokens" says.
         Spec.it s "CR 111.1 \"those tokens\" names every minted token, so all three are sacrificed" $ do
@@ -1523,7 +1451,7 @@ tokenGroupReadSpec s registry =
 -- in any other zone cease to exist, so a token that reached exile is not there to
 -- be counted. What discriminates is that all three leave and that nothing else
 -- does.
-tokenGroupMoveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tokenGroupMoveSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenGroupMoveSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
@@ -1541,19 +1469,6 @@ tokenGroupMoveSpec s registry =
         let (gs, oid) = S.handOne lightning base
          in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
    in Spec.describe s "Group move through InSlot" $ do
-        Spec.it s "CR 111.3 the spell mints three 3/1 Elementals and arms one delayed ability" $ do
-          lightning <- S.printingOf s registry "Feral Lightning"
-          mountain <- S.printingOf s registry "Mountain"
-          piker <- S.printingOf s registry "Goblin Piker"
-          rats <- S.printingOf s registry "Typhoid Rats"
-          let (_, _, base) = board mountain piker rats
-              armed = castLightning lightning base
-          case elementals armed of
-            tokens@[_, _, _] -> do
-              Spec.assertEqWith s "each is 3/1" (fmap (\oid -> (Projection.powerOf oid armed, Projection.toughnessOf oid armed)) tokens) [(Just 3, Just 1), (Just 3, Just 1), (Just 3, Just 1)]
-              Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Haste oid armed) tokens) "each has haste"
-              Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers armed)) 1
-            other -> Spec.assertFailure s ("expected exactly three Elemental tokens, got " <> show (length other))
         -- THE PROVING CASE. Before Effect.MoveToZone's InSlot arm read a group
         -- binding, the slot held no single object (Pawl.Engine.Resolve.Effect.slotOne
         -- answers Nothing for a group) and "exile them" moved NOBODY, while the
@@ -2273,62 +2188,6 @@ permanentEntersSpec s registry =
                   gs2
           Spec.assertEqWith s "twice, both from the one Warden" (sourcesOf gs3) (replicate 2 (TriggerSource.OfObject warden))
 
--- CR 603.7's arming gate, through Meandering Towershell -- the pool's one card
--- whose delayed ability is printed "on your NEXT turn" (Pawl.Types.Onset).
---
--- The gate is NOT vacuous, and this group's whole point is to prove it. The
--- ability's own condition is StepBegins (Combat DeclareAttackers)
--- ControllersTurn, and a TurnScope cannot tell one of the controller's turns
--- from another -- so an extra combat phase in the SAME turn (Relentless Assault,
--- and its siblings Aggravated Assault, Full Throttle and Aurelia) has a declare
--- attackers step that begins on alice's turn and would fire the return early.
-towershellOnsetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
-  let boardOf = do
-        towershell <- S.printingOf s registry "Meandering Towershell"
-        mountain <- S.printingOf s registry "Mountain"
-        island <- S.printingOf s registry "Island"
-        assault <- S.printingOf s registry "Relentless Assault"
-        pure (towershellAssaultBoard towershell mountain island assault)
-      towershellName = CardName.MkCardName $ Text.pack "Meandering Towershell"
-  Spec.it s "CR 603.7 a second declare attackers step THIS turn does not fire it" $ do
-    (gs, spell) <- boardOf
-    let -- alice attacks with the Towershell; its trigger exiles it and arms the
-        -- return, gated to a later turn.
-        atMain = runToTurnStep 1 Phase.PostcombatMain S.aggressiveAnswer gs
-        armed = GameState.delayedTriggers atMain
-        -- "After this main phase, there is an additional combat phase followed
-        -- by an additional main phase" (CR 500.8).
-        cast = snd (Engine.runGamePure S.identityAnswer atMain (S.cast S.alice spell))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        atExtra = runToTurnStep 1 (Phase.Combat CombatStep.DeclareAttackers) S.aggressiveAnswer resolved
-        afterExtra = snd (Engine.runGamePure S.aggressiveAnswer atExtra Engine.runStep)
-    Spec.assertEqWith s "the return is armed" (length armed) 1
-    -- Waiting for a BOUNDARY, not for a turn number: which turn alice's next one
-    -- is cannot be known here (Pawl.Types.TurnWindow), and this same turn is not
-    -- it whatever number it carries.
-    Spec.assertEqWith
-      s
-      "and gated to alice's next turn, which has not begun"
-      (fmap DelayedTrigger.window (Foldable.toList armed))
-      [TurnWindow.ControllersNextTurn]
-    Spec.assertEqWith s "the extra combat's declare attackers step really happened" (GameState.phase atExtra) (Phase.Combat CombatStep.DeclareAttackers)
-    Spec.assertEqWith s "it is still in exile" (S.countOnBattlefieldByName towershellName S.alice afterExtra) 0
-    Spec.assertEqWith s "and still armed, unspent" (length (GameState.delayedTriggers afterExtra)) 1
-  -- The control that stops the case above from passing for the wrong reason: a
-  -- gate that never opened would satisfy every assertion in it. The SAME line of
-  -- play -- extra combat phase included -- returns the Towershell on alice's
-  -- next turn.
-  Spec.it s "CR 603.7b and the same line of play returns it on alice's next turn" $ do
-    (gs, spell) <- boardOf
-    let atMain = runToTurnStep 1 Phase.PostcombatMain S.aggressiveAnswer gs
-        cast = snd (Engine.runGamePure S.identityAnswer atMain (S.cast S.alice spell))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        atNextTurn = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer resolved
-    Spec.assertEqWith s "alice's next turn is turn 3" (GameState.turnNumber atNextTurn) 3
-    Spec.assertEqWith s "and there it does return" (S.countOnBattlefieldByName towershellName S.alice atNextTurn) 1
-    Spec.assertEqWith s "spending the one shot (CR 603.7b)" (length (GameState.delayedTriggers atNextTurn)) 0
-
 -- CR 603.7a's last sentence -- "Other events that happen earlier may make the
 -- trigger event impossible" -- with both halves already in the pool: Meandering
 -- Towershell's return, armed for alice's NEXT turn, and Stonehorn Dignitary
@@ -2338,7 +2197,7 @@ towershellOnsetSpec s registry = Spec.describe s "DelayedOnset" $ do
 -- would leave the entry armed past it and fire the return on the FOLLOWING turn
 -- of alice's -- a turn the card does not name -- which is what the second case
 -- here discriminates.
-towershellSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+towershellSkipSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 towershellSkipSpec s registry = Spec.describe s "DelayedOnsetSkipped" $ do
   let boardOf = do
         towershell <- S.printingOf s registry "Meandering Towershell"
@@ -2355,19 +2214,6 @@ towershellSkipSpec s registry = Spec.describe s "DelayedOnsetSkipped" $ do
         GameEvent.StepBegan (StepBegan.MkStepBegan ph@(Phase.Combat _) who) <- S.eventsOf gs
         Monad.guard (who == pid)
         pure ph
-  -- The control that makes the case below discriminating: the same board and the
-  -- same line of play with the Dignitary never cast. S.aggressiveAnswer takes no
-  -- action at all, and S.fightAnswer is exactly it plus casting what it can
-  -- afford -- so the ONE difference between the two runs is that combat phase.
-  Spec.it s "CR 603.7 with alice's next turn intact the Towershell returns on it" $ do
-    gs <- boardOf
-    let turn3 = runToTurnStep 3 Phase.PostcombatMain S.aggressiveAnswer gs
-    -- All five of CR 506.1's steps, because the returning Towershell is "put
-    -- onto the battlefield attacking" -- CR 508.8's other half, which is what
-    -- keeps the declare blockers and combat damage steps from being skipped.
-    Spec.assertEqWith s "alice's turn 3 ran all five combat steps (CR 506.1)" (length (combatStepsOf S.alice turn3)) 5
-    Spec.assertEqWith s "and the Towershell returned there" (S.countOnBattlefieldByName towershellName S.alice turn3) 1
-    Spec.assertEqWith s "spending the one shot (CR 603.7b)" (length (GameState.delayedTriggers turn3)) 0
   -- THE PROVING CASE. bob's Dignitary, cast on turn 2, takes alice's turn-3
   -- combat phase away -- so the declare attackers step the return watches for
   -- never happens on the one turn "your next turn" named, and CR 603.7a's "other
@@ -2408,36 +2254,6 @@ towershellStonehornBoard towershell island plains stonehorn =
       withLands = List.foldl' (\g _ -> snd (S.addPermanent plains S.bob g)) base [1 :: Int .. 4]
       stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 8]
    in snd (S.addHandCard stonehorn S.bob (stock S.bob (stock S.alice withLands)))
-
--- alice at her declare attackers step with one Meandering Towershell, four
--- untapped Mountains (exactly Relentless Assault's {2}{R}{R}) and the Assault in
--- hand; bob defends. Both libraries hold Islands so the draw steps of the turns
--- these cases run through cannot empty one (CR 104.3c).
---
--- The Islands are in LIBRARIES and never on the battlefield, which matters for
--- this card: CR 702.14c's islandwalk reads the lands the DEFENDING PLAYER
--- CONTROLS, and a library is not the battlefield -- so nothing here turns on
--- evasion.
-towershellAssaultBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (GameState.GameState, ObjectId.ObjectId)
-towershellAssaultBoard towershell mountain island assault =
-  let (base, _, _) = S.combatBoardOf [towershell] []
-      withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) base [1 :: Int .. 4]
-      stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 8]
-      (withCard, spell) = S.handOne assault (stock S.bob (stock S.alice withLands))
-   in ( withCard
-          { GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice,
-            GameState.phase = GameState.phase base,
-            GameState.combat = GameState.combat base,
-            GameState.remaining = GameState.remaining base
-          },
-        spell
-      )
 
 -- Run whole steps until the board is at `phase` on turn `turn`, WITHOUT running
 -- that step. Bounded so a bug cannot loop forever; stops on a finished game.
@@ -3001,7 +2817,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   tokenGroupReadSpec s registry
   tokenGroupMoveSpec s registry
   singleTokenSlotReadSpec s registry
-  towershellOnsetSpec s registry
   towershellSkipSpec s registry
   orderingSpec s registry
   secondPlacementPassSpec s registry

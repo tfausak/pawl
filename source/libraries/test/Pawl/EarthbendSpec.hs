@@ -39,7 +39,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
@@ -168,21 +167,8 @@ spec s registry = Spec.describe s "Earthbend" $ do
   producerSpec s registry
 
 -- CR 701.66a's first two sentences.
-animationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+animationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 animationSpec s registry = Spec.describe s "Animation" $ do
-  -- CR 611.2a: rule 701.66a states no duration, so the animation is not "until end
-  -- of turn". Nothing but the CR 514.2 sweep can tell the two apart, and the sweep
-  -- is what a card printing the shorter duration would be caught by.
-  Spec.it s "CR 611.2a the animation does not end at cleanup" $ do
-    forest <- S.printingOf s registry "Forest"
-    lesson <- S.printingOf s registry "Earthbending Lesson"
-    let (target, _, after) = earthbent forest lesson
-        swept = Expiry.dropAtCleanup after
-    Spec.assertEqWith s "CR 611.2a the earthbent land is still a 4/4 after cleanup" (S.powerToughnessOf target swept) (Just (4, 4))
-    Spec.assertBool s (Projection.hasKeyword Keyword.Haste target swept) "and still has haste"
-    -- CR 514.2 really did run on this board: the animation surviving it is the
-    -- duration and not a sweep that reached nothing.
-    Spec.assertEqWith s "CR 514.2 the sweep did run" (length (GameState.continuousEffects swept)) (length (GameState.continuousEffects after))
   -- CR 302.6 read against CR 702.10b: the land was played this turn, so haste is
   -- the only thing that lets it attack. The Piker is the control -- equally sick,
   -- equally alice's, and without haste.

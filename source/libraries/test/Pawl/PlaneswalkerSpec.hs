@@ -388,12 +388,6 @@ attackingChandra p = case p of
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
   wanderingEmperorSpec s registry
-  Spec.it s "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (jaceId, after) = jaceOnBattlefield island jace
-    Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "on the battlefield"
-    Spec.assertEqWith s "loyalty 3" (S.counterOf CounterKind.Loyalty jaceId after) 3
 
   Spec.it s "CR 606.4 the +2 adds two loyalty counters and each player draws" $ do
     island <- S.printingOf s registry "Island"
@@ -439,30 +433,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
       s
       (all (`elem` Action.legalActions S.alice (alicesNextTurn after)) (activation jaceId plusTwo jace))
       "but the limit expires with the turn"
-
-  Spec.it s "CR 606.3 a loyalty ability is not offered on an opponent's turn" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (jaceId, board) = jaceOnBattlefield island jace
-        theirTurn = board {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
-    Spec.assertBool
-      s
-      (all (`notElem` Action.legalActions S.alice theirTurn) (activation jaceId plusTwo jace))
-      "the +2 is not offered"
-
-  -- The proof that CR 306.5b's counters accumulate into GameState.enteringCounters
-  -- rather than landing straight onto the object, so CR 614.16 reaches them in the
-  -- entry's own CR 616.1 pool. CR 614.16's second sentence is the rule: a
-  -- counter-scaling replacement applies "even if the original event being
-  -- modified wasn't itself an effect", and CR 306.5b's entry counters are
-  -- placed by a replacement effect.
-  Spec.it s "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    doublingSeason <- S.printingOf s registry "Doubling Season"
-    let (gs, handId) = S.handOne jace (snd (S.addPermanent doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-        after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
-    Spec.assertEqWith s "three doubled to six" (S.counterOf CounterKind.Loyalty (theJace after) after) 6
 
   -- The other half of the same rule, and the reason the two placements are
   -- deliberately different code paths: CR 614.16's FIRST sentence limits a
@@ -882,17 +852,6 @@ loyaltyAbilityOnlySpec s registry = Spec.describe s "LoyaltyAbilityOnly" $ do
 -- moves only the announcement.
 variableLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
-  Spec.it s "CR 306.5b / 107.3m Nissa enters with as many loyalty counters as the X she was cast for" $ do
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
-    let (nissaId, after) = nissaCastFor forest island nissa [] 5
-    Spec.assertBool s (Set.member nissaId (GameState.battlefield after)) "on the battlefield"
-    -- Five, and no other reading of the rule this board admits answers five: the
-    -- spell's mana value on the stack was seven, its printed symbols number
-    -- three, an unread announcement is zero, and nine lands were available.
-    Spec.assertEqWith s "loyalty 5" (S.counterOf CounterKind.Loyalty nissaId after) 5
-
   -- The pair. One board, one card, one difference -- the announced X -- so an
   -- implementation reading anything else off the spell (its mana value, its
   -- generic cost, a constant) cannot pass both halves.
@@ -1507,7 +1466,7 @@ tamiyoMinusXSpec s registry = Spec.describe s "TamiyoMinusX" $ do
 --
 -- The pair differs in whether she entered this turn: the refusal's board has her
 -- on the battlefield already, with her loyalty and the same four Plains.
-wanderingEmperorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wanderingEmperorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
   let giant = S.aliasRef "giant"
       plains = fmap (\i -> S.settled ("plains" <> show i) "Plains") [1 .. 4 :: Int]
@@ -1518,7 +1477,6 @@ wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
           )
           S.bob
           S.beginningOfCombat
-      casting = Choices.none {Choices.manaSources = Seq.fromList (fmap (\i -> Just (S.aliasRef ("plains" <> show i))) [1 .. 4 :: Int])}
       -- The -2, her third printed ability.
       exiling = Choices.none {Choices.targets = Just [giant]}
       attacking = S.on S.declareAttackers S.bob (S.attack [giant])
@@ -1527,20 +1485,6 @@ wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
               gs <- State.get
               Monad.unless (n <= (0 :: Int) || GameState.phase gs == S.endOfCombat || Maybe.isJust (GameState.result gs)) (Engine.runStep >> go (n - 1))
          in go 8
-  Spec.it s "CR 606.3 flashed in on bob's turn, her -2 exiles his attacker" $ do
-    let script =
-          S.turn
-            1
-            [ attacking,
-              S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "emperor") casting),
-              S.on S.declareBlockers S.alice (S.activateAbility (S.namedRef "The Wandering Emperor" 1) 2 exiling)
-            ]
-    built <- S.buildBoardOrFail s registry (setup [] [S.aliased "emperor" (S.cardSetup "The Wandering Emperor")])
-    (_, after) <- S.runScriptOrFail s script built toEndOfCombat
-    -- CR 400.7: the exiled card is a new object, so it is counted by name.
-    Spec.assertEqWith s "the Hill Giant is in exile" (length (Game.zoneMembers Zone.Exile S.bob after), S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob after) (1, 0)
-    Spec.assertEqWith s "alice gained 2 life" (S.lifeOf S.alice after) (Just 22)
-    Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
   Spec.it s "CR 606.3 already on the battlefield, she is not offered on bob's turn" $ do
     let resident = (S.aliased "emperor" (S.permanent "The Wandering Emperor")) {Placement.counters = Map.singleton CounterKind.Loyalty 3}
         -- She is attackable now, so bob also names where the Giant attacks.

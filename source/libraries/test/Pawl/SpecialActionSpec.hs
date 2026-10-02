@@ -1468,24 +1468,6 @@ suspending s registry = Spec.describe s "CR 116.2f Rift Bolt" $ do
     Spec.assertBool s (List.elem (Action.Type.Suspend boltId) actions) "the Bolt may be suspended"
     Spec.assertBool s (List.notElem (Action.Type.Suspend travelerId) actions) "the Doomed Traveler may not"
     Spec.assertBool s (List.notElem (Action.Type.Suspend boltId) (Action.legalActions S.alice opponentsTurn)) "and not on an opponent's turn, where the sorcery could not be cast"
-  -- CR 702.62c: "while determining if you could begin to cast a card with
-  -- suspend, take into consideration any effects that would PROHIBIT that card
-  -- from being cast." The pair is one board with a prohibition on it and the same
-  -- board without -- same mana, same phase, same hand.
-  Spec.it s "CR 702.62c a cast prohibition takes the action away" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Rift Bolt"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    silence <- S.printingOf s registry "Silence"
-    plains <- S.printingOf s registry "Plains"
-    let (boltId, _, gs) = riftBoltBoard mountain bolt traveler
-        -- BOB's Silence, whose "your opponents can't cast spells this turn"
-        -- names alice, on bob's own Plains so the pair differs in nothing alice
-        -- controls.
-        (silenceId, withSilence) = S.addHandCard silence S.bob (S.landsFor plains S.bob 1 gs)
-        silenced = S.runPure S.identityAnswer withSilence (S.cast S.bob silenceId >> Stack.resolveTop)
-    Spec.assertBool s (List.elem (Action.Type.Suspend boltId) (Action.legalActions S.alice withSilence)) "the control: with the Silence still in bob's hand, the action is offered"
-    Spec.assertBool s (List.notElem (Action.Type.Suspend boltId) (Action.legalActions S.alice silenced)) "and with it resolved it is not"
   -- The whole rule, driven: the action is taken, the counter ticks down on
   -- alice's next upkeep, and the Bolt is cast that same upkeep for nothing.
   Spec.it s "CR 702.62 the card is exiled with a time counter, ticks down at the next upkeep, and is cast free" $ do
@@ -2285,19 +2267,6 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
         asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
     Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (asked S.alice withBobsLands)) "the Arbiter's own controller may pay"
     Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (asked S.bob withBobsLands)) "and so may bob, whose two Forests pay the {2}"
-  -- CR 101.2: the prohibition wins, so the search does not happen -- and CR
-  -- 701.23 describes only how to look, so the card's own "then shuffle" still
-  -- does. Without the log both outcomes are indistinguishable from CR 701.23b's
-  -- legal decline.
-  Spec.it s "CR 101.2 a prohibited player does not search, but still shuffles" $ do
-    forest <- S.printingOf s registry "Forest"
-    arbiter <- S.printingOf s registry "Leonin Arbiter"
-    growth <- S.printingOf s registry "Rampant Growth"
-    let (_, growthId, gs) = arbiterBoard forest arbiter growth
-        (after, asked) = growAndResolve growthId gs
-    Spec.assertEqWith s "the Forest is still in the library" (S.countByName (S.printingName forest) S.alice after) 1
-    Spec.assertEqWith s "and no tenth Forest reached the battlefield" (S.countOnBattlefieldByName (S.printingName forest) S.alice after) 9
-    Spec.assertEqWith s "CR 701.23: the search was never offered, and the shuffle still happened" asked ["shuffle"]
   -- The same board and the same spell, with the special action taken first
   -- through the priority loop -- so this is Pawl.Engine.Engine's arm as well as
   -- the suppression, and the case above is its paired control.

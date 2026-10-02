@@ -604,27 +604,6 @@ ogreConversionNexus ogre piker conversion nexus conversionFirst =
           else snd (S.addPermanent conversion S.alice (snd (S.addPermanent nexus S.alice g)))
    in (ogreId, pikerId, place g2)
 
--- The same board reached through gameplay: alice has four Forests, the Ogre, the
--- Piker and the Conversion on the battlefield and Maskwood Nexus in hand. Cast
--- the Nexus and read the Ogre's card types BEFORE and AFTER it resolves, so the
--- Nexus's timestamp is the later one and nothing but its resolution differs.
-ogreAcrossNexus ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (Bool, Bool)
-ogreAcrossNexus forest ogre piker conversion nexus =
-  let (ogreId, g1) = S.addPermanent ogre S.alice (S.landsInPlay forest 4)
-      (_, g2) = S.addPermanent piker S.alice g1
-      (_, g3) = S.addPermanent conversion S.alice g2
-      (g4, nexusId) = S.handOne nexus g3
-      cast = snd (Engine.runGamePure S.identityAnswer g4 (S.cast S.alice nexusId))
-      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-      isArtifact gs = Set.member CardType.Artifact (Projection.cardTypesOf ogreId gs)
-   in (isArtifact cast, isArtifact resolved)
-
 -- The printings the graveyard-dependency group below shares: Synthetic Charnel
 -- Measure, Grist, the Hunger Tide and a Hill Giant.
 charnelPrintings ::
@@ -677,29 +656,6 @@ limbBloodMoon bayou shroofus limb bloodMoon limbFirst =
           then snd (S.addPermanent bloodMoon S.alice (snd (S.addPermanent limb S.alice g)))
           else snd (S.addPermanent limb S.alice (snd (S.addPermanent bloodMoon S.alice g)))
    in (bayouId, shroofusId, place g2)
-
--- alice has four Forests, an Abomination of Llanowar on the battlefield, two
--- cards of `stocked` already in her graveyard and Maskwood Nexus in hand. Cast
--- the Nexus, and read the Abomination's power BEFORE and AFTER it resolves.
---
--- The pair is the two readings of one board: the graveyard is stocked before
--- the Nexus is cast and nothing moves between them, so the only difference is
--- that the Nexus's continuous effect exists in the second.
-abominationAcrossNexus ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (Maybe Integer, Maybe Integer)
-abominationAcrossNexus forest abomination nexus stocked =
-  let base = S.landsInPlay forest 4
-      (_, g1) = S.addGraveyardCard stocked S.alice base
-      (_, g2) = S.addGraveyardCard stocked S.alice g1
-      (abominationId, g3) = S.addPermanent abomination S.alice g2
-      (g4, nexusId) = S.handOne nexus g3
-      cast = snd (Engine.runGamePure S.identityAnswer g4 (S.cast S.alice nexusId))
-      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-   in (Projection.powerOf abominationId cast, Projection.powerOf abominationId resolved)
 
 -- Elspeth, Sun's Champion {4}{W}{W} Legendary Planeswalker -- Elspeth, loyalty
 -- 4. "-7: You get an emblem with \"Creatures you control get +2/+2 and have
@@ -1682,60 +1638,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- mutation to the atom and report itself instead.
     Spec.assertEqWith s "the fixture: both Obelisks resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Obelisk of Urd")) S.alice gs) 2
 
-  -- THE REPLACE-ONLY-CREATURE-TYPES FALSIFIER. Ashaya, Soul of the Wild makes
-  -- each nontoken creature alice controls a Forest land in addition to its other
-  -- types, so the Bog Wraith carries a LAND type and a CREATURE type at once.
-  -- CR 205.1a: "when an effect sets one or more of an object's subtypes, the new
-  -- subtype(s) replaces any existing subtypes from the appropriate set (creature
-  -- types, land types, artifact types, enchantment types, planeswalker types, or
-  -- spell types)" -- the appropriate set here is the creature types alone, so
-  -- Forest has to survive. Replacing ALL subtypes leaves {Frog}; adding leaves
-  -- {Forest, Wraith, Frog}; only the rule's answer is {Forest, Frog}.
-  --
-  -- Neither effect depends on the other under CR 613.8a -- Turn to Frog's set is
-  -- a CR 611.2c TheseObjects, and Ashaya's reads card types and controller,
-  -- which no layer-4 subtype arm writes -- so this holds in timestamp order, and
-  -- both orders give the same answer anyway.
-  Spec.it s "CR 205.1a Turn to Frog replaces only the CREATURE types: Ashaya's Forest survives" $ do
-    island <- S.printingOf s registry "Island"
-    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
-    bogWraith <- S.printingOf s registry "Bog Wraith"
-    turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (_, withAshaya) = S.addPermanent ashaya S.alice (S.landsInPlay island 3)
-        (wraithId, board) = S.addPermanent bogWraith S.alice withAshaya
-        after = castAtCreature wraithId turnToFrog board
-    Spec.assertEqWith
-      s
-      "before: animated into a Forest land, still a Wraith"
-      (Projection.subtypesOf wraithId board)
-      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Wraith])
-    Spec.assertEqWith
-      s
-      "after: the creature type moved and the land type did not"
-      (Projection.subtypesOf wraithId after)
-      (Set.fromList [Subtype.Type.Forest, Subtype.Type.Frog])
-    -- CR 205.1a's last sentence -- "Removing an object's subtype doesn't affect
-    -- its card types at all" -- and CR 305.7's fourth, which the land-subtype
-    -- arm cites: setting a subtype moves no card type either way.
-    Spec.assertBool s (Projection.isCreatureOf wraithId after) "still a creature"
-    Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf wraithId after)) "still a land"
-
-  -- The other three of Turn to Frog's four layers, on the same board: CR 613.1e
-  -- (blue), CR 613.1f (loses all abilities) and CR 613.4b (base 1/1). Bog Wraith
-  -- is printed black, 3/3 and with swampwalk, so every one of them moves.
-  Spec.it s "CR 613.1e/613.1f/613.4b Turn to Frog also makes the Wraith blue, ability-less and 1/1" $ do
-    island <- S.printingOf s registry "Island"
-    bogWraith <- S.printingOf s registry "Bog Wraith"
-    turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (wraithId, board) = S.addPermanent bogWraith S.alice (S.landsInPlay island 3)
-        after = castAtCreature wraithId turnToFrog board
-    Spec.assertEqWith s "before: black" (Projection.colorsOf wraithId board) (Set.singleton Color.Black)
-    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)) wraithId board) "before: swampwalk"
-    Spec.assertEqWith s "before: 3/3" (Projection.powerOf wraithId board, Projection.toughnessOf wraithId board) (Just 3, Just 3)
-    Spec.assertEqWith s "after: blue only (CR 105.3, a set)" (Projection.colorsOf wraithId after) (Set.singleton Color.Blue)
-    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)) wraithId after)) "after: no swampwalk"
-    Spec.assertEqWith s "after: base 1/1" (Projection.powerOf wraithId after, Projection.toughnessOf wraithId after) (Just 1, Just 1)
-
   Spec.it s "CR 514.2 Turn to Frog wears off at cleanup and the Wraith is a Wraith again" $ do
     island <- S.printingOf s registry "Island"
     bogWraith <- S.printingOf s registry "Bog Wraith"
@@ -2446,22 +2348,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf ogreId gs)) "still an artifact, order-independent"
     Spec.assertBool s (not (Set.member CardType.Artifact (Projection.cardTypesOf pikerId gs))) "and the Piker still is not"
 
-  -- The same dependency reached through gameplay rather than through placement,
-  -- which is what fixes the timestamp order: the Nexus enters after the
-  -- Conversion, and CR 613.7a gives its static ability's effect the object's own
-  -- CR 613.7d timestamp.
-  Spec.it s "CR 613.8a casting the Nexus makes the Ogre an artifact when it resolves" $ do
-    forest <- S.printingOf s registry "Forest"
-    ogre <- S.printingOf s registry "Villainous Ogre"
-    piker <- S.printingOf s registry "Goblin Piker"
-    conversion <- S.printingOf s registry "Synthetic Tinker's Conversion"
-    nexus <- S.printingOf s registry "Maskwood Nexus"
-    Spec.assertEqWith
-      s
-      "not an artifact while the Nexus is still on the stack, an artifact once it resolves"
-      (ogreAcrossNexus forest ogre piker conversion nexus)
-      (False, True)
-
   -- The same limb of CR 613.8a clause (b), asked about an object OFF the
   -- battlefield. CR 613.1 names no zone, so the scan CR 613.8a describes ranges
   -- over an effect's whole affected set wherever it lies; projectDeciding's
@@ -2505,20 +2391,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (_, giantId, gs) = gristCharnel charnel grist giant False
     Spec.assertEqWith s "order-independent: still 1/1" (Projection.powerOf giantId gs) (Just 1)
     Spec.assertEqWith s "order-independent: still 1/1" (Projection.toughnessOf giantId gs) (Just 1)
-
-  -- The card-level proof, at gameplay level: alice casts the Measure off three
-  -- Forests and it resolves, rather than being placed. Grist is already lying in
-  -- her graveyard, so this is the Grist-older order.
-  Spec.it s "CR 613.4b casting the Measure sets the base P/T from the graveyard card's own layer-7b value" $ do
-    (charnel, grist, giant) <- charnelPrintings s registry
-    forest <- S.printingOf s registry "Forest"
-    let (_, g1) = S.addGraveyardCard grist S.alice (S.landsInPlay forest 3)
-        (giantId, g2) = S.addPermanent giant S.alice g1
-        (gs, charnelId) = S.handOne charnel g2
-        resolved = S.runPure S.identityAnswer gs (S.cast S.alice charnelId >> Stack.resolveTop)
-    Spec.assertEqWith s "the enchantment resolved" (GameState.stack resolved) []
-    Spec.assertEqWith s "the Giant's base is the greatest power in the graveyard, Grist's 1" (Projection.powerOf giantId resolved) (Just 1)
-    Spec.assertEqWith s "and its toughness with it" (Projection.toughnessOf giantId resolved) (Just 1)
 
   -- Two controls, each the same board with one thing changed. A plain 2/1 Goblin
   -- Piker in the graveyard instead of Grist is the LIVE half: no layer-7b effect
@@ -2625,36 +2497,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- The grant rides on the same affected set, so it lands on the same object.
     Spec.assertEqWith s "the Piker printed no activated ability and now has exactly the granted one" (length (Projection.abilitiesOf pikerId gs)) 1
 
-  -- THE GAMEPLAY PROOF, end to end, and the reader half: Ygra's own trigger is a
-  -- TriggerCondition.PermanentDies over Filter.HasSubtype Food (CR 700.4: "dies"
-  -- is "put into a graveyard from the battlefield"), which reads the PROJECTED
-  -- subtypes -- so the card is self-reading, and the only thing making the Piker a
-  -- Food is the layer-4 arm under test.
-  --
-  -- alice's Lightning Bolt kills her own Piker, CR 704.5g's state-based action
-  -- moves it to the graveyard, the CR 117.5 settle puts the trigger on the stack,
-  -- and it resolves for two +1/+1 counters. Ygra ends 8/8 where a board on which
-  -- the Piker never became a Food leaves her at her printed 6/6.
-  Spec.it s "CR 700.4 whole cards: the Piker dies a Food and Ygra's own trigger sees it" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    ygra <- S.printingOf s registry "Ygra, Eater of All"
-    piker <- S.printingOf s registry "Goblin Piker"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (ygraId, g1) = S.addPermanent ygra S.alice (S.landsInPlay mountain 1)
-        (pikerId, board) = S.addPermanent piker S.alice g1
-        (withBolt, spellId) = S.handOne lightningBolt board
-        cast = S.runPure (aimAtCreature pikerId) withBolt (S.cast S.alice spellId)
-        damaged = S.runPure (aimAtCreature pikerId) cast Stack.resolveTop
-        settled = S.runPure (aimAtCreature pikerId) damaged Engine.settleForPriority
-        after = S.runPure (aimAtCreature pikerId) settled Stack.resolveTop
-    Spec.assertEqWith s "Ygra starts at her printed 6/6" (Projection.powerOf ygraId board, Projection.toughnessOf ygraId board) (Just 6, Just 6)
-    Spec.assertEqWith s "and ends 8/8" (Projection.powerOf ygraId after, Projection.toughnessOf ygraId after) (Just 8, Just 8)
-    Spec.assertEqWith s "on two +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne ygraId after) 2
-    -- Diagnostics, after the behaviour: these separate "the Bolt never killed it"
-    -- from "the death never reached the trigger".
-    Spec.assertEqWith s "the Piker is gone" (Game.lookupObject pikerId settled) Nothing
-    Spec.assertEqWith s "and its death put exactly one trigger on the stack" (length (GameState.stack settled)) 1
-
   -- CR 702.73a's changeling, the subtype-defining ability -- CR 604.3 makes it a
   -- CDA, so CR 613.3 applies it at the start of its layer (4, CR 613.1d) rather
   -- than in timestamp order, and Pawl.Engine.Projection.applySubtypeDefining is
@@ -2724,27 +2566,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member Subtype.Type.Merfolk (Filter.subtypes view)) "a Merfolk off viewOfCard too"
     Spec.assertBool s (not (Set.member Subtype.Type.Island (Filter.subtypes view))) "and no land type there either"
 
-  -- CR 205.1b's add over the whole of CR 205.3m, the layer-4 arm changeling's two
-  -- routes both come down to. Wings of Velis Vel is the card: "target creature has
-  -- base power and toughness 4/4, gains all creature types, and gains flying".
-  -- Lord of Atlantis is the reader -- its affected set is a Filter.HasSubtype
-  -- Merfolk -- so the Piker ends up 4/4 base plus the lord's +1/+1, and the two
-  -- numbers are distinct on purpose: a no-op arm leaves 4.
-  Spec.it s "CR 205.1b Wings of Velis Vel adds every creature type without replacing the Piker's own" $ do
-    island <- S.printingOf s registry "Island"
-    lord <- S.printingOf s registry "Lord of Atlantis"
-    piker <- S.printingOf s registry "Goblin Piker"
-    wings <- S.printingOf s registry "Wings of Velis Vel"
-    let (_, withLord) = S.addPermanent lord S.alice (S.landsInPlay island 3)
-        (pikerId, board) = S.addPermanent piker S.alice withLord
-        after = castAtCreature pikerId wings board
-        subtypes = Projection.subtypesOf pikerId after
-    Spec.assertEqWith s "base 4/4, and the lord sees a Merfolk" (Projection.powerOf pikerId after) (Just 5)
-    Spec.assertBool s (Set.member Subtype.Type.Merfolk subtypes) "a Merfolk"
-    Spec.assertBool s (Set.member Subtype.Type.Goblin subtypes) "and still the printed Goblin (CR 205.1b: the add keeps the rest)"
-    Spec.assertBool s (not (Set.member Subtype.Type.Island subtypes)) "and not a land type"
-    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId after) "and flying"
-
   -- THE TWO ROUTES, ONE BOARD. CR 604.3a(2) gives CDA status only to an ability
   -- printed on the card it affects (or on a token's creating effect, or acquired
   -- by copy or text change), so a changeling another object's static ability
@@ -2806,30 +2627,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf pikerId after)) "a Merfolk"
     Spec.assertBool s (Set.member Subtype.Type.Goblin (Projection.subtypesOf pikerId after)) "and still the printed Goblin (CR 205.1b: the add keeps the rest)"
     Spec.assertBool s (Projection.hasKeyword Keyword.Changeling pikerId after) "and the keyword itself is there (CR 613.1f layer 6)"
-
-  -- Living metal's twin of the case above: a keyword granted in layer 6 whose
-  -- meaning (CR 702.161a) is a layer-4 static ability. Synthetic Living Alloy
-  -- ("target permanent gains living metal") is the producer; Scryfall
-  -- `o:"living metal"`, 2026-09-26, finds only Transformers back faces printing it.
-  --
-  -- One board, handed over to bob: an unconditional artifact-creature grant would
-  -- agree with the rule on alice's turn and differ only on bob's.
-  Spec.it s "CR 702.161a living metal granted by a RESOLUTION makes the Vehicle a creature on its controller's turn only" $ do
-    island <- S.printingOf s registry "Island"
-    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
-    alloy <- S.printingOf s registry "Synthetic Living Alloy"
-    let (vehicleId, before) = S.addPermanent dreadnought S.alice (S.landsInPlay island 1)
-        (withAlloy, alloyId) = S.handOne alloy before
-        aim :: Prompt.Prompt r -> r
-        aim p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (\r -> Recipient.objectOf r == Just vehicleId) . snd) sets
-          _ -> S.identityAnswer p
-        cast = snd (Engine.runGamePure aim withAlloy (S.cast S.alice alloyId))
-        after = snd (Engine.runGamePure aim cast Stack.resolveTop)
-        bobsTurn = S.runPure S.identityAnswer after Engine.handoffTurn
-    Spec.assertEqWith s "granted, it is an artifact creature during alice's turn" (Projection.cardTypesOf vehicleId after) (Set.fromList [CardType.Artifact, CardType.Creature])
-    Spec.assertEqWith s "and only an artifact during bob's" (Projection.cardTypesOf vehicleId bobsTurn) (Set.singleton CardType.Artifact)
-    Spec.assertEqWith s "ungranted, only an artifact during alice's turn too" (Projection.cardTypesOf vehicleId before) (Set.singleton CardType.Artifact)
 
   -- CR 613.8b's loop clause reached by two PRINTED cards, and the proving pair
   -- for deciding CR 613.8a over the whole board rather than per projected object.
@@ -3158,31 +2955,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "power 1 (layer 7b)" (Projection.powerOf land gs) (Just 1)
     Spec.assertEqWith s "toughness 1" (Projection.toughnessOf land gs) (Just 1)
     Spec.assertBool s (not (Projection.isCreatureOf self gs)) "the enchantment itself is no land, so it animates nothing but lands"
-
-  -- The whole card, cast: March of the Machines' own reminder text is
-  -- "(Equipment that's a creature can't equip a creature.)" -- CR 301.5c, whose
-  -- state-based action is CR 704.5p. So the two halves meet here: the layer-7b
-  -- part that CR 613.6 rescues gives the Equipment its P/T, and the layer-4
-  -- part that gave it the creature type also knocks it off the creature it was
-  -- equipping.
-  Spec.it s "CR 613.6 + CR 704.5p whole card: casting March animates an equipped Bonesplitter, which falls off" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    march <- S.printingOf s registry "March of the Machines"
-    let base = S.landsInPlay island 4 -- {3}{U}
-        (creature, g1) = S.addPermanent piker S.alice base
-        (equip, g2) = S.addPermanent bonesplitter S.alice g1
-        attached = S.attach equip creature g2
-        (withSpell, spellId) = S.handOne march attached
-        cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        after = snd (Engine.runGamePure S.identityAnswer resolved Engine.settleForPriority)
-    Spec.assertEqWith s "equipped, the Piker was 4/1" (Projection.powerOf creature attached) (Just 4)
-    Spec.assertEqWith s "the Equipment is a 1/1 creature" (Projection.powerOf equip after) (Just 1)
-    Spec.assertBool s (Set.member equip (GameState.battlefield after)) "it is still on the battlefield"
-    Spec.assertEqWith s "but unattached" (fmap Object.attachedTo (Game.lookupObject equip after)) (Just Nothing)
-    Spec.assertEqWith s "so the Piker is back to 2 power" (Projection.powerOf creature after) (Just 2)
 
   Spec.it s "CR 613 Humility + Opalescence: a real creature is 1/1 with no abilities" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3903,43 +3675,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 701.23a without the Nexus, Goblin Matron's search offers the printed Goblin alone" $ do
     candidates <- matronCandidates s registry False
     Spec.assertEqWith s "the Piker alone" candidates [Set.singleton (Text.pack "Goblin Piker")]
-
-  -- CR 613.1 over a card in a GRAVEYARD, read from inside the fold. Maskwood
-  -- Nexus's third clause ("creature cards you own that aren't on the
-  -- battlefield") is an Affected.MatchingAnywhere set, and Abomination of
-  -- Llanowar's CR 208.2a characteristic-defining P/T counts "Elf cards in your
-  -- graveyard" -- a count evaluated while layer 7a is being applied, so it reads
-  -- Projection.viewUpTo rather than fullView. That reader used to match every
-  -- off-battlefield candidate as a PRINTED card (#623), which read 1 here.
-  --
-  -- Three readings the pair separates. The two graveyard cards are printed
-  -- Goblin Warriors, so "the cards were always Elves" reads 3 before the Nexus
-  -- resolves as well as after. They are in the graveyard before the Nexus is
-  -- cast, so "the effect applied to them as they arrived" reads 1 in both. Only
-  -- a continuous effect applying to a card sitting in a graveyard reads 1 then
-  -- 3. The battlefield half of the count is the Abomination itself, a printed
-  -- Elf, in both halves -- so the change is not that half moving.
-  Spec.it s "CR 613.1 Maskwood Nexus makes the creature cards in a graveyard Elves, and a CDA counts them there" $ do
-    forest <- S.printingOf s registry "Forest"
-    abomination <- S.printingOf s registry "Abomination of Llanowar"
-    nexus <- S.printingOf s registry "Maskwood Nexus"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (before, after) = abominationAcrossNexus forest abomination nexus piker
-    Spec.assertEqWith s "the Abomination alone, while the Nexus is still a spell" before (Just 1)
-    Spec.assertEqWith s "the Abomination plus the two Goblins the Nexus made Elves" after (Just 3)
-
-  -- The negative half of the pair above, differing in exactly one thing: what is
-  -- in the graveyard. Maskwood Nexus's set is CREATURE cards, so two Lightning
-  -- Bolts there are outside it and the count stays at the Abomination itself --
-  -- which is what rules out "the Nexus resolving adds two to the count".
-  Spec.it s "CR 613.1 the Nexus leaves the instants in that graveyard alone" $ do
-    forest <- S.printingOf s registry "Forest"
-    abomination <- S.printingOf s registry "Abomination of Llanowar"
-    nexus <- S.printingOf s registry "Maskwood Nexus"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (before, after) = abominationAcrossNexus forest abomination nexus bolt
-    Spec.assertEqWith s "the Abomination alone, before" before (Just 1)
-    Spec.assertEqWith s "the Abomination alone, after" after (Just 1)
 
   -- The premise, asserted rather than assumed: CR 114.2 put one emblem in the
   -- command zone, and only the ultimate put it there.

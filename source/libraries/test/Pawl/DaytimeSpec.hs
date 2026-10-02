@@ -36,8 +36,8 @@
 -- static ability makes the clause inert on every daybound Human Werewolf,
 -- Tovolar himself included, so Daybreak Ranger // Nightfall Predator -- a Human
 -- Werewolf with no daybound -- is the only permanent the clause can reach. His
--- combat-damage trigger IS modeled, and is read by Pawl.TriggerSpec's
--- `tovolarSpec` rather than here.
+-- combat-damage trigger IS modeled, and is read by
+-- data/scenarios/counter-keyword-trigger rather than here.
 --
 -- Moonmist's second sentence is modeled by its card file and proved by
 -- Pawl.ReplacementSpec's Moonmist group, not here: it is a CR 615.1 prevention

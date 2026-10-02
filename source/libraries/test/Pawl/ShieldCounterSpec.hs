@@ -19,16 +19,13 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import Pawl.EntryReplacementSpec (hackAt)
 import Pawl.PreventionSpec (aimPlayer, answersFor, castAndResolve, countersOn, newestNamed, raceAnswer, settleDamage, theAbility, wasAskedToOrderDamage)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -477,7 +474,7 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
 -- reaches it: a CR 604.2 replacement watching OTHER objects, so the permanent
 -- holding it is on the battlefield for a text change to point at. Every earlier
 -- replacement naming a subtype matches Filter.IsSource instead, and hacking the
--- SPELL that holds such a row is tidewalkerSpec's shape below -- so this is one
+-- SPELL that holds such a row is the shape data/scenarios/shield-counter proves -- so this is one
 -- of the two shapes the rule reaches, not the only one.
 --
 -- CR 612.2 licenses the swap: "Dragon" here is a creature type word used as a
@@ -525,18 +522,9 @@ evolveAt oid from to p = case p of
 -- printed word does not; Hoarding Dragon (4/4 Creature -- Dragon) is the object
 -- the printed word reaches and the hacked one does not. Distinct printed sizes,
 -- so no reading of the rule produces the same number as another.
-dragonstormGlobeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dragonstormGlobeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 dragonstormGlobeSpec s registry =
   Spec.describe s "Dragonstorm Globe (CR 612.1)" $ do
-    -- The control leg: the same board, the same Piker, no Artificial Evolution.
-    Spec.it s "unhacked, the printed Dragon leaves that same Goblin alone" $ do
-      (after, entered) <- globeChain s registry Nothing "Goblin Piker"
-      case entered of
-        Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
-        Just pikerId -> do
-          Spec.assertEqWith s "printed 2/1, so the Globe's row did not apply" (Projection.powerOf pikerId after) (Just 2)
-          Spec.assertEqWith s "printed 2/1, so the Globe's row did not apply" (Projection.toughnessOf pikerId after) (Just 1)
-          Spec.assertEqWith s "no counter" (countersOn CounterKind.PlusOnePlusOne pikerId after) 0
     Spec.it s "unhacked, that same Dragon does take the counter" $ do
       (after, entered) <- globeChain s registry Nothing "Hoarding Dragon"
       case entered of
@@ -544,75 +532,6 @@ dragonstormGlobeSpec s registry =
         Just dragonId -> do
           Spec.assertEqWith s "CR 614.1c the printed row applies to a Dragon" (Projection.powerOf dragonId after) (Just 5)
           Spec.assertEqWith s "through one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne dragonId after) 1
-
--- Tidewalker {2}{U} Creature -- Elemental */*, whole text: "This creature enters
--- with a time counter on it for each Island you control. / Vanishing (At the
--- beginning of your upkeep, remove a time counter from this creature. When the
--- last is removed, sacrifice it.) / Tidewalker's power and toughness are each
--- equal to the number of time counters on it." (oracle checked on Scryfall
--- 2026-08-26)
---
--- The shape the Globe and the Beacon above route AROUND: the row is the ENTERING
--- permanent's own (Filter.IsSource), and the text change is on the SPELL it was a
--- moment earlier. CR 400.7a keeps that change applying to the permanent the spell
--- becomes, and CR 614.12 says the entry row is decided against "continuous
--- effects that already exist and would apply to the permanent" -- so the swapped
--- word is the one the CR 616.1 loop must read. The re-key runs inside
--- Event.changeZoneAttaching, before the entry loop, for exactly this.
---
--- THE TWO LAND COUNTS ARE UNEQUAL, four Islands and six Swamps, and both are
--- nonzero: a row read before the re-key answers four, a row read after answers
--- six, and neither is the other. Nonzero on both readings keeps CR 702.63b's
--- "when the last time counter is removed" and a CR 704.5f death out of the leg
--- -- the permanent arrives either way, and what the pair tells apart is which
--- word its own row named.
---
--- Four Islands rather than the one the mana needs: {2}{U} spends at most three
--- lands, so an Island is left untapped for the Hack however the payment picks,
--- and a leg cannot pass because the Hack was uncastable.
-tidewalkerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-tidewalkerSpec s registry = Spec.describe s "Tidewalker (CR 400.7a / 614.12)" $ do
-  -- The control: the same board and the same spell, no Magical Hack. It pins the
-  -- printed reading, so the pair differs in exactly the text change.
-  Spec.it s "unhacked, the printed Island is what its row counts" $ do
-    (before, after, entered) <- tidewalkerChain s registry False
-    case entered of
-      Nothing -> Spec.assertFailure s "the Tidewalker did not reach the battlefield"
-      Just tideId -> do
-        Spec.assertEqWith s "four time counters, one for each Island" (countersOn CounterKind.Time tideId after) 4
-        Spec.assertEqWith s "a 4/4" (S.powerToughnessOf tideId after) (Just (4, 4))
-        Spec.assertEqWith s "the Tidewalker is the only thing on the stack" (length (GameState.stack before)) 1
-
--- alice controls four Islands and six Swamps and holds the Tidewalker and Magical
--- Hack ({U}). The Tidewalker is CAST and left ON THE STACK -- that is the whole
--- point, since hacking it after it resolved is the Globe's shape and reads the
--- same either way -- then the Hack is cast at the SPELL and resolved, and only
--- then does the Tidewalker resolve. Returns the state with the Tidewalker alone
--- on the stack, the state after it resolves, and the permanent it became.
-tidewalkerChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, GameState.GameState, Maybe ObjectId.ObjectId)
-tidewalkerChain s registry hack = do
-  island <- S.printingOf s registry "Island"
-  swamp <- S.printingOf s registry "Swamp"
-  tidewalker <- S.printingOf s registry "Tidewalker"
-  magicalHack <- S.printingOf s registry "Magical Hack"
-  let base = S.landsFor swamp S.alice 6 (S.landsInPlay island 4)
-      (tideId, g1) = S.addHandCard tidewalker S.alice base
-      (hackId, g2) = S.addHandCard magicalHack S.alice g1
-      ready =
-        g2
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      onStack = S.runPure S.identityAnswer ready (S.cast S.alice tideId)
-      -- The Hack's target is FILTERED out of the offered set rather than rebuilt,
-      -- hackAt's reason: a hand-built recipient would be dropped at CR 608.2b's
-      -- re-read with no error.
-      before = case (hack, GameState.stack onStack) of
-        (True, spellId : _) -> castAndResolve (hackAt spellId Subtype.Island Subtype.Swamp) onStack hackId
-        _ -> onStack
-      after = S.runPure S.identityAnswer before Stack.resolveTop
-  pure (before, after, newestNamed (S.printingName tidewalker) after)
 
 -- Hurr Jackal {R} Creature -- Jackal 1/1, whole text: "{T}: Target creature
 -- can't be regenerated this turn." (oracle checked on Scryfall)
@@ -731,33 +650,13 @@ hurrJackalSpec s registry = Spec.describe s "Hurr Jackal (CR 701.19c)" $ do
 -- token and not a creature token, so the same Queen on the same lands appends
 -- nothing. Both boards carry both colours of mana so neither cast fails for
 -- want of it.
-queenAllenalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+queenAllenalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.1a)" $ do
   let board mountain island queen =
         let lands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) (S.landsInPlay mountain 2) [1 .. (2 :: Int)]
          in S.addPermanent queen S.alice lands
       soldierName = CardName.MkCardName (Text.pack "Soldier Token")
       goblinName = CardName.MkCardName (Text.pack "Goblin Token")
-      namedTokens name gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just name) (S.tokensOf gs)
-  Spec.it s "CR 614.1a two Goblins would be created, so two Goblins plus a Soldier are" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
-    dragonFodder <- S.printingOf s registry "Dragon Fodder"
-    let (queenId, g1) = board mountain island queen
-        (g2, spellId) = S.handOne dragonFodder g1
-        after = castAndResolve S.identityAnswer g2 spellId
-    Spec.assertEqWith s "one Soldier the spell never named" (S.countOnBattlefieldByName soldierName S.alice after) 1
-    Spec.assertEqWith s "and the two Goblins it did" (S.countOnBattlefieldByName goblinName S.alice after) 2
-    -- The appended token is the card the ROW printed, not a third Goblin.
-    case namedTokens soldierName after of
-      [soldier] -> do
-        Spec.assertEqWith s "a 1/1" (S.powerToughnessOf soldier after) (Just (1, 1))
-        Spec.assertEqWith s "and white" (Projection.colorsOf soldier after) (Set.singleton Color.White)
-        Spec.assertEqWith s "under alice's control (CR 111.2)" (Projection.controllerOf soldier after) (Just S.alice)
-      other -> Spec.assertFailure s ("expected exactly one Soldier, got " <> show (length other))
-    -- The Queen's own CR 604.3 box, read live: herself and three tokens.
-    Spec.assertEqWith s "the Queen counts the creatures she controls" (S.powerToughnessOf queenId after) (Just (4, 4))
   -- CR 616.1: the append is INSIDE the one creation event, which is what the
   -- order against Doubling Season observes. Queen first: two Goblins plus a
   -- Soldier, then doubled -- two Soldiers. Season first: four Goblins, then
@@ -822,5 +721,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   chatterfangSpec s registry
   shieldCounterSpec s registry
   dragonstormGlobeSpec s registry
-  tidewalkerSpec s registry
   hurrJackalSpec s registry

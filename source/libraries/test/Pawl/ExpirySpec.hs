@@ -22,7 +22,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
@@ -50,7 +49,6 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -1216,17 +1214,6 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     let unpinged = S.runCombat aliceOnlyAnswer jade
     Spec.assertEqWith s "bob still took 3 from the same attacker" (S.lifeOf S.bob unpinged) (Just 17)
     Spec.assertEqWith s "and the Statue took nothing when bob declined" (S.damageOf statueId unpinged) (Just 0)
-  -- The control for the two whole-card tests above: the same board, an
-  -- interpreter that never activates. The Statue stays a noncreature artifact,
-  -- so what animated it was the ability and nothing about the fixture.
-  Spec.it s "CR 500.5a whole card: an unactivated Jade Statue never becomes a creature" $ do
-    statue <- S.printingOf s registry "Jade Statue"
-    mountain <- S.printingOf s registry "Mountain"
-    let (statueId, _, jade) = jadeBoard statue mountain []
-        after = S.runCombat S.aggressiveAnswer jade
-    Spec.assertEqWith s "the whole combat phase ran" (GameState.phase after) Phase.PostcombatMain
-    Spec.assertBool s (not (Projection.isCreatureOf statueId after)) "never a creature"
-    Spec.assertEqWith s "so it never attacked" (S.lifeOf S.bob after) (Just 20)
 
 -- Aims every target slot at one object, so a spell with two legal targets on
 -- the board is pointed at the one the test means. S.identityAnswer would take
@@ -1540,16 +1527,6 @@ cannonadeSpec s registry = Spec.describe s "BrazenCannonade" $ do
     let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         armed = effectWith (Expiry.Type.AtEndOfCombatOn (AfterTurn.MkAfterTurn S.bob 1)) gone
     Spec.assertEqWith s "it ended at bob's seat" (GameState.continuousEffects (handoff armed)) []
-  Spec.it s "CR 500.5a / 611.2a whole card: the permission outlives bob's combat, and the card is played on alice's next turn" $ do
-    (pikerId, armed) <- cannonadeBoard s registry
-    let alicesNext = runToTurn S.identityAnswer 3 armed
-        played = runToTurn (castingFromExile pikerId) 4 alicesNext
-    Spec.assertEqWith s "the raid trigger exiled the Piker" (fmap S.nameOf (Game.cardOf pikerId armed)) (Just (CardName.MkCardName (Text.pack "Goblin Piker")))
-    Spec.assertEqWith s "alice may play it" (permissionOn pikerId armed) (Just S.alice)
-    Spec.assertEqWith s "alice's next turn began" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
-    Spec.assertEqWith s "the permission survived the end of bob's combat phase" (permissionOn pikerId alicesNext) (Just S.alice)
-    Spec.assertEqWith s "alice played the exiled card during that turn" (S.creaturesInPlay S.alice played) 2
-    Spec.assertEqWith s "so it is no longer in exile" (Game.zoneMembers Zone.Exile S.alice played) []
   Spec.it s "CR 500.5a whole card: the permission ends as alice's next combat phase ends" $ do
     (pikerId, armed) <- cannonadeBoard s registry
     let atTurn n phase gs = GameState.turnNumber gs == n && GameState.phase gs == phase

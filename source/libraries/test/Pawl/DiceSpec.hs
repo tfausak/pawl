@@ -365,27 +365,6 @@ portentOffers spell board =
 
 modifierSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
-  -- CR 706.2's first sentence, on the only card in data/cards/ whose roll
-  -- instruction prints a modifier. 14 is the primary pin because it is the printed boundary of the 1-14 band:
-  -- the modifier is the only thing that can move a natural 14 out of it. It is
-  -- also none of the values a wrong implementation reaches by accident -- not 1
-  -- (Replay.defaultAnswer, which S.identityAnswer falls through to), not 20 (the
-  -- die's size), not 15 (the other band's endpoint) and not 0.
-  Spec.it s "CR 706.2 the instruction's modifier is added to the natural result" $ do
-    (ids, spell, board) <- portentBoard s registry 1
-    case ids of
-      [_, _, third, _, _, _] ->
-        -- THE GAMEPLAY ASSERTION, and the only one in this case so nothing can
-        -- absorb a mutation. A natural 14 plus a hand of one is 15, which is the
-        -- 15+ band: scry 1 bottoms card 1 and draw 1 takes card 2, leaving card
-        -- 3 on top. An engine that dropped the modifier reads 14, fires the 1-14
-        -- band instead, draws card 1 and leaves card 2 on top.
-        Spec.assertEqWith
-          s
-          "CR 706.2: 14 plus a hand of one is 15, so the 15+ band scried"
-          (Maybe.listToMaybe (tableLibrary (runPortent 14 spell board)))
-          (Just third)
-      _ -> Spec.assertFailure s "expected six library cards"
   -- The pair that proves the modifier is the HAND COUNT and not a constant:
   -- SAME die, different hand, different band. It is also the guard against a
   -- Quantity evaluated against a context whose fields were never filled: that
@@ -407,30 +386,6 @@ modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
           (Maybe.listToMaybe (tableLibrary (runPortent 11 bigSpell big)))
           (Just bigThird)
       _ -> Spec.assertFailure s "expected six library cards"
-  -- CR 706.1a bounds the NATURAL result at 1..N; CR 706.2 adds the modifier
-  -- afterwards and no rule bounds the sum. A natural 20 with a hand of five is a
-  -- result of 25, past the die's own top face. An engine that reused the 1..N
-  -- filter on the SUM falls to CR 706.1a's floor of 1 and fires the 1-14 band.
-  Spec.it s "CR 706.1a the face is bounded by the die and the result is not" $ do
-    (ids, spell, board) <- portentBoard s registry 5
-    case ids of
-      [_, _, third, _, _, _] ->
-        Spec.assertEqWith
-          s
-          "CR 706.2: a natural 20 plus a hand of five is a result of 25"
-          (Maybe.listToMaybe (tableLibrary (runPortent 20 spell board)))
-          (Just third)
-      _ -> Spec.assertFailure s "expected six library cards"
-  -- The fixture pins, in their own case so they cannot stand in for a band
-  -- above: the spell really resolved, and the library really lost exactly the
-  -- one card X drew rather than being clamped short.
-  Spec.it s "CR 608.2 the spell resolved and the library is not short" $ do
-    (ids, spell, board) <- portentBoard s registry 1
-    let after = runPortent 14 spell board
-    Spec.assertEqWith s "six cards, top-first" (tableLibrary board) ids
-    -- Before the stack reading, which a cast that never happened also satisfies.
-    Spec.assertEqWith s "one card drawn out of six" (length (tableLibrary after)) 5
-    Spec.assertEqWith s "nothing left on the stack" (length (GameState.stack after)) 0
   -- Supporting, and in its own case: the modifier is the engine's arithmetic, so
   -- it did not become a second roll or a bigger die.
   Spec.it s "CR 706.1 a modified roll is still one roll of the printed die" $ do
@@ -542,14 +497,6 @@ severalDiceSpec s registry = Spec.describe s "RollSeveralDice" $ do
     -- result, separates these two boards.
     Spec.assertBool s (S.onBattlefield strong chose5) "power 4 is less than the chosen 5, so it survives"
     Spec.assertBool s (S.onBattlefield weak chose5) "and so does power 1"
-  -- CR 706.1a's own boundary, on the "greater than or equal" the card prints:
-  -- the creature whose power EQUALS the chosen result is destroyed, which a
-  -- strict comparison spares.
-  Spec.it s "CR 208.1 a power equal to the result is destroyed" $ do
-    (spell, weak, strong, board) <- endeavorBoard s registry
-    let chose4 = runEndeavor [1, 4] 1 spell board
-    Spec.assertBool s (not (S.onBattlefield strong chose4)) "power 4 equals the chosen 4, so it is destroyed"
-    Spec.assertBool s (S.onBattlefield weak chose4) "power 1 is below it, so it survives"
   -- The choice is ELIDED where it is not one. Two dice showing the same number
   -- leave both slots holding that number whichever is named, so the engine asks
   -- nothing -- and the resolution still reads both results.
@@ -859,19 +806,6 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
     let clammed2 = runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed
     Spec.assertBool s (not (S.onBattlefield strong clammed2)) "power 4 is at least the chosen 2, so it is destroyed"
     Spec.assertBool s (S.onBattlefield weak clammed2) "power 1 is below it, so it survives"
-  Spec.it s "CR 706.2a the reroll is the roller's to decline" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    clam <- S.printingOf s registry "Clam-I-Am"
-    let clammed = snd (S.addPermanent clam S.alice board)
-    -- The same board and the same script as the case above, one thing different:
-    -- the roller says no. CR 706.2a makes the modifier optional, so declining
-    -- leaves the natural 3 standing and the 6 is the second die -- the reading an
-    -- engine that applied the modifier unasked cannot produce.
-    Spec.assertEqWith
-      s
-      "CR 706.2a: a declined reroll leaves the natural result"
-      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell clammed))
-      3
   Spec.it s "CR 706.2a two free offers to the same player are one question" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     clam <- S.printingOf s registry "Clam-I-Am"
@@ -937,20 +871,6 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
     let (offers, naturals) = rerollPrompts [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed
     Spec.assertEqWith s "CR 706.1: two d6 were thrown" offers [6, 6]
     Spec.assertEqWith s "and no reroll was offered" naturals []
-  Spec.it s "CR 706.1a the offer is gated on the die the card names" $ do
-    dragon <- S.printingOf s registry "Ancient Copper Dragon"
-    clam <- S.printingOf s registry "Clam-I-Am"
-    let (bare, _, _) = S.combatBoardOf [dragon] []
-        clammed = snd (S.addPermanent clam S.alice bare)
-    -- THE GAMEPLAY ASSERTION: a d20 that came up 3 is not the Clam's six-sided
-    -- die, so the 3 stands and the Dragon mints three Treasures. An engine that
-    -- matched on the number alone rerolls into the 20 the script supplies next
-    -- and mints twenty.
-    Spec.assertEqWith
-      s
-      "CR 706.1a: a d20's 3 is not a six-sided die's 3"
-      (S.countOnBattlefieldByName treasure S.alice (fst (clamCombat [3, 20] clammed)))
-      3
 
 -- Answers all three questions one Endeavor under a CR 706.2 reroll asks: each
 -- die comes up the next number of `rolls`, each reroll offer takes the next
@@ -1013,35 +933,6 @@ rerollPrompts rolls decisions spell board =
           pure answer
       (offers, naturals, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], [], (rolls, decisions))
    in (reverse offers, reverse naturals)
-
--- The Dragon's combat under the Clam, guideCombat's shape and for its reason:
--- the roll happens in the combat damage step rather than the step the fixture
--- starts in. Every reroll offer is ACCEPTED, so a board that wrongly raised one
--- takes the script's next number rather than quietly declining back to the same
--- reading.
-clamCombat :: [Natural.Natural] -> GameState.GameState -> (GameState.GameState, [Natural.Natural])
-clamCombat rolls board =
-  let answering :: Prompt.Prompt r -> State.State ([Natural.Natural], [Natural.Natural]) r
-      answering p = case p of
-        Prompt.RollDie sides -> do
-          (pending, offers) <- State.get
-          case pending of
-            face : rest -> do
-              State.put (rest, sides : offers)
-              pure face
-            [] -> do
-              State.put ([], sides : offers)
-              pure 20
-        Prompt.RerollDie {} -> pure OptionalDecision.Exercises
-        _ -> pure (S.attackTo S.bob p)
-      go n gs =
-        if n <= (0 :: Int) || Maybe.isJust (GameState.result gs) || not (S.inCombatPhase (GameState.phase gs))
-          then pure gs
-          else do
-            (_, next) <- Engine.runGame answering gs Engine.runStep
-            go (n - 1) next
-      (settled, (_, seen)) = State.runState (go (24 :: Int) board) (rolls, [])
-   in (settled, reverse seen)
 
 -- CR 706.2a's OTHER half: "Modifiers may be optional and\/or have associated
 -- costs." Wall of Fortune ("Defender \/ You may tap an untapped Wall you control
@@ -1336,14 +1227,6 @@ nightShiftSpec s registry = Spec.describe s "IncreaseOrDecrease" $ do
     -- The paired board, one thing different: no Night Shift.
     let (bare, _) = nightShiftRun [5, 2] [] [Just (0, RollAdjustment.Increase)] 1 spell board
     Spec.assertEqWith s "CR 706.1: without it the 5 stands" (S.countOnBattlefieldByName knight S.alice bare) 5
-  Spec.it s "CR 706.2a the modifier is the roller's to decline" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    shift <- S.printingOf s registry "Night Shift of the Living Dead"
-    let shifted = snd (S.addPermanent shift S.alice board)
-        (after, _) = nightShiftRun [5, 2] [] [Nothing] 1 spell shifted
-    Spec.assertEqWith s "CR 706.2a: a declined modifier leaves the 5" (S.countOnBattlefieldByName knight S.alice after) 5
-    Spec.assertEqWith s "and no 6 was rolled" (S.countOnBattlefieldByName zombieEmployee S.alice after) 0
-    Spec.assertEqWith s "and no life was paid" (S.lifeOf S.alice after) (Just 20)
   Spec.it s "CR 706.2 a decrease moves a 6 off the number the trigger reads" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     shift <- S.printingOf s registry "Night Shift of the Living Dead"
@@ -1354,15 +1237,6 @@ nightShiftSpec s registry = Spec.describe s "IncreaseOrDecrease" $ do
     Spec.assertEqWith s "CR 706.2: a natural 6 decreased to 5 mints no Zombie" (S.countOnBattlefieldByName zombieEmployee S.alice lowered) 0
     Spec.assertEqWith s "and the other result is the 5" (S.countOnBattlefieldByName knight S.alice lowered) 5
     Spec.assertEqWith s "CR 706.2: the same 6 left alone mints one" (S.countOnBattlefieldByName zombieEmployee S.alice kept) 1
-  Spec.it s "CR 706.2 the roller picks which die to shift" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    shift <- S.printingOf s registry "Night Shift of the Living Dead"
-    let shifted = snd (S.addPermanent shift S.alice board)
-        (after, _) = nightShiftRun [2, 5] [] [Just (1, RollAdjustment.Increase)] 0 spell shifted
-    -- The SECOND die is named, so the 5 becomes the 6; an engine that shifted
-    -- the first die whatever the answer makes the 2 a 3 and mints five Knights.
-    Spec.assertEqWith s "CR 706.2: the second die's 6 is the other result" (S.countOnBattlefieldByName knight S.alice after) 6
-    Spec.assertEqWith s "and it is a 6 for the trigger" (S.countOnBattlefieldByName zombieEmployee S.alice after) 1
   Spec.it s "CR 706.2a the modifier is taken only once each turn" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     shift <- S.printingOf s registry "Night Shift of the Living Dead"

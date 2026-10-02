@@ -25,7 +25,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
 import Pawl.ManaSourceSpec (dawnBoards, oneSymbol, payable, plainGreen, plainOf, plainRed, poolOf, retainedGreen)
-import Pawl.ManaSpec (atLife, castOffBoard, poolSize, poolTypes, poolUnits, prefersColor, prefersSource, resolvedCreature, theAbility)
+import Pawl.ManaSpec (atLife, poolSize, poolTypes, poolUnits, prefersColor, prefersSource, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -259,14 +259,6 @@ snowRed =
 -- {R}-producing Mountain, differing only in CR 205.4g's supertype.
 snowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 snowSpec s registry = Spec.describe s "Snow" $ do
-  Spec.it s "CR 107.4h a Snow-Covered Mountain's mana pays {S}, and Icehide Golem resolves" $ do
-    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
-    icehideGolem <- S.printingOf s registry "Icehide Golem"
-    let after = resolvedCreature snowMountain icehideGolem 1
-    Spec.assertEqWith s "the Golem is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Icehide Golem") S.alice after) 1
-    Spec.assertEqWith s "the Snow-Covered Mountain paid for it" (S.tappedCount S.alice after) 1
-    Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
-
   -- The negative half, and it must fail for the RIGHT reason: the board is a
   -- mana source, it is untapped, and it produces exactly the red mana the snow
   -- one does. CR 205.4g's supertype is the only difference, and CR 107.4h asks
@@ -406,18 +398,6 @@ snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
       s
       (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.OfType ManaType.Colorless]) board)
       "but {C} is"
-
-  -- The gameplay-level proof (design.md section 4): a real spell cast end to end
-  -- off the one synthetic permanent. Liquimetal Coating is a plain {2} Artifact,
-  -- so the two mana CR 106.11 produced are the whole of what pays for it.
-  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Synthetic Snow Symbol" $ do
-    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
-    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
-    let resolved = castOffBoard S.identityAnswer [snowSymbol] liquimetalCoating
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
-    Spec.assertEqWith s "the land is tapped" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
 
 -- alice controls `n` copies of `first` and `m` copies of `second`, and nothing
 -- else. Both are lands in every caller, but nothing here requires it.
@@ -680,14 +660,6 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     Spec.assertEqWith s "and only three of them are tapped" (S.tappedCount S.alice after) 3
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
 
-  -- The generic route, with no red mana anywhere on the board.
-  Spec.it s "CR 107.4e whole card: Flame Javelin casts off six Islands, two generic per symbol" $ do
-    island <- S.printingOf s registry "Island"
-    flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let gs = S.landsInPlay island 6
-    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice javelinCost gs) "canPay says yes"
-    Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
-
   -- THE discriminating negative. Five Islands is one short of the {6} the
   -- all-generic route needs, and a payment path that charged one mana per
   -- {2/R} would call three of them sufficient, let alone five.
@@ -714,22 +686,6 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     -- One short of {R}{4} and one red short of {R}{R}{2}: four mana with
     -- only one red pays no route at all.
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice cost (mixedLands mountain island 1 3))) "one Mountain and three Islands: no route"
-
-  -- The gameplay-level proof (design.md section 4): the whole card, cast
-  -- and resolved off the all-generic route, doing what it says.
-  Spec.it s "CR 107.4e Flame Javelin cast off six Islands resolves for 4 damage" $ do
-    island <- S.printingOf s registry "Island"
-    flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let (g, spellId) = S.handOne flameJavelin (S.landsInPlay island 6)
-        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "every Island tapped" (S.tappedCount S.alice resolved) 6
-    Spec.assertEqWith s "nothing left floating" (poolSize S.alice resolved) 0
-    -- S.identityAnswer takes the least Recipient on offer, which with no
-    -- creatures anywhere is alice herself. Who it hits is the answer's
-    -- business; that it hits for 4 is the card's.
-    Spec.assertEqWith s "4 damage to the chosen target" (S.lifeOf S.alice resolved) (Just 16)
 
   -- What CR 118.13a's announcement leaves behind. Both halves are payable
   -- out of this pool and they leave DIFFERENT pools behind, so the choice
@@ -1015,38 +971,6 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertBool s (not failed) "at 1 the payment fails"
     Spec.assertEqWith s "and CR 601.2h leaves the life total alone" (S.lifeOf S.alice unchanged) (Just 1)
 
-  -- The gameplay-level proof (design.md section 4), mana route: the whole
-  -- card, cast off one Forest and resolved. Goblin Piker is 2/1, so +2/+2 is
-  -- 4/3.
-  Spec.it s "CR 107.4f whole card: Mutagenic Growth casts off one Forest for +2/+2" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
-        (g, spellId) = S.handOne mutagenicGrowth withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
-    Spec.assertEqWith s "toughness" (Projection.toughnessOf pikerId resolved) (Just 3)
-    Spec.assertEqWith s "the Forest paid for it" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "so no life was" (S.lifeOf S.alice resolved) (Just 20)
-
-  -- The same card with NO lands anywhere. Castability has to see the life
-  -- route or this never reaches the stack at all.
-  Spec.it s "CR 107.4f whole card: Mutagenic Growth casts with no mana at all, for 2 life" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (pikerId, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-        (g, spellId) = S.handOne mutagenicGrowth withPiker
-    Spec.assertBool s (S.castable S.alice spellId g) "castable with an empty battlefield but for the Piker"
-    let cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
-    Spec.assertEqWith s "toughness" (Projection.toughnessOf pikerId resolved) (Just 3)
-    Spec.assertEqWith s "exactly 2 life paid" (S.lifeOf S.alice resolved) (Just 18)
-
   -- THE discriminating negative: neither route open. One life short, and no
   -- green mana on the board.
   Spec.it s "CR 119.4 Mutagenic Growth is uncastable at 1 life with no green mana" $ do
@@ -1074,20 +998,6 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (oid, gs) = S.addPermanent mutagenicGrowth S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "green, not colourless" (Projection.colorsOf oid gs) (Set.singleton Color.Green)
-
-  -- And the colour survives the route that produces no green mana at all --
-  -- the reading that would call the card colourless is exactly the one a
-  -- life-paid cast tempts.
-  Spec.it s "CR 202.2d Mutagenic Growth is green on the stack even when 2 life paid for it" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (_, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-        (g, spellId) = S.handOne mutagenicGrowth withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-    Spec.assertEqWith s "2 life paid, no green mana ever made" (S.lifeOf S.alice cast) (Just 18)
-    case GameState.stack cast of
-      [sid] -> Spec.assertEqWith s "and the spell is still green" (Projection.colorsOf sid cast) (Set.singleton Color.Green)
-      _ -> Spec.assertFailure s "expected exactly one spell on the stack"
 
   -- Mana.resolutions' SORT, pinned -- the least-life rule has to hold across
   -- symbols and not merely within one, and the per-symbol product alone does

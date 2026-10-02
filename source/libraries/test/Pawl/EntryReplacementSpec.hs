@@ -31,7 +31,7 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
-import Pawl.PreventionSpec (answersFor, atPostcombatMain, castAndResolve, counterBoard, countersOn, newestNamed, nextTurn, raceAnswer, theAbility, wasAskedToReplace)
+import Pawl.PreventionSpec (answersFor, castAndResolve, counterBoard, countersOn, newestNamed, nextTurn, raceAnswer, theAbility, wasAskedToReplace)
 import qualified Pawl.Registry as Registry
 import Pawl.ReplacementSpec (atDeclareAttackers, attackersIn, controlledNamed, declineLastRiot, riotAsks, riotBoard, riotChoosing, wasAskedForRiot)
 import qualified Pawl.Spec as Spec
@@ -40,7 +40,6 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
@@ -71,51 +70,12 @@ import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
 riotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
-  -- Zhur-Taa Goblin and not Spider-Punk, whose file also carries "spells and
-  -- abilities can't be countered" and a riot-granting static ability: the
-  -- keyword is what is under test, and this printing is nothing but the keyword.
-  Spec.it s "CR 702.136a taking the counter enters a 3/3 with no haste" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
-    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
-    case held of
-      goblinCard : _ ->
-        let after = S.runPure (riotChoosing OptionalDecision.Exercises) gs (S.cast S.alice goblinCard >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
-              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
-              Just goblin -> do
-                Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne goblin after) 1
-                -- Printed 2/2, so the counter is visible in the projection (CR
-                -- 613.4c, layer 7c).
-                Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 3)
-                Spec.assertEqWith s "toughness" (Projection.toughnessOf goblin after) (Just 3)
-                -- CR 702.136a's "if you don't" is what grants haste, so taking
-                -- the counter must not.
-                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste goblin after)) "no haste"
-      _ -> Spec.assertFailure s "fixture did not deal a card"
-  Spec.it s "CR 702.136a declining the counter grants haste instead" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
-    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
-    case held of
-      goblinCard : _ ->
-        let after = S.runPure (riotChoosing OptionalDecision.Declines) gs (S.cast S.alice goblinCard >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
-              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
-              Just goblin -> do
-                Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne goblin after) 0
-                Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 2)
-                Spec.assertBool s (Projection.hasKeyword Keyword.Haste goblin after) "haste"
-      _ -> Spec.assertFailure s "fixture did not deal a card"
   -- THE PAIR THAT MAKES THE HASTE REAL. CR 302.6 keeps a creature that entered
   -- this turn from attacking, and CR 702.10b is the exception riot buys.
   Spec.it s "CR 702.10b the goblin that took haste attacks the turn it entered" $ do
@@ -168,69 +128,6 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
       pikerCard : _ ->
         let asked = answersFor S.identityAnswer gs (S.cast S.alice pikerCard >> Stack.resolveTop)
          in Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
-      _ -> Spec.assertFailure s "fixture did not deal a card"
-  -- CR 702.136a through a GRANT rather than a printing: Spider-Punk's "other
-  -- Spiders you control have riot". The keyword reaches the entering Giant
-  -- Spider through layer 6 (CR 613.1f), and the replacement is minted off that
-  -- post-layer projection -- which is the whole reason the mint lives there.
-  Spec.it s "CR 702.136a Spider-Punk gives another Spider riot as it enters" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    spiderPunk <- S.printingOf s registry "Spider-Punk"
-    giantSpider <- S.printingOf s registry "Giant Spider"
-    let (gs, held) = riotBoard mountain 3 forest 1 [giantSpider]
-        (_, board) = S.addPermanent spiderPunk S.alice gs
-        answer = riotChoosing OptionalDecision.Declines
-    case held of
-      spiderCard : _ ->
-        let asked = answersFor answer board (S.cast S.alice spiderCard >> Stack.resolveTop)
-            after = S.runPure answer board (S.cast S.alice spiderCard >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Giant Spider") after of
-              Nothing -> Spec.assertFailure s "Giant Spider did not reach the battlefield"
-              Just spider -> do
-                Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised for the granted riot"
-                Spec.assertBool s (Projection.hasKeyword Keyword.Haste spider after) "haste"
-      _ -> Spec.assertFailure s "fixture did not deal a card"
-  -- The grant from a permanent that has no riot of its own: Rhythm of the Wild
-  -- is an enchantment whose whole riot contribution is "nontoken creatures you
-  -- control have riot", so it is the case Spider-Punk cannot make -- the
-  -- entering creature's base face prints no riot AND the granting permanent's
-  -- prints none either, which is what Projection.grantsKeywordWhere is for.
-  Spec.it s "CR 702.136a Rhythm of the Wild gives an entering creature riot" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    rhythm <- S.printingOf s registry "Rhythm of the Wild"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (gs, held) = riotBoard mountain 2 forest 0 [pikerPrinting]
-        (_, board) = S.addPermanent rhythm S.alice gs
-        answer = riotChoosing OptionalDecision.Declines
-    case held of
-      pikerCard : _ ->
-        let asked = answersFor answer board (S.cast S.alice pikerCard >> Stack.resolveTop)
-            after = S.runPure answer board (S.cast S.alice pikerCard >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Goblin Piker") after of
-              Nothing -> Spec.assertFailure s "Goblin Piker did not reach the battlefield"
-              Just piker -> do
-                Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised for the granted riot"
-                Spec.assertBool s (Projection.hasKeyword Keyword.Haste piker after) "haste"
-      _ -> Spec.assertFailure s "fixture did not deal a card"
-  -- The control for the grant: the same Spider on the same board with no
-  -- Spider-Punk is asked nothing and gains nothing.
-  Spec.it s "CR 702.136a without Spider-Punk that Spider has no riot" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    giantSpider <- S.printingOf s registry "Giant Spider"
-    let (gs, held) = riotBoard mountain 3 forest 1 [giantSpider]
-        answer = riotChoosing OptionalDecision.Declines
-    case held of
-      spiderCard : _ ->
-        let asked = answersFor answer gs (S.cast S.alice spiderCard >> Stack.resolveTop)
-            after = S.runPure answer gs (S.cast S.alice spiderCard >> Stack.resolveTop)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Giant Spider") after of
-              Nothing -> Spec.assertFailure s "Giant Spider did not reach the battlefield"
-              Just spider -> do
-                Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
-                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste spider after)) "no haste"
       _ -> Spec.assertFailure s "fixture did not deal a card"
   -- CR 702.136b: "If a permanent has multiple instances of riot, each works
   -- separately." Zhur-Taa Goblin PRINTS riot and Rhythm of the Wild GRANTS it to
@@ -445,34 +342,11 @@ tributeAnswer who payer p = case p of
     if asked == payer then OptionalDecision.Exercises else OptionalDecision.Declines
   _ -> S.identityAnswer p
 
-tributeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tributeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 tributeSpec s registry =
   let snakeIn = newestNamed (CardName.MkCardName $ Text.pack "Snake of the Golden Grove")
       play held = S.cast S.alice held >> Stack.resolveTop >> Engine.placePendingTriggers >> Stack.resolveTop
    in Spec.describe s "Tribute (CR 702.104)" $ do
-        -- THE PAIR THAT MAKES THE DECISION REAL is this case and the one below.
-        Spec.it s "CR 702.104b the chosen opponent declines, so tribute wasn't paid and the trigger gains 4" $ do
-          forest <- S.printingOf s registry "Forest"
-          snake <- S.printingOf s registry "Snake of the Golden Grove"
-          let (gs, held) = tributeBoard forest snake
-              after = S.runPure (tributeAnswer S.bob S.carol) gs (play held)
-          Spec.assertEqWith s "CR 702.104b alice gained 4 life" (S.lifeOf S.alice after) (Just 24)
-          case snakeIn after of
-            Nothing -> Spec.assertFailure s "Snake of the Golden Grove did not reach the battlefield"
-            Just snakeId -> do
-              Spec.assertEqWith s "CR 702.104a and it is still a 4/4" (Projection.powerOf snakeId after) (Just 4)
-              Spec.assertEqWith s "with no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne snakeId after) 0
-        Spec.it s "CR 702.104a the chosen opponent pays, so it enters a 7/7 and the trigger does not gain" $ do
-          forest <- S.printingOf s registry "Forest"
-          snake <- S.printingOf s registry "Snake of the Golden Grove"
-          let (gs, held) = tributeBoard forest snake
-              after = S.runPure (tributeAnswer S.bob S.bob) gs (play held)
-          case snakeIn after of
-            Nothing -> Spec.assertFailure s "Snake of the Golden Grove did not reach the battlefield"
-            Just snakeId -> do
-              Spec.assertEqWith s "CR 702.104a it entered a 7/7" (Projection.powerOf snakeId after) (Just 7)
-              Spec.assertEqWith s "CR 702.104b and alice's life is untouched, so the trigger did not resolve" (S.lifeOf S.alice after) (Just 20)
-              Spec.assertEqWith s "with rule 702.104a's three +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne snakeId after) 3
         -- CR 702.104a: it is THE CHOSEN OPPONENT who decides. One board, one
         -- payer, and the only difference is which opponent alice named -- so a
         -- reading that asked every opponent, or asked the controller, or asked
@@ -598,44 +472,11 @@ sunburstBoard lands card =
 -- colours are 3 counters where three Plains are 1 (mana spent is not colours
 -- spent), and the Goblet's five lands carry four colours (its charge counters
 -- are 4, not 5 and not 0).
-sunburstSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sunburstSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 sunburstSpec s registry =
   let enters = castAndResolve S.aggressiveAnswer
       myrIn = newestNamed (CardName.MkCardName $ Text.pack "Suntouched Myr")
-      gobletIn = newestNamed (CardName.MkCardName $ Text.pack "Clearwater Goblet")
-      -- The name the CARD writes, not Pawl.Engine.Keyword.chargeCounter: CR
-      -- 122.1's last sentence makes counters interchangeable by name, so the
-      -- minted kind has to land on the key data/cards/clearwater-goblet.json
-      -- counts.
-      charge = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "charge"))
    in Spec.describe s "Sunburst (CR 702.44)" $ do
-        Spec.it s "CR 702.44a three colours of mana are three +1/+1 counters" $ do
-          plains <- S.printingOf s registry "Plains"
-          island <- S.printingOf s registry "Island"
-          mountain <- S.printingOf s registry "Mountain"
-          myr <- S.printingOf s registry "Suntouched Myr"
-          let (gs, held) = sunburstBoard [(plains, 1), (island, 1), (mountain, 1)] myr
-              after = enters gs held
-          case myrIn after of
-            Nothing -> Spec.assertFailure s "Suntouched Myr did not reach the battlefield"
-            Just oid -> do
-              Spec.assertEqWith s "three +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 3
-              -- Printed 0/0, so the counters are the whole of its size (CR
-              -- 613.4c, layer 7c) and CR 704.5f does not reach it.
-              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 3)
-              Spec.assertEqWith s "no charge counters on a creature" (countersOn charge oid after) 0
-        -- THE PAIR THAT MAKES IT COLOURS. The board above with the same three
-        -- mana all of one colour.
-        Spec.it s "CR 702.44a three mana of one colour are one counter" $ do
-          plains <- S.printingOf s registry "Plains"
-          myr <- S.printingOf s registry "Suntouched Myr"
-          let (gs, held) = sunburstBoard [(plains, 3)] myr
-              after = enters gs held
-          case myrIn after of
-            Nothing -> Spec.assertFailure s "Suntouched Myr did not reach the battlefield"
-            Just oid -> do
-              Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 1
-              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 1)
         -- CR 702.44b's "only if one or more colored mana was spent": the same
         -- three mana again, none of them coloured.
         Spec.it s "CR 702.44b colourless mana buys no counter at all" $ do
@@ -648,95 +489,6 @@ sunburstSpec s registry =
             Just oid -> do
               Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne oid after) 0
               Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 0)
-        -- CR 702.44a's OTHER half, and the only case that reaches it: an object
-        -- not entering as a creature takes charge counters instead.
-        Spec.it s "CR 702.44a a noncreature takes charge counters" $ do
-          plains <- S.printingOf s registry "Plains"
-          island <- S.printingOf s registry "Island"
-          mountain <- S.printingOf s registry "Mountain"
-          forest <- S.printingOf s registry "Forest"
-          goblet <- S.printingOf s registry "Clearwater Goblet"
-          let (gs, held) = sunburstBoard [(plains, 2), (island, 1), (mountain, 1), (forest, 1)] goblet
-              after = enters gs held
-          case gobletIn after of
-            Nothing -> Spec.assertFailure s "Clearwater Goblet did not reach the battlefield"
-            Just oid -> do
-              Spec.assertEqWith s "four charge counters off five mana" (countersOn charge oid after) 4
-              Spec.assertEqWith s "and no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 0
-
--- alice holds Jacked Rabbit, controls seven untapped Plains and has two cards
--- left in her library. SEVEN for both cases below, so the two boards differ in
--- nothing but the number announced -- X=4 leaves a Plains unspent rather than
--- taking one away, and the negative cannot pass for want of mana.
---
--- The library is stocked because the positive case DRAWS: an empty one loses
--- alice the game to CR 104.3c before the assertion runs, and two cards leave the
--- draw a change in a count rather than the last card.
-ravenousBoard :: Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
-ravenousBoard plains rabbit =
-  let lands = S.landsFor plains S.alice 7 (Setup.emptyGame S.bothPlayers)
-      stocked = snd (S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice lands)))
-      (held, gs) = S.addHandCard rabbit S.alice stocked
-   in (readyForAlice gs, held)
-
--- CR 601.2b's announcement pinned to one value rather than followed to the mana:
--- an answerer taking the prompt's affordability bound would announce 5 on both
--- boards.
-announcing :: Natural.Natural -> Prompt.Prompt r -> r
-announcing x p = case p of
-  Prompt.ChooseX {} -> x
-  _ -> S.aggressiveAnswer p
-
--- Cast, resolve the spell, then place and resolve the entry trigger CR 603.6a
--- gathered -- which the X=4 board does not have, `placePendingTriggers` having
--- dropped it on CR 603.4's "if".
-entersAnnouncing :: Natural.Natural -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-entersAnnouncing x gs spellId =
-  S.runPure (announcing x) gs (S.cast S.alice spellId >> Stack.resolveTop >> Engine.placePendingTriggers >> Stack.resolveTop)
-
--- CR 702.156: ravenous, on Jacked Rabbit ({X}{1}{W} 1/2 Rabbit Warrior, ravenous
--- plus an attack trigger that reads its own power). Both halves of rule 702.156a
--- at once -- a minted CR 614.1c row whose count is CR 107.3m's announced X, and a
--- minted entry trigger whose intervening "if" reads the same number.
---
--- ONE BOARD, TWO ANNOUNCEMENTS: the seven Plains, the card and the seat are the
--- same in both cases, so what the assertions tell apart is the value of X and
--- nothing else.
---
--- Distinct numbers everywhere: a printed 1/2 with five counters is a 6/7 and with
--- four a 5/6, so no counter count coincides with a power, a toughness or the
--- threshold.
-ravenousSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-ravenousSpec s registry =
-  let rabbitIn = newestNamed (CardName.MkCardName $ Text.pack "Jacked Rabbit")
-   in Spec.describe s "Ravenous (CR 702.156)" $ do
-        Spec.it s "CR 702.156a X is 5, so it enters a 6/7 and draws" $ do
-          plains <- S.printingOf s registry "Plains"
-          rabbit <- S.printingOf s registry "Jacked Rabbit"
-          let (gs, held) = ravenousBoard plains rabbit
-              after = entersAnnouncing 5 gs held
-          case rabbitIn after of
-            Nothing -> Spec.assertFailure s "Jacked Rabbit did not reach the battlefield"
-            Just oid -> do
-              Spec.assertEqWith s "five +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 5
-              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 6)
-              Spec.assertEqWith s "toughness" (Projection.toughnessOf oid after) (Just 7)
-              -- The Rabbit left the hand to be cast, so one card in hand is the
-              -- card rule 702.156a drew and nothing else.
-              Spec.assertEqWith s "drew a card" (S.handSize S.alice after) 1
-        -- THE PAIR THAT MAKES IT THE THRESHOLD. The board above, one lower.
-        Spec.it s "CR 702.156a X is 4, so it enters a 5/6 and draws nothing" $ do
-          plains <- S.printingOf s registry "Plains"
-          rabbit <- S.printingOf s registry "Jacked Rabbit"
-          let (gs, held) = ravenousBoard plains rabbit
-              after = entersAnnouncing 4 gs held
-          case rabbitIn after of
-            Nothing -> Spec.assertFailure s "Jacked Rabbit did not reach the battlefield"
-            Just oid -> do
-              Spec.assertEqWith s "four +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 4
-              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 5)
-              Spec.assertEqWith s "toughness" (Projection.toughnessOf oid after) (Just 6)
-              Spec.assertEqWith s "drew nothing" (S.handSize S.alice after) 0
 
 -- CR 702.54: bloodthirst, on Bloodrage Vampire ({2}{B} 3/1 Vampire, "Bloodthirst
 -- 1" and nothing else) for rule 702.54a's N, and on Petrified Wood-Kin ({6}{G}
@@ -772,18 +524,6 @@ bloodthirstSpec s registry =
       vampireIn = newestNamed (CardName.MkCardName $ Text.pack "Bloodrage Vampire")
       woodKinIn = newestNamed (CardName.MkCardName $ Text.pack "Petrified Wood-Kin")
    in Spec.describe s "Bloodthirst (CR 702.54)" $ do
-        Spec.it s "CR 702.54a nobody was dealt damage, so it enters a 3/1" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          vampire <- S.printingOf s registry "Bloodrage Vampire"
-          sentry <- S.printingOf s registry "Ogre Sentry"
-          let (gs, held, _) = bloodthirstBoard swamp vampire sentry
-              after = enters gs held
-          case vampireIn after of
-            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
-            Just vamp -> do
-              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
-              Spec.assertEqWith s "power" (Projection.powerOf vamp after) (Just 3)
-              Spec.assertEqWith s "toughness" (Projection.toughnessOf vamp after) (Just 1)
         -- THE PAIR THAT MAKES THE CONDITION REAL. The board above with one damage
         -- event added and nothing else changed.
         Spec.it s "CR 702.54a an opponent was dealt damage, so it enters a 4/2" $ do
@@ -888,61 +628,6 @@ bloodthirstSpec s registry =
               -- layer 7c).
               Spec.assertEqWith s "power" (Projection.powerOf kin after) (Just 8)
               Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 8)
-        -- CR 702.54b states NO CONDITION, unlike rule 702.54a: with nothing dealt
-        -- X is zero and the permanent still enters. This case reads the zero, not
-        -- the absence of the condition -- the counters cannot tell the two
-        -- readings apart on any board, which the Kismet pair below is for.
-        Spec.it s "CR 702.54b nobody was dealt damage, so X is zero" $ do
-          forest <- S.printingOf s registry "Forest"
-          woodKin <- S.printingOf s registry "Petrified Wood-Kin"
-          sentry <- S.printingOf s registry "Ogre Sentry"
-          let (gs0, held, _) = bloodthirstXBoard forest woodKin sentry
-              after = enters gs0 held
-          case woodKinIn after of
-            Nothing -> Spec.assertFailure s "Petrified Wood-Kin did not reach the battlefield"
-            Just kin -> do
-              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne kin after) 0
-              Spec.assertEqWith s "power" (Projection.powerOf kin after) (Just 3)
-              Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 3)
-        -- CR 616.1e: what SEPARATES rule 702.54b's unconditional row from rule
-        -- 702.54a's conditional one, since the counters above cannot. bob's Kismet
-        -- ({3}{W} Enchantment, "Artifacts, creatures, and lands your opponents
-        -- control enter tapped", EntryRewrite.Tapped) is a second CR 616.1e
-        -- candidate for alice's entering Wood-Kin, and NOTHING was dealt this turn
-        -- -- so rule 702.54b admits its row and there are two rows to order, where
-        -- rule 702.54a's condition would refuse it and leave one row with nothing
-        -- to ask.
-        --
-        -- The two orders converge on one board -- CR 616.1f re-collects, so the
-        -- Wood-Kin ends up tapped with zero counters whichever applies first -- so
-        -- the prompt is the only observable, exactly as kismetSpec's cases are.
-        -- THE PAIR IS THIS CASE AND THE ONE BELOW, one board apart in nothing but
-        -- Kismet.
-        --
-        -- That WAS the choice was asked is all this proves: Response.ChoseReplacement
-        -- records the chosen index alone, so the replay log names no asked player and
-        -- CR 616.1's "the affected object's controller" is not observable here. The
-        -- rule's chooser is kismetSpec's question, not this case's.
-        Spec.it s "CR 616.1e with nothing dealt the bloodthirst X row still races an opponent's Kismet" $ do
-          forest <- S.printingOf s registry "Forest"
-          woodKin <- S.printingOf s registry "Petrified Wood-Kin"
-          sentry <- S.printingOf s registry "Ogre Sentry"
-          kismet <- S.printingOf s registry "Kismet"
-          let (gs0, held, _) = bloodthirstXBoard forest woodKin sentry
-              raced = snd (S.addPermanent kismet S.bob gs0)
-              cast = S.cast S.alice held >> Stack.resolveTop
-              after = S.runPure S.aggressiveAnswer raced cast
-          Spec.assertBool s (wasAskedToReplace (answersFor S.aggressiveAnswer raced cast)) "a ChooseReplacement was raised"
-          -- Non-vacuity, not the proof: the tap shows Kismet really was the second
-          -- candidate, so "a prompt" is not a question about one row, and the zero
-          -- pins the board this case is about. Neither reads the bloodthirst row's
-          -- application -- zero counters is what refusing it would leave too,
-          -- which is the whole reason the prompt is the assertion.
-          case woodKinIn after of
-            Nothing -> Spec.assertFailure s "Petrified Wood-Kin did not reach the battlefield"
-            Just kin -> do
-              Spec.assertEqWith s "CR 702.54b X is zero" (countersOn CounterKind.PlusOnePlusOne kin after) 0
-              Spec.assertBool s (Game.isTapped kin after) "CR 614.1d Kismet tapped it"
         -- The DISCRIMINATING TWIN: the same board without Kismet, where rule
         -- 702.54b's row is alone in its bucket and there is nothing to ask.
         -- Without it "a prompt was raised" above would pass under a recorder that
@@ -2072,92 +1757,6 @@ ordersEntry seasonFirst seasonId p = case p of
       )
   _ -> pure (S.identityAnswer p)
 
--- CR 612.2 reaching an entry row's counter KINDS, at the one place a swap can
--- land two of them on the same key. CR 122.1b's keyword counter is the only kind
--- holding a word, and of the fifteen keywords that rule admits only hexproof
--- carries a payload a pair can reach: Pawl.Engine.Filter.rewriteKeyword descends
--- into a Filter for landwalk, [type]cycling, hexproof and protection, and
--- hexproof is the only one of those four CR 122.1b lists. So a collision needs
--- one permanent entering with two hexproof counters whose qualities the same pair
--- maps together.
---
--- CR 122.1's last sentence is what the merge owes: "Counters with the same name
--- or description are interchangeable", so after the swap the two rows are one
--- tally of one kind rather than a choice of which row survives. Map.mapKeys kept
--- an arbitrary survivor, which is the tally this proves is not what happens.
---
--- Synthetic Warding Beacon -- {2}{U} Artifact, whole text: "Each creature you
--- control enters with a hexproof from Islands counter and two hexproof from
--- Swamps counters on it." SYNTHETIC because no printing enters with two keyword
--- counters that one swap can collide: Scryfall `o:"hexproof counter"`,
--- 2026-08-25, answers four cards, and the only one placing a second keyword
--- counter beside a hexproof one is Perennation, whose other is indestructible --
--- a keyword with no payload, so no pair can bring the two together. Nothing in
--- the CR forbids the card: CR 702.11d makes "hexproof from [quality]" a variant
--- of hexproof, which is what CR 122.1b's closing "as well as any variants of
--- those keywords" admits as a counter, and CR 612.2 swaps the Island in it as a
--- land type word used as a land type.
---
--- IT WATCHES OTHER OBJECTS, Dragonstorm Globe's shape rather than an IsSource
--- row, and for globeChain's reason: the permanent holding the row is on the
--- battlefield for the text change to point at, where hacking the SPELL and
--- letting its own row see the swap is tidewalkerSpec's shape below.
--- Same rewrite either way -- Projection's TurnUpRewrite.WithCounters arm and its
--- EntryRewrite.WithCounters arm both call rewriteWithCounters.
---
--- THE COUNTS ARE UNEQUAL, one and two, so an arbitrary survivor is caught
--- whichever row it kept: the merged tally is three and neither printed count is.
-wardingBeaconSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-wardingBeaconSpec s registry = Spec.describe s "Synthetic Warding Beacon (CR 612.2)" $ do
-  let wardFrom subtype = CounterKind.Keyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype subtype)))
-      -- Both kinds the row names, read off the creature that entered.
-      wardsOn oid gs = (countersOn (wardFrom Subtype.Island) oid gs, countersOn (wardFrom Subtype.Swamp) oid gs)
-  -- The control: unhacked, the two qualities are two kinds at their printed
-  -- counts.
-  Spec.it s "CR 614.1c unhacked, the two hexproof counters stay two kinds" $ do
-    (after, entered) <- beaconChain s registry False
-    case entered of
-      Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
-      Just pikerId -> Spec.assertEqWith s "one hexproof from Islands counter and two hexproof from Swamps counters" (wardsOn pikerId after) (1, 2)
-
--- globeChain's board with Magical Hack ({U}) in place of Artificial Evolution:
--- alice controls the Beacon, an Island and six Mountains, and holds the Hack and
--- a Goblin Piker ({2}{R} Creature -- Goblin Warrior). The Beacon is on the
--- battlefield before either spell is cast, which is what makes its row live when
--- the entry loop runs, and hacking the PERMANENT needs no CR 400.7 exception at
--- all. The lands are Islands and Mountains and the swap names Island: it reaches
--- neither, since CR 612.1 applies a text change to the object it is on.
-beaconChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, Maybe ObjectId.ObjectId)
-beaconChain s registry hack = do
-  island <- S.printingOf s registry "Island"
-  mountain <- S.printingOf s registry "Mountain"
-  beacon <- S.printingOf s registry "Synthetic Warding Beacon"
-  magicalHack <- S.printingOf s registry "Magical Hack"
-  piker <- S.printingOf s registry "Goblin Piker"
-  let base = S.landsFor mountain S.alice 6 (S.landsInPlay island 1)
-      (beaconId, g1) = S.addPermanent beacon S.alice base
-      (hackId, g2) = S.addHandCard magicalHack S.alice g1
-      (pikerId, g3) = S.addHandCard piker S.alice g2
-      ready =
-        g3
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      hacked = if hack then castAndResolve (hackAt beaconId Subtype.Island Subtype.Swamp) ready hackId else ready
-      after = castAndResolve S.identityAnswer hacked pikerId
-  pure (after, newestNamed (S.printingName piker) after)
-
--- evolveAt's land-type twin, and the target is FILTERED out of the offered set
--- rather than rebuilt: a hand-built recipient of the wrong shape would be dropped
--- at CR 608.2b's re-read with no error, where an empty offered set fails the cast
--- where a reader can see it.
-hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
-hackAt oid from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
-  Prompt.ChooseLandTypeSwap {} -> (from, to)
-  _ -> S.identityAnswer p
-
 -- CR 614.1c's counter row with a CARD-AUTHORED condition on it, which is CR
 -- 604.2's clause on Pawl.Types.PrintedReplacement -- the same clause Monstrous
 -- War-Leech's "if it was kicked" rides above, over a WithCounters rewrite
@@ -2223,98 +1822,11 @@ dustAnimusSpec s registry = Spec.describe s "Dust Animus (CR 614.1c)" $ do
         Spec.assertEqWith s "and three of the seven Plains are tapped, leaving four untapped" (S.tappedCount S.alice after) 3
       _ -> Spec.assertFailure s "the Spirit did not reach the battlefield"
 
--- CR 614.12's OTHER reading of the same clause dustAnimusSpec above rides: WHICH
--- BOARD a card-authored entry condition counts over. A permanent being
--- materialized before its entry loop runs (Pawl.Engine.Event.runEntry) is what
--- lets CR 614.12's "characteristics of the permanent as it would exist on the
--- battlefield" be a plain projection, and it is exactly what must not make the
--- permanent countable -- Pawl.Engine.Projection.boardAsEntering.
---
--- Frontier Mastodon {2}{G} Creature -- Elephant 3/2, whole text: "Ferocious --
--- This creature enters with a +1/+1 counter on it if you control a creature with
--- power 4 or greater." (oracle checked on Scryfall 2026-08-27; "Ferocious" is an
--- ability word and means nothing). The card carries the ruling for one direction
--- and the fast lands carry the other: "Frontier Mastodon's ferocious ability
--- checks if you control a creature with power 4 or greater as Frontier Mastodon
--- enters the battlefield. Because Frontier Mastodon isn't on the battlefield at
--- this time, it won't count itself" (Gatherer 2014-11-24), and "if one of these
--- lands enters the battlefield at the same time as one or more other lands ... it
--- doesn't take those lands into consideration" (Blackcleave Cliffs, Gatherer
--- 2023-02-04).
---
--- TWO PAIRS, one per direction, because either exclusion alone would leave the
--- other's pair green:
---
---   * THE BATCH. Rise of the Dark Realms reanimates Jedit Ojanen (5/5) and the
---     Mastodon out of one graveyard, as one CR 608.2f sweep. The printed 3/2
---     cannot reach power 4 on this board, so only the SIBLING is in question.
---     The positive board moves the Ojanen: same nine Swamps, same cast, same
---     reanimated Mastodon, but the Cat is already on the battlefield.
---   * THE SUBJECT. Glorious Anthem makes the entering Mastodon a 4/3, so a board
---     that could see it would answer its own condition. Nothing else alice
---     controls is a creature. The positive board adds the Ojanen, which under the
---     same Anthem is a 6/6 -- so the pair differs in one permanent, and the
---     numbers 3, 4, 5 and 6 stay distinct.
---
--- The readout is doubled throughout, as dustAnimusSpec's is: the counter itself,
--- and the CR 613.4c power and toughness it moves in layer 613.1g.
-frontierMastodonSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-frontierMastodonSpec s registry = Spec.describe s "Frontier Mastodon (CR 614.12)" $ do
-  let mastodonName = CardName.MkCardName (Text.pack "Frontier Mastodon")
-      -- alice's nine Swamps, Rise of the Dark Realms in her hand, the Mastodon in
-      -- her graveyard, and Jedit Ojanen wherever `buried` says. Buried BEFORE the
-      -- Mastodon so that the sweep has already put the Cat onto the battlefield
-      -- when the Mastodon's own entry loop runs; that ordering is what the
-      -- negative rests on, and mutating boardAsEntering away reddens it.
-      reanimated buried = do
-        swamp <- S.printingOf s registry "Swamp"
-        rise <- S.printingOf s registry "Rise of the Dark Realms"
-        mastodon <- S.printingOf s registry "Frontier Mastodon"
-        ojanen <- S.printingOf s registry "Jedit Ojanen"
-        let lands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
-            withCat = if buried then snd (S.addGraveyardCard ojanen S.alice lands) else snd (S.addPermanent ojanen S.alice lands)
-            (_, withMastodon) = S.addGraveyardCard mastodon S.alice withCat
-            (ready, held) = S.handOne rise withMastodon
-            after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
-        pure (newestNamed mastodonName after, after)
-      -- Three Forests for the {2}{G}, Glorious Anthem, and the Mastodon cast from
-      -- hand -- one entry, no batch, so only the subject is in question.
-      castUnderAnthem withCat = do
-        forest <- S.printingOf s registry "Forest"
-        anthem <- S.printingOf s registry "Glorious Anthem"
-        mastodon <- S.printingOf s registry "Frontier Mastodon"
-        ojanen <- S.printingOf s registry "Jedit Ojanen"
-        let (_, enchanted) = S.addPermanent anthem S.alice (S.landsInPlay forest 3)
-            withOjanen = if withCat then snd (S.addPermanent ojanen S.alice enchanted) else enchanted
-            (ready, held) = S.handOne mastodon withOjanen
-            after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
-        pure (newestNamed mastodonName after, after)
-  Spec.it s "CR 614.12 the same 5/5 already on the battlefield does count, so the row applies" $ do
-    (found, after) <- reanimated False
-    case found of
-      Just oid -> do
-        Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 1
-        Spec.assertEqWith s "so the printed 3/2 is a 4/3" (S.powerToughnessOf oid after) (Just (4, 3))
-      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
-  Spec.it s "CR 614.12 a 4/3 under Glorious Anthem does not count itself, so the row does not apply" $ do
-    (found, after) <- castUnderAnthem False
-    case found of
-      Just oid -> do
-        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
-        Spec.assertEqWith s "so the Anthem alone makes the printed 3/2 a 4/3" (S.powerToughnessOf oid after) (Just (4, 3))
-      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
-  Spec.it s "CR 614.12 another creature under the same Anthem does count, so the row applies" $ do
-    (found, after) <- castUnderAnthem True
-    case found of
-      Just oid -> do
-        Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 1
-        Spec.assertEqWith s "so the Anthem and the counter make it a 5/4" (S.powerToughnessOf oid after) (Just (5, 4))
-      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
-
 -- Synthetic Magnetic Lockdown {2}{W} Instant: "Until end of turn, if you control
 -- three or more artifacts, artifacts enter the battlefield tapped." The FLOATING
--- twin of frontierMastodonSpec above: the same CR 614.12a board question, asked
--- of a row CR 614.3 installed rather than of a permanent's static ability.
+-- twin of Frontier Mastodon's (data/scenarios/entry-replacement): the same CR
+-- 614.12a board question, asked of a row CR 614.3 installed rather than of a
+-- permanent's static ability.
 --
 -- SYNTHETIC because the shape has no printing. Both halves are printed, and by
 -- different cards -- Kismet writes the EntryR/Tapped rewrite, Galvanic Blast's
@@ -2384,71 +1896,6 @@ magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (
         Spec.assertEqWith s "the Bauble entered tapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Tapped)
         Spec.assertEqWith s "setup: alice controlled three artifacts as it entered" (controlledNamed splitterName S.alice after) 3
       _ -> Spec.assertFailure s "the Bauble did not reach the battlefield"
-
--- Squad Captain {4}{W} Creature -- Human Soldier 2/2, whole text: "Vigilance
--- (Attacking doesn't cause this creature to tap.) / This creature enters with a
--- +1/+1 counter on it for each other creature you control." (oracle checked on
--- Scryfall 2026-08-28)
---
--- The AMOUNT half of the board question frontierMastodonSpec and
--- magneticLockdownSpec above ask of a CLAUSE: CR 614.12's "how they apply", where
--- what a rewrite reads is not whether a row applies but how many counters it
--- places. Same board, same rule, same exclusion --
--- Pawl.Engine.Projection.boardAsEntering -- reached through
--- Pawl.Engine.Event's EntryRewrite.WithCounters arm rather than through a
--- condition. Until this card the pool's two board-counting rewrites were
--- Tidewalker ("for each Island you control") and Undergrowth Scavenger, whose
--- count folds GRAVEYARDS and so cannot tell the two boards apart at all; and
--- every simultaneous entry data/cards can build is single-typed -- Rise of the
--- Dark Realms' creature cards, Open the Way's land cards, a Create's tokens,
--- kicked Rite of Replication's copies of one permanent -- so none of them puts
--- an Island onto the battlefield beside a Tidewalker. A printing that put a
--- creature and a land onto the battlefield at once would refute that.
--- Squad Captain counts CREATURES, which is exactly what Rise of the Dark Realms
--- reanimates, so one card closes the gap; see #2431.
---
--- THE PAIR differs in one thing: where alice's two other creatures are as the
--- Captain's entry loop runs. Rise of the Dark Realms reanimates the Captain out
--- of a graveyard holding Jedit Ojanen and a Goblin Piker as one CR 608.2f sweep,
--- and the sweep accumulates the battlefield as each member arrives -- both are
--- buried BEFORE the Captain, so both are already sitting there, materialized and
--- unentered, when its rewrite reads. The CR 614.12 determination the rewrite IS
--- runs while all three are materialized and none has entered, so the two are not
--- on the battlefield relative to the Captain: the count is ZERO and the printed
--- 2/2 stays a 2/2. The positive board is the same nine Swamps and the same cast,
--- with those two on the battlefield to start with, where the count is TWO and CR
--- 613.4c's layer 7c makes it a 4/4. Nothing else alice controls is a creature:
--- the nine Swamps are lands, and the Captain's own row says "other" (Filter.Not
--- Filter.IsSource), so 0, 2 and 4 stay distinct from any reading that counted the
--- subject as well.
-squadCaptainSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-squadCaptainSpec s registry = Spec.describe s "Squad Captain (CR 614.12)" $ do
-  let captainName = CardName.MkCardName (Text.pack "Squad Captain")
-      -- alice's nine Swamps for the {7}{B}{B}, Rise of the Dark Realms in hand,
-      -- the Captain in her graveyard, and the other two creatures wherever
-      -- `buried` says. Buried before the Captain so the sweep has already put
-      -- them onto the battlefield when its own entry loop runs; that ordering is
-      -- what the negative rests on.
-      reanimated buried = do
-        swamp <- S.printingOf s registry "Swamp"
-        rise <- S.printingOf s registry "Rise of the Dark Realms"
-        captain <- S.printingOf s registry "Squad Captain"
-        ojanen <- S.printingOf s registry "Jedit Ojanen"
-        piker <- S.printingOf s registry "Goblin Piker"
-        let lands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
-            place printing g = if buried then snd (S.addGraveyardCard printing S.alice g) else snd (S.addPermanent printing S.alice g)
-            withOthers = place piker (place ojanen lands)
-            (_, withCaptain) = S.addGraveyardCard captain S.alice withOthers
-            (ready, held) = S.handOne rise withCaptain
-            after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
-        pure (newestNamed captainName after, after)
-  Spec.it s "CR 614.12 the same two already on the battlefield do count, so it enters with two counters" $ do
-    (found, after) <- reanimated False
-    case found of
-      Just oid -> do
-        Spec.assertEqWith s "two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 2
-        Spec.assertEqWith s "so the printed 2/2 is a 4/4" (S.powerToughnessOf oid after) (Just (4, 4))
-      _ -> Spec.assertFailure s "the Captain did not reach the battlefield"
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
 -- Ooze -- {1}{G} 2/2 Creature -- Ooze with deathtouch and disguise {3}{G} --
@@ -2592,16 +2039,6 @@ zameckGuildmageSpec s registry = Spec.describe s "Zameck Guildmage (CR 614.3)" $
         -- the battlefield when the ability resolved gets nothing.
         Spec.assertEqWith s "and the Guildmage, already on the battlefield, has none" (countersOn CounterKind.PlusOnePlusOne mageId after) 0
       _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
-  -- CR 614.4: the row cannot go back in time. Same board, same Piker, same mana;
-  -- the ability is simply never activated.
-  Spec.it s "CR 614.4 a creature entering before the ability resolved enters without it" $ do
-    (_, _, alicesPiker, _, ready) <- board
-    let after = castFor S.alice ready alicesPiker
-    case newestNamed pikerName after of
-      Just oid -> do
-        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
-        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
-      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
   -- CR 109.5 on an ACTIVATED ability: "you" is the player who activated it, so
   -- the row's Filter.ControlledBy passes over bob's creature. Without this case
   -- a row matching every creature would look identical to the printed one.
@@ -2613,20 +2050,6 @@ zameckGuildmageSpec s registry = Spec.describe s "Zameck Guildmage (CR 614.3)" $
         Spec.assertEqWith s "no +1/+1 counter on bob's Piker" (countersOn CounterKind.PlusOnePlusOne oid after) 0
         Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
       _ -> Spec.assertFailure s "bob's Piker did not reach the battlefield"
-  -- CR 614.3's "until . . . their duration has expired", through CR 514.2's
-  -- cleanup: two handoffs put alice back in a main phase of her own with the
-  -- Piker still in hand and the lands untapped, and the row gone.
-  Spec.it s "CR 514.2 a creature entering on a later turn enters without it" $ do
-    built@(_, _, alicesPiker, _, _) <- board
-    let armed = arm built
-        alicesNext = atPostcombatMain S.identityAnswer (nextTurn S.identityAnswer (nextTurn S.identityAnswer armed))
-        after = castFor S.alice alicesNext alicesPiker
-    case newestNamed pikerName after of
-      Just oid -> do
-        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
-        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
-        Spec.assertEqWith s "setup: it is alice's own later turn, so the same cast was legal" (GameState.activePlayer after, GameState.turnNumber after > GameState.turnNumber armed) (S.alice, True)
-      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
 
 -- CR 702.38: amplify, on Feral Throwback ({4}{G}{G} 3/3 Beast, "Amplify 2" and
 -- provoke). A minted CR 614.1c row whose count is the answer to a question asked
@@ -2692,22 +2115,6 @@ amplifySpec s registry =
           case throwbackIn after of
             Nothing -> Spec.assertFailure s "Feral Throwback did not reach the battlefield"
             Just oid -> Spec.assertEqWith s "six +1/+1 counters, not eight" (countersOn CounterKind.PlusOnePlusOne oid after) 6
-        -- CR 702.38a's "any number" includes none, and the permanent still
-        -- enters: the same board with the reveal declined.
-        Spec.it s "CR 702.38a revealing nothing enters a plain 3/3" $ do
-          forest <- S.printingOf s registry "Forest"
-          throwback <- S.printingOf s registry "Feral Throwback"
-          baloth <- S.printingOf s registry "Durkwood Baloth"
-          thragtusk <- S.printingOf s registry "Thragtusk"
-          pack <- S.printingOf s registry "Gnarlid Pack"
-          sentry <- S.printingOf s registry "Ogre Sentry"
-          let (gs, held, _) = amplifyBoard forest throwback [baloth, thragtusk, pack] sentry
-              after = castAndResolve (revealing []) gs held
-          case throwbackIn after of
-            Nothing -> Spec.assertFailure s "Feral Throwback did not reach the battlefield"
-            Just oid -> do
-              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne oid after) 0
-              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 3)
         -- CR 702.38b: "if a creature has multiple instances of amplify, each one
         -- works separately." Asserted at the mint rather than at gameplay level,
         -- because nothing in the pool prints or grants a second instance -- the
@@ -2727,7 +2134,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   bloodthirstSpec s registry
   amplifySpec s registry
   sunburstSpec s registry
-  ravenousSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
   stuffyDollSpec s registry
@@ -2737,10 +2143,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   perennationSpec s registry
   toolkitSpec s registry
   voidpouncerSpec s registry
-  wardingBeaconSpec s registry
   dustAnimusSpec s registry
-  frontierMastodonSpec s registry
   magneticLockdownSpec s registry
-  squadCaptainSpec s registry
   printlifterSpec s registry
   zameckGuildmageSpec s registry
