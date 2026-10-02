@@ -1103,6 +1103,41 @@ spec s registry = Spec.describe s "Room" $ do
             Spec.assertEqWith s "CR 707.2: Copy Enchantment's copy of that copy has changeling too" (fmap (`changeling` recopied) (newPermanent resolved recopied)) [True]
           other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5b over a STORED copy effect: Mirrorweave's "each other creature
+  -- becomes a copy of target nonlegendary creature until end of turn" keeps its
+  -- copiable values in a row rather than a stamp (CR 611.2a), and each creature
+  -- it covers has the copied Room's halves all the same, read against its OWN
+  -- designations (CR 709.5c).
+  --
+  -- Opalescence makes both open Rooms creatures, and Mirrorweave copies Spiked
+  -- Corridor // Torture Pit with its left door open, a 4/4. The Hill Giant has no
+  -- designation, so it is nameless with mana value 0, a 0/0 that its +1/+1
+  -- counter (CR 122.1a, no copiable value) keeps alive as a 1/1; its own card
+  -- would leave it a named 4/4. Roaring Furnace // Steaming Sauna keeps "left
+  -- half unlocked", so it is Spiked Corridor, a 4/4; its own card would leave it
+  -- a 2/2 Roaring Furnace.
+  Spec.it s "CR 709.5b a creature Mirrorweave makes a copy of an animated Room has its halves" $ do
+    (_, _, gs) <- setUp s registry
+    room <- S.printingOf s registry "Roaring Furnace"
+    corridor <- S.printingOf s registry "Spiked Corridor"
+    opalescence <- S.printingOf s registry "Opalescence"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    let (_, withOpalescence) = S.addPermanent opalescence S.alice gs
+        (giant, withGiant) = S.addPermanent hillGiant S.alice withOpalescence
+        countered = S.addCounter CounterKind.PlusOnePlusOne 1 giant withGiant
+        (roomPerm, withRoom) = S.addPermanent room S.alice countered
+        (corridorPerm, withCorridor) = S.addPermanent corridor S.alice withRoom
+        leftOpen o = o {Object.unlockedHalves = Set.singleton RoomHalf.LeftHalf}
+        opened = withCorridor {GameState.objects = Map.adjust leftOpen corridorPerm (Map.adjust leftOpen roomPerm (GameState.objects withCorridor))}
+        (staged, weaveId) = S.handOne mirrorweave opened
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just corridorPerm) . Recipient.objectOf) . snd) sets
+          _ -> S.identityAnswer p
+        woven = S.runPure answer staged (S.cast S.alice weaveId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the Hill Giant is a nameless 1/1 Room" (Projection.namesOf giant woven, S.powerToughnessOf giant woven) (Set.empty, Just (1, 1))
+    Spec.assertEqWith s "and the Furnace Room, its left door open, is a 4/4 Spiked Corridor" (Projection.namesOf roomPerm woven, S.powerToughnessOf roomPerm woven) (Set.singleton corridorName, Just (4, 4))
   -- CR 709.5c over a permanent that starts copying a DIFFERENT Room: the
   -- designations are positional ("left half unlocked"), so the open door stays
   -- open on the new card's halves -- whatever that half is called.

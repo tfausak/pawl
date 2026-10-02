@@ -378,6 +378,11 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- an object's own designations, which re-applies them
     -- (Pawl.Engine.Projection.View.copiableCharacteristics).
     exceptions :: [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Card)],
+    -- | CR 702.140e: the records a merge took abilities from to graft onto these
+    -- copiable values, in the order it grafted them
+    -- (Pawl.Engine.Projection.View.withMergedAbilities). Read only where `halves`
+    -- is rebuilt, which re-grafts them, `exceptions` above's reason.
+    mergedDonors :: [ProjectedCharacteristics],
     -- | CR 722.2b: the PREPARE SPELL this object has -- "the existence and values
     -- of these alternative characteristics are part of the object's copiable
     -- values" -- and Nothing for an object with no inset frame. `halves` above's

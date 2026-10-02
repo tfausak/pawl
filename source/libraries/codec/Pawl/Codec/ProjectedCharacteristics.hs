@@ -85,6 +85,7 @@ codec = Fields.object $ do
   grantedCostReductions <- Fields.defaulted "grantedCostReductions" [] (Common.list CostReduction.codec) PC.grantedCostReductions
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   exceptions <- Fields.defaulted "exceptions" [] (Common.list (CopyException.codec (GrantedAbility.codec Card.codec))) PC.exceptions
+  mergedDonors <- Fields.defaulted "mergedDonors" [] (Common.list codec) PC.mergedDonors
   prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
   alternativeSpell <- Fields.defaulted "alternativeSpell" Nothing (Common.maybe (Face.codec Card.codec)) PC.alternativeSpell
   spell <- Fields.defaulted "spell" Face.Type.defaultSpell (Modal.codec Card.codec (GrantedAbility.codec Card.codec)) PC.spell
@@ -129,6 +130,7 @@ codec = Fields.object $ do
         PC.grantedCostReductions = grantedCostReductions,
         PC.halves = halves,
         PC.exceptions = exceptions,
+        PC.mergedDonors = mergedDonors,
         PC.prepare = prepare,
         PC.alternativeSpell = alternativeSpell,
         PC.spell = spell,
