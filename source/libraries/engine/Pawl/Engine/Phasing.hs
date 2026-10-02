@@ -20,8 +20,9 @@
 -- knowing phasing exists. Only the rules on the far side of the "except" name
 -- the new field, and Pawl.Types.GameState.phasedOut enumerates all of them: this
 -- module, CR 702.26k's leaves-the-game clause in
--- Pawl.Engine.Game.removeFromZones, CR 702.26n's reschedule below, and CR 514.2's
--- damage sweep -- which is on that list by rule and not by code, since
+-- Pawl.Engine.Game.removeFromZones, CR 702.26e's resolution-time freeze in
+-- Pawl.Engine.Resolve.Effect.frozenAffected, CR 702.26n's reschedule below,
+-- and CR 514.2's damage sweep -- which is on that list by rule and not by code, since
 -- Pawl.Engine.Damage.removeAllDamage clears every object rather than every
 -- permanent and so covers a phased-out one without naming it.
 --
@@ -68,8 +69,11 @@
 -- rule 702.26f's second sentence. Pawl.PhasingSpec's "CR 702.26f a
 -- for-as-long-as duration ends when its permanent phases out" is the proof.
 --
--- Not implemented: CR 702.26e for the three arms of
--- Pawl.Engine.Projection.affects that carry no battlefield conjunct (#1866).
+-- CR 702.26e, the other: a resolving effect's frozen set (CR 611.2c) names an
+-- object by id, which a group slot like `self` reaches whether or not it is
+-- phased out, so Pawl.Engine.Resolve.Effect.frozenAffected drops it there. A
+-- static ability's set needs nothing: it is re-derived every projection (CR
+-- 611.3a), which walks only GameState.battlefield.
 module Pawl.Engine.Phasing where
 
 import qualified Data.Map.Strict as Map
@@ -397,8 +401,9 @@ hostRemains oid gs = case Game.lookupObject oid gs >>= Object.attachedTo of
 
 -- | CR 702.26b's membership test, for the rules that are on the far side of its
 -- "except for rules and effects that specifically mention phased-out
--- permanents". Nothing in the closed half should need this; a reader that walks
--- GameState.battlefield already has rule 702.26b's answer.
+-- permanents". A reader that walks GameState.battlefield already has rule
+-- 702.26b's answer; one holding an id it did not read off the battlefield, as
+-- CR 702.26e's resolution-time freeze does, needs this.
 isPhasedOut :: ObjectId -> GameState -> Bool
 isPhasedOut oid gs = Map.member oid (GameState.phasedOut gs)
 
