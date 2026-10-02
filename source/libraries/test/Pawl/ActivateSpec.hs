@@ -6179,7 +6179,7 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
     case (filter isCraftAbility (Activatable.abilitiesFor latticeId board), extras) of
       ([ability], [ridgetopId, ripjawId, _]) -> do
         let after = S.runPure (craftExilingBoth ridgetopId ripjawId) board (Activate.activateAbility S.alice latticeId ability >> Stack.resolveTop)
-        Spec.assertEqWith s "CR 702.167c / 607.3 the Raptor's power is 2 + 4, the Altisaur's 3 left out" (mastercraftPower after) [Just 6]
+        Spec.assertEqWith s "CR 702.167c the Raptor's power is 2 + 4, the Altisaur's 3 left out" (mastercraftPower after) [Just 6]
       _ -> Spec.assertFailure s "expected one craft ability and three extras"
 
   -- CR 604.3 / 613.4a: the material's own power is defined by a CDA that works
