@@ -80,17 +80,18 @@ adjustOffers sides modifiers =
 -- tagged with its payer and the object that states it, and the rest. Every
 -- candidate must already be applicable now; Nothing when none is.
 --
--- The roller is asked only when two or more stand and some other player pays
--- one. Where the roller pays every one, putting them to the roller in turn is
--- the same choice: declining one hands the roller the next, so the roller
--- still settles which applies, and the first stands.
+-- Asked whenever two or more stand, the roller's own included: an increase
+-- or decrease the roller declines is not offered again, so putting them in
+-- timestamp order would decide which ones the roller can still use after
+-- another applies. Rerolls take the same prompt (Pawl.DiceSpec's "CR 706.2b
+-- the roller picks among their own modifiers").
 --
 -- FILTERED, NOT TRUSTED: an index past the end takes the first.
 pickModifier :: PlayerId -> [(PlayerId, Maybe ObjectId, a)] -> Game (Maybe ((PlayerId, Maybe ObjectId, a), [(PlayerId, Maybe ObjectId, a)]))
 pickModifier roller candidates = case candidates of
   [] -> pure Nothing
   first : rest
-    | null rest || all (\(payer, _, _) -> payer == roller) candidates -> pure (Just (first, rest))
+    | null rest -> pure (Just (first, rest))
     | otherwise -> do
         gs <- State.get
         index <- Game.choose (Prompt.ChooseRollModifier (Decide.deciderFor roller gs) roller (fmap (\(_, stated, _) -> stated) (first NonEmpty.:| rest)))
