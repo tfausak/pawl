@@ -39,6 +39,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Engine.Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
@@ -89,6 +90,7 @@ spec s registry = Spec.describe s "SacrificeRestriction" $ do
   offerSpec s registry
   instructionSpec s registry
   landSubtypeStripSpec s registry
+  zurgoSpec s registry
 
 -- CR 108.3 / 110.2 / 111.2: whose card it is, asked apart from who controls it.
 ownerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -344,3 +346,22 @@ endStepOf gs =
   let began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs
       placed = S.runPure S.identityAnswer began Engine.settleForPriority
    in S.runPure S.identityAnswer placed Stack.resolveTop
+
+-- CR 613.11 / 613.1f: a rule ability a STATIC ability grants, gated to one step
+-- of one player's turn (CR 500.1, CR 109.5). Zurgo, Thunder's Decree's "During
+-- your end step, Warrior tokens you control have 'This token can't be
+-- sacrificed.'" The scenario zurgo-end-step-spares-mobilized-warriors proves the
+-- grant at gameplay level; this group proves the gate's two conjuncts, on three
+-- boards differing only in the phase and the active player.
+zurgoSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+zurgoSpec s registry =
+  Spec.describe s "Zurgo" . Spec.it s "CR 500.1 / 109.5 whole card: Zurgo's Warrior token is spared only during alice's end step" $ do
+    zurgo <- S.printingOf s registry "Zurgo, Thunder's Decree"
+    let (_, g0) = S.addPermanent zurgo S.alice (Setup.emptyGame S.bothPlayers)
+        (token, g1) = S.addToken Engine.Keyword.warriorToken S.alice g0
+        at active phase = g1 {GameState.activePlayer = active, GameState.phase = phase}
+        endStep = Phase.Ending EndingStep.EndStep
+    -- The control: the grant reaches the token where the gate holds.
+    Spec.assertBool s (notElem token (offered (at S.alice endStep))) "alice's end step: the token is not offered"
+    Spec.assertBool s (elem token (offered (at S.alice Phase.PostcombatMain))) "alice's main phase: the token is offered"
+    Spec.assertBool s (elem token (offered (at S.bob endStep))) "bob's end step: the token is offered"

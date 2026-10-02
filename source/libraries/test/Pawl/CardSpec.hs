@@ -803,6 +803,7 @@ conditionQuantities condition = case condition of
   Condition.Type.Compares (Compares.MkCompares measured _ threshold) -> [measured, threshold]
   Condition.Type.Any conditions -> concatMap conditionQuantities conditions
   Condition.Type.All conditions -> concatMap conditionQuantities conditions
+  Condition.Type.During _ -> []
 
 -- Every Count reachable from a Condition, off the enumeration above.
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]

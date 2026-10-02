@@ -264,13 +264,11 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf. One another
         -- static ability grants is RECORDED, since only this fold knows who it
         -- reaches; withStaticGrants reads the record back to gather its effect.
-        -- A RULE ability, which CR 613.11 applies after the layers, joins none:
-        -- the gatherers read a stored grant of one through grantedRuleAbilities.
+        -- A RULE ability, which CR 613.11 applies after the layers, takes the
+        -- same split: a resolution's grant is read off the stored effect, and a
+        -- static ability's is recorded here; grantedRuleAbilities reads both.
         -- A PLAYER ability, applied after the layers too (CR 613.10), is
         -- recorded here whoever grants it.
-        --
-        -- Not implemented: a rule ability another static ability grants, whose
-        -- recipients only this fold knows (#1942).
         Modification.GainAbility g -> case g of
           GrantedAbility.Activated a ->
             pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
@@ -279,7 +277,10 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           GrantedAbility.Static sa -> case affected of
             Affected.TheseObjects _ -> pc
             _ -> pc {PC.grantedStaticAbilities = PC.grantedStaticAbilities pc <> [(stamp, sa)]}
-          GrantedAbility.Rules _ -> pc
+          -- Pawl.SacrificeRestrictionSpec's Zurgo group proves it.
+          GrantedAbility.Rules rules -> case affected of
+            Affected.TheseObjects _ -> pc
+            _ -> pc {PC.grantedRuleAbilities = PC.grantedRuleAbilities pc <> rules}
           -- CR 614.1 / 113.7: replacementsOf reads this list off the finished
           -- projection, so the row is the receiver's and its IsSource is the
           -- receiver. Pawl.CastPermissionSpec's "CR 613.1f The Eighth Doctor's
@@ -342,6 +343,9 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- gone. Unproven: no card in data/cards/ grants a static ability
               -- to a permanent an ability wipe reaches.
               PC.grantedStaticAbilities = [],
+              -- The same for a granted rule ability. Unproven: no card in
+              -- data/cards/ grants one to a permanent an ability wipe reaches.
+              PC.grantedRuleAbilities = mempty,
               -- CR 305.6's intrinsic mana ability has no list here to empty, so
               -- the removal is recorded instead and read back by
               -- Pawl.Engine.Subtype.intrinsicManaAbilityOf.
@@ -2586,11 +2590,13 @@ abilityRemovalAfter gs =
         then \ts -> abilitiesRemovedBy ((> ts) . gTimestamp) gated gs
         else \_ _ -> False
 
--- CR 613.11 / 613.1f: the rule abilities stored layer-6 grants give `oid`
--- (Chomping Kavu's backup), which each of the thirteen gatherers
--- (Pawl.Engine.CombatRestriction and its siblings) reads next to the object's
--- own (ruleAbilitiesOf). Hoisted over the whole game like abilityRemoval, and no
--- work on a board that stores no such grant.
+-- CR 613.11 / 613.1f: the rule abilities layer-6 grants give `oid`, which each
+-- of the thirteen gatherers (Pawl.Engine.CombatRestriction and its siblings)
+-- reads next to the object's own (ruleAbilitiesOf): a stored grant's (Chomping
+-- Kavu's backup), and a static ability's, which the fold recorded on the
+-- receiver (Zurgo, Thunder's Decree) and only a whole-board projection reads
+-- back. Hoisted over the whole game like abilityRemoval, and no work on a board
+-- with neither.
 --
 -- CR 613.1f's removal is asked in CR 613.7 timestamp order: only a removal
 -- later than the grant takes it (abilityRemovalAfter). Three gates a printed row
@@ -2610,7 +2616,11 @@ grantedRuleAbilities gs =
       removedAfter = abilityRemovalAfter gs
       heldBy oid (ts, holders, rules) =
         if Set.member oid holders && not (removedAfter ts oid) then rules else mempty
-   in if null grants then const mempty else \oid -> foldMap (heldBy oid) grants
+      stored = if null grants then const mempty else \oid -> foldMap (heldBy oid) grants
+      -- The fold already took any grant a later removal reaches (CR 613.7).
+      pcs = projectAll gs
+      recorded oid = PC.grantedRuleAbilities (projectGiven pcs oid gs)
+   in if grantsRuleAbilityAnywhere gs then \oid -> stored oid <> recorded oid else stored
 
 -- CR 613.1f: does this modification remove abilities? Total: a new
 -- ability-removing Modification must break this build rather than silently answer
@@ -5682,6 +5692,21 @@ grantsPlayerAbilityAnywhere gs =
   any (any (any grantsPlayerAbility . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
     || storedWrites grantsPlayerAbility gs
     || elsewhereGrants grantsPlayerAbility gs
+
+-- CR 613.11 / 613.1f: does this modification hand its affected objects a
+-- quoted rule ability? grantsRuleAbilityAnywhere's grantor question.
+grantsRuleAbility :: Modification -> Bool
+grantsRuleAbility = grantsAbilityWhere (\g -> case g of GrantedAbility.Rules _ -> True; _ -> False)
+
+-- CR 613.11: can the layer fold have recorded a rule ability on any permanent
+-- right now? grantsPlayerAbilityAnywhere's short-circuit, asked of the same
+-- grantors, in front of grantedRuleAbilities' read of
+-- ProjectedCharacteristics.grantedRuleAbilities.
+grantsRuleAbilityAnywhere :: GameState -> Bool
+grantsRuleAbilityAnywhere gs =
+  any (any (any grantsRuleAbility . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
+    || storedWrites grantsRuleAbility gs
+    || elsewhereGrants grantsRuleAbility gs
 
 -- Does this modification hand its affected objects a quoted ability `p` holds
 -- of? grantsMintingType's shape, and exhaustive for grantsKeywordWhere's

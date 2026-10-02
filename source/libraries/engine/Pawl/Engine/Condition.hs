@@ -38,15 +38,19 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.DuringPhase as DuringPhase
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TurnScope as TurnScope
 
 holds :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Condition.Type.Condition -> Bool
 holds viewOf context gs oid condition =
@@ -71,6 +75,13 @@ holds viewOf context gs oid condition =
         -- than leaving it undetermined -- the same conservative reading the header
         -- gives one comparison. An empty list is True, the fold's unit.
         Condition.Type.All conditions -> all (holds viewOf context gs oid) conditions
+        -- CR 500.1's window by containment, and CR 109.5's "your" as the
+        -- context's perspective: the reader's two conjuncts
+        -- (Pawl.Engine.ActivationRestriction's DuringPhase arm). With no
+        -- perspective only a scope naming no player can hold.
+        Condition.Type.During (DuringPhase.MkDuringPhase window scope) ->
+          Turn.inWindow window (GameState.phase gs)
+            && maybe (scope == TurnScope.EachTurn) (Turn.turnScopeAdmits gs scope (GameState.activePlayer gs)) (Filter.perspective context)
 
 -- CR 107.3m: the amounts a triggered ability's condition may read off the spell
 -- that became its source. Seeded into Filter.Context's boundAmounts by CR 603.4's
@@ -120,6 +131,7 @@ bakeBound players condition = case condition of
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (bakeBound players) conditions)
   Condition.Type.All conditions -> Condition.Type.All (fmap (bakeBound players) conditions)
+  Condition.Type.During _ -> condition
 
 -- The condition read for ONE affected player: every PlayerRef.Candidate inside
 -- it substituted by that seat (Quantity.forCandidate). Angelic Arbiter's "each
@@ -135,3 +147,4 @@ forCandidate pid condition = case condition of
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (forCandidate pid) conditions)
   Condition.Type.All conditions -> Condition.Type.All (fmap (forCandidate pid) conditions)
+  Condition.Type.During _ -> condition
