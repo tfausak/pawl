@@ -38,7 +38,6 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Asked as Asked
-import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -1400,16 +1399,6 @@ landDropBoard mountain grantors active =
 -- loop, rather than a direct call to Action.legalActions.
 playEveryLand :: GameState.GameState -> GameState.GameState
 playEveryLand gs = S.runPure S.playLandAnswer gs Engine.priorityLoop
-
--- alice's next turn, as far as CR 305.2 can see it: her untap step, which is
--- where Engine.runTurnBasedActions resets the per-turn tally -- "during their
--- turn" in CR 305.2 has to start over somewhere, and that is the first moment of
--- the new one.
-nextTurnFor :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-nextTurnFor pid gs =
-  let untap = Phase.Beginning BeginningStep.Untap
-      untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = pid, GameState.phase = untap}) (Engine.runTurnBasedActions untap)
-   in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passed = Set.empty}
 
 -- CR 601.3b's board, shared by the two groups below it -- Vedalken Orrery's and
 -- Sigarda's Aid's -- since what a permission is read off is the caller's `extra`.

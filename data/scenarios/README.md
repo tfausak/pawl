@@ -76,7 +76,11 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   offered or not, and must leave the stack and the player's hand and
   battlefield as they were. At any other prompt, a refused move naming
   something the prompt did not offer (a summoning-sick attacker, a target no
-  slot admits) is refused already, and the prompt takes the next entry.
+  slot admits) is refused already, and the prompt takes the next entry. The
+  one `Answer` the runner judges is a chosen card name (CR 201.4): it must be
+  a real card's that the prompt's restriction admits, so a `refuse` can carry
+  one. The engine's card lookups are answered from the card data, for every
+  name the board, timeline or final checks mention.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones,
   `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),

@@ -1659,13 +1659,6 @@ aimedAtObject oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just oid) candidates) sets
   _ -> S.identityAnswer p
 
--- The same, for a recipient known outright -- Lightning Bolt's CR 115.4 slot in
--- the tax cases below, where the pool offers players and permanents alike.
-aimedAtRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
-aimedAtRecipient recipient p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== recipient) candidates) sets
-  _ -> S.identityAnswer p
-
 -- alice casts Dovin off three Plains and activates the -1 at bob's Goblin Piker.
 -- Returns the shielded permanent, bob's War Mammoth, alice's own Piker, and the
 -- board.
@@ -1701,26 +1694,6 @@ dovinBoardAimedAt pick plains piker warMammoth dovin =
         ability : _ -> S.runPure (aimedAtObject (pick shielded attacker)) cast (do Activate.activateAbility S.alice dovinId ability; Stack.resolveTop)
         [] -> cast
    in (shielded, control, attacker, activated)
-
--- CR 601.2f's total, read as WHETHER one Mountain was enough for a Lightning
--- Bolt: taxed it is not, untaxed it is. `caster` is who holds the Bolt and that
--- Mountain, and is what tells PlayerScope.Opponents from EachPlayer.
---
--- The Mountain is added AFTER Dovin is cast, which is load-bearing in both
--- directions: it keeps {2}{W/U} from being paid with it (leaving a Plains
--- untapped and the Bolt payable whatever the tax), and it leaves alice's three
--- Plains tapped, so in her own leg the Mountain is the only mana she has and a
--- tax she does not pay is the only reason her Bolt gets cast.
-taxLeg :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> PlayerId.PlayerId -> Int
-taxLeg plains mountain bolt dovin withDovin caster =
-  let (withCard, dovinId) = S.handOne dovin (S.landsInPlay plains 3)
-      staged =
-        if withDovin
-          then S.runPure S.identityAnswer withCard (do S.cast S.alice dovinId; Stack.resolveTop)
-          else withCard
-      (boltId, gs) = S.addHandCard bolt caster (S.landsFor mountain caster 1 staged)
-      after = S.runPure (aimedAtRecipient (Recipient.ToPlayer S.alice)) gs (S.cast caster boltId)
-   in length (GameState.stack after)
 
 dovinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
@@ -1800,18 +1773,6 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
     let (_, _, attacker, gs) = dovinBoardAimedAt (\_ hers -> hers) plains piker warMammoth dovin
     Spec.assertEqWith s "no shield was installed" (fmap ActiveReplacement.expiry (GameState.replacements gs)) []
     Spec.assertEqWith s "and alice's own creature takes damage as usual" (S.damageOf attacker (settleDamage gs [hit attacker (Recipient.ToCreature attacker) 4])) (Just 4)
-  -- The static clause, so the card is not half-dead data. CR 601.2f's increase,
-  -- scoped to the OPPONENTS: alice's own instant is untaxed, which is the only
-  -- thing that tells PlayerScope.Opponents from Thalia's EachPlayer.
-  Spec.it s "CR 601.2f an opponent's instant costs {1} more, and alice's does not" $ do
-    plains <- S.printingOf s registry "Plains"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    dovin <- S.printingOf s registry "Dovin, Hand of Control"
-    let leg = taxLeg plains mountain bolt dovin
-    Spec.assertEqWith s "with no Dovin, bob's one Mountain casts the Bolt" (leg False S.bob) 1
-    Spec.assertEqWith s "under Dovin, the same Mountain does not" (leg True S.bob) 0
-    Spec.assertEqWith s "and alice's own Bolt is untaxed off hers" (leg True S.alice) 1
 
 -- Old Fat Spider Can't See Me {2}{U} Enchantment -- Saga (The Hobbit; name,
 -- cost, type line and Oracle text checked against api.scryfall.com): "I --

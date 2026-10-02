@@ -223,86 +223,6 @@ enteredFromSpec s registry =
           Spec.assertEqWith s "CR 603.4 the clause is false, so no Demon" (length (S.tokensOf after)) 0
           Spec.assertEqWith s "and the Vessel stayed on the battlefield" (length (vesselsOwnedBy S.alice vessel after)) 1
 
--- Breathless Knight {1}{W}{B} Creature -- Spirit Knight 2/2 (oracle text checked
--- against Scryfall, 2026-08-30): "Flying, lifelink. Whenever this creature or
--- another creature you control enters, if that creature entered from a graveyard
--- or you cast it from a graveyard, put a +1/+1 counter on this creature."
---
--- The family's OTHER reading of CR 603.4, and the one Archfiend's Vessel above
--- cannot supply. The Vessel's clause and its effect name the same object, so a
--- Vessel that left the battlefield fails CR 603.6's find and makes no Demon
--- whichever way the clause was read. The Knight's clause is about the ENTRANT --
--- Quantity.AgainstSlot at Binding.became -- while its effect acts on the KNIGHT,
--- so CR 603.6 stops nothing and killing the entrant between CR 603.4's two checks
--- separates a log read from a live-board one. That is the second case below.
---
--- Which way the rule goes: the log read is CR 603.4's answer and not merely
--- pawl's. "Entered from a graveyard" is a completed action, and CR 608.2i lets a
--- check needing information about a previous game action find its object wherever
--- it now is, so long as the check takes no action on it -- this one takes its
--- action on the Knight. Nothing a board can do makes a past entry un-happen, so
--- for this clause CR 603.4's second check can never answer differently from its
--- first. The observable fact is therefore not that the two checks disagree but
--- that the second reads the LOG: kill the entrant and the counter still lands.
---
--- The two disjuncts take their references for different reasons. The EnteredFrom
--- half is exact on its face: PlayerRef.EachPlayer makes its owner conjunct
--- vacuous, which is the printed "a graveyard", and every case below drives that
--- half. The WasCastFrom half is caster PlayerRef.Relative You over
--- PlayerRef.EachPlayer's graveyards -- "you cast it", out of anybody's pile --
--- which is what Pawl.Types.CastFrom's two references are for; foreignGraveyardCastSpec
--- below is where the two halves name different seats and the reading is proved.
--- The last case here drives the WasCastFrom disjunct's negative -- the Skeleton is
--- cast from a HAND -- and Archfiend's Vessel above is where its positive is proved.
---
--- Reassembling Skeleton supplies the entrant: "{1}{B}: Return this card from your
--- graveyard to the battlefield tapped" is one activation, so the entry comes out
--- of a graveyard with no reanimation spell in the way, and its 1 toughness is what
--- lets one marked damage kill it while the trigger waits.
-interveningRecheckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-interveningRecheckSpec s registry =
-  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
-      -- alice, holding priority in her own main phase, with the Knight settled on
-      -- the battlefield and two untapped Swamps -- the {1}{B} both the activation
-      -- and the cast below are paid with, so the three boards differ only in where
-      -- the Skeleton starts and whether it is killed.
-      board knight swamp =
-        let (knightId, withKnight) = S.addPermanent knight S.alice (S.landsInPlay swamp 2)
-         in ( knightId,
-              withKnight
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            )
-      -- CR 400.7 mints a fresh id for the returned card, so the entrant is found
-      -- by name rather than by the id the ability was activated from.
-      skeletonsOn skeleton gs =
-        filter (\oid -> S.soleFaceName oid gs == S.printingName skeleton) (Set.toList (GameState.battlefield gs))
-      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
-      -- One damage on a 1/1 and a state-based-action pass: CR 704.5g destroys the
-      -- entrant where it stands, with the Knight's trigger already on the stack
-      -- and untouched.
-      kill oid gs = S.settleSba (S.markDamage oid 1 gs)
-   in Spec.describe s "InterveningRecheck" $ do
-        -- The negative, one difference from the case above: the Skeleton starts in
-        -- alice's HAND, so the same {1}{B} casts it and it enters from the STACK.
-        -- Killed the same way, so "no counter" cannot be the kill's doing.
-        Spec.it s "CR 603.4 a creature entering from anywhere else does not" $ do
-          knight <- S.printingOf s registry "Breathless Knight"
-          skeleton <- S.printingOf s registry "Reassembling Skeleton"
-          swamp <- S.printingOf s registry "Swamp"
-          let (knightId, base) = board knight swamp
-              (handId, staged) = S.addHandCard skeleton S.alice base
-              raised = settle (resolveTop (S.runPure S.identityAnswer staged (S.cast S.alice handId)))
-          case skeletonsOn skeleton raised of
-            [entrant] -> do
-              let killed = kill entrant raised
-              Spec.assertEqWith s "the Knight is still 2/2" (sizeOf knightId (resolveTop killed)) (Just 2, Just 2)
-              Spec.assertEqWith s "because CR 603.4's clause was false, so nothing triggered" (length (GameState.stack raised)) 0
-            entrants -> Spec.assertEqWith s "exactly one Skeleton entered" (length entrants) 1
-
 -- Pins the trigger's target to one card by FILTERING the offered set, takes CR
 -- 608.2g's "may", and attacks bob with everything otherwise.
 --
@@ -636,7 +556,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
 
   monarchSpec s registry
   enteredFromSpec s registry
-  interveningRecheckSpec s registry
   foreignGraveyardCastSpec s registry
   lastKnownTokenSpec s registry
   lastKnownAttackingSpec s registry

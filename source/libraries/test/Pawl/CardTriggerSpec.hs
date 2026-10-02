@@ -1060,34 +1060,6 @@ ezuriExperienceSpec s registry =
             (targetId, gs) = S.addPermanent construct S.alice withEzuri
         pure (ezuriId, targetId, gs)
    in Spec.describe s "Ezuri, Claw of Progress" $ do
-        -- The whole arc #858 asks for, at gameplay level: alice CASTS three
-        -- small creature spells, the counters accumulate on her, and a
-        -- permanent's size changes by exactly that many. The Construct she
-        -- already had is the target, so its printed 2/1 is untouched by the
-        -- casting and 5/4 can only be 2/1 plus three.
-        Spec.it s "CR 122.1 three cast creature spells become three experience counters, and the combat trigger spends them" $ do
-          ezuri <- S.printingOf s registry "Ezuri, Claw of Progress"
-          construct <- S.printingOf s registry "Bonded Construct"
-          piker <- S.printingOf s registry "Goblin Piker"
-          mountain <- S.printingOf s registry "Mountain"
-          let (_, withEzuri) = S.addPermanent ezuri S.alice (S.landsInPlay mountain 6)
-              (targetId, board) = S.addPermanent construct S.alice withEzuri
-              (gs0, firstPiker) = S.handOne piker board
-              (secondPiker, gs1) = S.addHandCard piker S.alice gs0
-              (thirdPiker, gs2) = S.addHandCard piker S.alice gs1
-              cast = castAndResolve thirdPiker (castAndResolve secondPiker (castAndResolve firstPiker gs2))
-              combat = S.runPure (aimAt targetId) (atBeginningOfCombat S.alice cast) (Engine.runStep >> Engine.priorityLoop)
-          Spec.assertEqWith s "alice started with no experience" (experienceOf S.alice gs2) 0
-          Spec.assertEqWith s "three 2/1 spells resolved, so three experience counters" (experienceOf S.alice cast) 3
-          Spec.assertEqWith s "bob, who cast nothing, has none" (experienceOf S.bob cast) 0
-          Spec.assertEqWith s "the Construct took one +1/+1 counter per experience counter" (countersOn targetId combat) (Just 3)
-          Spec.assertEqWith s "so its printed 2/1 reads 5/4" (S.powerToughnessOf targetId combat) (Just (5, 4))
-          -- READING a player's counters is not removing them, and CR 728.1's rad
-          -- mill -- the pool's other user of this Quantity, which removes one
-          -- counter per nonland card it milled -- is why that is worth an
-          -- assertion. Ezuri's printed text says only "the number of experience
-          -- counters you have", so alice keeps all three.
-          Spec.assertEqWith s "and alice still has all three experience counters" (experienceOf S.alice combat) 3
         -- The control at a DIFFERENT count, which is what stops a payload that
         -- hardcodes three from passing the case above. Same two permanents, five
         -- counters instead of three, and 2/1 reads 7/6.
@@ -2228,14 +2200,6 @@ aimAtOffered oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
 
--- Both of an attach-moving ability's prompts: its target slot, and CR 701.3a's
--- destination choice.
-moveOnto :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-moveOnto subject dest p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just subject) . Recipient.objectOf) . snd) sets
-  Prompt.ChooseAttachment {} -> dest
-  _ -> S.identityAnswer p
-
 -- The CR 117.5 boundary scans for triggers, then the one it placed resolves.
 -- Narrower than the priority loop, which would sweep the rest of the board too.
 fireTriggers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
@@ -2251,54 +2215,9 @@ attachmentsOn host gs =
     (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
     (Set.toList (GameState.battlefield gs))
 
-firstActivatedOf :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-firstActivatedOf printing = case Face.activatedAbilities (S.combinedFace printing) of
-  ability : _ -> Just ability
-  [] -> Nothing
-
-brambleElementalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brambleElementalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 brambleElementalSpec s registry =
   Spec.describe s "CR 701.3a a trigger on becoming attached" $ do
-    -- CR 701.3a's other road: an Aura already on the battlefield MOVES.
-    -- Crown of the Ages, "{4}, {T}: Attach target Aura attached to a creature
-    -- to another creature" -- Unholy Strength enters on a Piker, where
-    -- nothing triggers, and is then moved onto the Elemental.
-    --
-    -- The Piker half is the pair's other board, one object different: same
-    -- Aura, same cast, same resolution, a host that is not the watcher.
-    Spec.it s "CR 701.3a whole card: Crown of the Ages moving an Aura onto the Elemental creates two Saprolings" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      piker <- S.printingOf s registry "Goblin Piker"
-      bramble <- S.printingOf s registry "Bramble Elemental"
-      unholyStrength <- S.printingOf s registry "Unholy Strength"
-      crown <- S.printingOf s registry "Crown of the Ages"
-      let (pikerId, base1) = S.addPermanent piker S.alice (S.landsInPlay swamp 7)
-          -- A DECOY creature, so Crown's "another creature" offers two
-          -- destinations and Attach.chooseHost really asks rather than
-          -- eliding at a single candidate.
-          (_, base2) = S.addPermanent piker S.alice base1
-          (brambleId, base3) = S.addPermanent bramble S.alice base2
-          (armed, auraSpell) = S.handOne unholyStrength base3
-          onPiker = S.runPure (aimAtOffered pikerId) armed (S.cast S.alice auraSpell >> Stack.resolveTop)
-          settledOnPiker = fireTriggers (aimAtOffered pikerId) onPiker
-      case attachmentsOn pikerId settledOnPiker of
-        [] -> Spec.assertFailure s "Unholy Strength should have entered attached to the Piker"
-        auraId : _ -> do
-          let (withCrown, crownSpell) = S.handOne crown settledOnPiker
-              resolved = S.runPure S.identityAnswer withCrown (S.cast S.alice crownSpell >> Stack.resolveTop)
-              crownIds = filter (\oid -> Game.cardOf oid resolved == Just (Printing.card crown)) (Set.toList (GameState.battlefield resolved))
-          case (crownIds, firstActivatedOf crown) of
-            (crownId : _, Just move) -> do
-              let ready = resolved {GameState.priority = Just S.alice}
-                  activated = S.runPure (moveOnto auraId brambleId) ready (Activate.activateAbility S.alice crownId move)
-                  moved = S.runPure (moveOnto auraId brambleId) activated Stack.resolveTop
-                  after = fireTriggers (moveOnto auraId brambleId) moved
-              Spec.assertEqWith s "CR 603.2 two Saprolings once the move's trigger resolves" (saprolingsOf S.alice after) 2
-              -- The other board, one object different: the same Aura entering
-              -- on a creature that is not the watcher fires nothing.
-              Spec.assertEqWith s "and none while the Aura sat on the Piker" (saprolingsOf S.alice settledOnPiker) 0
-              Spec.assertEqWith s "the Aura really moved onto the Elemental" (attachmentsOn brambleId moved) [auraId]
-            _ -> Spec.assertFailure s "Crown of the Ages should have resolved onto the battlefield with one activated ability"
     -- "An AURA", the word the Filter carries, on the SAME emit site as the
     -- leg above: Bonesplitter's equip attaches an Equipment to the Elemental
     -- through Event.attach, and nothing happens.

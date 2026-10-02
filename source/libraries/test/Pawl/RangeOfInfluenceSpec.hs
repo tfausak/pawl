@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- Covers: CR 801's limited range of influence option -- Pawl.Types.RangeOfInfluence,
 -- the Pawl.Types.GameSettings field that carries it, Pawl.Engine.Game.inRangeOf,
@@ -60,7 +59,6 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -487,23 +485,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 104.2b at an unlimited range alice wins" (GameState.result (upkeepOf S.alice (atLife 40))) (Just (Result.Won S.alice))
     Spec.assertEqWith s "CR 603.4 at 39 life nothing happens" (Game.stillPlaying (upkeepOf S.alice (atLife 39))) [S.alice, S.bob, S.carol, S.dave]
 
-  -- CR 104.4c / 801.15: alice casts Divine Intervention ("This enchantment enters
-  -- with two intervention counters on it. At the beginning of your upkeep, remove
-  -- an intervention counter from this enchantment. When you remove the last
-  -- intervention counter from this enchantment, the game is a draw.") and two of
-  -- her upkeeps pass. At range 1 the draw takes alice, bob and dave out; carol,
-  -- the last one playing, wins by CR 104.2a.
-  Spec.it s "CR 801.15 a draw is a draw for its controller and the players within their range" $ do
-    plains <- S.printingOf s registry "Plains"
-    intervention <- S.printingOf s registry "Divine Intervention"
-    let (spellId, g0) = S.addHandCard intervention S.alice (S.landsFor plains S.alice 8 S.fourPlayerGame)
-        played ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g0))
-        twice gs = upkeepOf S.alice (upkeepOf S.alice gs)
-        limited = twice (played (S.withRange 1))
-    Spec.assertEqWith s "one upkeep leaves the game running" (GameState.result (upkeepOf S.alice (played id))) Nothing
-    Spec.assertEqWith s "CR 801.15 at range 1 only carol is still playing" (Game.stillPlaying limited) [S.carol]
-    Spec.assertEqWith s "CR 104.4c at an unlimited range the game is a draw" (GameState.result (twice (played id))) (Just Result.Drawn)
-
   -- CR 801.16: Pawl.GameSpec's CR 104.4b loop -- alice's Sporemound mints a
   -- Saproling, a Life and Limb makes it a Forest land, and another player's
   -- Aether Flash buries it -- at SIX seats, so that two players can sit outside
@@ -608,8 +589,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
        in resolveAll (snd (Engine.runGamePure S.identityAnswer staged Engine.settleForPriority))
     -- A main phase with alice holding priority, for an instant she casts.
     onMain gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-    castResolved :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-    castResolved answer pid spellId gs = snd (Engine.runGamePure answer (S.runPure answer gs (S.cast pid spellId)) Engine.priorityLoop)
     -- CR 510.2: these creatures, attacking `defender` on `active`'s turn, deal
     -- their combat damage.
     strike active attackers defender gs =

@@ -16,7 +16,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import Pawl.CastProhibitionSpec (equipBoard, flashBoard, flashOnOwnTurn, isActivateOf, isPlay, landDropBoard, nextTurnFor, orreryScopeBoard, playEveryLand)
+import Pawl.CastProhibitionSpec (equipBoard, flashBoard, flashOnOwnTurn, isActivateOf, isPlay, landDropBoard, orreryScopeBoard, playEveryLand)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
@@ -98,21 +98,6 @@ extraLandDropsSpec s registry =
       Spec.assertEqWith s "one Mountain landed for bob" (S.countOnBattlefieldByName (S.printingName mountain) S.bob after) 1
       Spec.assertEqWith s "four are still in his hand" (S.handSize S.bob after) 4
       Spec.assertEqWith s "and his second is refused" (filter isPlay (Action.legalActions S.bob after)) []
-
-    -- CR 305.2's allowance is PER TURN, and the raised one refills like the
-    -- normal one: CR 703.4c's untap step clears the tally, and the next turn
-    -- gets two again rather than nothing or a running total.
-    Spec.it s "CR 305.2 the raised allowance refills each turn" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      exploration <- S.printingOf s registry "Exploration"
-      let firstTurn = playEveryLand (landDropBoard mountain [exploration] S.alice)
-          untapped = nextTurnFor S.alice firstTurn
-          secondTurn = playEveryLand untapped
-      Spec.assertEqWith s "two played on the first turn" (GameState.landsPlayed firstTurn) (Map.singleton S.alice 2)
-      Spec.assertEqWith s "the untap step clears the tally" (GameState.landsPlayed untapped) Map.empty
-      Spec.assertEqWith s "two more on the second turn" (GameState.landsPlayed secondTurn) (Map.singleton S.alice 2)
-      Spec.assertEqWith s "four Mountains in play" (S.countOnBattlefieldByName (S.printingName mountain) S.alice secondTurn) 4
-      Spec.assertEqWith s "and the fifth is still in hand, refused" (S.handSize S.alice secondTurn) 1
 
     -- CR 604.2: the grant is re-read from the battlefield on every look, so
     -- destroying Exploration between the second land and the third takes the
@@ -1912,32 +1897,6 @@ serraParagonSpec s registry =
               Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Graveyard (pbBuried b) paragonPlayed)) "the Paragon's play spent the use the Elves needed"
               Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Graveyard (pbBuried b) freePlayed) "the Crucible's left it"
             _ -> Spec.assertFailure s "expected the Forest to arrive under both answers"
-
-        -- CR 601.3 / 608.2g: Synthetic Woodland Bargainer's resolving offer is
-        -- itself an effect allowing the graveyard cast, so the Paragon's
-        -- permission is one alice may decline. The pair differs in her
-        -- answer and nothing else.
-        Spec.it s "CR 608.2g a cast an effect offers need not be made under Serra Paragon" $ do
-          b <- board "Llanowar Elves" "Forest" True
-          bargainer <- S.printingOf s registry "Synthetic Woodland Bargainer"
-          let (bargainerId, gs) = S.addPermanent bargainer S.alice (pbState b)
-              taking pick p = case p of
-                Prompt.OfferedCast {} -> OptionalDecision.Exercises
-                _ -> underPermission pick [] p
-              outcome ability pick =
-                let cast = S.runPure (taking pick) gs (Activate.activateAbility S.alice bargainerId ability >> Stack.resolveTop >> Stack.resolveTop)
-                 in case arrivedBetween gs cast of
-                      [permanent] -> Just (cast, diesAndResolves permanent cast)
-                      _ -> Nothing
-          case Face.activatedAbilities (S.combinedFace bargainer) of
-            [] -> Spec.assertFailure s "the Bargainer should declare one activated ability"
-            ability : _ -> case (outcome ability Nothing, outcome ability (pbParagon b)) of
-              (Just (offeredCast, underOffer), Just (paragonCast, underParagon)) -> do
-                Spec.assertEqWith s "declining the Paragon, alice gained nothing as the Elves died" (S.lifeOf S.alice underOffer) (S.lifeOf S.alice gs)
-                Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice offeredCast)) "and the Paragon's use is left for the graveyard Forest"
-                Spec.assertEqWith s "under the Paragon she gained 2 life" (S.lifeOf S.alice underParagon) (fmap (+ 2) (S.lifeOf S.alice gs))
-                Spec.assertBool s (notElem (pbGraveForest b, Nothing) (Action.playableLands S.alice paragonCast)) "and spent its use"
-              _ -> Spec.assertFailure s "expected the Elves to arrive under both answers"
 
 -- takeFirst, answering Prompt.ChoosePlayPermission with the option `pick`
 -- names: the permission that object grants, or Nothing for none of them. An

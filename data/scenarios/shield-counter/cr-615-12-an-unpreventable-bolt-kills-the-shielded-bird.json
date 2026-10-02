@@ -1,0 +1,140 @@
+{
+  "description": "CR 615.12 an unpreventable Bolt kills the shielded bird",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains-1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Swooping Protector",
+            "label": "bird-card"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Spider-Punk",
+            "label": "scaler"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bird-card",
+          "mana": [
+            "$plains-1",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Swooping Protector",
+          "kind": {
+            "type": "Shield"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "Swooping Protector"
+          ],
+          "mana": [
+            "$mountain-1"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Swooping Protector",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Swooping Protector",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

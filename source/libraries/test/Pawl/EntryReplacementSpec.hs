@@ -87,18 +87,6 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
               Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
               Just goblin -> Spec.assertEqWith s "attacks" (attackersIn after) [goblin]
       _ -> Spec.assertFailure s "fixture did not deal a card"
-  Spec.it s "CR 302.6 the goblin that took the counter cannot attack that turn" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
-    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
-        answer = riotChoosing OptionalDecision.Exercises
-    case held of
-      goblinCard : _ ->
-        let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
-            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.manaPerformer S.alice)
-         in Spec.assertEqWith s "no attackers" (attackersIn after) []
-      _ -> Spec.assertFailure s "fixture did not deal a card"
   -- THE CHOICE IS THE ANSWERER'S. Both outcomes above are reachable only through
   -- a prompt, and the prompt is never elided: CR 702.136a's two halves are
   -- distinguishable on every board.

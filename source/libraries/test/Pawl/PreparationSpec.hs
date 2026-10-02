@@ -105,7 +105,7 @@ prepareCopies gs =
 
 -- The newest battlefield permanent whose PRINTED card is a Clone -- read off the
 -- printing rather than off the projection, which is exactly the name a copy no
--- longer has (CR 707.2). Pawl.MoveCounterSpec's `newestNamed` reads the projected
+-- longer has (CR 707.2). Pawl.PreventionSpec's `newestNamed` reads the projected
 -- face for the same job; this one must not, since the object under test is a copy.
 newestClone :: GameState.GameState -> Maybe ObjectId.ObjectId
 newestClone gs =

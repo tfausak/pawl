@@ -1540,7 +1540,6 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlaneswalkerSpec.combinedLoyaltyCostSpec s registry
   Pawl.PlaneswalkerSpec.countersRemovedSpec s registry
-  Pawl.PlaneswalkerSpec.loyaltyAbilityOnlySpec s registry
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry

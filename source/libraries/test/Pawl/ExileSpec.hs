@@ -930,8 +930,8 @@ attackedHeightsHiding s registry copier hidden = do
         _ -> S.noSource
       -- CR 502.3 on a later turn: the land entered tapped, so nothing can pay its
       -- {T} until alice's next untap step. Two handoffs and that step's
-      -- turn-based actions alone, which is ManaSpec's nextTurnOfAlice -- a whole
-      -- turn of priority would draw this fixture's library empty (CR 104.3c).
+      -- turn-based actions alone -- a whole turn of priority would draw this
+      -- fixture's library empty (CR 104.3c).
       untapped =
         S.runPure
           S.identityAnswer

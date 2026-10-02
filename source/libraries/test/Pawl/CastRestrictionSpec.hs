@@ -60,7 +60,6 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -2346,11 +2345,6 @@ aimAtPlayer pid prompt = case prompt of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
   _ -> S.identityAnswer prompt
 
--- A player's life total set by hand, for the case that asks what CR 601.2h does
--- when the life is not there to pay.
-withLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameState
-withLife pid life gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = life}) pid (GameState.players gs)}
-
 terrorOfThePeaksSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
   -- The headline pair. bob's Bolt at the Dragon costs him 3 life on top of the
@@ -2384,25 +2378,6 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
         after = S.runPure (avenAnswer terrorId) board (S.cast S.alice boltId)
     Spec.assertEqWith s "alice's own Bolt at her own Dragon cost her no life" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "and is on the stack" (length (GameState.stack after)) 1
-  -- CR 601.2h: the tax is priced after CR 601.2c's targets are fixed, which is
-  -- after the castability gate ran -- so the gate offers the Bolt to a player
-  -- who cannot pay 3 life, and it is the PAYMENT that fails and CR 601.2's
-  -- rewind that answers. The pair again: at 2 life bob's Bolt at the Dragon
-  -- never leaves his hand, where the same Bolt at the Piker is cast.
-  Spec.it s "CR 601.2h a caster without the life to pay has the cast rewound, and the same caster aims the Bolt elsewhere" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    terror <- S.printingOf s registry "Terror of the Peaks"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (terrorId, pikerId, boltId, board) = terrorBoard mountain terror piker bolt S.bob
-        poor = withLife S.bob 2 board
-        atDragon = S.runPure (avenAnswer terrorId) poor (S.cast S.bob boltId)
-        atPiker = S.runPure (avenAnswer pikerId) poor (S.cast S.bob boltId)
-    Spec.assertEqWith s "CR 601.2h the Bolt at the Dragon was rewound: nothing is on the stack" (GameState.stack atDragon) []
-    Spec.assertEqWith s "bob still holds it" (S.handSize S.bob atDragon) 1
-    Spec.assertEqWith s "and paid nothing -- neither the life nor the Mountain" (S.lifeOf S.bob atDragon, S.tappedCount S.bob atDragon) (Just 2, 0)
-    Spec.assertEqWith s "where the same Bolt at the Piker is on the stack" (length (GameState.stack atPiker)) 1
-    Spec.assertBool s (S.castable S.bob boltId poor) "the gate offered the Bolt: CR 601.2c's choice is what decides whether the tax applies, and the gate runs before it"
   -- The third sentence, on its own: a Goblin Piker (2/1) entering under alice
   -- has the Dragon deal 2 -- the PIKER's power, not the Dragon's 5 -- to the
   -- target alice names. The Dragon entering with the Piker already out deals

@@ -20,7 +20,6 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event.Binding as Event
-import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -393,14 +392,6 @@ falseCureSpec s registry =
           Spec.assertEqWith s "alice gained 1 from her Soul Warden and lost 2" (S.lifeOf S.alice after) (Just 19)
           Spec.assertEqWith s "bob is where the first firing left him" (S.lifeOf S.bob after) (Just 18)
           Spec.assertEqWith s "carol gained nothing and lost nothing" (S.lifeOf S.carol after) (Just 20)
-        -- The control, through the narrowest path that ends the duration: CR 514.2's
-        -- cleanup, which Expiry.dropAtCleanup is. The SAME gain on the SAME board
-        -- afterwards costs bob nothing, so the two cases differ in exactly one thing.
-        Spec.it s "CR 514.2 the entry is gone after cleanup, so the same gain costs nothing" $ do
-          (fountainId, _, gs) <- armed
-          let after = entering fountainId (Expiry.dropAtCleanup gs)
-          Spec.assertEqWith s "bob gained his 2 and kept it" (S.lifeOf S.bob after) (Just 22)
-          Spec.assertEqWith s "alice is untouched either way" (S.lifeOf S.alice after) (Just 20)
         -- CR 603.2c inside ONE batch, which the cases above cannot reach: the
         -- entry's trigger event occurs three times before the settle, and CR
         -- 603.7b's stated duration lifts the one shot, so 603.2c's "it can trigger

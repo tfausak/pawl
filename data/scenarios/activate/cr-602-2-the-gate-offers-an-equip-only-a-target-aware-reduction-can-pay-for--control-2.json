@@ -1,0 +1,58 @@
+{
+  "description": "CR 602.2 the gate offers an equip only a target-aware reduction can pay for",
+  "note": "Control: no Mauler and three Mountains; the Aegis's printed equip is offered, so the one-Mountain control withholds an equip it has.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "War Mammoth",
+            "label": "mammoth"
+          },
+          {
+            "card": "Aegis of the Legion",
+            "label": "aegis"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          },
+          {
+            "card": "Mountain",
+            "label": "m3"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $aegis",
+            "ActivateManaAbility $mountain",
+            "ActivateManaAbility $m2",
+            "ActivateManaAbility $m3"
+          ]
+        }
+      }
+    }
+  ]
+}

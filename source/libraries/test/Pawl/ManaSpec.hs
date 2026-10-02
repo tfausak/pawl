@@ -787,17 +787,6 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
       (fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])
     Spec.assertBool s (elem birdsId (Mana.manaSources Cost.manaActivations S.alice gs)) "it is a mana source"
 
-  -- The discriminating half: identical board, identical spell, one different
-  -- answer. If the engine picked the colour itself this would pass too.
-  Spec.it s "the color is the player's: a Birds tapped for green does not pay {B}" $ do
-    birds <- S.printingOf s registry "Birds of Paradise"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let resolved = castOffBoard (prefersColor Color.Green) [birds] typhoidRats
-    Spec.assertEqWith s "the Rats never resolved" (S.creaturesInPlay S.alice resolved) 1
-    -- CR 601.2h: partial payments are not allowed, so the failed payment is
-    -- rolled back whole and the Birds is left untapped.
-    Spec.assertEqWith s "payment rolled back" (S.tappedCount S.alice resolved) 0
-
   -- CR 118.3 exactness. A greedy walk fails this one: it taps the Forest for
   -- {G}, then takes the Birds' FIRST colour (white) and reports {G}{B}
   -- unaffordable. Only a matching over what each source COULD produce gets it
@@ -1187,7 +1176,7 @@ towerBoard tower victim =
 -- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
 -- Ornitier and every other hit ride on "only once each turn" -- which is
 -- ActivationRestriction.OnlyOnceEachTurn and names no window either
--- (translatorSpec below is where that arm is exercised on this road) -- or on
+-- (data/scenarios/mana is where that arm is exercised on this road) -- or on
 -- "only if <condition>", which is its OnlyIf arm and names no window either
 -- (nimbusMazeSpec below is where that arm is exercised on this road), so neither
 -- kind reaches the phase axis this pair is about.
@@ -2401,21 +2390,6 @@ phyrexianAltarSpec s registry = Spec.describe s "Phyrexian Altar" $ do
     Spec.assertBool s (not (offered one)) "one creature cannot pay {R}{G}"
     Spec.assertBool s (offered two) "two creatures can"
 
-  -- And the payment carries it out, which the offer alone cannot say: the colours
-  -- are SCRIPTED, one per activation, so the second half is the same board and the
-  -- same spell with one answer changed. If the engine picked the colours itself
-  -- both halves would pass.
-  Spec.it s "CR 605.3a the Goblin is cast off a red activation and a green one" $ do
-    goblin <- S.printingOf s registry "Zhur-Taa Goblin"
-    board <- phyrexianAltarBoard s registry 2
-    let countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-        mixed = castScripted goblin board [Color.Red, Color.Green]
-        monochrome = castScripted goblin board [Color.Red, Color.Red]
-    Spec.assertEqWith s "the Goblin resolved" (countOf "Zhur-Taa Goblin" mixed) 1
-    Spec.assertEqWith s "both Pikers paid for it" (countOf "Goblin Piker" mixed) 0
-    Spec.assertEqWith s "two red activations pay no {G}, so the cast fails" (countOf "Zhur-Taa Goblin" monochrome) 0
-    Spec.assertEqWith s "and CR 601.2h rolled the sacrifices back" (countOf "Goblin Piker" monochrome) 2
-
 -- Alice's Phyrexian Altar and `victims` Goblin Pikers.
 phyrexianAltarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
 phyrexianAltarBoard s registry victims = do
@@ -2427,26 +2401,6 @@ phyrexianAltarBoard s registry victims = do
 paysColors :: [Color.Color] -> GameState.GameState -> Bool
 paysColors colors =
   Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost (fmap (ManaSymbol.OfType . ManaType.Colored) colors))
-
--- `spell` cast off `board` and resolved, with the mana-yield choices answered off
--- `script` in order -- the fixture a repeatable source needs, since one answer
--- has to serve two activations of one permanent.
-castScripted :: Printing.Printing -> GameState.GameState -> [Color.Color] -> GameState.GameState
-castScripted spell board script =
-  let (withSpell, oid) = S.handOne spell board
-      afterCast = snd (State.evalState (Engine.runGame nextColor withSpell (S.cast S.alice oid)) script)
-   in S.runPure S.identityAnswer afterCast Stack.resolveTop
-
--- The next colour in the script, or the default answer once it runs out.
-nextColor :: Prompt.Prompt r -> State.State [Color.Color] r
-nextColor p = case p of
-  Prompt.ChooseManaYield _ _ _ candidates -> do
-    scripted <- State.gets Maybe.listToMaybe
-    State.modify' (drop 1)
-    pure $ case scripted of
-      Nothing -> S.identityAnswer p
-      Just color -> optionOfTypes [ManaType.Colored color] candidates
-  _ -> pure (S.identityAnswer p)
 
 -- CR 601.2g before CR 601.2h, on a mana ability whose activation cost holds
 -- MANA: Transmogrant Altar, "{B}, {T}, Sacrifice a creature: Add
@@ -3884,7 +3838,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   omnathSpec s registry
   priorityWindowSpec s registry
   riderWindowSpec s registry
-  translatorSpec s registry
   cabalCoffersSpec s registry
   laviniaTurnRiderSpec s registry
   nimbusMazeSpec s registry
@@ -4229,61 +4182,6 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
 
--- CR 502: the untap step's turn-based actions alone, which is what makes the
--- permanents this spec taps available again on the next turn without running a
--- whole turn's priority and drawing a fixture library empty (CR 104.3c).
-untapStep :: GameState.GameState -> GameState.GameState
-untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
-
--- Two turn handoffs, CR 500.5's sweep of the pools, and then that untap: bob
--- takes a turn, alice takes the next one, whatever she floated is gone and
--- everything she controls untaps (CR 502.3) -- the same permanent, untapped and
--- with an empty pool, on a later turn. CR 602.5b's per-GAME memory is on the
--- object and no rule clears it at a handoff, which is what data/scenarios/mana
--- reads for Loot, the Pathfinder; Engine.beginTurnOf clears its per-TURN twin,
--- which is what translatorSpec reads.
-nextTurnOfAlice :: GameState.GameState -> GameState.GameState
-nextTurnOfAlice gs = untapStep (Mana.emptiedManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
-
--- CR 602.5b's rider timed PER TURN and printed on a MANA ability, which CR 605.3b
--- keeps off the stack entirely: Kozilek's Translator (Oath of the Gatewatch)
--- prints "Pay 1 life: Add {C}. Activate only once each turn." Oracle text checked
--- against Scryfall 2026-09-06. Locust Swarm is the same rider on the road CR
--- 602.2a puts on the stack (Pawl.ActivateSpec's PrintedActivationOnlyOnceEachTurn).
---
--- NO {T} in the cost, so nothing but the rider bounds the route: alice could
--- otherwise pay for every {1} in her hand out of one permanent, at a life apiece.
---
--- TWO Bonesplitters and NO lands, so the Translator's route is the only way to
--- pay for either of them, and both of CR 605.3a's windows run through
--- Cost.manaActivationsGiven rather than through Pawl.Engine.Activate, which
--- refuses a mana ability outright (CR 605.3b). Bonesplitter does nothing until it
--- is equipped, so the board it lands on is the board it left.
---
--- THE PAIR is the two moments below: the same permanents and the same hand,
--- differing only in whether the route was already spent this turn.
-translatorBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-translatorBoard translator splitter =
-  let (_, gs1) = S.addPermanent translator S.alice (Setup.emptyGame S.bothPlayers)
-      (firstSplitter, gs2) = S.addHandCard splitter S.alice gs1
-      (secondSplitter, gs3) = S.addHandCard splitter S.alice gs2
-   in ( firstSplitter,
-        secondSplitter,
-        gs3
-          { GameState.activePlayer = S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.priority = Just S.alice,
-            GameState.remaining = Seq.empty
-          }
-      )
-
--- One choice to pin: the payment asks which source to tap for mana, and the
--- Translator is the only one on the board.
-translatorAnswer :: Prompt.Prompt r -> r
-translatorAnswer p = case p of
-  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
-  _ -> S.identityAnswer p
-
 -- CR 106.3's count read off the BOARD rather than off the card: Cabal Coffers
 -- (Torment) prints "{2}, {T}: Add {B} for each Swamp you control." Oracle text
 -- checked against Scryfall 2026-09-15.
@@ -4337,27 +4235,6 @@ cabalCoffersSpec s registry = Spec.describe s "Cabal Coffers" $ do
     -- rather than through a payment: the two cannot disagree about what the
     -- board yields.
     Spec.assertEqWith s "CR 118.3 the cast gate agrees with the payment at both counts" (fmap (uncurry (S.castable S.alice)) [(threeSpell, three), (oneSpell, one)]) [True, False]
-
-translatorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-translatorSpec s registry = Spec.describe s "Kozilek's Translator" $ do
-  Spec.it s "CR 605.3a / 602.5b the per-turn mana ability pays for one spell and is withheld until the next turn" $ do
-    translator <- S.printingOf s registry "Kozilek's Translator"
-    splitter <- S.printingOf s registry "Bonesplitter"
-    let (firstSplitter, secondSplitter, board) = translatorBoard translator splitter
-        castOf oid gs = snd (Engine.runGamePure translatorAnswer gs (do S.cast S.alice oid; Stack.resolveTop))
-        spent = castOf firstSplitter board
-        next = nextTurnOfAlice spent
-        inHand oid gs = elem oid (Game.zoneMembers Zone.Hand S.alice gs)
-    Spec.assertBool s (not (inHand firstSplitter spent)) "CR 605.3a the route is offered, so the first Bonesplitter is paid for and resolves"
-    Spec.assertEqWith s "and the life the route cost was paid" (S.lifeOf S.alice spent) (Just 19)
-    Spec.assertBool s (inHand secondSplitter (castOf secondSplitter spent)) "CR 602.5b the second Bonesplitter cannot be paid for this turn, so it is still in her hand"
-    Spec.assertEqWith s "and no second life was paid, so it was the rider and not the cost that refused it" (S.lifeOf S.alice (castOf secondSplitter spent)) (Just 19)
-    Spec.assertBool s (not (inHand secondSplitter (castOf secondSplitter next))) "CR 602.5b the handoff resets the rider, so the same card IS paid for on alice's next turn"
-    Spec.assertEqWith s "and a second life went with it" (S.lifeOf S.alice (castOf secondSplitter next)) (Just 18)
-    -- CR 605.3a's OTHER window, which reaches the same capacity through
-    -- Mana.manaSourcesGiven rather than through a payment: the Translator is a
-    -- source again on the later turn and is none once its route is spent.
-    Spec.assertEqWith s "CR 605.3a the priority window drops the source whose only route is spent, and offers it again next turn" (fmap (length . filter isManaActivation . Action.legalActions S.alice) [spent, next]) [0, 1]
 
 -- CR 602.1b on a MANA ability: Mana Cache ({1}{R}{R} Enchantment, Oracle text
 -- checked against Scryfall 2026-09-29): "At the beginning of each player's end

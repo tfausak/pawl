@@ -32,8 +32,10 @@ import qualified Pawl.Codec.Reply as Codec.Reply
 import qualified Pawl.Codec.Timed as Codec.Timed
 import qualified Pawl.Engine.Action as ActionEngine
 import qualified Pawl.Engine.Attach as Attach
+import qualified Pawl.Engine.Card as Engine.Card
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
@@ -154,7 +156,12 @@ type Run = State.StateT Rehearsal (Either Failure.ScenarioFailure)
 run :: (Monad m) => Registry.Registry m -> Scenario.Scenario -> m (Either Failure.ScenarioFailure GameState.GameState)
 run registry scenario = do
   staging <- stage registry (Scenario.board scenario)
-  let names = Set.toList (foldMap (namesIn . Either.fromRight ReplyType.Null . Codec.Reply.fromValue . Codec.encode Codec.Timed.codec) (Scenario.timeline scenario))
+  let names =
+        Set.toList
+          ( foldMap (namesIn . encoded Codec.Timed.codec) (Scenario.timeline scenario)
+              <> foldMap (namesIn . encoded Codec.Check.codec) (Scenario.final scenario)
+              <> Set.fromList (fmap Placement.card (placementsOf (Scenario.board scenario)))
+          )
   found <- mapM (\name -> fmap (fmap ((,) name)) (Registry.fetchCard registry name)) names
   pure $ do
     board <- staging
@@ -163,8 +170,8 @@ run registry scenario = do
     State.evalStateT (mapM_ (expect Nothing final) (Scenario.final scenario)) rehearsal
     pure final
 
--- | Every string a timeline entry holds, read as a card name: the names a
--- CR 201.4 answer can choose, for Prompt.LookUpCard.
+-- | Every string an entry or check holds, read as a card name: with the board's
+-- cards, the names a CR 201.4 answer or a copy can ask Prompt.LookUpCard about.
 namesIn :: ReplyType.Reply -> Set.Set CardName.CardName
 namesIn reply = case reply of
   ReplyType.Text t -> Set.singleton (CardName.MkCardName t)
@@ -656,6 +663,7 @@ takeAnswer gs decider kind = do
   let key = When.MkWhen (GameState.turnNumber gs) (GameState.phase gs) label
       names timed = case Timed.entry timed of
         Entry.Do (Move.Answer answer) -> Answer.prompt answer == kind
+        Entry.Refuse (Move.Answer answer) -> Answer.prompt answer == kind
         _ -> False
   entries <- queueAt key
   pure (fmap (\(index, timed) -> (key, index, timed)) (List.find (names . snd) (zip [0 ..] (Foldable.toList entries))))
@@ -664,13 +672,43 @@ answerGeneric :: GameState.GameState -> When.When -> Text.Text -> Int -> Timed.T
 answerGeneric gs key kind index timed prompt = case Timed.entry timed of
   Entry.Do verb@(Move.Answer answer) -> do
     popAt key index
-    let resolve needs = case needs of
-          Reply.Done a -> pure a
-          Reply.Failed problem -> failWith (Failure.MkUnexpectedActionChoice key verb (kind <> Text.pack ": " <> problem))
-          Reply.NeedObject ref k -> resolveObject ref gs >>= resolve . k
-          Reply.NeedPlayer label k -> resolvePlayer label >>= resolve . k
-    resolve (Reply.decode (Reply.shapeOf prompt) (Answer.with answer))
+    chosen <- decodeAnswer verb answer
+    allowed <- legalAnswer gs prompt chosen
+    if allowed then pure chosen else failWith (Failure.MkUnexpectedActionChoice key verb (kind <> Text.pack ": the rule refuses it"))
+  -- CR 201.4: the one answer the runner judges, as an interpreter does, so the
+  -- one a refused Answer can carry; the prompt then takes the next entry.
+  Entry.Refuse verb@(Move.Answer answer) -> do
+    popAt key index
+    chosen <- decodeAnswer verb answer
+    allowed <- legalAnswer gs prompt chosen
+    if allowed
+      then failWith (Failure.MkUnrefusedMove key verb (Just kind))
+      else do
+        found <- takeAnswer gs (Just (When.player key)) kind
+        case found of
+          Just (answerKey, next, nextTimed) -> answerGeneric gs answerKey kind next nextTimed prompt
+          Nothing -> failWith (Failure.MkUnscheduledPrompt (GameState.turnNumber gs) (GameState.phase gs) (Just (When.player key)) kind [])
   entry -> failWith (Failure.MkUnexpectedPrompt key entry kind [])
+  where
+    decodeAnswer verb answer =
+      let resolve needs = case needs of
+            Reply.Done a -> pure a
+            Reply.Failed problem -> failWith (Failure.MkUnexpectedActionChoice key verb (kind <> Text.pack ": " <> problem))
+            Reply.NeedObject ref k -> resolveObject ref gs >>= resolve . k
+            Reply.NeedPlayer label k -> resolvePlayer label >>= resolve . k
+       in resolve (Reply.decode (Reply.shapeOf prompt) (Answer.with answer))
+
+-- | CR 201.4 / 201.4a: a chosen name must be a card's, and one the prompt's
+-- restriction admits from the chooser's seat. Every other answer passes: the
+-- engine judges those itself, or trusts them.
+legalAnswer :: GameState.GameState -> Prompt.Type.Prompt r -> r -> Run Bool
+legalAnswer gs prompt chosen = case prompt of
+  Prompt.Type.ChooseCardName _ chooser _ restriction _ -> do
+    known <- State.gets reference
+    pure $ case Map.lookup chosen known >>= Engine.Card.faceNamed chosen of
+      Nothing -> False
+      Just face -> Filter.matches (Filter.contextFor (Game.teams gs) (Just chooser) Nothing) (Projection.viewOfCard face) restriction
+  _ -> pure True
 
 -- | A priority prompt: first the checks at the head of this moment, in timeline
 -- order, then the first move that takes priority, and a pass when there is

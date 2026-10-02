@@ -64,7 +64,6 @@ import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -357,33 +356,6 @@ castSpec s registry = Spec.describe s "Cast" $ do
                   (Binding.triggerSource, Set.singleton (Recipient.ToObject top))
                 ]
             )
-  -- CR 601.2g: a legal answer that cannot pay. Birds of Paradise offers all five
-  -- colours, so answering green against Lightning Bolt's {R} is a choice the
-  -- engine must honour (Cost.payMana argues why) and then cannot pay with. This
-  -- is the reachable mid-announcement failure castSpell's haddock calls
-  -- deliberate, and the class #418 did NOT remove -- the player chose it.
-  --
-  -- What is asserted is the REWIND: CR 601.2's own remedy returns the game to the
-  -- state before CR 601.2a moved the card, so the Bolt is in hand and the Birds
-  -- is untapped again. The tap is the sharp half -- it proves the cost payment
-  -- was undone rather than merely abandoned. The prompts already issued are not
-  -- recalled (#741); the game state is.
-  Spec.it s "CR 601.2 a mis-coloured mana answer unwinds the whole cast" $ do
-    birds <- S.printingOf s registry "Birds of Paradise"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, withBirds) = S.addPermanent birds S.alice (Setup.emptyGame S.bothPlayers)
-        (oid, gs0) = S.addHandCard lightningBolt S.alice withBirds
-        gs = gs0 {GameState.phase = Phase.PrecombatMain}
-        -- Green whenever the colour choice is offered; everything else default.
-        picksGreen :: Prompt.Prompt r -> r
-        picksGreen p = case p of
-          Prompt.ChooseManaYield _ _ _ candidates ->
-            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}]) candidates
-          _ -> S.identityAnswer p
-        after = snd (Engine.runGamePure picksGreen gs (S.cast S.alice oid))
-    Spec.assertEqWith s "nothing on the stack" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "the Bolt is back in alice's hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
-    Spec.assertEqWith s "and the Birds is untapped again" (S.tappedCount S.alice after) 0
 
   Spec.it s "an illegal target answer makes the cast a no-op" $ do
     mountain <- S.printingOf s registry "Mountain"

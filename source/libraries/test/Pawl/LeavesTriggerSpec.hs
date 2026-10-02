@@ -3270,8 +3270,8 @@ skullclampSpec s registry =
 -- Swamps, the Skeleton in the graveyard, the activation and the end step are
 -- shared, so the negative cannot pass for want of mana or of a trigger event.
 --
--- Reassembling Skeleton supplies the entry, for
--- Pawl.ConditionSpec.interveningRecheckSpec's reason: "{1}{B}: Return this card
+-- Reassembling Skeleton supplies the entry, for data/scenarios/condition's
+-- reason with Breathless Knight: "{1}{B}: Return this card
 -- from your graveyard to the battlefield tapped" is one activation, so a creature
 -- enters out of a graveyard with no reanimation spell in the way and the
 -- Amalgam's intervening "if it entered from your graveyard" is true.

@@ -53,51 +53,6 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.Zone as Zone
 
--- CR 701.9a: "To discard a card, move it from its owner's hand to that player's
--- graveyard." Nothing in the pool triggered on that until Megrim, {2}{B}
--- Enchantment: "Whenever an opponent discards a card, this enchantment deals 2
--- damage to that player." One trigger condition, one effect, and the effect
--- targets nothing -- so the only new thing any case below can be passing on is
--- the condition.
---
--- The interaction is the reason the condition is hard rather than the condition
--- itself. CR 702.29a: "'Cycling [cost]' means '[Cost], Discard this card: Draw a
--- card'", so cycling IS discarding and a discard trigger has to see it. CR
--- 702.29d then bounds how often: "Some cards have abilities that trigger
--- whenever a player 'cycles or discards' a card. These abilities trigger only
--- once when a card is cycled." An engine that recorded the cycle and the discard
--- as two log entries, both of them describing the one discard, would answer 4
--- damage in cr-702-29d-cycling-a-card-fires-the-discard-trigger-exactly.json
--- instead of 2.
---
--- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
--- every "an opponent" below is alice.
-discardTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-discardTriggerSpec s registry =
-  Spec.describe s "DiscardTrigger" $ do
-    -- "An OPPONENT discards", not "a player": the axis is load-bearing, and a
-    -- board where only the opponent ever discards cannot tell a correct
-    -- implementation from one that ignores the player entirely. The same
-    -- board, the same component, one discarder apart.
-    Spec.it s "CR 102.2 'an opponent': bob discarding to his own Megrim fires nothing" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      megrim <- S.printingOf s registry "Megrim"
-      let base = snd (S.addPermanent megrim S.bob (S.landsInPlay mountain 1))
-          (_, withAlicesCard) = S.addHandCard piker S.alice base
-          (_, gs0) = S.addHandCard piker S.bob withAlicesCard
-          gs = gs0 {GameState.priority = Just S.alice}
-          discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution Map.empty pid S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
-          byAlice = discardBy S.alice
-          byBob = discardBy S.bob
-          settle g = S.runPure S.identityAnswer g Engine.priorityLoop
-      Spec.assertEqWith s "alice's card reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice byAlice)) 1
-      Spec.assertEqWith s "and bob's reached his" (length (Game.zoneMembers Zone.Graveyard S.bob byBob)) 1
-      Spec.assertEqWith s "the opponent's discard costs her 2" (S.lifeOf S.alice (settle byAlice)) (fmap (subtract 2) (S.lifeOf S.alice gs))
-      Spec.assertEqWith s "the controller's own discard costs him nothing" (S.lifeOf S.bob (settle byBob)) (S.lifeOf S.bob gs)
-      Spec.assertEqWith s "and costs alice nothing either" (S.lifeOf S.alice (settle byBob)) (S.lifeOf S.alice gs)
-      Spec.assertEqWith s "bob's discard put nothing on the stack at all" (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority)) []
-
 -- One board for every case below, differing in exactly one thing: WHICH seat
 -- holds the Barkhide Mauler and cycles it. alice controls the Prickly Marmoset
 -- throughout, so CR 603.3a fixes its "you" as alice on all three boards.
@@ -1624,7 +1579,6 @@ aimedAt victim p = case p of
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
-  discardTriggerSpec s registry
   cyclesTriggerSpec s registry
   selfDiscardTriggerSpec s registry
   controllerAtTriggerSpec s registry

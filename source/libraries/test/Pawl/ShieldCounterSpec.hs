@@ -21,7 +21,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import Pawl.PreventionSpec (aimPlayer, answersFor, castAndResolve, countersOn, newestNamed, raceAnswer, settleDamage, theAbility, wasAskedToOrderDamage)
+import Pawl.PreventionSpec (answersFor, castAndResolve, countersOn, newestNamed, raceAnswer, settleDamage, theAbility, wasAskedToOrderDamage)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -31,7 +31,6 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -42,7 +41,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 122.1c: the replacement and the prevention effect one or more shield counters
@@ -122,67 +120,6 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         Spec.assertEqWith s "unreplaced: the printed one" (shields once plain) 1
         Spec.assertEqWith s "bob's praetor halves alice's placement, rounded down" (shields half halved) 0
       _ -> Spec.assertFailure s "the bird did not reach the battlefield"
-  -- CR 122.1c's SECOND sentence: "if damage would be dealt to this permanent,
-  -- prevent that damage and remove a shield counter from it". Lightning Bolt's 3
-  -- would be lethal to a 2/1, so an unprevented point of it is visible twice over --
-  -- as marked damage and as a death.
-  Spec.it s "CR 122.1c a Bolt at the bird is prevented and takes the counter" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    (bird, entered) <- board ["Mountain"] Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid bolt entered)
-        Spec.assertBool s (Set.member oid (GameState.battlefield once)) "it survived the Bolt"
-        Spec.assertEqWith s "no damage was marked (CR 615.6)" (S.damageOf oid once) (Just 0)
-        Spec.assertEqWith s "and the counter paid for it" (shields oid once) 0
-  -- The discriminating twin, one difference from the case above: bob's praetor
-  -- halves the entry placement to nothing, so the same bird faces the same Bolt on
-  -- the same board with NO counter on it. Same mana, same seats, same spell.
-  Spec.it s "CR 122.1c the same Bolt kills the same bird with no counter on it" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    (bird, entered) <- board ["Mountain"] (Just ("Vorinclex, Monstrous Raider", S.bob))
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid bolt entered)
-        Spec.assertEqWith s "setup: the halving left no shield" (shields oid entered) 0
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield once))) "so the Bolt killed it"
-  -- CR 122.1c's FIRST sentence: "if this permanent would be destroyed as the result
-  -- of an effect, instead remove a shield counter from it". Doom Blade destroys
-  -- without dealing any damage, so nothing here can be mistaken for the prevention
-  -- half -- and the bird is left untapped, which is how this also shows the removal
-  -- is not a regeneration ("removing a shield counter in this way isn't the same as
-  -- regenerating a creature"; CR 701.19a taps).
-  Spec.it s "CR 122.1c Doom Blade is replaced by the counter, and the next one kills" $ do
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    (bird, entered) <- board (replicate 4 "Swamp") Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid doomBlade entered)
-            twice = S.settleSba (castAt oid doomBlade once)
-        Spec.assertBool s (Set.member oid (GameState.battlefield once)) "it survived the first Doom Blade"
-        Spec.assertEqWith s "the counter paid for it" (shields oid once) 0
-        Spec.assertEqWith s "and it was not regenerated" (fmap Object.tapped (Game.lookupObject oid once)) (Just TapState.Untapped)
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield twice))) "and the second Doom Blade killed it"
-  -- Two counters, two destructions, and the third kills: the count is how many
-  -- events the pair may still replace, and one counter comes off per application
-  -- however many are there ("if a permanent that would be dealt damage has more than
-  -- one shield counter on it ... only one shield counter is removed").
-  Spec.it s "CR 122.1c Doubling Season's two counters replace two destructions" $ do
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    (bird, entered) <- board (replicate 6 "Swamp") (Just ("Doubling Season", S.alice))
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid doomBlade entered)
-            twice = S.settleSba (castAt oid doomBlade once)
-            thrice = S.settleSba (castAt oid doomBlade twice)
-        Spec.assertEqWith s "one counter off, not both" (shields oid once) 1
-        Spec.assertBool s (Set.member oid (GameState.battlefield twice)) "the second destruction is replaced too"
-        Spec.assertEqWith s "and now there are none" (shields oid twice) 0
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield thrice))) "so the third kills it"
   -- CR 122.1c's "as the result of an EFFECT", as a pair of boards differing in
   -- nothing but the destruction's cause. Through the two doors rather than through
   -- gameplay because that is the only way to hold everything else equal: reaching CR
@@ -206,26 +143,6 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         -- exist with the incarnation that held them, so the id reads 0 whether the
         -- shield was spent or ignored, which tells the two apart not at all.
         Spec.assertEqWith s "and it reached its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice byRule)) 1
-  -- CR 122.1c is a RULE rather than an ability the permanent has: "if a creature
-  -- with a shield counter loses its abilities, the shield counter will still protect
-  -- it as normal". So the pair survives layer 6, which is what minting it from
-  -- Object.counters rather than from the projection's ability list buys. Humility
-  -- arrives AFTER the bird, so what is under test is the shield outliving the
-  -- abilities and not CR 614.12's question about an entry replacement under layer 6.
-  Spec.it s "CR 613.1f a Humility'd bird keeps its shield" $ do
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    humility <- S.printingOf s registry "Humility"
-    (bird, entered) <- board (replicate 2 "Swamp") Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let humbled = S.withHumility humility entered
-            once = S.settleSba (castAt oid doomBlade humbled)
-        Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid entered) "setup: the bird has flying"
-        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying oid humbled)) "setup: Humility took it away"
-        Spec.assertEqWith s "setup: the counter is still there" (shields oid humbled) 1
-        Spec.assertBool s (Set.member oid (GameState.battlefield once)) "and the shield still replaced the destruction"
-        Spec.assertEqWith s "spending the counter" (shields oid once) 0
   -- The gather's SHORT-CIRCUIT reads copiable rules text, and a shield counter is
   -- on none of it: Projection.replacementsAffecting would answer [] for a board whose only
   -- replacement is CR 122.1c's, so this case is what makes that disjunct
@@ -314,52 +231,6 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     Spec.assertEqWith s "nothing is marked" (S.damageOf giant after) (Just 0)
     Spec.assertEqWith s "and both counters paid for it" (shields giant after) 0
     Spec.assertBool s (Set.member giant (GameState.battlefield (S.settleSba after))) "the Giant is untouched"
-  -- CR 122.1c's "to THIS permanent": the pair protects the permanent its counters
-  -- are on and no other recipient. Two Bolts off one board, one at bob and one at
-  -- bob's Piker, so both shapes a wrongly scoped shield would reach are covered -- a
-  -- damage event naming a PLAYER, whose recipient is no object at all, and one
-  -- naming another creature.
-  Spec.it s "CR 122.1c the shield covers its own permanent and no other recipient" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    (bird, entered) <- board ["Mountain", "Mountain"] Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let (pikerId, staged) = S.addPermanent pikerPrinting S.bob entered
-            castAtBob gs =
-              let (held, g1) = S.addHandCard bolt S.alice gs
-               in S.runPure (aimPlayer S.bob) g1 (S.cast S.alice held >> Stack.resolveTop)
-            hitBob = S.settleSba (castAtBob staged)
-            hitPiker = S.settleSba (castAt pikerId bolt hitBob)
-        Spec.assertEqWith s "bob took the Bolt" (S.lifeOf S.bob hitBob) (fmap (subtract 3) (S.lifeOf S.bob staged))
-        Spec.assertEqWith s "and the bird's counter is untouched" (shields oid hitBob) 1
-        Spec.assertBool s (not (Set.member pikerId (GameState.battlefield hitPiker))) "the second Bolt killed bob's Piker"
-        Spec.assertEqWith s "and the counter is still untouched" (shields oid hitPiker) 1
-        Spec.assertBool s (Set.member oid (GameState.battlefield hitPiker)) "setup: the bird sat there through both"
-  -- CR 615.12 with CR 122.1c: the pair's prevention half says "prevent", so CR 615.1a
-  -- makes it a prevention effect and unpreventable damage is still MET by it and
-  -- still prevented none of -- the Bolt lands in full and kills the 2/1. The
-  -- discriminating twin is the first Bolt case above: same bird, same Bolt, and the
-  -- only difference is Spider-Punk on the board.
-  --
-  -- The rule's MIDDLE clause takes the bird's counter off with it ("if a permanent
-  -- with a shield counter is dealt unpreventable damage, that damage will be dealt
-  -- and a shield counter will still be removed"), so the bird reaches CR 704.5g
-  -- with nothing left to replace anything. The counter is unreadable after the
-  -- fact here -- CR 122.2 -- which is why the cases below use a body that
-  -- survives; the GAMEPLAY route to CR 122.1c's "as the result of an effect" is
-  -- the last of them, where two Bolts leave a still-shielded permanent facing CR
-  -- 704.5g.
-  Spec.it s "CR 615.12 an unpreventable Bolt kills the shielded bird" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    (bird, entered) <- board ["Mountain"] (Just ("Spider-Punk", S.bob))
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid bolt entered)
-        Spec.assertEqWith s "setup: the bird still entered with its counter" (shields oid entered) 1
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield once))) "and the Bolt killed it through the shield"
   -- CR 615.12's MIDDLE clause -- "those effects won't prevent any damage, but any
   -- additional effects they have will take place" -- over CR 122.1c's "prevent
   -- that damage and remove a shield counter from it". The removal is

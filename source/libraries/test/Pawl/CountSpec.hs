@@ -808,26 +808,6 @@ roothaSpec s registry =
           Spec.assertEqWith s "the log is empty on the next turn" (S.eventsOf handed) []
           Spec.assertEqWith s "one token still" (length (S.tokensOf handed)) 1
           mapM_ (\oid -> Spec.assertEqWith s "still 3/3" (S.powerToughnessOf oid (S.settleSba handed)) (Just (3, 3))) (S.tokensOf handed)
-        -- CR 603.4's intervening "if", on the same board minus the two spells
-        -- that satisfy it. The Wurm alone is a cast this turn, so an ability
-        -- reading "if you've cast a spell" would still trigger here.
-        --
-        -- The assertion is that the ability never TRIGGERS, not merely that no
-        -- token appears: an ability that triggered anyway would fold an empty
-        -- set, and the token that mints has no power at all and dies to a
-        -- state-based action, so "no token" holds for a second reason and cannot
-        -- tell the two apart.
-        Spec.it s "CR 603.4 a CREATURE spell alone does not satisfy the intervening if" $ do
-          rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
-          forest <- S.printingOf s registry "Forest"
-          mountain <- S.printingOf s registry "Mountain"
-          island <- S.printingOf s registry "Island"
-          wurm <- S.printingOf s registry "Panglacial Wurm"
-          let cast = castOne wurm S.alice (board rootha forest mountain island)
-              after = throughBeginningOfCombat cast
-          Spec.assertEqWith s "the Wurm was cast" (length (filter isSpellCast (S.eventsOf cast))) 1
-          Spec.assertEqWith s "the ability never triggered" (filter isAbilityTriggered (S.eventsOf after)) []
-          Spec.assertEqWith s "and no token was created" (S.tokensOf after) []
 
 isAbilityTriggered :: GameEvent.GameEvent -> Bool
 isAbilityTriggered event = case event of

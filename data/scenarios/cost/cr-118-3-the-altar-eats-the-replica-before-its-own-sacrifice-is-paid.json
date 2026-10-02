@@ -1,0 +1,120 @@
+{
+  "description": "CR 118.3 the Altar eats the Replica before its own sacrifice is paid",
+  "note": "The window feeds the Replica to the Altar, so the Replica's own sacrifice cannot be paid and the activation is reversed; CR 733.1's ReverseManaAbilities is answered Exercises, as the Haskell answerer does, which undoes the Altar's sacrifice and empties the pool. Paying from the Plains, the activation stands.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Auriok Replica",
+            "label": "subject",
+            "ready": true
+          },
+          {
+            "card": "Ashnod's Altar",
+            "label": "altar",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "land1",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ReverseManaAbilities",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$subject",
+          "ability": 0,
+          "mana": [
+            "$altar",
+            "$land1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Auriok Replica",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ManaPool",
+          "player": "alice",
+          "is": []
+        }
+      }
+    }
+  ]
+}

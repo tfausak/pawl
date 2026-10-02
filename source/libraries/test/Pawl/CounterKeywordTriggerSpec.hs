@@ -349,59 +349,8 @@ vanishingSpec s registry =
         let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
             settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
          in (settled, snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop))
-      after pid gs = snd (upkeepOf pid gs)
       times = S.counterOf CounterKind.Time
-      -- The wurm CAST rather than placed, because rule 702.63a's first ability is
-      -- a replacement on the entry -- S.addPermanent builds the object directly and
-      -- so reaches no CR 616.1 loop, which is what the counterless case below
-      -- turns on.
-      castWurm = do
-        swamp <- S.printingOf s registry "Swamp"
-        wurm <- S.printingOf s registry "Waning Wurm"
-        let base = S.landsInPlay swamp 4
-            (held, gs0) = S.addHandCard wurm S.alice base
-            gs =
-              gs0
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
-        pure (wurmOn entered, entered)
-      wurmOn gs =
-        let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Waning Wurm"))
-         in List.find named (Set.toList (GameState.battlefield gs))
    in Spec.describe s "Vanishing" $ do
-        -- The proving test, and all three of rule 702.63a's abilities in one
-        -- board: two counters on the entry, one removed at each of alice's
-        -- upkeeps, and the sacrifice when the last one goes.
-        Spec.it s "CR 702.63a whole card: the Wurm enters with two time counters and counts them down" $ do
-          (found, entered) <- castWurm
-          case found of
-            Nothing -> Spec.assertFailure s "Waning Wurm did not reach the battlefield"
-            Just wurm -> do
-              Spec.assertEqWith s "two time counters on the entry" (times wurm entered) 2
-              let first = after S.alice entered
-              Spec.assertEqWith s "one after the first upkeep" (times wurm first) 1
-              Spec.assertBool s (S.onBattlefield wurm first) "and it is still on the battlefield"
-              let second = after S.alice first
-              Spec.assertEqWith s "none after the second" (times wurm second) 0
-              Spec.assertBool s (not (S.onBattlefield wurm second)) "so the last removal sacrificed it"
-              -- CR 701.21a: a sacrifice is a move to the OWNER's graveyard, and
-              -- not a destruction -- so this is the zone the wurm is in.
-              Spec.assertEqWith s "in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice second)) 1
-        -- Rule 702.63a says "YOUR upkeep", which is TurnScope.ControllersTurn: an
-        -- opponent's upkeep is not this trigger, and an arm reading EachTurn would
-        -- count the wurm down twice as fast.
-        Spec.it s "CR 702.63a bob's upkeep removes nothing" $ do
-          (found, entered) <- castWurm
-          case found of
-            Nothing -> Spec.assertFailure s "Waning Wurm did not reach the battlefield"
-            Just wurm -> do
-              let (settled, resolved) = upkeepOf S.bob entered
-              Spec.assertEqWith s "nothing was even put on the stack" (GameState.stack settled) []
-              Spec.assertEqWith s "so both counters are still there" (times wurm resolved) 2
-              Spec.assertBool s (S.onBattlefield wurm resolved) "and the wurm is untouched"
         -- CR 603.4's intervening "if": rule 702.63a's second ability does not
         -- trigger AT ALL on an upkeep where the permanent has no time counter, so
         -- nothing reaches the stack. S.addPermanent is what reaches this board --
@@ -443,98 +392,27 @@ vanishingSpec s registry =
 -- replacement at all. Tidewalker {2}{U} Creature -- Elemental */* is the card --
 -- "this creature enters with a time counter on it for each Island you control",
 -- numberless vanishing, and a CR 208.2a characteristic-defining power and
--- toughness equal to the time counters on it.
---
--- ALICE HOLDS THREE ISLANDS AND BOB HOLDS TWO, which is what makes the numbers
--- readable rather than coincidental: three is not one (a mint that defaulted the
--- absent N), not zero (an entry rider whose "you" was empty, which CR 704.5f
--- would then bury as a 0/0 before any upkeep), not five (a filter that dropped
--- "you control") and not the mana value. The one-Island board every number on
--- would be 1 cannot tell any of those apart.
---
--- The CDA is the reason a second reading is taken AFTER an upkeep: a power set
--- once on entry and a CR 613.4a ability that re-reads the counters agree at 3/3
--- and disagree at 2/2.
-numberlessVanishingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-numberlessVanishingSpec s registry =
-  let upkeep = Phase.Beginning BeginningStep.Upkeep
-      -- vanishingSpec's helper, and for its reasons: one upkeep for `pid`, run
-      -- out to the end of the priority loop so the trigger is gathered (CR 603.3)
-      -- and resolved.
-      after pid gs =
-        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
-            settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
-         in snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop)
-      times = S.counterOf CounterKind.Time
-      -- CAST rather than placed, for vanishingSpec's reason: the card's own entry
-      -- replacement is what puts the counters on, and S.addPermanent reaches no CR
-      -- 616.1 loop. `swamps` pays the generic half of {2}{U} on the control board,
-      -- where two Islands are one mana short.
-      castTidewalker islands swamps = do
-        island <- S.printingOf s registry "Island"
-        swamp <- S.printingOf s registry "Swamp"
-        tidewalker <- S.printingOf s registry "Tidewalker"
-        let base = S.landsFor swamp S.alice swamps (S.landsFor island S.bob 2 (S.landsInPlay island islands))
-            (held, gs0) = S.addHandCard tidewalker S.alice base
-            gs =
-              gs0
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
-        pure (walkerOn entered, entered)
-      walkerOn gs =
-        let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Tidewalker"))
-         in List.find named (Set.toList (GameState.battlefield gs))
-   in Spec.describe s "Vanishing" $ do
-        Spec.it s "CR 702.63b whole card: Tidewalker counts down the counters its own text put on" $ do
-          (found, entered) <- castTidewalker 3 0
-          case found of
-            Nothing -> Spec.assertFailure s "Tidewalker did not reach the battlefield"
-            Just walker -> do
-              Spec.assertEqWith s "a 3/3 on the entry, alice's three Islands and not bob's two" (S.powerToughnessOf walker entered) (Just (3, 3))
-              Spec.assertEqWith s "three time counters behind it" (times walker entered) 3
-              let first = after S.alice entered
-              Spec.assertEqWith s "a 2/2 after the first upkeep, so CR 613.4a re-read the counters" (S.powerToughnessOf walker first) (Just (2, 2))
-              Spec.assertEqWith s "two counters left" (times walker first) 2
-              let second = after S.alice first
-              Spec.assertEqWith s "a 1/1 after the second" (S.powerToughnessOf walker second) (Just (1, 1))
-              Spec.assertBool s (S.onBattlefield walker second) "and still on the battlefield, which a 0/0 would not be"
-              let third = after S.alice second
-              Spec.assertBool s (not (S.onBattlefield walker third)) "the third upkeep takes the last counter"
-              -- Either road ends here: CR 702.63b's second ability sacrifices it,
-              -- and a 0/0 it briefly is goes the same way under CR 704.5f. CR
-              -- 701.21a makes a sacrifice a move to the OWNER's graveyard.
-              Spec.assertEqWith s "and it is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice third)) 1
-        -- The pair board, differing in ONE thing: alice holds two Islands instead
-        -- of three (the Swamp only pays the generic half of {2}{U}). Both numbers
-        -- move, which is what says they are read rather than constant.
-        Spec.it s "CR 702.63b one Island fewer is a 2/2 that goes an upkeep sooner" $ do
-          (found, entered) <- castTidewalker 2 1
-          case found of
-            Nothing -> Spec.assertFailure s "Tidewalker did not reach the battlefield"
-            Just walker -> do
-              Spec.assertEqWith s "a 2/2 on the entry" (S.powerToughnessOf walker entered) (Just (2, 2))
-              Spec.assertEqWith s "two time counters" (times walker entered) 2
-              let second = after S.alice (after S.alice entered)
-              Spec.assertBool s (not (S.onBattlefield walker second)) "gone after two upkeeps, where three Islands survived two"
-        -- The mint itself, spelled out for vanishingSpec's reason. Rule 702.63b
-        -- states the SAME two triggers as rule 702.63a and no entry ability, so
-        -- the absent number changes exactly one of the two lists.
-        Spec.it s "CR 702.63b keeps both triggers and mints no entry rewrite" $ do
-          let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)
-              emptied = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Time Zone.Battlefield)
-          Spec.assertEqWith
-            s
-            "both of rule 702.63a's triggers, numberless"
-            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Vanishing Nothing) 1)))
-            [counted, emptied]
-          Spec.assertEqWith
-            s
-            "and no entry rewrite, however many instances"
-            (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing Nothing) 2)
-            []
+-- toughness equal to the time counters on it. data/scenarios/counter-keyword-trigger
+-- drives it whole.
+numberlessVanishingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+numberlessVanishingSpec s _ =
+  Spec.describe s "Vanishing" $ do
+    -- The mint itself, spelled out for vanishingSpec's reason. Rule 702.63b
+    -- states the SAME two triggers as rule 702.63a and no entry ability, so
+    -- the absent number changes exactly one of the two lists.
+    Spec.it s "CR 702.63b keeps both triggers and mints no entry rewrite" $ do
+      let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)
+          emptied = TriggerCondition.SelfLastCounterRemoved (SelfCountersRemoved.MkSelfCountersRemoved CounterKind.Time Zone.Battlefield)
+      Spec.assertEqWith
+        s
+        "both of rule 702.63a's triggers, numberless"
+        (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Vanishing Nothing) 1)))
+        [counted, emptied]
+      Spec.assertEqWith
+        s
+        "and no entry rewrite, however many instances"
+        (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing Nothing) 2)
+        []
 
 -- CR 702.32 fading, vanishing's neighbour and the reason the two are separate
 -- keywords rather than one with a counter kind on it. Rule 702.32a states TWO
@@ -563,61 +441,8 @@ fadingSpec s registry =
         let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
             settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
          in (settled, snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop))
-      after pid gs = snd (upkeepOf pid gs)
       fades = S.counterOf CounterKind.Fade
-      -- CAST rather than placed, for vanishingSpec's reason: rule 702.32a's first
-      -- ability is a replacement on the entry, and S.addPermanent reaches no CR
-      -- 616.1 loop.
-      castRidgeback = do
-        forest <- S.printingOf s registry "Forest"
-        ridgeback <- S.printingOf s registry "Skyshroud Ridgeback"
-        let base = S.landsInPlay forest 4
-            (held, gs0) = S.addHandCard ridgeback S.alice base
-            gs =
-              gs0
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
-        pure (ridgebackOn entered, entered)
-      ridgebackOn gs =
-        let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Skyshroud Ridgeback"))
-         in List.find named (Set.toList (GameState.battlefield gs))
    in Spec.describe s "Fading" $ do
-        -- The proving test, and both of rule 702.32a's abilities in one board.
-        Spec.it s "CR 702.32a whole card: the Ridgeback enters with two fade counters and outlives them by an upkeep" $ do
-          (found, entered) <- castRidgeback
-          case found of
-            Nothing -> Spec.assertFailure s "Skyshroud Ridgeback did not reach the battlefield"
-            Just ridgeback -> do
-              Spec.assertEqWith s "two fade counters on the entry" (fades ridgeback entered) 2
-              let first = after S.alice entered
-              Spec.assertEqWith s "one after the first upkeep" (fades ridgeback first) 1
-              Spec.assertBool s (S.onBattlefield ridgeback first) "and it is still on the battlefield"
-              let second = after S.alice first
-              Spec.assertEqWith s "none after the second" (fades ridgeback second) 0
-              -- Rule 702.32a rather than rule 702.63a: the removal that empties
-              -- the pile sacrifices nothing, because the rule's "if you can't" is
-              -- about a removal that did not happen.
-              Spec.assertBool s (S.onBattlefield ridgeback second) "and STILL on it, which a vanishing 2 creature would not be"
-              let third = after S.alice second
-              Spec.assertBool s (not (S.onBattlefield ridgeback third)) "the third upkeep could remove none, so it was sacrificed"
-              -- CR 701.21a: a sacrifice is a move to the OWNER's graveyard and not
-              -- a destruction.
-              Spec.assertEqWith s "in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice third)) 1
-              Spec.assertEqWith s "and the pile it was counting is still empty" (fades ridgeback third) 0
-        -- Rule 702.32a says "YOUR upkeep", which is TurnScope.ControllersTurn: an
-        -- arm reading EachTurn would count the Ridgeback down twice as fast.
-        Spec.it s "CR 702.32a bob's upkeep removes nothing" $ do
-          (found, entered) <- castRidgeback
-          case found of
-            Nothing -> Spec.assertFailure s "Skyshroud Ridgeback did not reach the battlefield"
-            Just ridgeback -> do
-              let (settled, resolved) = upkeepOf S.bob entered
-              Spec.assertEqWith s "nothing was even put on the stack" (GameState.stack settled) []
-              Spec.assertEqWith s "so both counters are still there" (fades ridgeback resolved) 2
-              Spec.assertBool s (S.onBattlefield ridgeback resolved) "and the Ridgeback is untouched"
         -- Rule 702.32a states NO intervening "if", which is the other half of the
         -- difference from rule 702.63a: the ability triggers on an upkeep where
         -- the pile is already empty, and that firing IS the sacrifice.

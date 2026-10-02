@@ -1,0 +1,153 @@
+{
+  "description": "CR 118.3 the Altar eats the Executioner before its own exile is paid",
+  "note": "The window feeds the Executioner to the Altar, so its own exile cannot be paid and the activation is reversed; CR 733.1's ReverseManaAbilities is answered Exercises, as the Haskell answerer does, which undoes the Altar's sacrifice. Paying from the Plains, the activation stands.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Hanged Executioner",
+            "label": "subject",
+            "ready": true
+          },
+          {
+            "card": "Ashnod's Altar",
+            "label": "altar",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "land1",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "land2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "land3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "land4",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ReverseManaAbilities",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$subject",
+          "ability": 0,
+          "mana": [
+            "$altar",
+            "$land1",
+            "$land2",
+            null
+          ],
+          "targets": [
+            "$piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Hanged Executioner",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    }
+  ]
+}

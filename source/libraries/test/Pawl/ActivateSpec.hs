@@ -1192,16 +1192,6 @@ isPowerUp a = case a of
   A.Activate _ ability -> ActivatedAbility.keyword ability == Just Keyword.PowerUp
   _ -> False
 
--- Takes the power-up activation whenever it is offered and passes otherwise, so
--- a second one is refused by CR 702.193a's rider rather than declined here.
-powerUpAnswer :: Prompt.Prompt r -> r
-powerUpAnswer p = case p of
-  Prompt.ChooseAction _ _ options -> case filter isPowerUp options of
-    a : _ -> a
-    [] -> A.Pass
-  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
-  _ -> S.identityAnswer p
-
 -- alice's precombat main phase with `n` Forests and Hulk, Gamma Goliath -- put
 -- onto the battlefield THIS TURN from her hand when `entered`, by a zone change
 -- the turn's log records (CR 400.7), and otherwise placed as a permanent the log
@@ -1240,18 +1230,6 @@ powerUpSpec s registry = Spec.describe s "Power-up (CR 702.193)" $ do
     Spec.assertEqWith s "three Forests pay the power-up of a Hulk that entered this turn" (offered enteredId entered) 1
     Spec.assertEqWith s "and not that of a Hulk that was already there" (offered settledId settled) 0
     Spec.assertEqWith s "both Hulks are on the battlefield" (fmap (\(oid, gs) -> Set.member oid (GameState.battlefield gs)) [(enteredId, entered), (settledId, settled)]) [True, True]
-
-  -- The gameplay-level proof (design.md section 4), through the priority loop.
-  -- Six Forests pay the reduced {3} twice, so the second activation is refused by
-  -- CR 702.193a's "activate this ability only once" and not by the mana.
-  Spec.it s "CR 702.193a whole card: Hulk powers up once, for {3}, and is refused the second time" $ do
-    hulk <- S.printingOf s registry "Hulk, Gamma Goliath"
-    forest <- S.printingOf s registry "Forest"
-    let (hulkId, board) = hulkBoard True hulk forest 6
-        after = S.runPure powerUpAnswer board Engine.priorityLoop
-    Spec.assertEqWith s "Hulk is an 11/10, so five counters went on and not ten" (S.powerToughnessOf hulkId after) (Just (11, 10))
-    Spec.assertEqWith s "exactly three Forests were tapped, so three remain to pay a second activation" (S.tappedCount S.alice after) 3
-    Spec.assertEqWith s "and the power-up is not offered again" (filter isPowerUp (activationsOf hulkId (Action.legalActions S.alice after))) []
 
   -- Hulk's second line, a Pawl.Types.ReduceActivationCost narrowed to power-up:
   -- Kang's {5}{U}{U}{U} less {3} is {2}{U}{U}{U}, which five Islands pay. Kang
@@ -1522,57 +1500,6 @@ equipSpec s registry = Spec.describe s "Equip" $ do
         Spec.assertEqWith s "and on the Mammoth in the other run" (fmap Object.attachedTo (Game.lookupObject aegisId (resolve mammothId ontoMammoth))) (Just (Just (Recipient.ToCreature mammothId)))
         Spec.assertEqWith s "setup: rule 702.6a minted the Aegis's printed equip {3}" (ActivatedAbility.cost ability) (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])
         Spec.assertEqWith s "setup: nothing was tapped before either activation" (S.tappedCount S.alice board) 0
-      abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
-
-  -- The same reduction seen by the GATES rather than by the payment, which is
-  -- what CR 601.2e's position after CR 601.2c is about: the rules never measure
-  -- an activation cost without the targets in hand, and pawl's two gates -- the
-  -- one Action.legalActions enumerates through and the one at CR 601.2b's
-  -- position inside activateAbility -- both run earlier than any rule does. Per
-  -- CR 602.2 an activation is legal if the player can comply with every step, so
-  -- neither gate may refuse one that a legal choice of targets completes.
-  --
-  -- WHY ONE MOUNTAIN. The Aegis's printed equip is {3} and the reduced cost is
-  -- {1}, so a single Mountain pays the reduced cost and cannot pay the printed
-  -- one: this is the board the three-Mountain case above cannot be, since there
-  -- both readings offer and both pay.
-  --
-  -- WHY THE MAMMOTH, twice over. On the same board and one target apart it is
-  -- the negative: aiming the equip at it charges the printed {3}, one Mountain
-  -- cannot pay it, and CR 602.2's rewind leaves the Aegis where it stood -- so
-  -- the offer is not a promise, and a gate that assumed every legal target
-  -- reduces would still be wrong about what is PAID. It is also what keeps the
-  -- Maulerless control honest: the equip's slot stays fillable when the Mauler
-  -- is gone, so what withholds the offer there is the cost and not an empty
-  -- target set.
-  Spec.it s "CR 602.2 the gate offers an equip only a target-aware reduction can pay for" $ do
-    mauler <- S.printingOf s registry "Dwarven Mauler"
-    mammoth <- S.printingOf s registry "War Mammoth"
-    aegis <- S.printingOf s registry "Aegis of the Legion"
-    mountain <- S.printingOf s registry "Mountain"
-    let (maulerId, g0) = S.addPermanent mauler S.alice (Setup.emptyGame S.bothPlayers)
-        (mammothId, g1) = S.addPermanent mammoth S.alice g0
-        (aegisId, g2) = S.addPermanent aegis S.alice g1
-        ready g = g {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-        board = ready (S.landsFor mountain S.alice 1 g2)
-        (_, m1) = S.addPermanent mammoth S.alice (Setup.emptyGame S.bothPlayers)
-        (aegisAloneId, m2) = S.addPermanent aegis S.alice m1
-        maulerless = ready (S.landsFor mountain S.alice 1 m2)
-    case Projection.abilitiesOf aegisId board of
-      [ability] -> do
-        let equipOnto victim = S.runPure (aimAtOffered victim) board (Activate.activateAbility S.alice aegisId ability)
-            resolve victim activated = S.runPure (aimAtOffered victim) activated Stack.resolveTop
-            ontoMauler = resolve maulerId (equipOnto maulerId)
-            ontoMammoth = resolve mammothId (equipOnto mammothId)
-        Spec.assertEqWith s "CR 701.3a the equip that targets the Mauler completes and the Aegis is on it" (fmap Object.attachedTo (Game.lookupObject aegisId ontoMauler)) (Just (Just (Recipient.ToCreature maulerId)))
-        Spec.assertEqWith s "CR 601.2f paying {3} minus {2} taps the one Mountain" (S.tappedCount S.alice ontoMauler) 1
-        Spec.assertEqWith s "CR 602.2 while the same equip aimed at the Mammoth owes the printed {3} and never moves" (fmap Object.attachedTo (Game.lookupObject aegisId ontoMammoth)) (Just Nothing)
-        Spec.assertEqWith s "and that rewind left the Mountain untapped" (S.tappedCount S.alice ontoMammoth) 0
-        Spec.assertEqWith s "CR 601.2e the equip is offered on a board that cannot pay its printed cost" (length (activationsOf aegisId (Action.legalActions S.alice board))) 1
-        Spec.assertEqWith s "while the same board without the Mauler offers nothing" (length (activationsOf aegisAloneId (Action.legalActions S.alice maulerless))) 0
-        Spec.assertBool s (not (null (Projection.abilitiesOf aegisAloneId maulerless))) "though that Aegis has an equip to withhold"
-        Spec.assertEqWith s "setup: rule 702.6a minted the Aegis's printed equip {3}" (ActivatedAbility.cost ability) (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])
-        Spec.assertEqWith s "setup: one Mountain, untapped, before either run" (S.tappedCount S.alice board) 0
       abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
 
 -- CR 702.77: reinforce, cycling's zone with a TARGET. Mosquito Guard is a {W}

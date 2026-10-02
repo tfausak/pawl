@@ -14,7 +14,6 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -33,7 +32,6 @@ import qualified Pawl.Extra.Int as Int
 import Pawl.LifeReplacementSpec (aimCreatureAndOrder, castDeflection, castDisaster, deflectionCombat, winTheFlipAndOrder)
 import Pawl.PreventionSpec (aimAndChoose, aimCreature, aimPlayer, answersFor, atLife, attackNoBlock, bobAttacks, castAndResolve, chosenSourcesIn, countersOn, onlyCreature, preventAllRows, preventionsRecorded, riderHits, settleDamage, shieldsLeft, theAbility, wasAskedToAllocateDamage, wasAskedToOrderDamage)
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action
@@ -43,7 +41,6 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -63,7 +60,6 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -72,7 +68,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
-import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -3572,60 +3567,6 @@ cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" 
     Spec.assertEqWith s "setup: it went into the step untapped" (tapStateOf piker stunned) (Just TapState.Untapped)
     Spec.assertEqWith s "and came out of it untapped" (tapStateOf piker after) (Just TapState.Untapped)
 
--- CR 614.1a / 502.3: Bewitching Leechcraft {1}{U} Enchantment -- Aura, "Enchant
--- creature / When this Aura enters, tap enchanted creature. / Enchanted creature
--- has 'If this creature would untap during your untap step, remove a +1/+1
--- counter from it instead. If you do, untap it.'" (Oracle text checked against
--- api.scryfall.com 2026-09-29).
---
--- alice casts it on bob's Piker through the priority loop, so the grant and the
--- tap are the card's own. The three boards differ in one thing each: the
--- Piker's counters (paid versus none to pay), and which road untaps it (bob's
--- untap step versus Dream's Grip in alice's main phase).
-bewitchingLeechcraftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-bewitchingLeechcraftSpec s registry = Spec.describe s "Bewitching Leechcraft (CR 614.1a)" $ do
-  let piker = S.aliasRef "piker"
-      island = S.namedRef "Island"
-      leechcraft = S.namedRef "Bewitching Leechcraft" 1
-      pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
-      leechBoard counters =
-        S.board
-          ( (S.battlefield S.alice [S.permanent "Island", S.permanent "Island", S.permanent "Island"]) {Seat.hand = Seq.fromList [S.permanent "Bewitching Leechcraft", S.permanent "Dream's Grip"]}
-              NonEmpty.:| [S.battlefield S.bob [(S.settled "piker" "Goblin Piker") {Placement.counters = counters}]]
-          )
-          S.alice
-          S.precombatMain
-      enchant =
-        S.on
-          S.precombatMain
-          S.alice
-          ( S.castAction
-              leechcraft
-              Choices.none
-                { Choices.targets = Just [piker],
-                  Choices.manaSources = Seq.fromList [Just (island 1), Just (island 2), Nothing]
-                }
-          )
-      -- CR 502.3, bob's: the step Engine.runStep runs for the phase it is in.
-      bobsUntapStep gs = S.runPure S.identityAnswer gs {GameState.activePlayer = S.bob, GameState.phase = Phase.Beginning BeginningStep.Untap} Engine.runStep
-      pikerIn gs = case Scenario.namedObjects pikerName gs of
-        [oid] -> Just oid
-        _ -> Nothing
-      pikerState gs = case pikerIn gs of
-        Just oid -> (tapStateOf oid gs, S.counterOf CounterKind.PlusOnePlusOne oid gs)
-        Nothing -> (Nothing, 0)
-  Spec.it s "CR 614.1a the enchanted creature pays a +1/+1 counter to untap in its controller's untap step" $ do
-    enchanted <- S.play s registry (leechBoard (Map.singleton CounterKind.PlusOnePlusOne 2)) (S.turn 1 [enchant]) S.priorityGame
-    let untapped = bobsUntapStep enchanted
-    Spec.assertEqWith s "CR 614.1a the Piker untapped and paid exactly one of its two counters" (pikerState untapped) (Just TapState.Untapped, 1)
-    Spec.assertEqWith s "setup: the Aura's trigger tapped the Piker, which kept both counters" (pikerState enchanted) (Just TapState.Tapped, 2)
-  -- "If you do": with nothing to remove, the untap does not happen.
-  Spec.it s "CR 614.1a with no +1/+1 counter to remove it stays tapped" $ do
-    enchanted <- S.play s registry (leechBoard Map.empty) (S.turn 1 [enchant]) S.priorityGame
-    let untapped = bobsUntapStep enchanted
-    Spec.assertEqWith s "CR 614.1a the counterless Piker is still tapped after bob's untap step" (pikerState untapped) (Just TapState.Tapped, 0)
-    Spec.assertEqWith s "setup: the Aura's trigger tapped the Piker" (pikerState enchanted) (Just TapState.Tapped, 0)
-
 -- The names of the cards in a player's graveyard, sorted.
 graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
 graveyardNames pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs))
@@ -3670,5 +3611,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   lavaBurstSpec s registry
   queensBayPaladinSpec s registry
   cryogenicStasisSpec s registry
-  bewitchingLeechcraftSpec s registry
   killSuitCultistSpec s registry

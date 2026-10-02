@@ -1,0 +1,251 @@
+{
+  "description": "CR 613.1f a Humility'd bird keeps its shield",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains-1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-1"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Swooping Protector",
+            "label": "bird-card"
+          },
+          {
+            "card": "Doom Blade",
+            "label": "blade-1"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "bob-plains-1"
+          },
+          {
+            "card": "Plains",
+            "label": "bob-plains-2"
+          },
+          {
+            "card": "Plains",
+            "label": "bob-plains-3"
+          },
+          {
+            "card": "Plains",
+            "label": "bob-plains-4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Humility",
+            "label": "humility"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bird-card",
+          "mana": [
+            "$plains-1",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "Swooping Protector",
+          "keyword": {
+            "type": "Flying"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Swooping Protector",
+          "kind": {
+            "type": "Shield"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$humility",
+          "mana": [
+            "$bob-plains-1",
+            "$bob-plains-2",
+            "$bob-plains-3",
+            "$bob-plains-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Keywords": {
+          "object": "Swooping Protector",
+          "keyword": {
+            "type": "Flying"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Counters": {
+          "object": "Swooping Protector",
+          "kind": {
+            "type": "Shield"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$blade-1",
+          "targets": [
+            "Swooping Protector"
+          ],
+          "mana": [
+            "$swamp-1",
+            "$swamp-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Swooping Protector",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Swooping Protector",
+          "kind": {
+            "type": "Shield"
+          },
+          "count": 0
+        }
+      }
+    }
+  ]
+}

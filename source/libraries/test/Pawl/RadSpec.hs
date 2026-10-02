@@ -65,7 +65,7 @@ spec s registry = Spec.describe s "Rad counters" $ do
   reanimationSpec s registry
 
 -- CR 122.1i through the card that hands the counters out.
-producerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+producerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 producerSpec s registry = Spec.describe s "The Master, Transcendent" $ do
   Spec.it s "CR 122.1i its enters trigger gives the TARGETED player two rad counters" $ do
     master <- S.printingOf s registry "The Master, Transcendent"
@@ -77,28 +77,6 @@ producerSpec s registry = Spec.describe s "The Master, Transcendent" $ do
     -- The falsifier for a recipient plumbed to the resolving controller (#120):
     -- alice cast it, and alice gets nothing.
     Spec.assertEqWith s "and alice, who cast it, has none" (radOf S.alice after) 0
-  -- The whole rule, end to end: a card puts the counters on, and the player they
-  -- landed on pays rule 728.1's price on their own next precombat main phase.
-  Spec.it s "CR 728.1 those counters then mill bob, cost him life and burn themselves down" $ do
-    master <- S.printingOf s registry "The Master, Transcendent"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    mountain <- S.printingOf s registry "Mountain"
-    lands <- fourColorLands s registry
-    let (gs, spellId) = S.handOne master (boardOf lands)
-        cast = S.runPure (targeting S.bob) gs (S.cast S.alice spellId)
-        entered = S.runPure (targeting S.bob) cast Engine.priorityLoop
-        -- Three cards, of which the mill reaches the top TWO, both nonland; the
-        -- Mountain under them proves the mill counts rad counters and not the
-        -- library, and keeps the milled count (2) apart from the number of
-        -- cards there were (3).
-        stocked = libraryTopped [bolt, bolt, mountain] S.bob entered
-        after = S.runPure S.identityAnswer (precombatMainOf S.bob stocked) (Engine.runStep >> Engine.priorityLoop)
-    Spec.assertEqWith s "two cards milled" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
-    Spec.assertEqWith s "and one left in the library" (length (Game.zoneMembers Zone.Library S.bob after)) 1
-    Spec.assertEqWith s "bob lost 1 life per nonland card milled" (S.lifeOf S.bob after) (Just 18)
-    -- Both counters spent on the two nonland cards: rule 728.1's ability eats
-    -- what it fires on, so a second precombat main phase would find nothing.
-    Spec.assertEqWith s "and no rad counter is left" (radOf S.bob after) 0
 
 -- CR 728.1's ability on its own, over the boards that vary what the mill finds.
 abilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

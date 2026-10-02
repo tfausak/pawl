@@ -1,0 +1,208 @@
+{
+  "description": "CR 702.6e equip planeswalker suits up Jace, and CR 704.5n leaves Luxior on him",
+  "note": "Eight Islands rather than the test's five, so that the {3} plain equip is affordable when it is refused on Jace and the refusal is the target's, not the mana's.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island-1",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-5",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-6",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-7",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-8",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin",
+            "ready": true
+          },
+          {
+            "card": "Luxior, Giada's Gift",
+            "label": "luxior",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Jace Beleren",
+            "label": "jace-card"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$jace-card",
+          "mana": [
+            "$island-1",
+            "$island-2",
+            "$island-3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$luxior",
+          "ability": 1,
+          "targets": [
+            "$goblin"
+          ],
+          "mana": [
+            "$island-4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$luxior",
+          "ability": 0,
+          "targets": [
+            "Jace Beleren"
+          ],
+          "mana": [
+            "$island-4",
+            "$island-5",
+            "$island-6",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$luxior",
+          "ability": 1,
+          "targets": [
+            "Jace Beleren"
+          ],
+          "mana": [
+            "$island-4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "AttachedTo",
+          "object": "$luxior",
+          "is": "Jace Beleren"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Types": {
+          "object": "Jace Beleren",
+          "types": [
+            "Creature"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Subtypes": {
+          "object": "Jace Beleren",
+          "subtypes": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Jace Beleren",
+          "power": 3,
+          "toughness": 3
+        }
+      }
+    }
+  ]
+}
