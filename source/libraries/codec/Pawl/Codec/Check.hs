@@ -10,12 +10,12 @@ import qualified Pawl.Codec.KeywordsAre as KeywordsAre
 import qualified Pawl.Codec.LifeIs as LifeIs
 import qualified Pawl.Codec.MonarchIs as MonarchIs
 import qualified Pawl.Codec.NamesAre as NamesAre
-import qualified Pawl.Codec.ViewIs as ViewIs
 import qualified Pawl.Codec.PlayerCountersAre as PlayerCountersAre
 import qualified Pawl.Codec.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Codec.SubtypesAre as SubtypesAre
 import qualified Pawl.Codec.TappedIs as TappedIs
 import qualified Pawl.Codec.TypesAre as TypesAre
+import qualified Pawl.Codec.ViewIs as ViewIs
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.Check as Check

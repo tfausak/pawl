@@ -10,12 +10,12 @@ import qualified Pawl.Types.KeywordsAre as KeywordsAre
 import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.MonarchIs as MonarchIs
 import qualified Pawl.Types.NamesAre as NamesAre
-import qualified Pawl.Types.ViewIs as ViewIs
 import qualified Pawl.Types.PlayerCountersAre as PlayerCountersAre
 import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.SubtypesAre as SubtypesAre
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TypesAre as TypesAre
+import qualified Pawl.Types.ViewIs as ViewIs
 
 -- | One fact a scenario asserts about the game, in the nouns a client would
 -- display.
