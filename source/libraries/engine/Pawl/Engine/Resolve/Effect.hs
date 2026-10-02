@@ -1058,6 +1058,15 @@ settleArrivals depthOf zone placement targets =
         -- the position it is handed.
         _ -> pure (fmap (\oid -> (oid, (LibraryPosition.defaultValue, 0))) targets)
 
+-- Game.apnapOrder cut to Game.reachableBy: a departed seat is no longer a player
+-- (CR 102.1), and CR 801.10 keeps an effect off one outside its controller's
+-- range. Pawl.RangeOfInfluenceSpec's and Pawl.DepartureSpec's Fanatic of Mogis
+-- prove both.
+reachableInApnap :: PlayerId -> GameState -> [PlayerId]
+reachableInApnap controller gs =
+  let reachable = Game.reachableBy controller gs
+   in filter (`elem` reachable) (Game.apnapOrder gs)
+
 -- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
 -- as RECIPIENTS. It exists because CR 115.4's "any target" includes a player and
 -- CR 120.1 lets damage go to one, so DealDamage's InSlot arm must name something
@@ -1083,12 +1092,12 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachAbility _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachOnStack _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
-  -- Game.apnapOrder.
-  ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (Game.apnapOrder gs)
+  -- reachableInApnap.
+  ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (reachableInApnap controller gs)
   -- CR 120.3a again, over CR 102.1's opponents alone -- the arm above filtered
   -- by PlayerRelation.holds against CR 109.5's "you", which is the resolving
   -- controller. APNAP order survives the filter (CR 608.2f).
-  ObjectRef.EachOpponent -> fmap Recipient.ToPlayer (filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) (Game.apnapOrder gs))
+  ObjectRef.EachOpponent -> fmap Recipient.ToPlayer (filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) (reachableInApnap controller gs))
   -- CR 120.3a, one seat wide: the player the SOURCE chose as it entered (CR
   -- 614.12a). Read off `source` (CR 113.7a), not `resolving`, which for a
   -- triggered ability is the ability object and never carries the choice.
