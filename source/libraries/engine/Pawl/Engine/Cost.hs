@@ -4284,7 +4284,11 @@ composeReversal before windows = case NonEmpty.nonEmpty windows of
 -- rule's "revealed from a library" protects. `nextEventGroup` rides at
 -- `since`'s value, since a carried-over entry may already hold a group
 -- `snapshot`'s own counter would otherwise repeat -- GameState.events' groups
--- are non-decreasing along the log.
+-- are non-decreasing along the log. `nextTimestamp` rides there too, the
+-- clock Pawl.Engine.Reversal's `newest` never turns back: a CR 733.1 answer
+-- stamps GameState.lastChoice off the live clock (`reverseIllegal`), and CR
+-- 104.4b's check (Pawl.Engine.Engine.checkMandatoryLoop) subtracts that stamp
+-- from this one.
 keepingLibraryActions :: GameState -> GameState -> GameState
 keepingLibraryActions since snapshot =
   let keep pid held = case Map.lookup pid (GameState.library since) of
@@ -4297,7 +4301,8 @@ keepingLibraryActions since snapshot =
    in snapshot
         { GameState.library = Map.mapWithKey keep (GameState.library snapshot),
           GameState.events = GameState.events snapshot <> Seq.filter revealedFromLibrary (Seq.drop (Seq.length (GameState.events snapshot)) (GameState.events since)),
-          GameState.nextEventGroup = GameState.nextEventGroup since
+          GameState.nextEventGroup = GameState.nextEventGroup since,
+          GameState.nextTimestamp = GameState.nextTimestamp since
         }
 
 -- The restore every caller that reverts a failed payment to its own snapshot
