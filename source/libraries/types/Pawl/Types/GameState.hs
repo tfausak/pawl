@@ -389,10 +389,11 @@ data GameState = MkGameState
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
     -- ability carrying that rider, as the same record CR 603.3b's log carries.
-    -- A stored set rather than the log, because `events` is cleared at the turn
-    -- handoff and this record must outlive it; Pawl.Engine.Event.withinTriggerLimit
-    -- derives its key from these exactly as it does from the log.
-    triggeredThisGame :: Set.Set AbilityTriggered.AbilityTriggered,
+    -- Stored beside the log rather than read off it, because `events` is cleared
+    -- at the turn handoff and this record must outlive it; a sequence rather
+    -- than a set, because Pawl.Engine.Event.withinTriggerLimit COUNTS these
+    -- records exactly as it counts the log's (CR 113.2c).
+    triggeredThisGame :: Seq.Seq AbilityTriggered.AbilityTriggered,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
     -- controlled; last created wins (CR 723.1a), promoted into `control` at
     -- that player's turn (CR 723.1b).

@@ -256,7 +256,7 @@ inherentPending events _ =
   let rolledPlaneswalker event = case event of
         GameEvent.PlanarDieRolled r | PlanarDieRolled.face r == PlanarDieFace.Planeswalker -> Just (PlanarDieRolled.roller r)
         _ -> Nothing
-   in fmap (\pid -> PendingTrigger.MkPendingTrigger TriggerSource.Sourceless pid planeswalkingAbility Map.empty Nothing Nothing) (Maybe.mapMaybe rolledPlaneswalker events)
+   in fmap (\pid -> PendingTrigger.MkPendingTrigger TriggerSource.Sourceless pid planeswalkingAbility Map.empty Nothing Nothing 1) (Maybe.mapMaybe rolledPlaneswalker events)
 
 -- | CR 901.8's text. The condition is never matched -- inherentPending gathers
 -- the ability off the event -- and PlayerRollsDice is the nearest description.
