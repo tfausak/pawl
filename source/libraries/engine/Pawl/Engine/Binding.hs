@@ -482,6 +482,17 @@ returnedPermanent = SlotName.MkSlotName (Text.pack "thatReturnedPermanent")
 exiledCard :: SlotName
 exiledCard = SlotName.MkSlotName (Text.pack "thatExiledCard")
 
+-- CR 702.167c: the reserved slot under which a CostComponent.ExileMaterials
+-- payment binds the materials' EXILE incarnations, exiledCard's reason. Folded
+-- onto the craft ability by Pawl.Engine.Activate, and read by
+-- Pawl.Engine.Resolve.Effect's MoveToZone arm, which links each card still in
+-- exile to the permanent that ability returns (GameState.exiledWith).
+--
+-- Not a target, so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as sacrificedPermanent above.
+craftMaterials :: SlotName
+craftMaterials = SlotName.MkSlotName (Text.pack "thoseCraftMaterials")
+
 -- CR 400.7j: the reserved slot under which the card a DiscardThis COST payment
 -- discarded is bound, as the object it became in the graveyard -- Calim, Djinn
 -- Emperor's "return Calim from your graveyard to the battlefield tapped" after

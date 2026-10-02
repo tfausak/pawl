@@ -6035,6 +6035,31 @@ craftBattlefieldNames gs = Set.unions (fmap (\o -> Projection.namesOf o gs) (Gam
 craftNamesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
 craftNamesIn zone gs = List.sort (Maybe.mapMaybe (\o -> fmap S.nameOf (Game.cardOf o gs)) (Game.zoneMembers zone S.alice gs))
 
+-- Saheeli's Lattice on alice's battlefield with five Mountains, which is exactly
+-- {4}{R}, and the named printings on her battlefield, in her graveyard and in
+-- exile, their ids answered in that order.
+latticeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> [String] -> [String] -> m (ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId])
+latticeBoard s registry there graveyard exiled = do
+  lattice <- S.printingOf s registry "Saheeli's Lattice"
+  mountain <- S.printingOf s registry "Mountain"
+  thereP <- mapM (S.printingOf s registry) there
+  graveyardP <- mapM (S.printingOf s registry) graveyard
+  exiledP <- mapM (S.printingOf s registry) exiled
+  let (latticeId, g0) = S.addPermanent lattice S.alice (S.landsInPlay mountain 5)
+      place add (sofar, g) p = let (i, g') = add p S.alice g in (sofar <> [i], g')
+      (ids, g1) = List.foldl' (place S.addExiledCard) (List.foldl' (place S.addGraveyardCard) (List.foldl' (place S.addPermanent) ([], g0) thereP) graveyardP) exiledP
+  pure (latticeId, g1 {GameState.priority = Just S.alice, GameState.activePlayer = S.alice, GameState.phase = Phase.PostcombatMain}, ids)
+
+isCraftAbility :: ActivatedAbility.ActivatedAbility c g -> Bool
+isCraftAbility ability = case ActivatedAbility.keyword ability of
+  Just (Keyword.Craft _) -> True
+  _ -> False
+
+-- The projected power of every Mastercraft Raptor on alice's battlefield: the
+-- crafted permanent is a new object (CR 400.7), so it is found by its name.
+mastercraftPower :: GameState.GameState -> [Maybe Integer]
+mastercraftPower gs = [Projection.powerOf o gs | o <- Game.zoneMembers Zone.Battlefield S.alice gs, Set.member (CardName.MkCardName (Text.pack "Mastercraft Raptor")) (Projection.namesOf o gs)]
+
 tithingBlade, consumingSepulcher, goblinPiker, armoredGalleon, hillGiantName, dinosaurHeaddress :: CardName.CardName
 tithingBlade = CardName.MkCardName (Text.pack "Tithing Blade")
 consumingSepulcher = CardName.MkCardName (Text.pack "Consuming Sepulcher")
@@ -6102,7 +6127,7 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
   -- (Oracle text checked against Scryfall, 2026-09-20). That back face also
   -- prints "As this Equipment becomes attached to a creature, choose an exiled
   -- creature card used to craft this Equipment" and "Equipped creature is a copy
-  -- of the last chosen card"; neither clause is transcribed (#3931), which leaves
+  -- of the last chosen card"; neither clause is transcribed (#4598), which leaves
   -- pawl's card STRICTER than printed and touches nothing below -- no case here
   -- attaches the Headdress to anything whose characteristics it would rewrite.
   --
@@ -6142,6 +6167,32 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
         Spec.assertBool s (Set.member hillGiantName (craftBattlefieldNames after)) "CR 702.167a and the Hill Giant, which the payer did not choose, is still on the battlefield"
         Spec.assertBool s (Set.member dinosaurHeaddress (craftBattlefieldNames after)) "CR 702.167a the card the cost exiled came back TRANSFORMED, as Dinosaur Headdress"
       abilities -> Spec.assertFailure s ("expected one craft ability, got " <> show (length abilities))
+
+  -- CR 702.167c: Saheeli's Lattice // Mastercraft Raptor, "Craft with one or
+  -- more Dinosaurs {4}{R}", whose back face's power "is equal to the total
+  -- power of the exiled cards used to craft it" (Oracle text checked against
+  -- Scryfall, 2026-10-02). A Ridgetop Raptor (2) off the battlefield and a
+  -- Ripjaw Raptor (4) out of the graveyard are the materials; a Temple Altisaur
+  -- already in exile, linked to nothing, is what a zone sweep would add in.
+  Spec.it s "CR 702.167c Mastercraft Raptor's power totals the cards exiled to craft it, and only those" $ do
+    (latticeId, board, extras) <- latticeBoard s registry ["Ridgetop Raptor"] ["Ripjaw Raptor"] ["Temple Altisaur"]
+    case (filter isCraftAbility (Activatable.abilitiesFor latticeId board), extras) of
+      ([ability], [ridgetopId, ripjawId, _]) -> do
+        let after = S.runPure (craftExilingBoth ridgetopId ripjawId) board (Activate.activateAbility S.alice latticeId ability >> Stack.resolveTop)
+        Spec.assertEqWith s "CR 702.167c the Raptor's power is 2 + 4, the Altisaur's 3 left out" (mastercraftPower after) [Just 6]
+      _ -> Spec.assertFailure s "expected one craft ability and three extras"
+
+  -- CR 604.3 / 613.4a: the material's own power is defined by a CDA that works
+  -- in exile. Maskwood Nexus makes the Tarmogoyf a Dinosaur, so it can be the
+  -- material; once exiled it is a */1+* counting the three card types among the
+  -- graveyard's Mountain, Lightning Bolt and Thrilling Discovery.
+  Spec.it s "CR 604.3 Mastercraft Raptor reads the power an exiled Tarmogoyf's CDA defines" $ do
+    (latticeId, board, extras) <- latticeBoard s registry ["Maskwood Nexus", "Tarmogoyf"] ["Mountain", "Lightning Bolt", "Thrilling Discovery"] []
+    case (filter isCraftAbility (Activatable.abilitiesFor latticeId board), extras) of
+      ([ability], [_, goyfId, _, _, _]) -> do
+        let after = S.runPure (craftExiling goyfId) board (Activate.activateAbility S.alice latticeId ability >> Stack.resolveTop)
+        Spec.assertEqWith s "CR 604.3 / 702.167c the Raptor's power is the exiled Goyf's 3, not a blank read as 0" (mastercraftPower after) [Just 3]
+      _ -> Spec.assertFailure s "expected one craft ability and five extras"
 
 -- Leonin Shikari {1}{W} Creature -- Cat Soldier 2/2: "You may activate equip
 -- abilities any time you could cast an instant." Forge Anew {2}{W} Enchantment

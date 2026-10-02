@@ -2431,6 +2431,19 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
   -- above, so what they exile is filed by their own windows, not this one's.
   runEntryEffects
 
+-- CR 702.167c: the cards exiled to pay the cost of the craft ability resolving
+-- as `resolving` (Binding.craftMaterials), linked to the permanent it put onto
+-- the battlefield as `entered`, so CR 607.2a's readers -- AgainstCardsExiledWith,
+-- EachCardExiledWithSource -- find them from that permanent. Only those still in
+-- exile, which is the rule's "cards in exile". Pawl.ActivateSpec's Mastercraft
+-- Raptor case is the proof.
+linkCraftMaterials :: ObjectId -> ObjectId -> GameState -> GameState
+linkCraftMaterials resolving entered gs =
+  let paid = foldMap Set.toList (Map.lookup Binding.craftMaterials (Binding.targetsOf (slotBindings resolving gs)))
+      materials = filter (`Set.member` GameState.exile gs) (Maybe.mapMaybe Recipient.objectOf paid)
+      link = ExileLink.MkExileLink {ExileLink.source = entered, ExileLink.ability = Nothing}
+   in gs {GameState.exiledWith = foldr (`Map.insert` link) (GameState.exiledWith gs) materials}
+
 -- CR 607.2a's name for the ability resolving as `resolving`: an activated
 -- ability's ActivatedAbility.name, which is how a linked reference names one of
 -- two exiling abilities of an object. Nothing for every other kind of object,
@@ -4892,8 +4905,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- battlefield, for Filter.EnteredWithSource. Read off where the
             -- incarnation landed, so a redirected move records nothing.
             landed <- State.gets (fmap Object.zone . Game.lookupObject newId)
-            Monad.when (landed == Just Zone.Battlefield) $
+            Monad.when (landed == Just Zone.Battlefield) $ do
               State.modify' (\g -> g {GameState.enteredWith = Map.insert newId source (GameState.enteredWith g)})
+              State.modify' (linkCraftMaterials resolving newId)
           pure (foldr Set.insert sofar mNew, mNew : acc)
         -- The context a CHOICE's candidates are filtered in, off the board the
         -- choice is being made on: the resolution's own slots ride along, so a

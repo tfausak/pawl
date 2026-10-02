@@ -4320,7 +4320,18 @@ projectDecidingFrom seedOf admits cands =
                   -- applies to has the same state on the running board as under the
                   -- bound, so scanning it could not change an answer, and paying for
                   -- every library card on every board would.
-                  reachable = Set.unions (GameState.battlefield gs : fmap (\c -> candidatesFor (gAffected c) gs) here)
+                  reachable = Set.unions (GameState.battlefield gs : definingReach : fmap (\c -> candidatesFor (gAffected c) gs) here)
+                  -- CR 604.3 / 613.4a: where this object's own CDA reads power,
+                  -- every object off the battlefield whose CDA defines one --
+                  -- Mastercraft Raptor totalling the power of a Tarmogoyf it was
+                  -- crafted from, which no other effect at this sublayer reaches.
+                  -- Empty on every other projection, which keeps the walk over
+                  -- every object off the hot path. Pawl.ActivateSpec's Tarmogoyf
+                  -- case is the proof.
+                  definingReach =
+                    if definingMovable
+                      then Set.filter (Maybe.isJust . PC.characteristicPT . (`copiableCharacteristics` gs)) (Set.difference (Map.keysSet (GameState.objects gs)) (GameState.battlefield gs))
+                      else Set.empty
                   otherBoards = Map.fromSet snapshot (Set.delete oid reachable)
                   -- CR 613.8b: an effect that depends on another waits for it, and
                   -- CR 613.7 timestamp order picks the next among those waiting on
@@ -4555,12 +4566,9 @@ projectDecidingFrom seedOf admits cands =
                     _ -> False
                   -- CR 613.4a's units, in a board-wide order so that every object's
                   -- projection breaks a timestamp tie the same way. `oid` is here
-                  -- as well as on the battlefield: CR 604.3 makes a CDA function in
-                  -- every zone.
-                  --
-                  -- Not implemented: the range is `reachable`, which at this
-                  -- sublayer is the battlefield alone, so a count cannot read a
-                  -- power a CDA defines on a card in another zone (#3109).
+                  -- as well as on the battlefield, and so is every other object
+                  -- carrying a P/T-defining ability (`definingReach`): CR 604.3
+                  -- makes a CDA function in every zone.
                   definingUnits = do
                     (o, (p, _)) <- Map.toAscList (Map.insert oid (seeded, decided) otherBoards)
                     obj <- Maybe.maybeToList (Game.lookupObject o gs)
