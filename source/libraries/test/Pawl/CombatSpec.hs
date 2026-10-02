@@ -1973,10 +1973,11 @@ defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerComb
 -- CR 508.1c's PAIRWISE attacking restriction: one naming WHAT the attack is aimed
 -- at rather than which creatures may attack. Blazing Archon ({6}{W}{W}{W}
 -- Creature -- Archon 5/6, "Flying / Creatures can't attack you." -- checked
--- against Scryfall, 2026-09-01) is the pool's first, and CR 802.3a is the rule
+-- against Scryfall, 2026-09-01) is one, and CR 802.3a is the rule
 -- that says such a restriction reaches only the creatures attacking that player.
--- Vow of Flight, at the foot of the group, is the pool's second, and names two
--- of CR 506.3's three attackable things where the Archon names one.
+-- Vow of Flight, near the foot of the group, names two of CR 506.3's three
+-- attackable things where the Archon names one; Teferi's Moat, last, reads its
+-- own chosen colour.
 --
 -- Two seats throughout, deliberately: this is not a multiplayer rule. CR 508.1b
 -- makes a planeswalker its controller controls a SECOND announcement at two
