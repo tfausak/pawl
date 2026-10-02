@@ -2342,8 +2342,8 @@ apply batch candidate event =
                 -- Through addEnteringCounters (inside addCopyExceptionCounters),
                 -- the WithCounters arm's funnel and for its reasons: CR 122.6's
                 -- counters must be on the permanent before it exists on the
-                -- battlefield, and CR 614.16 applies
-                -- inside this entry's own CR 616.1 loop (Doubling Season). The
+                -- battlefield, and CR 614.16 applies inside this entry's own CR
+                -- 616.1 loop (Doubling Season). The
                 -- amount is read the same way too -- CR 107.3m's announced X
                 -- substituted in (Altered Ego announces X on the spell, and CR
                 -- 400.7 leaves the permanent none), and evaluated against
