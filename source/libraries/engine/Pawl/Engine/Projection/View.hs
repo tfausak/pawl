@@ -1601,7 +1601,7 @@ copiableRuleAbilitiesOf carrier gs =
         -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
         Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
 
--- The thirteen lists a printed face declares. Its own function so that the seed
+-- The fourteen lists a printed face declares. Its own function so that the seed
 -- above and copiableRuleAbilitiesOf's fallback cannot drift on what a face
 -- contributes.
 ruleAbilitiesOfFace :: Face.Face Card.Type.Card -> RuleAbilities.RuleAbilities
