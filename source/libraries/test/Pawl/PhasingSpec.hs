@@ -52,8 +52,11 @@
 -- than by walking a zone. It is bounded by the battlefield all the same, which
 -- is what CR 702.26b then answers.
 --
--- Not implemented: CR 702.26e for the three arms of
--- Pawl.Engine.Projection.affects that carry no battlefield conjunct (#1866).
+-- Lurking Evil joins them for CR 702.26e: its "this enchantment becomes a 4/4"
+-- names its source through a group slot rather than a target, so only rule
+-- 702.26e keeps a phased-out Evil out of the set the effect freezes. Jinxed
+-- Idol's "target opponent gains control of this artifact" is the same shape for
+-- a control change.
 module Pawl.PhasingSpec where
 
 import qualified Control.Monad as Monad
@@ -84,6 +87,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -451,6 +455,57 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     Spec.assertEqWith s "CR 702.26a the Thief phases in at alice's untap step" (onBattlefield thief back) True
     Spec.assertEqWith s "and the Myr stays with bob" (Projection.controllerOf myr back) (Just S.bob)
     Spec.assertEqWith s "with nothing restored" (GameState.continuousEffects back) []
+  -- CR 702.26e: Lurking Evil's "this enchantment becomes a 4/4 Phyrexian Horror
+  -- creature with flying" names its source through the `self` group slot, not a
+  -- target, so CR 608.2b never drops it. Phased out in response by Clever
+  -- Concealment, it is left out of the set CR 611.2c freezes, and so phases back
+  -- in an enchantment. The unconcealed twin is the same board without the spell.
+  Spec.it s "CR 702.26e a phased-out permanent is left out of a resolving effect that names it" $ do
+    plains <- S.printingOf s registry "Plains"
+    lurkingEvil <- S.printingOf s registry "Lurking Evil"
+    conceal <- S.printingOf s registry "Clever Concealment"
+    case Face.activatedAbilities (S.combinedFace lurkingEvil) of
+      [ability] -> do
+        let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+            (evil, withEvil) = S.addPermanent lurkingEvil S.alice base
+            (board, spell) = S.handOne conceal withEvil
+            activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice evil ability)
+            plain = S.runPure S.identityAnswer activated (Monad.void Stack.resolveTop)
+            hidden = S.runPure S.identityAnswer (concealAll (Set.singleton evil) spell activated) (Monad.void Stack.resolveTop)
+            back = settleFor (untapStep S.alice hidden)
+        Spec.assertEqWith s "setup: unconcealed, the ability makes it a 4/4" (Projection.powerOf evil plain) (Just 4)
+        Spec.assertEqWith s "setup: concealed, it phased out" (Phasing.isPhasedOut evil hidden) True
+        Spec.assertEqWith s "setup: and the ability resolved" (GameState.stack hidden) []
+        Spec.assertEqWith s "setup: it phases in at alice's untap step" (onBattlefield evil back) True
+        Spec.assertEqWith s "it phases in an enchantment, not a creature" (Projection.isCreatureOf evil back) False
+        Spec.assertEqWith s "with no power" (Projection.powerOf evil back) Nothing
+        Spec.assertEqWith s "and no effect was stored" (GameState.continuousEffects back) []
+      _ -> Spec.assertFailure s "Lurking Evil should have one activated ability"
+  -- The control half of CR 702.26e, the same board shape: Jinxed Idol's "target
+  -- opponent gains control of this artifact" names the Idol through `self`, and
+  -- a Goblin Piker is the creature its cost sacrifices.
+  Spec.it s "CR 702.26e a phased-out permanent is left out of a resolving control change that names it" $ do
+    plains <- S.printingOf s registry "Plains"
+    idol <- S.printingOf s registry "Jinxed Idol"
+    piker <- S.printingOf s registry "Goblin Piker"
+    conceal <- S.printingOf s registry "Clever Concealment"
+    case Face.activatedAbilities (S.combinedFace idol) of
+      [ability] -> do
+        let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+            (jinxed, withIdol) = S.addPermanent idol S.alice base
+            (_, withPiker) = S.addPermanent piker S.alice withIdol
+            (board, spell) = S.handOne conceal withPiker
+            activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice jinxed ability)
+            plain = S.runPure S.identityAnswer activated (Monad.void Stack.resolveTop)
+            hidden = S.runPure S.identityAnswer (concealAll (Set.singleton jinxed) spell activated) (Monad.void Stack.resolveTop)
+            back = settleFor (untapStep S.alice hidden)
+        Spec.assertEqWith s "setup: unconcealed, bob gains control of the Idol" (Projection.controllerOf jinxed plain) (Just S.bob)
+        Spec.assertEqWith s "setup: concealed, it phased out" (Phasing.isPhasedOut jinxed hidden) True
+        Spec.assertEqWith s "setup: and the ability resolved" (GameState.stack hidden) []
+        Spec.assertEqWith s "setup: it phases in at alice's untap step" (onBattlefield jinxed back) True
+        Spec.assertEqWith s "it phases in still alice's" (Projection.controllerOf jinxed back) (Just S.alice)
+        Spec.assertEqWith s "and no effect was stored" (GameState.continuousEffects back) []
+      _ -> Spec.assertFailure s "Jinxed Idol should have one activated ability"
 
 indirectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 indirectSpec s registry = Spec.describe s "Indirect" $ do
