@@ -193,6 +193,11 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf reads it without a
     -- projection.
     grantedStaticAbilities :: [(Timestamp.Timestamp, StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Card))],
+    -- | CR 613.1f / 613.11: the rule abilities a STATIC ability's layer-6 grant
+    -- gave the object, read back by Pawl.Engine.Projection.grantedRuleAbilities.
+    -- A resolution's stored grant is not recorded here, for
+    -- grantedStaticAbilities' reason.
+    grantedRuleAbilities :: RuleAbilities.RuleAbilities,
     -- | CR 116.2: the special actions this object's rules text grants -- the
     -- axis Pawl.Types.Face.specialActions carries. Copiable because CR 707.2
     -- names rules text among the copiable values and CR 707.2a copies the

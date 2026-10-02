@@ -1583,7 +1583,7 @@ copiableSpecialActionsOf carrier gs =
 -- Pawl.MutateSpec's "CR 702.140e a Silent Arbiter under a Cubwarden still holds
 -- alice to one attacker" is what proves the merged read.
 --
--- Copiable text only: what a stored grant gave the object is
+-- Copiable text only: what a layer-6 grant gave the object is
 -- Pawl.Engine.Projection.grantedRuleAbilities, which each gatherer reads beside
 -- this.
 copiableRuleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
@@ -1665,6 +1665,7 @@ noCharacteristics =
       PC.playerAbilities = [],
       PC.grantedPlayerAbilities = [],
       PC.grantedStaticAbilities = [],
+      PC.grantedRuleAbilities = mempty,
       -- CR 116.2: no characteristics, so no printed permission either.
       PC.specialActions = [],
       PC.activatedAbilities = [],
@@ -1808,6 +1809,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- Layer 6 writes this; the seed grants nothing.
               PC.grantedPlayerAbilities = [],
               PC.grantedStaticAbilities = [],
+              PC.grantedRuleAbilities = mempty,
               -- CR 116.2, in the seed for the same reason and read by
               -- copiableSpecialActionsOf below: CR 707.2a copies the abilities a
               -- face's rules text derives, and CR 116.2d's permission is one of
