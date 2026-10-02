@@ -78,6 +78,10 @@ import qualified Pawl.Types.DefendersAre as DefendersAre
 import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.Entry as Entry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.FaceDownState as FaceDownState
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
@@ -329,6 +333,7 @@ boardFailure ids board =
       counts = Map.fromListWith (+) (fmap (\label -> (label, 1 :: Natural)) labels)
       duplicate = fmap fst (List.find ((> 1) . snd) (Map.toAscList counts))
       unknownController = List.find (\label -> not (Map.member label ids)) (Maybe.mapMaybe Placement.controller placements)
+      unknownProtector = List.find (\label -> not (Map.member label ids)) (Maybe.mapMaybe Placement.protector placements)
       -- CR 809.2: one emperor per team, and an emperor is on one.
       emperors = filter Seat.emperor seats
       illegalEmperor = List.find (maybe True (\team -> length (filter ((== Just team) . Seat.team) emperors) > 1) . Seat.team) emperors
@@ -336,7 +341,9 @@ boardFailure ids board =
         Just label -> Just (Failure.MkDuplicateLabel label)
         Nothing -> case unknownController of
           Just label -> Just (Failure.MkUnknownController label)
-          Nothing -> fmap (Failure.MkIllegalEmperor . Seat.name) illegalEmperor
+          Nothing -> case unknownProtector of
+            Just label -> Just (Failure.MkUnknownProtector label)
+            Nothing -> fmap (Failure.MkIllegalEmperor . Seat.name) illegalEmperor
 
 placeSeats :: (Monad m) => Registry.Registry m -> [(Seat.Seat, PlayerId.PlayerId)] -> Staged.Staged -> m (Either Failure.ScenarioFailure Staged.Staged)
 placeSeats registry seated board = case seated of
@@ -377,6 +384,7 @@ placeAll registry zone owner placements board = case placements of
     case found of
       Nothing -> pure (Left (Failure.MkUnknownCard (Placement.card placement)))
       Just _ | Placement.token placement && zone /= Zone.Battlefield -> pure (Left (Failure.MkTokenOffBattlefield (Placement.card placement)))
+      Just card | Just name <- Placement.face placement, Maybe.isNothing (Engine.Card.faceNamed name card) -> pure (Left (Failure.MkUnknownFace (Placement.card placement) name))
       Just card -> do
         let (printingId, interned) = Game.intern (Printing.ofCard card) (Staged.state board)
             (oid, placedCard) = Setup.placeCard zone owner printingId interned
@@ -398,7 +406,13 @@ placeAll registry zone owner placements board = case placements of
                   -- Object.counterTimestamps stays empty: CR 613.7c then reads
                   -- every placed counter as old as its permanent.
                   Object.counters = Placement.counters placement,
-                  Object.source = if Placement.token placement then Source.OfToken printingId else Object.source obj
+                  Object.source = if Placement.token placement then Source.OfToken printingId else Object.source obj,
+                  -- CR 712.8e: showing a named face, as an entry transformed
+                  -- leaves it; Object.turnedOverAt stays Nothing, nothing
+                  -- having turned it over.
+                  Object.face = Placement.face placement,
+                  Object.facing = maybe Facing.FaceUp facingFor (Placement.faceDown placement),
+                  Object.protector = Placement.protector placement >>= \label -> Map.lookup label (Staged.seats board)
                 }
             next =
               board
@@ -406,6 +420,17 @@ placeAll registry zone owner placements board = case placements of
                   Staged.objects = foldr (\label -> Map.insert label oid) (Staged.objects board) (Placement.label placement)
                 }
         placeAll registry zone owner rest next
+
+-- | CR 708.2: a placed face-down permanent's status, listing what the rules
+-- that allowed it list -- CR 702.168b's and CR 701.58a's ward {2}, else CR
+-- 708.2a's.
+facingFor :: FaceDownReason.FaceDownReason -> Facing.Facing
+facingFor reason = case reason of
+  FaceDownReason.Disguised -> listing
+  FaceDownReason.Cloaked -> listing
+  _ -> Facing.faceDown reason
+  where
+    listing = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = reason, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}
 
 -- Answering -------------------------------------------------------------------
 
@@ -746,7 +771,7 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseOfferedCastSpell _ _ offers -> chosen `elem` offers
   Prompt.Type.RandomFirstPlayer players -> chosen `elem` players
   Prompt.Type.RandomObject objects -> chosen `elem` objects
-  Prompt.Type.ChooseDieResult _ _ _ results -> chosen `elem` results
+  Prompt.Type.ChooseDieResult _ _ _ results -> toInteger chosen < toInteger (length results)
   Prompt.Type.ChooseCoinResult _ _ faces -> chosen `elem` faces
   Prompt.Type.ChooseDiscard _ _ cards _ -> all (`elem` cards) chosen
   Prompt.Type.ChooseScry _ _ cards -> all (`elem` cards) (uncurry (<>) chosen)
@@ -1507,6 +1532,8 @@ render failure = case failure of
   Failure.MkUnknownActivePlayer label -> Label.unwrap label <> Text.pack " is active but has no seat"
   Failure.MkUnknownController label -> Label.unwrap label <> Text.pack " controls a placed card but has no seat"
   Failure.MkUnknownCard name -> Text.pack "no card named " <> CardName.unwrap name
+  Failure.MkUnknownProtector label -> Label.unwrap label <> Text.pack " protects a placed battle but has no seat"
+  Failure.MkUnknownFace name face -> CardName.unwrap name <> Text.pack " has no face named " <> CardName.unwrap face
   Failure.MkIllegalAttachment label -> Text.pack "a placement cannot be attached to " <> Label.unwrap label
   Failure.MkIllegalEmperor label -> Label.unwrap label <> Text.pack " is an emperor on no team, or not its team's only one"
   Failure.MkTokenOffBattlefield name -> Text.pack "a token " <> CardName.unwrap name <> Text.pack " placed off the battlefield"

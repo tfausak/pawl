@@ -80,5 +80,8 @@ card name =
       Placement.Type.token = False,
       Placement.Type.controller = Nothing,
       Placement.Type.attached = Nothing,
-      Placement.Type.commander = False
+      Placement.Type.commander = False,
+      Placement.Type.face = Nothing,
+      Placement.Type.faceDown = Nothing,
+      Placement.Type.protector = Nothing
     }

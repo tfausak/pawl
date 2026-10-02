@@ -181,7 +181,10 @@ objectSetup name =
       Placement.token = False,
       Placement.controller = Nothing,
       Placement.attached = Nothing,
-      Placement.commander = False
+      Placement.commander = False,
+      Placement.face = Nothing,
+      Placement.faceDown = Nothing,
+      Placement.protector = Nothing
     }
 
 -- Test-source spelling of objectSetup: a Magic card name, never a corpus slug.

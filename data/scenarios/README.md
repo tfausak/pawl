@@ -18,7 +18,10 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
   302.6), `damage`, `counters`, `token` (CR 111.1, battlefield only), a
   `controller`, the label of the object or seat it is `attached` to, and
-  `commander` (CR 903.3: its owner's commander). `active` names a seat;
+  `commander` (CR 903.3: its owner's commander), the name of the `face` it
+  shows (CR 712.8e, `"Nightfall Predator"`), `faceDown` with the reason it is
+  (CR 708.2a / 708.6, `{ "type": "Manifested" }`) and a battle's `protector`
+  seat (CR 310.9). `active` names a seat;
   `turn` (default 1) and `step` are where the game starts; `monarch` optionally names a seat;
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent; `brawl` (CR 903.12a),

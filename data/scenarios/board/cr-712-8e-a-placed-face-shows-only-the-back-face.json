@@ -1,0 +1,63 @@
+{
+  "description": "CR 712.8e a placed double-faced permanent showing its back face has only that face's characteristics",
+  "note": "Daybreak Ranger is a 2/2 Human Werewolf; its back face, Nightfall Predator, a 4/4 Werewolf. The placement's face is the only thing turning it over.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Daybreak Ranger",
+            "label": "ranger",
+            "face": "Nightfall Predator"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$ranger",
+          "names": [
+            "Nightfall Predator"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$ranger",
+          "power": 4,
+          "toughness": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Subtypes": {
+          "object": "$ranger",
+          "subtypes": [
+            "Werewolf"
+          ]
+        }
+      }
+    }
+  ]
+}

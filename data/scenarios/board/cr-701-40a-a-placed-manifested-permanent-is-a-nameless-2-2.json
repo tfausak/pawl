@@ -1,0 +1,88 @@
+{
+  "description": "CR 701.40a a placed manifested permanent is a 2/2 with no name and no subtypes",
+  "note": "Goblin Piker is a 2/1 Goblin Warrior; face down it is CR 701.40a's 2/2 with no name. The reason the placement gives is what offers CR 701.40b's turn-face-up for its mana cost, {1}{R}, which the two Mountains pay.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "faceDown": {
+              "type": "Manifested"
+            }
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$piker",
+          "names": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Subtypes": {
+          "object": "$piker",
+          "subtypes": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "TurnFaceUp $piker Manifest",
+            "ActivateManaAbility $mountain",
+            "ActivateManaAbility $mountain-2"
+          ]
+        }
+      }
+    }
+  ]
+}
