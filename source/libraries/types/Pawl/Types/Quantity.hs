@@ -304,6 +304,10 @@ data Quantity
   | -- | CR 607.2a / 614.14: the inner quantity read against each card this
     -- quantity's source exiled, summed (CR 607.3); an empty pile reads 0.
     AgainstCardsExiledWith Quantity
+  | -- | CR 702.167c: the inner quantity read against each exiled card used to
+    -- craft this quantity's source, summed; AgainstCardsExiledWith narrowed to
+    -- the craft link (Mastercraft Raptor).
+    AgainstCraftMaterials Quantity
   | -- | CR 702.184c: the tapped creature's power, or its toughness where that is
     -- greater and the ability's controller controls a permanent carrying
     -- Modification.GrantsStationToughness. Engine-only, a leaf like Power:

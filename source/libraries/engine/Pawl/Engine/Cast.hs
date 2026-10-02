@@ -2542,6 +2542,7 @@ isCastAnnouncementCondition condition = case condition of
   Condition.Type.Compares c -> isCastAnnouncementQuantity (Compares.measured c) && isCastAnnouncementQuantity (Compares.threshold c)
   Condition.Type.Any conditions -> all isCastAnnouncementCondition conditions
   Condition.Type.All conditions -> all isCastAnnouncementCondition conditions
+  Condition.Type.During _ -> False
 
 -- CR 702.33g/702.113b: does a clause's printed "if" hold ALREADY, at CR
 -- 601.2c's step -- the same question Resolve.gateHolds asks a clause when it is
@@ -2592,6 +2593,9 @@ holdsForCandidate castFor condition = case condition of
     _ -> False
   Condition.Type.Any conditions -> any (holdsForCandidate castFor) conditions
   Condition.Type.All conditions -> all (holdsForCandidate castFor) conditions
+  -- Unreachable past isCastAnnouncementCondition; False is the Compares arm's
+  -- answer for what it cannot read.
+  Condition.Type.During _ -> False
 
 -- holdsForCandidate's per-Quantity read, total only over
 -- isCastAnnouncementQuantity's three constructors -- everything else answers

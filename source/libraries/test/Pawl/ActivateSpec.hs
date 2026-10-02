@@ -6035,6 +6035,63 @@ craftBattlefieldNames gs = Set.unions (fmap (\o -> Projection.namesOf o gs) (Gam
 craftNamesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
 craftNamesIn zone gs = List.sort (Maybe.mapMaybe (\o -> fmap S.nameOf (Game.cardOf o gs)) (Game.zoneMembers zone S.alice gs))
 
+-- CR 702.167c / 613.1f: The Enigma Jewel // Locus of Enlightenment, "Craft with
+-- four or more nonlands with activated abilities {8}{U}", whose back face "has
+-- each activated ability of the exiled cards used to craft it. You may activate
+-- each of those abilities only once each turn." (Oracle text checked against
+-- Scryfall, 2026-10-02). Its second ability, "Whenever you activate an ability
+-- that isn't a mana ability, copy it", is not transcribed (#4603), which leaves
+-- pawl's card STRICTER than printed: no ping below is doubled.
+--
+-- The four materials sit in alice's graveyard, exactly the minimum, so the
+-- prompt is elided: TWO Brothers of Fire, a Withered Wretch, and an Omen Hawker,
+-- whose only ability is a mana ability, which "with activated abilities"
+-- admits. Nine Islands pay the craft; ten Mountains added afterwards pay the
+-- borrowed Wretch's {1}, both Brothers' {1}{R}{R}, and three more, so every
+-- refusal below is a rule's and not the mana's.
+--
+-- Three readings the board tells apart. The borrowed Wretch exiles bob's Ashling
+-- the Pilgrim, which the Locus's own ability links to it (CR 607.2a) but which
+-- was not used to craft it, so the Locus must not gain Ashling's ability. The
+-- two Brothers' abilities are identically worded, and CR 602.5c (the Jewel's
+-- ruling says it outright) makes each its own once-each-turn: bob takes 2, where
+-- one shared record would stop him at 1. And neither is offered a third time.
+locusSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+locusSpec s registry =
+  Spec.it s "CR 702.167c Locus of Enlightenment has each material's activated abilities, each once each turn" $ do
+    jewel <- S.printingOf s registry "The Enigma Jewel"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    ashling <- S.printingOf s registry "Ashling the Pilgrim"
+    materials <- mapM (S.printingOf s registry) ["Brothers of Fire", "Brothers of Fire", "Withered Wretch", "Omen Hawker"]
+    let (jewelId, g0) = S.addPermanent jewel S.alice (S.landsInPlay island 9)
+        g1 = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) g0 materials
+        (ashlingId, g2) = S.addGraveyardCard ashling S.bob g1
+        board = g2 {GameState.priority = Just S.alice, GameState.activePlayer = S.alice, GameState.phase = Phase.PostcombatMain}
+        modalsOf printing = let (o, g) = S.addPermanent printing S.bob board in fmap ActivatedAbility.modal (Activatable.abilitiesFor o g)
+        crafted = case filter isCraftAbility (Activatable.abilitiesFor jewelId board) of
+          [ability] -> S.runPure S.identityAnswer board (Activate.activateAbility S.alice jewelId ability >> Stack.resolveTop)
+          _ -> board
+        withMountains = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) crafted [1 .. 10 :: Int]
+        locusIds = [o | o <- Game.zoneMembers Zone.Battlefield S.alice withMountains, Set.member (CardName.MkCardName (Text.pack "Locus of Enlightenment")) (Projection.namesOf o withMountains)]
+        offered printing g = [(o, a) | A.Activate o a <- Action.legalActions S.alice g, o `elem` locusIds, ActivatedAbility.modal a `elem` modalsOf printing]
+        activate g = case offered brothers g of
+          (o, a) : _ -> S.runPure (aimAt S.bob) g (Activate.activateAbility S.alice o a >> Stack.resolveTop)
+          [] -> g
+        aimAtAshling :: Prompt.Prompt r -> r
+        aimAtAshling p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just ashlingId) . Recipient.objectOf) . snd) sets
+          _ -> S.identityAnswer p
+        exiledAshling = case offered wretch withMountains of
+          (o, a) : _ -> S.runPure aimAtAshling withMountains (Activate.activateAbility S.alice o a >> Stack.resolveTop)
+          [] -> withMountains
+        fired = activate (activate exiledAshling)
+    Spec.assertEqWith s "CR 602.5c / 702.167c the Locus pings bob once with EACH exiled Brothers of Fire's ability" (S.lifeOf S.bob fired) (Just 18)
+    Spec.assertEqWith s "CR 602.5b and neither is offered a third time this turn, three Mountains still untapped" (fmap fst (offered brothers fired)) []
+    Spec.assertEqWith s "CR 607.2a / 702.167c the Ashling the borrowed Wretch exiled gave the Locus nothing" (fmap fst (offered ashling fired)) []
+
 -- Saheeli's Lattice on alice's battlefield with five Mountains, which is exactly
 -- {4}{R}, and the named printings on her battlefield, in her graveyard and in
 -- exile, their ids answered in that order.
@@ -6193,6 +6250,8 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
         let after = S.runPure (craftExiling goyfId) board (Activate.activateAbility S.alice latticeId ability >> Stack.resolveTop)
         Spec.assertEqWith s "CR 604.3 / 702.167c the Raptor's power is the exiled Goyf's 3, not a blank read as 0" (mastercraftPower after) [Just 3]
       _ -> Spec.assertFailure s "expected one craft ability and five extras"
+
+  locusSpec s registry
 
 -- Leonin Shikari {1}{W} Creature -- Cat Soldier 2/2: "You may activate equip
 -- abilities any time you could cast an instant." Forge Anew {2}{W} Enchantment
