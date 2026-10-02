@@ -97,8 +97,8 @@
             "Pass",
             "PlayLand Mountain#3",
             "Activate Prodigal Sorcerer",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2"
           ]
         }
       }

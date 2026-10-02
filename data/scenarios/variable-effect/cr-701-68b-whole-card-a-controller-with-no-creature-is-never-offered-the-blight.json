@@ -1,0 +1,161 @@
+{
+  "description": "CR 701.68b whole card: a controller with no creature is never offered the blight",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boggart Mischief",
+            "label": "boggart-mischief",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Wall of Stone",
+            "ready": true
+          },
+          {
+            "card": "Typhoid Rats",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$boggart-mischief",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Boggart Mischief",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Boggart Mischief",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Boggart Mischief",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Boggart Mischief",
+        "tapped": false
+      }
+    },
+    {
+      "Counters": {
+        "object": "Goblin Piker",
+        "kind": {
+          "type": "MinusOneMinusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "Wall of Stone",
+        "kind": {
+          "type": "MinusOneMinusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "Typhoid Rats",
+        "kind": {
+          "type": "MinusOneMinusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Token",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Goblin Token",
+        "count": 0
+      }
+    }
+  ]
+}

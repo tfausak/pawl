@@ -89,9 +89,9 @@
             "PlayLand Forest#5",
             "PlayLand Forest#6",
             "Cast $llanowar-elves",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility $forest",
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3"
           ]
         }
       }
@@ -128,8 +128,8 @@
             "Pass",
             "PlayLand Forest#4",
             "PlayLand Forest#5",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3"
           ]
         }
       }

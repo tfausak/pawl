@@ -53,8 +53,8 @@
             "Cast Sol Ring",
             "Cast Ancestral Recall",
             "Activate $bonesplitter",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})"
+            "ActivateManaAbility $island",
+            "ActivateManaAbility $omen-hawker"
           ]
         }
       }

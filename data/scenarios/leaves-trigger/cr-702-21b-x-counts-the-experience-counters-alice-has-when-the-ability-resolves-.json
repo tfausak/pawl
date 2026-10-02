@@ -106,7 +106,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 11",
+            "trigger of $minthara-merciless-soul",
             "Giant Growth"
           ]
         }
@@ -182,7 +182,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 11",
+            "trigger of $minthara-merciless-soul",
             "Giant Growth"
           ]
         }

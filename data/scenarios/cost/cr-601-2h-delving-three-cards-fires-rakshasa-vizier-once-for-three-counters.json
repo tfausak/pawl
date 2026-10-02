@@ -139,8 +139,8 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 21",
-            "object 20",
+            "trigger of $spirit-mascot",
+            "trigger of $rakshasa-vizier",
             "Treasure Cruise"
           ]
         }

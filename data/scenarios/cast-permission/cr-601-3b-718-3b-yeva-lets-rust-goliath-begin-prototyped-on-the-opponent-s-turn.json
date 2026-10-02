@@ -82,15 +82,15 @@
           "is": [
             "Pass",
             "Cast $rust-goliath",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})",
-            "ActivateManaAbility (MkObjectId {unwrap = 7})",
-            "ActivateManaAbility (MkObjectId {unwrap = 8})"
+            "ActivateManaAbility $forest",
+            "ActivateManaAbility $forest-2",
+            "ActivateManaAbility $forest-3",
+            "ActivateManaAbility $forest-4",
+            "ActivateManaAbility $forest-5",
+            "ActivateManaAbility Forest#6",
+            "ActivateManaAbility Forest#7",
+            "ActivateManaAbility Forest#8",
+            "ActivateManaAbility Forest#9"
           ]
         }
       }

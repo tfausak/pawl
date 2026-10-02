@@ -55,8 +55,8 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 5",
-            "object 3"
+            "trigger of Renewed Faith",
+            "ability of $renewed-faith"
           ]
         }
       }
@@ -88,7 +88,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 3"
+            "ability of $renewed-faith"
           ]
         }
       }

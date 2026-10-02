@@ -79,7 +79,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 7"
+            "trigger of $ygra-eater-of-all"
           ]
         }
       }

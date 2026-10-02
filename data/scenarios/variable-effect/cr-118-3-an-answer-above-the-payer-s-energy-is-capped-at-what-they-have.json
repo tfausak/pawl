@@ -1,0 +1,152 @@
+{
+  "description": "CR 118.3 an answer above the payer's energy is capped at what they have",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [
+          {
+            "key": {
+              "type": "Energy"
+            },
+            "value": 2
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Harnessed Lightning",
+            "label": "harnessed-lightning",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Wall of Stone",
+            "label": "wall-of-stone",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChoosePaidEnergy",
+          "with": 9
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$harnessed-lightning",
+          "targets": [
+            "$wall-of-stone"
+          ],
+          "mana": [
+            "$mountain",
+            "$mountain-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$wall-of-stone",
+          "damage": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Harnessed Lightning",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Harnessed Lightning",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$mountain",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$mountain-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PlayerCounters": {
+          "player": "alice",
+          "kind": {
+            "type": "Energy"
+          },
+          "count": 0
+        }
+      }
+    }
+  ]
+}

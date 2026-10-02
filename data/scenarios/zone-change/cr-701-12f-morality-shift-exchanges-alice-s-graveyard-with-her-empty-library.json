@@ -1,0 +1,328 @@
+{
+  "description": "CR 701.12f Morality Shift exchanges alice's graveyard with her empty library",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-5",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-6",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-7",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Morality Shift",
+            "label": "morality-shift",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Llanowar Elves"
+          },
+          {
+            "card": "Giant Growth"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Swamp"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
+            "Llanowar Elves",
+            "Giant Growth"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$morality-shift",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$swamp-4",
+            "$swamp-5",
+            "$swamp-6",
+            "$swamp-7"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Morality Shift",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Giant Growth",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Llanowar Elves",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Morality Shift",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Giant Growth",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Llanowar Elves",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-3",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-4",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-5",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-6",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-7",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Library",
+          "is": [
+            "Llanowar Elves",
+            "Giant Growth"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": [
+            "Morality Shift"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Library",
+          "is": [
+            "Island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Graveyard",
+          "is": [
+            "Swamp#8"
+          ]
+        }
+      }
+    }
+  ]
+}

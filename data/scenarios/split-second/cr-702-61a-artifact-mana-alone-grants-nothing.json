@@ -120,10 +120,10 @@
           "is": [
             "Pass",
             "Cast Lightning Bolt",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mountain#3",
+            "ActivateManaAbility Mountain#4"
           ]
         }
       }

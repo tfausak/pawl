@@ -1,0 +1,193 @@
+{
+  "description": "CR 701.39a the same tie answered the other way counters the other creature",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Typhoid Rats",
+            "ready": true
+          },
+          {
+            "card": "Wall of Stone",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Cached Defenses",
+            "label": "cached-defenses",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseBolster",
+          "with": "$goblin-piker"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$cached-defenses",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Cached Defenses",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Cached Defenses",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$forest",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$forest-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$forest-3",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$goblin-piker",
+          "power": 5,
+          "toughness": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$goblin-piker",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Typhoid Rats",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Wall of Stone",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 0
+        }
+      }
+    }
+  ]
+}

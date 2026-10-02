@@ -94,8 +94,8 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 5",
-            "object 3"
+            "trigger of Windcaller Aven",
+            "ability of $windcaller-aven"
           ]
         }
       }
@@ -114,7 +114,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 3"
+            "ability of $windcaller-aven"
           ]
         }
       }

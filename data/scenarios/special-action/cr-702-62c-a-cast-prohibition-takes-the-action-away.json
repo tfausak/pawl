@@ -105,8 +105,8 @@
           "player": "alice",
           "is": [
             "Pass",
-            "Suspend (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})"
+            "Suspend Rift Bolt",
+            "ActivateManaAbility Mountain"
           ]
         }
       }
@@ -146,7 +146,7 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})"
+            "ActivateManaAbility Mountain"
           ]
         }
       }

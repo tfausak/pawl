@@ -1,6 +1,6 @@
 {
   "description": "CR 115.1 the copy's NEW target becomes a target, and ward fires",
-  "note": "object 13 is the Tomakul Honor Guard's ward trigger, named by object number; the timeline's entries were reordered (same moves) so the stack check lands between the copy's retarget and the ward payment.",
+  "note": "The timeline's entries were reordered (same moves) so the stack check lands between the copy's retarget and the ward payment.",
   "board": {
     "seats": [
       {
@@ -139,7 +139,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 13",
+            "trigger of $tomakul-honor-guard",
             "Giant Growth#2",
             "Giant Growth"
           ]

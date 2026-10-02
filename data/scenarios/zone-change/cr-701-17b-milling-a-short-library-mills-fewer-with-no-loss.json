@@ -1,0 +1,101 @@
+{
+  "description": "CR 701.17b milling a short library mills fewer with no loss",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Tome Scour",
+            "label": "tome-scour",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$tome-scour",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$island"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Tome Scour",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Tome Scour",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Result",
+        "is": null
+      }
+    }
+  ]
+}

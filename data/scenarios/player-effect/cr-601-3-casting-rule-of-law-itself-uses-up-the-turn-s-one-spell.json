@@ -101,12 +101,12 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})",
-            "ActivateManaAbility (MkObjectId {unwrap = 7})",
-            "ActivateManaAbility (MkObjectId {unwrap = 8})"
+            "ActivateManaAbility Plains#4",
+            "ActivateManaAbility Plains#5",
+            "ActivateManaAbility Plains#6",
+            "ActivateManaAbility Plains#7",
+            "ActivateManaAbility Plains#8",
+            "ActivateManaAbility Plains#9"
           ]
         }
       }

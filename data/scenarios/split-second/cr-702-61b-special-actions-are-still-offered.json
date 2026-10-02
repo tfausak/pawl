@@ -189,15 +189,15 @@
           "player": "bob",
           "is": [
             "Pass",
-            "DiscardFromHand (MkObjectId {unwrap = 20})",
-            "ActivateManaAbility (MkObjectId {unwrap = 11})",
-            "ActivateManaAbility (MkObjectId {unwrap = 12})",
-            "ActivateManaAbility (MkObjectId {unwrap = 13})",
-            "ActivateManaAbility (MkObjectId {unwrap = 14})",
-            "ActivateManaAbility (MkObjectId {unwrap = 15})",
-            "ActivateManaAbility (MkObjectId {unwrap = 16})",
-            "ActivateManaAbility (MkObjectId {unwrap = 17})",
-            "ActivateManaAbility (MkObjectId {unwrap = 18})"
+            "DiscardFromHand Circling Vultures",
+            "ActivateManaAbility Mountain#9",
+            "ActivateManaAbility Mountain#10",
+            "ActivateManaAbility Mountain#11",
+            "ActivateManaAbility Mountain#12",
+            "ActivateManaAbility Mountain#13",
+            "ActivateManaAbility Mountain#14",
+            "ActivateManaAbility Mountain#15",
+            "ActivateManaAbility Mountain#16"
           ]
         }
       }

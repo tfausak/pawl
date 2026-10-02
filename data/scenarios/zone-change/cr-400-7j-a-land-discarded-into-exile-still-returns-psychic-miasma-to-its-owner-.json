@@ -1,0 +1,126 @@
+{
+  "description": "CR 400.7j a land discarded into exile still returns Psychic Miasma to its owner's hand",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Rest in Peace",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Psychic Miasma",
+            "label": "psychic-miasma",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "hand": [
+          {
+            "card": "Swamp",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$psychic-miasma",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Swamp",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Hand",
+        "is": [
+          "Psychic Miasma"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Exile",
+        "is": [
+          "Swamp#4"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Graveyard",
+        "is": []
+      }
+    }
+  ]
+}

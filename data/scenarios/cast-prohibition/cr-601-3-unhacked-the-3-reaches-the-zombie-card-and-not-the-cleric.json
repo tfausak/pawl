@@ -100,9 +100,9 @@
             "Pass",
             "Cast Artificial Evolution",
             "Cast Whipstitched Zombie",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility Island",
+            "ActivateManaAbility Swamp",
+            "ActivateManaAbility Swamp#2"
           ]
         }
       }

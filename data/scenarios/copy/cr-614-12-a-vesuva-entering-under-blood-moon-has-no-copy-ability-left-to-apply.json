@@ -1,6 +1,6 @@
 {
   "description": "CR 614.12 a Vesuva entering under Blood Moon has no copy ability left to apply",
-  "note": "Mana.manaTypesOf being red is read as two checks: the Offered view gives the untapped Vesuva (object 5) a mana ability, and its only subtype is Mountain (CR 305.6); the exact colour is not readable.",
+  "note": "Mana.manaTypesOf being red is read as two checks: the Offered view gives the untapped Vesuva a mana ability, and its only subtype is Mountain (CR 305.6); the exact colour is not readable.",
   "board": {
     "seats": [
       {
@@ -57,10 +57,10 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mutavault",
+            "ActivateManaAbility Vesuva"
           ]
         }
       }

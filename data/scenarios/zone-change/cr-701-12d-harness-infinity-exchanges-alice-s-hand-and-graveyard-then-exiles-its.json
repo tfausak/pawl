@@ -1,0 +1,275 @@
+{
+  "description": "CR 701.12d Harness Infinity exchanges alice's hand and graveyard, then exiles itself",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Lightning Bolt",
+            "ready": true
+          },
+          {
+            "card": "Harness Infinity",
+            "label": "harness-infinity",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Llanowar Elves"
+          },
+          {
+            "card": "Giant Growth"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "hand": [
+          {
+            "card": "Island",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$harness-infinity",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$swamp-4",
+            "$forest",
+            "$forest-2",
+            "$forest-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Forest",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Giant Growth",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Harness Infinity",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Llanowar Elves",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Forest",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Giant Growth",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Lightning Bolt",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Llanowar Elves",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Hand",
+        "is": [
+          "Llanowar Elves",
+          "Giant Growth"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": [
+          "Forest#4",
+          "Lightning Bolt"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": [
+          "Harness Infinity"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Hand",
+        "is": [
+          "Island"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Graveyard",
+        "is": [
+          "Swamp#5"
+        ]
+      }
+    }
+  ]
+}

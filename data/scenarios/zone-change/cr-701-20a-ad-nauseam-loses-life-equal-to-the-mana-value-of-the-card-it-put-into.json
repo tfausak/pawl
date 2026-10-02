@@ -1,0 +1,228 @@
+{
+  "description": "CR 701.20a Ad Nauseam loses life equal to the mana value of the card it put into hand",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ad Nauseam",
+            "label": "ad-nauseam",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Hill Giant"
+          },
+          {
+            "card": "Lightning Bolt"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseRepeat",
+          "with": {
+            "type": "Declines"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ad-nauseam",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$swamp-4",
+            "$swamp-5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 16
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Ad Nauseam",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Hill Giant",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Ad Nauseam",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Hill Giant",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-3",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-4",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$swamp-5",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Hand",
+          "is": [
+            "Hill Giant"
+          ]
+        }
+      }
+    }
+  ]
+}

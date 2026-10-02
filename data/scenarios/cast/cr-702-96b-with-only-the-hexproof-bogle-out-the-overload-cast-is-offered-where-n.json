@@ -78,13 +78,13 @@
           "is": [
             "Pass",
             "Cast $cyclonic-rift",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})"
+            "ActivateManaAbility $island",
+            "ActivateManaAbility $island-2",
+            "ActivateManaAbility $island-3",
+            "ActivateManaAbility $island-4",
+            "ActivateManaAbility $island-5",
+            "ActivateManaAbility $island-6",
+            "ActivateManaAbility $island-7"
           ]
         }
       }

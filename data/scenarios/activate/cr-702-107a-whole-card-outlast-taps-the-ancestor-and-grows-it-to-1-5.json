@@ -65,7 +65,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 3"
+            "ability of $disowned-ancestor"
           ]
         }
       }

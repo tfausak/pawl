@@ -74,7 +74,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 8"
+            "trigger of $ministrant-of-obligation"
           ]
         }
       }

@@ -63,12 +63,12 @@
           "is": [
             "Pass",
             "Cast $part-the-waterveil",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})"
+            "ActivateManaAbility $birds-of-paradise",
+            "ActivateManaAbility $birds-of-paradise-2",
+            "ActivateManaAbility $birds-of-paradise-3",
+            "ActivateManaAbility $birds-of-paradise-4",
+            "ActivateManaAbility $birds-of-paradise-5",
+            "ActivateManaAbility $birds-of-paradise-6"
           ]
         }
       }

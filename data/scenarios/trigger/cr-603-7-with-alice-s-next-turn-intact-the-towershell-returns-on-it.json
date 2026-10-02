@@ -1,0 +1,239 @@
+{
+  "description": "CR 603.7 with alice's next turn intact the Towershell returns on it",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Meandering Towershell",
+            "label": "meandering-towershell",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Stonehorn Dignitary",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$meandering-towershell"
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 15
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Island",
+          "count": 7
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Library",
+          "card": "Island",
+          "count": 7
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "Meandering Towershell",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Meandering Towershell",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Meandering Towershell",
+          "power": 5,
+          "toughness": 9
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 5,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    }
+  ]
+}

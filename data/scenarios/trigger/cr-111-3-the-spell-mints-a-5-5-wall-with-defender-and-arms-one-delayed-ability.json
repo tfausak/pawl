@@ -1,0 +1,180 @@
+{
+  "description": "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Tidal Wave",
+            "label": "tidal-wave",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$tidal-wave",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "Wall Token",
+          "keyword": {
+            "type": "Defender"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Wall Token",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "Wall Token",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Wall Token",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Wall Token",
+          "power": 5,
+          "toughness": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Tidal Wave"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Tidal Wave",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Tidal Wave",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Wall Token",
+        "count": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "description": "CR 401.2 a STATED end raises no ChooseLibraryEnd",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Griptide",
+            "label": "griptide",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Lightning Bolt"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$griptide",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Griptide",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Griptide",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-4",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Library",
+        "is": [
+          "Goblin Piker",
+          "Lightning Bolt"
+        ]
+      }
+    }
+  ]
+}

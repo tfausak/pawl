@@ -1,0 +1,165 @@
+{
+  "description": "CR 202.3 One with the Machine draws the GREATEST mana value, not the count, the sum or the least",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Bonesplitter",
+            "ready": true
+          },
+          {
+            "card": "Serum Powder",
+            "ready": true
+          },
+          {
+            "card": "Mindslaver",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "One with the Machine",
+            "label": "one-with-the-machine",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$one-with-the-machine",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 6
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "One with the Machine",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "One with the Machine",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 4
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-4",
+        "tapped": true
+      }
+    }
+  ]
+}

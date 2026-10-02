@@ -1,0 +1,299 @@
+{
+  "description": "CR 111.3 the spell mints three 1/1 Humans with haste and arms one delayed ability",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Thatcher Revolt",
+            "label": "thatcher-revolt",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$thatcher-revolt",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OrderTimestamps",
+          "with": [
+            0,
+            1,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Human Token",
+          "count": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "Human Token",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Human Token",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Human Token",
+          "power": 1,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "Human Token#2",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Human Token#2",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Human Token#2",
+          "power": 1,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "Human Token#3",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Human Token#3",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Human Token#3",
+          "power": 1,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "Human Token",
+          "keyword": {
+            "type": "Haste"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "Human Token#2",
+          "keyword": {
+            "type": "Haste"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "Human Token#3",
+          "keyword": {
+            "type": "Haste"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Thatcher Revolt"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Thatcher Revolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Thatcher Revolt",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-3",
+        "tapped": true
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Human Token",
+        "count": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "description": "CR 701.9b a valid pick is honoured and only the shortfall is completed",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mind Rot",
+            "label": "mind-rot",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDiscard",
+          "with": [
+            "$goblin-piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$mind-rot",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Mind Rot",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Mind Rot",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 2
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Hand",
+        "is": [
+          "Goblin Piker"
+        ]
+      }
+    }
+  ]
+}

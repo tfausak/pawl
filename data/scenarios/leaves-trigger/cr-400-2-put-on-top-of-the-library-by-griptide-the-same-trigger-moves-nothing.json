@@ -80,7 +80,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 9"
+            "trigger of $synthetic-persistent-roaches"
           ]
         }
       }

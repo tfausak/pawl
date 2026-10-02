@@ -124,7 +124,7 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})"
+            "ActivateManaAbility $nimbus-maze"
           ]
         }
       }

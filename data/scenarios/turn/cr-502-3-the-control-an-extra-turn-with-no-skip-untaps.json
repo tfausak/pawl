@@ -1,0 +1,239 @@
+{
+  "description": "CR 502.3 the control: an extra turn with no skip untaps",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-5",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "tapped": true,
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Time Warp",
+            "label": "time-warp",
+            "ready": true
+          },
+          {
+            "card": "Savor the Moment",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$time-warp",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4",
+            "$island-5",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$goblin-piker",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$goblin-piker",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Time Warp",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Time Warp",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 9
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": false
+      }
+    }
+  ]
+}

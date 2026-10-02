@@ -1,0 +1,39 @@
+{
+  "description": "CR 508.8 an attacker-less combat changes no life total",
+  "board": {
+    "seats": [
+      {
+        "name": "alice"
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "description": "CR 702.29c the trigger fires from the graveyard, off a new incarnation",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Windcaller Aven",
+            "label": "windcaller-aven",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$windcaller-aven",
+          "ability": 0,
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Windcaller Aven",
+            "ability of $windcaller-aven"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Windcaller Aven",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Windcaller Aven",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

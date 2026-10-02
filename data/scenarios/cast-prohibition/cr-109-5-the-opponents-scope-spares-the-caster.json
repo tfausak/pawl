@@ -133,7 +133,7 @@
           "is": [
             "Pass",
             "Cast Silence",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})"
+            "ActivateManaAbility Plains#2"
           ]
         }
       }

@@ -103,7 +103,7 @@
           "is": [
             "Pass",
             "Cast Ornithopter",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})"
+            "ActivateManaAbility Mountain#3"
           ]
         }
       }
@@ -119,7 +119,7 @@
           "is": [
             "Pass",
             "Cast Lightning Bolt#2",
-            "ActivateManaAbility (MkObjectId {unwrap = 7})"
+            "ActivateManaAbility Mountain#4"
           ]
         }
       }

@@ -92,10 +92,10 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 13})"
+            "ActivateManaAbility Forest",
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3",
+            "ActivateManaAbility Forest#11"
           ]
         }
       }

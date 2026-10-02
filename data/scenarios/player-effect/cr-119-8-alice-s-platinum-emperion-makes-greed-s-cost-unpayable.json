@@ -82,7 +82,7 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})"
+            "ActivateManaAbility Swamp"
           ]
         }
       }

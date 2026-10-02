@@ -59,9 +59,9 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})"
+            "ActivateManaAbility Plains",
+            "ActivateManaAbility Plains#2",
+            "ActivateManaAbility Plains#3"
           ]
         }
       }

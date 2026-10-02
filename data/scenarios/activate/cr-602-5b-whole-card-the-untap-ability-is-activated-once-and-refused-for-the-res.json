@@ -81,9 +81,9 @@
           "is": [
             "Pass",
             "Activate $locust-swarm",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})"
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3",
+            "ActivateManaAbility Forest#4"
           ]
         }
       }

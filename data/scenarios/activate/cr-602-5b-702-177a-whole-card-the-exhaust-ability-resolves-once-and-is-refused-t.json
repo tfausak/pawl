@@ -103,10 +103,10 @@
           "is": [
             "Pass",
             "Activate $greenbelt-guardian",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})",
-            "ActivateManaAbility (MkObjectId {unwrap = 7})"
+            "ActivateManaAbility Forest#5",
+            "ActivateManaAbility Forest#6",
+            "ActivateManaAbility Forest#7",
+            "ActivateManaAbility Forest#8"
           ]
         }
       }

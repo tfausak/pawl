@@ -99,7 +99,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 11",
+            "trigger of $vengeful-townsfolk",
             "Phyrexian Tribute"
           ]
         }

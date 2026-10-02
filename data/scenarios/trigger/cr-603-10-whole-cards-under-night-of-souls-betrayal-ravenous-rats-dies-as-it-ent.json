@@ -1,0 +1,173 @@
+{
+  "description": "CR 603.10 whole cards: under Night of Souls' Betrayal, Ravenous Rats dies as it enters and STILL makes bob discard",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Night of Souls' Betrayal",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ravenous Rats",
+            "label": "ravenous-rats",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ravenous-rats",
+          "mana": [
+            "$swamp",
+            "$swamp-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "target",
+              [
+                [
+                  "Player",
+                  "bob"
+                ]
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDiscard",
+          "with": [
+            "$goblin-piker"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Ravenous Rats",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Ravenous Rats",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Ravenous Rats",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": [
+          "Ravenous Rats"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Hand",
+        "is": [
+          "Goblin Piker"
+        ]
+      }
+    }
+  ]
+}

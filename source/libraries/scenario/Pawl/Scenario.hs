@@ -1115,7 +1115,7 @@ describeObject gs oid = do
   labels <- State.gets (Staged.objects . staged)
   let describeSource source = case List.find ((== source) . snd) (Map.toAscList labels) of
         Just (label, _) -> Codec.Reference.toText (Reference.Labelled label)
-        Nothing -> case Game.cardOf source gs of
+        Nothing -> case Game.cardOfWithLastKnown source gs of
           Just card -> CardName.unwrap (Face.name (NonEmpty.head (Card.faces card)))
           Nothing -> Text.pack ("object " <> show (ObjectId.unwrap source))
   pure $ case List.find ((== oid) . snd) (Map.toAscList labels) of

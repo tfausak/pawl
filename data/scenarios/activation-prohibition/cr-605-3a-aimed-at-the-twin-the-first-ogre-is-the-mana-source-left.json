@@ -74,8 +74,8 @@
           "player": "bob",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Treasonous Ogre"
           ]
         }
       }

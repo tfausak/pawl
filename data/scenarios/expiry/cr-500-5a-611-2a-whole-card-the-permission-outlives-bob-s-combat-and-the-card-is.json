@@ -119,8 +119,8 @@
           "is": [
             "Pass",
             "Cast Goblin Piker",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})"
+            "ActivateManaAbility $mountain",
+            "ActivateManaAbility $mountain-2"
           ]
         }
       }

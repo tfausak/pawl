@@ -1,0 +1,155 @@
+{
+  "description": "CR 601.3 the upkeep player may cast the card the trigger exiled, and the Lair's controller may not",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Elkin Lair",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "lightning-bolt",
+            "ready": true
+          },
+          {
+            "card": "Bog Wraith",
+            "ready": true
+          },
+          {
+            "card": "Bird Maiden",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "RandomObject",
+          "with": "$lightning-bolt"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Exile",
+          "is": [
+            "Lightning Bolt"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "Cast Lightning Bolt",
+            "ActivateManaAbility Mountain#2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility Mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "Mountain",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "Mountain",
+          "is": "alice"
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    }
+  ]
+}

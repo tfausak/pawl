@@ -1,0 +1,188 @@
+{
+  "description": "CR 508.8 an attacker removed from combat still keeps the two steps",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ray of Command",
+            "label": "ray-of-command",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$goblin-piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$ray-of-command",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {}
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Ray of Command",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Ray of Command",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island-3",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island-4",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

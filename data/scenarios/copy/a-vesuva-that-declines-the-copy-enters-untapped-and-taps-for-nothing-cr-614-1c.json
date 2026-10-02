@@ -65,9 +65,9 @@
           "is": [
             "Pass",
             "Activate Mutavault",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mutavault"
           ]
         }
       }

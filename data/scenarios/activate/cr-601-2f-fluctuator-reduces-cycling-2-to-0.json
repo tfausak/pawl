@@ -47,7 +47,7 @@
           "is": [
             "Pass",
             "Activate $barkhide-mauler",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})"
+            "ActivateManaAbility $forest"
           ]
         }
       }
@@ -74,7 +74,7 @@
         "View": {
           "of": "Stack",
           "is": [
-            "object 4"
+            "ability of $barkhide-mauler"
           ]
         }
       }

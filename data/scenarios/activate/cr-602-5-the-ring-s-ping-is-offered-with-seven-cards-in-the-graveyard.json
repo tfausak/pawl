@@ -86,8 +86,8 @@
           "is": [
             "Pass",
             "Activate $ring",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility $ring",
+            "ActivateManaAbility Mountain"
           ]
         }
       }

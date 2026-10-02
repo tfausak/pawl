@@ -1,0 +1,141 @@
+{
+  "description": "CR 701.39a bolster looks only at creatures its controller controls",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Wall of Stone",
+            "label": "wall-of-stone",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Cached Defenses",
+            "label": "cached-defenses",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Typhoid Rats",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$cached-defenses",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Cached Defenses",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Cached Defenses",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$wall-of-stone",
+        "power": 3,
+        "toughness": 11
+      }
+    },
+    {
+      "Counters": {
+        "object": "$wall-of-stone",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 3
+      }
+    },
+    {
+      "Counters": {
+        "object": "Goblin Piker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "Typhoid Rats",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

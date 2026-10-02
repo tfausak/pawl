@@ -52,9 +52,9 @@
           "is": [
             "Pass",
             "Activate $dutiful-knowledge-seeker",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility $island",
+            "ActivateManaAbility $island-2",
+            "ActivateManaAbility $island-3"
           ]
         }
       }

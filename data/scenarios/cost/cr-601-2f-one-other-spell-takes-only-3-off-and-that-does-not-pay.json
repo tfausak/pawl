@@ -93,14 +93,14 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})",
-            "ActivateManaAbility (MkObjectId {unwrap = 7})",
-            "ActivateManaAbility (MkObjectId {unwrap = 8})"
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3",
+            "ActivateManaAbility Forest#4",
+            "ActivateManaAbility Forest#5",
+            "ActivateManaAbility Forest#6",
+            "ActivateManaAbility Forest#7",
+            "ActivateManaAbility Forest#8",
+            "ActivateManaAbility Forest#9"
           ]
         }
       }

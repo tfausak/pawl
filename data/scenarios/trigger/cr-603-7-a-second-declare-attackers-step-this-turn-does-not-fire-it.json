@@ -1,0 +1,263 @@
+{
+  "description": "CR 603.7 a second declare attackers step THIS turn does not fire it",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Meandering Towershell",
+            "label": "meandering-towershell",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Relentless Assault",
+            "label": "relentless-assault",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$meandering-towershell"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$relentless-assault",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Relentless Assault",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Relentless Assault",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$mountain",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$mountain-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$mountain-3",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$mountain-4",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $meandering-towershell"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 3,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

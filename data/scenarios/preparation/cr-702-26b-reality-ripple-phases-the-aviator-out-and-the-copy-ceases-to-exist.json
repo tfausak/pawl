@@ -78,9 +78,9 @@
             "Pass",
             "Cast $reality-ripple",
             "Cast Jump#2",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})"
+            "ActivateManaAbility $island",
+            "ActivateManaAbility $island-2",
+            "ActivateManaAbility Island#3"
           ]
         }
       }
@@ -132,7 +132,7 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})"
+            "ActivateManaAbility Island#3"
           ]
         }
       }

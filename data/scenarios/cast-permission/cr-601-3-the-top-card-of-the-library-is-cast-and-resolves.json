@@ -109,9 +109,9 @@
             "Pass",
             "Cast Rampant Growth",
             "Cast $llanowar-elves",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility $forest",
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3"
           ]
         }
       }

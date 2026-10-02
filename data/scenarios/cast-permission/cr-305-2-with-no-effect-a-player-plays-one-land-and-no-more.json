@@ -54,7 +54,7 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})"
+            "ActivateManaAbility Mountain#5"
           ]
         }
       }

@@ -1,0 +1,142 @@
+{
+  "description": "CR 115 Angelic Edict may exile an enchantment (non-creature permanent)",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Angelic Edict",
+            "label": "angelic-edict",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Rest in Peace",
+            "label": "rest-in-peace",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$angelic-edict",
+          "targets": [
+            "$rest-in-peace"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            "$plains-4",
+            "$plains-5"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Angelic Edict",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Angelic Edict",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Rest in Peace",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-5",
+        "tapped": true
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Exile",
+        "card": "Rest in Peace",
+        "count": 1
+      }
+    }
+  ]
+}

@@ -91,12 +91,12 @@
           "player": "alice",
           "is": [
             "Pass",
-            "TurnFaceUp (MkObjectId {unwrap = 11}) Disguise",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})"
+            "TurnFaceUp Defenestrated Phantom Disguise",
+            "ActivateManaAbility Plains#3",
+            "ActivateManaAbility Plains#4",
+            "ActivateManaAbility Plains#5",
+            "ActivateManaAbility Plains#6",
+            "ActivateManaAbility Plains#7"
           ]
         }
       }

@@ -1,0 +1,157 @@
+{
+  "description": "CR 601.2b announcing 2 instead returns the mana value 2 card and leaves the 3",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [
+          {
+            "key": {
+              "type": "Energy"
+            },
+            "value": 5
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Chthonian Nightmare",
+            "label": "chthonian-nightmare",
+            "ready": true
+          },
+          {
+            "card": "Ogre Sentry",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker"
+          },
+          {
+            "card": "Kalakscion, Hunger Tyrant"
+          },
+          {
+            "card": "Russet Wolves"
+          },
+          {
+            "card": "Cancel"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$chthonian-nightmare",
+          "ability": 0,
+          "targets": [
+            "$goblin-piker"
+          ],
+          "x": 2,
+          "costOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Kalakscion, Hunger Tyrant",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Chthonian Nightmare",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Ogre Sentry",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Chthonian Nightmare",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Ogre Sentry",
+        "count": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Goblin Piker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Goblin Piker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "PlayerCounters": {
+        "player": "alice",
+        "kind": {
+          "type": "Energy"
+        },
+        "count": 3
+      }
+    }
+  ]
+}

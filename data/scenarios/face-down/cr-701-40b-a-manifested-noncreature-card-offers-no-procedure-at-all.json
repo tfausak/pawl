@@ -95,12 +95,12 @@
           "player": "alice",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})",
-            "ActivateManaAbility (MkObjectId {unwrap = 6})",
-            "ActivateManaAbility (MkObjectId {unwrap = 7})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mountain#3",
+            "ActivateManaAbility Mountain#4",
+            "ActivateManaAbility Mountain#5",
+            "ActivateManaAbility Mountain#6"
           ]
         }
       }

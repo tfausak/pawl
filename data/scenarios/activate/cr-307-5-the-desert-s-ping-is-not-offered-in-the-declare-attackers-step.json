@@ -64,7 +64,7 @@
           "is": [
             "Pass",
             "Activate $sorcerer",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility $desert"
           ]
         }
       }

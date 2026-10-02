@@ -1,0 +1,204 @@
+{
+  "description": "CR 603.2 whole card: the bound is the damage the event carried",
+  "note": "Alice first answers the trigger with the Tyrant, which the 2-damage bound leaves unoffered, so it is asked again; with the -1/-1 counter removed that answer stands and the run fails.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Venerable Warsinger",
+            "label": "venerable-warsinger",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "MinusOneMinusOne"
+                },
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker"
+          },
+          {
+            "card": "Kalakscion, Hunger Tyrant"
+          },
+          {
+            "card": "Russet Wolves"
+          },
+          {
+            "card": "Lightning Bolt"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$venerable-warsinger",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$venerable-warsinger"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$venerable-warsinger",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "target",
+              [
+                [
+                  "Object",
+                  "Kalakscion, Hunger Tyrant"
+                ]
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "target",
+              [
+                [
+                  "Object",
+                  "$goblin-piker"
+                ]
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseOptional",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Kalakscion, Hunger Tyrant",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Russet Wolves",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 18
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Goblin Piker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Goblin Piker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker",
+        "power": 2,
+        "toughness": 1
+      }
+    }
+  ]
+}

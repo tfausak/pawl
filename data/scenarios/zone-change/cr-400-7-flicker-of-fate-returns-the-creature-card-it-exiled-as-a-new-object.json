@@ -1,0 +1,135 @@
+{
+  "description": "CR 400.7 Flicker of Fate returns the creature card it exiled, as a new object",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Flicker of Fate",
+            "label": "flicker-of-fate",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$flicker-of-fate",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Flicker of Fate",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Flicker of Fate",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Goblin Piker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Goblin Piker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Goblin Piker",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Exile",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Battlefield",
+        "is": [
+          "Goblin Piker"
+        ]
+      }
+    }
+  ]
+}

@@ -98,11 +98,11 @@
             "Pass",
             "Cast Unsummon",
             "Activate Uthden Troll#2",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mountain#3",
+            "ActivateManaAbility Mountain#4",
+            "ActivateManaAbility Island"
           ]
         }
       }

@@ -1,0 +1,188 @@
+{
+  "description": "CR 601.2c the SAME board draws two when the other creature is the target",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-5",
+            "ready": true
+          },
+          {
+            "card": "Thragtusk",
+            "ready": true
+          },
+          {
+            "card": "Giant Spider",
+            "label": "giant-spider",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Soul's Majesty",
+            "label": "soul-s-majesty",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Panglacial Wurm",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$soul-s-majesty",
+          "targets": [
+            "$giant-spider"
+          ],
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            "$forest-5"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Soul's Majesty",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Soul's Majesty",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 10.0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-5",
+        "tapped": true
+      }
+    }
+  ]
+}

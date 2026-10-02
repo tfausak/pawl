@@ -100,7 +100,7 @@
           "player": "bob",
           "is": [
             "Pass",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})"
+            "ActivateManaAbility Plains#2"
           ]
         }
       }

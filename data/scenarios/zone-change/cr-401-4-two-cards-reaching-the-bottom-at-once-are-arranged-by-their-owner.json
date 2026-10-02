@@ -1,0 +1,296 @@
+{
+  "description": "CR 401.4 two cards reaching the BOTTOM at once are arranged by their owner",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Aetherspouts",
+            "label": "aetherspouts",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$goblin-piker",
+          "$hill-giant"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseLibraryEnd",
+          "with": {
+            "type": "Bottom"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseLibraryEnd",
+          "with": {
+            "type": "Bottom"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ArrangeLibraryArrivals",
+          "with": [
+            1,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$aetherspouts",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4",
+            "$island-5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Hill Giant",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Aetherspouts",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Aetherspouts",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Library",
+          "card": "Hill Giant",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island-3",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island-4",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island-5",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Library",
+          "is": [
+            "Island#6",
+            "Island#7",
+            "Goblin Piker",
+            "Hill Giant"
+          ]
+        }
+      }
+    }
+  ]
+}

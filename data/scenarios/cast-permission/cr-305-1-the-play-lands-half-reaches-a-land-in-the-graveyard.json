@@ -121,12 +121,12 @@
           "is": [
             "Pass",
             "Cast $yawgmoth-s-will",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})"
+            "ActivateManaAbility $swamp",
+            "ActivateManaAbility $swamp-2",
+            "ActivateManaAbility $swamp-3",
+            "ActivateManaAbility Swamp#4",
+            "ActivateManaAbility Swamp#5",
+            "ActivateManaAbility Swamp#6"
           ]
         }
       }
@@ -211,9 +211,9 @@
             "Pass",
             "PlayLand Swamp#7",
             "Cast Sign in Blood",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})",
-            "ActivateManaAbility (MkObjectId {unwrap = 5})"
+            "ActivateManaAbility Swamp#4",
+            "ActivateManaAbility Swamp#5",
+            "ActivateManaAbility Swamp#6"
           ]
         }
       }

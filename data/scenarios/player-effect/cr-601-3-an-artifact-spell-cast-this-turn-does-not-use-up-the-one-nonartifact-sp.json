@@ -94,9 +94,9 @@
             "Pass",
             "Cast Lightning Bolt",
             "Cast Goblin Piker",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})"
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mountain#3"
           ]
         }
       }

@@ -66,8 +66,8 @@
           "is": [
             "Pass",
             "Activate Ninja of the Deep Hours",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})"
+            "ActivateManaAbility Island",
+            "ActivateManaAbility Island#2"
           ]
         }
       }

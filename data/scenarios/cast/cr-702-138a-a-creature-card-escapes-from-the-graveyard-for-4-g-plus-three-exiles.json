@@ -72,11 +72,11 @@
           "is": [
             "Pass",
             "Cast $loathsome-chimera",
-            "ActivateManaAbility (MkObjectId {unwrap = 0})",
-            "ActivateManaAbility (MkObjectId {unwrap = 1})",
-            "ActivateManaAbility (MkObjectId {unwrap = 2})",
-            "ActivateManaAbility (MkObjectId {unwrap = 3})",
-            "ActivateManaAbility (MkObjectId {unwrap = 4})"
+            "ActivateManaAbility $forest",
+            "ActivateManaAbility $forest-2",
+            "ActivateManaAbility $forest-3",
+            "ActivateManaAbility $forest-4",
+            "ActivateManaAbility $forest-5"
           ]
         }
       }
