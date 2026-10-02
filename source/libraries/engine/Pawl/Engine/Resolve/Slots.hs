@@ -1529,6 +1529,7 @@ conditionSlots condition = case condition of
     joinTwo (quantitySlots (Compares.measured c)) (quantitySlots (Compares.threshold c))
   Condition.Type.Any conditions -> joinSlots (fmap conditionSlots conditions)
   Condition.Type.All conditions -> joinSlots (fmap conditionSlots conditions)
+  Condition.Type.During _ -> Map.empty
 
 -- Everything one waiting ROW can name a slot with: the Filters its pattern and its
 -- rewrite describe things with, and the Quantities its rewrite counts with. A
@@ -2130,6 +2131,7 @@ conditionSlotsAreExhaustive condition = case condition of
     Quantity.slotsAreExhaustive (Compares.measured c) && Quantity.slotsAreExhaustive (Compares.threshold c)
   Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
   Condition.Type.All conditions -> all conditionSlotsAreExhaustive conditions
+  Condition.Type.During _ -> True
 
 -- conditionSlots' mirror for X: does either side of any comparison read it?
 conditionReadsX :: Condition.Type.Condition -> Bool
@@ -2137,6 +2139,7 @@ conditionReadsX condition = case condition of
   Condition.Type.Compares c -> Quantity.readsX (Compares.measured c) || Quantity.readsX (Compares.threshold c)
   Condition.Type.Any conditions -> any conditionReadsX conditions
   Condition.Type.All conditions -> any conditionReadsX conditions
+  Condition.Type.During _ -> False
 
 -- Does any of these effects read X? A card that reads X must declare it in its
 -- cost (CR 107.3, CR 107.3a, CR 118.4), the same reads-equal-declares contract

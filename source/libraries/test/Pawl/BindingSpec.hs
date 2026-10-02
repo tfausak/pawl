@@ -39,6 +39,7 @@ sampleSnapshot =
       PC.playerAbilities = [],
       PC.grantedPlayerAbilities = [],
       PC.grantedStaticAbilities = [],
+      PC.grantedRuleAbilities = mempty,
       PC.specialActions = [],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],

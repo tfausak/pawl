@@ -1,0 +1,23 @@
+{
+  "description": "CR 613.11 Zurgo's end-step grant keeps its mobilized Warriors from mobilize's own sacrifice",
+  "note": "Zurgo, Thunder's Decree attacks and mobilize 2 makes two Warrior tokens and arms their sacrifice at the beginning of the next end step, which is alice's. During that end step Zurgo's static ability gives each token \"This token can't be sacrificed\", so the delayed sacrifice resolves and both tokens stay. Dalkovan Packbeasts' scenario is the control: with no Zurgo the same sacrifice takes them.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Zurgo, Thunder's Decree", "label": "zurgo", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$zurgo"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2"] } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 2 } } }
+  ]
+}

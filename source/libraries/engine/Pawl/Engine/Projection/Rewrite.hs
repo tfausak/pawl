@@ -1960,6 +1960,8 @@ rewriteCondition pairs condition = case condition of
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (rewriteCondition pairs) conditions)
   Condition.Type.All conditions -> Condition.Type.All (fmap (rewriteCondition pairs) conditions)
+  -- A phase or step names no subtype.
+  Condition.Type.During _ -> condition
 
 -- CR 612.1 through ONE clause of an activated ability's CR 602.5 "activate only
 -- ..." rider, which is printed text like the rest of the ability.

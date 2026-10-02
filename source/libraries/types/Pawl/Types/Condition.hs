@@ -1,6 +1,7 @@
 module Pawl.Types.Condition where
 
 import qualified Pawl.Types.Compares as Compares
+import qualified Pawl.Types.DuringPhase as DuringPhase
 
 -- | A predicate over game STATE rather than over an event, with one vocabulary
 -- and several customers: a state trigger's condition (CR 603.8, checked at every
@@ -19,9 +20,10 @@ import qualified Pawl.Types.Compares as Compares
 -- and CR 611.2c's parenthetical keeps them apart: the duration ENDS a stored
 -- effect once, while the clause gates one that is re-derived every read.
 --
--- ONE comparison plus a disjunction and a conjunction of them, and no other
--- escape hatch. CR 611.2b's "for as long as you control this creature" is a
--- source-restricted count of one (Filter.IsSource), not a special arm.
+-- ONE comparison, one step-or-phase window, and a disjunction and a
+-- conjunction of them, and no other escape hatch. CR 611.2b's "for as long as
+-- you control this creature" is a source-restricted count of one
+-- (Filter.IsSource), not a special arm.
 --
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
 -- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. Such a
@@ -51,4 +53,7 @@ data Condition
     -- `All []` is True, the fold's unit, which is Filter's `And []` one type over.
     -- There is still no Not: no rule in the pool asks for one.
     All [Condition]
+  | -- | True while the turn is inside this phase or step of the turns its scope
+    -- names, "your" being the reader's perspective (CR 500.1, CR 109.5).
+    During DuringPhase.DuringPhase
   deriving (Eq, Ord, Show)
