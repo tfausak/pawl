@@ -2339,14 +2339,22 @@ apply batch candidate event =
                 -- snapshot above but placed on the object -- and it happens only
                 -- where a copy was actually made.
                 --
-                -- Through addEnteringCounters, the WithCounters arm's funnel and
-                -- for its reasons: CR 122.6's counters must be on the permanent
-                -- before it exists on the battlefield, and CR 614.16 applies
-                -- inside this entry's own CR 616.1 loop (Doubling Season). The
+                -- Through addEnteringCounters (inside addCopyExceptionCounters),
+                -- the WithCounters arm's funnel and for its reasons: CR 122.6's
+                -- counters must be on the permanent before it exists on the
+                -- battlefield, and CR 614.16 applies inside this entry's own CR
+                -- 616.1 loop (Doubling Season). The
                 -- amount is read the same way too -- CR 107.3m's announced X
                 -- substituted in (Altered Ego announces X on the spell, and CR
                 -- 400.7 leaves the permanent none), and evaluated against
                 -- boardAsEntering rather than the live battlefield.
+                --
+                -- CR 707.9e's second sentence first: an earlier copy effect's
+                -- exception on this entry no longer happens, this one being
+                -- applied after it (Altered Ego copying an uncopied Quicksilver
+                -- Gargantuan), so takeBackCopyException lifts its counters off
+                -- the pending map before this row's own go on.
+                takeBackCopyException oid
                 Foldable.for_ (AsCopy.counters asCopy) $ \withCounters -> do
                   gs2 <- State.get
                   let viewOf = Projection.viewWithLastKnown oid gs2
@@ -2355,7 +2363,7 @@ apply batch candidate event =
                   Foldable.for_ (Map.toList (WithCounters.counters withCounters)) $ \(kind, quantity) ->
                     case Quantity.evaluate viewOf context (Projection.boardAsEntering gs2) oid (Quantity.substituteAnnouncedX announcedX quantity) of
                       Nothing -> pure () -- unevaluable quantity: no counters, the WithCounters arm's posture
-                      Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
+                      Just n -> addCopyExceptionCounters oid kind (Integer.toNaturalSaturating n)
                 -- CR 707.9g: a linked trigger an EARLIER copy effect on this entry
                 -- armed no longer triggers, this one being applied after it; then
                 -- this row's own is armed (Replacement.linkedCopyTrigger), on this
@@ -4631,7 +4639,7 @@ showsInstantBackFace oid gs = Maybe.fromMaybe False $ do
 flushEnteringCounters :: ObjectId -> Game ()
 flushEnteringCounters oid = do
   pending <- State.gets (Map.findWithDefault Map.empty oid . GameState.enteringCounters)
-  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs)})
+  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs), GameState.copyExceptionCounters = Map.delete oid (GameState.copyExceptionCounters gs)})
   Monad.mapM_ (\(kind, n) -> Monad.void (settleCounters oid kind n)) (Map.toAscList pending)
 
 -- CR 310.9a: "as a battle enters the battlefield, its controller chooses a player
@@ -5030,6 +5038,31 @@ addEnteringCounters oid kind n =
       { GameState.enteringCounters =
           Map.insertWith (Map.unionWith (+)) oid (Map.singleton kind n) (GameState.enteringCounters gs)
       }
+
+-- CR 707.9e: addEnteringCounters for a copy effect's additional-counters
+-- exception, remembering the share in GameState.copyExceptionCounters so that a
+-- copy effect applied to the same entry afterwards can take it back.
+addCopyExceptionCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game ()
+addCopyExceptionCounters oid kind n = do
+  addEnteringCounters oid kind n
+  Monad.when (n > 0) . State.modify' $ \gs ->
+    gs
+      { GameState.copyExceptionCounters =
+          Map.insertWith (Map.unionWith (+)) oid (Map.singleton kind n) (GameState.copyExceptionCounters gs)
+      }
+
+-- CR 707.9e: the earlier copy effect's exception does not happen, so its share
+-- comes back off the pending map. Exact rather than approximate: CR 616.1c ranks
+-- every copy effect ahead of a CR 616.1e counter scaler (Doubling Season), so
+-- nothing can have rescaled the share between the two copy effects.
+takeBackCopyException :: ObjectId -> Game ()
+takeBackCopyException oid = State.modify' $ \gs ->
+  let placed = Map.findWithDefault Map.empty oid (GameState.copyExceptionCounters gs)
+      takeBack pending = Map.differenceWith (\n m -> Monad.mfilter (> 0) (Just (Natural.minusSaturating n m))) pending placed
+   in gs
+        { GameState.enteringCounters = Map.adjust takeBack oid (GameState.enteringCounters gs),
+          GameState.copyExceptionCounters = Map.delete oid (GameState.copyExceptionCounters gs)
+        }
 
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
