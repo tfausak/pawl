@@ -3019,21 +3019,26 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- Nalaar, Chief Mechanic's "create an X\/X colorless Vehicle artifact token named
 -- Nalaar Aetherjet". The same half of rule 111.4 as the legendary case, but
 -- nothing in the card data marks it, so this is a hand-kept list rather than a
--- predicate. CR 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles)
--- and the copy tokens of CR 111.4's own Spitting Image example (named Doomed
--- Dissenter, "not Human Token or Doomed Dissenter Token") will each want a line
--- here too.
+-- predicate. CR 111.10's named predefined tokens are listed too (111.10j's
+-- Cursed, 111.10q's Wicked); 111.10d's Walker, the other Roles and the copy
+-- tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter, "not
+-- Human Token or Doomed Dissenter Token") will each want a line here as their
+-- cards arrive.
 namedTokens :: Set.Set CardName.CardName
 namedTokens =
   Set.fromList
     [ -- Synthetic Ursine Rite's, whose card-authored name spells its own Bear
       -- subtype inside a longer word -- the CR 612.2 boundary case.
       CardName.MkCardName (Text.pack "Bearer of the Wilds"),
+      -- CR 111.10j's Cursed Role (Spiteful Hexmage).
+      CardName.MkCardName (Text.pack "Cursed"),
       CardName.MkCardName (Text.pack "Nalaar Aetherjet"),
       CardName.MkCardName (Text.pack "Rabid Sheep"),
       -- Preston Garvey, Minuteman's "create a green Aura enchantment token named
       -- Settlement attached to up to one target land you control".
-      CardName.MkCardName (Text.pack "Settlement")
+      CardName.MkCardName (Text.pack "Settlement"),
+      -- CR 111.10q's Wicked Role (Witch's Mark, Twisted Fealty).
+      CardName.MkCardName (Text.pack "Wicked")
     ]
 
 tokenNameOffends :: Face.Face Card.Type.Card -> Bool

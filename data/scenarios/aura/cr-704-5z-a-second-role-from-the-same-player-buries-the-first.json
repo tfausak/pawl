@@ -1,0 +1,53 @@
+{
+  "description": "CR 704.5z a second Role from the same player buries the first",
+  "note": "Witch's Mark puts alice's Wicked Role on her Hill Giant (4/4), then her Twisted Fealty steals bob's Hill Giant and puts a second Wicked Role of hers on her own. CR 303.7a / 704.5z keep only the newer, so alice controls one Wicked and her Giant stays 4/4, not 5/5; the buried Wicked's CR 111.10q trigger costs bob 1 life. Then her Spiteful Hexmage's Cursed Role, newer still, buries the second Wicked: the Giant is 1/1 (CR 111.10j), where keeping the OLDEST Role would leave it 4/4 and two identical Wickeds could not tell the difference. The negative twin, where bob's Role joins hers, is cr-704-5z-roles-from-two-players-both-stay.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Hill Giant", "label": "giant" },
+          { "card": "Mountain", "label": "m1" },
+          { "card": "Mountain", "label": "m2" },
+          { "card": "Mountain", "label": "m3" },
+          { "card": "Mountain", "label": "m4" },
+          { "card": "Mountain", "label": "m5" },
+          { "card": "Swamp", "label": "swamp" }
+        ],
+        "hand": [
+          { "card": "Witch's Mark", "label": "mark" },
+          { "card": "Twisted Fealty", "label": "fealty" },
+          { "card": "Spiteful Hexmage", "label": "hexmage" }
+        ],
+        "library": [{ "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Hill Giant", "label": "ogre" }],
+        "library": [{ "card": "Mountain" }, { "card": "Mountain" }, { "card": "Mountain" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$mark", "targets": ["$giant"], "mana": ["$m1", "$m2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Declines" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$fealty", "targetsBySlot": { "target": ["$ogre"], "creature": ["$giant"] }, "mana": ["$m3", "$m4", "$m5", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wicked", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 4, "toughness": 4 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 19 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$hexmage", "mana": ["$swamp"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$giant"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "$giant", "power": 1, "toughness": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wicked", "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } }
+  ]
+}
