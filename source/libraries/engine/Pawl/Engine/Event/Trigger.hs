@@ -520,7 +520,8 @@ looksBack condition = case condition of
   TriggerCondition.SelfPutFromBattlefieldInto _ -> True
   TriggerCondition.PermanentLeavesTheBattlefield _ -> True
   -- CR 603.6c's family too: CR 708.9's reveal happens only as the permanent
-  -- moves from the battlefield, so this triggers on that move. A watcher swept
+  -- leaves the battlefield, by a move or with its owner, so this triggers on
+  -- that departure. A watcher swept
   -- up in the same batch is offered it (Pawl.FaceDownSpec's Day of Judgment
   -- case).
   TriggerCondition.FaceDownPermanentLeavesRevealed -> True

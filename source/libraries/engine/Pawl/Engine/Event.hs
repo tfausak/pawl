@@ -2603,8 +2603,8 @@ apply batch candidate event =
             -- CR 102.1 makes a player one of the people IN the game, and CR
             -- 104.3a lets one leave at any time -- so the offer is
             -- Game.stillPlaying and not GameState.turnOrder, which keeps a
-            -- departed seat.
-            let opponents = Game.opponentsOf controller gs
+            -- departed seat -- cut to the controller's range (CR 801.5a).
+            let opponents = Game.opponentsInReach controller gs
             opponent <- case opponents of
               -- CR 102.2: a two-player game leaves exactly one opponent, and
               -- one option is not a choice. The empty case is a game whose
@@ -3312,10 +3312,10 @@ apply batch candidate event =
           -- Unreachable, and defensive for the reason riot's arm gives above.
           Nothing -> pure (Just event)
           Just controller -> do
-            -- CR 102.1's seats still in the game, Game.opponentsOf's own read --
-            -- a player who has left (CR 104.3a) is nobody's opponent and cannot be
-            -- offered the choice.
-            chosen <- case Game.opponentsOf controller gs of
+            -- CR 102.1's seats still in the game, cut to the controller's range
+            -- (CR 801.5a) -- a player who has left (CR 104.3a) is nobody's
+            -- opponent and cannot be offered the choice.
+            chosen <- case Game.opponentsInReach controller gs of
               -- No opponent left to ask, a board CR 104.2a has already ended the
               -- game on. Nobody decides, so tribute is not paid -- the state rule
               -- 702.104b's condition reads as true.
@@ -8829,7 +8829,8 @@ shuffleAttractionDeck pid = do
 --
 -- The `cause` is what a later rule asks about the reveal (see RevealCause): CR
 -- 702.94a's "this way" from the draw funnel's miracle window, CR 708.9's
--- departure from changeZoneAttaching, and Ordinary from every other caller.
+-- departure from changeZoneAttaching and Pawl.Engine.Departure.objectsLeaveWith,
+-- and Ordinary from every other caller.
 --
 -- CR 708.12 does NOT move this read, and that is the rule rather than an
 -- oversight: it governs what a revealing ability READS, not what the log records,
@@ -8843,8 +8844,14 @@ shuffleAttractionDeck pid = do
 reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get
-  Monad.when (Maybe.isJust (Game.lookupObject oid gs)) $
-    State.modify' (recordEvent (GameEvent.Revealed (Revealed.MkRevealed pid oid cause (Projection.project oid gs))))
+  Monad.mapM_ (State.modify' . recordEvent) (revealedOn cause pid oid gs)
+
+-- `reveal`'s event, read off `gs` without recording it: Nothing when the object
+-- does not exist there. Pawl.Engine.Departure.objectsLeaveWith reads it on the
+-- board before CR 800.4a's departure and records it after.
+revealedOn :: RevealCause.RevealCause -> PlayerId -> ObjectId -> GameState -> Maybe GameEvent.GameEvent
+revealedOn cause pid oid gs =
+  fmap (const (GameEvent.Revealed (Revealed.MkRevealed pid oid cause (Projection.project oid gs)))) (Game.lookupObject oid gs)
 
 -- CR 603.2: does this condition fire on this event, for the permanent that bears
 -- it? `bearer` is the object whose ability this is and `you` its controller (CR
