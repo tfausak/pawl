@@ -2877,6 +2877,14 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- CR 701.23f's search triggers have nothing to reach. A stated characteristic
   -- does not make it one -- rule 701.23b governs a player who is SEARCHING, and
   -- nothing here asks anyone to.
+  ObjectRef.EachCardInYourLibrary mFilter ->
+    let inLibrary = Game.zoneMembers Zone.Library controller gs
+     in case mFilter of
+          Nothing -> inLibrary
+          Just filter_ ->
+            let context = effectContext gs controller source legal (slotBindings resolving gs)
+                viewOf = Projection.viewsOf gs
+             in filter (\oid -> Filter.matches context (viewOf oid) filter_) inLibrary
   -- CR 108.3's owner over every zone at once, so no APNAP order to impose:
   -- ascending id, the objects map's own order. CR 108.2 keeps a token and a
   -- copy out of "card"; Game.isCardObject is that classification, a regression
@@ -2888,14 +2896,6 @@ objectRefObjects legal resolving controller source gs ref = case ref of
         viewOf = Projection.viewsOf gs
         owned oid obj = Object.owner obj == controller && Game.isCardObject oid gs && Filter.matches context (viewOf oid) filter_
      in Map.keys (Map.filterWithKey owned (GameState.objects gs))
-  ObjectRef.EachCardInYourLibrary mFilter ->
-    let inLibrary = Game.zoneMembers Zone.Library controller gs
-     in case mFilter of
-          Nothing -> inLibrary
-          Just filter_ ->
-            let context = effectContext gs controller source legal (slotBindings resolving gs)
-                viewOf = Projection.viewsOf gs
-             in filter (\oid -> Filter.matches context (viewOf oid) filter_) inLibrary
   -- CR 607.2a's linked set: the cards GameState.exiledWith files against this
   -- effect's SOURCE. The relation, not a zone sweep, is the membership test, so a
   -- card exiled by a second copy of the same printing is not named; a stated
