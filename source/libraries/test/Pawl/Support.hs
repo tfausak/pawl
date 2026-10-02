@@ -249,6 +249,7 @@ board seats active step =
               Board.attackOption = Just AttackOption.MultiplePlayers,
               Board.brawl = False,
               Board.sharedTeamTurns = False,
+              Board.sharedTeamLife = False,
               Board.deployCreatures = False
             }
         else error "S.board: seats must be listed alice, bob, carol, dave"
@@ -2082,7 +2083,7 @@ oneMountainState mountain ph =
             Object.activatedOnce = Map.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.sharedTeamLife = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),

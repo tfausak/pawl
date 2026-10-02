@@ -64,8 +64,13 @@ import qualified Pawl.Types.Zone as Zone
 
 -- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), CR 704.5c
 -- (ten or more poison counters), and CR 704.6c / CR 903.10a (twenty-one combat
--- damage from one commander). Two-Headed Giant's shared-poison variant (CR
--- 704.6b / 810) is out of scope (design.md §6).
+-- damage from one commander).
+--
+-- CR 704.6a / 810.8c: a team at 0 or less life is every member at 0 or less,
+-- Game.adjustLife keeping a shared total on each member, so CR 704.5a takes the
+-- whole team at once. Poison stays per player, which is CR 904.13c's reading.
+--
+-- Not implemented: CR 704.6b's shared poison threshold (#4494).
 --
 -- Rule 704.6c's disjunct is delegated to Pawl.Engine.Commander, the way CR
 -- 704.5aa's is to Pawl.Engine.Speed: this module owns WHEN a state-based action

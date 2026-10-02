@@ -275,6 +275,7 @@ stage registry board =
                         { GameSettings.attackOption = Board.attackOption board,
                           GameSettings.brawl = Board.brawl board,
                           GameSettings.sharedTeamTurns = Board.sharedTeamTurns board,
+                          GameSettings.sharedTeamLife = Board.sharedTeamLife board,
                           GameSettings.deployCreatures = Board.deployCreatures board,
                           GameSettings.teams = Teams.MkTeams (Map.fromList [(pid, team) | (seat, pid) <- NonEmpty.toList seated, Just team <- [Seat.team seat]]),
                           GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(pid, range) | (seat, pid) <- NonEmpty.toList seated, Just range <- [Seat.range seat]]),
@@ -338,13 +339,17 @@ boardFailure ids board =
       -- CR 809.2: one emperor per team, and an emperor is on one.
       emperors = filter Seat.emperor seats
       illegalEmperor = List.find (maybe True (\team -> length (filter ((== Just team) . Seat.team) emperors) > 1) . Seat.team) emperors
+      -- CR 810.4: one total per team, so every member shows the same one.
+      unsharedLife = List.find (\seat -> Board.sharedTeamLife board && any (\other -> Maybe.isJust (Seat.team seat) && Seat.team other == Seat.team seat && Seat.life other /= Seat.life seat) seats) seats
    in case duplicate of
         Just label -> Just (Failure.MkDuplicateLabel label)
         Nothing -> case unknownController of
           Just label -> Just (Failure.MkUnknownController label)
           Nothing -> case unknownProtector of
             Just label -> Just (Failure.MkUnknownProtector label)
-            Nothing -> fmap (Failure.MkIllegalEmperor . Seat.name) illegalEmperor
+            Nothing -> case illegalEmperor of
+              Just seat -> Just (Failure.MkIllegalEmperor (Seat.name seat))
+              Nothing -> fmap (Failure.MkUnsharedLife . Seat.name) unsharedLife
 
 placeSeats :: (Monad m) => Registry.Registry m -> [(Seat.Seat, PlayerId.PlayerId)] -> Staged.Staged -> m (Either Failure.ScenarioFailure Staged.Staged)
 placeSeats registry seated board = case seated of
@@ -1549,6 +1554,7 @@ render failure = case failure of
   Failure.MkUnknownFace name face -> CardName.unwrap name <> Text.pack " has no face named " <> CardName.unwrap face
   Failure.MkIllegalAttachment label -> Text.pack "a placement cannot be attached to " <> Label.unwrap label
   Failure.MkIllegalEmperor label -> Label.unwrap label <> Text.pack " is an emperor on no team, or not its team's only one"
+  Failure.MkUnsharedLife label -> Label.unwrap label <> Text.pack "'s life differs from a teammate's, but the team shares one total"
   Failure.MkTokenOffBattlefield name -> Text.pack "a token " <> CardName.unwrap name <> Text.pack " placed off the battlefield"
   Failure.MkUnknownMonarch label -> Label.unwrap label <> Text.pack " is the monarch but has no seat"
   Failure.MkUnknownObject ref known ->

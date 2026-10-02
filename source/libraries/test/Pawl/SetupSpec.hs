@@ -260,6 +260,19 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     Spec.assertEqWith s "the same deck outside Brawl: CR 903.7's forty" (S.lifeOf S.alice (build S.bothPlayers False)) (Just 40)
     Spec.assertEqWith s "and forty at three seats too, so the seat count alone is not the cause" (S.lifeOf S.alice (build S.threePlayers False)) (Just 40)
 
+  -- CR 810.4 / 810.11: one deck built three ways on four seats -- two teams of
+  -- two sharing life, a team of three sharing life, and two teams of two that
+  -- do not -- so the option and the team size are each the sole difference.
+  Spec.it s "CR 810.4 a team sharing a life total starts at 30, and CR 810.11 at 45 with three members" $ do
+    let build teams shared =
+          let gs = S.inTeams teams (Setup.emptyGame S.fourPlayers)
+              settled = gs {GameState.settings = (GameState.settings gs) {GameSettings.sharedTeamLife = shared}}
+           in S.runPure S.identityAnswer settled $
+                Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.empty, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
+    Spec.assertEqWith s "CR 810.4 two heads: 30" (S.lifeOf S.alice (build [[S.alice, S.bob], [S.carol, S.dave]] True)) (Just 30)
+    Spec.assertEqWith s "CR 810.11 three heads: 45" (S.lifeOf S.alice (build [[S.alice, S.bob, S.carol], [S.dave]] True)) (Just 45)
+    Spec.assertEqWith s "the same teams without the option: CR 103.4's twenty" (S.lifeOf S.alice (build [[S.alice, S.bob], [S.carol, S.dave]] False)) (Just 20)
+
   -- CR 727.1 restarts "following the procedures set forth in rule 103" for the
   -- same players, and CR 729.2's subgame "proceeds like a normal game": neither
   -- turns an option off, which is why Setup.restartGame and

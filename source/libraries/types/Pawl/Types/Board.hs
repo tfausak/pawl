@@ -24,6 +24,8 @@ data Board = MkBoard
     brawl :: Bool,
     -- | CR 805.1: whether each team takes its turns together.
     sharedTeamTurns :: Bool,
+    -- | CR 810.4 / 904.13b: whether each team shares one life total.
+    sharedTeamLife :: Bool,
     -- | CR 804.2: whether each creature can be deployed to a teammate.
     deployCreatures :: Bool
   }

@@ -25,6 +25,7 @@ import qualified Pawl.Scenario.Load as Load
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Concession as Concession
@@ -47,6 +48,7 @@ import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TeamId as TeamId
 import qualified Pawl.Types.When as When
 import qualified System.Directory as Directory
 
@@ -87,6 +89,13 @@ spec s registry = Spec.describe s "Scenario" $ do
         setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
     result <- Scenario.stage registry setup
     Spec.assertEqWith s "teamless emperor" result (Left (ScenarioFailure.MkIllegalEmperor (Label.MkLabel (Text.pack "alice"))))
+
+  Spec.it s "CR 810.4 teammates showing different life totals on a shared-life board are rejected" $ do
+    let alice = (S.playerSetup S.alice) {Seat.team = Just (TeamId.MkTeamId 1), Seat.life = 7}
+        bob = (S.playerSetup S.bob) {Seat.team = Just (TeamId.MkTeamId 1)}
+        setup = (S.board (alice NonEmpty.:| [bob]) S.alice S.precombatMain) {Board.sharedTeamLife = True}
+    result <- Scenario.stage registry setup
+    Spec.assertEqWith s "unshared life" result (Left (ScenarioFailure.MkUnsharedLife (Label.MkLabel (Text.pack "alice"))))
 
   Spec.it s "CR 111.7 a token placed off the battlefield is rejected" $ do
     let token = (S.permanent "Goblin Piker") {Placement.token = True}

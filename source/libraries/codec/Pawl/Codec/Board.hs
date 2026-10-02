@@ -22,6 +22,7 @@ codec = Fields.object $ do
   attackOption <- Fields.defaulted "attackOption" (Just AttackOption.MultiplePlayers) (Common.maybe Arm.keyedEnum) Board.attackOption
   brawl <- Fields.defaulted "brawl" False Common.boolean Board.brawl
   sharedTeamTurns <- Fields.defaulted "sharedTeamTurns" False Common.boolean Board.sharedTeamTurns
+  sharedTeamLife <- Fields.defaulted "sharedTeamLife" False Common.boolean Board.sharedTeamLife
   deployCreatures <- Fields.defaulted "deployCreatures" False Common.boolean Board.deployCreatures
   pure
     Board.MkBoard
@@ -33,5 +34,6 @@ codec = Fields.object $ do
         Board.attackOption = attackOption,
         Board.brawl = brawl,
         Board.sharedTeamTurns = sharedTeamTurns,
+        Board.sharedTeamLife = sharedTeamLife,
         Board.deployCreatures = deployCreatures
       }

@@ -2190,6 +2190,24 @@ teams = GameSettings.teams . GameState.settings
 areOpponents :: GameState -> PlayerId -> PlayerId -> Bool
 areOpponents gs = Teams.areOpponents (teams gs)
 
+-- CR 810.4 / 904.13b: the players whose life total is this player's -- the
+-- player, and every teammate (CR 102.3) when GameSettings.sharedTeamLife is
+-- on. A departed teammate is still one: CR 810.9 shares the TEAM's total, and
+-- keeping their row equal keeps every member's Player.life the team's.
+lifeSharers :: PlayerId -> GameState -> [PlayerId]
+lifeSharers pid gs =
+  pid : [other | GameSettings.sharedTeamLife (GameState.settings gs), other <- Map.keys (GameState.players gs), Teams.sameTeam (teams gs) pid other]
+
+-- CR 119.3 / 810.9: move this player's life total by this much. The life
+-- event happens to the player and its result to their team's shared total,
+-- which is every sharer's Player.life (lifeSharers), so a read of any member's
+-- total is CR 810.9a's read of the team's with no reader rerouted. Every write
+-- of a life total in play goes through here.
+adjustLife :: PlayerId -> Integer -> GameState -> GameState
+adjustLife pid delta gs =
+  let sharers = lifeSharers pid gs
+   in gs {GameState.players = Map.mapWithKey (\other p -> if other `elem` sharers then p {Player.life = Player.life p + delta} else p) (GameState.players gs)}
+
 -- CR 801.2 / CR 801.2b: is @candidate@ within @you@'s range of influence --
 -- within that many seats of them, counted either way round the table? Always
 -- for yourself, and always under an unlimited range (CR 801.1).

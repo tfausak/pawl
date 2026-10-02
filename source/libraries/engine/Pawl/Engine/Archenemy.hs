@@ -12,7 +12,8 @@
 --
 --   * CR 904.2's team structure and CR 904.6's first turn, which are the
 --     caller's settings and turn order (#4315).
---   * CR 904.13's Archenemy Commander option (#4315).
+--   * CR 904.13d's scheme deck construction, deck legality being unchecked
+--     (#4458).
 module Pawl.Engine.Archenemy where
 
 import qualified Control.Monad as Monad

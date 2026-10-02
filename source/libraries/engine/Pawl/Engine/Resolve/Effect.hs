@@ -6317,6 +6317,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- exchange won't happen", the WHOLE exchange, which is CR 701.12a's
   -- all-or-nothing again. Asked through `barred` below, so nothing here cases on
   -- an effect. Pawl.ZoneChangeSpec's ExchangeLifeTotals group is the proof.
+  --
+  -- CR 810.9e needs nothing: teammates sharing a total (Game.lifeSharers) hold
+  -- the same one, so both deltas are zero and the exchange moves nothing.
   Effect.ExchangeLifeTotals sides -> do
     gs <- State.get
     let twoSides = case sides of
@@ -6414,7 +6417,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Each delta goes through changeLifeByDelta, which proposes a DOWNWARD one as a
   -- life loss and an UPWARD one as a life gain, since rule 119.5 spells a lower
   -- total as the player losing "the necessary amount of life" and a higher one as
-  -- their gaining it.
+  -- their gaining it. Under a shared team total (Game.lifeSharers) that is CR
+  -- 810.9c's single player: their gain or loss moves the team's total.
+  --
+  -- Not implemented: CR 810.9d's team choosing the one member a "set each
+  -- player's life total" affects, so the team's total takes every named
+  -- member's delta (#4493).
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -6484,8 +6492,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- filter is where it belongs. Pawl.ZoneChangeSpec's RedistributeLifeTotals
   -- group is the proof.
   --
-  -- Not implemented: CR 810.9f's "not more than one member of each team", which
-  -- is a Two-Headed Giant rule (#2849).
+  -- Not implemented: CR 810.9f's "not more than one member of each team"
+  -- (#4493).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
     let candidates = Game.reachableBy controller gs

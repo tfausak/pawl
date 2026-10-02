@@ -11,6 +11,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Archenemy as Archenemy
 import qualified Pawl.Engine.Engine as Engine
@@ -25,10 +26,12 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Zone as Zone
@@ -48,6 +51,31 @@ spec s registry = Spec.describe s "Pawl.Engine.Archenemy" $ do
     Spec.assertEqWith s "CR 904.4 all three schemes are in her scheme deck" (length (Archenemy.deckOf S.alice started)) 3
     Spec.assertEqWith s "none is face up" (Archenemy.faceUp started) []
     Spec.assertEqWith s "and none is in her library" (length (Game.zoneMembers Zone.Library S.alice started)) 13
+
+  -- CR 904.13b / 904.13c through Setup.newGame: a three-seat Commander game in
+  -- which alice brings the scheme deck and bob and carol are the opposing team.
+  -- The pair of starts differs only in GameSettings.sharedTeamLife. Bob loses
+  -- 7, which carol's total shows (CR 810.9a). From there, carol taking ten
+  -- poison loses alone, and bob losing the other 53 takes the whole team.
+  Spec.it s "CR 904.13b the opposing team shares one 60-point life total, and CR 904.13c keeps poison per player" $ do
+    forest <- S.printingOf s registry "Forest"
+    look <- S.printingOf s registry "Look Skyward and Despair"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let commanderDeck = (Deck.fromCards (Map.singleton forest 20)) {Deck.commander = Set.singleton shimatsu}
+        alices = commanderDeck {Deck.schemes = Map.singleton look 2}
+        teamed shared =
+          let gs = S.inTeams [[S.bob, S.carol]] (Setup.emptyGame S.threePlayers)
+           in gs {GameState.settings = (GameState.settings gs) {GameSettings.sharedTeamLife = shared}}
+        started shared = S.runPure S.identityAnswer (teamed shared) (Setup.newGame Resolve.performHandAction ((S.alice, alices) NonEmpty.:| [(S.bob, commanderDeck), (S.carol, commanderDeck)]))
+        lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+        struck = S.runPure S.identityAnswer (started True) (Event.changeLife S.bob (-7))
+        poisoned = S.settleSba (S.addPlayerCounter PlayerCounterKind.Poison 10 S.carol struck)
+        felled = S.settleSba (S.runPure S.identityAnswer struck (Event.changeLife S.bob (-53)))
+    Spec.assertEqWith s "CR 904.13b alice starts at 60, and bob and carol at their shared 60" (lives (started True)) (Just 60, Just 60, Just 60)
+    Spec.assertEqWith s "CR 810.9 bob's loss of 7 is carol's too" (lives struck) (Just 60, Just 53, Just 53)
+    Spec.assertEqWith s "CR 904.13c carol loses at ten poison and bob plays on" (Game.stillPlaying poisoned) [S.alice, S.bob]
+    Spec.assertEqWith s "CR 810.8c a team at 0 life loses together" (Game.stillPlaying felled) [S.alice]
+    Spec.assertEqWith s "without the shared total each opponent starts at CR 903.7's 40" (lives (started False)) (Just 60, Just 40, Just 40)
 
   -- CR 703.4e / 904.9 / 704.6e: at the start of her precombat main phase alice
   -- sets Look Skyward and Despair in motion; its "When you set this scheme in
