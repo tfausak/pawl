@@ -80,11 +80,8 @@ adjustOffers sides modifiers =
 -- tagged with its payer and the object that states it, and the rest. Every
 -- candidate must already be applicable now; Nothing when none is.
 --
--- Asked whenever two or more stand, the roller's own included: an increase
--- or decrease the roller declines is not offered again, so putting them in
--- timestamp order would decide which ones the roller can still use after
--- another applies. Rerolls take the same prompt (Pawl.DiceSpec's "CR 706.2b
--- the roller picks among their own modifiers").
+-- Asked whenever two or more stand, the roller's own included (Pawl.DiceSpec's
+-- "CR 706.2b the roller picks among their own modifiers").
 --
 -- FILTERED, NOT TRUSTED: an index past the end takes the first.
 pickModifier :: PlayerId -> [(PlayerId, Maybe ObjectId, a)] -> Game (Maybe ((PlayerId, Maybe ObjectId, a), [(PlayerId, Maybe ObjectId, a)]))

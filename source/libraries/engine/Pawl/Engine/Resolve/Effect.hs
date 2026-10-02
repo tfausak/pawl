@@ -10388,33 +10388,35 @@ throwDice controller sides named perDie = do
       -- the printed ruling's reading of "after you roll a die", and the answer
       -- names the die.
       --
-      -- Each offer is asked AT MOST ONCE per instruction: a modifier applies
-      -- to a roll once, so the list is not re-read after one is taken. The
-      -- budget and the cost are re-read before each question.
-      --
       -- CR 706.2b's pick, `offering`'s: the roller chooses which standing offer
-      -- is put next, and the one put is spent whether taken or not.
+      -- is put next. An offer TAKEN is spent, since a modifier applies to a
+      -- roll once. One declined, or not standing, waits out the rest of this
+      -- look and is offered again once another modifier applies, over the
+      -- number that left (`waiting`). The budget and the cost are re-read
+      -- before each question.
       adjusting results = do
         modifiers <- Dice.modifiersFor controller
         gs <- State.get
-        adjustingThrough (fmap (\(stated, offer, amount) -> (payerOf gs stated, stated, (offer, amount))) (Dice.adjustOffers sides modifiers)) results
-      adjustingThrough offers results = case NonEmpty.nonEmpty results of
+        adjustingThrough (fmap (\(stated, offer, amount) -> (payerOf gs stated, stated, (offer, amount))) (Dice.adjustOffers sides modifiers)) [] results
+      adjustingThrough offers waiting results = case NonEmpty.nonEmpty results of
         Nothing -> pure results
         Just shown -> do
           gs <- State.get
           let standing (payer, stated, (offer, _)) = Dice.withinLimit gs payer stated offer && payable gs payer stated (ModifiedRoll.cost offer)
-          picked <- Dice.pickModifier controller (filter standing offers)
+              (up, idle) = List.partition standing offers
+          picked <- Dice.pickModifier controller up
           case picked of
             Nothing -> pure results
-            Just ((payer, stated, (offer, amount)), rest) -> do
+            Just (chosen@(payer, stated, (offer, amount)), rest) -> do
               let mCost = ModifiedRoll.cost offer
+                  passed = adjustingThrough rest (chosen : idle <> waiting) results
               answer <- Game.choose (Prompt.AdjustDieRoll (Decide.deciderFor payer gs) payer shown amount mCost)
               case answer of
-                Nothing -> adjustingThrough rest results
+                Nothing -> passed
                 Just (index, direction) -> do
                   paid <- payModifier payer stated mCost
                   if not paid
-                    then adjustingThrough rest results
+                    then passed
                     else do
                       State.modify' (Dice.spendLimit stated offer)
                       -- FILTERED, NOT TRUSTED: an index past the end shifts
@@ -10423,7 +10425,7 @@ throwDice controller sides named perDie = do
                           shift n = case direction of
                             RollAdjustment.Increase -> n + toInteger amount
                             RollAdjustment.Decrease -> n - toInteger amount
-                      adjustingThrough rest (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
+                      adjustingThrough (rest <> idle <> waiting) [] (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
       -- CR 706.2a's cost, charged between the offer and the modifier's
       -- application: a declined or failed payment leaves the number standing.
       --

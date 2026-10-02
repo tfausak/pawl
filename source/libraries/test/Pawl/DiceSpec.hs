@@ -1407,6 +1407,16 @@ nightShiftSpec s registry = Spec.describe s "IncreaseOrDecrease" $ do
     -- the first die whatever the answer makes the 2 a 3 and mints five Knights.
     Spec.assertEqWith s "CR 706.2: the second die's 6 is the other result" (S.countOnBattlefieldByName knight S.alice after) 6
     Spec.assertEqWith s "and it is a 6 for the trigger" (S.countOnBattlefieldByName zombieEmployee S.alice after) 1
+  Spec.it s "CR 706.2b a declined shift is offered again once another applies" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.alice (snd (S.addPermanent shift S.alice board)))
+        answers = [Nothing, Just (0 :: Natural.Natural, RollAdjustment.Increase), Just (0, RollAdjustment.Increase)]
+        (after, _) = nightShiftRun [4, 2] [] answers 1 spell shifted
+    -- THE GAMEPLAY ASSERTION: two Night Shifts over a 4. The first is
+    -- declined, the second pushes the 4 to 5, and the first, put again over the
+    -- 5, pushes it to 6. An engine that spent the declined offer stops at 5.
+    Spec.assertEqWith s "CR 706.2b: the declined Night Shift moves the 5 to 6" (S.countOnBattlefieldByName knight S.alice after) 6
   Spec.it s "CR 706.2a the modifier is taken only once each turn" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     shift <- S.printingOf s registry "Night Shift of the Living Dead"
