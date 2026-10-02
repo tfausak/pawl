@@ -158,9 +158,11 @@ timingWith flash pid oid name gs = case proposedFace oid name gs of
 -- sorcery with sneak may begin one in that step; which COST may then be announced
 -- is the per-candidate question, and rule 702.190a's window admits only its own.
 --
--- The keyword is read flashOn's two ways and for its reasons -- the proposed
--- half's printed keywords and the object's post-layer ones -- so a granted sneak
--- widens the window as a printed one does.
+-- The keyword is read two ways -- the proposed half's printed keywords and the
+-- spell's post-layer ones on the stack (Cost.spellKeywords), where rule
+-- 702.190a's ability functions -- so a granted sneak widens the window as a
+-- printed one does. Offering's window reads the latter for rule 702.48a's
+-- same reason.
 cardTimingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 cardTimingOk pid oid name gs = cardTimingWith (timingOk pid oid name gs) pid oid name gs
 
@@ -174,11 +176,11 @@ cardTimingWith window pid oid name gs = case proposedFace oid name gs of
       -- first: the window is False at all but one step of one player's turn, and
       -- the projection fold behind the second limb then never runs.
       || ( Turn.declareBlockersWindow pid gs
-             && (Keyword.hasSneak (Face.keywordSet face) || Keyword.hasSneak (Map.keysSet (Projection.keywordsOf oid gs)))
+             && (Keyword.hasSneak (Face.keywordSet face) || Keyword.hasSneak (Map.keysSet (Cost.spellKeywords pid oid gs)))
          )
       -- CR 702.48a: offering's window, open only while some offering
       -- candidate exists, and to those candidates only (windowedCandidates).
-      || ( not (null (Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs))))
+      || ( not (null (Keyword.offeringQualities (Map.keysSet (Cost.spellKeywords pid oid gs))))
              && any CandidateCost.instantSpeed (Cost.candidateCostsFor pid name oid gs)
          )
 
