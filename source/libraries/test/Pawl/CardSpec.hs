@@ -5221,20 +5221,26 @@ attackRequirementFilters requirement =
 
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 combatRestrictionFilters restriction = case restriction of
-  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless affected condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
-  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless affected condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless affected condition _) -> affectedSet affected <> foldMap conditionFilters condition
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless affected condition _) -> affectedSet affected <> foldMap conditionFilters condition
   -- Three positions on the PAIRWISE arm: the attackers restricted, the blockers
   -- barred from them, and the gate.
-  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition _) -> unframed (affectedFilters affected <> [blockers]) <> foldMap conditionFilters condition
-  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures affected attackers condition _) -> unframed (affectedFilters affected <> [attackers]) <> foldMap conditionFilters condition
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition _) -> affectedSet affected <> unframed [blockers] <> foldMap conditionFilters condition
+  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures affected attackers condition _) -> affectedSet affected <> unframed [attackers] <> foldMap conditionFilters condition
   -- Two on the attacking one: the creatures restricted and the gate. The
   -- players they may not attack are a PlayerScope and the announcements barred
   -- at those seats are CR 506.3 kinds, both card data with no Filter in them --
   -- so nothing stands in for either here, the size-bounding arms' posture.
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ _ condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
-  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ _ condition _) -> affectedSet affected <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition _) -> affectedSet affected <> foldMap conditionFilters condition
   CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless _ _ condition) -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
+  where
+    -- AffectedSetFramed for staticAbilityFilters' reason: Pawl.Engine.CombatRestriction
+    -- matches it through Projection.affectsOn, whose context is
+    -- SourceContext.sourceContext (Teferi's Moat). The pairwise blockers and
+    -- attackers are read in the OTHER creature's frame, so stay Unframed.
+    affectedSet = fmap ((,) AffectedSetFramed) . affectedFilters
 
 -- ALL THREE of a blocking requirement's Filter positions -- CR 509.1c's subject
 -- axis (Razorgrass Screen), its object axis (Lure) and the CR 604.2 clause the
@@ -5346,10 +5352,11 @@ blockPermissionFilters permission =
 --     Filter.Context.slotNames is filled and CR 709.4a's
 --     Filter.SameNameAsBound answers in its Count filter (Grim Reminder). It
 --     overlays no Filter.Context.sourceAttachedTo.
---   * AffectedSetFramed -- a static ability's own affected set, matched by
---     Pawl.Engine.Projection.affectsWith through affectedContext, which fills
---     Filter.Context.sourceChosenColor and sourceChosenSubtype (CR 607.2d,
---     Gauntlet of Power, Obelisk of Urd).
+--   * AffectedSetFramed -- a static ability's or a combat restriction's own
+--     affected set, matched by Pawl.Engine.Projection.affectsWith through
+--     affectedContext, which fills Filter.Context.sourceChosenColor and
+--     sourceChosenSubtype (CR 607.2d, Gauntlet of Power, Obelisk of Urd,
+--     Teferi's Moat).
 --   * ActivationCostFramed -- an activated ability's own cost, whose pools in
 --     Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent fill the
 --     same two fields off the source (SourceContext.withChoicesOf, Doom Cannon).
@@ -5525,7 +5532,8 @@ data Framing
   | -- | CR 119.3's per-recipient amount, evaluated in the resolution's own
     -- context. See the overview above.
     LifeLossAmountFramed
-  | -- | A static ability's own affected set. See the overview above.
+  | -- | A static ability's or a combat restriction's own affected set. See the
+    -- overview above.
     AffectedSetFramed
   | -- | An activated ability's own cost. See the overview above.
     ActivationCostFramed
