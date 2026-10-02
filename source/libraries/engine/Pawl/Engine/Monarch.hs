@@ -149,7 +149,7 @@ inherentMonarchPending events gs = case GameState.monarch gs of
   Just m ->
     let matchEvent ab ev = case inherentMatch m (TriggeredAbility.condition ab) gs ev of
           Nothing -> Nothing
-          Just b -> Just (PendingTrigger.MkPendingTrigger TriggerSource.Sourceless m ab b Nothing Nothing)
+          Just b -> Just (PendingTrigger.MkPendingTrigger TriggerSource.Sourceless m ab b Nothing Nothing 1)
         forAbility ab = Maybe.mapMaybe (matchEvent ab) events
      in concatMap forAbility monarchAbilities
 

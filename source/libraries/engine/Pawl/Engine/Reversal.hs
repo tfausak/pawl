@@ -136,7 +136,7 @@ withoutAnnouncement before entry closed = do
   activationsThisTurn <- eventsOf GameState.activationsThisTurn
   castPermissionsUsedThisTurn <- mapOfSets GameState.castPermissionsUsedThisTurn
   rollModifiersUsedThisTurn <- mapOfSets GameState.rollModifiersUsedThisTurn
-  triggeredThisGame <- setOf GameState.triggeredThisGame
+  triggeredThisGame <- seqOf GameState.triggeredThisGame
   pendingControl <- mapOf GameState.pendingControl
   control <- mapOf GameState.control
   monarch <- one GameState.monarch
