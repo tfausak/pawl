@@ -1,0 +1,68 @@
+{
+  "description": "CR 601.2a the card leaving the hand makes the rider true before the mana is paid",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Synthetic Hollow Spring",
+            "label": "synthetic-hollow-spring",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Sol Ring",
+            "label": "sol-ring",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$sol-ring",
+          "mana": [
+            "$synthetic-hollow-spring"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Sol Ring",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$synthetic-hollow-spring",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

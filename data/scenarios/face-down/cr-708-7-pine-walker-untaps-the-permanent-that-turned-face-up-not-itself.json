@@ -1,0 +1,196 @@
+{
+  "description": "CR 708.7 Pine Walker untaps the permanent that turned face up, not itself",
+  "note": "The Tracker is placed face down (Morphed) and tapped beside a tapped Pine Walker, the three Mountains its {3} cast spent placed tapped; alice turns it up for {4}{R}. The Offered view is the 'action is available' control.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain-1",
+            "ready": true,
+            "tapped": false
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true,
+            "tapped": false
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true,
+            "tapped": false
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true,
+            "tapped": false
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-5",
+            "ready": true,
+            "tapped": false
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-6",
+            "ready": true,
+            "tapped": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-7",
+            "ready": true,
+            "tapped": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-8",
+            "ready": true,
+            "tapped": true
+          },
+          {
+            "card": "Ainok Tracker",
+            "label": "ainok",
+            "faceDown": {
+              "type": "Morphed"
+            },
+            "ready": true,
+            "tapped": true
+          },
+          {
+            "card": "Pine Walker",
+            "label": "walker",
+            "ready": true,
+            "tapped": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$ainok",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$walker",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "TurnFaceUp $ainok Morph",
+            "ActivateManaAbility $mountain-1",
+            "ActivateManaAbility $mountain-2",
+            "ActivateManaAbility $mountain-3",
+            "ActivateManaAbility $mountain-4",
+            "ActivateManaAbility $mountain-5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Take": {
+          "action": "TurnFaceUp $ainok Morph",
+          "mana": [
+            "$mountain-1",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4",
+            "$mountain-5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $walker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$ainok",
+          "names": [
+            "Ainok Tracker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$ainok",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$walker",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "description": "CR 602.2 aimed at the twin, the first Troll is the one still offered",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [
+          {
+            "key": {
+              "type": "Energy"
+            },
+            "value": 2
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Deadlock Trap",
+            "label": "deadlock-trap",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Uthden Troll",
+            "ready": true
+          },
+          {
+            "card": "Uthden Troll",
+            "label": "uthden-troll",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$deadlock-trap",
+          "ability": 0,
+          "targets": [
+            "$uthden-troll"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "Activate Uthden Troll",
+            "ActivateManaAbility Mountain"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$uthden-troll",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$deadlock-trap",
+        "tapped": true
+      }
+    }
+  ]
+}

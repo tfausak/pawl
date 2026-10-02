@@ -754,31 +754,6 @@ spec s registry = Spec.describe s "Room" $ do
       "the control: the second door really opened"
       (fmap Object.unlockedHalves (Game.lookupObject permId after))
       (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
-  -- CR 709.5i's SECOND branch: "or when it has neither designation and gains
-  -- both." Both doors shut, and "unlock each locked door" gives both designations
-  -- in one write -- the only way to reach that branch, since CR 709.5d's entry
-  -- gives at most one (a player casts one half, CR 709.3) and CR 709.5e's and CR
-  -- 709.5f's singular choices give one each.
-  --
-  -- What the case pins is that the ability triggers ONCE. Pawl.Engine.Event's
-  -- write records one event per door, CR 709.5h asking its question of each; a
-  -- writer that flagged both as completing the card would fire the Leech twice
-  -- and cost bob two life rather than one. That is the difference 19 and 18 name,
-  -- and it is the whole content of the second branch -- two sequential unlocks
-  -- produce the same one trigger, so the branch is otherwise indistinguishable
-  -- from the first.
-  Spec.it s "CR 709.5i a Room that gains both designations at once fires once" $ do
-    (permId, keyId, key, board) <- foreignRoom s registry Set.empty
-    let after = turnKey 0 key keyId permId board
-    -- THE ASSERTION: one trigger, so one life apiece and no more.
-    Spec.assertEqWith s "gaining both designations costs bob one life" (S.lifeOf S.bob after) (Just 19)
-    Spec.assertEqWith s "and carol one" (S.lifeOf S.carol after) (Just 19)
-    Spec.assertEqWith s "and alice, who unlocked, nothing" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith
-      s
-      "the control: both doors really opened, in one write"
-      (fmap Object.unlockedHalves (Game.lookupObject permId after))
-      (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
   -- CR 709.5g in the plural: "To lock half of a permanent, a player chooses an
   -- unlocked half of that permanent, and that permanent loses the appropriate
   -- unlocked designation." Skeleton Key's other ability names every unlocked

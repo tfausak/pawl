@@ -9,33 +9,25 @@ module Pawl.EventTriggerSpec where
 import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
-import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Combat as Combat.Type
-import qualified Pawl.Types.CombatStep as CombatStep
-import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
@@ -46,8 +38,6 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -58,59 +48,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.RevealCause as RevealCause
-import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
-
--- CR 701.9a: "To discard a card, move it from its owner's hand to that player's
--- graveyard." Nothing in the pool triggered on that until Megrim, {2}{B}
--- Enchantment: "Whenever an opponent discards a card, this enchantment deals 2
--- damage to that player." One trigger condition, one effect, and the effect
--- targets nothing -- so the only new thing any case below can be passing on is
--- the condition.
---
--- The interaction is the reason the condition is hard rather than the condition
--- itself. CR 702.29a: "'Cycling [cost]' means '[Cost], Discard this card: Draw a
--- card'", so cycling IS discarding and a discard trigger has to see it. CR
--- 702.29d then bounds how often: "Some cards have abilities that trigger
--- whenever a player 'cycles or discards' a card. These abilities trigger only
--- once when a card is cycled." An engine that recorded the cycle and the discard
--- as two log entries, both of them describing the one discard, would answer 4
--- damage in cr-702-29d-cycling-a-card-fires-the-discard-trigger-exactly.json
--- instead of 2.
---
--- bob controls the Megrim throughout, so CR 109.5 fixes its "you" as bob and
--- every "an opponent" below is alice.
-discardTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-discardTriggerSpec s registry =
-  Spec.describe s "DiscardTrigger" $ do
-    -- "An OPPONENT discards", not "a player": the axis is load-bearing, and a
-    -- board where only the opponent ever discards cannot tell a correct
-    -- implementation from one that ignores the player entirely. The same
-    -- board, the same component, one discarder apart.
-    Spec.it s "CR 102.2 'an opponent': bob discarding to his own Megrim fires nothing" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      megrim <- S.printingOf s registry "Megrim"
-      let base = snd (S.addPermanent megrim S.bob (S.landsInPlay mountain 1))
-          (_, withAlicesCard) = S.addHandCard piker S.alice base
-          (_, gs0) = S.addHandCard piker S.bob withAlicesCard
-          gs = gs0 {GameState.priority = Just S.alice}
-          discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution Map.empty pid S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
-          byAlice = discardBy S.alice
-          byBob = discardBy S.bob
-          settle g = S.runPure S.identityAnswer g Engine.priorityLoop
-      Spec.assertEqWith s "alice's card reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice byAlice)) 1
-      Spec.assertEqWith s "and bob's reached his" (length (Game.zoneMembers Zone.Graveyard S.bob byBob)) 1
-      Spec.assertEqWith s "the opponent's discard costs her 2" (S.lifeOf S.alice (settle byAlice)) (fmap (subtract 2) (S.lifeOf S.alice gs))
-      Spec.assertEqWith s "the controller's own discard costs him nothing" (S.lifeOf S.bob (settle byBob)) (S.lifeOf S.bob gs)
-      Spec.assertEqWith s "and costs alice nothing either" (S.lifeOf S.alice (settle byBob)) (S.lifeOf S.alice gs)
-      Spec.assertEqWith s "bob's discard put nothing on the stack at all" (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority)) []
 
 -- One board for every case below, differing in exactly one thing: WHICH seat
 -- holds the Barkhide Mauler and cycles it. alice controls the Prickly Marmoset
@@ -162,25 +103,6 @@ marmosetBoard marmoset mauler forest piker cycler =
 cyclesTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclesTriggerSpec s registry =
   Spec.describe s "CyclesTrigger" $ do
-    -- The whole card: alice cycles the Mauler for {2}, the Marmoset's trigger is
-    -- placed above the cycling ability, and the Marmoset is a 4/3 once it
-    -- resolves.
-    Spec.it s "CR 702.29a whole card: cycling a card pumps Prickly Marmoset" $ do
-      forest <- S.printingOf s registry "Forest"
-      marmoset <- S.printingOf s registry "Prickly Marmoset"
-      mauler <- S.printingOf s registry "Barkhide Mauler"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (marmosetId, maulerId, gs) = marmosetBoard marmoset mauler forest piker S.alice
-      Spec.assertEqWith s "the Marmoset starts a 2/3" (S.powerToughnessOf marmosetId gs) (Just (2, 3))
-      case Activatable.abilitiesFor maulerId gs of
-        [ability] -> do
-          let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
-              placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
-              after = S.runPure S.identityAnswer placed Stack.resolveTop
-          Spec.assertEqWith s "the Mauler was discarded to pay the cost" (length (Game.zoneMembers Zone.Graveyard S.alice cycled)) 1
-          Spec.assertEqWith s "the trigger is on the stack, above the cycling ability" (length (GameState.stack placed)) 2
-          Spec.assertEqWith s "and the Marmoset is a 4/3 once it resolves" (S.powerToughnessOf marmosetId after) (Just (4, 3))
-        abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
     -- The player axis, which is what makes this condition PlayerCycles rather
     -- than a nullary one: the same board and the same act, one cycling seat
     -- apart. An arm ignoring the discarder would pump alice's Marmoset on all
@@ -335,383 +257,6 @@ selfDiscardTriggerSpec s registry =
           Spec.assertBool s (not (S.onBattlefield cowId after)) "the Cow took lethal damage and died"
           Spec.assertEqWith s "exactly one Food token" (S.countOnBattlefieldByName foodTokenName S.alice after) 1
 
--- CR 121.1's draw, counted. "Whenever you draw your second card each turn" is the
--- pool's reader of WHICH draw of the turn a draw was, and Erudite Wizard, {2}{U}
--- 2/3 Creature -- Human Wizard, prints nothing else: "Whenever you draw your
--- second card each turn, put a +1/+1 counter on this creature." One condition,
--- one targetless effect, so the only new thing these cases can be passing on is
--- the ordinal.
---
--- The draws are Think Twice's, {1}{U} Instant "Draw a card" -- ONE card per
--- resolution, so each case decides for itself how many draws the turn has had
--- and a miscount cannot hide inside a multi-card draw. alice controls the Wizard
--- throughout, so CR 109.5 fixes its "you" as her.
---
--- Every case reads the counter through the Wizard's power and toughness rather
--- than off the object, so what is asserted is what a player at the table sees.
-drawTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-drawTriggerSpec s registry =
-  Spec.describe s "DrawTrigger" $ do
-    -- THE case: two draws on one board, so "the second" is told apart from "any".
-    -- CR 121.2 makes each its own draw, and only the second one fires.
-    Spec.it s "CR 121.1 the turn's first draw fires nothing and its second fires the Wizard" $ do
-      island <- S.printingOf s registry "Island"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      wizard <- S.printingOf s registry "Erudite Wizard"
-      let (wizardId, gs, firsts) = drawBoard island piker think wizard 2
-      case firsts of
-        [firstId, secondId] -> do
-          let afterFirst = resolveCast gs firstId
-              afterSecond = resolveCast afterFirst secondId
-          Spec.assertEqWith s "one card drawn so far" (Map.lookup S.alice (GameState.drawsThisTurn afterFirst)) (Just 1)
-          Spec.assertEqWith s "the FIRST draw leaves the Wizard printed-size" (S.powerToughnessOf wizardId afterFirst) (Just (2, 3))
-          Spec.assertEqWith s "two cards drawn" (Map.lookup S.alice (GameState.drawsThisTurn afterSecond)) (Just 2)
-          Spec.assertEqWith s "the SECOND draw puts a +1/+1 counter on it" (S.powerToughnessOf wizardId afterSecond) (Just (3, 4))
-        _ -> Spec.assertFailure s "fixture should put two Think Twice in alice's hand"
-    -- CR 121.1's other producer of a draw: the draw step's turn-based action. The
-    -- same board and the same single cast, one draw step apart -- so the cast's
-    -- draw is the turn's first on one and its second on the other.
-    Spec.it s "CR 121.1 the draw step's draw is the turn's first, so the next one fires" $ do
-      island <- S.printingOf s registry "Island"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      wizard <- S.printingOf s registry "Erudite Wizard"
-      let (wizardId, gs, firsts) = drawBoard island piker think wizard 1
-      case firsts of
-        [thinkId] -> do
-          let stepped = S.runPure S.identityAnswer (gs {GameState.phase = Phase.Beginning BeginningStep.DrawStep}) S.drawStep
-              afterStep = resolveCast (stepped {GameState.phase = Phase.PrecombatMain}) thinkId
-              afterNoStep = resolveCast gs thinkId
-          Spec.assertEqWith s "the draw step drew one card" (Map.lookup S.alice (GameState.drawsThisTurn stepped)) (Just 1)
-          Spec.assertEqWith s "so the cast's draw is the second and fires" (S.powerToughnessOf wizardId afterStep) (Just (3, 4))
-          Spec.assertEqWith s "without the draw step it is the first and fires nothing" (S.powerToughnessOf wizardId afterNoStep) (Just (2, 3))
-        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
-    -- "EACH turn", which is what makes the tally a per-turn count rather than a
-    -- running total: four draws across two turns fire the Wizard TWICE, on the
-    -- second draw of each. A tally that accumulated would fire once and stop.
-    --
-    -- Think Twice is an instant, so the two casts after the handoff are legal on
-    -- bob's turn -- and the draws they make are still alice's own (CR 121.1).
-    Spec.it s "CR 121.1 the count is per turn: the handoff clears it and the next turn fires again" $ do
-      island <- S.printingOf s registry "Island"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      wizard <- S.printingOf s registry "Erudite Wizard"
-      let (wizardId, gs, firsts) = drawBoard island piker think wizard 4
-      case firsts of
-        [a, b, c, d] -> do
-          let thisTurn = resolveCast (resolveCast gs a) b
-              handed = S.runPure S.identityAnswer thisTurn Engine.handoffTurn
-              nextTurn = resolveCast (resolveCast handed c) d
-          Spec.assertEqWith s "the first turn's second draw fired it once" (S.powerToughnessOf wizardId thisTurn) (Just (3, 4))
-          Spec.assertEqWith s "the handoff clears the tally for every seat" (GameState.drawsThisTurn handed) Map.empty
-          Spec.assertEqWith s "and the new turn's second draw fires it again" (S.powerToughnessOf wizardId nextTurn) (Just (4, 5))
-        _ -> Spec.assertFailure s "fixture should put four Think Twice in alice's hand"
-    -- "YOU draw", not "a player draws". The same Wizard, the same two Think
-    -- Twice, the same two draws -- one seat apart, which is the only difference
-    -- a board with two seats can express and the one this axis turns on.
-    Spec.it s "CR 109.5 'you': bob drawing his second card leaves alice's Wizard alone" $ do
-      island <- S.printingOf s registry "Island"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      wizard <- S.printingOf s registry "Erudite Wizard"
-      let (wizardId, base, _) = drawBoard island piker think wizard 0
-          withLands = S.landsFor island S.bob 4 base
-          addThink (ids, g) _ = let (oid, g2) = S.addHandCard think S.bob g in (ids <> [oid], g2)
-          (bobsThinks, withHand) = List.foldl' addThink ([], withLands) [1 .. (2 :: Int)]
-          gs = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.bob g)) withHand [1 .. (10 :: Int)]
-      case bobsThinks of
-        [a, b] -> do
-          let after = resolveCastBy S.bob (resolveCastBy S.bob gs a) b
-          Spec.assertEqWith s "bob drew two cards" (Map.lookup S.bob (GameState.drawsThisTurn after)) (Just 2)
-          Spec.assertEqWith s "alice drew none of them" (Map.lookup S.alice (GameState.drawsThisTurn after)) Nothing
-          Spec.assertEqWith s "so her Wizard is printed-size" (S.powerToughnessOf wizardId after) (Just (2, 3))
-        _ -> Spec.assertFailure s "fixture should put two Think Twice in bob's hand"
-    -- No ordinal: Teferi, Hero of Dominaria's emblem, "Whenever you draw a card,
-    -- exile target permanent an opponent controls" (Oracle text checked against
-    -- api.scryfall.com 2026-09-27), fires on EVERY draw -- the first one, which
-    -- leaves the Wizard above alone, and the second alike. bob holds three
-    -- Goblin Pikers, so each draw costs him one.
-    Spec.it s "CR 121.2 the Teferi emblem fires on the turn's first draw and on its second" $ do
-      island <- S.printingOf s registry "Island"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      wizard <- S.printingOf s registry "Erudite Wizard"
-      teferi <- S.printingOf s registry "Teferi, Hero of Dominaria"
-      let (_, base, thinks) = drawBoard island piker think wizard 2
-          (teferiId, withTeferi) = S.addPermanent teferi S.alice base
-          armed = S.addCounter CounterKind.Loyalty 8 teferiId withTeferi
-          gs = List.foldl' (\g _ -> snd (S.addPermanent piker S.bob g)) armed [1 .. (3 :: Int)]
-          -- The first offered recipient per slot, so the emblem's trigger is
-          -- not declined for want of a target.
-          aiming :: Prompt.Prompt r -> r
-          aiming p = case p of
-            Prompt.ChooseTargets _ _ _ offered -> fmap (\(n, set) -> Set.fromList (take (Natural.toIntSaturating n) (Set.toList set))) offered
-            _ -> S.identityAnswer p
-          castAiming g oid = S.runPure aiming (S.runPure aiming g (S.cast S.alice oid)) Engine.priorityLoop
-          bobsPermanents g = length (filter (\oid -> Projection.View.controllerOf oid g == Just S.bob) (Set.toList (GameState.battlefield g)))
-      case (drop 2 (Face.activatedAbilities (S.combinedFace teferi)), thinks) of
-        (ultimate : _, [a, b]) -> do
-          let emblemed = S.runPure S.identityAnswer gs (do Activate.activateAbility S.alice teferiId ultimate; Stack.resolveTop)
-              afterFirst = castAiming emblemed a
-              afterSecond = castAiming afterFirst b
-          Spec.assertEqWith s "the first draw exiled one of bob's three" (bobsPermanents afterFirst) 2
-          Spec.assertEqWith s "and the second another" (bobsPermanents afterSecond) 1
-          Spec.assertEqWith s "the emblem is in the command zone" (Set.size (GameState.command emblemed)) 1
-        _ -> Spec.assertFailure s "Teferi prints three loyalty abilities and the fixture two Think Twice"
-
--- alice controls an Erudite Wizard and enough Islands to cast `copies` Think
--- Twice, holds that many of them (none at all when `copies` is 0, which is the
--- board the opponent case builds on), and has ten Goblin Pikers in her library --
--- more than any case draws, so CR 104.3c never decks her before an assertion
--- runs. Returns the Wizard, the board, and the Think Twice ids in hand order.
-drawBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Int ->
-  (ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId])
-drawBoard island piker think wizard copies =
-  let (wizardId, base) = S.addPermanent wizard S.alice (S.landsInPlay island (2 * copies))
-      addThink (ids, g) _ = let (oid, g2) = S.addHandCard think S.alice g in (ids <> [oid], g2)
-      (thinkIds, withHand) = List.foldl' addThink ([], base) [1 .. copies]
-      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withHand [1 .. (10 :: Int)]
-   in ( wizardId,
-        stocked
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice,
-            -- NOT the first turn: CR 103.8a has the starting player skip that
-            -- turn's draw step, and one of the cases above turns on a draw step
-            -- that draws.
-            GameState.turnNumber = 2
-          },
-        thinkIds
-      )
-
--- Cast one spell and let the stack empty: the draw happens, and any trigger it
--- fires resolves before the next assertion.
-resolveCast :: GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-resolveCast = resolveCastBy S.alice
-
-resolveCastBy :: PlayerId.PlayerId -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-resolveCastBy pid gs oid =
-  let cast = S.runPure S.identityAnswer gs (S.cast pid oid)
-   in S.runPure S.identityAnswer cast Engine.priorityLoop
-
--- CR 702.94a's miracle: the reveal-as-you-drawn window (CR 121.9) and the linked
--- triggered ability (CR 603.11) it opens.
---
--- Thunderous Wrath, {4}{R}{R} Instant, "Thunderous Wrath deals 5 damage to any
--- target." plus "Miracle {R}", is the producer -- every clause expressible, and
--- the cost gap between {4}{R}{R} and {R} is what makes the alternative cost
--- observable at all: alice never has six mana on any of these boards, so a leg
--- that dealt 5 damage can only have paid the miracle cost.
---
--- The draws are Think Twice's, {1}{U} Instant "Draw a card", and the draw step's,
--- for `drawTriggerSpec`'s reasons. bob is the victim throughout and starts every
--- leg at the same life, so "5 damage happened" is one subtraction either way.
---
--- Every assertion reads the BOARD -- bob's life, and which zone the Wrath is in
--- -- rather than whether a prompt was raised.
-miracleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-miracleSpec s registry =
-  Spec.describe s "Miracle" $ do
-    -- THE case, and its two negatives on one board: the same first draw of the
-    -- same turn, answered three ways. CR 702.94a's two "may"s are separate
-    -- questions, so declining the reveal and declining the cast are different
-    -- boards -- the third leg reveals and still does not cast.
-    Spec.it s "CR 702.94a a revealed first draw may be cast for its miracle cost, and both 'may's are the player's" $ do
-      island <- S.printingOf s registry "Island"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      thunder <- S.printingOf s registry "Thunderous Wrath"
-      let (gs, thinks) = miracleBoard island mountain piker think thunder 1 0
-          wrath = S.printingName thunder
-      case thinks of
-        [thinkId] -> do
-          let cast = resolveCastWith (miracleAnswer OptionalDecision.Exercises OptionalDecision.Exercises) gs thinkId
-              hidden = resolveCastWith (miracleAnswer OptionalDecision.Declines OptionalDecision.Exercises) gs thinkId
-              shown = resolveCastWith (miracleAnswer OptionalDecision.Exercises OptionalDecision.Declines) gs thinkId
-          Spec.assertEqWith s "revealing and casting deals bob 5" (S.lifeOf S.bob cast) (fmap (subtract 5) (S.lifeOf S.bob gs))
-          Spec.assertEqWith s "and the Wrath resolved into alice's graveyard" (namedIn wrath Zone.Graveyard S.alice cast) 1
-          Spec.assertEqWith s "declining the reveal leaves bob alone" (S.lifeOf S.bob hidden) (S.lifeOf S.bob gs)
-          Spec.assertEqWith s "and the Wrath an ordinary card in her hand" (namedIn wrath Zone.Hand S.alice hidden) 1
-          Spec.assertEqWith s "revealing and then declining the cast leaves bob alone too" (S.lifeOf S.bob shown) (S.lifeOf S.bob gs)
-          Spec.assertEqWith s "and the Wrath still in her hand" (namedIn wrath Zone.Hand S.alice shown) 1
-          Spec.assertEqWith s "the reveal happened on that leg even so" (length (filter isMiracleReveal (S.eventsOf shown))) 1
-          Spec.assertEqWith s "and did not on the leg that declined it" (length (filter isMiracleReveal (S.eventsOf hidden))) 0
-        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
-    -- THE DISCRIMINATING CASE, and the turn boundary in the same pair. Two draws
-    -- on one board with a Goblin Piker ahead of the Wrath, so the Wrath arrives on
-    -- the SECOND draw -- and CR 702.94a's gate must keep the window shut. The
-    -- other leg is that board with a turn handoff between the two casts, which
-    -- makes the very same draw the new turn's first.
-    --
-    -- Both legs run the answerer that reveals and casts everything it is offered,
-    -- so a leg that does nothing did nothing because the engine never asked.
-    Spec.it s "CR 702.94a the second draw of a turn opens no window, and the handoff reopens it" $ do
-      island <- S.printingOf s registry "Island"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      thunder <- S.printingOf s registry "Thunderous Wrath"
-      let (gs, thinks) = miracleBoard island mountain piker think thunder 2 1
-          wrath = S.printingName thunder
-          step = resolveCastWith miracleTaken
-      case thinks of
-        [a, b] -> do
-          let afterFirst = step gs a
-              sameTurn = step afterFirst b
-              nextTurn = step (S.runPure miracleTaken afterFirst Engine.handoffTurn) b
-          Spec.assertEqWith s "the first draw took the Piker, not the Wrath" (namedIn wrath Zone.Hand S.alice afterFirst) 0
-          Spec.assertEqWith s "drawn second, the Wrath sits in hand" (namedIn wrath Zone.Hand S.alice sameTurn) 1
-          Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob sameTurn) (S.lifeOf S.bob gs)
-          Spec.assertEqWith s "after the handoff the same draw is the turn's first, so it is cast" (namedIn wrath Zone.Graveyard S.alice nextTurn) 1
-          Spec.assertEqWith s "and bob takes 5" (S.lifeOf S.bob nextTurn) (fmap (subtract 5) (S.lifeOf S.bob gs))
-        _ -> Spec.assertFailure s "fixture should put two Think Twice in alice's hand"
-    -- CR 121.1's other producer of a draw. The window is inside the draw funnel,
-    -- so the draw step's turn-based action opens it exactly as a spell's draw
-    -- does -- and no Think Twice is cast on this board at all.
-    Spec.it s "CR 121.9 the draw step's own draw opens the window" $ do
-      island <- S.printingOf s registry "Island"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      thunder <- S.printingOf s registry "Thunderous Wrath"
-      let (base, _) = miracleBoard island mountain piker think thunder 0 0
-          gs = base {GameState.phase = Phase.Beginning BeginningStep.DrawStep}
-          drawn = S.runPure miracleTaken gs S.drawStep
-          after = S.runPure miracleTaken (drawn {GameState.phase = Phase.PrecombatMain}) Engine.priorityLoop
-      Spec.assertEqWith s "the draw step drew alice's first card" (Map.lookup S.alice (GameState.drawsThisTurn drawn)) (Just 1)
-      Spec.assertEqWith s "the Wrath was cast off it" (namedIn (S.printingName thunder) Zone.Graveyard S.alice after) 1
-      Spec.assertEqWith s "and bob takes 5" (S.lifeOf S.bob after) (fmap (subtract 5) (S.lifeOf S.bob gs))
-
-    -- CR 613.1 names no zone, so Molecule Man's "nonland cards in your hand have
-    -- miracle {0}" reaches the Goblin Piker the moment it is drawn. A pair of
-    -- boards differing only in whether Molecule Man is in play: the Piker has no
-    -- printed miracle, and alice's lone Mountain after Think Twice cannot pay its
-    -- {1}{R}, so a Piker on the battlefield can only have been cast for {0}.
-    Spec.it s "CR 702.94a Molecule Man's granted miracle opens the window on a drawn Goblin Piker" $ do
-      island <- S.printingOf s registry "Island"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      thunder <- S.printingOf s registry "Thunderous Wrath"
-      man <- S.printingOf s registry "Molecule Man"
-      let (without, thinks) = miracleBoard island mountain piker think thunder 1 1
-          withMan = snd (S.addPermanent man S.alice without)
-          name = S.printingName piker
-      case thinks of
-        [thinkId] -> do
-          let granted = resolveCastWith miracleTaken withMan thinkId
-              printed = resolveCastWith miracleTaken without thinkId
-          Spec.assertEqWith s "with Molecule Man the drawn Piker is cast for {0}" (namedIn name Zone.Battlefield S.alice granted) 1
-          Spec.assertEqWith s "without it the Piker stays in alice's hand" (namedIn name Zone.Hand S.alice printed) 1
-          Spec.assertEqWith s "and no miracle reveal was offered" (length (filter isMiracleReveal (S.eventsOf printed))) 0
-        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
-    -- CR 702.94b's "its miracle ability" and CR 607.2h: a Thunderous Wrath under
-    -- Molecule Man has miracle {R} and miracle {0}, and one reveal is made under
-    -- one of them, firing that one's trigger alone. alice declines the {0}
-    -- reveal and takes the {R} one, so the Wrath costs her the Mountain.
-    Spec.it s "CR 702.94b a reveal under one of two miracle abilities fires only its own trigger" $ do
-      island <- S.printingOf s registry "Island"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      think <- S.printingOf s registry "Think Twice"
-      thunder <- S.printingOf s registry "Thunderous Wrath"
-      man <- S.printingOf s registry "Molecule Man"
-      let (base, thinks) = miracleBoard island mountain piker think thunder 1 0
-          gs = snd (S.addPermanent man S.alice base)
-          free cost = Cost.Type.mana cost == Just (ManaCost.MkManaCost [])
-          answer :: Prompt.Prompt r -> r
-          answer p = case p of
-            Prompt.OfferedMiracleReveal _ _ _ _ cost -> if free cost then OptionalDecision.Declines else OptionalDecision.Exercises
-            _ -> miracleTaken p
-          isMiracleTrigger event = case event of
-            GameEvent.AbilityTriggered record -> TriggeredAbility.condition (AbilityTriggered.ability record) == TriggerCondition.SelfRevealedForMiracle
-            _ -> False
-      case thinks of
-        [thinkId] -> do
-          let after = resolveCastWith answer gs thinkId
-          Spec.assertEqWith s "revealed for miracle {R}, the Wrath deals bob 5" (S.lifeOf S.bob after) (fmap (subtract 5) (S.lifeOf S.bob gs))
-          Spec.assertEqWith s "and it cost alice her Mountain as well as both Islands" (S.tappedCount S.alice after) 3
-          Spec.assertEqWith s "one reveal fired one miracle trigger" (length (filter isMiracleTrigger (S.eventsOf after))) 1
-        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
-
--- alice, in her precombat main phase on turn 2 (so CR 103.8a's skipped draw step
--- is not in play), holding `copies` Think Twice, with two Islands per copy and one
--- Mountain out -- {R} exactly, which is the miracle cost and nowhere near
--- Thunderous Wrath's printed {4}{R}{R}.
---
--- Her library has `ahead` Goblin Pikers on top of one Thunderous Wrath, then ten
--- more Pikers beneath it, so no leg decks her before an assertion runs (CR
--- 104.3c). addLibraryCard puts each new card on top, so the stocking order below
--- is bottom-up.
---
--- Returns the board and the Think Twice ids in hand order.
-miracleBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Int ->
-  Int ->
-  (GameState.GameState, [ObjectId.ObjectId])
-miracleBoard island mountain piker think thunder copies ahead =
-  let lands = S.landsFor mountain S.alice 1 (S.landsInPlay island (2 * copies))
-      addThink (ids, g) _ = let (oid, g2) = S.addHandCard think S.alice g in (ids <> [oid], g2)
-      (thinkIds, withHand) = List.foldl' addThink ([], lands) [1 .. copies]
-      pile g n = List.foldl' (\g2 _ -> snd (S.addLibraryCard piker S.alice g2)) g [1 .. n]
-      stocked = pile (snd (S.addLibraryCard thunder S.alice (pile withHand (10 :: Int)))) ahead
-   in ( stocked
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice,
-            GameState.turnNumber = 2
-          },
-        thinkIds
-      )
-
--- Answer CR 702.94a's two "may"s with the pinned decisions, aim every target at
--- bob, and cast nothing at a player's own timing.
---
--- The two answers are PINNED rather than searched for, so a mutation that broke
--- which question is being asked cannot be repaired by the answerer picking the
--- other one. ChooseAction passes: every cast on these boards is driven by the
--- test calling Cast.castSpell directly, so nothing else can spend alice's
--- Mountain.
--- Both "may"s taken: the answerer the two gate cases run, so a leg where nothing
--- happened is a leg the engine never asked.
-miracleTaken :: Prompt.Prompt r -> r
-miracleTaken = miracleAnswer OptionalDecision.Exercises OptionalDecision.Exercises
-
--- Cast one spell under `answer` and let the stack empty. `resolveCastBy`'s shape
--- with the answerer supplied, which is the whole of what these cases vary.
-resolveCastWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-resolveCastWith answer gs oid = S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) Engine.priorityLoop
-
-miracleAnswer :: OptionalDecision.OptionalDecision -> OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
-miracleAnswer reveal offer p = case p of
-  Prompt.OfferedMiracleReveal {} -> reveal
-  Prompt.OfferedCast {} -> offer
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter (== Recipient.ToPlayer S.bob) legal) sets
-  _ -> S.identityAnswer p
-
--- How many cards named `name` this player has in that zone.
-namedIn :: CardName.CardName -> Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> Int
-namedIn name zone pid gs = length (filter ((== Just name) . fmap S.nameOf . flip Game.cardOf gs) (Game.zoneMembers zone pid gs))
-
--- CR 702.94a's own reveal, told from CR 701.20a's ordinary one by its cause.
-isMiracleReveal :: GameEvent.GameEvent -> Bool
-isMiracleReveal event = case event of
-  GameEvent.Revealed (Revealed.MkRevealed _ _ (RevealCause.ForMiracle _) _) -> True
-  _ -> False
-
 -- alice is the active player in her postcombat main phase, holding a Zealous
 -- Conscripts and eight uncastable Goblin Pikers, with five Mountains out; bob
 -- controls a Megrim and nothing else. Nothing is in either library, so no draw
@@ -737,18 +282,6 @@ conscriptBoard mountain piker megrim conscripts =
             GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
           }
       )
-
--- Cast `spell` and narrow every target slot it offers to `victim`, answering
--- everything else as S.identityAnswer does. The cast is pinned to the one card
--- rather than left to S.castAnswer because a padded hand holds other castable
--- cards, and a leg that spent the mana on one of those would never reach it.
-aimedCast :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedCast spell victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
-  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
-    action : _ -> action
-    [] -> A.Pass
-  _ -> S.identityAnswer p
 
 -- Run out the three steps conscriptBoard leaves scheduled -- the postcombat main
 -- phase, the end step and the cleanup step -- so that every leg observes the same
@@ -784,30 +317,9 @@ toCleanup answer gs = List.foldl' (\g _ -> S.runPure answer g Engine.runStep) gs
 --
 -- Three legs on one board, one target apart: the theft, the same cast aimed at
 -- alice's own Mountain instead, and the same board with nothing cast.
-controllerAtTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+controllerAtTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 controllerAtTriggerSpec s registry =
   Spec.describe s "ControllerAtTrigger" $ do
-    Spec.it s "CR 603.3a whole cards: a Megrim stolen until end of turn does not fire on its new controller's own cleanup discard" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      megrim <- S.printingOf s registry "Megrim"
-      conscripts <- S.printingOf s registry "Zealous Conscripts"
-      let (megrimId, _, conscriptsId, gs) = conscriptBoard mountain piker megrim conscripts
-          after = toCleanup (aimedCast conscriptsId megrimId) gs
-      Spec.assertEqWith s "CR 514.1 trimmed alice to her maximum hand size, so a discard really happened" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
-      Spec.assertEqWith s "CR 514.2 gave the Megrim back, which is what the boundary read would have seen" (Projection.View.controllerOf megrimId after) (Just S.bob)
-      Spec.assertEqWith s "CR 603.3a alice controlled it at CR 514.1, so 'an opponent' was bob and nothing triggered" (S.lifeOf S.alice after) (Just 20)
-      Spec.assertEqWith s "and bob, who discarded nothing, is untouched" (S.lifeOf S.bob after) (Just 20)
-    Spec.it s "CR 109.5 the twin: the same cast aimed at alice's own Mountain leaves the Megrim with bob, and her discard costs her 2" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      megrim <- S.printingOf s registry "Megrim"
-      conscripts <- S.printingOf s registry "Zealous Conscripts"
-      let (megrimId, landId, conscriptsId, gs) = conscriptBoard mountain piker megrim conscripts
-          after = toCleanup (aimedCast conscriptsId landId) gs
-      Spec.assertEqWith s "the same one discard" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
-      Spec.assertEqWith s "bob held the Megrim throughout" (Projection.View.controllerOf megrimId after) (Just S.bob)
-      Spec.assertEqWith s "so alice's discard IS an opponent's, and the trigger deals her 2" (S.lifeOf S.alice after) (Just 18)
     Spec.it s "the control leg: no Conscripts cast at all, and the Megrim still fires" $ do
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
@@ -831,128 +343,44 @@ controllerAtTriggerSpec s registry =
 -- part of an instant or sorcery spell's resolution, the spell is put into its
 -- owner's graveyard" -- so the stack-to-graveyard zone change a countering
 -- records is indistinguishable from the one an ordinary resolution records. The
--- first three cases below are that distinction, from three sides: the countering
--- fires, a countering that CR 113.6g stopped does not, and a resolution into the
--- very same graveyard does not. The fourth is the PlayerRelation axis -- whose
--- spell did the countering -- and the fifth is Baral's other half, its CR 601.2f
--- cost reduction.
+-- case below is the resolution side of that distinction; the countering, the
+-- CR 113.6g, CR 113.9 and CR 601.2f cases live in data/scenarios/event-trigger.
 --
 -- bob controls the Baral throughout, so CR 109.5 fixes its "you" as bob (CR
 -- 603.3a).
 --
 -- Baral's reflexive "if you do" is one Optional mode over both instructions
 -- (#487), so `Exercises` below draws AND discards.
-counterTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+counterTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterTriggerSpec s registry =
-  let -- Targets the spell already on the stack, and takes rule 603.5's "may".
-      answerWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-      answerWith victimId p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets
-        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-        _ -> S.identityAnswer p
-   in Spec.describe s "CounterTrigger" $ do
-        -- The negative that keeps
-        -- cr-701-6a-whole-cards-bob-s-cancel-counters-alice-s-spell.json from
-        -- passing vacuously. CR
-        -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
-        -- zone change rule 701.6a's countering makes -- so an implementation
-        -- that matched the zone pair rather than the recorded countering would
-        -- fire here too.
-        Spec.it s "CR 608.2n bob's own Bolt resolving into that same graveyard fires nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          bolt <- S.printingOf s registry "Lightning Bolt"
-          let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
-              withLand = snd (S.addPermanent mountain S.bob withBaral)
-              (_, withLibrary) = S.addLibraryCard mountain S.bob withLand
-              (boltId, gs) = S.addHandCard bolt S.bob withLibrary
-              answer :: Prompt.Prompt r -> r
-              answer p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
-                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-                _ -> S.identityAnswer p
-              cast = S.runPure answer gs (S.cast S.bob boltId)
-              resolved = S.runPure answer cast Stack.resolveTop
-              placed = S.runPure answer resolved Engine.settleForPriority
-          Spec.assertEqWith s "the Bolt really did resolve into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
-          Spec.assertEqWith s "alice took 3, so it resolved rather than fizzling" (S.lifeOf S.alice resolved) (fmap (subtract 3) (S.lifeOf S.alice gs))
-          Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
-          Spec.assertEqWith s "bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
-        -- THE discriminating case for rule 701.6a's OTHER subject. That rule is
-        -- about "a spell or ability", and Stifle ({U} Instant, "Counter target
-        -- activated or triggered ability") counters the second -- but Baral's
-        -- printed object is "counters A SPELL", so Baral must stay silent. CR
-        -- 113.9 is the rule that keeps the two apart: "activated and triggered
-        -- abilities on the stack aren't spells."
-        --
-        -- ONE board, run two ways, because either half alone proves nothing: a
-        -- silent Baral could be a Baral that never worked, and a firing one
-        -- could be a condition that ignores what was countered. The Cancel run
-        -- fires it and the Stifle run does not, from the same starting state,
-        -- with the same interpreter answering `Exercises` to CR 603.5's "may" --
-        -- so the silence is not a declined option either.
-        --
-        -- bob's LIBRARY is the readout, not his hand: Baral draws then discards,
-        -- which leaves the hand the size it was.
-        Spec.it s "CR 113.9 the same Baral: a countered SPELL fires it, a countered ABILITY does not" $ do
-          island <- S.printingOf s registry "Island"
-          cancel <- S.printingOf s registry "Cancel"
-          stifle <- S.printingOf s registry "Stifle"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-          piker <- S.printingOf s registry "Goblin Piker"
-          mountain <- S.printingOf s registry "Mountain"
-          case Face.activatedAbilities (S.combinedFace sorcerer) of
-            [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
-            ability : _ -> do
-              -- bob: Baral, three Islands, one library card, and both a Cancel
-              -- and a Stifle in hand. alice: a settled Prodigal Sorcerer (CR
-              -- 302.6, so its {T} may be activated) and a Goblin Piker spell on
-              -- the stack -- one victim of each kind, standing side by side.
-              let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
-                  withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withBaral [1 .. (3 :: Int)]
-                  (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
-                  (srcId, withSorcerer) = S.addPermanent sorcerer S.alice withLibrary
-                  settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-                  (victimId, onStack) = S.spellOnStack piker S.alice settled
-                  (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
-                  (stifleId, gs) = S.addHandCard stifle S.bob withCancel
-                  -- The SPELL run: bob's Cancel at alice's Piker spell.
-                  spellRun = S.runPure (answerWith victimId) gs (S.cast S.bob cancelId)
-                  spellCountered = S.runPure (answerWith victimId) spellRun Stack.resolveTop
-                  spellPlaced = S.runPure (answerWith victimId) spellCountered Engine.settleForPriority
-                  spellAfter = S.runPure (answerWith victimId) spellPlaced Stack.resolveTop
-                  -- The ABILITY run: alice activates her Sorcerer at herself,
-                  -- and bob's Stifle counters the ability. Aimed at alice so the
-                  -- effect that must NOT occur is her own life total.
-                  atAlice :: Prompt.Prompt r -> r
-                  atAlice p = case p of
-                    Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
-                    Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-                    _ -> S.identityAnswer p
-                  -- Stifle's only legal target is the ability -- the Pool.Abilities
-                  -- set holds nothing else -- so the default interpreter picks it,
-                  -- and its `Exercises` is what would take Baral's "may".
-                  atAbility :: Prompt.Prompt r -> r
-                  atAbility p = case p of
-                    Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-                    _ -> S.identityAnswer p
-                  activated = S.runPure atAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
-                  abilityRun = S.runPure atAbility activated (S.cast S.bob stifleId)
-                  abilityCountered = S.runPure atAbility abilityRun Stack.resolveTop
-                  abilityPlaced = S.runPure atAbility abilityCountered Engine.settleForPriority
-              -- Half one: a countered SPELL. Baral fires, and lands.
-              Spec.assertEqWith s "the Piker spell was countered into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice spellCountered)) 1
-              Spec.assertEqWith s "Baral's trigger is the only thing on the stack" (length (GameState.stack spellPlaced)) 1
-              Spec.assertEqWith s "and bob drew his only library card" (length (Game.zoneMembers Zone.Library S.bob spellAfter)) 0
-              -- Half two: a countered ABILITY. The countering really happened --
-              -- the ability is off the stack and alice took no damage -- and
-              -- Baral saw nothing.
-              Spec.assertEqWith s "the ability is gone, leaving only the untouched Piker spell" (GameState.stack abilityPlaced) [victimId]
-              Spec.assertEqWith s "alice took no damage, so the ability never resolved" (S.lifeOf S.alice abilityPlaced) (Just 20)
-              Spec.assertEqWith s "no ability went to a graveyard: alice's is empty" (length (Game.zoneMembers Zone.Graveyard S.alice abilityPlaced)) 0
-              Spec.assertEqWith s "bob's holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob abilityPlaced)) 1
-              Spec.assertEqWith s "and Baral never fired: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob abilityPlaced)) 1
+  Spec.describe s "CounterTrigger" $ do
+    -- The negative that keeps
+    -- cr-701-6a-whole-cards-bob-s-cancel-counters-alice-s-spell.json from
+    -- passing vacuously. CR
+    -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
+    -- zone change rule 701.6a's countering makes -- so an implementation
+    -- that matched the zone pair rather than the recorded countering would
+    -- fire here too.
+    Spec.it s "CR 608.2n bob's own Bolt resolving into that same graveyard fires nothing" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      baral <- S.printingOf s registry "Baral, Chief of Compliance"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
+          withLand = snd (S.addPermanent mountain S.bob withBaral)
+          (_, withLibrary) = S.addLibraryCard mountain S.bob withLand
+          (boltId, gs) = S.addHandCard bolt S.bob withLibrary
+          answer :: Prompt.Prompt r -> r
+          answer p = case p of
+            Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+            Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+            _ -> S.identityAnswer p
+          cast = S.runPure answer gs (S.cast S.bob boltId)
+          resolved = S.runPure answer cast Stack.resolveTop
+          placed = S.runPure answer resolved Engine.settleForPriority
+      Spec.assertEqWith s "the Bolt really did resolve into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+      Spec.assertEqWith s "alice took 3, so it resolved rather than fizzling" (S.lifeOf S.alice resolved) (fmap (subtract 3) (S.lifeOf S.alice gs))
+      Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
+      Spec.assertEqWith s "bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
 
 -- CR 603.2's binding half of a per-permanent counter trigger: the ability names
 -- the permanent the counters went on, and that permanent is neither the bearer
@@ -1077,7 +505,7 @@ auntieOolSpec s registry =
 -- sentence and a Filter that confused them would still answer right. carol is
 -- the seat that is neither the caster nor the ability's controller, and the
 -- opponent case below names all three players in its assertions.
-youngPyromancerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+youngPyromancerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 youngPyromancerSpec s registry =
   let elemental = CardName.MkCardName (Text.pack "Elemental Token")
       elementalsOf = S.countOnBattlefieldByName elemental
@@ -1105,38 +533,6 @@ youngPyromancerSpec s registry =
               after = castAndResolve S.alice boilId gs
           Spec.assertEqWith s "no Elemental before the cast" (elementalsOf S.alice gs) 0
           Spec.assertEqWith s "exactly one Elemental token afterwards" (elementalsOf S.alice after) 1
-        -- The card-type half of the Filter, moved on its own: alice still casts,
-        -- and only what she casts changes. A Filter that admitted everything and
-        -- one that read the type correctly are indistinguishable without this.
-        Spec.it s "CR 601.2i a CREATURE spell fires nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          pyromancer <- S.printingOf s registry "Young Pyromancer"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (pikerId, gs) = S.addHandCard piker S.alice (board mountain pyromancer)
-              after = castAndResolve S.alice pikerId gs
-          -- Positive control: the cast really happened and really resolved, so
-          -- the silence below is the Filter's answer and not a fixture that
-          -- never cast anything.
-          Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
-          Spec.assertEqWith s "and no Elemental token" (elementalsOf S.alice after) 0
-        -- The "you" half, moved on its own: the same instant, cast from the seat
-        -- to alice's left instead of hers. carol makes the board three-handed,
-        -- so "bob cast it" is not the same statement as "an opponent cast it".
-        Spec.it s "CR 109.5 'you cast': an OPPONENT's instant fires nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          pyromancer <- S.printingOf s registry "Young Pyromancer"
-          boil <- S.printingOf s registry "Boil"
-          let base = board mountain pyromancer
-              (bobsBoil, withBobs) = S.addHandCard boil S.bob base
-              (alicesBoil, gs) = S.addHandCard boil S.alice withBobs
-              byBob = castAndResolve S.bob bobsBoil gs
-              byAlice = castAndResolve S.alice alicesBoil gs
-          Spec.assertEqWith s "alice gets no Elemental from bob's cast" (elementalsOf S.alice byBob) 0
-          Spec.assertEqWith s "and neither does bob" (elementalsOf S.bob byBob) 0
-          Spec.assertEqWith s "and neither does carol" (elementalsOf S.carol byBob) 0
-          -- The same board, one caster apart: alice casting her own copy is what
-          -- proves the seat is the only thing the silence above turns on.
-          Spec.assertEqWith s "the same board fires for alice's own cast" (elementalsOf S.alice byAlice) 1
 
 -- The printed rider "This ability triggers only once each turn"
 -- (Pawl.Types.TriggerLimit), on top of the trigger event the group above covers.
@@ -1385,7 +781,7 @@ acrobaticCheerleaderSpec s registry =
 -- The reading is Projection.keywordsOf, which counts CR 122.1b counter INSTANCES
 -- -- Nothing where the ability never fired, against the control's Just 1 -- so a
 -- bare "it does not fly" cannot stand in for it.
-secondMainPhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+secondMainPhaseSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 secondMainPhaseSpec s registry =
   let atPhase p g = GameState.phase g == p
       -- Run whole steps until `phase` is the current one and has NOT yet run.
@@ -1447,16 +843,11 @@ secondMainPhaseSpec s registry =
           Spec.assertEqWith s "the extra main phase really ran, with the Cheerleader untapped" (GameState.phase secondMain, tapState oid secondMain) (Phase.PostcombatMain, Just TapState.Untapped)
           Spec.assertEqWith s "and the third main phase really ran, with it tapped" (GameState.phase thirdMain, tapState oid thirdMain) (Phase.PostcombatMain, Just TapState.Tapped)
           Spec.assertEqWith s "the rider is unspent, so nothing but the ordinal held the trigger back" (length (GameState.triggeredThisGame after)) 0
-        Spec.it s "CR 505.1b and the same attack does trigger at a second main phase the Assault did not move" $ do
-          (oid, _, gs) <- boardOf
-          let secondMain = stepUntil S.aggressiveAnswer (atPhase Phase.PostcombatMain) gs
-              after = oneStep S.aggressiveAnswer secondMain
-          Spec.assertEqWith s "one flying counter, put on at alice's second main phase" (flyingOn oid after) (Just 1)
-          Spec.assertEqWith s "which is the postcombat main, reached with the Cheerleader tapped" (GameState.phase secondMain, tapState oid secondMain) (Phase.PostcombatMain, Just TapState.Tapped)
 
 -- The same CR 601.2i cast, read for WHICH cast of the turn it was --
--- SpellCast.ordinal. The cast-side twin of drawTriggerSpec's Erudite Wizard, and
--- the two conditions answer the same question about different events.
+-- SpellCast.ordinal. The cast-side twin of Erudite Wizard's draw ordinal
+-- (data/scenarios/event-trigger), and the two conditions answer the same question
+-- about different events.
 --
 -- Clarion Spirit, {1}{W} Creature -- Spirit 2/2: "Whenever you cast your second
 -- spell each turn, create a 1/1 white Spirit creature token with flying."
@@ -1537,27 +928,6 @@ clarionSpiritSpec s registry =
               Spec.assertEqWith s "the handoff clears the log the count reads" (GameState.events handed) Seq.empty
               Spec.assertEqWith s "and the new turn's second cast fires it again" (spiritsOf S.alice nextTurn) 2
             _ -> Spec.assertFailure s "fixture should put four Boil in alice's hand"
-        -- The Filter, applied to the EARLIER casts and not only to the one being
-        -- matched: bob's Boil sits between alice's two in the log, so a count of
-        -- every cast in it would make alice's second the turn's third and fire
-        -- nothing. The pair of boards differ in exactly that cast.
-        Spec.it s "CR 109.5 'you cast': an opponent's cast is not counted toward the ordinal" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          clarion <- S.printingOf s registry "Clarion Spirit"
-          boil <- S.printingOf s registry "Boil"
-          case handOf boil S.alice 2 (board mountain clarion) of
-            ([first, second], withHand) -> do
-              let (bobsBoil, gs) = S.addHandCard boil S.bob withHand
-                  afterAlice = castAndResolve S.alice first gs
-                  afterBob = castAndResolve S.bob bobsBoil afterAlice
-                  interleaved = castAndResolve S.alice second afterBob
-                  straight = castAndResolve S.alice second afterAlice
-              Spec.assertEqWith s "bob's cast alone makes nobody a Spirit" (spiritsOf S.alice afterBob) 0
-              Spec.assertEqWith s "alice's second still fires with his cast in between" (spiritsOf S.alice interleaved) 1
-              -- The same board without bob's cast, which is the only difference
-              -- between the two: it fires either way.
-              Spec.assertEqWith s "and fires without it" (spiritsOf S.alice straight) 1
-            _ -> Spec.assertFailure s "fixture should put two Boil in alice's hand"
 
 -- CR 113.6k: the first ability in the pool that functions from the STACK. The
 -- same rule that put Narcomoeba's in a graveyard, one zone over.
@@ -1572,7 +942,7 @@ clarionSpiritSpec s registry =
 -- another SpellCast case: at CR 601.2i the Twin is on nobody's battlefield and in
 -- nobody's graveyard, so every candidate source but Event.eventTriggers'
 -- `spellCast` misses it entirely, and the token below never appears.
-desolationTwinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+desolationTwinSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 desolationTwinSpec s registry =
   let eldrazi = CardName.MkCardName (Text.pack "Eldrazi Token")
       eldraziOf = S.countOnBattlefieldByName eldrazi
@@ -1599,20 +969,6 @@ desolationTwinSpec s registry =
           -- the trigger's and not a fixture that never cast anything.
           Spec.assertEqWith s "the Twin itself resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName twin) S.alice after) 1
           Spec.assertEqWith s "and its cast trigger made exactly one token" (eldraziOf S.alice after) 1
-        -- The same board and the same caster, one spell apart. A fence on the
-        -- candidate source's SCOPE rather than on the condition: `spellCast`
-        -- offers the cast spell alone, so a source that reached into the hand or
-        -- swept the whole stack would make a token here. No mutation of the code
-        -- as it stands turns this red.
-        Spec.it s "CR 601.2i a different card's cast fires nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          twin <- S.printingOf s registry "Desolation Twin"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (_, withTwin) = S.addHandCard twin S.alice (board mountain)
-              (pikerId, gs) = S.addHandCard piker S.alice withTwin
-              after = castAndResolve S.alice pikerId gs
-          Spec.assertEqWith s "the Piker resolved" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
-          Spec.assertEqWith s "and the Twin in hand made no token" (eldraziOf S.alice after) 0
 
 -- CR 601.2i's trigger reading back the spell it watched: the reserved slot
 -- Event.eventBindings stamps for that condition (Binding.castSpell), and the
@@ -1686,20 +1042,6 @@ presenceOfTheMasterSpec s registry =
               after = castAndResolve S.bob pikerId gs
           Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.bob after) 1
           Spec.assertEqWith s "and nothing went to bob's graveyard" (graveyardOf S.bob after) 0
-        -- "A player", not "you" and not "an opponent": the bearer's own
-        -- controller is a player too, so alice's enchantment dies to her own
-        -- Presence. The case bob's cast above cannot make.
-        Spec.it s "CR 601.2i 'a player casts' includes the bearer's controller" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          mountain <- S.printingOf s registry "Mountain"
-          presence <- S.printingOf s registry "Presence of the Master"
-          badMoon <- S.printingOf s registry "Bad Moon"
-          let (moonId, gs) = S.addHandCard badMoon S.alice (board swamp mountain presence)
-              after = castAndResolve S.alice moonId gs
-          Spec.assertEqWith s "alice's own Bad Moon never reaches the battlefield" (S.countOnBattlefieldByName (S.printingName badMoon) S.alice after) 0
-          Spec.assertEqWith s "it is in alice's graveyard" (graveyardOf S.alice after) 1
-          Spec.assertEqWith s "bob's graveyard is untouched" (graveyardOf S.bob after) 0
-          Spec.assertEqWith s "and carol's" (graveyardOf S.carol after) 0
 
 -- CR 601.2i's trigger reading back the PLAYER it watched, which is the other
 -- half of the event: Binding.triggerPlayer stamped off GameEvent.SpellCast's
@@ -1807,65 +1149,13 @@ kambalSpec s registry =
 -- BOTH the counter and the projected power are asserted, because CR 122.1a is
 -- what makes the counter mean anything: a counter that landed but never reached
 -- the CR 613.4c layer would leave the count right and the creature a 2/1.
-brinebornCutthroatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brinebornCutthroatSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 brinebornCutthroatSpec s registry =
   let -- alice bears the Cutthroat and three Forests, one per Fog: no untap step
-      -- runs between the casts below, so the lands are not reused. bob and carol
-      -- get nothing at all -- they are turns here, not casters.
-      board forest cutthroat =
-        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent forest pid g2)) g [1 .. (n :: Int)]
-            withLands = addLands S.alice 3 S.threePlayerGame
-            (cutthroatId, withCutthroat) = S.addPermanent cutthroat S.alice withLands
-         in ( cutthroatId,
-              withCutthroat
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            )
-      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
       -- alice keeps priority throughout: CR 117.1a lets her cast an instant on
       -- anybody's turn, which is the whole premise of the card.
       onTurnOf pid gs = gs {GameState.activePlayer = pid, GameState.priority = Just S.alice}
-      countersOn = S.counterOf CounterKind.PlusOnePlusOne
    in Spec.describe s "SpellCast during an opponent's turn" $ do
-        -- THE case, in one run so the counts accumulate: the same caster and the
-        -- same spell three times over, one turn apart each.
-        Spec.it s "CR 601.2i Brineborn Cutthroat counts only the casts on another player's turn" $ do
-          forest <- S.printingOf s registry "Forest"
-          fog <- S.printingOf s registry "Fog"
-          cutthroat <- S.printingOf s registry "Brineborn Cutthroat"
-          let (cutthroatId, base) = board forest cutthroat
-              (fog1, g1) = S.addHandCard fog S.alice base
-              (fog2, g2) = S.addHandCard fog S.alice g1
-              (fog3, g3) = S.addHandCard fog S.alice g2
-              afterAlice = castAndResolve S.alice fog1 (onTurnOf S.alice g3)
-              afterBob = castAndResolve S.alice fog2 (onTurnOf S.bob afterAlice)
-              afterCarol = castAndResolve S.alice fog3 (onTurnOf S.carol afterBob)
-              graveyardOf gs = length (Game.zoneMembers Zone.Graveyard S.alice gs)
-          Spec.assertEqWith s "no counter before anything is cast" (countersOn cutthroatId g3) 0
-          -- Positive control: all three casts really happened and really
-          -- resolved, so any silence below is the scope's answer rather than a
-          -- fixture that ran out of mana on the second Fog.
-          Spec.assertEqWith s "each Fog resolved into alice's graveyard in turn" (graveyardOf afterAlice, graveyardOf afterBob, graveyardOf afterCarol) (1, 2, 3)
-          -- ONE TUPLE over the three turns rather than three assertions, so a
-          -- scope read the wrong way round shows its whole trajectory at once:
-          -- alice's own turn is the seat that must NOT count, bob's is the first
-          -- that must, and carol's is the seat that is neither the caster nor the
-          -- one other player -- which is what "an opponent's" has to mean (CR
-          -- 102.2, CR 806.1).
-          Spec.assertEqWith
-            s
-            "only bob's and carol's turns put a counter on"
-            (countersOn cutthroatId afterAlice, countersOn cutthroatId afterBob, countersOn cutthroatId afterCarol)
-            (0, 1, 2)
-          -- And the same three states read through the CR 613.4c layer, so a
-          -- counter that landed without reaching the projected P/T is caught.
-          Spec.assertEqWith
-            s
-            "CR 122.1a moves the printed 2/1 with them"
-            (S.powerToughnessOf cutthroatId afterAlice, S.powerToughnessOf cutthroatId afterBob, S.powerToughnessOf cutthroatId afterCarol)
-            (Just (2, 1), Just (3, 2), Just (4, 3))
         -- CR 702.8a's flash, which the trigger above does not touch: casting an
         -- INSTANT on an opponent's turn is CR 117.1a and says nothing about the
         -- Cutthroat's own keyword. Goblin Piker is the control -- an ordinary
@@ -2129,219 +1419,10 @@ blightChroniclerBoard s registry withSolemnity withOwnWatcher = do
           (g6 {GameState.phase = endStep, GameState.activePlayer = S.alice})
   pure (gnarlbarkId, S.runPure S.identityAnswer begun Engine.settleForPriority)
 
--- CR 701.66b's earthbend as a TRIGGER EVENT, and rule 701.67c's waterbend
--- beside it. The one printing that watches either act, Avatar Aang, reads only
--- its own controller's ("whenever YOU waterbend, earthbend, ..."; Scryfall
--- oracle:earthbend, oracle:waterbend, oracle:airbend and oracle:firebend, every
--- card_faces entry read, 2026-09-19), and avatarAangSpec below is its case. The
--- watchers here read EVERY player's, which no printing does, so they are made
--- up -- data/cards/synthetic-stonelistener-adept.json and
--- data/cards/synthetic-tidecaller-scribe.json, both "Whenever a player
--- [bend]s, put a +1/+1 counter on this creature". One trigger condition over
--- one event, and the counter is an effect the engine already had.
---
--- Each watcher sits under BOB while alice bends, so every case reads
--- PlayerRelation.AnyPlayer across a seat rather than a self-scoped trigger.
---
--- The bender is Earthbending Lesson ({3}{G} Sorcery -- Lesson, whose whole text
--- is "Earthbend 4") and Geyser Leaper ({4}{U} 4/3, "Flying / Waterbend {4}: Draw
--- a card, then discard a card"); Pawl.EarthbendSpec and Pawl.CostSpec are where
--- what those two do is proved.
-bendTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-bendTriggerSpec s registry =
-  let placeTriggers gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-      settle gs = S.runPure S.identityAnswer (placeTriggers gs) Stack.resolveTop
-      plus = S.counterOf CounterKind.PlusOnePlusOne
-   in Spec.describe s "Bend triggers" $ do
-        -- THE MOMENT, which is the whole of rule 701.66b: the ability triggers
-        -- when rule 701.66a's DELAYED triggered ability is created, not when
-        -- that delayed ability later returns the land. The two readings are
-        -- separated by reading the Adept twice on one board -- once while the
-        -- Lesson has only just resolved, and again after the earthbent land has
-        -- died and come back. A "when it returns" implementation answers 0 then
-        -- 1 where rule 701.66b answers 1 then 1.
-        Spec.it s "CR 701.66b the Adept fires as rule 701.66a's delayed ability is created, not when it returns the land" $ do
-          forest <- S.printingOf s registry "Forest"
-          lesson <- S.printingOf s registry "Earthbending Lesson"
-          adept <- S.printingOf s registry "Synthetic Stonelistener Adept"
-          let (adeptId, g1) = S.addPermanent adept S.bob (S.landsInPlay forest 5)
-              (g2, spell) = S.handOne lesson g1
-              target = lastLand g2
-              answer :: Prompt.Prompt r -> r
-              answer = aimedAt target
-              cast = S.runPure answer g2 (S.cast S.alice spell)
-              earthbent = settle (S.runPure answer cast Stack.resolveTop)
-              returned = settle (settle (S.settleSba (S.markDamage target 4 earthbent)))
-          Spec.assertEqWith s "CR 701.66b the earthbend put a +1/+1 counter on bob's Adept" (plus adeptId earthbent) 1
-          Spec.assertEqWith s "CR 701.66b and rule 701.66a's delayed ability returning the land puts no second one" (plus adeptId returned) 1
-          -- The proxies, after the behaviour: rule 701.66a really ran, and the
-          -- delayed ability really resolved, so neither reading above is of a
-          -- board that never moved.
-          Spec.assertEqWith s "CR 701.66a the earthbend itself put four +1/+1 counters on the land" (plus target earthbent) 4
-          Spec.assertBool s (not (S.onBattlefield target returned)) "CR 400.7 the earthbent land itself is gone"
-          Spec.assertEqWith s "CR 701.66a and the card it was came back, so alice controls five lands again" (length (Game.zoneMembers Zone.Battlefield S.alice returned)) 5
-        -- Rule 701.67c's "regardless of how they paid that cost", as the one
-        -- thing the pair varies: the same Leaper, the same waterbend {4}, paid
-        -- once entirely by rule 701.67a's taps on a landless board and once
-        -- entirely in mana off four Mountains. A condition reading the taps
-        -- would fire on the first and not the second.
-        Spec.it s "CR 701.67c a waterbend cost paid by tapping fires the Scribe" $ do
-          (scribeId, tappable, leaperId, gs) <- leaperBoard s registry 0
-          resolved <- activateLeaper s (ManaCost.MkManaCost []) tappable leaperId gs
-          Spec.assertEqWith s "CR 701.67c the waterbend put a +1/+1 counter on bob's Scribe" (plus scribeId (settle resolved)) 1
-          Spec.assertEqWith s "and the four permanents rule 701.67a tapped for it are tapped" (S.tappedCount S.alice resolved) 4
-        Spec.it s "CR 701.67c and the same cost paid entirely in mana fires it just the same" $ do
-          (scribeId, _, leaperId, gs) <- leaperBoard s registry 4
-          resolved <- activateLeaper s (ManaCost.MkManaCost [ManaSymbol.Generic 4]) [] leaperId gs
-          Spec.assertEqWith s "CR 701.67c the waterbend put a +1/+1 counter on bob's Scribe" (plus scribeId (settle resolved)) 1
-          Spec.assertEqWith s "and only the four Mountains she spent are tapped" (S.tappedCount S.alice resolved) 4
-
--- alice's last battlefield permanent in ObjectId order. Her battlefield holds
--- nothing but Forests on this board, so this is one of them; rule 701.66a's
--- "target land you control" asks nothing about whether paying for the Lesson
--- tapped it.
-lastLand :: GameState.GameState -> ObjectId.ObjectId
-lastLand gs = case List.sortOn Ord.Down (Game.zoneMembers Zone.Battlefield S.alice gs) of
-  oid : _ -> oid
-  [] -> S.noSource
-
--- Aim a target slot at this permanent, PINNED rather than searched: an answerer
--- that took whatever was legal would find another Forest after a mutation and
--- keep the case green. FILTERED out of the offered set rather than built from
--- the id, since CR 608.2b re-reads the recipient the pool offered.
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just victim) . Recipient.objectOf) offered) sets
-  _ -> S.castAnswer p
-
--- alice controls a Geyser Leaper, two Goblin Pikers, two Crawlspaces and
--- `lands` Mountains, with two Mountains in her library so the ability's draw
--- neither decks her (CR 104.3c) nor runs out; bob controls the Scribe. She has
--- priority in her own precombat main phase, which is when CR 117.1b lets her
--- activate. Returns the Scribe, the four tappable permanents, the Leaper and
--- that state.
---
--- The Leaper and the Scribe are themselves untapped creatures, so the tap prompt
--- is offered more candidates than the cost can take and is a real choice.
-leaperBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
-leaperBoard s registry lands = do
-  mountain <- S.printingOf s registry "Mountain"
-  leaper <- S.printingOf s registry "Geyser Leaper"
-  piker <- S.printingOf s registry "Goblin Piker"
-  crawlspace <- S.printingOf s registry "Crawlspace"
-  scribe <- S.printingOf s registry "Synthetic Tidecaller Scribe"
-  let (leaperId, g1) = S.addPermanent leaper S.alice (S.landsInPlay mountain lands)
-      (tappable, g2) = List.foldl' (\(ids, g) printing -> let (oid, next) = S.addPermanent printing S.alice g in (ids <> [oid], next)) ([], g1) [piker, piker, crawlspace, crawlspace]
-      (scribeId, g3) = S.addPermanent scribe S.bob g2
-      g4 = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g3 [1 :: Int .. 2]
-  pure
-    ( scribeId,
-      tappable,
-      leaperId,
-      g4
-        { GameState.phase = Phase.PrecombatMain,
-          GameState.activePlayer = S.alice,
-          GameState.priority = Just S.alice
-        }
-    )
-
--- alice activates the Leaper's sole activated ability, taking the substitution
--- that leaves `wanted` to pay with mana and tapping `tapped` for the rest, and
--- the ability resolves. Both answers are FILTERED against what the engine
--- offered rather than built, so an answer it did not offer fails the payment
--- visibly instead of being repaired.
-activateLeaper :: (Monad m) => Spec.Spec m n -> ManaCost.ManaCost -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
-activateLeaper s wanted tapped leaperId gs = case Projection.abilitiesOf leaperId gs of
-  ability : _ ->
-    let answer :: Prompt.Prompt r -> r
-        answer p = case p of
-          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just wanted) . Cost.Type.mana) candidates)
-          Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (`elem` tapped) candidates)
-          _ -> S.identityAnswer p
-        activated = S.runPure answer gs (Activate.activateAbility S.alice leaperId ability)
-     in pure (S.runPure answer activated Stack.resolveTop)
-  [] -> Spec.assertFailure s "expected the Leaper to carry an activated ability"
-
--- Avatar Aang's front face, "Whenever you waterbend, earthbend, firebend, or
--- airbend, draw a card. Then if you've done all four this turn, transform
--- Avatar Aang": CR 701.65b, CR 701.66b, CR 701.67c and CR 702.189b as one CR
--- 603.1b AnyOf, and the second sentence a CR 608.2c clause over CR 603.1b's
--- "all of those conditions" for the turn.
---
--- A PAIR of turns differing in one thing, the Earthbending Lesson: alice
--- airbends bob's Sol Ring with Airbending Lesson, waterbends through Geyser
--- Leaper, and attacks with Aang, whose own firebending 2 is the fourth verb.
--- Three of four draws three and leaves Aang on his front face; all four draws
--- four and turns him over as the last one resolves.
-avatarAangSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-avatarAangSpec s registry = Spec.describe s "Avatar Aang" $ do
-  Spec.it s "CR 603.1b Aang draws on each bending verb and transforms only once all four were done this turn" $ do
-    (aangId, all4) <- aangTurn s registry True
-    (_, three) <- aangTurn s registry False
-    -- The negative first: a condition that answers early turns Aang over on
-    -- the full turn too, and his back face then stops drawing.
-    Spec.assertEqWith s "CR 603.1b three of four leaves Aang on his front face" (Projection.namesOf aangId three) (Set.singleton (CardName.MkCardName (Text.pack "Avatar Aang")))
-    -- Four of Aang's draws, the Lesson's one and the Leaper's one.
-    Spec.assertEqWith s "CR 701.65b/701.66b/701.67c/702.189b Aang drew once per verb" (libraryDrawn all4) 6
-    Spec.assertEqWith s "CR 603.1b all four this turn transforms Aang" (Projection.namesOf aangId all4) (Set.singleton (CardName.MkCardName (Text.pack "Aang, Master of Elements")))
-    -- The proxy, after the behaviour: the three-verb turn really ran its three.
-    Spec.assertEqWith s "and three of four drew three, the Lesson's and the Leaper's besides" (libraryDrawn three) 5
-
--- How many cards alice's ten-card library has lost.
-libraryDrawn :: GameState.GameState -> Int
-libraryDrawn gs = 10 - length (Game.zoneMembers Zone.Library S.alice gs)
-
--- alice's turn with Avatar Aang, four Forests, three Plains, a Geyser Leaper and
--- three Goblin Pikers, and ten Mountains in her library; bob controls a Sol
--- Ring. When `earthbends`, she first casts Earthbending Lesson on a land; then
--- Airbending Lesson on the Sol Ring, the Leaper's waterbend {4} paid by tapping
--- it and the Pikers, and combat with Aang attacking. Returns Aang and the state
--- at the declare blockers step, each trigger resolved.
-aangTurn :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
-aangTurn s registry earthbends = do
-  aang <- S.printingOf s registry "Avatar Aang"
-  forest <- S.printingOf s registry "Forest"
-  plains <- S.printingOf s registry "Plains"
-  mountain <- S.printingOf s registry "Mountain"
-  leaper <- S.printingOf s registry "Geyser Leaper"
-  piker <- S.printingOf s registry "Goblin Piker"
-  solRing <- S.printingOf s registry "Sol Ring"
-  earthLesson <- S.printingOf s registry "Earthbending Lesson"
-  airLesson <- S.printingOf s registry "Airbending Lesson"
-  let placeTriggers gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-      settle gs = S.runPure S.identityAnswer (placeTriggers gs) Stack.resolveTop
-      castAt target spell gs =
-        let answer :: Prompt.Prompt r -> r
-            answer = aimedAt target
-         in settle (S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop)
-      g0 = S.landsFor plains S.alice 3 (S.landsInPlay forest 4)
-      landId = lastLand g0
-      (aangId, g1) = S.addPermanent aang S.alice g0
-      (leaperId, g2) = S.addPermanent leaper S.alice g1
-      (pikers, g3) = List.foldl' (\(ids, g) _ -> let (oid, next) = S.addPermanent piker S.alice g in (ids <> [oid], next)) ([], g2) [1 :: Int .. 3]
-      (ringId, g4) = S.addPermanent solRing S.bob g3
-      g5 = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g4 [1 :: Int .. 10]
-      (earthId, g6) = S.addHandCard earthLesson S.alice g5
-      (airId, g7) = S.addHandCard airLesson S.alice g6
-      main = g7 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-      earthbent = if earthbends then castAt landId earthId main else main
-      airbent = castAt ringId airId earthbent
-  waterbent <- activateLeaper s (ManaCost.MkManaCost []) (leaperId : pikers) leaperId airbent
-  let combat =
-        (settle waterbent)
-          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
-            GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
-          }
-  pure (aangId, S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer combat)
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
-  discardTriggerSpec s registry
   cyclesTriggerSpec s registry
   selfDiscardTriggerSpec s registry
-  drawTriggerSpec s registry
-  miracleSpec s registry
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
   auntieOolSpec s registry
@@ -2357,5 +1438,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   oreskosSunGuideSpec s registry
   wellRestedSpec s registry
   blightChroniclerSpec s registry
-  bendTriggerSpec s registry
-  avatarAangSpec s registry

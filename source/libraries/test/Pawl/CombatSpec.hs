@@ -57,7 +57,6 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
-import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -67,14 +66,12 @@ import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Seat as Seat
@@ -83,32 +80,6 @@ import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
-
-combatDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
-  Spec.it s "CR 613.11 Tapestry Warden compares power and toughness after characteristic effects" $ do
-    warden <- S.printingOf s registry "Tapestry Warden"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [warden, piker] []
-    case mine of
-      [_, pikerId] -> do
-        let after = S.runCombat S.aggressiveAnswer (withToughnessBoost pikerId gs)
-        -- The final 2/3 Piker joins the Warden in assigning with toughness.
-        Spec.assertEqWith s "defender took seven" (S.lifeOf S.bob after) (Just 13)
-      _ -> Spec.assertFailure s "fixture should have two attackers"
-  Spec.it s "CR 702.19b a trampling Tapestry Warden spills the excess over its toughness" $ do
-    warden <- S.printingOf s registry "Tapestry Warden"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [warden] [piker]
-    case mine of
-      [] -> Spec.assertFailure s "fixture should have an attacker"
-      attacker : _ -> do
-        -- CR 702.19b's excess is excess over what the creature ASSIGNS, so the
-        -- 3/4 Warden divides 4: one lethal point onto the 2/1 Piker and three
-        -- over. Reading power would leave bob at 18.
-        let after = S.settleSba (S.fightWith trampleThresholdAnswer (withTrample attacker gs))
-        Spec.assertEqWith s "defender took three over the blocker" (S.lifeOf S.bob after) (Just 17)
-        Spec.assertEqWith s "and the blocker took its lethal point" (S.creaturesInPlay S.bob after) 0
 
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
 declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
@@ -186,29 +157,6 @@ choosesDefenderRecordingDecider who p = case p of
     State.modify' (\seen -> seen <> [decider])
     pure who
   _ -> pure (S.identityAnswer p)
-
--- Records the PlayerId of every Prompt.DeclareBlockers ask AND the blocker
--- candidates that ask was offered, then blocks the first attacker with
--- everything. Two accumulators threaded as one State pair: the ASK is what
--- CR 509.1 is about (who declares), and the OFFER is what CR 509.1a is about
--- (whose creatures are even eligible). Everything else delegates, so the
--- wildcard keeps this out of the -Werror exhaustiveness net.
-recordingBlockers :: Prompt.Prompt r -> State.State ([PlayerId.PlayerId], [ObjectId.ObjectId]) r
-recordingBlockers p = case p of
-  Prompt.DeclareBlockers _ pid candidates attackers -> do
-    State.modify' (\(asks, offers) -> (asks <> [pid], offers <> candidates))
-    pure $ case attackers of
-      [] -> Map.empty
-      a : _ -> Map.fromList (fmap (\b -> (b, Set.singleton a)) candidates)
-  _ -> pure (S.identityAnswer p)
-
--- Run Combat.declareBlockers under recordingBlockers. State.runState (State s a)
--- s0 :: (a, s), so the tuple comes back (final state, accumulators) and this
--- flips it to put the accumulators first.
-runRecordingBlockers :: GameState.GameState -> (([PlayerId.PlayerId], [ObjectId.ObjectId]), GameState.GameState)
-runRecordingBlockers gs =
-  let (after, seen) = State.runState (fmap snd (Engine.runGame recordingBlockers gs (Combat.declareBlockers S.manaPerformer))) ([], [])
-   in (seen, after)
 
 -- CR 802: the attack multiple players option, which every game pawl starts uses
 -- (Pawl.Types.GameSettings.attackOption). THREE SEATS throughout, since
@@ -472,33 +420,6 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     Spec.assertEqWith s "alice really had a legal attacker" (fmap (\oid -> Combat.canAttack S.alice oid ready) mine) [True]
     Spec.assertEqWith s "nobody attacked" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertEqWith s "and nothing was tapped" (S.tappedCount S.alice after) 0
-  Spec.it s "CR 509.1 only the defending player is asked to declare blockers" $ do
-    -- CR 509.1's first sentence names THE defending player, singular. CR 802.4
-    -- has several of them declare in APNAP order, which Combat.declareBlockers
-    -- does by looping over Defender.defendingPlayers; this board records carol as
-    -- the only defender, so that loop has one seat to ask.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (board, mine, bobs, carols) = S.threePlayerCombat [piker] [piker] [piker]
-        attackMap = case mine of
-          oid : _ -> Map.singleton oid (AttackTarget.OfPlayer S.carol)
-          [] -> Map.empty
-        ready =
-          board
-            { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
-              GameState.combat =
-                (GameState.combat board)
-                  { Combat.Type.defenders = [S.carol],
-                    Combat.Type.attackers = attackMap
-                  }
-            }
-        ((asked, offeredBlockers), after) = runRecordingBlockers ready
-    Spec.assertEqWith s "the fixture gave bob and carol a blocker each" (length bobs, length carols) (1, 1)
-    -- Discriminating: the behaviour this phase replaces loops over every
-    -- opponent, so `asked` would be [bob, carol].
-    Spec.assertEqWith s "only carol was asked" asked [S.carol]
-    -- And bob's untapped creature is never offered, per CR 509.1a.
-    Spec.assertEqWith s "bob's creature is in no candidate list" (filter (\oid -> elem oid bobs) offeredBlockers) []
-    Spec.assertEqWith s "carol's block was recorded" (Map.size (Combat.Type.blockers (GameState.combat after))) 1
 
 -- Re-sicken alice's creatures, as though they had just resolved this turn.
 justArrived :: GameState.GameState -> GameState.GameState
@@ -569,52 +490,6 @@ attacking mine theirs =
   let (gs, ours, yours) = S.combatBoardOf mine theirs
       after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
    in (after, ours, yours)
-
--- CR 702.19: grant trample to `oid` with a stored continuous effect, the M2c
--- granted-keyword posture. Tapestry Warden does not print trample, and the pool has no printed
--- trampler that also assigns with toughness.
-withTrample :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-withTrample oid gs =
-  let (ts, gs1) = Game.freshTimestamp gs
-      eff =
-        ContinuousEffect.MkContinuousEffect
-          { ContinuousEffect.source = oid,
-            ContinuousEffect.timestamp = ts,
-            ContinuousEffect.expiry = Expiry.AtCleanup,
-            ContinuousEffect.modification = Modification.GainKeyword Keyword.Trample,
-            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-          }
-   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-
--- CR 702.19b: assigns each blocker exactly the threshold the engine offered and
--- every leftover point to the defending player. Reads the amount off the prompt
--- rather than computing it, so a wrong substitution shows up as a wrong life
--- total rather than a rejected assignment.
-trampleThresholdAnswer :: Prompt.Prompt r -> r
-trampleThresholdAnswer p = case p of
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    let blockers = Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds
-        spent = sum (Map.elems blockers)
-        leftover = if n >= spent then n - spent else 0
-     in case filter (not . S.isCreatureRecipient) (Map.keys thresholds) of
-          d : _ -> Map.insert d leftover blockers
-          [] -> blockers
-  _ -> S.aggressiveAnswer p
-
--- A layer-7c effect that turns Goblin Piker's 2/1 into a 2/3, so Tapestry
--- Warden's CR 613.11 rules effect must see the finished characteristics.
-withToughnessBoost :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-withToughnessBoost oid gs =
-  let (ts, gs1) = Game.freshTimestamp gs
-      eff =
-        ContinuousEffect.MkContinuousEffect
-          { ContinuousEffect.source = oid,
-            ContinuousEffect.timestamp = ts,
-            ContinuousEffect.expiry = Expiry.AtCleanup,
-            ContinuousEffect.modification = Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal 2)),
-            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-          }
-   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- Any printings at all onto `who`'s battlefield, on a board that already exists.
 -- S.addPermanent is any-printing rather than creature-only, which is how the CR
@@ -696,8 +571,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     Spec.assertEqWith s "CR 702.73a two Giants and a changeling: legal" (blockable [] changeling) (Just True)
     Spec.assertEqWith s "alice's Goblin is not the defending player's: still illegal" (blockable [piker] piker) (Just False)
     -- Forest is a land type, not a creature type: a Dryad Arbor beside two
-    -- Forests made creatures (layer 4, withTrample's stored-effect posture) holds
-    -- Forest three ways and a creature type only once.
+    -- Forests made creatures (layer 4, a stored continuous effect) holds Forest
+    -- three ways and a creature type only once.
     arbor <- S.printingOf s registry "Dryad Arbor"
     forest <- S.printingOf s registry "Forest"
     let animate oid gs =
@@ -738,13 +613,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks chosenAlice) "and with alice chosen instead the same Piker may"
         Spec.assertEqWith s "CR 614.1c and the two boards really differ in the seat the Nemesis chose" (Game.lookupObject a chosenBob >>= Object.chosenPlayer, Game.lookupObject a chosenAlice >>= Object.chosenPlayer) (Just S.bob, Just S.alice)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-  Spec.it s "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $ do
-    -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
-    -- fails if evasion is wrongly implemented as a filter on the candidates.
-    birdMaiden <- S.printingOf s registry "Bird Maiden"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, theirs) = attacking [birdMaiden] [piker]
-    Spec.assertEqWith s "still offered" (Combat.legalBlockers S.bob gs) theirs
   Spec.it s "CR 509.1a a Mountain is not a legal blocker, flier or no flier" $ do
     -- The classification, from the other side: `canBlock` asks
     -- is-it-a-creature, never which card it is. M1b (tests cards) "a land may not
@@ -914,10 +782,10 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     (onIsland, wraith2, blocker2) <- wraithBoard False "Island"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton wraith2)) onIsland) "an Island does not"
 
--- CR 702.111: grant menace to `oid` with a stored continuous effect, withTrample's
--- twin. Used only by the CR 509.1b "after a legal block has been declared" case
--- below, which needs menace to ARRIVE mid-combat; every other case here reads
--- Boggart Brute's printed keyword.
+-- CR 702.111: grant menace to `oid` with a stored continuous effect. Used only
+-- by the CR 509.1b "after a legal block has been declared" case below, which
+-- needs menace to ARRIVE mid-combat; every other case here reads Boggart
+-- Brute's printed keyword.
 withMenace :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 withMenace oid gs =
   let (ts, gs1) = Game.freshTimestamp gs
@@ -1627,100 +1495,13 @@ combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
         Spec.assertBool s (Combat.canBlock S.bob evenBlocker bare) "the pair: with the Winnower gone the even creature may block again"
       _ -> Spec.assertFailure s "fixture should have two creatures a side"
 
--- CR 601.2c: announce every variable slot at one, then aim each slot at `oid`
--- where it is a legal recipient and take the rest as they come. Reasonable Doubt
--- has two slots and only one of them may be a creature, so the spell slot keeps
--- the one spell on the stack while the creature slot takes the named Piker.
-suspecting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-suspecting oid p = case p of
-  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
-  Prompt.ChooseTargets _ _ _ offers -> S.preferring (\r -> Recipient.objectOf r == Just oid) offers
-  _ -> S.identityAnswer p
-
--- bob's suspect, a Goblin Piker beside it and his two Islands, with `ahead`
--- placed under him BEFORE the pair and `behind` after them -- which is how the
--- pair below puts one Humility on either side of the same permanent and changes
--- nothing else. Placement order is timestamp order (Pawl.Support.addPermanent
--- allocates one per object), so the two boards differ in exactly one timestamp
--- comparison.
---
--- Then alice attacks, a Goblin Piker spell of hers goes on the stack to be
--- Reasonable Doubt's counter target, and bob casts the Doubt suspecting the
--- FIRST of the two. Returns the settled board, the suspected permanent, the one
--- beside it, alice's attacker and the spell the Doubt countered.
---
--- `suspected` is the printing the designation lands on: a Goblin Piker for the
--- timestamp pair, a Dryad Arbor for the CR 305.7 case, which needs a permanent a
--- basic-land-type set can reach.
-suspectBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  Printing.Printing ->
-  [Printing.Printing] ->
-  [Printing.Printing] ->
-  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
-suspectBoard s registry suspected ahead behind = do
-  piker <- S.printingOf s registry "Goblin Piker"
-  island <- S.printingOf s registry "Island"
-  doubt <- S.printingOf s registry "Reasonable Doubt"
-  let (gs0, mine, _) = S.combatBoardOf [piker] []
-      (suspect, gsA) = S.addPermanent suspected S.bob (withPermanents S.bob ahead gs0)
-      (other, gsB) = S.addPermanent piker S.bob gsA
-      gs2 = withPermanents S.bob (behind <> [island, island]) gsB
-      declared = S.runPure S.aggressiveAnswer gs2 (Combat.declareAttackers S.manaPerformer S.alice)
-      (victim, gs3) = S.spellOnStack piker S.alice declared
-      (doubtId, gs4) = S.addHandCard doubt S.bob gs3
-      resolved = S.runPure (suspecting suspect) gs4 (S.cast S.bob doubtId >> Stack.resolveTop >> Engine.settleForPriority)
-      attacker = case mine of
-        a : _ -> a
-        [] -> S.noSource
-  pure (resolved, suspect, other, attacker, victim)
-
--- CR 701.60b's designation, read off the object -- Nothing for an object that has
--- left, which no assertion below wants to pass for.
-suspectedOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Bool
-suspectedOf oid gs = fmap (Set.member Designation.Suspected . Object.designations) (Game.lookupObject oid gs)
-
--- Convincing Mirage's two prompts: its CR 303.4a enchant slot, forced onto the
--- one land this group cares about, and its CR 614.1c as-enters basic land type.
--- Recipient.ToObject and not ToCreature: the Aura's slot is over lands, which is
--- what Pawl.Support's stillLegalEnchant note warns about.
-mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
-mirageOn landId subtype p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject landId))) sets
-  Prompt.ChooseBasicLandType {} -> subtype
-  _ -> S.identityAnswer p
-
 -- CR 509.1b's pairwise restriction written from the BLOCKER's side
 -- (CombatRestriction.CantBlockCreatures). Every board attacks with a 2/1 Goblin
 -- Piker AND a 1/1 Llanowar Elves, so each barred pair has a legal twin beside it
 -- and a blocker that could block nothing fails the second leg.
-cantBlockCreaturesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cantBlockCreaturesSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
-  let pair blockerName = do
-        blocker <- S.printingOf s registry blockerName
-        piker <- S.printingOf s registry "Goblin Piker"
-        elves <- S.printingOf s registry "Llanowar Elves"
-        pure (attacking [piker, elves] [blocker])
-      blocks gs b a = Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs
-  Spec.it s "CR 509.1b Brassclaw Orcs can't block a creature with power 2, and can block one with power 1" $ do
-    (gs, mine, theirs) <- pair "Brassclaw Orcs"
-    case (mine, theirs) of
-      ([piker, elves], [orcs]) -> do
-        Spec.assertBool s (not (blocks gs orcs piker)) "the Orcs may not block the 2/1 Piker"
-        Spec.assertBool s (blocks gs orcs elves) "the Orcs may block the 1/1 Elves"
-      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
-  -- The Filter is read in the BLOCKER's context: "greater than this creature's
-  -- power" is the 1/1 Handler's. Read in the attacker's, the Piker would be
-  -- compared against itself and admitted.
-  Spec.it s "CR 509.1b Spitfire Handler can't block a creature with greater power than its own" $ do
-    (gs, mine, theirs) <- pair "Spitfire Handler"
-    case (mine, theirs) of
-      ([piker, elves], [handler]) -> do
-        Spec.assertBool s (not (blocks gs handler piker)) "the 1/1 Handler may not block the 2/1 Piker"
-        Spec.assertBool s (blocks gs handler elves) "the Handler may block the 1/1 Elves"
-      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  let blocks gs b a = Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs
   -- Wan Shi Tong, All-Knowing's Spirit tokens, "This token can't block or be
   -- blocked by non-Spirit creatures": the card's own library trigger makes them,
   -- and each half is proved against a Spirit (Dutiful Knowledge Seeker) and a
@@ -1746,96 +1527,6 @@ cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
         Spec.assertBool s (blocks gs a seekerId) "it may block the Spirit Seeker"
         Spec.assertEqWith s "both tokens are bob's" (fmap (`Projection.controllerOf` gs) [a, b]) [Just S.bob, Just S.bob]
       (_, other) -> Spec.assertFailure s ("expected two Spirit tokens, got " <> show (length other))
-
--- CR 701.60c against the two rules that strip abilities: CR 613.1f's layer-6
--- removal, ordered by CR 613.7, and CR 305.7's layer-4 subtype set, which spares
--- an ability the rules granted. Proved by Reasonable Doubt {1}{U} Instant,
--- "Counter target spell unless its controller pays {2}. Suspect up to one target
--- creature", cast under Humility for the first pair and beside a Convincing
--- Mirage for the third case.
---
--- Rule 701.60c states its restriction as quoted text, so what the designation gives
--- a permanent is an ABILITY, and CR 613.1f puts Humility's removal in the same
--- layer as the grant. The grant's timestamp is the suspected permanent's own (see
--- Pawl.Engine.Projection.designationGathered), so ORDER decides: a Humility already
--- on the battlefield when the Piker arrived applies first and the grant lands on
--- top of it, while one that arrived later applies last and takes the ability away.
---
--- The pair of boards differs in that one thing, and the two boards must DISAGREE --
--- a reading with no timestamps in it answers both alike. Rule 701.60c's two halves
--- are then each other's anti-vacuity leg: menace goes through the layer fold and
--- "can't block" through Pawl.Engine.CombatRestriction, so if only one of them moves
--- between the boards, one subsystem read the order and the other did not. The
--- second Piker is the third leg: it entered beside the suspect and was never
--- suspected, so a board on which nothing can block fails at it rather than passing.
-suspectedAbilityRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-suspectedAbilityRemovalSpec s registry = Spec.describe s "SuspectedAbilityRemoval" $ do
-  Spec.it s "CR 613.7 a Humility older than the suspect leaves rule 701.60c's ability in place" $ do
-    humility <- S.printingOf s registry "Humility"
-    piker <- S.printingOf s registry "Goblin Piker"
-    (gs, suspect, other, attacker, victim) <- suspectBoard s registry piker [humility] []
-    Spec.assertEqWith s "the Doubt resolved and suspected the Piker it named, not the one beside it" (suspectedOf suspect gs, suspectedOf other gs) (Just True, Just False)
-    -- The Doubt's other clause, so the card is exercised whole rather than only in
-    -- the half this pair turns on: alice paid nothing, so her spell was countered.
-    -- Her graveyard is what separates that from the spell having RESOLVED, which
-    -- would have put a third Piker onto the battlefield instead. CR 701.6a puts the
-    -- countered spell into its owner's graveyard as a new incarnation, so the stack
-    -- object itself is gone.
-    Spec.assertEqWith s "and countered the spell it named" (Maybe.isNothing (Game.lookupObject victim gs), length (Game.zoneMembers Zone.Graveyard S.alice gs)) (True, 1)
-    Spec.assertBool s (Projection.hasKeyword Keyword.Menace suspect gs) "CR 701.60c: the later grant survives the earlier removal, so the menace half is there"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) gs)) "CR 701.60c: and so is the can't-block half"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "while the unsuspected Piker beside it blocks"
-  Spec.it s "CR 613.7 a Humility younger than the suspect removes it" $ do
-    humility <- S.printingOf s registry "Humility"
-    piker <- S.printingOf s registry "Goblin Piker"
-    (gs, suspect, other, attacker, _) <- suspectBoard s registry piker [] [humility]
-    Spec.assertEqWith s "the same designation, on the same Piker: CR 701.60b makes it no ability, so no removal reaches it" (suspectedOf suspect gs, suspectedOf other gs) (Just True, Just False)
-    Spec.assertBool s (not (Projection.hasKeyword Keyword.Menace suspect gs)) "CR 613.1f: the later removal wipes the grant, so the menace half is gone"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) gs) "CR 613.1f: and the can't-block half with it"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "as the Piker beside it could all along"
-  -- CR 305.7's carve-out, which the case above's Humility cannot reach: that rule
-  -- strips "all abilities generated from its rules text" and then says outright
-  -- that it "doesn't remove any abilities that were granted to the land by other
-  -- effects". Rule 701.60c grants this one, so the strip must spare it.
-  --
-  -- Dryad Arbor is the suspect because it is a PRINTED Land Creature -- no
-  -- animation, so there is no second effect to confuse the read, and CR 305.7's
-  -- own "doesn't add or remove any card types" keeps it a creature and therefore
-  -- a would-be blocker afterwards. Convincing Mirage {1}{U} ("Enchant land / As
-  -- this Aura enters, choose a basic land type. / Enchanted land is the chosen
-  -- type.") is the setter, CAST rather than attached by hand: the chosen type is
-  -- a CR 614.1c as-enters rewrite, and an Aura placed without it would leave
-  -- Object.chosenSubtype empty and strip nothing at all.
-  Spec.it s "CR 305.7 setting a suspected land's subtype spares the ability rule 701.60c granted" $ do
-    dryadArbor <- S.printingOf s registry "Dryad Arbor"
-    island <- S.printingOf s registry "Island"
-    mirage <- S.printingOf s registry "Convincing Mirage"
-    -- Two Islands behind the pair, so bob can pay for the Mirage after the Doubt:
-    -- untouched mana is what keeps the negative leg below about the designation.
-    (board, arbor, other, attacker, _) <- suspectBoard s registry dryadArbor [] [island, island]
-    let (mirageId, withMirage) = S.addHandCard mirage S.bob board
-        cast = S.runPure (mirageOn arbor Subtype.Island) withMirage (S.cast S.bob mirageId)
-        settled = S.settleSba (S.runPure (mirageOn arbor Subtype.Island) cast Stack.resolveTop)
-        -- Dryad Arbor is a LAND, so bob's two casts may have tapped it for mana.
-        -- CR 509.1a lets only an untapped creature block, and a tapped one would
-        -- make the first assertion pass without the restriction being read at
-        -- all. Untapped here rather than by juggling which land pays: nothing in
-        -- this case is about mana.
-        gs = settled {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) arbor (GameState.objects settled)}
-    -- THE assertion, gameplay level and first.
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton arbor (Set.singleton attacker)) gs)) "CR 305.7: the rulebook-granted can't-block survives the subtype set"
-    -- The third leg the pair above uses: an unsuspected permanent beside it still
-    -- blocks, so a board on which nothing can block fails here.
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "while the unsuspected Piker beside it blocks"
-    -- The other half of rule 701.60c's one sentence, which goes through the layer
-    -- fold instead: the two must agree.
-    Spec.assertBool s (Projection.hasKeyword Keyword.Menace arbor gs) "CR 701.60c: and the menace half, which no layer-4 strip touches, is there too"
-    -- ANTI-VACUITY, and not optional: if the Aura failed to attach or the chosen
-    -- type went unset, there are no set-land-subtype effects at all, the gate this
-    -- case exists to remove is vacuously satisfied, and the first assertion passes
-    -- under the wrong implementation too.
-    Spec.assertEqWith s "CR 305.7: the set really happened -- an Island where a Forest was, the Dryad creature type untouched" (Projection.subtypesOf arbor gs) (Set.fromList [Subtype.Island, Subtype.Dryad])
-    Spec.assertEqWith s "on the permanent the Doubt suspected, which is still suspected" (suspectedOf arbor gs, suspectedOf other gs) (Just True, Just False)
 
 -- CR 508.1c's and CR 509.1b's SECOND clause -- "or that it can't attack unless
 -- some condition is met" -- proved by Blind-Spot Giant ("This creature can't
@@ -2406,8 +2097,7 @@ renewBoard rakshasa swamp piker =
 
 -- Announces X and answers CR 601.2c's targets out of `oids`, by FILTERING the
 -- offered set: the pool decides which flavour of Recipient a candidate arrives
--- as, and a hand-built one of another flavour is dropped by CR 608.2b's re-read
--- (Pawl.ActivateSpec's answerXTargeting says the same).
+-- as, and a hand-built one of another flavour is dropped by CR 608.2b's re-read.
 --
 -- As many of them as the slot was OFFERED, rather than all of them: an offer of
 -- the wrong size then lands counters on the wrong creatures instead of failing
@@ -2894,15 +2584,6 @@ windowAttackRestrictionSpec s registry = Spec.describe s "WindowAttackRestrictio
     Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(giant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob alicesTurn))) "the window is open, so the Giant may not attack"
     Spec.assertBool s (not (Combat.canAttack S.alice giant (declaringAt S.bob alicesTurn))) "and it is off CR 508.1a's candidate list"
     Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(openGiant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob openAlices)) "the pair: with nothing stored the same Giant attacks"
-  Spec.it s "CR 514.2 the window closes at the end of the turn it named" $ do
-    (giant, _, blocked) <- wallBoard s registry "Wall of Dust"
-    let afterwards = handoffUntapping (handoffUntapping (handoffUntapping blocked))
-        later = handoffUntapping afterwards
-    Spec.assertEqWith s "alice is active again on turn 5" (GameState.activePlayer later, GameState.turnNumber later) (S.alice, 5)
-    Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(giant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob later)) "the Giant attacks on the turn after the one the window named"
-    -- Ordered BEHIND the declaration above so a sweep that kept the row reddens
-    -- the gameplay assertion rather than being absorbed by a list length.
-    Spec.assertEqWith s "with nothing left stored once that turn's cleanup has run" (GameState.attackProhibitions afterwards) []
 
 -- Turn 1 played through its whole combat phase: alice attacks with a Hill Giant
 -- and bob blocks with `blocker`, whose only job on the Wall of Stone leg is to
@@ -3098,7 +2779,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   declareSpec s registry
   creatureBattleDeclarationSpec s registry
-  combatDamageSpec s registry
   defenderSpec s registry
   defendingPlayerSpec s registry
   attackMultiplePlayersSpec s registry
@@ -3116,7 +2796,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   storedAttackRestrictionSpec s registry
   storedClassAttackRestrictionSpec s registry
   windowAttackRestrictionSpec s registry
-  suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry
   aimedAttackRestrictionSpec s registry

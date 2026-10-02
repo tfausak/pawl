@@ -1,0 +1,109 @@
+{
+  "description": "CR 707.2 a graveyard card offers the authored abilities of what it is a copy of",
+  "note": "Synthetic Mirror of the Fallen makes alice's graveyard Goblin Piker a copy of bob's Reassembling Skeleton, so it offers the Skeleton's {1}{B} return. The control file aims the same Mirror at her Skeleton and bob's Hill Giant instead, and her Skeleton offers no return. Two Swamps are left in both, exactly the return's {1}{B}.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Reassembling Skeleton",
+            "label": "own skeleton"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "own piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Mirror of the Fallen",
+            "label": "mirror"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Reassembling Skeleton",
+            "label": "their skeleton"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "their giant"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$mirror",
+          "targetsBySlot": {
+            "mirrored": [
+              "$own piker"
+            ],
+            "archetype": [
+              "$their skeleton"
+            ]
+          },
+          "mana": [
+            "Island",
+            "Island#2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $own skeleton",
+            "Activate $own piker",
+            "ActivateManaAbility Swamp",
+            "ActivateManaAbility Swamp#2"
+          ]
+        }
+      }
+    }
+  ]
+}

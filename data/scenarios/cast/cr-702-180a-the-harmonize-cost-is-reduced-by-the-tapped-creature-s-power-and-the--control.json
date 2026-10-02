@@ -1,0 +1,87 @@
+{
+  "description": "CR 702.180a control: with only the Piker no reduction reaches three, so the same three Islands cannot pay the harmonize cost",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true,
+            "label": "piker"
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Unending Whisper",
+            "label": "unending-whisper"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$unending-whisper",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Unending Whisper",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$piker",
+        "tapped": false
+      }
+    }
+  ]
+}

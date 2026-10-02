@@ -12,9 +12,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
-import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -28,19 +26,16 @@ import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   lizrogSpec s registry
-  spiderManSpec s registry
   overseerSpec s registry
   eventidesShadowSpec s registry
 
@@ -138,77 +133,6 @@ lizrogBoard s registry = do
       (lizrogId, entered) = S.entersWithTrigger lizrog S.alice counted
   pure (lizrogId, pikerId, giantId, bobsId, entered)
 
--- Sensational Spider-Man {1}{W}{U} Legendary Creature -- Spider Human Hero 3/3
--- (Oracle text checked against Scryfall 2026-09-27): "Whenever Sensational
--- Spider-Man attacks, tap target creature defending player controls and put a
--- stun counter on it. Then you may remove up to three stun counters from among
--- all permanents. Draw cards equal to the number of stun counters removed this
--- way."
---
--- RemovalCount.UpTo, and a tally a Draw reads.
---
--- THE BOARD: alice attacks with Spider-Man; bob defends with a Goblin Piker,
--- which the trigger targets, and a Hill Giant carrying the stun counters given.
--- alice's library holds five cards.
-spiderManSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-spiderManSpec s registry =
-  let stun = CounterKind.Stun
-      run answer (board, pikerId) = State.runState (fmap snd (Engine.runGame (recording answer (plan OptionalDecision.Exercises (Just pikerId))) board S.combatGame)) []
-      drawn board after = S.handSize S.alice after - S.handSize S.alice board
-   in Spec.describe s "Sensational Spider-Man" $ do
-        Spec.it s "CR 608.2d up to three stun counters from among all permanents, and a card for each" $ do
-          (board, _, pikerId, giantId) <- spiderManBoard s registry 2
-          let (after, asked) = run (Map.fromList [(pikerId, 1), (giantId, 2)]) (board, pikerId)
-          Spec.assertEqWith s "CR 121.2 alice drew three" (drawn board after) 3
-          Spec.assertEqWith s "CR 122.1 the Piker's new stun counter came off" (S.counterOf stun pikerId after) 0
-          Spec.assertEqWith s "and both of the Giant's" (S.counterOf stun giantId after) 0
-          Spec.assertEqWith s "alice was asked once, capped at three, over both" asked [UpTo 3 (Map.fromList [(pikerId, 1), (giantId, 2)])]
-        -- Fewer than the cap is an answer.
-        Spec.it s "CR 608.2d fewer than three is an answer, and draws that many" $ do
-          (board, _, pikerId, giantId) <- spiderManBoard s registry 2
-          let (after, _) = run (Map.singleton giantId 1) (board, pikerId)
-          Spec.assertEqWith s "CR 121.2 alice drew one" (drawn board after) 1
-          Spec.assertEqWith s "and the Piker and Giant keep one apiece" (S.counterOf stun pikerId after, S.counterOf stun giantId after) (1, 1)
-        -- The cap: four counters are there, and an answer taking all of them is
-        -- refused rather than cut down.
-        Spec.it s "CR 608.2d an answer above three removes nothing" $ do
-          (board, _, pikerId, giantId) <- spiderManBoard s registry 3
-          let (after, _) = run (Map.fromList [(pikerId, 1), (giantId, 3)]) (board, pikerId)
-          Spec.assertEqWith s "alice drew nothing" (drawn board after) 0
-          Spec.assertEqWith s "and the Piker and Giant keep theirs" (S.counterOf stun pikerId after, S.counterOf stun giantId after) (1, 3)
-        -- CR 508.5's second sentence: Spider-Man leaves combat (here, the
-        -- battlefield) with its trigger on the stack, and "defending player" is
-        -- still bob, so the Piker stays a legal target at CR 608.2b's re-check
-        -- and the ability resolves in full.
-        Spec.it s "CR 508.5 bounced with its trigger on the stack, its target is still the defending player's" $ do
-          (board, spiderId, pikerId, giantId) <- spiderManBoard s registry 2
-          let act = do
-                Combat.declareAttackers S.manaPerformer S.alice
-                _ <- Engine.placePendingTriggers
-                Event.changeZone spiderId Zone.Hand
-                Stack.resolveTop
-              division = Map.fromList [(pikerId, 1), (giantId, 2)]
-              (after, _) = State.runState (fmap snd (Engine.runGame (recording division (plan OptionalDecision.Exercises (Just pikerId))) board act)) []
-          let library g = length (Game.zoneMembers Zone.Library S.alice g)
-          Spec.assertEqWith s "CR 608.2b the ability resolved: alice drew three" (library board - library after) 3
-          Spec.assertEqWith s "and the Piker is tapped" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Tapped)
-          Spec.assertEqWith s "and Spider-Man is in alice's hand" (length (Game.zoneMembers Zone.Hand S.alice after) - length (Game.zoneMembers Zone.Hand S.alice board)) 4
-
--- The board spiderManSpec's cases share, described above it, with the Giant's
--- stun counters given.
-spiderManBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Natural -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
-spiderManBoard s registry stunned = do
-  spider <- S.printingOf s registry "Sensational Spider-Man"
-  piker <- S.printingOf s registry "Goblin Piker"
-  giant <- S.printingOf s registry "Hill Giant"
-  forest <- S.printingOf s registry "Forest"
-  let (gs0, ours, theirs) = S.combatBoardOf [spider] [piker, giant]
-      stock g = snd (S.addLibraryCard forest S.alice g)
-      stocked = stock (stock (stock (stock (stock gs0))))
-  case (ours, theirs) of
-    ([spiderId], [pikerId, giantId]) -> pure (S.addCounter CounterKind.Stun stunned giantId stocked, spiderId, pikerId, giantId)
-    _ -> Spec.assertFailure s "fixture should give alice Spider-Man and bob a Piker and a Giant"
-
 -- Overseer of Vault 76 {2}{W} Legendary Creature -- Human Advisor 3/3 (Oracle
 -- text checked against Scryfall 2026-09-27): "First Contact -- Whenever Overseer
 -- of Vault 76 or another creature you control with power 3 or less enters, put a
@@ -252,14 +176,6 @@ overseerSpec s registry =
           Spec.assertEqWith s "CR 603.12 the Giant got a +1/+1 counter" (S.counterOf plusOne giantId after) 1
           Spec.assertEqWith s "and every quest counter came off" (S.counterOf quest overseerId after, S.counterOf quest forestId after) (0, 0)
           Spec.assertEqWith s "and nothing was asked" asked []
-        -- And one fewer again: two is not three, so the "may" is no option at all
-        -- and the reflexive ability never triggers.
-        Spec.it s "CR 608.2d with two quest counters the removal is impossible, so nothing happens" $ do
-          (overseerId, forestId, giantId, _, board) <- overseerBoard s registry 2 0
-          let (after, _) = run Map.empty board
-          Spec.assertEqWith s "the Giant got no +1/+1 counter" (S.counterOf plusOne giantId after) 0
-          Spec.assertEqWith s "and the Overseer kept both" (S.counterOf quest overseerId after) 2
-          Spec.assertEqWith s "and the Forest has none" (S.counterOf quest forestId after) 0
 
 quest :: CounterKind.CounterKind Keyword.Keyword
 quest = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "quest"))
@@ -300,7 +216,7 @@ overseerBoard s registry onOverseer onForest = do
 -- THE BOARD: alice holds the Shadow over five Swamps and controls a Goblin Piker
 -- carrying a +1/+1 and a vigilance counter; bob's Hill Giant carries two +1/+1
 -- counters and a stun counter. alice's library holds five cards.
-eventidesShadowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+eventidesShadowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 eventidesShadowSpec s registry =
   let run answer board shadowId = State.runState (fmap snd (Engine.runGame (recordingMixed answer) board (S.cast S.alice shadowId >> Stack.resolveTop))) []
    in Spec.describe s "Eventide's Shadow" $ do
@@ -316,20 +232,6 @@ eventidesShadowSpec s registry =
           Spec.assertEqWith s "CR 121.1 alice drew the three removed" (length (Game.zoneMembers Zone.Hand S.alice after)) 3
           Spec.assertEqWith s "CR 119.3 and lost three life" (S.lifeOf S.alice after) (Just 17)
           Spec.assertEqWith s "alice was asked once, from zero, over every permanent by kind" asked [(CounterSpread.FromAmongAtLeast, 0, Map.fromList [(pikerId, Map.fromList [(plusOne, 1), (vigilance, 1)]), (giantId, Map.fromList [(plusOne, 2), (CounterKind.Stun, 1)])])]
-        -- None is an answer to "any number", and the tally is then zero.
-        Spec.it s "CR 608.2d removing none draws nothing and loses nothing" $ do
-          (shadowId, pikerId, giantId, board) <- shadowBoard s registry
-          let (after, _) = run Map.empty board shadowId
-          Spec.assertEqWith s "every counter stayed" (S.counterOf vigilance pikerId after, S.counterOf CounterKind.Stun giantId after, S.counterOf plusOne giantId after) (1, 1, 2)
-          Spec.assertEqWith s "alice drew nothing" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
-          Spec.assertEqWith s "and lost nothing" (S.lifeOf S.alice after) (Just 20)
-        -- A division naming a kind a permanent does not carry is refused, not
-        -- repaired into another one.
-        Spec.it s "CR 608.2d an answer naming a kind the permanent lacks removes nothing" $ do
-          (shadowId, pikerId, _, board) <- shadowBoard s registry
-          let (after, _) = run (Map.singleton pikerId (Map.singleton CounterKind.Stun 1)) board shadowId
-          Spec.assertEqWith s "the Piker kept both" (S.counterOf vigilance pikerId after, S.counterOf plusOne pikerId after) (1, 1)
-          Spec.assertEqWith s "and alice drew nothing" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
 
 vigilance :: CounterKind.CounterKind Keyword.Keyword
 vigilance = CounterKind.Keyword Keyword.Vigilance

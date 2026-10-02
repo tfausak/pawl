@@ -1,0 +1,111 @@
+{
+  "description": "CR 601.3 unhacked the -3 reaches the Zombie card and not the Cleric",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Liliana, Untouched by Death",
+            "label": "liliana-untouched-by-death",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 4
+              }
+            ]
+          }
+        ],
+        "hand": [
+          {
+            "card": "Artificial Evolution",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Whipstitched Zombie"
+          },
+          {
+            "card": "Cabal Evangel"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$liliana-untouched-by-death",
+          "ability": 2,
+          "mana": [
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$liliana-untouched-by-death",
+          "kind": {
+            "type": "Loyalty"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast Artificial Evolution",
+            "Cast Whipstitched Zombie",
+            "ActivateManaAbility Island",
+            "ActivateManaAbility Swamp",
+            "ActivateManaAbility Swamp#2"
+          ]
+        }
+      }
+    }
+  ]
+}

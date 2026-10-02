@@ -1,0 +1,116 @@
+{
+  "description": "CR 508.1b attacking the leader's planeswalker is not attacking the leader",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 15,
+        "battlefield": [
+          {
+            "card": "Enraged Revolutionary",
+            "label": "enraged-revolutionary",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Jace Beleren",
+            "label": "jace-beleren",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "life": 10,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$enraged-revolutionary"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$enraged-revolutionary",
+      "do": {
+        "ChooseAttackTarget": "$jace-beleren"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$enraged-revolutionary": "$jace-beleren"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$enraged-revolutionary",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$enraged-revolutionary",
+        "tapped": true
+      }
+    }
+  ]
+}

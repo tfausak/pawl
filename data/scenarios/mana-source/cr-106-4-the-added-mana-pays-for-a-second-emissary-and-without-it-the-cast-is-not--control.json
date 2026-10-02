@@ -1,0 +1,54 @@
+{
+  "description": "CR 106.4 the added mana pays for a second Emissary, and without it the cast is not offered",
+  "note": "The first Emissary is cast off a Mountain and a Forest, which it taps, so once its enters trigger resolves the only mana anywhere is the {R}{G} it added. The control has the Emissary placed on the battlefield, so nothing triggered and the second cast is not offered.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Burning-Tree Emissary",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Burning-Tree Emissary",
+            "label": "e2"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$e2"
+        }
+      }
+    }
+  ]
+}

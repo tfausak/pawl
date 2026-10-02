@@ -1,0 +1,64 @@
+{
+  "description": "CR 702.154a a vigilant co-attacker is untapped and still cannot be enlisted",
+  "note": "The vigilant Kemba's Legion attacks beside the Steelcrusher, so it stays untapped yet is not offered: no ChooseEnlist prompt comes, which an unscheduled prompt would fail. The control leaves the Legion home, where it is enlisted, tapped, and pumps the Steelcrusher.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Yavimaya Steelcrusher",
+            "label": "crusher",
+            "ready": true
+          },
+          {
+            "card": "Kemba's Legion",
+            "label": "legion",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$crusher",
+          "$legion"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$crusher",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$legion",
+          "tapped": false
+        }
+      }
+    }
+  ]
+}

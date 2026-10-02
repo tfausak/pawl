@@ -1,0 +1,221 @@
+{
+  "description": "CR 612.1 hacked Zombie -> Goblin, the entry rider's counter is a hexproof from Goblins counter",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "Island",
+            "label": "island"
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Warded Homecoming",
+            "label": "spell"
+          },
+          {
+            "card": "Artificial Evolution",
+            "label": "evolution"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Tarfire",
+            "label": "tarfire"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$spell",
+          "targets": [
+            "$piker"
+          ],
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$evolution",
+          "targets": [
+            "Synthetic Warded Homecoming"
+          ],
+          "mana": [
+            "$island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "source": "Artificial Evolution",
+      "do": {
+        "ChooseTypeSwap": {
+          "from": {
+            "type": "Zombie"
+          },
+          "to": {
+            "type": "Goblin"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Goblin Piker",
+          "kind": {
+            "type": "Keyword",
+            "value": {
+              "type": "Hexproof",
+              "value": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Goblin"
+                }
+              }
+            }
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Goblin Piker",
+          "kind": {
+            "type": "Keyword",
+            "value": {
+              "type": "Hexproof",
+              "value": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Zombie"
+                }
+              }
+            }
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "refuse": {
+        "Cast": {
+          "object": "$tarfire",
+          "targets": [
+            "Goblin Piker"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Tarfire",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    }
+  ],
+  "note": "Synthetic Warded Homecoming returns the Piker with a hexproof from Zombies counter; Artificial Evolution on the Homecoming swaps Zombie for Goblin, so bob's Tarfire (a Goblin spell, CR 702.11d) may not target the returned Piker. Proven by casting the Homecoming unhacked, where the refused Tarfire stands."
+}

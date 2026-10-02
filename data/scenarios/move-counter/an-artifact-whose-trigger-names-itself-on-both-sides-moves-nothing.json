@@ -1,0 +1,145 @@
+{
+  "description": "an artifact whose trigger names itself on both sides moves nothing",
+  "note": "March of the Machines makes Agent's Toolkit a creature, so its own entry triggers it and names it on both sides; Doubling Season makes a self-move observable (one off, two back). The may is never put and no counter question is asked: either prompt here would be unscheduled and fail the run.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "f"
+          },
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Mountain",
+            "label": "m"
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "March of the Machines"
+          },
+          {
+            "card": "Doubling Season"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Agent's Toolkit",
+            "label": "kit"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$kit",
+          "mana": [
+            "$f",
+            "$i1",
+            "$p1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Agent's Toolkit"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "Agent's Toolkit",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "Agent's Toolkit",
+        "kind": {
+          "type": "Keyword",
+          "value": {
+            "type": "Deathtouch"
+          }
+        },
+        "count": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "Agent's Toolkit",
+        "kind": {
+          "type": "Keyword",
+          "value": {
+            "type": "Flying"
+          }
+        },
+        "count": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "Agent's Toolkit",
+        "kind": {
+          "type": "Shield"
+        },
+        "count": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "description": "an empty sweep binds zero, so the rider puts no counters on",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-5",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-6",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Bane of Progress",
+            "label": "bane-of-progress",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bane-of-progress",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            "$forest-5",
+            "$forest-6"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Bane of Progress",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Bane of Progress",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-6",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Bane of Progress",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Bane of Progress",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Bane of Progress",
+        "power": 2,
+        "toughness": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "Bane of Progress",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

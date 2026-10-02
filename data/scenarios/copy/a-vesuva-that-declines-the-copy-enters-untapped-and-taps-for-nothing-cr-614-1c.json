@@ -1,0 +1,119 @@
+{
+  "description": "a Vesuva that declines the copy enters untapped and taps for nothing (CR 614.1c)",
+  "note": "Mana.manaTypesOf being empty is read off the Offered view: the untapped Vesuva is offered no ActivateManaAbility, while objects 0 to 2 (the Mountains and Mutavault) are.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mutavault",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Vesuva",
+            "label": "vesuva",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "PlayLand": "$vesuva"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCopyTarget",
+          "with": null
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate Mutavault",
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mutavault"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "Vesuva",
+          "names": [
+            "Vesuva"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Vesuva",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Vesuva",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Vesuva",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Vesuva",
+        "tapped": false
+      }
+    }
+  ]
+}

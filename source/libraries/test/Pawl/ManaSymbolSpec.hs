@@ -25,7 +25,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
 import Pawl.ManaSourceSpec (dawnBoards, oneSymbol, payable, plainGreen, plainOf, plainRed, poolOf, retainedGreen)
-import Pawl.ManaSpec (atLife, castOffBoard, poolSize, poolTypes, poolUnits, prefersColor, prefersSource, resolvedCreature, theAbility)
+import Pawl.ManaSpec (atLife, poolSize, poolTypes, poolUnits, prefersColor, prefersSource, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -41,7 +41,6 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRetention as ManaRetention
@@ -51,7 +50,6 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
@@ -259,14 +257,6 @@ snowRed =
 -- {R}-producing Mountain, differing only in CR 205.4g's supertype.
 snowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 snowSpec s registry = Spec.describe s "Snow" $ do
-  Spec.it s "CR 107.4h a Snow-Covered Mountain's mana pays {S}, and Icehide Golem resolves" $ do
-    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
-    icehideGolem <- S.printingOf s registry "Icehide Golem"
-    let after = resolvedCreature snowMountain icehideGolem 1
-    Spec.assertEqWith s "the Golem is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Icehide Golem") S.alice after) 1
-    Spec.assertEqWith s "the Snow-Covered Mountain paid for it" (S.tappedCount S.alice after) 1
-    Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
-
   -- The negative half, and it must fail for the RIGHT reason: the board is a
   -- mana source, it is untapped, and it produces exactly the red mana the snow
   -- one does. CR 205.4g's supertype is the only difference, and CR 107.4h asks
@@ -407,18 +397,6 @@ snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
       (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.OfType ManaType.Colorless]) board)
       "but {C} is"
 
-  -- The gameplay-level proof (design.md section 4): a real spell cast end to end
-  -- off the one synthetic permanent. Liquimetal Coating is a plain {2} Artifact,
-  -- so the two mana CR 106.11 produced are the whole of what pays for it.
-  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Synthetic Snow Symbol" $ do
-    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
-    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
-    let resolved = castOffBoard S.identityAnswer [snowSymbol] liquimetalCoating
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
-    Spec.assertEqWith s "the land is tapped" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
-
 -- alice controls `n` copies of `first` and `m` copies of `second`, and nothing
 -- else. Both are lands in every caller, but nothing here requires it.
 mixedLands :: Printing.Printing -> Printing.Printing -> Int -> Int -> GameState.GameState
@@ -473,54 +451,6 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     Spec.assertBool s (not (fst (S.runPureWith S.identityAnswer gs (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice cost)))) "and paying fails"
     Spec.assertEqWith s "two {R/G} alone WOULD be payable from them" (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs) True
 
-  Spec.it s "CR 107.4e whole card: Burning-Tree Emissary casts off RR, GG, or RG" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
-    let castOff reds greens =
-          let (gs, spellId) = S.handOne burningTreeEmissary (mixedLands mountain forest reds greens)
-              cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-           in length (GameState.stack cast)
-    Spec.assertEqWith s "two Mountains" (castOff 2 0) 1
-    Spec.assertEqWith s "two Forests" (castOff 0 2) 1
-    Spec.assertEqWith s "one of each" (castOff 1 1) 1
-    Spec.assertEqWith s "one land is not enough" (castOff 1 0) 0
-
-  -- CR 601.2b's announcement for CR 107.4e's COLOUR/COLOUR half, and the board
-  -- that makes the answer observable. Gyre Engineer ("{T}: Add {G}{U}") is the
-  -- oversupply: one activation puts BOTH of {G/U}'s halves in the pool, so
-  -- Slippery Bogle ({G/U}) spends one and floats the other. Which one floats is
-  -- the announcement, and Llanowar Elves ({G}) in hand is what reads it -- with
-  -- the Engineer tapped there is no other source, so the Elves are castable
-  -- exactly when the Bogle took the BLUE half.
-  --
-  -- Asserting the BOARD and not merely the prompt: a prompt whose answer
-  -- changed nothing would satisfy the transcript legs alone.
-  Spec.it s "CR 601.2b whichever half of {G/U} is announced, the OTHER floats" $ do
-    gyreEngineer <- S.printingOf s registry "Gyre Engineer"
-    slipperyBogle <- S.printingOf s registry "Slippery Bogle"
-    llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    let (_, board) = S.addPermanent gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
-        (withBogle, bogleId) = S.handOne slipperyBogle board
-        (elvesId, gs) = S.addHandCard llanowarElves S.alice withBogle
-        -- Resolved, not merely cast: the Elves are a creature spell, and CR
-        -- 302.1 lets one be cast only "during a main phase of their turn when
-        -- the stack is empty", so the Bogle has to leave the stack before the
-        -- mana that floated is any use to them.
-        castWith half =
-          let ((_, cast), asked) = Replay.record (announcesHalf half) gs (S.cast S.alice bogleId)
-           in (asked, cast, snd (S.runPureWith (announcesHalf half) cast Stack.resolveTop))
-        (askedGreen, castGreen, afterGreen) = castWith greenMana
-        (askedBlue, castBlue, afterBlue) = castWith blueMana
-    Spec.assertEqWith s "the green half was announced" (halfAnnouncements askedGreen) [greenMana]
-    Spec.assertEqWith s "the blue half was announced" (halfAnnouncements askedBlue) [blueMana]
-    Spec.assertEqWith s "both casts reached the stack" (length (GameState.stack castGreen), length (GameState.stack castBlue)) (1, 1)
-    Spec.assertEqWith s "and both Bogles resolved" (length (GameState.stack afterGreen), length (GameState.stack afterBlue)) (0, 0)
-    Spec.assertEqWith s "green paid, so BLUE floats" (poolTypes S.alice afterGreen) [blueMana]
-    Spec.assertEqWith s "blue paid, so GREEN floats" (poolTypes S.alice afterBlue) [greenMana]
-    Spec.assertBool s (S.castable S.alice elvesId afterBlue) "the floating {G} casts Llanowar Elves"
-    Spec.assertBool s (not (S.castable S.alice elvesId afterGreen)) "the floating {U} does not"
-
   Spec.it s "CR 107.4e a hybrid symbol is ALL of its component colours" $ do
     burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
     let (oid, gs) = S.addPermanent burningTreeEmissary S.alice (Setup.emptyGame S.bothPlayers)
@@ -533,10 +463,6 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
 greenMana, blueMana :: ManaType.ManaType
 greenMana = ManaType.Colored Color.Green
 blueMana = ManaType.Colored Color.Blue
-
-redMana, whiteMana :: ManaType.ManaType
-redMana = ManaType.Colored Color.Red
-whiteMana = ManaType.Colored Color.White
 
 -- The `announces` shape for CR 107.4e's COLOUR/COLOUR hybrid: answers
 -- Prompt.AnnounceHybridHalf with `half` whenever it is on offer, and defers
@@ -555,80 +481,6 @@ halfAnnouncements responses =
         Response.AnnouncedHybridHalf half -> Just half
         _ -> Nothing
    in Maybe.mapMaybe announcement responses
-
--- CR 118.13b: "If a cost paid during the resolution of a spell or ability
--- contains a mana symbol that can be paid in multiple ways, the player paying
--- that cost chooses how to pay for that symbol immediately before they pay that
--- cost." The moment CR 118.13a's two announcements do not cover, reached through
--- Pawl.Engine.Resolve.Effect.payGatePaidBy rather than through a cast or an activation.
---
--- Shu Yun, the Silent Tempest, {2}{U} 3/2 with prowess and "Whenever you cast a
--- noncreature spell, you may pay {R/W}{R/W}. If you do, target creature gains
--- double strike until end of turn." The "you may pay ... if you do" is CR
--- 118.12's pay gate, so the cost is paid while the TRIGGER resolves, and its two
--- {R/W} are CR 107.4e symbols payable two ways each.
---
--- Synthetic Speed Boost, a {0} sorcery, is the noncreature spell that fires the
--- trigger: it costs no mana, so the four lands below are all still untapped when
--- the gate is offered. Prowess fires off the same cast and changes nothing here.
---
--- Two Mountains and two Plains, and the SAME source answers on both legs -- the
--- head of every Prompt.ChooseManaSource, which is a Mountain while one is
--- untapped -- so the only difference between the legs is which half the payer
--- announced. Announcing red is paid by the two Mountains and the window closes;
--- announcing white leaves the cost uncovered until both Plains are down, and the
--- {R}{R} already in the pool is then what floats. Lightning Bolt in hand reads
--- it: with every land tapped, the floating red is the only thing that could pay
--- for it.
---
--- Mutate the announcement away and the cost stays {R/W}{R/W}, which the two
--- Mountains cover on either leg: the pool is empty both times and the Bolt is
--- castable neither time, so the first assertion below is the one that reddens.
-shuYunSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-shuYunSpec s registry = Spec.describe s "Shu Yun, the Silent Tempest" $ do
-  Spec.it s "CR 118.13b the half announced as the trigger resolves is the mana that resolution spends" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    shuYun <- S.printingOf s registry "Shu Yun, the Silent Tempest"
-    boost <- S.printingOf s registry "Synthetic Speed Boost"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let lands = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (shuYunId, withShuYun) = S.addPermanent shuYun S.alice lands
-        (boostId, withBoost) = S.addHandCard boost S.alice withShuYun
-        (boltId, withBolt) = S.addHandCard bolt S.alice withBoost
-        board =
-          withBolt
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        -- Pays the gate, announces `half` wherever it is on offer, and aims the
-        -- trigger at Shu Yun itself. Everything else is S.identityAnswer, whose
-        -- Prompt.ChooseManaSource answer is the head candidate.
-        answering :: ManaType.ManaType -> Prompt.Prompt r -> r
-        answering half p = case p of
-          Prompt.ChooseToPay {} -> PaymentDecision.Pays
-          Prompt.AnnounceHybridHalf _ _ _ _ offers ->
-            if elem half (NonEmpty.toList offers) then half else NonEmpty.head offers
-          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just shuYunId) . Recipient.objectOf) legal) sets
-          _ -> S.identityAnswer p
-        -- Cast, then let the step's priority round put both triggers on the
-        -- stack and resolve them. NOT a step advance: CR 500.5 empties the pool
-        -- as a step ends, and the pool is what the assertions read.
-        legOf half = S.runPure (answering half) (S.runPure (answering half) board (S.cast S.alice boostId)) Engine.priorityLoop
-        redLeg = legOf redMana
-        whiteLeg = legOf whiteMana
-    -- THE assertion, and the one the announcement decides: what the payment left
-    -- behind, read as a cast the player can now make.
-    Spec.assertBool s (S.castable S.alice boltId whiteLeg) "white was announced, so the unspent {R}{R} floats and pays for Lightning Bolt"
-    Spec.assertBool s (not (S.castable S.alice boltId redLeg)) "red was announced, so it was spent and the two untapped Plains cannot pay for it"
-    -- The gate was paid on BOTH legs, so the difference above is the announcement
-    -- and not one leg failing to pay at all.
-    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike shuYunId redLeg) "the red route paid, so CR 118.12's IfPaid branch ran"
-    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike shuYunId whiteLeg) "and the white route paid too"
-    Spec.assertEqWith s "the red route closed the window with the two Mountains down" (S.tappedCount S.alice redLeg) 2
-    Spec.assertEqWith s "the white route kept tapping until both Plains were down" (S.tappedCount S.alice whiteLeg) 4
-    Spec.assertEqWith s "and what floats is exactly the red the white route did not spend" (poolTypes S.alice whiteLeg) [redMana, redMana]
 
 twoOrRed :: ManaSymbol.ManaSymbol
 twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
@@ -680,14 +532,6 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     Spec.assertEqWith s "and only three of them are tapped" (S.tappedCount S.alice after) 3
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
 
-  -- The generic route, with no red mana anywhere on the board.
-  Spec.it s "CR 107.4e whole card: Flame Javelin casts off six Islands, two generic per symbol" $ do
-    island <- S.printingOf s registry "Island"
-    flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let gs = S.landsInPlay island 6
-    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice javelinCost gs) "canPay says yes"
-    Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
-
   -- THE discriminating negative. Five Islands is one short of the {6} the
   -- all-generic route needs, and a payment path that charged one mana per
   -- {2/R} would call three of them sufficient, let alone five.
@@ -714,22 +558,6 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     -- One short of {R}{4} and one red short of {R}{R}{2}: four mana with
     -- only one red pays no route at all.
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice cost (mixedLands mountain island 1 3))) "one Mountain and three Islands: no route"
-
-  -- The gameplay-level proof (design.md section 4): the whole card, cast
-  -- and resolved off the all-generic route, doing what it says.
-  Spec.it s "CR 107.4e Flame Javelin cast off six Islands resolves for 4 damage" $ do
-    island <- S.printingOf s registry "Island"
-    flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let (g, spellId) = S.handOne flameJavelin (S.landsInPlay island 6)
-        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "every Island tapped" (S.tappedCount S.alice resolved) 6
-    Spec.assertEqWith s "nothing left floating" (poolSize S.alice resolved) 0
-    -- S.identityAnswer takes the least Recipient on offer, which with no
-    -- creatures anywhere is alice herself. Who it hits is the answer's
-    -- business; that it hits for 4 is the card's.
-    Spec.assertEqWith s "4 damage to the chosen target" (S.lifeOf S.alice resolved) (Just 16)
 
   -- What CR 118.13a's announcement leaves behind. Both halves are payable
   -- out of this pool and they leave DIFFERENT pools behind, so the choice
@@ -822,43 +650,6 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     Spec.assertEqWith s "no choice existed, so none was asked" (hybridAnnouncements asked) []
     Spec.assertEqWith s "the Javelin resolved" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "off all three Mountains" (S.tappedCount S.alice resolved) 3
-
-  -- CR 601.2b names the nonhybrid equivalent cost, and CR 601.2f totals
-  -- THAT minus every reduction: announced as {2}{2}{2} the Javelin is
-  -- {6}, which Baral takes to {5}. The castability gate asks the same
-  -- question over the same completions, so a Javelin payable only through
-  -- the reduced generic route is offered -- and the reduction the gate
-  -- sees is the one the payment takes. Flame Javelin's own ruling is that
-  -- side of it: a generic cost reduction applies to a monocolored hybrid
-  -- only where the announced payment includes generic mana.
-  Spec.it s "CR 601.2f Baral's reduction reaches the castability gate for a {2/R}" $ do
-    island <- S.printingOf s registry "Island"
-    baral <- S.printingOf s registry "Baral, Chief of Compliance"
-    flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let withBaral n = S.handOne flameJavelin (snd (S.addPermanent baral S.alice (S.landsInPlay island n)))
-        (four, fourId) = withBaral 4
-        (five, fiveId) = withBaral 5
-        (six, sixId) = withBaral 6
-    Spec.assertBool s (S.castable S.alice fiveId five) "five Islands: offered, since CR 601.2f's total is {5}"
-    -- The gate is EXACT and not merely looser: the cast it admits
-    -- completes, and it completes off all five Islands and no more.
-    let (_, offFive) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) five fiveId
-    Spec.assertEqWith s "and the Javelin resolved" (length (GameState.stack offFive)) 0
-    Spec.assertEqWith s "off exactly five Islands" (S.tappedCount S.alice offFive) 5
-    -- The discriminating negative on the same axis. One Island fewer and
-    -- {5} is out of reach through EVERY completion -- {6} through the
-    -- generic route, {2}{2}{R} and its siblings through the typed ones,
-    -- none of which four Islands pay -- so the gate still refuses, and the
-    -- attempted cast still puts nothing on the stack.
-    Spec.assertBool s (not (S.castable S.alice fourId four)) "four Islands: still refused, since CR 601.2f's total is {5}"
-    let (_, offFour) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) four fourId
-    Spec.assertEqWith s "and nothing was cast" (length (GameState.stack offFour)) 0
-    -- The control, and it is what makes the legs above about the
-    -- reduction rather than about the board: one more Island and the cast
-    -- still pays FIVE, leaving the sixth untapped.
-    Spec.assertBool s (S.castable S.alice sixId six) "six Islands: offered"
-    let (_, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) six sixId
-    Spec.assertEqWith s "and only five of the six are tapped" (S.tappedCount S.alice resolved) 5
 
   -- CR 107.4e's last sentence, as CR 202.2d restates it for the whole
   -- object: a monocolored hybrid's other component is generic mana, which
@@ -1015,38 +806,6 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertBool s (not failed) "at 1 the payment fails"
     Spec.assertEqWith s "and CR 601.2h leaves the life total alone" (S.lifeOf S.alice unchanged) (Just 1)
 
-  -- The gameplay-level proof (design.md section 4), mana route: the whole
-  -- card, cast off one Forest and resolved. Goblin Piker is 2/1, so +2/+2 is
-  -- 4/3.
-  Spec.it s "CR 107.4f whole card: Mutagenic Growth casts off one Forest for +2/+2" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
-        (g, spellId) = S.handOne mutagenicGrowth withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
-    Spec.assertEqWith s "toughness" (Projection.toughnessOf pikerId resolved) (Just 3)
-    Spec.assertEqWith s "the Forest paid for it" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "so no life was" (S.lifeOf S.alice resolved) (Just 20)
-
-  -- The same card with NO lands anywhere. Castability has to see the life
-  -- route or this never reaches the stack at all.
-  Spec.it s "CR 107.4f whole card: Mutagenic Growth casts with no mana at all, for 2 life" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (pikerId, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-        (g, spellId) = S.handOne mutagenicGrowth withPiker
-    Spec.assertBool s (S.castable S.alice spellId g) "castable with an empty battlefield but for the Piker"
-    let cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
-    Spec.assertEqWith s "toughness" (Projection.toughnessOf pikerId resolved) (Just 3)
-    Spec.assertEqWith s "exactly 2 life paid" (S.lifeOf S.alice resolved) (Just 18)
-
   -- THE discriminating negative: neither route open. One life short, and no
   -- green mana on the board.
   Spec.it s "CR 119.4 Mutagenic Growth is uncastable at 1 life with no green mana" $ do
@@ -1074,20 +833,6 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let (oid, gs) = S.addPermanent mutagenicGrowth S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "green, not colourless" (Projection.colorsOf oid gs) (Set.singleton Color.Green)
-
-  -- And the colour survives the route that produces no green mana at all --
-  -- the reading that would call the card colourless is exactly the one a
-  -- life-paid cast tempts.
-  Spec.it s "CR 202.2d Mutagenic Growth is green on the stack even when 2 life paid for it" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (_, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-        (g, spellId) = S.handOne mutagenicGrowth withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
-    Spec.assertEqWith s "2 life paid, no green mana ever made" (S.lifeOf S.alice cast) (Just 18)
-    case GameState.stack cast of
-      [sid] -> Spec.assertEqWith s "and the spell is still green" (Projection.colorsOf sid cast) (Set.singleton Color.Green)
-      _ -> Spec.assertFailure s "expected exactly one spell on the stack"
 
   -- Mana.resolutions' SORT, pinned -- the least-life rule has to hold across
   -- symbols and not merely within one, and the per-symbol product alone does
@@ -1788,7 +1533,6 @@ castAndResolveRecording answer gs oid =
 -- Pay the {G/U/P} with life, and answer the CR 616.1e race by SOURCE -- Doubling
 -- Season's row names the enchantment, compleated's names Tamiyo -- so the
 -- assertion does not rest on the engine's canonical candidate order.
--- Pawl.DamageReplacementSpec.raceIsSelf is the same idiom.
 racesCompleated :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 racesCompleated wantCompleated seasonId p = case p of
   Prompt.ChooseReplacement _ _ entries ->
@@ -2293,7 +2037,6 @@ treasureIn gs =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   hybridSpec s registry
-  shuYunSpec s registry
   monocoloredHybridSpec s registry
   phyrexianSpec s registry
   totalCostSpec s registry

@@ -1,0 +1,91 @@
+{
+  "description": "CR 119.8 alice's Platinum Emperion makes Greed's cost unpayable",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Greed",
+            "ready": true
+          },
+          {
+            "card": "Platinum Emperion",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "final": [
+    {
+      "Life": {
+        "player": "alice",
+        "life": 20.0
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Hand",
+        "is": []
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Swamp",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Swamp#2",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Greed",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Platinum Emperion",
+        "tapped": false
+      }
+    }
+  ],
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility Swamp"
+          ]
+        }
+      }
+    }
+  ]
+}

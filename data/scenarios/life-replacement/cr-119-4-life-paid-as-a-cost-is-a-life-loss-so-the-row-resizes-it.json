@@ -1,0 +1,159 @@
+{
+  "description": "CR 119.4 life paid as a cost is a life loss, so the row resizes it",
+  "note": "One board, both payments: alice pays Greed's 2 life first and loses exactly 2 (she is not her own opponent), then bob, alice's opponent on alice's turn, pays 2 and loses 4 under alice's Bloodletter while alice stays at 18.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bloodletter of Aclazotz",
+            "ready": true
+          },
+          {
+            "card": "Greed",
+            "label": "agreed",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "as1",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "as2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "as3",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Greed",
+            "label": "bgreed",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "bs1",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "bs2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "bs3",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$agreed",
+          "mana": [
+            "$as1",
+            "$as2",
+            "$as3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 18
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$bgreed",
+          "mana": [
+            "$bs1",
+            "$bs2",
+            "$bs3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 16
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 18
+        }
+      }
+    }
+  ]
+}

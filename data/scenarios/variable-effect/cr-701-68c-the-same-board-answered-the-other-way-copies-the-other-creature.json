@@ -1,0 +1,172 @@
+{
+  "description": "CR 701.68c the same board answered the other way copies the other creature",
+  "note": "The Haskell board turns Grub to its back face by a direct transform; here alice starts in her upkeep with a Mountain and pays {R} to Grub, Storied Matriarch's first-main-phase trigger, so Grub, Notorious Auntie is what attacks (its Names check is that setup). Grub and Sinister Gnarlbark attack; alice takes Grub's may and blights her Sinister Gnarlbark, so the one token on her battlefield is a Gnarlbark copy and only the Gnarlbark has a -1/-1 counter.",
+  "board": {
+    "active": "alice",
+    "step": "Upkeep",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Grub, Storied Matriarch",
+            "label": "grub",
+            "ready": true
+          },
+          {
+            "card": "Wall of Stone",
+            "label": "wall",
+            "ready": true
+          },
+          {
+            "card": "Sinister Gnarlbark",
+            "label": "gnarlbark",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "source": "$grub",
+      "do": {
+        "ChooseToPay": {
+          "decision": {
+            "type": "Pays"
+          },
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$grub",
+          "$gnarlbark"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$grub",
+      "do": {
+        "ChooseOptional": {
+          "type": "Exercises"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseBlight",
+          "with": "$gnarlbark"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$grub",
+          "names": [
+            "Grub, Notorious Auntie"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Battlefield",
+          "is": [
+            "$grub",
+            "$wall",
+            "$gnarlbark",
+            "$mountain",
+            "Sinister Gnarlbark#2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "Sinister Gnarlbark#2",
+          "names": [
+            "Sinister Gnarlbark"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$wall",
+          "kind": {
+            "type": "MinusOneMinusOne"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$gnarlbark",
+          "kind": {
+            "type": "MinusOneMinusOne"
+          },
+          "count": 1
+        }
+      }
+    }
+  ]
+}

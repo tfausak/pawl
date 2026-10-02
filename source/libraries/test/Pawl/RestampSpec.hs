@@ -14,22 +14,18 @@
 -- reaches the same function and no board can observe it -- see the note on
 -- restampOrderSpec. Objects ENTERING together are Restamp.settle's, driven on
 -- Replenish's MoveToZone road by the data/scenarios/restamp/ files and on the token road by
--- tokenOrderSpec, on Mirror Match's CR 608.2f loop by
+-- its Rite of Replication files, on Mirror Match's CR 608.2f loop by
 -- cr-613-7m-608-2f-the-controller-orders-every-token-one-loop.json,
 -- and on Ornate Imitations' conjure loop by conjuredOrderSpec.
 module Pawl.RestampSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Interpreter as Interpreter
@@ -38,32 +34,24 @@ import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Asked as Asked
-import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Combat as Combat.Type
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
   restampOrderSpec s registry
   apnapOrderSpec s registry
-  tokenOrderSpec s registry
   conjuredOrderSpec s registry
-  mirrorMatchSiblingSpec s registry
 
 -- | The producer is a synthetic pair, and no printing reaches the rule; see
 -- #2571 for the search behind that. Observing which of two simultaneous CR
@@ -216,70 +204,6 @@ orderPrompts gs =
 faceNames :: [ObjectId.ObjectId] -> GameState.GameState -> [Maybe String]
 faceNames oids gs = fmap (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) oids
 
--- The battlefield permanents printed as this card.
-onField :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
-onField printing gs = filter (\oid -> Game.cardOf oid gs == Just (Printing.card printing)) (Set.toList (GameState.battlefield gs))
-
--- | CR 613.7m on the TOKEN road (Event.createTokens' Restamp.settle). Kicked Rite
--- of Replication makes five token copies of a Clone that copied nothing, so each
--- token makes its own CR 707.5 copy choice as it enters. The first copies
--- Harmonious Archon and the other four copy Godhead of Awe, so the tokens write
--- a Hill Giant's base P/T in layer 7b -- 3/3 or 1/1 -- and the later stamp wins.
--- The printed Archon and Godhead are older than every token, so their own
--- writes come first either way.
-tokenOrderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-tokenOrderSpec s registry =
-  Spec.describe s "Tokens" $ do
-    Spec.it s "CR 613.7m the seat's own answer decides which simultaneous token is stamped later" $ do
-      (board, cloneId, archonId, godheadId, giantId) <- replicationBoard s registry
-      let (after, asked) = replicate5 True cloneId archonId godheadId board
-          (canonical, _) = replicate5 False cloneId archonId godheadId board
-      Spec.assertEqWith s "CR 613.7m the Archon copy was stamped last, so the Giant is 3/3" (S.powerToughnessOf giantId after) (Just (3, 3))
-      Spec.assertEqWith s "while the arrival order leaves a Godhead copy last, so the Giant is 1/1" (S.powerToughnessOf giantId canonical) (Just (1, 1))
-      Spec.assertEqWith s "and alice was asked once, over all five tokens" asked [(S.alice, 5)]
-
--- alice holds Rite of Replication and the nine Islands its kicked cost wants, and
--- controls a Clone that copied nothing -- kept alive past CR 704.5f by a +1/+1
--- counter -- a Harmonious Archon, a Godhead of Awe and a Hill Giant.
-replicationBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
-replicationBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  clone <- S.printingOf s registry "Clone"
-  archon <- S.printingOf s registry "Harmonious Archon"
-  godhead <- S.printingOf s registry "Godhead of Awe"
-  giant <- S.printingOf s registry "Hill Giant"
-  rite <- S.printingOf s registry "Rite of Replication"
-  let (cloneId, g1) = S.addPermanent clone S.alice (S.landsInPlay island 9)
-      g2 = S.addCounter CounterKind.PlusOnePlusOne 1 cloneId g1
-      (archonId, g3) = S.addPermanent archon S.alice g2
-      (godheadId, g4) = S.addPermanent godhead S.alice g3
-      (giantId, g5) = S.addPermanent giant S.alice g4
-      (g6, _) = S.handOne rite g5
-  pure (g6, cloneId, archonId, godheadId, giantId)
-
--- Cast the Rite kicked at the Clone and resolve it. The FIRST copy choice asked
--- takes the Archon and every later one the Godhead, threaded through State so the
--- five structurally identical prompts can be answered apart. `reversing` answers
--- CR 613.7m's order with the reverse of the offered indices. Hands back the board
--- and who was asked the order, over how many.
-replicate5 :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [(PlayerId.PlayerId, Int)])
-replicate5 reversing cloneId archonId godheadId gs =
-  let answer :: Prompt.Prompt r -> State.State (Int, [(PlayerId.PlayerId, Int)]) r
-      answer p = case p of
-        Prompt.ChooseKicker {} -> pure (KickerDecision.MkKickerDecision 1)
-        Prompt.ChooseTargets _ _ _ sets -> pure (Map.map (const (Set.singleton (Recipient.ToCreature cloneId))) sets)
-        Prompt.ChooseCopyTarget {} -> do
-          (n, seen) <- State.get
-          State.put (n + 1, seen)
-          pure (Just (if n == 0 then archonId else godheadId))
-        Prompt.OrderTimestamps _ pid batch -> do
-          State.modify (\(n, seen) -> (n, seen <> [(pid, length batch)]))
-          pure (if reversing then reverse (zipWith const [0 ..] batch) else zipWith const [0 ..] batch)
-        _ -> pure (S.identityAnswer p)
-      spell = lastInHand gs
-      ((_, after), (_, asked)) = State.runState (Engine.runGame answer gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) (0, [])
-   in (after, asked)
-
 -- | CR 613.7m over a conjure: Ornate Imitations ({X}{G}{U} Sorcery, "For each
 -- number between 1 and X, conjure a duplicate of a random creature card with
 -- that mana value onto the battlefield. X can't be 0."), Oracle text verified on
@@ -291,16 +215,9 @@ replicate5 reversing cloneId archonId godheadId gs =
 -- two write base P/T in layer 7b (1/1 and 3/3), and bob's Goblin Piker (2/1)
 -- reads whichever is later. The Godhead is conjured first, so the arrival order
 -- stamps the Archon later; the two boards differ only in alice's answer.
-conjuredOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conjuredOrderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 conjuredOrderSpec s registry =
   Spec.describe s "Conjure" $ do
-    Spec.it s "CR 613.7m / 608.2f the controller orders every card one conjure loop made" $ do
-      (board, pikerId, fixture) <- ornateBoard s registry ["Godhead of Awe", "Harmonious Archon"] False
-      let (after, asked) = ornateImitations fixture (Just [1, 0]) board
-          (canonical, _) = ornateImitations fixture Nothing board
-      Spec.assertEqWith s "CR 613.7m alice stamped the Godhead last, so bob's Goblin Piker is 1/1" (S.powerToughnessOf pikerId after) (Just (1, 1))
-      Spec.assertEqWith s "while the arrival order leaves the Archon last, so it is 3/3" (S.powerToughnessOf pikerId canonical) (Just (3, 3))
-      Spec.assertEqWith s "and alice was asked once, over both cards" asked [(S.alice, 2)]
     -- CR 614.12 over the same loop: Tayam, Luminous Enigma (mana value 4, "Each
     -- other creature you control enters with an additional vigilance counter on
     -- it.") is conjured at 4 and the Godhead at 5. Entering at the same moment,
@@ -361,41 +278,3 @@ ornateImitations fixture permutation gs =
         [] -> ObjectId.MkObjectId 0
       ((_, after), asked) = State.runState (Engine.runGameAsked (Interpreter.lookingUpCards fixture answer) gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) []
    in (after, asked)
-
--- | CR 614.12 over Mirror Match's CR 608.2f loop: alice attacks bob with Tayam,
--- Luminous Enigma and a Goblin Piker, and bob's Mirror Match makes a token copy
--- of each. The tokens enter at one moment, so bob's Tayam token gives bob's
--- Piker token no vigilance counter, whichever member the loop takes first. Both
--- orders are answered, since the one that takes Tayam first is the one a
--- per-call sibling set gets wrong.
-mirrorMatchSiblingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-mirrorMatchSiblingSpec s registry =
-  Spec.describe s "ForEach" $ do
-    Spec.it s "CR 614.12 / 608.2f a token one loop made later enters beside the earlier ones, not after them" $ do
-      island <- S.printingOf s registry "Island"
-      tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
-      piker <- S.printingOf s registry "Goblin Piker"
-      mirror <- S.printingOf s registry "Mirror Match"
-      let (tayamId, g1) = S.addPermanent tayam S.alice (S.landsFor island S.bob 6 (Setup.emptyGame S.bothPlayers))
-          (pikerId, g2) = S.addPermanent piker S.alice g1
-          (_, g3) = S.addHandCard mirror S.bob g2
-          attacking = Map.fromList [(tayamId, AttackTarget.OfPlayer S.bob), (pikerId, AttackTarget.OfPlayer S.bob)]
-          board =
-            g3
-              { GameState.activePlayer = S.alice,
-                GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
-                GameState.priority = Just S.bob,
-                GameState.combat = Combat.emptyCombat {Combat.Type.attackers = attacking, Combat.Type.defenders = [S.bob]}
-              }
-          run reversed =
-            let answer :: Prompt.Prompt r -> State.State () r
-                answer p = case p of
-                  Prompt.OrderForEach _ _ _ members -> pure ((if reversed then reverse else id) (zipWith const [0 ..] members))
-                  _ -> pure (S.identityAnswer p)
-                spell = case Game.zoneMembers Zone.Hand S.bob board of
-                  oid : _ -> oid
-                  [] -> ObjectId.MkObjectId 0
-             in snd (fst (State.runState (Engine.runGame answer board (S.cast S.bob spell >> Stack.resolveTop >> Engine.settleForPriority)) ()))
-          pikerTokens g = filter (\oid -> Projection.controllerOf oid g == Just S.bob) (Scenario.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) g)
-          vigilance g = fmap (\oid -> S.counterOf (CounterKind.Keyword Keyword.Vigilance) oid g) (pikerTokens g)
-      Spec.assertEqWith s "CR 614.12 in either order, bob's Piker token entered beside his Tayam token and has no vigilance counter" (vigilance (run False), vigilance (run True)) ([0], [0])

@@ -1,0 +1,167 @@
+{
+  "description": "CR 404.3 the top card is the one the owner's own arrangement put there",
+  "note": "The Haskell test applies a bare surveil 2; here Izoni, Center of the Web's \"Sacrifice four tokens: Surveil 2, then draw two cards\" supplies it, so no spell card lands on the graveyard above the surveilled pair. Two Islands stocked between the pair and the Benalish Hero feed its draw, so the piles end as the test's do. The control file names the surveilled cards in the other order.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Soldevi Digger",
+            "label": "digger"
+          },
+          {
+            "card": "Izoni, Center of the Web",
+            "label": "izoni"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "t1",
+            "token": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "t2",
+            "token": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "t3",
+            "token": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "t4",
+            "token": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          },
+          {
+            "card": "Bird Maiden",
+            "label": "maiden"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Benalish Hero"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Ogre Sentry"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$izoni",
+          "mana": [
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseSurveil",
+          "with": [
+            [
+              "$maiden",
+              "$piker"
+            ],
+            []
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$digger",
+          "mana": [
+            "$p1",
+            "$p2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": [
+            "Bird Maiden"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Library",
+          "is": [
+            "Benalish Hero",
+            "Goblin Piker"
+          ]
+        }
+      }
+    }
+  ]
+}

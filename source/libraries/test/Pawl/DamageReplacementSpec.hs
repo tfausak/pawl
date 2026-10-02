@@ -14,16 +14,13 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
-import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -31,10 +28,9 @@ import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
-import Pawl.LifeReplacementSpec (aimCreatureAndOrder, castDeflection, castDisaster, deflectionCombat, winTheFlipAndOrder)
-import Pawl.PreventionSpec (aimAndChoose, aimCreature, aimPlayer, answersFor, atLife, attackNoBlock, bobAttacks, castAndResolve, chosenSourcesIn, countersOn, onlyCreature, preventAllRows, preventionsRecorded, riderHits, settleDamage, shieldsLeft, theAbility, wasAskedToAllocateDamage, wasAskedToOrderDamage)
+import Pawl.LifeReplacementSpec (castDeflection, deflectionCombat)
+import Pawl.PreventionSpec (aimAndChoose, aimCreature, aimPlayer, answersFor, atLife, attackNoBlock, bobAttacks, castAndResolve, countersOn, onlyCreature, preventAllRows, preventionsRecorded, riderHits, settleDamage, shieldsLeft, theAbility, wasAskedToAllocateDamage)
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action
@@ -43,10 +39,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -57,25 +50,18 @@ import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
-import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -104,7 +90,7 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- The numbers are all distinct -- shield 3, 5 at alice, 2 at her creature, 5 back
 -- at the attacker -- so no two readings of the rule land on the same board.
-divineDeflectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+divineDeflectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)" $ do
   -- THE case. One shield of 3 against 5 aimed at alice and 2 aimed at her
   -- creature, in one combat damage batch: a shield per recipient would prevent
@@ -172,237 +158,6 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- Ordered last on purpose, since a row count sitting first absorbs every
     -- mutation of the arm that builds the rows and reports itself instead.
     Spec.assertEqWith s "and the resolution installed ONE shield, holding 3" (shieldsLeft shielded) [3]
-  -- The other half of collapsing a batch to one record: a trigger scoped to ONE
-  -- of the recipients still reads its own share. Selfless Squire ({3}{W} Creature
-  -- -- Human Soldier 1/1, "Whenever damage that would be dealt to you is
-  -- prevented, put that many +1/+1 counters on this creature") is that trigger,
-  -- and Divine Deflection's shield is the one in data/cards/ that can span a
-  -- player and a permanent at once, so this pair is the only board in the pool
-  -- where "that many" and "the whole application" differ.
-  --
-  -- The Squire is put onto the battlefield DIRECTLY, so its own enters trigger
-  -- never installs a second shield to confuse the two: the only prevention here
-  -- is the Deflection's.
-  --
-  -- The allocation is the creature's 2 first and alice's last 1 second, so her
-  -- share is 1 of the 3 -- distinct from the total, from the 2 the creature took
-  -- and from the 5 aimed at her, so no two readings land on the same board.
-  Spec.it s "CR 615.13 a trigger scoped to one recipient reads its own share of the application" $ do
-    plains <- S.printingOf s registry "Plains"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    piker <- S.printingOf s registry "Goblin Piker"
-    deflection <- S.printingOf s registry "Divine Deflection"
-    squirePrinting <- S.printingOf s registry "Selfless Squire"
-    let base = S.landsInPlay plains 4
-        (mine, g1) = S.addPermanent jedit S.alice base
-        (squire, g2) = S.addPermanent squirePrinting S.alice g1
-        (_, g3) = S.addPermanent jedit S.bob g2
-        (blocked, g4) = S.addPermanent piker S.bob g3
-        (unshielded, spellId) = S.handOne deflection g4
-        shielded = castAndResolve (castDeflection 3 S.bob) unshielded spellId
-        after = S.runCombat (deflectionCombat mine blocked [Recipient.ToCreature mine, Recipient.ToPlayer S.alice]) (bobAttacks shielded)
-    Spec.assertEqWith s "setup: the Squire is on the battlefield as a 1/1" (S.powerToughnessOf squire shielded) (Just (1, 1))
-    -- The board the counters are read against: the shield stopped 2 on her
-    -- creature and 1 of the 5 aimed at her.
-    Spec.assertEqWith s "the creature's 2 never happens" (S.damageOf mine after) (Just 0)
-    Spec.assertEqWith s "and 1 of alice's 5 is prevented" (S.lifeOf S.alice after) (Just 16)
-    -- The discriminating assertion: HER share, not the application's total. A
-    -- reading that handed the trigger everything the shield stopped would make
-    -- this a 4/4.
-    Spec.assertEqWith s "so the Squire counts alice's 1, not the whole application's 3" (countersOn CounterKind.PlusOnePlusOne squire after) 1
-    Spec.assertEqWith s "leaving the 1/1 a 2/2" (S.powerToughnessOf squire after) (Just (2, 2))
-  -- CR 608.2f: one instruction naming objects AND players is ONE action, so its
-  -- damage is one batch. Molten Disaster ({X}{R}{R} Sorcery, "Kicker {R}. If this
-  -- spell was kicked, it has split second. Molten Disaster deals X damage to each
-  -- creature without flying and each player." -- name, cost, type line and Oracle
-  -- text checked against api.scryfall.com 2026-08-29) is the sentence, written as
-  -- one Effect.DealDamage over two ObjectRefs.
-  --
-  -- The shield above is the only observer in data/cards/ that can tell one batch
-  -- from two: it alone spans a player AND their permanents, so it alone is
-  -- contested by a batch holding both. Two sequential batches spend it on
-  -- whichever ran first and raise no CR 615.7 question at all.
-  --
-  -- Numbers all distinct -- shield 3, X of 2, a 5/5 and a 2/1 -- so no two
-  -- readings land on the same board.
-  Spec.it s "CR 608.2f creatures and players in one sentence are one batch" $ do
-    plains <- S.printingOf s registry "Plains"
-    mountain <- S.printingOf s registry "Mountain"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    piker <- S.printingOf s registry "Goblin Piker"
-    deflection <- S.printingOf s registry "Divine Deflection"
-    disaster <- S.printingOf s registry "Molten Disaster"
-    let base = S.landsFor mountain S.alice 6 (S.landsInPlay plains 4)
-        (mine, g1) = S.addPermanent jedit S.alice base
-        (theirs, g2) = S.addPermanent piker S.bob g1
-        (deflectionId, g3) = S.addHandCard deflection S.alice g2
-        (disasterId, unshielded) = S.addHandCard disaster S.alice g3
-        shielded = castAndResolve (castDeflection 3 S.bob) unshielded deflectionId
-        blast order g = castAndResolve (castDisaster 2 order) g disasterId
-        aliceFirst = blast [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
-        creatureFirst = blast [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
-        control = blast [] unshielded
-    -- THE case. Spending the pool on alice's own 2 first leaves 1 for her
-    -- creature's 2, so 1 is marked. Two batches cannot produce this board: the
-    -- creature half is the sentence's first half and would take the shield whole.
-    Spec.assertEqWith s "spent on alice, 1 of her creature's 2 is dealt" (S.damageOf mine aliceFirst) (Just 1)
-    Spec.assertEqWith s "and all 2 aimed at alice were prevented" (S.lifeOf S.alice aliceFirst) (Just 20)
-    -- The other allocation, which is also what two batches would have produced --
-    -- kept so the pair of boards differs in the answer and in nothing else.
-    Spec.assertEqWith s "spent on her creature instead, its 2 never happens" (S.damageOf mine creatureFirst) (Just 0)
-    Spec.assertEqWith s "and 1 of alice's 2 is dealt" (S.lifeOf S.alice creatureFirst) (Just 19)
-    -- The question itself: two batches leave the shield uncontested in each, so
-    -- nothing is asked.
-    Spec.assertBool
-      s
-      (wasAskedToAllocateDamage (answersFor (castDisaster 2 []) shielded (S.cast S.alice disasterId Monad.>> Stack.resolveTop)))
-      "alice was asked how the one batch's shield is divided"
-    -- The fences. The shield covers alice's side only, so bob and his Piker take
-    -- the whole 2 either way -- and CR 615.5's rider throws back the 3 that was
-    -- prevented, which is one pool's worth however it was allocated.
-    Spec.assertEqWith s "bob takes the disaster's 2 and the rider's 3" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 15, Just 15)
-    Spec.assertEqWith s "and his unshielded creature is marked with the whole 2" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 2, Just 2)
-    Spec.assertEqWith s "and the shield is spent to 0 either way (CR 615.7)" (shieldsLeft aliceFirst, shieldsLeft creatureFirst) ([], [])
-    -- The unshielded board, differing in exactly the shield: alice takes all 2 and
-    -- so does her creature, and bob takes 2 with no rider behind it.
-    Spec.assertEqWith s "without the shield alice takes all 2" (S.lifeOf S.alice control) (Just 18)
-    Spec.assertEqWith s "her creature takes all 2" (S.damageOf mine control) (Just 2)
-    Spec.assertEqWith s "and bob takes 2, there being no rider to run" (S.lifeOf S.bob control) (Just 18)
-  -- CR 608.2f again, over a sentence whose halves deal DIFFERENT amounts. Char
-  -- ({2}{R} Instant, "Char deals 4 damage to any target and 2 damage to you" --
-  -- name, cost, type line and Oracle text checked against api.scryfall.com
-  -- 2026-08-29) is one instruction over two clauses, 4 at the target and 2 at its
-  -- caster, where Molten Disaster's two clauses share one amount.
-  --
-  -- Aimed at alice's OWN creature, so the shield above spans both halves: the
-  -- sentence's whole 6 is dealt to her side at once, and 3 of it is prevented.
-  --
-  -- Written as two instructions -- one amount per instruction, which is what the
-  -- opcode could carry before -- the target's 4 runs first and takes the shield
-  -- whole, which is exactly the creature-first board below. So the alice-first
-  -- board is the one no two-instruction reading can produce.
-  --
-  -- Numbers all distinct -- shield 3, 4 at the creature, 2 at alice, a 5/5 and a
-  -- 2/1 -- so no two readings land on the same board.
-  Spec.it s "CR 608.2f one sentence's differing amounts are one batch" $ do
-    plains <- S.printingOf s registry "Plains"
-    mountain <- S.printingOf s registry "Mountain"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    piker <- S.printingOf s registry "Goblin Piker"
-    deflection <- S.printingOf s registry "Divine Deflection"
-    char <- S.printingOf s registry "Char"
-    let base = S.landsFor mountain S.alice 3 (S.landsInPlay plains 4)
-        (mine, g1) = S.addPermanent jedit S.alice base
-        (theirs, g2) = S.addPermanent piker S.bob g1
-        (deflectionId, g3) = S.addHandCard deflection S.alice g2
-        (charId, unshielded) = S.addHandCard char S.alice g3
-        shielded = castAndResolve (castDeflection 3 S.bob) unshielded deflectionId
-        burn order g = castAndResolve (aimCreatureAndOrder mine order) g charId
-        aliceFirst = burn [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
-        creatureFirst = burn [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
-        control = burn [] unshielded
-    -- THE case. Spending the pool on alice's own 2 first leaves 1 for her
-    -- creature's 4, so 3 is marked. Two instructions cannot produce this board:
-    -- the target's 4 is the sentence's first half and would take the shield
-    -- whole, leaving 1.
-    Spec.assertEqWith s "spent on alice, 3 of her creature's 4 is dealt" (S.damageOf mine aliceFirst) (Just 3)
-    Spec.assertEqWith s "and all 2 aimed at alice were prevented" (S.lifeOf S.alice aliceFirst) (Just 20)
-    -- The other allocation, which is also what two instructions would have
-    -- produced -- kept so the pair of boards differs in the answer and in
-    -- nothing else.
-    Spec.assertEqWith s "spent on her creature instead, only 1 of its 4 is dealt" (S.damageOf mine creatureFirst) (Just 1)
-    Spec.assertEqWith s "and alice takes the whole 2" (S.lifeOf S.alice creatureFirst) (Just 18)
-    -- The question itself: two instructions leave the shield uncontested in each,
-    -- so nothing is asked.
-    Spec.assertBool
-      s
-      (wasAskedToAllocateDamage (answersFor (aimCreatureAndOrder mine []) shielded (S.cast S.alice charId Monad.>> Stack.resolveTop)))
-      "alice was asked how the one batch's shield is divided"
-    -- The fences. Bob's creature is no part of the sentence, and CR 615.5's rider
-    -- throws back the 3 that was prevented, which is one pool's worth however it
-    -- was allocated.
-    Spec.assertEqWith s "the rider deals bob the 3 that was prevented, either way" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 17, Just 17)
-    Spec.assertEqWith s "and bob's creature, named by neither half, is untouched" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 0, Just 0)
-    Spec.assertEqWith s "and the shield is spent to 0 either way (CR 615.7)" (shieldsLeft aliceFirst, shieldsLeft creatureFirst) ([], [])
-    -- The unshielded board, differing in exactly the shield: her creature takes
-    -- all 4, alice takes all 2, and bob takes nothing at all.
-    Spec.assertEqWith s "without the shield her creature takes all 4" (S.damageOf mine control) (Just 4)
-    Spec.assertEqWith s "and alice takes all 2" (S.lifeOf S.alice control) (Just 18)
-    Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
-  -- The same sentence shape on an ACTIVATED ability, and with the halves' amounts
-  -- EQUAL. Brothers of Fire ({1}{R}{R} Creature -- Human Shaman 2/2,
-  -- "{1}{R}{R}: This creature deals 1 damage to any target and 1 damage to you" --
-  -- name, cost, type line, power/toughness and Oracle text checked against
-  -- api.scryfall.com 2026-08-29) was written as two instructions until this
-  -- change, and equal amounts fit one instruction as the opcode already stood.
-  --
-  -- Aimed at alice's own creature again, so the shield spans both halves. The
-  -- discriminator is the PAIR: a shield of 1 spent on alice's own 1 leaves her
-  -- creature's 1 dealt, where two instructions spend it on the target's 1 first
-  -- and leave alice's own dealt instead. Either board marks one damage somewhere,
-  -- so neither reading is told apart by one number alone.
-  Spec.it s "CR 608.2f an ability's two halves are one batch" $ do
-    plains <- S.printingOf s registry "Plains"
-    mountain <- S.printingOf s registry "Mountain"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    deflection <- S.printingOf s registry "Divine Deflection"
-    brothers <- S.printingOf s registry "Brothers of Fire"
-    let base = S.landsFor mountain S.alice 3 (S.landsInPlay plains 2)
-        (mine, g1) = S.addPermanent jedit S.alice base
-        (dealerId, g2) = S.addPermanent brothers S.alice g1
-        (deflectionId, unshielded) = S.addHandCard deflection S.alice g2
-        shielded = castAndResolve (castDeflection 1 S.bob) unshielded deflectionId
-        burn order g = S.runPure (aimCreatureAndOrder mine order) g (Activate.activateAbility S.alice dealerId (theAbility brothers) Monad.>> Stack.resolveTop)
-        aliceFirst = burn [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
-        creatureFirst = burn [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
-        control = burn [] unshielded
-    -- THE case, read as a pair: the shield went on alice's own 1, so her
-    -- creature's 1 is dealt. Two instructions produce the other board, which the
-    -- next assertion is.
-    Spec.assertEqWith s "spent on alice, her creature takes the 1 and she takes none" (S.damageOf mine aliceFirst, S.lifeOf S.alice aliceFirst) (Just 1, Just 20)
-    Spec.assertEqWith s "spent on her creature instead, alice takes the 1" (S.damageOf mine creatureFirst, S.lifeOf S.alice creatureFirst) (Just 0, Just 19)
-    -- The fences: CR 615.5's rider throws back the 1 that was prevented, the
-    -- dealer took none of its own damage, and the unshielded board differs in
-    -- exactly the shield.
-    Spec.assertEqWith s "the rider deals bob the 1 that was prevented, either way" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 19, Just 19)
-    Spec.assertEqWith s "and the dealer itself is untouched" (S.damageOf dealerId aliceFirst, S.damageOf dealerId creatureFirst) (Just 0, Just 0)
-    Spec.assertEqWith s "without the shield both halves land" (S.damageOf mine control, S.lifeOf S.alice control) (Just 1, Just 19)
-    Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
-  -- The mass shape of the same conversion. Winter Sky ({R} Sorcery, "Flip a coin.
-  -- If you win the flip, Winter Sky deals 1 damage to each creature and each
-  -- player. If you lose the flip, each player draws a card." -- name, cost, type
-  -- line and Oracle text checked against api.scryfall.com 2026-08-29) is Molten
-  -- Disaster's sentence at a fixed 1, and was written as two instructions until
-  -- this change. The flip is PINNED to a win, this case being about the damage
-  -- sentence alone.
-  Spec.it s "CR 608.2f creatures and players in a won flip are one batch" $ do
-    plains <- S.printingOf s registry "Plains"
-    mountain <- S.printingOf s registry "Mountain"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    piker <- S.printingOf s registry "Goblin Piker"
-    deflection <- S.printingOf s registry "Divine Deflection"
-    sky <- S.printingOf s registry "Winter Sky"
-    let base = S.landsFor mountain S.alice 1 (S.landsInPlay plains 2)
-        (mine, g1) = S.addPermanent jedit S.alice base
-        (theirs, g2) = S.addPermanent piker S.bob g1
-        (deflectionId, g3) = S.addHandCard deflection S.alice g2
-        (skyId, unshielded) = S.addHandCard sky S.alice g3
-        shielded = castAndResolve (castDeflection 1 S.bob) unshielded deflectionId
-        blast order g = castAndResolve (winTheFlipAndOrder order) g skyId
-        aliceFirst = blast [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
-        creatureFirst = blast [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
-        control = blast [] unshielded
-    -- THE case, the pair again: alice's shield of 1 covers her own 1 and her
-    -- creature's 1, and two instructions would spend it on the creature half the
-    -- sentence writes first.
-    Spec.assertEqWith s "spent on alice, her creature takes the 1 and she takes none" (S.damageOf mine aliceFirst, S.lifeOf S.alice aliceFirst) (Just 1, Just 20)
-    Spec.assertEqWith s "spent on her creature instead, alice takes the 1" (S.damageOf mine creatureFirst, S.lifeOf S.alice creatureFirst) (Just 0, Just 19)
-    -- The fences: the shield covers alice's side only, so bob takes the sorcery's
-    -- 1 plus CR 615.5's rider, and his creature takes the whole 1.
-    Spec.assertEqWith s "bob takes the sorcery's 1 and the rider's 1, either way" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 18, Just 18)
-    Spec.assertEqWith s "and his unshielded creature is marked with the whole 1" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 1, Just 1)
-    Spec.assertEqWith s "without the shield both of alice's halves land" (S.damageOf mine control, S.lifeOf S.alice control) (Just 1, Just 19)
-    Spec.assertEqWith s "and bob takes 1, there being no rider to run" (S.lifeOf S.bob control) (Just 19)
 
 -- CR 615.5's additional effect on the UNBOUNDED shield (CR 615.1 / 615.3), which
 -- Test of Faith's countdown shield above cannot reach. Brace for Impact ({4}{W}
@@ -602,34 +357,6 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
         settle kind = settleDamage S.identityAnswer g2 [hit kind attacker (Recipient.ToCreature capridor) 2]
     Spec.assertEqWith s "noncombat: the 2 is prevented" (S.damageOf capridor (settle DamageKind.Noncombat)) (Just 0)
     Spec.assertEqWith s "combat: the same 2 is marked" (S.damageOf capridor (settle DamageKind.Combat)) (Just 2)
-  -- The same refusal driven through a REAL combat phase, which is the funnel
-  -- that would run a rider if one fired (Engine's combat damage step drains the
-  -- queue): the Capridor blocks, takes 2, and gains nothing.
-  Spec.it s "CR 615.5 combat damage puts no counter on, because none of it was prevented" $ do
-    plains <- S.printingOf s registry "Plains"
-    capridorPrinting <- S.printingOf s registry "Stormwild Capridor"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let base = S.landsInPlay plains 1
-        (_attacker, g1) = S.addPermanent pikerPrinting S.alice base
-        (capridor, g2) = S.addPermanent capridorPrinting S.bob g1
-        after =
-          S.runCombat S.aggressiveAnswer $
-            g2
-              { GameState.activePlayer = S.alice,
-                GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-                GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
-                GameState.remaining =
-                  Seq.fromList
-                    [ Phase.Combat CombatStep.DeclareBlockers,
-                      Phase.Combat CombatStep.CombatDamage,
-                      Phase.Combat CombatStep.EndOfCombat,
-                      Phase.PostcombatMain
-                    ]
-              }
-    Spec.assertBool s (S.onBattlefield capridor after) "the 1/3 blocker survived a 2-power attacker"
-    Spec.assertEqWith s "with the attacker's 2 marked on it" (S.damageOf capridor after) (Just 2)
-    Spec.assertEqWith s "and no counters, since nothing was prevented" (countersOn CounterKind.PlusOnePlusOne capridor after) 0
-    Spec.assertEqWith s "so it is still a 1/3" (S.powerToughnessOf capridor after) (Just (1, 3))
 
 -- CR 615.10's static shield with an amount, which is the shape neither Fog's
 -- blanket prevention nor CR 615.7's countdown can reach: Temple Altisaur ({4}{W}
@@ -957,20 +684,6 @@ ajaniSteadfastSpec s registry = Spec.describe s "Ajani Steadfast (CR 114.4, CR 6
     Spec.assertEqWith s "CR 114.2 setup: the ultimate left one emblem in the command zone" (Set.size (GameState.command armed)) 1
     Spec.assertEqWith s "and the unemblemed board has none" (Set.size (GameState.command unarmed)) 0
     Spec.assertEqWith s "setup: alice is at 9 before the burn" (S.lifeOf S.alice armed) (Just 9)
-  -- The -2, whose two instructions differ in every part: counter kind, the card
-  -- type swept, and whether the source itself is included. "Each other" is
-  -- spelled Filter.Not Filter.IsSource -- a SWEEP rather than a target, so the
-  -- exclusion is read off the ability's own source as the instruction is
-  -- reached -- and it is the only thing keeping Ajani from topping himself up.
-  Spec.it s "CR 122.1e the -2 counters alice's creatures and every OTHER planeswalker she controls"
-    . withBoard
-    $ \printing ajani jace karn piker source base -> do
-      let after = loyaltyAbility 1 S.identityAnswer printing ajani base
-      Spec.assertEqWith s "alice's Piker takes a +1/+1 counter, so the 2/1 is a 3/2" (S.powerToughnessOf piker after) (Just (3, 2))
-      Spec.assertEqWith s "CR 306.5c her other planeswalker gains one loyalty counter: 8 + 1" (countersOn CounterKind.Loyalty jace after) 9
-      Spec.assertEqWith s "\"each other\" excludes Ajani, who only pays: 7 - 2" (countersOn CounterKind.Loyalty ajani after) 5
-      Spec.assertEqWith s "CR 109.5 bob's planeswalker is untouched" (countersOn CounterKind.Loyalty karn after) 6
-      Spec.assertEqWith s "and bob's Piker takes no +1/+1 counter, so it is still a 2/1" (S.powerToughnessOf source after) (Just (2, 1))
 
 -- Activate the nth loyalty ability of `walker` in printed order, resolve it, and
 -- settle CR 704's state-based actions -- which is what buries a planeswalker
@@ -1000,25 +713,8 @@ loyaltyAbility n answer printing walker gs =
 -- and the Hydra goes from 4/4 to 1/1. A permanent's own X of 0 would answer no
 -- counters at all, an unrun rider would leave 4, and a per-event reading of "that
 -- many" would leave 3.
-proteanHydraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+proteanHydraSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 proteanHydraSpec s registry = Spec.describe s "Protean Hydra (CR 107.3m, CR 615.5)" $ do
-  Spec.it s "CR 107.3m the X announced for the spell is the X its entry replacement reads" $ do
-    forest <- S.printingOf s registry "Forest"
-    hydraPrinting <- S.printingOf s registry "Protean Hydra"
-    let (g1, spellId) = S.handOne hydraPrinting (S.landsInPlay forest 5)
-        -- CR 400.7 mints a new object, but under the same id: the permanent the
-        -- spell became is `spellId` on the battlefield.
-        after = castAndResolve (answerXOf 4) g1 spellId
-        -- CR 400.7 with CR 601.2a: casting moved the card to the stack, where it
-        -- became a new object, and resolving moved it again -- so the permanent
-        -- is neither `spellId` nor any of the five lands. It is what the
-        -- battlefield gained.
-        hydra = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield g1)) of
-          oid : _ -> oid
-          [] -> S.noSource
-    Spec.assertEqWith s "four +1/+1 counters, the announced X and not the permanent's 0" (countersOn CounterKind.PlusOnePlusOne hydra after) 4
-    Spec.assertEqWith s "so the printed 0/0 is a 4/4" (S.powerToughnessOf hydra after) (Just (4, 4))
-
   -- CR 615.5's rider on the same card, on a board where the Hydra is PLACED
   -- rather than cast: the counters are handed to it directly, so what the Bolt
   -- proves is the removal alone.
@@ -1036,14 +732,6 @@ proteanHydraSpec s registry = Spec.describe s "Protean Hydra (CR 107.3m, CR 615.
     Spec.assertEqWith s "CR 615.6: nothing was marked, the damage having been prevented" (S.damageOf hydra after) (Just 0)
     Spec.assertEqWith s "so the 4/4 is a 1/1" (S.powerToughnessOf hydra after) (Just (1, 1))
 
--- Announces this value of X and answers every other prompt with the identity
--- fallback. Pawl.CastSpec's answerXOf without its target arm, which the Hydra
--- has no use for -- it targets nothing.
-answerXOf :: Natural.Natural -> Prompt.Prompt r -> r
-answerXOf n p = case p of
-  Prompt.ChooseX {} -> n
-  _ -> S.identityAnswer p
-
 -- CR 604.2's "as long as" clause on a PRINTED replacement ability, whose producer
 -- is Jared Carthalion, True Heir ({R}{G}{W} Legendary Creature -- Human Warrior
 -- 3/3): "If damage would be dealt to Jared Carthalion while you're the monarch,
@@ -1059,7 +747,7 @@ answerXOf n p = case p of
 -- Numbers distinct: the Firebolt is 2, the counters are 2 because CR 615.5's
 -- "that many" says so, and Jared's 3/3 becomes 5/5. A "one counter per event"
 -- reading would answer 1 and an unrun rider 0.
-jaredCarthalionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaredCarthalionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (CR 604.2)" $ do
   -- alice holds `n` Firebolts over one Mountain apiece, bob's Jared is on the
   -- battlefield, and carol is the third seat. Jared is placed rather than cast,
@@ -1100,22 +788,6 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
     Spec.assertEqWith s "carol is the monarch, so the same 2 is marked in full" (S.damageOf jared heldByCarol) (Just 2)
     Spec.assertEqWith s "and no counter is put on" (countersOn CounterKind.PlusOnePlusOne jared heldByCarol) 0
     Spec.assertEqWith s "so Jared is still a 3/3" (S.powerToughnessOf jared heldByCarol) (Just (3, 3))
-  -- CR 604.1's "simply true", which is what makes the clause a live read rather
-  -- than a latch: the crown changes hands with no trigger and no resolution in
-  -- between, and the SAME permanent's ability stops applying. A gate snapshotted
-  -- when the ability was gathered -- or when the permanent entered -- would
-  -- prevent the second Firebolt too.
-  Spec.it s "CR 604.1 the clause is re-asked, so losing the crown turns the ability off" $ do
-    (jared, bolts, g) <- board 2
-    case bolts of
-      [first, second] -> do
-        let shielded = castAndResolve (aimCreature jared) (S.withMonarch S.bob g) first
-            dethroned = castAndResolve (aimCreature jared) (S.withMonarch S.carol shielded) second
-        Spec.assertEqWith s "the first Firebolt is prevented while bob wears the crown" (S.damageOf jared shielded) (Just 0)
-        Spec.assertEqWith s "leaving two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne jared shielded) 2
-        Spec.assertEqWith s "the second lands in full once carol has it" (S.damageOf jared dethroned) (Just 2)
-        Spec.assertEqWith s "and adds no third counter" (countersOn CounterKind.PlusOnePlusOne jared dethroned) 2
-      _ -> Spec.assertFailure s "fixture should hold two Firebolts"
 
 -- CR 613.1f's NAMED removal aimed at a printed PREVENTION ability, whose producer
 -- is Glittering Lion ({2}{W} Creature -- Cat 2/2, Prophecy): "Prevent all damage
@@ -1157,13 +829,6 @@ glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ 
       -- the SBAs have to run or a dead Lion still reads as being on the
       -- battlefield.
       dealAndCheck lion attacker gs = S.settleSba (settleDamage S.identityAnswer gs (hits attacker lion))
-  -- The CONTROL, and what stops the case below passing vacuously: a Lion that
-  -- never had the prevention would die on both boards.
-  Spec.it s "CR 614.1 the printed ability prevents the 2 that would otherwise be lethal" $ do
-    (lion, attacker, g) <- board
-    let after = dealAndCheck lion attacker g
-    Spec.assertBool s (S.onBattlefield lion after) "the 2/2 survives 2 damage, because all of it is prevented"
-    Spec.assertEqWith s "with nothing marked on it (CR 615.6)" (S.damageOf lion after) (Just 0)
   -- THE PROVING CASE. The same board and the same 2 damage, with the Lion's own
   -- {3} resolved in between. A removal reaching only PC.activatedAbilities leaves
   -- the prevention standing and the Lion alive -- the two implementations
@@ -1298,23 +963,6 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
       Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim after) (Just 3)
       Spec.assertEqWith s "and the event happened, at its full amount" (amounts after) [3]
       Spec.assertEqWith s "the shield still holds all 4" (shieldsLeft after) [4]
-  -- The third clause made GAMEPLAY-observable, which the row read above is not:
-  -- one script over both boards -- take 3, lose the Punks (CR 604.2), take 2 --
-  -- and the shield that was never reduced still covers the 2, where the control's
-  -- spent shield cannot.
-  Spec.it s "CR 615.12 the unreduced shield still covers the next 2 once Spider-Punk is gone"
-    . withBoard
-    $ \build -> do
-      let script (victim, attacker, _, punks, shielded) =
-            let first_ = settleDamage S.identityAnswer shielded [hit attacker (Recipient.ToCreature victim) 3]
-                gone = S.runPure S.identityAnswer first_ (Event.destroy Regenerability.Regenerable punks)
-             in settleDamage S.identityAnswer gone [hit attacker (Recipient.ToCreature victim) 2]
-          punkBoard@(punkVictim, _, _, _, _) = build True
-          control@(controlVictim, _, _, _, _) = build False
-      Spec.assertEqWith s "with Spider-Punk only the first 3 is marked: the 2 is prevented whole" (S.damageOf punkVictim (script punkBoard)) (Just 3)
-      Spec.assertEqWith s "and 2 of the shield's untouched 4 are left" (shieldsLeft (script punkBoard)) [2]
-      Spec.assertEqWith s "without it the first 3 was prevented, so only 1 of the 2 is" (S.damageOf controlVictim (script control)) (Just 1)
-      Spec.assertEqWith s "and that shield is spent to 0 and gone" (shieldsLeft (script control)) []
   -- The ELISION half, and the CR 615.7 prompt's other gate: two applicable
   -- sources deal damage to the shielded creature at the same time, and the rule
   -- gives its controller the choice of which the shield prevents -- but only
@@ -1381,21 +1029,6 @@ phantomTigerSpec s registry = Spec.describe s "Phantom Tiger (CR 615.12)" $ do
   let hit src recipient n =
         DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       named = CardName.MkCardName . Text.pack
-  -- CR 614.1c's entry replacement first, so the counters the cases below hand
-  -- the Tiger directly are the ones its own card puts there.
-  Spec.it s "CR 614.1c it enters with two +1/+1 counters, so the printed 1/0 is a 3/2" $ do
-    forest <- S.printingOf s registry "Forest"
-    tigerPrinting <- S.printingOf s registry "Phantom Tiger"
-    let (g1, spellId) = S.handOne tigerPrinting (S.landsInPlay forest 3)
-        after = castAndResolve S.identityAnswer g1 spellId
-        -- CR 400.7 with CR 601.2a: casting and resolving each minted a new
-        -- object, so the permanent is neither `spellId` nor one of the lands. It
-        -- is what the battlefield gained (proteanHydraSpec's reading).
-        tiger = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield g1)) of
-          oid : _ -> oid
-          [] -> S.noSource
-    Spec.assertEqWith s "two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne tiger after) 2
-    Spec.assertEqWith s "so the printed 1/0 is a 3/2" (S.powerToughnessOf tiger after) (Just (3, 2))
   -- THE CASE. One Lightning Bolt at one Phantom Tiger, on two boards differing
   -- in Spider-Punk alone. With him the 3 cannot be prevented and lands whole,
   -- and the rider still takes the counter that makes it lethal; without him the
@@ -1428,26 +1061,6 @@ phantomTigerSpec s registry = Spec.describe s "Phantom Tiger (CR 615.12)" $ do
     Spec.assertEqWith s "CR 615.6: with nothing marked on it" (S.damageOf controlTiger control) (Just 0)
     Spec.assertEqWith s "and one counter gone all the same, so a 4/3" (S.powerToughnessOf controlTiger control) (Just (4, 3))
     Spec.assertEqWith s "CR 615.12a: exactly one counter, so the application happened once" (countersOn CounterKind.PlusOnePlusOne controlTiger control) 3
-  -- CR 615.1's printed RECIPIENT, on the unpreventable board: the ability covers
-  -- "this creature", so a Bolt at the Piker beside it is not an application at
-  -- all and no counter moves. Without this, "any unpreventable damage runs every
-  -- rider on the board" would pass the case above.
-  Spec.it s "CR 615.1 unpreventable damage to something else applies nothing and moves no counter" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    tigerPrinting <- S.printingOf s registry "Phantom Tiger"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    punkPrinting <- S.printingOf s registry "Spider-Punk"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let base = S.landsInPlay mountain 1
-        (tiger, g1) = S.addPermanent tigerPrinting S.alice base
-        g2 = S.addCounter CounterKind.PlusOnePlusOne 4 tiger g1
-        (piker, g3) = S.addPermanent pikerPrinting S.alice g2
-        (_, g4) = S.addPermanent punkPrinting S.alice g3
-        (g5, spellId) = S.handOne bolt g4
-        after = S.runPure (aimCreature piker) g5 (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority)
-    Spec.assertEqWith s "the Tiger keeps all four counters, so it is still a 5/4" (S.powerToughnessOf tiger after) (Just (5, 4))
-    Spec.assertEqWith s "all four counters, none of them spent on somebody else's damage" (countersOn CounterKind.PlusOnePlusOne tiger after) 4
-    Spec.assertBool s (not (S.onBattlefield piker after)) "and the Piker the Bolt did name is dead"
   -- CR 615.13's control, and the one that fixes WHICH clause the fix implements.
   -- Phyrexian Vindicator prints the same PreventAll over itself, but its extra
   -- effect is a TRIGGERED ability -- "when damage is prevented this way" -- and
@@ -1887,18 +1500,6 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
       Spec.assertEqWith s "only the War Mammoth's event happened" (amounts after) [3]
       Spec.assertEqWith s "so alice loses 3 and no more" (S.lifeOf S.alice after) (Just 17)
       Spec.assertEqWith s "and it lasts the turn rather than being used up (CR 615.3)" (length (GameState.replacements after)) 1
-  -- CR 609.7b's RECHECK, which is what makes this a filter rather than a list of
-  -- objects captured when the shield was made: the Piker's damage is prevented
-  -- while it is red and dealt in full once it is not. One board, one shield, and
-  -- the only thing that differs between the two readings is the source's colour.
-  Spec.it s "CR 609.7b the shield rechecks the source: a Piker made green deals its 2"
-    . withBoard
-    $ \_ piker _ shielded -> do
-      let bleached = S.withEffect piker (Modification.SetColor (Set.singleton Color.Green))
-          after = S.runPure S.identityAnswer (bleached shielded) (Damage.applyDamage [hit piker 2])
-          asPrinted = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit piker 2])
-      Spec.assertEqWith s "while red, the Piker's 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
-      Spec.assertEqWith s "once green, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
   -- CR 608.2h's DEPARTED source, the half neither case above reaches: both of
   -- them deal damage from a permanent still on the battlefield, so the recheck
   -- reads a live projection either way. Ghitu Fire-Eater ({2}{R} Creature --
@@ -1947,11 +1548,6 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
       Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater after)) "setup: and the id it left behind names nothing"
       Spec.assertEqWith s "setup: the shield was a floating replacement before the activation" (length (GameState.replacements shielded)) 1
       Spec.assertEqWith s "supporting: and it lasts the turn rather than being used up (CR 615.3)" (length (GameState.replacements after)) 1
-  Spec.it s "CR 609.7b the recheck reads the RECORD, not the print: a Fire-Eater made green before it left deals its 2"
-    . ghituBoard (\oid -> S.withEffect oid (Modification.SetColor (Set.singleton Color.Green)))
-    $ \fireEater _ after -> do
-      Spec.assertEqWith s "bob takes 2: neither disjunct matches the green source the record filed" (S.lifeOf S.bob after) (Just 18)
-      Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater after)) "setup: the source departed here too, so the two boards differ only in colour"
 
 -- CR 615.1 / 609.7b again, on two axes at once: a shield that names its source by
 -- CHARACTERISTIC and narrows by DAMAGE KIND. Its producer is Moonmist ({1}{G}
@@ -1969,10 +1565,10 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
 -- from the Or" from "Wolf dropped from the Or", and would pass under either.
 --
 -- Tovolar's front face is a Human Werewolf, so Moonmist's OWN first sentence
--- names him -- and CR 702.145b's third static ability refuses it (Pawl.DaytimeSpec's
--- restrictionSpec is the proof). Nothing here rests on which way that goes: the
--- damage amounts are hand-built rather than read off power, and both of his faces
--- are Werewolves.
+-- names him -- and CR 702.145b's third static ability refuses it
+-- (data/scenarios/daytime is the proof). Nothing here rests on which way that
+-- goes: the damage amounts are hand-built rather than read off power, and both
+-- of his faces are Werewolves.
 --
 -- The DAMAGE BATCH is hand-built and the SPELL is not, for mendingHandsSpec's
 -- reason.
@@ -2020,19 +1616,6 @@ moonmistSpec s registry = Spec.describe s "Moonmist (CR 615.1, CR 609.7b)" $ do
       let after = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit DamageKind.Noncombat piker 2])
       Spec.assertEqWith s "the event happened" (sources after) [piker]
       Spec.assertEqWith s "and alice took it" (S.lifeOf S.alice after) (Just 18)
-  -- CR 609.7b's RECHECK, which is what makes this a filter rather than a list of
-  -- objects captured when the shield was made: the Piker's damage is prevented
-  -- while it is not a Wolf, and dealt in full once it is one. One board, one
-  -- shield, and the only thing that differs between the two readings is a subtype
-  -- the projection adds after the shield already exists.
-  Spec.it s "CR 609.7b the shield rechecks the source: a Piker made a Wolf deals its 2"
-    . withBoard
-    $ \_ _ piker shielded -> do
-      let lupine = S.withEffect piker (Modification.AddCreatureSubtype Subtype.Wolf)
-          after = S.runPure S.identityAnswer (lupine shielded) (Damage.applyDamage [hit DamageKind.Combat piker 2])
-          asPrinted = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit DamageKind.Combat piker 2])
-      Spec.assertEqWith s "while a Goblin Warrior, the 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
-      Spec.assertEqWith s "once a Wolf, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
 
 -- CR 615.13's trigger read BLIND to which prevention applied: Selfless Squire
 -- ({3}{W} Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
@@ -2234,30 +1817,6 @@ raceShield wantMinted wanted p = case p of
      in maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantMinted) . minted) entries)
   _ -> preferTarget wanted p
 
--- CR 616.1's choice between the two prevention effects one Phyrexian Vindicator
--- with protection from artifacts offers: the one its card PRINTS and CR 702.16e's
--- minted one. Both are a PreventAll on the same source, so the only thing left to
--- tell them apart by is the SOURCE half of the pattern -- rule 702.16e writes the
--- protection quality there, and the Vindicator's printed sentence qualifies the
--- damage in no way.
-raceProtection :: Bool -> [Recipient.Recipient] -> Prompt.Prompt r -> r
-raceProtection wantMinted wanted p = case p of
-  Prompt.ChooseReplacement _ _ entries ->
-    let minted entry = case ReplacementEntry.effect entry of
-          ReplacementEffect.DamageR (DamageR.MkDamageR matching DamageRewrite.PreventAll _) ->
-            DamagePattern.whatSource matching == Filter.Type.HasCardType CardType.Artifact
-          _ -> False
-     in maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantMinted) . minted) entries)
-  _ -> preferTarget wanted p
-
--- CR 616.1's choice between a permanent's own prevention effect and a FLOATING
--- one somebody else installed, told apart by whose object the entry names.
-raceIsSelf :: Bool -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
-raceIsSelf wantSelf oid wanted p = case p of
-  Prompt.ChooseReplacement _ _ entries ->
-    maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantSelf) . (== oid) . ReplacementEntry.source) entries)
-  _ -> preferTarget wanted p
-
 -- Settle one damage batch, then let whatever it triggered go on the stack and
 -- resolve. selflessSquireSpec's local twin, top-level because the answer is
 -- rank-2 and these cases hand it a different one per case.
@@ -2334,75 +1893,6 @@ phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 6
     -- prevention each branch actually applied.
     Spec.assertEqWith s "the counter was spent on the minted branch" (countersOn CounterKind.Shield vindicator mintedAfter) 0
     Spec.assertEqWith s "and left alone on the printed one" (countersOn CounterKind.Shield vindicator printedAfter) 1
-  -- CR 702.16e's prevention, the SAME point one rules-minted prevention over.
-  -- "Any damage that would be dealt by sources that have the stated quality to a
-  -- permanent or player with protection is prevented" is a prevention rule 702.16
-  -- gives the permanent, not a sentence its card prints -- so the damage it stops
-  -- was not stopped "this way" either, and a permanent holding both must stay
-  -- silent for it.
-  --
-  -- Rule 122.1c's pair above is told apart from a printed row by its rewrite;
-  -- this one is a plain PreventAll, structurally what Stormwild Capridor and the
-  -- Vindicator itself print, so nothing about the VALUE separates them. The
-  -- discriminator is the same shape as the shield case: one board, one 4-damage
-  -- event, and the CR 616.1 choice answered both ways.
-  --
-  -- Tower of the Magistrate ("{1}, {T}: Target creature gains protection from
-  -- artifacts until end of turn.") is the grant and Darksteel Garrison ({2}
-  -- Artifact -- Fortification) the artifact source, both checked against Scryfall
-  -- on 2026-08-27. The Garrison is bob's, so the trigger's "any OTHER target" and
-  -- the damage's source are different objects.
-  Spec.it s "CR 702.16e protection's prevention is not 'this way', and the same board's printed one is" $ do
-    plains <- S.printingOf s registry "Plains"
-    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
-    towerPrinting <- S.printingOf s registry "Tower of the Magistrate"
-    garrisonPrinting <- S.printingOf s registry "Darksteel Garrison"
-    let base = S.landsInPlay plains 2
-        (vindicator, g1) = S.addPermanent vindicatorPrinting S.alice base
-        (tower, g2) = S.addPermanent towerPrinting S.alice g1
-        (garrison, g3) = S.addPermanent garrisonPrinting S.bob g2
-    case Projection.abilitiesOf tower g3 of
-      [_, protect] -> do
-        let activated = S.runPure (preferTarget [Recipient.ToCreature vindicator]) g3 (Activate.activateAbility S.alice tower protect)
-            protected = S.runPure (preferTarget [Recipient.ToCreature vindicator]) activated Stack.resolveTop
-            batch = [hit garrison (Recipient.ToCreature vindicator) 4]
-            (mintedDealt, mintedAfter) = strikeAndSettleWith (raceProtection True onlyBob) protected batch
-            (printedDealt, printedAfter) = strikeAndSettleWith (raceProtection False onlyBob) protected batch
-        Spec.assertBool s (Projection.hasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasCardType CardType.Artifact, Protection.spares = Nothing}) vindicator protected) "setup: the Tower's ability really did grant protection from artifacts"
-        -- The gameplay assertion, ahead of every proxy: rule 702.16e's prevention
-        -- fires nothing, so bob keeps his life, and the very same board choosing
-        -- the printed prevention instead takes 4 off him.
-        Spec.assertEqWith s "protection's prevention leaves bob untouched" (S.lifeOf S.bob mintedAfter) (Just 20)
-        Spec.assertEqWith s "the printed one deals him the same 4" (S.lifeOf S.bob printedAfter) (Just 16)
-        Spec.assertEqWith s "both prevented the whole 4 off the Vindicator" (fmap (S.damageOf vindicator) [mintedAfter, printedAfter]) [Just 0, Just 0]
-        Spec.assertEqWith s "nothing triggered off protection's prevention" (length (GameState.stack mintedDealt)) 0
-        Spec.assertEqWith s "and the printed one triggered once" (length (GameState.stack printedDealt)) 1
-      abilities -> Spec.assertFailure s ("expected exactly two Tower abilities, got " <> show (length abilities))
-  -- The FLOATING rival, and the Squire's ruling read from the other end. Mending
-  -- Hands ({W} Instant, "Prevent the next 4 damage that would be dealt to any
-  -- target this turn") shields the Vindicator for exactly the amount its own
-  -- ability would have stopped, so the two candidates race for one event and
-  -- neither the recipient nor the amount can tell them apart -- only whose effect
-  -- it was. A prevention of somebody else's is not "this way".
-  Spec.it s "CR 615.13 another card's prevention of the same 4, on the same creature, is not 'this way'" $ do
-    plains <- S.printingOf s registry "Plains"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
-    mendingHands <- S.printingOf s registry "Mending Hands"
-    let base = S.landsInPlay plains 1
-        (attacker, g1) = S.addPermanent pikerPrinting S.bob base
-        (vindicator, g2) = S.addPermanent vindicatorPrinting S.alice g1
-        (g3, spellId) = S.handOne mendingHands g2
-        shielded = castAndResolve (preferTarget [Recipient.ToCreature vindicator]) g3 spellId
-        batch = [hit attacker (Recipient.ToCreature vindicator) 4]
-        (theirsDealt, theirsAfter) = strikeAndSettleWith (raceIsSelf False vindicator onlyBob) shielded batch
-        (oursDealt, oursAfter) = strikeAndSettleWith (raceIsSelf True vindicator onlyBob) shielded batch
-    Spec.assertEqWith s "setup: Mending Hands left a floating shield behind" (length (GameState.replacements shielded)) 1
-    Spec.assertEqWith s "Mending Hands' prevention leaves bob untouched" (S.lifeOf S.bob theirsAfter) (Just 20)
-    Spec.assertEqWith s "the Vindicator's own deals him the same 4" (S.lifeOf S.bob oursAfter) (Just 16)
-    Spec.assertEqWith s "both prevented the whole 4 off the Vindicator" (fmap (S.damageOf vindicator) [theirsAfter, oursAfter]) [Just 0, Just 0]
-    Spec.assertEqWith s "nothing triggered off Mending Hands' prevention" (length (GameState.stack theirsDealt)) 0
-    Spec.assertEqWith s "and the Vindicator's own triggered once" (length (GameState.stack oursDealt)) 1
   -- "Any OTHER target": the answerer reaches for the Vindicator first and takes
   -- bob only because the pool never offers it. Damage the Vindicator dealt
   -- ITSELF would be prevented by its own shield (CR 615.6) and so leave no mark,
@@ -2455,35 +1945,8 @@ shieldedSource gs = case GameState.replacements gs of
 -- Distinct amounts on the two events, so no life total below can be reached two
 -- ways: 20 - 5 + 2 is 17, 20 - 2 is 18, and the unfiltered reading's 20 - 2 + 5
 -- is 23.
-samiteMinistrationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+samiteMinistrationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 samiteMinistrationSpec s registry = Spec.describe s "Samite Ministration (CR 615.9 / 615.13)" $ do
-  Spec.it s "CR 615.9 / 615.13 samite ministration gains life from a black source it named, and none from a green one" $ do
-    plains <- S.printingOf s registry "Plains"
-    evangelPrinting <- S.printingOf s registry "Cabal Evangel"
-    spiderPrinting <- S.printingOf s registry "Giant Spider"
-    ministration <- S.printingOf s registry "Samite Ministration"
-    let base = S.landsInPlay plains 2
-        (evangel, g1) = S.addPermanent evangelPrinting S.bob base
-        (spider, g2) = S.addPermanent spiderPrinting S.bob g1
-        (g3, spellId) = S.handOne ministration g2
-        batch =
-          [ DamageEvent.MkDamageEvent evangel (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat,
-            DamageEvent.MkDamageEvent spider (Recipient.ToPlayer S.alice) 5 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
-          ]
-        run named =
-          let shielded = castAndResolve (nameDamageSource named) g3 spellId
-              (dealt, after) = strikeAndSettleWith (nameDamageSource named) shielded batch
-           in (shielded, dealt, after)
-        (blackShield, blackDealt, blackAfter) = run evangel
-        (greenShield, greenDealt, greenAfter) = run spider
-    Spec.assertEqWith s "setup: alice is at 20 before either branch" (S.lifeOf S.alice g3) (Just 20)
-    Spec.assertEqWith s "setup: each branch installed one shield, naming the source it chose" (fmap shieldedSource [blackShield, greenShield]) [Just evangel, Just spider]
-    -- The gameplay assertions, ahead of every proxy: alice's life is the only
-    -- place the trigger shows, and the two branches disagree about it.
-    Spec.assertEqWith s "naming the black source: the green 5 got through, and the prevented 2 came back as life" (S.lifeOf S.alice blackAfter) (Just 17)
-    Spec.assertEqWith s "naming the green source: only the black 2 got through, and no life came back" (S.lifeOf S.alice greenAfter) (Just 18)
-    Spec.assertEqWith s "the black branch gathered its trigger" (length (GameState.stack blackDealt)) 1
-    Spec.assertEqWith s "and the green branch gathered nothing" (length (GameState.stack greenDealt)) 0
   -- The printed sentence names TWO colours, and a Filter that had dropped either
   -- disjunct would still pass the pair above. bob's red Goblin Piker on a board
   -- of its own, for a third amount again.
@@ -2689,44 +2152,6 @@ turnTheTablesSpec s registry = Spec.describe s "Turn the Tables (CR 614.9)" $ do
       hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       targets gs = fmap DamageEvent.target (S.damageEventsOf gs)
-  -- THE WHOLE CARD. alice attacks with a lone Jedit Ojanen (5/5); bob redirects
-  -- its combat damage onto Jedit itself, which is lethal to a 5/5 (CR 704.5g).
-  Spec.it s "CR 614.9 whole card: the attacker's combat damage is dealt to the attacker instead of to bob" $ do
-    plains <- S.printingOf s registry "Plains"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    tables <- S.printingOf s registry "Turn the Tables"
-    case tablesBoard plains 5 [jedit] [tables] of
-      (gs, [attacker]) -> do
-        let atDamage = atCombatDamage (castInOrder ["Turn the Tables"] attacker) gs
-            after = S.runCombat (castInOrder ["Turn the Tables"] attacker) atDamage
-        -- Combat-timing vacuity: a fixture that skipped combat would pass the
-        -- life assertions below without dealing anything.
-        Spec.assertEqWith s "setup: the spell resolved and combat damage has NOT been dealt yet" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
-        -- The "did the target stick" trap: all three baked fields, not merely
-        -- that some redirect exists.
-        Spec.assertEqWith s "setup: one row, keyed to COMBAT damage to bob, aimed at the creature bob targeted" (redirectRows atDamage) [(Just DamageKind.Combat, Just (Recipient.ToPlayer S.bob), Recipient.ToCreature attacker)]
-        Spec.assertEqWith s "the damage never reached bob" (S.lifeOf S.bob after) (Just 20)
-        Spec.assertEqWith s "it landed on the attacker instead" (targets after) [Recipient.ToCreature attacker]
-        -- The assertion that separates a redirect from a prevention: CR 614.9
-        -- replaces the RECIPIENT and nothing else, so one event of the same size.
-        Spec.assertEqWith s "one event, of the same amount" (amounts after) [5]
-        Spec.assertEqWith s "5 marked on a 5/5 is lethal" (S.creaturesInPlay S.alice after) 0
-        Spec.assertEqWith s "and nothing splashed onto the attacker's controller" (S.lifeOf S.alice after) (Just 20)
-      _ -> Spec.assertFailure s "fixture should have one attacker"
-  -- The BASELINE that makes the case above discriminate: the same board, the
-  -- spell never cast. Every assertion moves.
-  Spec.it s "CR 614.9 no redirect, no move: the same 5 lands on bob and the attacker survives" $ do
-    plains <- S.printingOf s registry "Plains"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    tables <- S.printingOf s registry "Turn the Tables"
-    case tablesBoard plains 5 [jedit] [tables] of
-      (gs, [attacker]) -> do
-        let after = S.runCombat S.aggressiveAnswer gs
-        Spec.assertEqWith s "setup: no row was installed" (redirectRows after) []
-        Spec.assertEqWith s "bob takes all 5" (S.lifeOf S.bob after) (Just 15)
-        Spec.assertEqWith s "addressed to bob" (targets after) [Recipient.ToPlayer S.bob]
-        Spec.assertEqWith s "and the attacker is unharmed" (S.damageOf attacker after) (Just 0)
-      _ -> Spec.assertFailure s "fixture should have one attacker"
   -- THE KIND NARROWING. "All COMBAT damage", so a noncombat event aimed at bob
   -- is none of the card's business. Without this case the whichKind thread is
   -- unproven, and dropping it would run WEAKER than printed in bob's favour.
@@ -2771,28 +2196,6 @@ turnTheTablesSpec s registry = Spec.describe s "Turn the Tables (CR 614.9)" $ do
         Spec.assertEqWith s "addressed to bob, its original recipient" (targets after) [Recipient.ToPlayer S.bob]
         Spec.assertEqWith s "the big attacker took nothing" (S.damageOf big after) (Just 0)
       _ -> Spec.assertFailure s "fixture should have two attackers"
-  -- CR 615.12 is about PREVENTION effects, and CR 614.9's redirection is not one
-  -- (CR 615.1a: it never says "prevent"). Spider-Punk's "damage can't be
-  -- prevented" therefore has nothing to say to it, and the damage still moves.
-  --
-  -- This is the case that gives Replacement.prevents' Redirect arm an observer:
-  -- classify a redirect as a prevention and `inertPrevention` makes it do
-  -- nothing here, though the CR 615.13 trigger route cannot tell the two apart
-  -- (a redirect shrinks no event, so preventionBy reports nothing either way).
-  Spec.it s "CR 615.12 a redirect is not a prevention: unpreventable damage is still moved" $ do
-    plains <- S.printingOf s registry "Plains"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    spiderPunk <- S.printingOf s registry "Spider-Punk"
-    tables <- S.printingOf s registry "Turn the Tables"
-    case tablesBoard plains 5 [jedit] [tables] of
-      (gs, [attacker]) -> do
-        let (punk, withPunk) = S.addPermanent spiderPunk S.bob gs
-            after = S.runCombat (castInOrder ["Turn the Tables"] attacker) withPunk
-        Spec.assertBool s (Set.member punk (GameState.battlefield withPunk)) "setup: Spider-Punk is out, so no damage can be prevented"
-        Spec.assertEqWith s "the damage still left bob" (S.lifeOf S.bob after) (Just 20)
-        Spec.assertEqWith s "and landed on the attacker" (targets after) [Recipient.ToCreature attacker]
-        Spec.assertEqWith s "at its full size" (amounts after) [5]
-      _ -> Spec.assertFailure s "fixture should have one attacker"
 
 -- The SOURCE each floating redirection row watches (DamagePattern.whichSource),
 -- read off the store. redirectRows above reads the other three baked fields; a
@@ -2804,82 +2207,6 @@ redirectSources gs = do
   case ActiveReplacement.effect active of
     ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect _) _) -> pure (DamagePattern.whichSource pat)
     _ -> []
-
--- CR 609.7a's chosen source on CR 614.9's REDIRECTION, whose producer is
--- Oracle's Attendants ({3}{W} Creature -- Human Soldier, 1/5: "{T}: All damage
--- that would be dealt to target creature this turn by a source of your choice is
--- dealt to this creature instead").
---
--- Turn the Tables above with CR 609.7a's clause added, which is exactly the
--- difference the rule makes: that redirection moves damage from EVERY source,
--- this one only from the ONE object its controller chose when the effect was
--- created. Auriok Replica carries the same field on CR 615.1's PREVENTION side;
--- this is the same choice on CR 614.1's replacement side.
---
--- The chosen source is deliberately NOT the first candidate the prompt offers:
--- CR 609.7a's pool here holds alice's Plains, the Attendants, the victim and the
--- two Pikers, sorted ascending, and the Plains was placed first -- so an engine
--- that ignored the answer and took the head would watch the Plains and both
--- damage assertions would read the other way round.
---
--- "This creature" is the destination, so the Attendants is BOTH the ability's
--- source and where the damage lands: `to` is EachMatching Filter.IsSource, and
--- the case asserts that sweep resolved to the Attendants alone by reading the
--- damage off it.
-oraclesAttendantsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-oraclesAttendantsSpec s registry = Spec.describe s "Oracle's Attendants (CR 614.9, CR 609.7a)" $ do
-  let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
-  Spec.it s "CR 609.7a the redirection moves the chosen source's damage and no other source's" $ do
-    plains <- S.printingOf s registry "Plains"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    attendants <- S.printingOf s registry "Oracle's Attendants"
-    let base = S.landsInPlay plains 1
-        (attendantsId, g1) = S.addPermanent attendants S.alice base
-        (victim, g2) = S.addPermanent pikerPrinting S.alice g1
-        (alpha, g3) = S.addPermanent pikerPrinting S.bob g2
-        (omega, g4) = S.addPermanent pikerPrinting S.bob g3
-        activate = Activate.activateAbility S.alice attendantsId (theAbility attendants) Monad.>> Stack.resolveTop
-        aimed = S.runPure (aimAndChoose victim omega) g4 activate
-        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature victim) n])
-    -- THE gameplay assertion, and the one this unit exists for: the source alice
-    -- did NOT choose is not redirected, so its damage stays on the creature it
-    -- was aimed at. Before the chosenSource field this 2 moved to the
-    -- Attendants, the row naming no source at all.
-    Spec.assertEqWith s "the unchosen source's 2 stays on the victim" (S.damageOf victim (strike alpha 2 aimed)) (Just 2)
-    Spec.assertEqWith s "and nothing landed on the Attendants" (S.damageOf attendantsId (strike alpha 2 aimed)) (Just 0)
-    -- Its twin, on the same board and differing in one thing: the chosen
-    -- source's damage IS moved, so the case cannot pass by installing no row.
-    Spec.assertEqWith s "the chosen source's 3 leaves the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 0)
-    -- CR 614.9 replaces the RECIPIENT and nothing else, so the whole 3 arrives:
-    -- "does nothing" and "prevents" are what this separates the redirect from.
-    Spec.assertEqWith s "and lands whole on the Attendants, the ability's own source" (S.damageOf attendantsId (strike omega 3 aimed)) (Just 3)
-    -- The proxies, after the behaviour: a row exists, it watches the object
-    -- alice named, and she was asked at all.
-    Spec.assertEqWith s "setup: one redirection row, from the targeted victim to the Attendants" (redirectRows aimed) [(Nothing, Just (Recipient.ToCreature victim), Recipient.ToCreature attendantsId)]
-    Spec.assertEqWith s "and it watches the source alice chose" (redirectSources aimed) [Just omega]
-    Spec.assertEqWith s "alice was asked which source, and answered omega" (chosenSourcesIn (answersFor (aimAndChoose victim omega) g4 activate)) [omega]
-  -- The discriminating twin, differing from the case above in the ANSWER alone:
-  -- CR 609.7a's source is the player's choice, so the same board answering alpha
-  -- moves alpha's damage and leaves omega's where it was. Without it the case
-  -- above could pass on an engine that baked a fixed candidate -- the last one,
-  -- say -- rather than the one alice named.
-  Spec.it s "CR 609.7a the same board answering the OTHER source moves that one's damage instead" $ do
-    plains <- S.printingOf s registry "Plains"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    attendants <- S.printingOf s registry "Oracle's Attendants"
-    let base = S.landsInPlay plains 1
-        (attendantsId, g1) = S.addPermanent attendants S.alice base
-        (victim, g2) = S.addPermanent pikerPrinting S.alice g1
-        (alpha, g3) = S.addPermanent pikerPrinting S.bob g2
-        (omega, g4) = S.addPermanent pikerPrinting S.bob g3
-        activate = Activate.activateAbility S.alice attendantsId (theAbility attendants) Monad.>> Stack.resolveTop
-        aimed = S.runPure (aimAndChoose victim alpha) g4 activate
-        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature victim) n])
-    Spec.assertEqWith s "alpha's 2 moves now that alpha is the chosen source" (S.damageOf attendantsId (strike alpha 2 aimed)) (Just 2)
-    Spec.assertEqWith s "and the victim took none of it" (S.damageOf victim (strike alpha 2 aimed)) (Just 0)
-    Spec.assertEqWith s "omega's 3 stays on the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 3)
-    Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (aimAndChoose victim alpha) g4 activate)) [alpha]
 
 -- Every floating COUNTED redirection row, as (remaining, source side, destination,
 -- watched source): redirectRows' twin for DamageRewrite.RedirectNext, read back
@@ -2913,15 +2240,6 @@ orderedBy :: [Recipient.Recipient] -> Prompt.Prompt r -> r
 orderedBy wanted p = case p of
   Prompt.AllocateDamage _ _ events share ->
     S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
-  _ -> S.identityAnswer p
-
--- Divide a contested countdown a point at a time, one to each offered event --
--- the division Harm's Way's rulings name and no ORDER of the batch can produce.
--- Pinned by shape rather than searched for, so a mutation cannot be repaired
--- into the right answer.
-onePointEach :: Prompt.Prompt r -> r
-onePointEach p = case p of
-  Prompt.AllocateDamage _ _ events _ -> fmap (const 1) events
   _ -> S.identityAnswer p
 
 -- CR 614.9's redirection with CR 615.7's countdown, whose producer is Carom
@@ -3070,8 +2388,8 @@ aimAliceToBobAtTwo p = case p of
 -- event, rather than a row per recipient. The destination is bob himself, so the
 -- moved damage is read off a life total.
 --
--- The chosen source is omega, deliberately not the first candidate offered,
--- Oracle's Attendants' reason.
+-- The chosen source is omega, deliberately not the first candidate offered, so
+-- an engine that took the head would watch the wrong source.
 harmsWaySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 609.7a)" $ do
   let hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
@@ -3199,73 +2517,6 @@ harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 60
       [(3, Recipient.ToCreature mine), (2, Recipient.ToPlayer S.bob), (1, Recipient.ToPlayer S.alice)]
     Spec.assertEqWith s "either way bob takes exactly the 2" (fmap (`S.lifeOf` creatureFirst) [S.bob] <> fmap (`S.lifeOf` aliceFirst) [S.bob]) [Just 18, Just 18]
     Spec.assertBool s (wasAskedToAllocateDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) redirected (Damage.applyDamage batch))) "alice was asked how to divide the 2"
-  -- The ruling's LAST sentence, which an order cannot express: "If you like, you
-  -- can choose to redirect 1 damage that would be dealt by the chosen source to
-  -- each of two different recipients." One source dealing 2 to each of two of
-  -- alice's 2/2s -- Pyroclasm's shape, named in the ruling above -- and a
-  -- countdown of 2 split a point each way, so each creature is marked with 1 and
-  -- CR 704.5g takes neither. Spending the 2 down the batch instead, which is
-  -- every ORDER of it, leaves the second creature its whole 2 and kills it.
-  --
-  -- Cabal Evangel ({2}{W}{W} Creature -- Human Cleric 2/2, vanilla; name, cost,
-  -- type line and Oracle text checked against api.scryfall.com 2026-09-15) is the
-  -- recipient: 2 toughness is what makes 1 survivable and 2 lethal, and no
-  -- ability of its own can reach the board.
-  Spec.it s "CR 615.7 alice redirects 1 from each of two simultaneous hits, and both creatures live" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    evangel <- S.printingOf s registry "Cabal Evangel"
-    harmsWay <- S.printingOf s registry "Harm's Way"
-    let base = S.landsInPlay plains 1
-        (first_, g1) = S.addPermanent evangel S.alice base
-        (second_, g2) = S.addPermanent evangel S.alice g1
-        (omega, g3) = S.addPermanent piker S.bob g2
-        (harmsWayId, g4) = S.addHandCard harmsWay S.alice g3
-        ready =
-          g4
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        redirected = S.runPure (aimAtBobChoosing omega) ready (S.cast S.alice harmsWayId Monad.>> Stack.resolveTop)
-        batch = [hit omega (Recipient.ToCreature first_) 2, hit omega (Recipient.ToCreature second_) 2]
-        split_ = S.settleSba (S.runPure onePointEach redirected (Damage.applyDamage batch))
-        downTheBatch = S.settleSba (S.runPure (orderedBy [Recipient.ToCreature first_, Recipient.ToCreature second_]) redirected (Damage.applyDamage batch))
-    -- THE gameplay assertion: 1 came off each, so CR 704.5g takes neither.
-    Spec.assertEqWith
-      s
-      "a point off each leaves both 2/2s alive"
-      (S.onBattlefield first_ split_, S.onBattlefield second_ split_)
-      (True, True)
-    Spec.assertEqWith s "each keeps 1 of its 2" (S.damageOf first_ split_, S.damageOf second_ split_) (Just 1, Just 1)
-    -- The other division, which is what every ORDER of the batch produces: the
-    -- whole 2 goes to the first hit and the second creature dies.
-    Spec.assertEqWith
-      s
-      "spent down the batch instead, the second creature dies"
-      (S.onBattlefield first_ downTheBatch, S.onBattlefield second_ downTheBatch)
-      (True, False)
-    -- Either way the target takes exactly the 2 that moved, so life cannot tell
-    -- the two divisions apart and the board above is the only reading that does.
-    Spec.assertEqWith s "bob takes the 2 either way" (S.lifeOf S.bob split_, S.lifeOf S.bob downTheBatch) (Just 18, Just 18)
-    -- The proxies, after the behaviour.
-    Spec.assertBool s (wasAskedToAllocateDamage (answersFor onePointEach redirected (Damage.applyDamage batch))) "alice was asked how to divide the 2"
-    Spec.assertEqWith s "setup: one counted row of 2, aimed at bob and watching omega" (countedRedirectRows redirected) [(2, Nothing, Recipient.ToPlayer S.bob, Just omega)]
-  -- CR 615.12 speaks of PREVENTION effects, and a redirection is not one, so
-  -- unpreventable damage still contends for the 2 and is still moved. This is
-  -- what gives Replacement.contested's `contends` its observer: filtering the
-  -- batch by preventability, as a prevention shield's contest is, would leave
-  -- nothing to order here.
-  Spec.it s "CR 615.12 unpreventable damage is still moved, and still contended for" $ do
-    (mine, _, omega, _, redirected) <- board
-    spiderPunk <- S.printingOf s registry "Spider-Punk"
-    let (_, withPunk) = S.addPermanent spiderPunk S.bob redirected
-        batch = [hit omega (Recipient.ToCreature mine) 3, hit omega (Recipient.ToPlayer S.alice) 3]
-        aliceFirst = S.runPure (orderedBy [Recipient.ToPlayer S.alice]) withPunk (Damage.applyDamage batch)
-    Spec.assertEqWith s "alice first: she keeps 1" (S.lifeOf S.alice aliceFirst) (Just 19)
-    Spec.assertEqWith s "the creature keeps its whole 3" (S.damageOf mine aliceFirst) (Just 3)
-    Spec.assertEqWith s "and bob takes the 2" (S.lifeOf S.bob aliceFirst) (Just 18)
-    Spec.assertBool s (wasAskedToAllocateDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) withPunk (Damage.applyDamage batch))) "alice was asked how to divide the 2"
   -- The BASELINE: the same board, the spell never cast.
   Spec.it s "CR 614.9 no redirect, no move: alice takes the whole 5" $ do
     (_, _, omega, ready, _) <- board
@@ -3275,7 +2526,7 @@ harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 60
     Spec.assertEqWith s "setup: no row" (countedRedirectRows ready) []
 
 -- CR 614.9 with BOTH halves of the sentence printed on a card, which is what
--- separates this group from Turn the Tables and Oracle's Attendants above: those
+-- separates this group from Turn the Tables and Oracle's Attendants: those
 -- two are resolutions, so the engine bakes their recipient and their destination
 -- as ids. Pariah ({2}{W} Enchantment -- Aura, "Enchant creature / All damage
 -- that would be dealt to you is dealt to enchanted creature instead"; name,
@@ -3365,14 +2616,6 @@ aimObjectWithX n oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just oid) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
 
--- The same, aimed at a PLAYER instead: CR 115.4's "any target" offers both kinds
--- of recipient, and Lava Burst's clause narrows to one of them.
-aimPlayerWithX :: Natural.Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
-aimPlayerWithX n pid p = case p of
-  Prompt.ChooseX {} -> n
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just pid) . Recipient.playerOf) . snd) sets
-  _ -> S.identityAnswer p
-
 -- CR 615.12 and CR 614.9 on the CR 611.2c STORED carrier -- a spell speaking
 -- about the damage its own resolution is about to deal -- whose producer is Lava
 -- Burst ({X}{R} Sorcery, "Lava Burst deals X damage to any target. If Lava Burst
@@ -3398,62 +2641,10 @@ aimPlayerWithX n pid p = case p of
 -- control on their OWN board differing in the SOURCE alone, and the middle one
 -- is itself the control for the RECIPIENT limb -- so none can pass on an engine
 -- that suppressed the whole class of preventions or redirections.
-lavaBurstSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lavaBurstSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 lavaBurstSpec s registry = Spec.describe s "Lava Burst (CR 615.12, CR 614.9)" $ do
   let hit src recipient n =
         DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
-  -- CR 615.12 from the stored carrier, with its control on the same board: the
-  -- shield prevents the Piker's damage whole and none of Lava Burst's.
-  Spec.it s "CR 615.12 the shield prevents none of Lava Burst's 3 and is not reduced by it" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    mendingHands <- S.printingOf s registry "Mending Hands"
-    lavaBurst <- S.printingOf s registry "Lava Burst"
-    let base = S.landsFor mountain S.alice 4 (S.landsInPlay plains 1)
-        (victim, g1) = S.addPermanent jedit S.alice base
-        (decoy, g2) = S.addPermanent pikerPrinting S.bob g1
-        (g3, mendId) = S.handOne mendingHands g2
-        (g4, burstId) = S.handOne lavaBurst g3
-        -- The shield is REALLY cast, so its pattern and its stored amount are the
-        -- codec's parse of the committed card rather than a hand-built row.
-        shielded = S.runPure (aimObjectWithX 0 victim) g4 (S.cast S.alice mendId Monad.>> Stack.resolveTop)
-        burnt = S.runPure (aimObjectWithX 3 victim) shielded (S.cast S.alice burstId Monad.>> Stack.resolveTop)
-    -- THE gameplay assertion, and the one #844 existed for: the whole 3 is marked
-    -- on the shielded creature. With the source dropped on the way out of
-    -- `applying`, Filter.IsSource answered False and the shield ate all of it.
-    Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim burnt) (Just 3)
-    -- CR 615.12's last sentence: "existing damage prevention shields won't be
-    -- reduced by damage that can't be prevented".
-    Spec.assertEqWith s "and the shield still holds all 4" (shieldsLeft burnt) [4]
-    -- THE CONTROL, on the same board and differing in the SOURCE alone: the
-    -- Piker's 2 is a source Lava Burst's clause does not name, so the same shield
-    -- prevents it whole and is spent for it.
-    let elsewhere = settleDamage S.identityAnswer burnt [hit decoy (Recipient.ToCreature victim) 2]
-    Spec.assertEqWith s "the Piker's 2 is prevented, so nothing more is marked" (S.damageOf victim elsewhere) (Just 3)
-    Spec.assertEqWith s "and 2 of the shield's 4 were spent for it" (shieldsLeft elsewhere) [2]
-    -- The proxies, after the behaviour.
-    Spec.assertEqWith s "setup: the shield is a floating replacement holding 4" (shieldsLeft shielded) [4]
-    Spec.assertEqWith s "setup: Lava Burst resolved out of hand" (length (GameState.stack burnt)) 0
-  -- The RECIPIENT limb, which is the other half of Lava Burst's condition: the
-  -- clause says "if Lava Burst would deal damage to A CREATURE", so its own
-  -- damage dealt to a PLAYER is preventable like anybody's. Same card, same
-  -- shield amount and same X as the case above; what differs is the KIND of
-  -- recipient both are aimed at.
-  Spec.it s "CR 615.12 the same shield still prevents Lava Burst's 3 dealt to a player" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    mendingHands <- S.printingOf s registry "Mending Hands"
-    lavaBurst <- S.printingOf s registry "Lava Burst"
-    let base = S.landsFor mountain S.alice 4 (S.landsInPlay plains 1)
-        (g1, mendId) = S.handOne mendingHands base
-        (g2, burstId) = S.handOne lavaBurst g1
-        shielded = S.runPure (aimPlayerWithX 0 S.bob) g2 (S.cast S.alice mendId Monad.>> Stack.resolveTop)
-        burnt = S.runPure (aimPlayerWithX 3 S.bob) shielded (S.cast S.alice burstId Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "bob loses no life, the shield having prevented the lot" (S.lifeOf S.bob burnt) (Just 20)
-    Spec.assertEqWith s "and 3 of the shield's 4 were spent for it" (shieldsLeft burnt) [1]
-    Spec.assertEqWith s "setup: the shield is a floating replacement holding 4" (shieldsLeft shielded) [4]
   -- CR 614.9, the redirection limb, and #1681's own case. Oracle's Attendants
   -- ({3}{W} Creature -- Human Soldier, 1/5: "{T}: All damage that would be dealt
   -- to target creature this turn by a source of your choice is dealt to this
@@ -3614,51 +2805,13 @@ shieldWith :: ObjectId.ObjectId -> ObjectId.ObjectId -> ActivatedAbility.Activat
 shieldWith cultistId victim ability gs =
   S.runPure (aimingAt victim) gs {GameState.priority = Just S.alice} (Activate.activateAbility S.alice cultistId ability Monad.>> Stack.resolveTop)
 
--- Attack with everything, block every attacker with every blocker, and settle a
--- contested batch by SOURCE -- deflectionCombat's shape, ordering by source
--- rather than by recipient because the batch below shares one recipient.
-blockAllAndOrder :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-blockAllAndOrder wanted p = case p of
-  Prompt.DeclareAttackers _ _ ids -> ids
-  Prompt.DeclareBlockers _ _ blockers attackers -> Map.fromList (fmap (\b -> (b, Set.fromList attackers)) blockers)
-  Prompt.OrderDamage _ _ events ->
-    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.source e) wanted)
-     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
-  _ -> S.identityAnswer p
-
 -- CR 614.1a's "instead" with an ACTION rather than an amount or a destination:
 -- Kill-Suit Cultist's "{B}, Sacrifice this creature: The next time damage would
 -- be dealt to target creature this turn, destroy that creature instead". The one
 -- printing whose damage replacement RUNS a card's effects, and the one whose
 -- nested effect names the slot its own ability targeted.
-killSuitCultistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+killSuitCultistSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 killSuitCultistSpec s registry = Spec.describe s "Kill-Suit Cultist (CR 614.1a)" $ do
-  -- CR 614.3's "used up", at gameplay level rather than as a count of rows: the
-  -- shield covers the FIRST event and the second lands whole.
-  --
-  -- Darksteel Myr is what makes a second event reachable at all. CR 701.8c: an
-  -- indestructible permanent cannot be destroyed, so what the rewrite runs does
-  -- nothing to it -- and the ROW is used up all the same, which is the half CR
-  -- 614.3 states and this board reads.
-  Spec.it s "CR 614.3 the row covers the next damage event and no later one" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    swampPrinting <- S.printingOf s registry "Swamp"
-    cultistPrinting <- S.printingOf s registry "Kill-Suit Cultist"
-    myr <- S.printingOf s registry "Darksteel Myr"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let base = S.landsFor swampPrinting S.alice 1 (S.landsInPlay mountain 2)
-        (cultistId, g1) = S.addPermanent cultistPrinting S.alice base
-        (myrId, g2) = S.addPermanent myr S.bob g1
-        (g3, firstBolt) = S.handOne bolt g2
-        (g4, secondBolt) = S.handOne bolt g3
-    case Face.activatedAbilities (S.combinedFace cultistPrinting) of
-      [] -> Spec.assertFailure s "Kill-Suit Cultist should declare one activated ability"
-      ability : _ -> do
-        let shielded = shieldWith cultistId myrId ability g4
-            afterFirst = castAndResolve (aimingAt myrId) shielded firstBolt
-            afterSecond = castAndResolve (aimingAt myrId) afterFirst secondBolt
-        Spec.assertEqWith s "the first Bolt is replaced: nothing is marked on the Myr" (S.damageOf myrId afterFirst) (Just 0)
-        Spec.assertEqWith s "and the second lands whole, the row having been used up" (S.damageOf myrId afterSecond) (Just 3)
   -- CR 701.14a's fight is an ordinary damage event, so what a rewrite runs in its
   -- place happens INSIDE the resolution that dealt it. The board reads the state
   -- the instant Prey Upon finishes resolving: bob's 0/8 Wall took 2 from a 2/1
@@ -3683,38 +2836,6 @@ killSuitCultistSpec s registry = Spec.describe s "Kill-Suit Cultist (CR 614.1a)"
             fought = castAndResolve S.identityAnswer shielded preyId
         Spec.assertBool s (not (Set.member wallId (GameState.battlefield fought))) "the Wall is gone as the fight's own resolution ends"
         Spec.assertEqWith s "and it was destroyed rather than dealt the 2 a 0/8 survives" (S.damageOf wallId fought) Nothing
-  -- CR 616.1: a ONCE row that admits two simultaneous events is exhausted by
-  -- either, so the shielded object's controller chooses which one it replaces --
-  -- Replacement.contestedResource counts this row in APPLICATIONS, CR 122.1c's
-  -- unit rather than CR 615.7's.
-  --
-  -- The two orderings differ in nothing but the answer, and alice's life is what
-  -- separates them: CR 120.3f gains her 2 for the lifelinker's damage exactly
-  -- when the Piker's event is the one replaced. An engine that reported no
-  -- contested resource settles the batch by APNAP alone and answers the same
-  -- both times.
-  Spec.it s "CR 616.1 the shielded creature's controller picks which of two simultaneous events the row replaces" $ do
-    swampPrinting <- S.printingOf s registry "Swamp"
-    cultistPrinting <- S.printingOf s registry "Kill-Suit Cultist"
-    childOfNight <- S.printingOf s registry "Child of Night"
-    piker <- S.printingOf s registry "Goblin Piker"
-    palaceGuard <- S.printingOf s registry "Palace Guard"
-    let (gs0, mine, theirs) = S.combatBoardOf [childOfNight, piker] [palaceGuard]
-        withSwamp = S.landsFor swampPrinting S.alice 1 gs0
-        (cultistId, g1) = S.addPermanent cultistPrinting S.alice withSwamp
-    case (Face.activatedAbilities (S.combinedFace cultistPrinting), mine, theirs) of
-      (ability : _, [lifelinker, plainAttacker], [guardId]) -> do
-        let shielded = (shieldWith cultistId guardId ability g1) {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
-            strike order = S.runCombat (blockAllAndOrder order) shielded
-            lifelinkerReplaced = strike [lifelinker, plainAttacker]
-            pikerReplaced = strike [plainAttacker, lifelinker]
-        Spec.assertEqWith s "replacing the lifelinker's event gains alice nothing" (S.lifeOf S.alice lifelinkerReplaced) (Just 20)
-        Spec.assertEqWith s "replacing the other one leaves the lifelink to land" (S.lifeOf S.alice pikerReplaced) (Just 22)
-        Spec.assertBool
-          s
-          (wasAskedToOrderDamage (answersFor (blockAllAndOrder [lifelinker, plainAttacker]) shielded S.combatGame))
-          "the Guard's controller was asked which of the two events the one-use row replaces"
-      _ -> Spec.assertFailure s "fixture should have two attackers, a Palace Guard and one activated ability"
 
 cryogenicStasisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" $ do
@@ -3760,79 +2881,6 @@ cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" 
     Spec.assertEqWith s "setup: it went into the step untapped" (tapStateOf piker stunned) (Just TapState.Untapped)
     Spec.assertEqWith s "and came out of it untapped" (tapStateOf piker after) (Just TapState.Untapped)
 
--- CR 614.1a / 502.3: Bewitching Leechcraft {1}{U} Enchantment -- Aura, "Enchant
--- creature / When this Aura enters, tap enchanted creature. / Enchanted creature
--- has 'If this creature would untap during your untap step, remove a +1/+1
--- counter from it instead. If you do, untap it.'" (Oracle text checked against
--- api.scryfall.com 2026-09-29).
---
--- alice casts it on bob's Piker through the priority loop, so the grant and the
--- tap are the card's own. The three boards differ in one thing each: the
--- Piker's counters (paid versus none to pay), and which road untaps it (bob's
--- untap step versus Dream's Grip in alice's main phase).
-bewitchingLeechcraftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-bewitchingLeechcraftSpec s registry = Spec.describe s "Bewitching Leechcraft (CR 614.1a)" $ do
-  let piker = S.aliasRef "piker"
-      island = S.namedRef "Island"
-      leechcraft = S.namedRef "Bewitching Leechcraft" 1
-      grip = S.namedRef "Dream's Grip" 1
-      pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
-      leechBoard counters =
-        S.board
-          ( (S.battlefield S.alice [S.permanent "Island", S.permanent "Island", S.permanent "Island"]) {Seat.hand = Seq.fromList [S.permanent "Bewitching Leechcraft", S.permanent "Dream's Grip"]}
-              NonEmpty.:| [S.battlefield S.bob [(S.settled "piker" "Goblin Piker") {Placement.counters = counters}]]
-          )
-          S.alice
-          S.precombatMain
-      enchant =
-        S.on
-          S.precombatMain
-          S.alice
-          ( S.castAction
-              leechcraft
-              Choices.none
-                { Choices.targets = Just [piker],
-                  Choices.manaSources = Seq.fromList [Just (island 1), Just (island 2), Nothing]
-                }
-          )
-      -- CR 502.3, bob's: the step Engine.runStep runs for the phase it is in.
-      bobsUntapStep gs = S.runPure S.identityAnswer gs {GameState.activePlayer = S.bob, GameState.phase = Phase.Beginning BeginningStep.Untap} Engine.runStep
-      pikerIn gs = case Scenario.namedObjects pikerName gs of
-        [oid] -> Just oid
-        _ -> Nothing
-      pikerState gs = case pikerIn gs of
-        Just oid -> (tapStateOf oid gs, S.counterOf CounterKind.PlusOnePlusOne oid gs)
-        Nothing -> (Nothing, 0)
-  Spec.it s "CR 614.1a the enchanted creature pays a +1/+1 counter to untap in its controller's untap step" $ do
-    enchanted <- S.play s registry (leechBoard (Map.singleton CounterKind.PlusOnePlusOne 2)) (S.turn 1 [enchant]) S.priorityGame
-    let untapped = bobsUntapStep enchanted
-    Spec.assertEqWith s "CR 614.1a the Piker untapped and paid exactly one of its two counters" (pikerState untapped) (Just TapState.Untapped, 1)
-    Spec.assertEqWith s "setup: the Aura's trigger tapped the Piker, which kept both counters" (pikerState enchanted) (Just TapState.Tapped, 2)
-  -- "If you do": with nothing to remove, the untap does not happen.
-  Spec.it s "CR 614.1a with no +1/+1 counter to remove it stays tapped" $ do
-    enchanted <- S.play s registry (leechBoard Map.empty) (S.turn 1 [enchant]) S.priorityGame
-    let untapped = bobsUntapStep enchanted
-    Spec.assertEqWith s "CR 614.1a the counterless Piker is still tapped after bob's untap step" (pikerState untapped) (Just TapState.Tapped, 0)
-    Spec.assertEqWith s "setup: the Aura's trigger tapped the Piker" (pikerState enchanted) (Just TapState.Tapped, 0)
-  -- CR 502.3: "during your untap step" only. Dream's Grip's second mode untaps
-  -- it at alice's beginning of combat, a step after the Aura's trigger tapped
-  -- it, and the row does not apply.
-  Spec.it s "CR 502.3 an untap outside the untap step is not replaced" $ do
-    let untap =
-          S.on
-            S.beginningOfCombat
-            S.alice
-            ( S.castAction
-                grip
-                Choices.none
-                  { Choices.targets = Just [piker],
-                    Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
-                    Choices.manaSources = Seq.fromList [Just (island 3)]
-                  }
-            )
-    gripped <- S.play s registry (leechBoard (Map.singleton CounterKind.PlusOnePlusOne 2)) (S.turn 1 [enchant, untap]) (Engine.runStep Monad.>> Engine.runStep)
-    Spec.assertEqWith s "CR 502.3 Dream's Grip untapped the Piker and it kept both counters" (pikerState gripped) (Just TapState.Untapped, 2)
-
 -- The names of the cards in a player's graveyard, sorted.
 graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
 graveyardNames pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs))
@@ -3869,7 +2917,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   interventionPactSpec s registry
   newWayForwardSpec s registry
   turnTheTablesSpec s registry
-  oraclesAttendantsSpec s registry
   caromSpec s registry
   harmsWaySpec s registry
   captainsManeuverSpec s registry
@@ -3877,5 +2924,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   lavaBurstSpec s registry
   queensBayPaladinSpec s registry
   cryogenicStasisSpec s registry
-  bewitchingLeechcraftSpec s registry
   killSuitCultistSpec s registry

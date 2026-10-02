@@ -39,22 +39,16 @@
 -- reason: Prompt.ChooseCardName offers no candidate list.
 module Pawl.PreparationSpec where
 
-import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
-import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Cast as Cast
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
@@ -63,7 +57,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
-import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -74,13 +67,9 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.Zone as Zone
@@ -109,15 +98,6 @@ prepareCopies gs =
     (\oid -> case Game.lookupObject oid gs of Nothing -> False; Just obj -> Maybe.isJust (Object.preparedCopyOf obj))
     (Set.toList (GameState.exile gs))
 
--- The newest battlefield permanent whose PRINTED card is a Clone -- read off the
--- printing rather than off the projection, which is exactly the name a copy no
--- longer has (CR 707.2). Pawl.MoveCounterSpec's `newestNamed` reads the projected
--- face for the same job; this one must not, since the object under test is a copy.
-newestClone :: GameState.GameState -> Maybe ObjectId.ObjectId
-newestClone gs =
-  let printed oid = fmap (S.nameOf . Printing.card) (Game.printingOfObject oid gs) == Just cloneName
-   in Maybe.listToMaybe (List.sortOn Ord.Down (filter printed (Set.toList (GameState.battlefield gs))))
-
 isPrepared :: ObjectId.ObjectId -> GameState.GameState -> Bool
 isPrepared oid gs = maybe False (Set.member Designation.Prepared . Object.designations) (Game.lookupObject oid gs)
 
@@ -127,26 +107,6 @@ isPrepared oid gs = maybe False (Set.member Designation.Prepared . Object.design
 jumpAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 jumpAt victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets
-  _ -> S.identityAnswer p
-
--- CR 707.5's as-enters choice, pinned to ONE named permanent rather than
--- searched, which is Pawl.CopySpec's `copyNamed` posture and for its reason: an
--- answerer that looked for a legal creature would find the Aviator again after a
--- mutation and repair the assertion. Trigger batches are ordered as they arrive,
--- since the Clone's own entry and the attack put several on the stack.
-copyNamed :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-copyNamed wanted p = case p of
-  Prompt.ChooseCopyTarget {} -> Just wanted
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  _ -> S.identityAnswer p
-
--- Reality Ripple's one target, pinned to a named permanent for copyNamed's
--- reason, and everything else answered as `attackTo` would so the same answerer
--- can carry a combat.
-rippleAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-rippleAt victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just victim) . Recipient.objectOf) . snd) sets
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   _ -> S.identityAnswer p
 
 -- alice's Aviator and a Goblin Piker against bob, with one Island to pay the
@@ -163,99 +123,11 @@ aviatorDuel =
     ]
     []
 
--- The same board with Aurelia, the Warleader beside the Aviator: her CR 500.8
--- additional combat phase is what gives one turn two declare-attackers steps, and
--- her untap (she is the only source of one here) is what lets the Aviator attack
--- in the second one.
---
--- bob starts at 60 so that two combats do not kill him: the three attackers deal
--- 7 a combat, and a dead defending player would end the game (CR 104.3b) before
--- the second declaration this case is about.
-aureliaDuel :: Board.Board
-aureliaDuel =
-  S.board
-    ( S.battlefield
-        S.alice
-        [ S.settled "aviator" "Encouraging Aviator",
-          S.settled "aurelia" "Aurelia, the Warleader",
-          S.settled "piker" "Goblin Piker",
-          S.aliased "island" (S.permanent "Island")
-        ]
-        NonEmpty.:| [(S.battlefield S.bob []) {Seat.life = 60}]
-    )
-    S.alice
-    S.beginningOfCombat
-
 -- The Aviator attacks bob unblocked, and the whole combat phase runs -- so CR
 -- 508.1's declaration, CR 603.3's trigger placement and CR 608's resolution all
 -- happen inside the engine rather than being poked in.
 attackScript :: Seq.Seq Timed.Timed
 attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "aviator"])]
-
--- CR 722.2b's board. The printed Aviator is here only to be COPIED: Concordant
--- Crossroads gives every creature haste (CR 702.10b), so the Clone can attack the
--- turn it enters. Six Islands, where the Clone's {2}{U} and then Jump's {U} come
--- to four: the spare mana is what keeps "alice may cast the copy" a claim about
--- CR 722.3c's permission rather than about an empty board.
---
--- The printed Aviator attacks too -- `attackTo` declares every creature -- and
--- mints a copy of its own, which is why every assertion below is keyed to the
--- permanent a copy NAMES rather than to a count of exile.
-cloneDuel :: Board.Board
-cloneDuel =
-  S.duel
-    S.precombatMain
-    [ S.settled "aviator" "Encouraging Aviator",
-      S.settled "piker" "Goblin Piker",
-      S.permanent "Concordant Crossroads",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island",
-      S.permanent "Island"
-    ]
-    []
-
--- CR 702.26b's board: the proving board plus three Islands and Reality Ripple in
--- alice's own hand, so the phase-out happens after the mint with nothing else
--- changed.
-rippleDuel :: Board.Board
-rippleDuel =
-  S.board
-    ( ( S.battlefield
-          S.alice
-          [ S.settled "aviator" "Encouraging Aviator",
-            S.settled "piker" "Goblin Piker",
-            S.permanent "Island",
-            S.permanent "Island",
-            S.permanent "Island"
-          ]
-      )
-        { Seat.hand = Seq.fromList [S.aliased "ripple" (S.cardSetup "Reality Ripple")]
-        }
-        NonEmpty.:| [S.battlefield S.bob []]
-    )
-    S.alice
-    S.beginningOfCombat
-
--- The exile copy minted FOR this permanent, by id. Keyed to the permanent rather
--- than to a count, so a board carrying two prepared permanents can name either.
-copyFor :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
-copyFor permanentId gs =
-  filter
-    (\oid -> case Game.lookupObject oid gs of Nothing -> False; Just obj -> Object.preparedCopyOf obj == Just permanentId)
-    (prepareCopies gs)
-
--- CR 502's untap step, run for `pid`: Pawl.PhasingSpec's helper of the same name
--- and shape, since CR 702.26a's phase-in is a turn-based action of that step and
--- there is no shorter road to it.
-untapStep :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-untapStep pid gs =
-  S.runPure
-    S.identityAnswer
-    gs {GameState.activePlayer = pid}
-    (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
 aliasOrFail :: (Monad m) => Spec.Spec m n -> Staged.Staged -> String -> m ObjectId.ObjectId
 aliasOrFail s built name = case Map.lookup (Label.MkLabel (Text.pack name)) (Staged.objects built) of
@@ -356,125 +228,3 @@ spec s registry = Spec.describe s "Preparation" $ do
         swept = S.runPure S.identityAnswer bounced Sba.checkStateBasedActions
     Spec.assertEqWith s "CR 704.5e: the copy has ceased to exist" (prepareCopies swept) []
     Spec.assertEqWith s "and exile is empty" (Foldable.toList (GameState.exile swept)) []
-  -- CR 722.3a's second gate: "a permanent can't gain this designation if the
-  -- permanent already has it." Aurelia's CR 500.8 additional combat phase gives
-  -- the turn two declare-attackers steps and her untap lets the Aviator attack in
-  -- both, so its printed trigger resolves TWICE with the copy still in exile.
-  --
-  -- The control is the first attack: exactly one copy after it, so the one copy
-  -- after the second is a refused gain rather than a combat that never happened.
-  Spec.it s "CR 722.3a a second attack while already prepared mints no second copy" $ do
-    built <- S.buildBoardOrFail s registry aureliaDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    let twice = S.runCombat (S.attackTo S.bob) (Staged.state built)
-    -- The CONTROL, and what keeps the count below from passing vacuously: two
-    -- combats of 7 took bob from 60 to 46, where one would have left him at 53.
-    -- So the Aviator really did attack a second time while prepared.
-    Spec.assertEqWith s "CR 500.8: two combat phases happened" (S.lifeOf S.bob twice) (Just 46)
-    Spec.assertBool s (isPrepared aviatorId twice) "the Aviator is still prepared"
-    Spec.assertEqWith s "CR 722.3a: still exactly one copy in exile" (length (prepareCopies twice)) 1
-  -- CR 722.2b: "the existence and values of these alternative characteristics are
-  -- part of the object's copiable values." So a permanent has a prepare spell
-  -- because of what it COPIES, not because of the card printed underneath it --
-  -- and a Clone that entered as a copy of the Aviator (CR 707.5's as-enters road)
-  -- becomes prepared and mints a Jump copy of its own.
-  --
-  -- The falsifier is reading the printing behind Object.source, which is what the
-  -- first slice did: the Clone's own card is a {2}{U} shapeshifter with no inset
-  -- frame, so CR 722.3a's gate refused the designation and exile stayed empty.
-  --
-  -- The printed Aviator attacks alongside and mints its own copy, which is the
-  -- control: a mint that fired for neither, or one that fired only for the printed
-  -- card, is told apart by WHICH permanent each copy names.
-  Spec.it s "CR 722.2b a Clone of the Aviator becomes prepared and mints a Jump copy" $ do
-    built <- S.buildBoardOrFail s registry cloneDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    pikerId <- aliasOrFail s built "piker"
-    clone <- S.printingOf s registry "Clone"
-    let (cloneHandId, ready) = S.addHandCard clone S.alice (Staged.state built)
-        entered = S.runPure (copyNamed aviatorId) ready (S.cast S.alice cloneHandId *> Stack.resolveTop *> Engine.settleForPriority)
-    case newestClone entered of
-      Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
-      Just cloneId -> do
-        -- Without this the mint below could be the printed Aviator's: the Clone
-        -- has to be a copy at all before CR 722.2b has anything to say.
-        Spec.assertEqWith s "CR 707.5: the Clone entered as a copy of the Aviator" (Projection.namesOf cloneId entered) (Set.singleton aviatorName)
-        Spec.assertBool s (not (isPrepared cloneId entered)) "before: the Clone is not prepared"
-        -- Six steps carry the turn from its precombat main phase, where CR
-        -- 302.1's sorcery timing let the Clone be cast, into and through combat.
-        -- S.runCombat cannot: `combatGame` stops at once when the phase is not a
-        -- combat one, so it would run nothing here and the case would assert
-        -- against a board that never fought.
-        let fought = S.runPure (S.attackTo S.bob) entered (Monad.replicateM_ 6 Engine.runStep)
-        -- THE gameplay assertion, first so no proxy can absorb a mutation.
-        Spec.assertBool s (isPrepared cloneId fought) "CR 722.2b: the Clone became prepared"
-        case copyFor cloneId fought of
-          [copyId] -> do
-            Spec.assertEqWith s "CR 722.3c: the Clone's copy is Jump" (Projection.namesOf copyId fought) (Set.singleton jumpName)
-            Spec.assertBool s (Cast.castable S.alice copyId jumpName Facing.FaceUp fought) "and alice may cast it"
-            let resolved = S.runPure (jumpAt pikerId) fought (Cast.castSpell S.manaPerformer S.alice copyId jumpName Facing.FaceUp *> Stack.resolveTop)
-            Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId resolved) "and casting it gives the Piker flying"
-            Spec.assertBool s (not (isPrepared cloneId resolved)) "CR 601.2i: the Clone is no longer prepared"
-          other -> Spec.assertFailure s ("expected exactly one copy for the Clone, got " <> show (length other))
-        -- The control: the printed Aviator attacked too and minted its own, so a
-        -- mint that never ran at all is caught here rather than passing above.
-        Spec.assertEqWith s "and the printed Aviator minted one of its own" (length (copyFor aviatorId fought)) 1
-  -- CR 702.26b: a phased-out permanent "is treated as though it does not exist",
-  -- and CR 722.3c keeps the copy only "for as long as the prepared permanent
-  -- remains on the battlefield". So phasing the Aviator out ends the copy at the
-  -- next state-based check, which is also what that rule's own "or phases in
-  -- prepared" branch presupposes -- phasing in would otherwise mint a second copy
-  -- beside a first that never left.
-  --
-  -- The falsifier is reading Object.zone, which is what the first slice did: CR
-  -- 702.26d leaves a phased-out permanent's zone at Zone.Battlefield, so the copy
-  -- stayed in exile and stayed castable while the permanent did not exist.
-  Spec.it s "CR 702.26b Reality Ripple phases the Aviator out and the copy ceases to exist" $ do
-    built <- S.buildBoardOrFail s registry rippleDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    rippleId <- aliasOrFail s built "ripple"
-    (_, attacked) <- S.runScriptOrFail s attackScript built S.combatGame
-    -- The control, and what keeps the assertions below from passing vacuously.
-    Spec.assertEqWith s "the copy is there to lose" (length (prepareCopies attacked)) 1
-    Spec.assertBool s (any (\oid -> Cast.castable S.alice oid jumpName Facing.FaceUp attacked) (prepareCopies attacked)) "and alice may cast it"
-    let phased = S.runPure (rippleAt aviatorId) attacked (S.cast S.alice rippleId *> Stack.resolveTop *> Sba.checkStateBasedActions)
-    -- Without this the copy's absence could be a Reality Ripple that fizzled.
-    Spec.assertEqWith s "CR 702.26b: the Aviator left GameState.battlefield, phased out" (Set.member aviatorId (GameState.battlefield phased), Phasing.isPhasedOut aviatorId phased) (False, True)
-    -- THE gameplay assertion.
-    Spec.assertEqWith s "CR 704.5e: the copy has ceased to exist" (prepareCopies phased) []
-    Spec.assertEqWith s "and exile is empty" (Foldable.toList (GameState.exile phased)) []
-    Spec.assertBool s (notElem jumpName (namesOffered phased)) "so no Jump is offered any more"
-  -- CR 722.3c's SECOND trigger: "as a permanent with a prepare spell gains the
-  -- prepared designation or PHASES IN PREPARED, its controller creates a copy of
-  -- that object in exile". The case above takes the prepared Aviator away and CR
-  -- 704.5e ends its copy; alice's next untap step brings the same permanent back
-  -- still carrying the designation (CR 702.26a, and CR 702.26d touches no
-  -- designation), so the rule mints a fresh copy that is castable like the first.
-  --
-  -- Empty exile between the two is the control, and what makes this a claim about
-  -- the phase-in rather than about the first copy: without it a copy found
-  -- afterwards could be one that never left.
-  --
-  -- The falsifier is minting nothing, which is what the first two slices did: the
-  -- Aviator came back prepared with no copy in exile and no Jump to cast ever
-  -- again, since CR 722.3a refuses a designation the permanent already has.
-  Spec.it s "CR 722.3c the Aviator phases in prepared and mints a fresh Jump copy" $ do
-    built <- S.buildBoardOrFail s registry rippleDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    pikerId <- aliasOrFail s built "piker"
-    rippleId <- aliasOrFail s built "ripple"
-    (_, attacked) <- S.runScriptOrFail s attackScript built S.combatGame
-    let phased = S.runPure (rippleAt aviatorId) attacked (S.cast S.alice rippleId *> Stack.resolveTop *> Sba.checkStateBasedActions)
-    Spec.assertEqWith s "the first copy is gone before the return" (prepareCopies phased) []
-    let back = untapStep S.alice phased
-    -- Without the first two a mint that never ran could be a Ripple that never
-    -- wore off; without the third the flying below could be flying the Piker
-    -- already had.
-    Spec.assertEqWith s "CR 702.26a: the Aviator is back on the battlefield, still prepared, and the Piker has no flying" (Set.member aviatorId (GameState.battlefield back), isPrepared aviatorId back, Projection.hasKeyword Keyword.Flying pikerId back) (True, True, False)
-    case copyFor aviatorId back of
-      [copyId] -> do
-        let resolved = S.runPure (jumpAt pikerId) back (Cast.castSpell S.manaPerformer S.alice copyId jumpName Facing.FaceUp *> Stack.resolveTop)
-        -- THE gameplay assertion, first so no proxy can absorb a mutation: the
-        -- copy minted on the phase-in was cast and did what Jump says.
-        Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId resolved) "CR 722.3c: the copy minted on phasing in gives the Piker flying"
-      other -> Spec.assertFailure s ("expected exactly one copy for the returning Aviator, got " <> show (length other))

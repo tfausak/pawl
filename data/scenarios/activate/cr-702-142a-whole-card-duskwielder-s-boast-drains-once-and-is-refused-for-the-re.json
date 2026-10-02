@@ -1,0 +1,124 @@
+{
+  "description": "CR 702.142a whole card: Duskwielder's boast drains once and is refused for the rest of the turn",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Duskwielder",
+            "label": "duskwielder",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Prodigal Sorcerer",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$duskwielder"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$duskwielder",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$swamp",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate Prodigal Sorcerer",
+            "ActivateManaAbility Swamp#2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "bob",
+        "life": 19
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 21
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$duskwielder",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Swamp#2",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Prodigal Sorcerer",
+        "tapped": false
+      }
+    }
+  ]
+}

@@ -176,23 +176,6 @@ storedSpec s registry = Spec.describe s "Stored" $ do
     Spec.assertEqWith s "and its twin's is the one Troll offer left" offered [twin]
     Spec.assertEqWith s "one prohibition was stored, over the Troll named" (fmap ActiveActivationProhibition.object (GameState.activationProhibitions resolved)) [victim]
     Spec.assertEqWith s "and the ability's other clause tapped that same Troll" (fmap Object.tapped (Game.lookupObject victim resolved)) (Just TapState.Tapped)
-  -- The pair's other half: the same activation, aimed at the twin.
-  Spec.it s "CR 602.2 aimed at the twin, the first Troll is the one still offered" $ do
-    (victim, twin, resolved) <- deadlockResolved s registry "Uthden Troll" (\_ t -> t)
-    let offered = twinOffers victim twin resolved
-    Spec.assertBool s (notElem twin offered) "the twin's regeneration is withheld instead"
-    Spec.assertEqWith s "and the first Troll's is the one Troll offer left" offered [victim]
-  -- CR 605.3a's window, which the STORED row closes too: Pawl.Types.ForbidActivation
-  -- carries no CR 605.1a kind, so a mana ability goes the way every other
-  -- activated ability does. Treasonous Ogre's "Pay 3 life: Add {R}" is the pool's
-  -- mana ability that costs no tap, which the Trap's own tap would otherwise
-  -- answer for. The pair is the same activation aimed at the other Ogre.
-  Spec.it s "CR 605.3a whole cards: the Ogre Deadlock Trap named is no longer a mana source, and its twin is" $ do
-    (victim, twin, resolved) <- deadlockResolved s registry "Treasonous Ogre" const
-    Spec.assertEqWith s "only the twin is offered as a mana source" (twinOffers victim twin resolved) [twin]
-  Spec.it s "CR 605.3a aimed at the twin, the first Ogre is the mana source left" $ do
-    (victim, twin, resolved) <- deadlockResolved s registry "Treasonous Ogre" (\_ t -> t)
-    Spec.assertEqWith s "only the first Ogre is offered as a mana source" (twinOffers victim twin resolved) [victim]
   -- CR 400.7: the replayed Troll is a new object, so the row names nothing on
   -- the board and that Troll may regenerate. `replayed` below has the board.
   Spec.it s "CR 400.7 whole cards: a Troll bounced by Unsummon and replayed the same turn is no longer prohibited" $ do
@@ -205,12 +188,6 @@ storedSpec s registry = Spec.describe s "Stored" $ do
     Spec.assertBool s (elem twin offered) "and so is the twin's, which the Trap never named"
     Spec.assertEqWith s "exactly one permanent arrived on the replay" (length arrivals) 1
     Spec.assertEqWith s "and the stored row still names the Troll that left" (fmap ActiveActivationProhibition.object (GameState.activationProhibitions final)) [victim]
-  -- The control, differing from the case above in the bounce and nothing else.
-  Spec.it s "CR 602.2 the control: with no bounce that same Troll's regeneration stays withheld" $ do
-    (victim, twin, _, final) <- replayed s registry False
-    let offered = activatableIds (Action.legalActions S.alice final)
-    Spec.assertBool s (notElem victim offered) "the Troll the Trap named is still withheld"
-    Spec.assertBool s (elem twin offered) "and the twin beside it is still offered"
 
 -- The two twins bob may activate right now, narrowed off `activatableIds` so
 -- bob's Mountain -- which CR 605.3a offers him on every board here -- cannot

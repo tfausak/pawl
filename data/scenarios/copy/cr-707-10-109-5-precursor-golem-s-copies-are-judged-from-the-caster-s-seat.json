@@ -1,0 +1,137 @@
+{
+  "description": "CR 707.10 / 109.5 Precursor Golem's copies are judged from the caster's seat",
+  "note": "bob is the active player so he casts at his first priority; the Haskell fixture set priority by hand. He declines Crumb and Get It's gift.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Precursor Golem",
+            "label": "precursor"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains"
+          },
+          {
+            "card": "Coal Golem",
+            "label": "coal"
+          },
+          {
+            "card": "Icehide Golem",
+            "label": "icehide"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Crumb and Get It",
+            "label": "crumb"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseKicker",
+          "with": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$crumb",
+          "targets": [
+            "$icehide"
+          ],
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $precursor",
+            "Crumb and Get It"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Crumb and Get It#2",
+            "Crumb and Get It"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "PowerToughness": {
+        "object": "$coal",
+        "power": 5,
+        "toughness": 5
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$precursor",
+        "power": 3,
+        "toughness": 3
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$icehide",
+        "power": 4,
+        "toughness": 4
+      }
+    },
+    {
+      "View": {
+        "of": "Stack",
+        "is": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+  "description": "CR 612.1 a text change naming the count's word moves which permanents it counts",
+  "note": "Cabal Coffers with three tapped Swamps and one tapped Island of alice's, three Forests to pay its {2} and the Bloodletter's {1}. bob casts Magical Hack at the Coffers, off his own Island, swapping Swamp for Island: the Coffers now counts the one Island, makes one black, and the Bloodletter's {1}{B}{B}{B} cannot be paid. The control file swaps Plains instead, a word the Coffers never carried, and the same cast stands.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "f1"
+          },
+          {
+            "card": "Forest",
+            "label": "f2"
+          },
+          {
+            "card": "Forest",
+            "label": "f3"
+          },
+          {
+            "card": "Cabal Coffers",
+            "label": "coffers"
+          },
+          {
+            "card": "Swamp",
+            "label": "s1",
+            "tapped": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s2",
+            "tapped": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s3",
+            "tapped": true
+          },
+          {
+            "card": "Island",
+            "label": "alice-island",
+            "tapped": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Bloodletter of Aclazotz",
+            "label": "bloodletter"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "bob-island"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Magical Hack",
+            "label": "hack"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$hack",
+          "targets": [
+            "$coffers"
+          ],
+          "mana": [
+            "$bob-island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Magical Hack"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseTypeSwap": {
+          "from": {
+            "type": "Swamp"
+          },
+          "to": {
+            "type": "Island"
+          }
+        }
+      },
+      "source": "Magical Hack"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Magical Hack",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$bloodletter",
+          "mana": [
+            "$coffers",
+            "$f1",
+            "$f2",
+            "$f3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Bloodletter of Aclazotz",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Bloodletter of Aclazotz",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

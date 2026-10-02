@@ -1,0 +1,131 @@
+{
+  "description": "CR 702.5c enchant permanent then enchant creature offers no land",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "land"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Warden of Two Charges",
+            "label": "synthetic-warden-of-two-charges",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$synthetic-warden-of-two-charges",
+          "targets": [
+            "$land"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$synthetic-warden-of-two-charges",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Synthetic Warden of Two Charges",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Synthetic Warden of Two Charges",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Damage": {
+        "object": "Synthetic Warden of Two Charges",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Synthetic Warden of Two Charges",
+        "tapped": false
+      }
+    }
+  ]
+}

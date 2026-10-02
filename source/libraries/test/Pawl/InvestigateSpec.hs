@@ -58,7 +58,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
@@ -67,17 +66,6 @@ import qualified Pawl.Types.Zone as Zone
 -- move, so an id taken before a zone change never matches the one after it.
 namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
 namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
-
--- Answers Prompt.ChooseSacrifices with `wanted`, when it is on offer. A pair of
--- tests differing only in this argument proves the ANSWER decides which permanent
--- is sacrificed, rather than the order the candidates are enumerated in.
-sacrifices :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-sacrifices wanted p = case p of
-  Prompt.ChooseSacrifices _ _ _ candidates _ _ ->
-    if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
-  _ -> S.identityAnswer p
 
 -- CR 701.16a: "'Investigate' means 'Create a Clue token.' See rule 111.10f."
 -- The keyword action is pure shorthand for a Create, which is why Thraben
@@ -115,58 +103,8 @@ clueOf gs = case S.tokensOf gs of
   [oid] -> Just oid
   _ -> Nothing
 
--- The untapped lands on the board -- on this board, alice's Plains and nothing
--- else. Used to build the one-mana board from the two-mana board by tapping one
--- more land and changing nothing else.
-untappedPlains :: GameState.GameState -> [ObjectId.ObjectId]
-untappedPlains gs =
-  filter
-    (\oid -> Set.member CardType.Land (Projection.cardTypesOf oid gs) && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped)
-    (Set.toList (GameState.battlefield gs))
-
-investigateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+investigateSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 investigateSpec s registry = Spec.describe s "Investigate" $ do
-  Spec.it s "CR 701.16a Thraben Inspector's ETB creates one colorless Clue artifact token" $ do
-    after <- investigateBoard s registry
-    -- Three Plains, the Inspector and exactly one more permanent. Stated as a
-    -- total rather than as "one token" so that a Create minting two fails here
-    -- as well as at clueOf below.
-    Spec.assertEqWith s "five permanents: three Plains, the Inspector and one more" (Set.size (GameState.battlefield after)) 5
-    Spec.assertEqWith s "the Inspector resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Thraben Inspector") S.alice after) 1
-    case clueOf after of
-      Nothing -> Spec.assertFailure s "expected exactly one token on the battlefield"
-      Just clueId -> do
-        -- CR 111.4: investigate does not name its token, so the name is the
-        -- subtype plus the word "Token".
-        Spec.assertEqWith s "the token is named Clue Token" (fmap Face.name (Game.faceOf clueId after)) (Just . CardName.MkCardName $ Text.pack "Clue Token")
-        Spec.assertEqWith s "CR 111.10f: an artifact" (Projection.cardTypesOf clueId after) (Set.singleton CardType.Artifact)
-        Spec.assertEqWith s "CR 111.10f: with subtype Clue" (Projection.subtypesOf clueId after) (Set.singleton Subtype.Clue)
-        -- CR 202.2b ("objects with no colored mana symbols in their mana costs
-        -- are colorless") plus CR 202.2e (a color indicator is the other way an
-        -- object gets a color): the token face carries neither, which is how
-        -- the card data spells "colorless". The falsifier for the clause being
-        -- asserted rather than assumed -- a token face given colorIndicator
-        -- White fails here and nowhere else.
-        Spec.assertEqWith s "CR 111.10f: and colorless" (Projection.colorsOf clueId after) Set.empty
-        -- CR 111.2: the player who creates a token controls it.
-        Spec.assertEqWith s "CR 111.2: alice created it, so alice controls it" (Projection.controllerOf clueId after) (Just S.alice)
-  Spec.it s "CR 111.10f the Clue's {2} is real: one untapped Plains cannot pay it" $ do
-    -- The negative board differs from the positive one ONLY in how many lands
-    -- are untapped: same permanents, same phase, same empty stack. Without
-    -- that, "not activatable" would pass for any of the reasons a cost check
-    -- can fail.
-    twoMana <- investigateBoard s registry
-    case (clueOf twoMana, untappedPlains twoMana) of
-      (Just clueId, first : _) -> do
-        let oneMana = S.tapObject first twoMana
-        Spec.assertEqWith s "two Plains untapped after the {W}" (length (untappedPlains twoMana)) 2
-        Spec.assertEqWith s "one on the negative board" (length (untappedPlains oneMana)) 1
-        case Activatable.abilitiesFor clueId twoMana of
-          [ability] -> do
-            Spec.assertBool s (Activatable.activatable S.alice clueId ability twoMana) "two mana pays {2}"
-            Spec.assertBool s (not (Activatable.activatable S.alice clueId ability oneMana)) "one does not"
-          other -> Spec.assertFailure s ("expected exactly one activated ability on the Clue, got " <> show (length other))
-      _ -> Spec.assertFailure s "expected one token and at least one untapped Plains"
   Spec.it s "CR 111.10f cracking the Clue draws a card, and the token ceases to exist (CR 111.7)" $ do
     before <- investigateBoard s registry
     case clueOf before of
@@ -429,30 +367,8 @@ repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
 -- the designation from what CR 701.60c hangs off it: its menace is PRINTED and it
 -- is never suspected, so a criterion reading the menace grant rather than the
 -- designation would offer it as fodder.
-runeBrandJugglerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+runeBrandJugglerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 runeBrandJugglerSpec s registry = Spec.describe s "RuneBrandJuggler" $ do
-  Spec.it s "CR 701.60b the cost takes the suspected creature, and the menace one is not a candidate" $ do
-    (jugglerId, pikerId, bruteId, wallId, gs0) <- jugglerBoard s registry
-    let entered = S.runPure (takingTargets 1 [pikerId]) gs0 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-    -- The board the activation happens on: exactly one of alice's three creatures
-    -- is suspected, so every assertion below has a same-board counterexample.
-    Spec.assertEqWith s "the Piker is suspected, the Brute and the Juggler are not" (fmap (`suspectedOf` entered) [pikerId, bruteId, jugglerId]) [Just True, Just False, Just False]
-    Spec.assertEqWith s "and the Brute's menace is printed rather than the designation's" (Projection.hasKeyword Keyword.Menace bruteId entered, suspectedOf bruteId entered) (True, Just False)
-    case Activatable.abilitiesFor jugglerId entered of
-      [ability] -> do
-        Spec.assertBool s (Activatable.activatable S.alice jugglerId ability entered) "a suspected creature to sacrifice makes it activatable"
-        let after = S.runPure (jugglerAnswer wallId bruteId) entered (Activate.activateAbility S.alice jugglerId ability >> Stack.resolveTop >> Engine.settleForPriority)
-        -- The interpreter asks for the BRUTE whenever a sacrifice is on offer, and
-        -- CR 701.21a's prompt is raised only above one candidate -- so a criterion
-        -- that dropped the designation would sacrifice the Brute here, and a
-        -- criterion that read menace would sacrifice it instead of the Piker.
-        Spec.assertBool s (not (S.onBattlefield pikerId after)) "the suspected creature paid the cost"
-        Spec.assertEqWith s "and reached alice's graveyard (CR 701.21a)" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [CardName.MkCardName $ Text.pack "Goblin Piker"]
-        Spec.assertBool s (S.onBattlefield bruteId after) "the creature with menace and no designation did not"
-        Spec.assertBool s (S.onBattlefield jugglerId after) "and neither did the Juggler"
-        Spec.assertEqWith s "before: the Wall is a 0/8" (S.powerToughnessOf wallId entered) (Just (0, 8))
-        Spec.assertEqWith s "after: the ability resolved for -5/-5" (S.powerToughnessOf wallId after) (Just (-5, 3))
-      other -> Spec.assertFailure s ("expected exactly one activated ability on the Juggler, got " <> show (length other))
   -- The same board, the same lands and the same three creatures; the one
   -- difference is CR 115.6's announcement, which leaves nothing suspected.
   Spec.it s "CR 701.60b with nothing suspected the cost cannot be paid, though the creatures and the mana are the same" $ do
@@ -504,15 +420,6 @@ suspectedOf oid gs = fmap isSuspected (Game.lookupObject oid gs)
 -- CR 701.60b asked of one object, which is Set membership rather than a field.
 isSuspected :: Object.Object -> Bool
 isSuspected = Set.member Designation.Suspected . Object.designations
-
--- Aims the ability at `victim` and asks for `fodder` whenever CR 701.21a offers a
--- sacrifice choice. The fodder is deliberately the permanent the criterion must
--- NOT offer: at one candidate Prompt.ChooseSacrifices is elided, so this half of
--- the interpreter can only ever fire on a criterion that is too wide.
-jugglerAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-jugglerAnswer victim fodder p = case p of
-  Prompt.ChooseSacrifices {} -> sacrifices fodder p
-  _ -> takingTargets 1 [victim] p
 
 -- CR 701.60a's transition read as a TRIGGER EVENT (CR 603.2), proved by Synthetic
 -- Neighborhood Watch {1}{W} Enchantment, "Whenever a permanent becomes suspected,
@@ -1351,239 +1258,6 @@ decliningTargets p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (const 0) offers
   _ -> S.identityAnswer p
 
--- CR 701.57a's discover: "Exile cards from the top of your library until you
--- exile a nonland card with mana value N or less. You may cast that card without
--- paying its mana cost if the resulting spell's mana value is less than or equal
--- to N. If you don't cast it, put that card into your hand. Put the remaining
--- exiled cards on the bottom of your library in a random order."
---
--- Trumpeting Carnosaur {4}{R}{R} Creature -- Dinosaur 7/6 -- "Trample / When this
--- creature enters, discover 5. / {2}{R}, Discard this card: It deals 3 damage to
--- target creature or planeswalker." (Oracle text checked 2026-09-12) -- is the
--- producer.
---
--- CARD DATA AND NO OPCODE. Rule 701.57a is four instructions the effect DSL
--- already has, in the order the rule states them: CR 702.85a's walk
--- (ObjectRef.TopOfLibraryUntil) into exile, CR 608.2g's offer, "that card" back
--- out of the same slot into the hand, and the rest to the bottom. The third and
--- fourth read the slot after the offer and find the card gone if it was cast, CR
--- 400.7 having deleted the exiled incarnation -- Heirloom Blade's shape with an
--- offer wedged into it.
---
--- The library is stocked so each conjunct of the walk is what passes or stops it:
--- an Ainok Tracker of mana value 6 (one over the bound, so "N or less" is a bound
--- and not the whole library), a Mountain (a LAND, so cheapness alone is not
--- enough), and an Armored Galleon of mana value 5 EXACTLY, which ends it -- a
--- "less than N" reading would pass it by. Think Twice sits under the Galleon and
--- is never reached, which is what makes the walk's stopping visible.
---
--- TWO LEGS off one board, differing only in the answer to CR 608.2g's offer:
--- taken, the Galleon is cast for free and enters; declined, rule 701.57a's third
--- sentence puts it in alice's hand. Neither leg puts it on the bottom, which is
--- the reading the last sentence does NOT have.
-trumpetingCarnosaurSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-trumpetingCarnosaurSpec s registry = Spec.describe s "TrumpetingCarnosaur" $ do
-  let named = CardName.MkCardName . Text.pack
-      -- Cast the Carnosaur for its printed {4}{R}{R} and resolve everything: the
-      -- spell, then the entry trigger it put on the stack (CR 603.3), then
-      -- whatever the offer casts.
-      play :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
-      play answer (oid, gs) =
-        let step g action = snd (Engine.runGamePure answer g (action >> Engine.settleForPriority))
-            drain g = if null (GameState.stack g) then g else drain (step g Stack.resolveTop)
-         in drain (step gs (S.cast S.alice oid))
-      bottomed = fmap Just [named "Think Twice", named "Ainok Tracker", named "Mountain"]
-      onBattlefield gs = Set.fromList (Maybe.catMaybes (namesIn Zone.Battlefield S.alice gs))
-      setUp carnosaur tracker mountain galleon think =
-        -- S.addLibraryCard puts each card ON TOP, so this stocks bottom first.
-        let base = S.landsFor mountain S.alice 6 (Setup.emptyGame S.bothPlayers)
-            (_, g1) = S.addLibraryCard think S.alice base
-            (_, g2) = S.addLibraryCard galleon S.alice g1
-            (_, g3) = S.addLibraryCard mountain S.alice g2
-            (_, g4) = S.addLibraryCard tracker S.alice g3
-            (carnosaurId, g5) = S.addHandCard carnosaur S.alice g4
-         in ( carnosaurId,
-              g5
-                { GameState.activePlayer = S.alice,
-                  GameState.phase = Phase.PrecombatMain,
-                  GameState.priority = Just S.alice
-                }
-            )
-      board = do
-        carnosaur <- S.printingOf s registry "Trumpeting Carnosaur"
-        tracker <- S.printingOf s registry "Ainok Tracker"
-        mountain <- S.printingOf s registry "Mountain"
-        galleon <- S.printingOf s registry "Armored Galleon"
-        think <- S.printingOf s registry "Think Twice"
-        pure (setUp carnosaur tracker mountain galleon think)
-  -- THE PROVING TEST.
-  Spec.it s "CR 701.57a discover 5 exiles past the Tracker and the Mountain, stops at the Galleon and casts it free" $ do
-    after <- fmap (play discovering) board
-    Spec.assertEqWith
-      s
-      "the Galleon the walk stopped at was cast without paying its mana cost"
-      (onBattlefield after)
-      (Set.fromList [named "Trumpeting Carnosaur", named "Armored Galleon", named "Mountain"])
-    -- A rotation of TWO is its own inverse, so this pins the order the batch came
-    -- back in rather than proving the channel was consulted; Cascade's three-card
-    -- batch is where that is proved (Pawl.KeywordTriggerSpec).
-    Spec.assertEqWith
-      s
-      "the two cards the walk passed over sit under the card it never reached"
-      (namesIn Zone.Library S.alice after)
-      bottomed
-    -- Proxies, AFTER the two behavioural assertions: rule 701.57a's last sentence
-    -- empties exile, and six lands paid for the Carnosaur alone.
-    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) []
-    Spec.assertEqWith s "six lands paid the Carnosaur's {4}{R}{R} and nothing paid the Galleon's {4}{U}" (S.tappedCount S.alice after) 6
-  -- CR 701.57a's third sentence, the same board with the offer declined.
-  Spec.it s "CR 701.57a the discovered card goes to the hand when the offer is declined" $ do
-    after <- fmap (play declining) board
-    Spec.assertEqWith s "the Galleon is in alice's hand rather than on the battlefield" (namesIn Zone.Hand S.alice after) [Just (named "Armored Galleon")]
-    Spec.assertEqWith
-      s
-      "and the two cards the walk passed over are on the bottom either way"
-      (namesIn Zone.Library S.alice after)
-      bottomed
-    -- Proxies, AFTER the behaviour: the Galleon did not enter, and exile is empty.
-    Spec.assertEqWith
-      s
-      "only the Carnosaur and the lands are on the battlefield"
-      (onBattlefield after)
-      (Set.fromList [named "Trumpeting Carnosaur", named "Mountain"])
-    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) []
-
--- CR 608.2g's offer over a set, taken MORE THAN ONCE: Pawl.Types.CastRepetition's
--- AnyNumber, the printed "you may cast any number of" that one
--- Prompt.ChooseOfferedCastSpell cannot say on its own (see #3595).
---
--- Fevered Suspicion {6}{B}{R} Sorcery -- "Each opponent exiles cards from the top
--- of their library until they exile a nonland card. You may cast any number of
--- spells from among those nonland cards without paying their mana costs. /
--- Rebound" (Oracle text checked 2026-09-14) -- is the producer.
---
--- CARD DATA AND NO OPCODE beyond the repetition rider: the walk into exile is
--- ObjectRef.TopOfLibraryUntil over PlayerRelation.Opponent, and the offer is
--- ObjectRef.EachCardFromAmong over what it bound, which is Trumpeting Carnosaur's
--- pair one group up with the offer told to repeat.
---
--- THREE SEATS, because "each opponent" is what makes the set bigger than one: a
--- two-player board exiles one nonland card and could not tell a repeated offer
--- from a single one. Each opponent's library is stocked with a Mountain over the
--- creature the walk stops at, so the walk's stopping is visible, and a Think
--- Twice under it that is never reached.
---
--- The two creatures cost {1}{R} and {4}{U} where alice's eight lands are seven
--- Mountains and a Swamp: she cannot pay for either, so a tapped count of eight
--- is the whole of "without paying their mana costs".
-feveredSuspicionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-feveredSuspicionSpec s registry = Spec.describe s "FeveredSuspicion" $ do
-  let named = CardName.MkCardName . Text.pack
-      piker = named "Goblin Piker"
-      galleon = named "Armored Galleon"
-      play :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
-      play answer (oid, gs) =
-        let step g action = snd (Engine.runGamePure answer g (action >> Engine.settleForPriority))
-            drain g = if null (GameState.stack g) then g else drain (step g Stack.resolveTop)
-         in drain (step gs (S.cast S.alice oid))
-      -- What alice CONTROLS, which is not what `namesIn` would answer: CR 108.3
-      -- indexes the battlefield by OWNER, and the two creatures cast off this
-      -- offer are owned by bob and carol.
-      onBattlefield gs =
-        Set.fromList
-          [ S.nameOf card
-          | pid <- [S.alice, S.bob, S.carol],
-            oid <- Game.zoneMembers Zone.Battlefield pid gs,
-            Projection.controllerOf oid gs == Just S.alice,
-            card <- Maybe.maybeToList (Game.cardOf oid gs)
-          ]
-      exiled gs = Set.fromList (Maybe.catMaybes (namesIn Zone.Exile S.bob gs <> namesIn Zone.Exile S.carol gs))
-      stock creature mountain think pid gs =
-        -- S.addLibraryCard puts each card ON TOP, so this stocks bottom first.
-        let (_, g1) = S.addLibraryCard think pid gs
-            (_, g2) = S.addLibraryCard creature pid g1
-            (_, g3) = S.addLibraryCard mountain pid g2
-         in g3
-      setUp suspicion pikerCard galleonCard mountain swamp think =
-        let base = S.landsFor swamp S.alice 1 (S.landsFor mountain S.alice 7 S.threePlayerGame)
-            g1 = stock pikerCard mountain think S.bob base
-            g2 = stock galleonCard mountain think S.carol g1
-            (suspicionId, g3) = S.addHandCard suspicion S.alice g2
-         in ( suspicionId,
-              g3
-                { GameState.activePlayer = S.alice,
-                  GameState.phase = Phase.PrecombatMain,
-                  GameState.priority = Just S.alice
-                }
-            )
-      board = do
-        suspicion <- S.printingOf s registry "Fevered Suspicion"
-        pikerCard <- S.printingOf s registry "Goblin Piker"
-        galleonCard <- S.printingOf s registry "Armored Galleon"
-        mountain <- S.printingOf s registry "Mountain"
-        swamp <- S.printingOf s registry "Swamp"
-        think <- S.printingOf s registry "Think Twice"
-        pure (setUp suspicion pikerCard galleonCard mountain swamp think)
-  -- THE PROVING TEST.
-  Spec.it s "CR 608.2g an any-number offer casts both of the cards it named" $ do
-    after <- fmap (play castingBoth) board
-    Spec.assertEqWith
-      s
-      "both opponents' nonland cards were cast off one offer"
-      (onBattlefield after)
-      (Set.fromList [piker, galleon, named "Mountain", named "Swamp"])
-    -- Proxies, AFTER the behaviour: the lands the walk passed over stay exiled,
-    -- and eight lands paid the {6}{B}{R} and nothing else.
-    Spec.assertEqWith s "the lands the walk passed over stay in exile" (exiled after) (Set.singleton (named "Mountain"))
-    Spec.assertEqWith s "eight lands paid the Suspicion's {6}{B}{R} and nothing paid the two creatures" (S.tappedCount S.alice after) 8
-  -- The "any" half of "any number": the same board, with the second offer refused.
-  Spec.it s "CR 608.2g a refused offer leaves the card it named where the walk put it" $ do
-    after <- fmap (play castingOnlyThePiker) board
-    Spec.assertEqWith
-      s
-      "the Piker was cast and the Galleon was not"
-      (onBattlefield after)
-      (Set.fromList [piker, named "Mountain", named "Swamp"])
-    Spec.assertEqWith
-      s
-      "the refused Galleon is still in carol's exile"
-      (Set.fromList (Maybe.catMaybes (namesIn Zone.Exile S.carol after)))
-      (Set.fromList [galleon, named "Mountain"])
-
--- Takes CR 608.2g's offer however often it is made, and picks the Goblin Piker
--- FIRST when both are on offer -- filtered out of the offered set rather than
--- built, so a pick the engine did not offer cannot pass.
-castingBoth :: Prompt.Prompt r -> r
-castingBoth p = case p of
-  Prompt.OfferedCast {} -> OptionalDecision.Exercises
-  Prompt.ChooseOfferedCastSpell _ _ offers ->
-    Maybe.fromMaybe (NonEmpty.head offers) (List.find ((== CardName.MkCardName (Text.pack "Goblin Piker")) . snd) (NonEmpty.toList offers))
-  _ -> S.identityAnswer p
-
--- `castingBoth` with the Armored Galleon's offer refused, which is the pair's one
--- difference: the prompt names the card, so the two structurally identical
--- OfferedCast questions are told apart by their payload rather than by a count.
-castingOnlyThePiker :: Prompt.Prompt r -> r
-castingOnlyThePiker p = case p of
-  Prompt.OfferedCast _ _ _ name | name == CardName.MkCardName (Text.pack "Armored Galleon") -> OptionalDecision.Declines
-  _ -> castingBoth p
-
--- Takes CR 608.2g's offer and rotates the batch rule 701.57a's last sentence
--- hands the random-order channel; `declining` refuses the offer and answers
--- everything else the same way, so a pair of legs differs in that answer alone.
-discovering :: Prompt.Prompt r -> r
-discovering p = case p of
-  Prompt.OfferedCast {} -> OptionalDecision.Exercises
-  Prompt.Shuffle ids -> case ids of
-    h : t -> t <> [h]
-    [] -> []
-  _ -> S.identityAnswer p
-
-declining :: Prompt.Prompt r -> r
-declining p = case p of
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  _ -> discovering p
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   cookbookSpec s registry
@@ -1596,5 +1270,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   neighborhoodWatchSpec s registry
   randomRevealSpec s registry
   wildEvocationSpec s registry
-  trumpetingCarnosaurSpec s registry
-  feveredSuspicionSpec s registry

@@ -1,0 +1,275 @@
+{
+  "description": "CR 707.10f a copy of a creature spell resolves as a token creature beside the card",
+  "note": "Game.isToken has no check: with the one Rollicker card still on the stack, the Rollicker already on the battlefield (Nyxborn Rollicker#2) is the resolved copy and so a token; the empty graveyard view stands in for no Rollicker face reaching it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-5",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Lithoform Engine",
+            "label": "lithoform-engine",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "War Mammoth",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "ready": true
+          },
+          {
+            "card": "Nyxborn Rollicker",
+            "label": "nyxborn-rollicker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$nyxborn-rollicker",
+          "cost": [
+            {
+              "type": "OfType",
+              "value": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              }
+            }
+          ],
+          "mana": [
+            "$mountain",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$lithoform-engine",
+          "ability": 2,
+          "targets": [
+            "Nyxborn Rollicker"
+          ],
+          "mana": [
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4",
+            "$mountain-5",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Nyxborn Rollicker#2",
+            "Nyxborn Rollicker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Nyxborn Rollicker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Nyxborn Rollicker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Nyxborn Rollicker#2",
+          "power": 1,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "Nyxborn Rollicker#2",
+          "is": "alice"
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Nyxborn Rollicker",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Nyxborn Rollicker",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$lithoform-engine",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Nyxborn Rollicker",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Nyxborn Rollicker",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Nyxborn Rollicker",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Nyxborn Rollicker#2",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Nyxborn Rollicker#2",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Nyxborn Rollicker#2",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Stack",
+        "is": []
+      }
+    }
+  ]
+}

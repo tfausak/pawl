@@ -10,27 +10,18 @@ module Pawl.ZoneReplacementSpec where
 
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
-import qualified Data.Set as Set
-import qualified Data.Text as Text
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
-import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.DiscardCause as DiscardCause
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Zone as Zone
 
@@ -52,14 +43,6 @@ import qualified Pawl.Types.Zone as Zone
 reversingShuffle :: Prompt.Prompt r -> r
 reversingShuffle p = case p of
   Prompt.Shuffle ids -> reverse ids
-  _ -> S.identityAnswer p
-
--- CR 601.2c aimed at one object, by FILTERING the set the engine offers rather
--- than by building a recipient of its own -- a hand-built one is a different
--- recipient and CR 608.2b drops it silently.
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
   _ -> S.identityAnswer p
 
 -- Which objects a CR 701.20a reveal has shown, in the order the log holds them.
@@ -102,70 +85,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         milled = S.runPure S.identityAnswer gs (Event.changeZone nexusId Zone.Graveyard)
     Spec.assertEqWith s "CR 614.6 the card never left the library" (length (Game.zoneMembers Zone.Library S.alice milled)) 1
     Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice milled)) 0
-  -- CR 608.2n's trip to the graveyard, replaced from the STACK: the spell is the
-  -- object with the ability, and it is still on the stack as the move is
-  -- proposed. The ruling above is about exactly this road.
-  Spec.it s "CR 113.6b a stated row functions from the stack, so the resolved spell goes to the library" $ do
-    island <- S.printingOf s registry "Island"
-    nexus <- S.printingOf s registry "Nexus of Fate"
-    let base = S.landsInPlay island 7
-        (nexusId, gs1) = S.addHandCard nexus S.alice base
-        gs =
-          gs1
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice nexusId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "CR 614.6 the resolved spell is in its owner's library" (length (Game.zoneMembers Zone.Library S.alice resolved)) 1
-    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
-    -- After the two above, so that neither can be absorbed by a cast that never
-    -- happened: an uncast Nexus would leave the library empty and fail the first.
-    Spec.assertEqWith s "the spell really was cast" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "and really did resolve" (length (GameState.stack resolved)) 0
-  -- EXILE, which CR 400.2 makes public but which CR 113.6 gives no default
-  -- reaching either, so the row functions there only because the card states it.
-  -- Pull from Eternity ({W} Instant, Oracle text fetched from Scryfall
-  -- 2026-09-05: "Put target face-up exiled card into its owner's graveyard") is
-  -- the pool's one move OUT of exile INTO a graveyard, which is the only road on
-  -- which a row gathered from exile can be observed.
-  --
-  -- A pair of boards differing in one thing: which of alice's cards is the one
-  -- sitting in exile. bob's Ogre Sentry is exiled on both, so the target is a
-  -- real choice rather than the pool's only member, and the answerer FILTERS the
-  -- offered set rather than building a recipient of its own.
-  Spec.it s "CR 113.6b a stated row functions from exile, so the pulled card lands in the library" $ do
-    plains <- S.printingOf s registry "Plains"
-    pull <- S.printingOf s registry "Pull from Eternity"
-    nexus <- S.printingOf s registry "Nexus of Fate"
-    piker <- S.printingOf s registry "Goblin Piker"
-    sentry <- S.printingOf s registry "Ogre Sentry"
-    let pulled victim =
-          let (g1, pullId) = S.handOne pull (S.landsInPlay plains 2)
-              (victimId, g2) = S.addExiledCard victim S.alice g1
-              (_, g3) = S.addExiledCard sentry S.bob g2
-              board =
-                g3
-                  { GameState.phase = Phase.PrecombatMain,
-                    GameState.activePlayer = S.alice,
-                    GameState.priority = Just S.alice
-                  }
-              cast = S.runPure (aimedAt victimId) board (S.cast S.alice pullId)
-           in S.runPure S.identityAnswer cast Stack.resolveTop
-        nexusAfter = pulled nexus
-        pikerAfter = pulled piker
-    Spec.assertEqWith
-      s
-      "CR 614.6 the Nexus reaches its owner's library, where an ordinary card in the same seat reaches nothing but the graveyard"
-      (length (Game.zoneMembers Zone.Library S.alice nexusAfter), length (Game.zoneMembers Zone.Library S.alice pikerAfter))
-      (1, 0)
-    -- Proxies, after the behaviour: the spell resolved on both boards and took
-    -- alice's card out of exile, leaving bob's Ogre Sentry there; CR 608.2n then
-    -- put the Pull itself into alice's graveyard, which the Piker joins and the
-    -- Nexus does not.
-    Spec.assertEqWith s "one card left in exile on each board" (Set.size (GameState.exile nexusAfter), Set.size (GameState.exile pikerAfter)) (1, 1)
-    Spec.assertEqWith s "and alice's graveyard holds the spell alone, then the spell and the Piker" (length (Game.zoneMembers Zone.Graveyard S.alice nexusAfter), length (Game.zoneMembers Zone.Graveyard S.alice pikerAfter)) (1, 2)
   -- The gate the three cases above cannot show, as a pair of boards differing in
   -- one thing: Rest in Peace's row states NO zone, so CR 113.6's default leaves it
   -- functioning on the battlefield and nowhere else. The enchantment is bob's and
@@ -182,46 +101,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice (binned inGraveyard))) 0
     Spec.assertEqWith s "CR 113.6's default: the same enchantment on the battlefield exiles it instead" (length (Game.zoneMembers Zone.Exile S.alice (binned onBattlefield))) 1
     Spec.assertEqWith s "so that graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (binned onBattlefield))) 0
-  -- The DEFAULT the case above has none of: CR 113.6's first sentence functions
-  -- an instant's or a sorcery's abilities while the object is on the stack, so a
-  -- row that states no zone is gathered there and nowhere else. The stack walk
-  -- asked CR 113.6b's stated set alone until this case; see #2590.
-  --
-  -- Synthetic Fading Counsel is "{1}{U} Instant, you gain 2 life. If this spell
-  -- would be put into a graveyard, exile it instead." SYNTHETIC because no
-  -- printing has the shape: Scryfall's "(t:instant or t:sorcery) o:/would be (put
-  -- into|exiled|countered)/ o:~ -o:'you may cast' -o:'that spell'", 2026-09-01,
-  -- returns Nexus of Fate alone, and Nexus states every zone -- so the stated set
-  -- would decide it and the default would change nothing. The rules shape is
-  -- printed all the same: rule 702.27a's buyback is "put this spell into its
-  -- owner's hand instead of into that player's graveyard as it resolves" and
-  -- says in so many words that it functions while the spell is on the stack.
-  -- pawl's buyback (Elvish Fury) does not reach this walk: rule 702.27a's "as it
-  -- resolves" scopes the rewrite to CR 608.2n's own move, so it is MINTED for
-  -- that one move by Pawl.Engine.Resolve.finishSpell rather than gathered as a
-  -- printed row (Pawl.Engine.Replacement.installBuybackReturn).
-  --
-  -- CR 608.2n's trip to the graveyard is the observer, driven through a real cast
-  -- and a real resolution rather than the zone-change funnel: the card has to be
-  -- on the stack as its own move is proposed, and resolving is how it gets there.
-  Spec.it s "CR 113.6 an instant's row stating no zone functions from the stack" $ do
-    island <- S.printingOf s registry "Island"
-    counsel <- S.printingOf s registry "Synthetic Fading Counsel"
-    let (counselId, gs1) = S.addHandCard counsel S.alice (S.landsInPlay island 2)
-        gs =
-          gs1
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice counselId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "CR 614.6 the resolved spell is in exile" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
-    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
-    -- After the two above, for the Nexus case's reason: an uncast spell would
-    -- leave both zones empty and pass the second on its own.
-    Spec.assertEqWith s "the spell really was cast" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "and really did resolve" (length (GameState.stack resolved)) 0
   -- The other half of that default, as a pair of boards differing in one thing:
   -- CR 113.6's first sentence reaches an INSTANT OR SORCERY spell, and a
   -- permanent spell's abilities are left functioning on the battlefield. Read off
@@ -294,44 +173,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "CR 701.20a the Nexus was shown, under the id it had in the zone it left" (revealed (discarding nexusId)) [nexusId]
     Spec.assertEqWith s "the control: discarding a card with no such row shows nobody anything" (revealed (discarding pikerId)) []
     Spec.assertEqWith s "and the control card really was discarded" (length (Game.zoneMembers Zone.Graveyard S.alice (discarding pikerId))) 1
-  -- CR 613.1f / 611.2c: Can't Stay Away's "It gains 'If this creature would
-  -- die, exile it instead.'" is a quoted replacement ability a RESOLUTION
-  -- grants, stored and read off the receiver's projection. Llanowar Elves is
-  -- returned; a second Elves already on the battlefield is the control, and a
-  -- Clone of the returned one is the CR 707.2 tripwire -- a grant is not a
-  -- copiable value, so the copy dies normally.
-  Spec.it s "CR 613.1f Can't Stay Away's quoted replacement exiles the returned creature and nothing else" $ do
-    plains <- S.printingOf s registry "Plains"
-    swamp <- S.printingOf s registry "Swamp"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    spell <- S.printingOf s registry "Can't Stay Away"
-    clone <- S.printingOf s registry "Clone"
-    let lands = S.landsFor swamp S.alice 1 (S.landsFor plains S.alice 1 (Setup.emptyGame S.bothPlayers))
-        (buried, g1) = S.addGraveyardCard elves S.alice lands
-        (control, g2) = S.addPermanent elves S.alice g1
-        (_, g3) = S.addLibraryCard plains S.alice g2
-        (gs, spellId) = S.handOne spell g3
-        cast = S.runPure (aimedAt buried) gs (S.cast S.alice spellId)
-        resolved = S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
-        arrived = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield gs))
-        destroyed oid g = S.runPure S.identityAnswer g (Event.destroy Regenerability.Regenerable [oid] >> Engine.settleForPriority)
-        named name zone g = length (filter (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid g) == Just name) (Game.zoneMembers zone S.alice g))
-        elvesIn = named "Llanowar Elves"
-    case arrived of
-      [returned] -> do
-        let copying :: Prompt.Prompt r -> r
-            copying p = case p of
-              Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== returned) legal
-              _ -> S.identityAnswer p
-            (_, staged) = S.spellOnStack clone S.alice resolved
-            copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-            copies = Set.toList (Set.difference (GameState.battlefield copied) (GameState.battlefield resolved))
-        Spec.assertEqWith s "the returned Elves were exiled as they were destroyed" (elvesIn Zone.Exile (destroyed returned resolved)) 1
-        Spec.assertEqWith s "the control Elves, never returned, went to the graveyard" (elvesIn Zone.Exile (destroyed control resolved), elvesIn Zone.Graveyard (destroyed control resolved)) (0, 1)
-        case copies of
-          [copy] -> Spec.assertEqWith s "CR 707.2 a Clone of the returned Elves copies no grant, so it dies into the graveyard" (named "Clone" Zone.Exile (destroyed copy copied), named "Clone" Zone.Graveyard (destroyed copy copied)) (0, 1)
-          _ -> Spec.assertFailure s ("expected one Clone to arrive, got " <> show copies)
-      _ -> Spec.assertFailure s ("expected one returned creature, got " <> show arrived)
   -- CR 613.1f in a GRAVEYARD: Yixlid Jailer ({1}{B} Creature -- Zombie Wizard
   -- 2/1, "Cards in graveyards lose all abilities." -- checked against
   -- api.scryfall.com 2026-09-29) takes Darkblast's dredge 3 away, so CR 702.52a

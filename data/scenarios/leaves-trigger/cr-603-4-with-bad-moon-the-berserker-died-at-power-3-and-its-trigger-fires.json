@@ -1,0 +1,173 @@
+{
+  "description": "CR 603.4 with Bad Moon the Berserker died at power 3 and its trigger fires",
+  "note": "The token's printed 2/2 is pinned by its projected 3/3 under the one Bad Moon (+1/+1 to black creatures).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Bad Moon",
+            "ready": true
+          },
+          {
+            "card": "Deathknell Berserker",
+            "label": "deathknell-berserker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "lightning-bolt",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$deathknell-berserker",
+          "power": 3,
+          "toughness": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$lightning-bolt",
+          "targets": [
+            "$deathknell-berserker"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $deathknell-berserker"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Deathknell Berserker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Zombie Berserker Token",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Deathknell Berserker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Lightning Bolt",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Zombie Berserker Token",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Zombie Berserker Token",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Zombie Berserker Token",
+        "power": 3,
+        "toughness": 3
+      }
+    },
+    {
+      "View": {
+        "of": "Colors",
+        "object": "Zombie Berserker Token",
+        "is": [
+          "Black"
+        ]
+      }
+    },
+    {
+      "Subtypes": {
+        "object": "Zombie Berserker Token",
+        "subtypes": [
+          "Zombie",
+          "Berserker"
+        ]
+      }
+    }
+  ]
+}

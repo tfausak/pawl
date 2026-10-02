@@ -1,0 +1,131 @@
+{
+  "description": "CR 514.1 each player on the active team discards to hand size",
+  "note": "The control without shared team turns: bob neither draws nor discards on alice's turn, and still holds eight Islands in his own upkeep.",
+  "board": {
+    "active": "alice",
+    "step": "Untap",
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Island",
+            "label": "h1"
+          },
+          {
+            "card": "Island",
+            "label": "h2"
+          },
+          {
+            "card": "Island",
+            "label": "h3"
+          },
+          {
+            "card": "Island",
+            "label": "h4"
+          },
+          {
+            "card": "Island",
+            "label": "h5"
+          },
+          {
+            "card": "Island",
+            "label": "h6"
+          },
+          {
+            "card": "Island",
+            "label": "h7"
+          },
+          {
+            "card": "Island",
+            "label": "h8"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 8
+        }
+      }
+    }
+  ]
+}

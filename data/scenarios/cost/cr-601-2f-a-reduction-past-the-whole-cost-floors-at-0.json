@@ -1,0 +1,123 @@
+{
+  "description": "CR 601.2f a reduction past the whole cost floors at {0}",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Icehide Golem",
+            "ready": true
+          },
+          {
+            "card": "Icehide Golem",
+            "ready": true
+          },
+          {
+            "card": "Icehide Golem",
+            "ready": true
+          },
+          {
+            "card": "Icehide Golem",
+            "ready": true
+          },
+          {
+            "card": "Icehide Golem",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Frogmite",
+            "label": "frogmite",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$frogmite"
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Frogmite",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Frogmite",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Frogmite",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Frogmite",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Frogmite",
+        "power": 2,
+        "toughness": 2
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Icehide Golem",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Icehide Golem#2",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Icehide Golem#3",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Icehide Golem#4",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Icehide Golem#5",
+        "tapped": false
+      }
+    }
+  ]
+}

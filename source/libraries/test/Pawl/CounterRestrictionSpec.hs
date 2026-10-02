@@ -110,9 +110,6 @@ newestNamed wanted gs =
   let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
    in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
 
-toolkitName :: CardName.CardName
-toolkitName = CardName.MkCardName (Text.pack "Agent's Toolkit")
-
 solemnitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 solemnitySpec s registry = Spec.describe s "Solemnity" $ do
   let -- alice: two Forests and three Plains, a Goblin Piker (2/1) settled on the
@@ -152,22 +149,6 @@ solemnitySpec s registry = Spec.describe s "Solemnity" $ do
     (target, heldGrowth, _, _, ready) <- board False
     let after = S.runPure (aiming target) ready (S.cast S.alice heldGrowth >> Stack.resolveTop)
     Spec.assertEqWith s "one counter, and CR 613.4c shows it" (seenOn CounterKind.PlusOnePlusOne target after) (1, Just 3, Just 2)
-  -- CR 122.6's SECOND road: "counters put on that object while it's on the
-  -- battlefield AND ... an object that's given counters as it enters". Agent's
-  -- Toolkit enters with four counters, which reach the same door through
-  -- Pawl.Engine.Event.flushEnteringCounters.
-  Spec.it s "CR 122.6 an artifact given counters as it enters is given none" $ do
-    (_, _, heldToolkit, _, ready) <- board True
-    let after = S.runPure S.identityAnswer ready (S.cast S.alice heldToolkit >> Stack.resolveTop)
-    case newestNamed toolkitName after of
-      Just toolkit -> Spec.assertEqWith s "the entry line placed none of its four" (S.counterOf CounterKind.PlusOnePlusOne toolkit after, S.counterOf CounterKind.Shield toolkit after) (0, 0)
-      Nothing -> Spec.assertFailure s "the artifact did not reach the battlefield"
-  Spec.it s "and the same entry on the same board without it places them" $ do
-    (_, _, heldToolkit, _, ready) <- board False
-    let after = S.runPure S.identityAnswer ready (S.cast S.alice heldToolkit >> Stack.resolveTop)
-    case newestNamed toolkitName after of
-      Just toolkit -> Spec.assertEqWith s "the entry line placed all four" (S.counterOf CounterKind.PlusOnePlusOne toolkit after, S.counterOf CounterKind.Shield toolkit after) (1, 1)
-      Nothing -> Spec.assertFailure s "the artifact did not reach the battlefield"
   -- The card's FIRST line, which is the PLAYER axis: Solemnity names every player
   -- and every kind, where Melira below names one of each. bob casts Prologue to
   -- Phyresis ({1}{U} instant: target opponent gets a poison counter, draw a card)
@@ -256,18 +237,6 @@ meliraSpec s registry = Spec.describe s "Melira, Sylvok Outcast" $ do
     ((_, _, _, _), (_, _, _, _, theirPrologue), ready) <- board False
     let after = S.runPure S.identityAnswer ready (S.cast S.bob theirPrologue >> Stack.resolveTop)
     Spec.assertEqWith s "one poison counter" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 1
-  -- THE PLAYER SCOPING. Melira says "YOU", so the same spell pointed the other
-  -- way lands: alice casts her own Prologue and bob is poisoned.
-  Spec.it s "CR 101.2 an opponent still gets poison counters" $ do
-    ((_, _, _, _), (_, _, _, myPrologue, _), ready) <- board True
-    let after = S.runPure S.identityAnswer ready (S.cast S.alice myPrologue >> Stack.resolveTop)
-    Spec.assertEqWith s "one poison counter on the player Melira does not name" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
-  -- THE PLAYER-COUNTER KIND SCOPING, which poison alone cannot show: Melira's
-  -- controller may get no poison counter and still gets energy counters.
-  Spec.it s "CR 101.2 and you still get counters of a kind she does not name" $ do
-    ((mine, _, _, _), (_, _, heldLightning, _, _), ready) <- board True
-    let after = S.runPure (aiming mine) ready (S.cast S.alice heldLightning >> Stack.resolveTop)
-    Spec.assertEqWith s "three energy counters" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
   -- The card's THIRD line, which is what makes the transcription whole. A pair
   -- of Glistener Elves, one on each side of the table.
   Spec.it s "CR 613.1f creatures your opponents control lose infect" $ do

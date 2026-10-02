@@ -1,0 +1,162 @@
+{
+  "description": "CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest"
+          },
+          {
+            "card": "Zada, Hedron Grinder",
+            "label": "zada"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          },
+          {
+            "card": "Giant Spider",
+            "label": "spider"
+          },
+          {
+            "card": "Wall of Stone",
+            "label": "wall"
+          },
+          {
+            "card": "Blurred Mongoose",
+            "label": "mongoose"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Giant Growth",
+            "label": "growth"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$growth",
+          "targets": [
+            "$zada"
+          ],
+          "mana": [
+            "$forest"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $zada",
+            "Giant Growth"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OrderForEach",
+          "with": [
+            0,
+            1,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Giant Growth#4",
+            "Giant Growth#3",
+            "Giant Growth#2",
+            "Giant Growth"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "PowerToughness": {
+        "object": "$piker",
+        "power": 5,
+        "toughness": 4
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$spider",
+        "power": 5,
+        "toughness": 7
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$wall",
+        "power": 3,
+        "toughness": 11
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$mongoose",
+        "power": 2,
+        "toughness": 1
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$zada",
+        "power": 6,
+        "toughness": 6
+      }
+    },
+    {
+      "View": {
+        "of": "Stack",
+        "is": []
+      }
+    }
+  ]
+}

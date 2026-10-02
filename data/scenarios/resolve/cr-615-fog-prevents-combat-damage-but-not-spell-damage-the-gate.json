@@ -1,0 +1,59 @@
+{
+  "description": "CR 615 Fog prevents combat damage but not spell damage (the gate)",
+  "note": "alice casts Fog, then attacks with her Piker into bob's blocking Bog Wraith: the combat damage both ways is prevented. After combat her Firebolt deals its 2 to the same Wraith, untouched: Fog's prevention is gated to combat damage. The Haskell test's hand-built damage events are reached by a real block and a real spell.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fog",
+            "label": "fog"
+          },
+          {
+            "card": "Firebolt",
+            "label": "firebolt"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "wraith",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$fog", "mana": ["$forest", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$piker"]}},
+    {"turn": 1, "step": "DeclareBlockers", "player": "bob", "do": {"Block": {"$wraith": ["$piker"]}}},
+    {"turn": 1, "step": "EndOfCombat", "player": "alice", "check": {"Damage": {"object": "$wraith", "damage": 0}}},
+    {"turn": 1, "step": "EndOfCombat", "player": "alice", "check": {"Damage": {"object": "$piker", "damage": 0}}},
+    {"turn": 1, "step": "PostcombatMain", "player": "alice", "do": {"Cast": {"object": "$firebolt", "targets": ["$wraith"], "mana": ["$mountain"]}}},
+    {"turn": 1, "step": "PostcombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PostcombatMain", "player": "alice", "check": {"Damage": {"object": "$wraith", "damage": 2}}}
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "description": "CR 514.3a a trigger waiting during cleanup resolves in that cleanup",
+  "note": "alice discards to seven in her cleanup step; bob's Megrim triggers on the discard, so CR 514.3a gives the step a priority round. The trigger is on the stack at alice's first priority there and has dealt its 2 at her next, still turn 1, still alice's cleanup step.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Megrim",
+            "label": "megrim"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Cleanup"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDiscard",
+          "with": [
+            "$goblin-piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $megrim"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 18
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Goblin Piker",
+          "count": 7
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Cleanup",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Step",
+          "is": "Cleanup"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "description": "CR 702.188a with a tapped Piker the Spider-Man is cast for {W} and the Piker goes home; untapped, no cast is offered",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "tapped": true,
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Spider-Man, Web-Slinger",
+            "label": "spider-man-web-slinger",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$spider-man-web-slinger",
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Spider-Man, Web-Slinger",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Spider-Man, Web-Slinger",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Spider-Man, Web-Slinger",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Spider-Man, Web-Slinger",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Spider-Man, Web-Slinger",
+        "power": 3,
+        "toughness": 3
+      }
+    }
+  ]
+}

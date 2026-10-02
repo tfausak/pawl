@@ -1,0 +1,117 @@
+{
+  "description": "CR 603.4 the upkeep triggers read what each player cast last turn",
+  "note": "Turns are played out rather than handed off. Turn 1 (alice's): bob casts a Fog, so alice's Daybreak Ranger stays up at bob's upkeep (A). Turn 2: nobody casts, so it transforms at alice's upkeep (B). Turn 3: alice and bob cast one Fog each, which is not a player casting two, so it stays Nightfall Predator (C). Turn 4: bob casts two, so it transforms back (D). Each read is at the draw step, after the upkeep. Daybreak Ranger has no daybound, so the day/night designation stays unset.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Daybreak Ranger",
+            "label": "ranger"
+          },
+          {
+            "card": "Forest",
+            "label": "a-forest"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fog",
+            "label": "a-fog"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "b-forest-1"
+          },
+          {
+            "card": "Forest",
+            "label": "b-forest-2"
+          },
+          {
+            "card": "Forest",
+            "label": "b-forest-3"
+          },
+          {
+            "card": "Forest",
+            "label": "b-forest-4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fog",
+            "label": "fog-a"
+          },
+          {
+            "card": "Fog",
+            "label": "fog-b"
+          },
+          {
+            "card": "Fog",
+            "label": "fog-c"
+          },
+          {
+            "card": "Fog",
+            "label": "fog-d"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$fog-a", "mana": ["$b-forest-1", null]}}},
+    {"turn": 2, "step": "DrawStep", "player": "alice", "check": {"View": {"of": "Daytime", "is": null}}},
+    {"turn": 2, "step": "DrawStep", "player": "alice", "check": {"Names": {"object": "$ranger", "names": ["Daybreak Ranger"]}}},
+    {"turn": 2, "step": "DrawStep", "player": "alice", "check": {"PowerToughness": {"object": "$ranger", "power": 2, "toughness": 2}}},
+    {"turn": 3, "step": "DrawStep", "player": "alice", "check": {"Names": {"object": "$ranger", "names": ["Nightfall Predator"]}}},
+    {"turn": 3, "step": "DrawStep", "player": "alice", "check": {"PowerToughness": {"object": "$ranger", "power": 4, "toughness": 4}}},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$a-fog", "mana": ["$a-forest"]}}},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 3, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$fog-b", "mana": ["$b-forest-1", null]}}},
+    {"turn": 3, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": []}},
+    {"turn": 4, "step": "DrawStep", "player": "alice", "check": {"Names": {"object": "$ranger", "names": ["Nightfall Predator"]}}},
+    {"turn": 4, "step": "DrawStep", "player": "alice", "check": {"PowerToughness": {"object": "$ranger", "power": 4, "toughness": 4}}},
+    {"turn": 4, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$fog-c", "mana": ["$b-forest-1", null]}}},
+    {"turn": 4, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$fog-d", "mana": ["$b-forest-2", null]}}},
+    {"turn": 5, "step": "DrawStep", "player": "alice", "check": {"Names": {"object": "$ranger", "names": ["Daybreak Ranger"]}}},
+    {"turn": 5, "step": "DrawStep", "player": "alice", "check": {"PowerToughness": {"object": "$ranger", "power": 2, "toughness": 2}}},
+    {"turn": 5, "step": "DrawStep", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Hand", "card": "Fog", "count": 0}}},
+    {"turn": 5, "step": "DrawStep", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Fog", "count": 0}}}
+  ]
+}

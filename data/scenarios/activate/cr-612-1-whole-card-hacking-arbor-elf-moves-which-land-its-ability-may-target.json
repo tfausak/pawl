@@ -1,0 +1,140 @@
+{
+  "description": "CR 612.1 whole card: hacking Arbor Elf moves which land its ability may target",
+  "note": "Arbor Elf's \"{T}: Untap target Forest.\" under a Magical Hack swapping Forest for Island. Both lands start tapped, so the refused aim at the Forest and the Island waking up are distinct states; Seat of the Synod, neither type, pays the Hack.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Arbor Elf",
+            "label": "elf",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest",
+            "tapped": true,
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "tapped": true,
+            "ready": true
+          },
+          {
+            "card": "Seat of the Synod",
+            "label": "seat",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Magical Hack",
+            "label": "hack"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$hack",
+          "targets": [
+            "$elf"
+          ],
+          "mana": [
+            "$seat"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "source": "Magical Hack",
+      "do": {
+        "ChooseTypeSwap": {
+          "from": {
+            "type": "Forest"
+          },
+          "to": {
+            "type": "Island"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$elf",
+          "targets": [
+            "$forest"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$elf",
+          "targets": [
+            "$island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$island",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$forest",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

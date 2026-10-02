@@ -1,0 +1,310 @@
+{
+  "description": "CR 801.2c a seat emptied mid-turn closes up only when the next turn begins",
+  "note": "Every seat has range 1. bob concedes in alice's precombat main phase. Each Ravenous Rats trigger is a probe of its target opponent slot: a refused target is one the slot does not offer, and a target taken is shown offered by that player's one card being discarded. On alice's turn carol, across bob's emptied seat, is refused and dave is taken; on carol's turn alice and dave are both taken.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "range": 1,
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "a1"
+          },
+          {
+            "card": "Swamp",
+            "label": "a2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ravenous Rats",
+            "label": "alice-rats"
+          },
+          {
+            "card": "Mountain",
+            "label": "alice-card"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "range": 1
+      },
+      {
+        "name": "carol",
+        "range": 1,
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "c1"
+          },
+          {
+            "card": "Swamp",
+            "label": "c2"
+          },
+          {
+            "card": "Swamp",
+            "label": "c3"
+          },
+          {
+            "card": "Swamp",
+            "label": "c4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ravenous Rats",
+            "label": "carol-rats"
+          },
+          {
+            "card": "Ravenous Rats",
+            "label": "carol-rats2"
+          },
+          {
+            "card": "Mountain",
+            "label": "carol-card"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "range": 1,
+        "hand": [
+          {
+            "card": "Mountain",
+            "label": "dave-card"
+          },
+          {
+            "card": "Island",
+            "label": "dave-card2"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Concede"
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$alice-rats",
+          "mana": [
+            "$a1",
+            "$a2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "refuse": {
+        "ChooseTargets": {
+          "target": [
+            "$carol"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$dave"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "dave",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDiscard",
+          "with": [
+            "$dave-card"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "dave",
+          "zone": "Hand",
+          "card": "Mountain",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Hand",
+          "card": "Mountain",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$carol-rats",
+          "mana": [
+            "$c1",
+            "$c2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$alice"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Mountain",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$carol-rats2",
+          "mana": [
+            "$c3",
+            "$c4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$dave"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "dave",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 0
+        }
+      }
+    }
+  ]
+}

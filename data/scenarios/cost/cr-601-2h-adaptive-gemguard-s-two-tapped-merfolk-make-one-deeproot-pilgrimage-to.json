@@ -1,0 +1,139 @@
+{
+  "description": "CR 601.2h Adaptive Gemguard's two tapped Merfolk make one Deeproot Pilgrimage token",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Deeproot Pilgrimage",
+            "ready": true
+          },
+          {
+            "card": "Adaptive Gemguard",
+            "label": "adaptive-gemguard",
+            "ready": true
+          },
+          {
+            "card": "Merfolk Spy",
+            "label": "merfolk-spy",
+            "ready": true
+          },
+          {
+            "card": "Merfolk Spy",
+            "label": "merfolk-spy-2",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTaps",
+          "with": [
+            "$merfolk-spy",
+            "$merfolk-spy-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$adaptive-gemguard",
+          "ability": 0,
+          "mana": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Merfolk Token",
+        "count": 1
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$adaptive-gemguard",
+        "power": 4,
+        "toughness": 4
+      }
+    },
+    {
+      "Counters": {
+        "object": "$adaptive-gemguard",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$merfolk-spy",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$merfolk-spy-2",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Merfolk Token",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Merfolk Token",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Merfolk Token",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Island",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$adaptive-gemguard",
+        "tapped": false
+      }
+    }
+  ]
+}

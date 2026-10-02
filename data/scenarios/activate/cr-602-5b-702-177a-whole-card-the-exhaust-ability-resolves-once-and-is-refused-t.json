@@ -1,0 +1,181 @@
+{
+  "description": "CR 602.5b / 702.177a whole card: the exhaust ability resolves once and is refused the second time",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Greenbelt Guardian",
+            "label": "greenbelt-guardian",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$greenbelt-guardian",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$greenbelt-guardian",
+          "ability": 1,
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $greenbelt-guardian",
+            "ActivateManaAbility Forest#5",
+            "ActivateManaAbility Forest#6",
+            "ActivateManaAbility Forest#7",
+            "ActivateManaAbility Forest#8"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-4",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$greenbelt-guardian",
+        "power": 5,
+        "toughness": 5
+      }
+    },
+    {
+      "Counters": {
+        "object": "$greenbelt-guardian",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 3
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#5",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#6",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#7",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#8",
+        "tapped": false
+      }
+    }
+  ]
+}

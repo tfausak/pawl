@@ -1,0 +1,256 @@
+{
+  "description": "CR 601.2c zero announced against an unbounded count: nothing is exiled and nobody is damaged",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-5",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-6",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-7",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-8",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-9",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Soulfire Eruption",
+            "label": "soulfire-eruption",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Benalish Hero"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Hill Giant"
+          },
+          {
+            "card": "Bird Maiden"
+          },
+          {
+            "card": "Sabretooth Tiger"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ogre Sentry",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "AnnounceTargets",
+          "with": [
+            [
+              "victims",
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$soulfire-eruption",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3",
+            "$mountain-4",
+            "$mountain-5",
+            "$mountain-6",
+            "$mountain-7",
+            "$mountain-8",
+            "$mountain-9"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "alice",
+        "life": 20.0
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 20.0
+      }
+    },
+    {
+      "Life": {
+        "player": "carol",
+        "life": 20.0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Soulfire Eruption",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Soulfire Eruption",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-7",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-8",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-9",
+        "tapped": true
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Exile",
+        "is": []
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Benalish Hero",
+          "Goblin Piker",
+          "Hill Giant",
+          "Bird Maiden",
+          "Sabretooth Tiger"
+        ]
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": [
+          "Soulfire Eruption"
+        ]
+      }
+    }
+  ]
+}

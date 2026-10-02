@@ -1,0 +1,179 @@
+{
+  "description": "CR 612.1 a text change naming the count's word moves which permanents it counts (control: a swap of Plains, a word the Coffers never carried)",
+  "note": "The control board for the hacked Cabal Coffers: the same board, with bob's Magical Hack swapping Plains for Island. The Coffers still counts alice's three Swamps, so the Bloodletter's {1}{B}{B}{B} is paid and it arrives.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "f1"
+          },
+          {
+            "card": "Forest",
+            "label": "f2"
+          },
+          {
+            "card": "Forest",
+            "label": "f3"
+          },
+          {
+            "card": "Cabal Coffers",
+            "label": "coffers"
+          },
+          {
+            "card": "Swamp",
+            "label": "s1",
+            "tapped": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s2",
+            "tapped": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s3",
+            "tapped": true
+          },
+          {
+            "card": "Island",
+            "label": "alice-island",
+            "tapped": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Bloodletter of Aclazotz",
+            "label": "bloodletter"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "bob-island"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Magical Hack",
+            "label": "hack"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$hack",
+          "targets": [
+            "$coffers"
+          ],
+          "mana": [
+            "$bob-island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Magical Hack"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "ChooseTypeSwap": {
+          "from": {
+            "type": "Plains"
+          },
+          "to": {
+            "type": "Island"
+          }
+        }
+      },
+      "source": "Magical Hack"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Magical Hack",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bloodletter",
+          "mana": [
+            "$coffers",
+            "$f1",
+            "$f2",
+            "$f3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Bloodletter of Aclazotz",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "description": "CR 613.4c turning one face up drops the Whisperer by two",
+  "note": "Three manifested creatures (one alice's, two bob's) beside two face-up ones make Primal Whisperer 8/8; Break Open turns bob's Ainok Tracker over and the live count leaves 6/6.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m2",
+            "ready": true
+          },
+          {
+            "card": "Primal Whisperer",
+            "label": "whisperer"
+          },
+          {
+            "card": "Thragtusk",
+            "label": "tusk",
+            "faceDown": {
+              "type": "Manifested"
+            }
+          }
+        ],
+        "hand": [
+          {
+            "card": "Break Open",
+            "label": "break"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "giant"
+          },
+          {
+            "card": "Ainok Tracker",
+            "label": "victim",
+            "faceDown": {
+              "type": "Manifested"
+            }
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "faceDown": {
+              "type": "Manifested"
+            }
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$whisperer",
+          "power": 8,
+          "toughness": 8
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$break",
+          "targets": [
+            "$victim"
+          ],
+          "mana": [
+            "$m1",
+            "$m2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$whisperer",
+          "power": 6,
+          "toughness": 6
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$victim",
+          "names": [
+            "Ainok Tracker"
+          ]
+        }
+      }
+    }
+  ]
+}

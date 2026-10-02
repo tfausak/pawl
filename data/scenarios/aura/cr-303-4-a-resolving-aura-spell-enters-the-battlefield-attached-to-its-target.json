@@ -1,0 +1,86 @@
+{
+  "description": "CR 303.4: a resolving Aura spell enters the battlefield attached to its target",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Unholy Strength",
+            "label": "unholy-strength",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$unholy-strength",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "mana": [
+            "$swamp"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Unholy Strength",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Unholy Strength",
+        "count": 0
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 4,
+        "toughness": 2
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "Unholy Strength",
+        "is": "$goblin-piker"
+      }
+    }
+  ]
+}

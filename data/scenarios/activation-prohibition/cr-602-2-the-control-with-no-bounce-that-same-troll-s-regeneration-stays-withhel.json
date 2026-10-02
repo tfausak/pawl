@@ -1,0 +1,125 @@
+{
+  "description": "CR 602.2 the control: with no bounce that same Troll's regeneration stays withheld",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [
+          {
+            "key": {
+              "type": "Energy"
+            },
+            "value": 2
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Uthden Troll",
+            "label": "uthden-troll",
+            "ready": true
+          },
+          {
+            "card": "Uthden Troll",
+            "ready": true
+          },
+          {
+            "card": "Deadlock Trap",
+            "label": "deadlock-trap",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Unsummon",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$deadlock-trap",
+          "ability": 0,
+          "targets": [
+            "$uthden-troll"
+          ],
+          "mana": [
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast Unsummon",
+            "Activate Uthden Troll#2",
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mountain#3",
+            "ActivateManaAbility Mountain#4",
+            "ActivateManaAbility Island"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$uthden-troll",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$deadlock-trap",
+        "tapped": true
+      }
+    }
+  ]
+}

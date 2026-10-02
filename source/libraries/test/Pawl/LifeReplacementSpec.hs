@@ -17,19 +17,15 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Extra.Int as Int
-import Pawl.PreventionSpec (answersFor, atLife, attackAndBlock, attackNoBlock, bobAttacks, inMainPhase, theAbility, wasAskedToReplace)
+import Pawl.PreventionSpec (atLife, attackNoBlock, bobAttacks, inMainPhase, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -37,7 +33,6 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 614.1a / 120.4c: Worship ({3}{W} Enchantment, "If you control a creature,
@@ -66,21 +61,8 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- Every number is distinct -- alice at 2 or 5, a 3/4 attacker, a floor of 1, a
 -- 4-life drain -- so no two readings of the rule land on the same total.
-worshipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+worshipSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
-  Spec.it s "CR 614.1a the life total stops at 1, and the damage is dealt in full anyway" $ do
-    plains <- S.printingOf s registry "Plains"
-    worship <- S.printingOf s registry "Worship"
-    piker <- S.printingOf s registry "Goblin Piker"
-    celestine <- S.printingOf s registry "Celestine, the Living Saint"
-    let base = S.landsInPlay plains 2
-        (_, g1) = S.addPermanent worship S.alice base
-        (_, g2) = S.addPermanent piker S.alice g1
-        (_, g3) = S.addPermanent celestine S.bob g2
-        after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g3))
-    Spec.assertEqWith s "CR 614.1a alice stops at 1 rather than the -1 the damage would give" (S.lifeOf S.alice after) (Just 1)
-    Spec.assertEqWith s "CR 120.3f the whole 3 was still dealt, so lifelink gains bob 3 and not 1" (S.lifeOf S.bob after) (Just 23)
-    Spec.assertEqWith s "CR 120.4b the damage event itself is undiminished" (fmap DamageEvent.amount (S.damageEventsOf after)) [3]
   -- The CONTROL is the same board with alice's creature taken away, so the only
   -- difference is the printed clause.
   Spec.it s "CR 604.2 with no creature the printed clause is false and the whole 3 lands" $ do
@@ -92,35 +74,6 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
         (_, g2) = S.addPermanent celestine S.bob g1
         after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g2))
     Spec.assertEqWith s "alice controls no creature, so she takes all 3 and ends at -1" (S.lifeOf S.alice after) (Just (-1))
-  -- CR 120.4d's SECOND Example, which is the half CR 120.3f's gain makes
-  -- reachable without Awe Strike: one damage event whose results are both a loss
-  -- and a gain. "That's processed into its results, so the damage event is now
-  -- [the defending player loses 5 life, the defending player gains 5 life].
-  -- Worship's effect sees that the damage event would not reduce the player's
-  -- life total to less than 1, so Worship's effect is not applied."
-  --
-  -- Alice at 4 takes 5 from an unblocked Jedit Ojanen and gains 3 from her own
-  -- lifelink Celestine striking the Goblin Piker she blocked -- one CR 510.2
-  -- batch. The event leaves her at 2, so the floor is never breached. Reading
-  -- the loss against a board the gain has not reached yet gives 4, which is what
-  -- this discriminates; see #2563.
-  --
-  -- Every number distinct: 4 life, 5 damage, 3 gained, 2 left, a floor of 1.
-  Spec.it s "CR 120.4c a simultaneous life gain keeps the same event off the floor" $ do
-    plains <- S.printingOf s registry "Plains"
-    worship <- S.printingOf s registry "Worship"
-    celestine <- S.printingOf s registry "Celestine, the Living Saint"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let base = S.landsInPlay plains 2
-        (_, g1) = S.addPermanent worship S.alice base
-        (blocker, g2) = S.addPermanent celestine S.alice g1
-        (_, g3) = S.addPermanent jedit S.bob g2
-        (blocked, g4) = S.addPermanent piker S.bob g3
-        after = S.runCombat (attackAndBlock blocker blocked) (bobAttacks (atLife S.alice 4 g4))
-    Spec.assertEqWith s "CR 120.4c alice ends at 4 - 5 + 3 = 2, the floor never applying" (S.lifeOf S.alice after) (Just 2)
-    Spec.assertEqWith s "setup: the block happened, so Celestine's 3 killed the 2/1 Piker (CR 704.5g)" (S.creaturesInPlay S.bob after) 1
-    Spec.assertEqWith s "setup: alice's lifelink blocker survived the Piker's 2, so Worship's clause stayed true" (S.creaturesInPlay S.alice after) 1
 
 -- Fills every target slot with bob, the opponent whose life total the exchange
 -- cases below drive down. FILTERED rather than hand-built, so CR 608.2b's re-read
@@ -162,33 +115,6 @@ exchangingWithBob p =
 -- discriminates rather than that three boards differ.
 bloodletterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 / 119.5 / 701.12c)" $ do
-  -- CR 119.4's second sentence is the whole of this case: "If a player pays life,
-  -- the payment is subtracted from their life total; in other words, the player
-  -- loses that much life." A payment is a life loss, so a row watching life loss
-  -- reaches it. Greed ({3}{B} Enchantment, "{2}{B}, Pay 2 life: Draw a card") is
-  -- the payer, and the COST it charges is unchanged at 2 -- what doubles is the
-  -- loss the payment causes.
-  Spec.it s "CR 119.4 life paid as a cost is a life loss, so the row resizes it" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    greed <- S.printingOf s registry "Greed"
-    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
-        (bobsGreed, g2) = S.addPermanent greed S.bob g1
-        (alicesGreed, g3) = S.addPermanent greed S.alice g2
-        -- A card to draw for each activation, so no seat is decked out from under
-        -- the assertion (CR 104.3c) and the draw is a real one.
-        (_, g4) = S.addLibraryCard piker S.bob g3
-        (_, g5) = S.addLibraryCard piker S.alice g4
-        withMana = S.landsFor swamp S.bob 3 (S.landsFor swamp S.alice 3 g5)
-        pay who what = S.runPure S.identityAnswer withMana (Activate.activateAbility who what (theAbility greed))
-        bobPaid = pay S.bob bobsGreed
-        alicePaid = pay S.alice alicesGreed
-    Spec.assertEqWith s "CR 119.4 bob is alice's opponent on alice's turn, so his 2-life payment costs him 4" (S.lifeOf S.bob bobPaid) (Just 16)
-    -- CR 109.5: "an opponent" is read against the ROW's controller, and alice is
-    -- not her own opponent. The same card, the same payment, the same turn.
-    Spec.assertEqWith s "alice paying the same 2 life loses exactly 2" (S.lifeOf S.alice alicePaid) (Just 18)
-    Spec.assertEqWith s "and bob's payment left alice alone" (S.lifeOf S.alice bobPaid) (Just 20)
   -- CR 120.4c, the control that matters: Worship's clause names DAMAGE, so it must
   -- not see a payment. The two boards differ in one thing -- what takes alice's
   -- last 2 life -- and Worship's own ruling says which way it falls: "Worship does
@@ -269,34 +195,6 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     -- it names are hers -- and she is not her own opponent.
     Spec.assertEqWith s "the same exchange the other way costs alice exactly her 17" (S.lifeOf S.alice aliceLower) (Just 5)
     Spec.assertEqWith s "and bob, gaining, takes alice's 22" (S.lifeOf S.bob aliceLower) (Just 22)
-  -- CR 119.7 / 119.8 with CR 119.5: a redistribution hands out totals, and every
-  -- seat that lands lower loses "the necessary amount of life" -- the same
-  -- proposal a set makes, so the same row reaches it. Reverse the Sands ({6}{W}{W}
-  -- Sorcery, "Redistribute any number of players' life totals. (Each of those
-  -- players gets one life total back.)" -- name, cost, type line and Oracle text
-  -- checked against api.scryfall.com 2026-09-02).
-  --
-  -- The permutation is PINNED rather than searched, so no answerer can repair a
-  -- mutation by finding another legal one. It is a 3-cycle, which is what puts two
-  -- losers on one board: bob's, an opponent's, doubled, and alice's own, not.
-  --
-  -- Every number is distinct -- 20, 30, 12 before; 12, 10, 30 after -- and the
-  -- unreplaced reading leaves bob on alice's 20 rather than 10.
-  Spec.it s "CR 119.7 a redistribution's lowered total is a life loss the row resizes" $ do
-    plains <- S.printingOf s registry "Plains"
-    sands <- S.printingOf s registry "Reverse the Sands"
-    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
-    let (_, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
-        (held, g2) = S.addHandCard sands S.alice g1
-        ready = inMainPhase S.alice (atLife S.alice 20 (atLife S.bob 30 (atLife S.carol 12 (S.landsFor plains S.alice 8 g2))))
-        assigning :: Prompt.Prompt r -> r
-        assigning p = case p of
-          Prompt.ChooseRedistribution {} -> Map.fromList [(S.alice, S.carol), (S.bob, S.alice), (S.carol, S.bob)]
-          _ -> S.identityAnswer p
-        after = S.runPure assigning ready (S.cast S.alice held Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "CR 119.5 bob's loss of 10 down to alice's 20 is doubled: 30 - 20 = 10" (S.lifeOf S.bob after) (Just 10)
-    Spec.assertEqWith s "alice's own loss of 8 down to carol's 12 is not an opponent's" (S.lifeOf S.alice after) (Just 12)
-    Spec.assertEqWith s "carol takes bob's 30, and a gain is no life loss to resize" (S.lifeOf S.carol after) (Just 30)
 
 -- CR 614.11 / 121.6: Words of Worship ({2}{W} Enchantment, "{1}: The next time
 -- you would draw a card this turn, you gain 5 life instead" -- name, cost, type
@@ -367,23 +265,6 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
         after = S.runPure S.identityAnswer unarmed (Event.drawCard S.alice)
     Spec.assertEqWith s "she gained nothing" (S.lifeOf S.alice after) (Just 20)
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "CR 704.5b and the failed draw is on the books"
-  -- CR 109.5's "you": the pattern is ControllerRelation.Yours, so bob's draw is
-  -- not alice's, and the row is still there afterwards.
-  --
-  -- BOB's life is what discriminates, not alice's: the rewrite gains the life to
-  -- the player the EVENT named, so a row that wrongly matched his draw would gain
-  -- HIM the 5 and leave alice at 20 either way.
-  Spec.it s "CR 109.5 the row watches its controller's draws and nobody else's" $ do
-    plains <- S.printingOf s registry "Plains"
-    wordsOfWorship <- S.printingOf s registry "Words of Worship"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (armed, _) = wordsBoard plains wordsOfWorship piker True
-        stocked = snd (S.addLibraryCard piker S.bob armed)
-        after = S.runPure S.identityAnswer stocked (Event.drawCard S.bob)
-    Spec.assertEqWith s "CR 109.5 bob's draw is not alice's, so the rewrite never ran" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "CR 121.1 and bob drew his card" (S.handSize S.bob after) 1
-    Spec.assertEqWith s "alice gained nothing either" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith s "CR 614.3 the row is unspent" (length (GameState.replacements after)) 1
 
   -- CR 614.3 / 608.2: the row is an effect of a resolution that has ENDED, so its
   -- CR 109.5 "you" was fixed when the ability resolved. Destroying the
@@ -408,22 +289,6 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     Spec.assertBool s (not (Set.member enchantment (GameState.battlefield gone))) "setup: the enchantment really left the battlefield"
     Spec.assertEqWith s "CR 614.3 the row still applied, so alice is at 25" (S.lifeOf S.alice after) (Just 25)
     Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
-  -- The same field one reading over: a CONTROL CHANGE. Confiscate ({4}{U}{U}
-  -- Aura, "Enchant permanent / You control enchanted permanent") hands bob the
-  -- enchantment, and the row stays alice's -- a live reading would answer bob and
-  -- stop matching her draw.
-  Spec.it s "CR 109.5 the row stays with the player who activated it, not the enchantment" $ do
-    plains <- S.printingOf s registry "Plains"
-    wordsOfWorship <- S.printingOf s registry "Words of Worship"
-    confiscate <- S.printingOf s registry "Confiscate"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (armed, enchantment) = wordsBoard plains wordsOfWorship piker True
-        (aura, g1) = S.addPermanent confiscate S.bob armed
-        stolen = S.attachTo aura (Recipient.ToObject enchantment) g1
-        after = S.runPure S.identityAnswer stolen (Event.drawCard S.alice)
-    Spec.assertEqWith s "setup: bob really controls the enchantment now" (Projection.controllerOf enchantment stolen) (Just S.bob)
-    Spec.assertEqWith s "CR 109.5 the row is still alice's, so she is at 25" (S.lifeOf S.alice after) (Just 25)
-    Spec.assertEqWith s "CR 614.6 and her draw still never happened" (S.handSize S.alice after) 0
 
 -- alice with a Plains, a Words of Worship and two library cards, with the
 -- ability activated and resolved when `arm` is True and untouched when it is
@@ -466,60 +331,8 @@ emptyLibraryBoard plains wordsOfWorship arm =
 -- Every number is distinct -- an instruction naming three cards, four cards in
 -- bob's library, three in alice's, two in carol's, one card drawn each -- so no two
 -- readings land on the same count.
-almsCollectorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+almsCollectorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 almsCollectorSpec s registry = Spec.describe s "Alms Collector (CR 121.2a)" $ do
-  Spec.it s "CR 121.2a an opponent's instruction to draw three becomes one card each" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    collector <- S.printingOf s registry "Alms Collector"
-    recall <- S.printingOf s registry "Ancestral Recall"
-    let (gs, held) = collectorBoard island piker collector recall True
-        after = S.runPure (atPlayerAnswer S.bob) gs (S.cast S.carol held Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "CR 121.2a bob's instruction to draw three left him one card" (S.handSize S.bob after) 1
-    Spec.assertEqWith s "CR 614.1a and alice, whose collector applied, drew the other" (S.handSize S.alice after) 1
-    Spec.assertEqWith s "carol, who cast it, drew none of them" (S.handSize S.carol after) 0
-    Spec.assertEqWith s "CR 121.2 one card left bob's library of four" (length (Game.zoneMembers Zone.Library S.bob after)) 3
-  -- The CONTROL: the same board with no collector on it, so the only difference is
-  -- the row.
-  Spec.it s "CR 121.2 with no collector the same instruction draws all three" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    collector <- S.printingOf s registry "Alms Collector"
-    recall <- S.printingOf s registry "Ancestral Recall"
-    let (gs, held) = collectorBoard island piker collector recall False
-        after = S.runPure (atPlayerAnswer S.bob) gs (S.cast S.carol held Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "bob drew all three" (S.handSize S.bob after) 3
-    Spec.assertEqWith s "and alice drew nothing" (S.handSize S.alice after) 0
-    Spec.assertEqWith s "three cards left bob's library of four" (length (Game.zoneMembers Zone.Library S.bob after)) 1
-  -- CR 102.2 / 109.5: "an opponent", read against the row's own controller, and
-  -- alice is not her own opponent. The same spell and the same count, the other
-  -- target.
-  Spec.it s "CR 102.2 the collector's controller draws her own three cards in full" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    collector <- S.printingOf s registry "Alms Collector"
-    recall <- S.printingOf s registry "Ancestral Recall"
-    let (gs, held) = collectorBoard island piker collector recall True
-        after = S.runPure (atPlayerAnswer S.alice) gs (S.cast S.carol held Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "CR 102.2 alice's own instruction is not an opponent's, so she drew three" (S.handSize S.alice after) 3
-    Spec.assertEqWith s "and bob drew nothing" (S.handSize S.bob after) 0
-    Spec.assertEqWith s "her library of three is empty" (length (Game.zoneMembers Zone.Library S.alice after)) 0
-  -- CR 614.1a: "two or more". An instruction naming ONE card does not meet the
-  -- row's condition, so it is left alone -- Greed ({3}{B} Enchantment, "{2}{B}, Pay
-  -- 2 life: Draw a card"), the one-card instruction the Bloodletter group above
-  -- uses, put under bob's control so its drawer is alice's opponent.
-  Spec.it s "CR 614.1a an opponent's one-card instruction is under the threshold" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    collector <- S.printingOf s registry "Alms Collector"
-    greed <- S.printingOf s registry "Greed"
-    let (_, g1) = S.addPermanent collector S.alice S.threePlayerGame
-        (bobsGreed, g2) = S.addPermanent greed S.bob g1
-        g3 = snd (S.addLibraryCard piker S.alice (snd (S.addLibraryCard piker S.bob g2)))
-        ready = inMainPhase S.alice (S.landsFor swamp S.bob 3 g3)
-        after = S.runPure S.identityAnswer ready (Activate.activateAbility S.bob bobsGreed (theAbility greed) Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "CR 614.1a bob drew his one card" (S.handSize S.bob after) 1
-    Spec.assertEqWith s "and alice, the instruction being under the threshold, drew nothing" (S.handSize S.alice after) 0
   -- CR 616.1g: "one replacement effect may apply to an event, and another may apply
   -- to an event contained within the first". The instruction is the outer event and
   -- each draw it leaves is an inner one, so Words of Worship still meets alice's
@@ -541,48 +354,12 @@ almsCollectorSpec s registry = Spec.describe s "Alms Collector (CR 121.2a)" $ do
     Spec.assertEqWith s "CR 614.6 alice's half of the rewrite was itself replaced, so she gained 5" (S.lifeOf S.alice after) (Just 25)
     Spec.assertEqWith s "and drew nothing" (S.handSize S.alice after) 0
     Spec.assertEqWith s "CR 121.2a bob still drew the one card the replacement left him" (S.handSize S.bob after) 1
-  -- CR 616.1 through Replacement.readsApplier: two collectors under DIFFERENT
-  -- controllers are not value-equal, because which one applies decides who gets the
-  -- extra card. So the affected player -- bob, whom the instruction names -- is
-  -- asked, and the answer is pinned by source id rather than by candidate order.
-  --
-  -- bob casts it at himself, so that alice and carol both hold a matching row and
-  -- the pair differs in nothing but its controller.
-  Spec.it s "CR 616.1 two collectors under different controllers are told apart, and the drawer chooses" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    collector <- S.printingOf s registry "Alms Collector"
-    recall <- S.printingOf s registry "Ancestral Recall"
-    let (alices, g1) = S.addPermanent collector S.alice S.threePlayerGame
-        (carols, g2) = S.addPermanent collector S.carol g1
-        g3 = stockLibraries piker g2
-        (held, g4) = S.addHandCard recall S.bob g3
-        ready = inMainPhase S.alice (S.landsFor island S.bob 1 g4)
-        cast = S.cast S.bob held Monad.>> Stack.resolveTop
-        toAlice = S.runPure (collectorRaceAnswer alices) ready cast
-        toCarol = S.runPure (collectorRaceAnswer carols) ready cast
-        asked = answersFor (collectorRaceAnswer alices) ready cast
-    Spec.assertEqWith s "CR 616.1 taking alice's collector hands alice the card" (S.handSize S.alice toAlice) 1
-    Spec.assertEqWith s "and carol none of it" (S.handSize S.carol toAlice) 0
-    Spec.assertEqWith s "CR 616.1 taking carol's hands carol the card instead" (S.handSize S.carol toCarol) 1
-    Spec.assertEqWith s "and alice none of it" (S.handSize S.alice toCarol) 0
-    Spec.assertEqWith s "CR 121.2a either way bob's instruction of three left him one card" (S.handSize S.bob toAlice) 1
-    Spec.assertBool s (wasAskedToReplace asked) "a ChooseReplacement was raised"
 
 -- Aim a spell's player slot at one seat -- Ancestral Recall's "target player".
 atPlayerAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 atPlayerAnswer pid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer pid))) sets
   _ -> S.identityAnswer p
-
--- atPlayerAnswer aimed at bob, plus a CR 616.1 race answered by the candidate whose
--- SOURCE is `preferred` -- by id, so the assertion does not depend on the engine's
--- canonical candidate order. raceAnswer above is the same shape over a creature
--- target rather than a player one.
-collectorRaceAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-collectorRaceAnswer preferred p = case p of
-  Prompt.ChooseReplacement _ _ entries -> maybe 0 Int.toNaturalSaturating (List.findIndex ((== preferred) . ReplacementEntry.source) entries)
-  _ -> atPlayerAnswer S.bob p
 
 -- Four cards for bob, three for alice, two for carol: distinct depths, so a hand
 -- size and a library size cannot agree by coincidence, and no seat is decked out
@@ -649,37 +426,8 @@ collectorBoard island piker collector recall collecting =
 -- THREE SEATS wherever the clause's CR 109.5 "you" is the question, because a
 -- two-player board cannot tell "the row's controller" from "the player the event
 -- names" when one seat holds both roles.
-boonReflectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boonReflectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 614.1a)" $ do
-  -- CR 119.3's plain road: Pawl.Engine.Resolve's Effect.GainLife arm. ONE board,
-  -- two casts of the SAME spell, so the only thing that differs between the two
-  -- answers is which seat controls the row. Blossoming Calm ({W} Instant,
-  -- "Choose one -- * You gain 2 life. * ..." in pawl's transcription: hexproof
-  -- until your next turn and 2 life) is an instant, so bob may cast his on
-  -- alice's main phase.
-  --
-  -- Every number distinct -- a gain of 2, a doubled 4, and totals of 24, 22 and
-  -- 20 -- so no two readings of the rule land on the same total.
-  Spec.it s "CR 119.3 an effect's life gain is doubled for the row's controller and nobody else" $ do
-    plains <- S.printingOf s registry "Plains"
-    calm <- S.printingOf s registry "Blossoming Calm"
-    boon <- S.printingOf s registry "Boon Reflection"
-    let (_, g1) = S.addPermanent boon S.alice S.threePlayerGame
-        (alicesCalm, g2) = S.addHandCard calm S.alice g1
-        (bobsCalm, g3) = S.addHandCard calm S.bob g2
-        ready = S.landsFor plains S.bob 1 (S.landsFor plains S.alice 1 (inMainPhase S.alice g3))
-        after =
-          S.runPure
-            S.identityAnswer
-            ready
-            ( S.cast S.alice alicesCalm
-                Monad.>> Stack.resolveTop
-                Monad.>> S.cast S.bob bobsCalm
-                Monad.>> Stack.resolveTop
-            )
-    Spec.assertEqWith s "CR 614.1a alice's printed gain of 2 becomes 4" (S.lifeOf S.alice after) (Just 24)
-    Spec.assertEqWith s "CR 109.5 bob is not the row's you, so his same 2 stays 2" (S.lifeOf S.bob after) (Just 22)
-    Spec.assertEqWith s "and carol, who gained nothing, is untouched" (S.lifeOf S.carol after) (Just 20)
   -- CR 120.3f: lifelink's gain is a life gain event like any other, so the row
   -- reaches it -- which is the half of this unit that no Effect.GainLife road can
   -- prove, Pawl.Engine.Damage having its own write.
@@ -711,22 +459,6 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     Spec.assertEqWith s "and the Bond drains the SETTLED 6, so alice takes 3 + 6" (S.lifeOf S.alice doubled) (Just 11)
     Spec.assertEqWith s "the same board without the row gains bob the printed 3" (S.lifeOf S.bob control) (Just 23)
     Spec.assertEqWith s "and drains alice 3, so she takes 3 + 3" (S.lifeOf S.alice control) (Just 14)
-  -- CR 614.11's substituted gain, the fourth road into the funnel: Words of
-  -- Worship's "the next time you would draw a card this turn, you gain 5 life
-  -- instead" gains life through a REPLACEMENT rather than through an effect, and
-  -- rule 119.10 knows no difference -- a source caused alice to gain life.
-  --
-  -- The board is the Words of Worship group's armed one with a row added, so the
-  -- two differ in exactly one thing, and the draw is still cancelled either way.
-  Spec.it s "CR 614.11 the life a draw replacement substitutes is a gain the row resizes" $ do
-    plains <- S.printingOf s registry "Plains"
-    wordsOfWorship <- S.printingOf s registry "Words of Worship"
-    boon <- S.printingOf s registry "Boon Reflection"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (armed, _) = wordsBoard plains wordsOfWorship piker True
-        after = S.runPure S.identityAnswer (snd (S.addPermanent boon S.alice armed)) (Event.drawCard S.alice)
-    Spec.assertEqWith s "CR 614.1a the substituted 5 becomes 10, so alice is at 30" (S.lifeOf S.alice after) (Just 30)
-    Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
 
 ashiokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 614.6)" $ do
@@ -806,43 +538,6 @@ deflectionCombat :: ObjectId.ObjectId -> ObjectId.ObjectId -> [Recipient.Recipie
 deflectionCombat blocker attacker wanted p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers {} -> Map.singleton blocker (Set.singleton attacker)
-  Prompt.AllocateDamage _ _ events share ->
-    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
-  _ -> S.identityAnswer p
-
--- Cast Molten Disaster UNKICKED for `x`, spending a contested shield on the
--- batch's hits in `wanted` order. The kicker answer is PINNED rather than
--- deferred: kicking it turns on a static ability that grants split second (CR
--- 702.61a), and the case below is about the damage sentence alone.
---
--- The order is stated by RECIPIENT, deflectionCombat's shape, so the assertions
--- do not depend on the order the instruction's own sweep gathered the batch in.
-castDisaster :: Natural.Natural -> [Recipient.Recipient] -> Prompt.Prompt r -> r
-castDisaster x wanted p = case p of
-  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
-  Prompt.ChooseX {} -> x
-  Prompt.AllocateDamage _ _ events share ->
-    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
-  _ -> S.identityAnswer p
-
--- Aim CR 115.4's "any target" at `victim` and spend a contested prevention
--- shield on the batch's hits in `wanted` order. The target is FILTERED out of
--- the offered set rather than built, castDeflection's shape, and the order is
--- stated by RECIPIENT, castDisaster's.
-aimCreatureAndOrder :: ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
-aimCreatureAndOrder victim wanted p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets
-  Prompt.AllocateDamage _ _ events share ->
-    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
-  _ -> S.identityAnswer p
-
--- Win Winter Sky's CR 705.2 call, then spend a contested shield in `wanted`
--- order. The flip is pinned rather than deferred: the losing branch draws cards
--- instead of dealing damage, and the case below is about the damage sentence.
-winTheFlipAndOrder :: [Recipient.Recipient] -> Prompt.Prompt r -> r
-winTheFlipAndOrder wanted p = case p of
-  Prompt.FlipCoin -> CoinFace.Heads
-  Prompt.CallCoin {} -> CoinFace.Heads
   Prompt.AllocateDamage _ _ events share ->
     S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
   _ -> S.identityAnswer p

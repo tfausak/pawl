@@ -41,12 +41,6 @@
 -- the host it is cast onto, and the permanent left behind when Clever
 -- Concealment names the Aura alone.
 --
--- Master Thief joins them for CR 702.26f, whose "for as long as" half needs a
--- duration (CR 611.2b) tracking a permanent Reality Ripple can then send away:
--- "gain control of target artifact for as long as you control this creature" is
--- the rulebook's own example of one. Darksteel Myr is the artifact it takes, and
--- the only one on that board, so the trigger's CR 603.3d choice is forced.
---
 -- Synthetic Puppeteer's Yoke joins them for the CR 613.1b layer-2 fold, whose
 -- Affected.AttachedPlayerControls arm names a permanent by its CONTROLLER rather
 -- than by walking a zone. It is bounded by the battlefield all the same, which
@@ -77,7 +71,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -88,12 +81,10 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
-import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -105,7 +96,12 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
-import qualified Pawl.Types.ZoneChange as ZoneChange
+
+-- The sweep every settle runs, at the answerer these boards take. Duplicated
+-- from Pawl.ExpirySpec rather than hoisted into Pawl.Support, which rebuilds
+-- every spec in the tree.
+settleFor :: GameState.GameState -> GameState.GameState
+settleFor gs = S.runPure S.identityAnswer gs Engine.settleForPriority
 
 -- CR 502: the untap step's turn-based actions, run for `pid`. DaytimeSpec's
 -- helper of the same shape, with the active player made explicit because the
@@ -160,16 +156,6 @@ enchantedCrocodile crocodile pacifism owner enchanter gs =
 attachedHostOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
 attachedHostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo
 
--- The Saproling tokens `pid` controls. TOKENS and by SUBTYPE, so a fixture that
--- grew another creature could not drift the count.
-saprolingsOf :: PlayerId.PlayerId -> GameState.GameState -> Int
-saprolingsOf pid gs =
-  length
-    ( filter
-        (\oid -> Set.member Subtype.Saproling (Projection.subtypesOf oid gs) && Projection.controllerOf oid gs == Just pid)
-        (S.tokensOf gs)
-    )
-
 -- Aim every target slot at `oid`, and otherwise answer as S.aggressiveAnswer does
 -- -- so one answerer serves both the quiet boards and the combat ones.
 --
@@ -219,38 +205,6 @@ equippedBoard island piker bonesplitter ripple =
     let (host, withHost) = S.addPermanent piker S.alice gs
         (equip, withEquip) = S.addPermanent bonesplitter S.alice withHost
      in ((host, equip), S.attach equip host withEquip)
-
--- The sweep every settle runs, and the whole priority loop, at the answerer
--- these boards take. Duplicated from Pawl.ExpirySpec rather than hoisted into Pawl.Support,
--- which rebuilds every spec in the tree.
-settleFor :: GameState.GameState -> GameState.GameState
-settleFor gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-
-resolveAll :: GameState.GameState -> GameState.GameState
-resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
-
--- alice's Master Thief has entered and its ETB has taken bob's Darksteel Myr, on
--- a rippleBoard so the Ripple can be cast at the Thief afterwards. The Myr is the
--- only artifact, so the TRIGGER's CR 603.3d target choice is forced and no aiming
--- answerer is needed for it -- only for the Ripple, whose pool is artifacts,
--- creatures and lands and so offers more. Master Thief is PUT onto the
--- battlefield rather than cast, leaving rippleBoard's "two Islands is exactly
--- {1}{U}" invariant untouched.
---
--- Returns the Thief and the Myr, then the Ripple in alice's hand.
-stolenBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  ((ObjectId.ObjectId, ObjectId.ObjectId), ObjectId.ObjectId, GameState.GameState)
-stolenBoard island darksteelMyr masterThief ripple =
-  rippleBoard island ripple $ \gs ->
-    let (myr, withMyr) = S.addPermanent darksteelMyr S.bob gs
-        (thief, withThief) = S.addPermanent masterThief S.alice withMyr
-        entered = ZoneChange.MkZoneChange thief thief Zone.Stack Zone.Battlefield
-        seen = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thief withThief))] withThief
-     in ((thief, myr), resolveAll (settleFor seen))
 
 -- CR 601.2c's whole announcement for Clever Concealment: as many targets as
 -- `oids` names, and exactly those objects taken out of the offered set.
@@ -368,27 +322,6 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     -- CR 702.26d: no zone change, so Object.zone is untouched and the object still
     -- exists. Both are what CR 702.26i's host test later reads.
     Spec.assertEqWith s "its zone still says battlefield" (zoneOf victim after) (Just Zone.Battlefield)
-  -- CR 702.26b's "can't be affected by anything else in the game", at the one
-  -- reader a spell goes through: CR 601.2c's choice of targets, which admits only
-  -- legal candidates. A second Reality Ripple
-  -- cannot aim at the permanent the first one sent away, though it can still aim
-  -- at the one beside it.
-  Spec.it s "CR 702.26b a phased-out permanent is not a legal target" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    ripple <- S.printingOf s registry "Reality Ripple"
-    let ((victim, bystander), spell, board) =
-          rippleBoard island ripple $ \gs ->
-            let (a, g1) = S.addPermanent piker S.bob gs
-                (b, g2) = S.addPermanent piker S.bob g1
-             in ((a, b), g2)
-        after = rippleAt victim spell board
-        legalIn gs = case S.spellTargetSlot ripple of
-          Nothing -> Set.empty
-          Just slot -> Set.map Recipient.objectOf (Target.legalRecipients Nothing S.noSource slot gs)
-    Spec.assertEqWith s "setup: it was a legal target while phased in" (Set.member (Just victim) (legalIn board)) True
-    Spec.assertEqWith s "and is not once phased out" (Set.member (Just victim) (legalIn after)) False
-    Spec.assertEqWith s "while the Piker beside it still is" (Set.member (Just bystander) (legalIn after)) True
   -- CR 702.26a's phase-in half applied to a permanent with NO phasing, which is
   -- the reading Pawl.Engine.Phasing.phasingIn implements -- "the keyword decides
   -- who leaves, never who returns" -- and which no board could distinguish from
@@ -416,45 +349,6 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     -- phasing phases out on the schedule, so bob's untap step does not
     -- send it straight back out again.
     Spec.assertEqWith s "and it does not phase out again at once" (Phasing.phasedOutStatus victim bobs) Nothing
-  -- CR 702.26f's second sentence, read on the duration CR 611.2b names: a "for as
-  -- long as" effect that tracks a permanent ENDS when that permanent phases out,
-  -- "because they can no longer see it", and does not come back with it. Master
-  -- Thief's "gain control of target artifact for as long as you control this
-  -- creature" is the rulebook's own example of such a duration; Reality Ripple
-  -- sends the Thief away mid-turn, which is the only way to reach this.
-  --
-  -- Nothing in Pawl.Engine.Expiry or Pawl.Engine.Projection names phasing. The
-  -- duration's Condition counts the Thief on the battlefield, Phasing.phaseOut
-  -- takes it out of GameState.battlefield, so Expiry.sweepConditional DELETES the
-  -- effect -- and deletion, not suspension, is what the second sentence needs.
-  --
-  -- The minimal-pair sibling is attachedSpec's Bonesplitter case, on the same
-  -- Ripple-then-untapStep shape: a STATIC ability is re-derived from battlefield
-  -- membership every projection and comes back (4 -> 2 -> 4), where this STORED
-  -- effect is deleted and does not (alice -> bob -> bob). Same shape, opposite
-  -- third value.
-  --
-  -- Both readings are taken after a settle, since untapStep runs only
-  -- Engine.runTurnBasedActions while the sweep lives in Engine.settleForPriority.
-  Spec.it s "CR 702.26f a for-as-long-as duration ends when its permanent phases out" $ do
-    island <- S.printingOf s registry "Island"
-    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-    masterThief <- S.printingOf s registry "Master Thief"
-    ripple <- S.printingOf s registry "Reality Ripple"
-    let ((thief, myr), spell, stolen) = stolenBoard island darksteelMyr masterThief ripple
-        gone = settleFor (rippleAt thief spell stolen)
-        back = settleFor (untapStep S.alice gone)
-    Spec.assertEqWith s "setup: alice's Master Thief took bob's Myr" (Projection.controllerOf myr stolen) (Just S.alice)
-    Spec.assertEqWith s "setup: and the duration really armed" (length (GameState.continuousEffects stolen)) 1
-    Spec.assertEqWith s "the Ripple phased the Thief out" (Phasing.isPhasedOut thief gone) True
-    -- CR 702.26f's "end", at gameplay level and ahead of every structural proxy.
-    Spec.assertEqWith s "so control of the Myr reverts to bob" (Projection.controllerOf myr gone) (Just S.bob)
-    Spec.assertEqWith s "the effect is deleted, not masked" (GameState.continuousEffects gone) []
-    -- CR 702.26a brings the Thief back under alice, who controls it; CR 702.26f's
-    -- second sentence says the effect does not come back with it.
-    Spec.assertEqWith s "CR 702.26a the Thief phases in at alice's untap step" (onBattlefield thief back) True
-    Spec.assertEqWith s "and the Myr stays with bob" (Projection.controllerOf myr back) (Just S.bob)
-    Spec.assertEqWith s "with nothing restored" (GameState.continuousEffects back) []
   -- CR 702.26e: Lurking Evil's "this enchantment becomes a 4/4 Phyrexian Horror
   -- creature with flying" names its source through the `self` group slot, not a
   -- target, so CR 608.2b never drops it. Phased out in response by Clever
@@ -645,100 +539,6 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
         events = length . GameState.events
     Spec.assertEqWith s "phasing out logged nothing" (events gone) (events board)
     Spec.assertEqWith s "and phasing in logged nothing" (events back) (events gone)
-  -- CR 702.26j with a real attachment event behind it: "abilities that trigger
-  -- when a permanent becomes attached or unattached from an object or player
-  -- don't trigger when that permanent phases in or out."
-  --
-  -- Bramble Elemental watches for it ("whenever an Aura becomes attached to this
-  -- creature, create two 1\/1 green Saproling creature tokens"), and the board is
-  -- built by CASTING Pacifism at it -- so the baseline of two is a real count that
-  -- a real emit produced, which is the whole difference between this case and the
-  -- one above. Reality Ripple then phases the enchanted Elemental out, the Aura
-  -- goes with it (CR 702.26g), and alice's untap step brings both back attached.
-  --
-  -- A FENCE STILL, though a discriminating one: CR 702.26j is satisfied
-  -- structurally rather than by a guard, since Pawl.Engine.Phasing never clears
-  -- Object.attachedTo (the case above asserts the Aura is still attached after a
-  -- full cycle), so on the way back in there is no attachment for a plausible
-  -- implementation to record. What it holds is that the phasing path stays quiet.
-  Spec.it s "CR 702.26j phasing an enchanted permanent out and back in does not re-trigger" $ do
-    plains <- S.printingOf s registry "Plains"
-    island <- S.printingOf s registry "Island"
-    bramble <- S.printingOf s registry "Bramble Elemental"
-    pacifism <- S.printingOf s registry "Pacifism"
-    ripple <- S.printingOf s registry "Reality Ripple"
-    let base = S.landsFor plains S.alice 3 (S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (brambleId, withBramble) = S.addPermanent bramble S.alice base
-        (armed, auraSpell) = S.handOne pacifism withBramble
-        cast = S.runPure (aimedAt brambleId) armed (S.cast S.alice auraSpell)
-        entered = S.runPure (aimedAt brambleId) cast (Monad.void Stack.resolveTop)
-        placed = S.runPure (aimedAt brambleId) entered Engine.settleForPriority
-        enchanted = S.runPure (aimedAt brambleId) placed Stack.resolveTop
-        (withRipple, rippleSpell) = S.handOne ripple enchanted
-        phasedOut = rippleAt brambleId rippleSpell withRipple
-        returned = untapStep S.alice phasedOut
-        -- The CR 117.5 boundary AFTER the untap step, and then the stack: a
-        -- trigger the phase-in had recorded would be placed here and resolve
-        -- here. Without it the count below could not tell an engine that emitted
-        -- nothing from one that emitted and was never scanned.
-        placedAfter = S.runPure (aimedAt brambleId) returned Engine.settleForPriority
-        phasedIn = S.runPure (aimedAt brambleId) placedAfter Stack.resolveTop
-    Spec.assertEqWith s "the cast Aura made two Saprolings" (saprolingsOf S.alice enchanted) 2
-    -- THE DISCRIMINATOR. Four would mean the phase-in recorded an attachment.
-    Spec.assertEqWith s "CR 702.26j still exactly two after a phase cycle" (saprolingsOf S.alice phasedIn) 2
-    -- Without these the count above is vacuous: a permanent that never phased
-    -- reads two either way.
-    Spec.assertEqWith s "CR 702.26b the Elemental phased out" (onBattlefield brambleId phasedOut) False
-    Spec.assertEqWith s "CR 702.26a and phased back in at alice's untap step" (onBattlefield brambleId phasedIn) True
-    case filter (\oid -> (Game.lookupObject oid phasedIn >>= Object.attachedTo >>= Recipient.objectOf) == Just brambleId) (Set.toList (GameState.battlefield phasedIn)) of
-      [auraId] -> Spec.assertEqWith s "CR 702.26g with the Aura back on it" (attachedHostOf auraId phasedIn) (Just (Recipient.ToCreature brambleId))
-      other -> Spec.assertFailure s ("expected exactly one Aura back on the Elemental, got " <> show (length other))
-  -- CR 702.26j's UNATTACHED half, on the one board where the phasing path really
-  -- does clear Object.attachedTo: rule 702.26i's phase-in detach. Grafted Wargear
-  -- watches for it ("whenever this Equipment becomes unattached from a permanent,
-  -- sacrifice that permanent") and is equipped through the real CR 702.6a road, so
-  -- the attach behind this board is a genuine event.
-  --
-  -- Reality Ripple phases the WARGEAR out directly, Doom Blade kills the creature
-  -- it was on while it is away, and alice's untap step brings it back -- at which
-  -- point hostRemains is False and Pawl.Engine.Phasing.phaseIn writes the detach.
-  --
-  -- A FENCE rather than a proof, the case above's posture: rule 702.26j is
-  -- satisfied by construction here, phaseIn being a pure GameState -> GameState
-  -- with no way to append to CR 608.2i's log. What it holds is that the write
-  -- stays there and the phasing path stays quiet.
-  Spec.it s "CR 702.26j/702.26i a phase-in detach is no unattachment" $ do
-    island <- S.printingOf s registry "Island"
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    wargear <- S.printingOf s registry "Grafted Wargear"
-    ripple <- S.printingOf s registry "Reality Ripple"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    let base = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (pikerId, withPiker) = S.addPermanent piker S.alice base
-        (gearId, withGear) = S.addPermanent wargear S.alice withPiker
-        ready = withGear {GameState.priority = Just S.alice}
-    case Projection.abilitiesOf gearId ready of
-      [] -> Spec.assertFailure s "Grafted Wargear should offer rule 702.6a's minted equip ability"
-      equip : _ -> do
-        let equipped = S.runPure (aimedAt pikerId) ready (Activate.activateAbility S.alice gearId equip >> Monad.void Stack.resolveTop)
-            settled = S.runPure (aimedAt pikerId) (S.runPure (aimedAt pikerId) equipped Engine.settleForPriority) Stack.resolveTop
-            (withRipple, rippleSpell) = S.handOne ripple settled
-            phasedOut = rippleAt gearId rippleSpell withRipple
-            (withBlade, bladeSpell) = S.handOne doomBlade (phasedOut {GameState.priority = Just S.alice})
-            killed = S.runPure (aimedAt pikerId) withBlade (S.cast S.alice bladeSpell >> Monad.void Stack.resolveTop)
-            phasedIn = S.runPure S.identityAnswer (untapStep S.alice killed) Engine.settleForPriority
-            unattachments g = length (filter (\e -> case e of GameEvent.BecameUnattached {} -> True; _ -> False) (S.eventsOf g))
-        -- THE DISCRIMINATOR, and the only assertion that would move: the
-        -- attachment CAME OFF across the cycle and rule 702.26j kept it silent.
-        Spec.assertEqWith s "CR 702.26j the phase cycle logged no unattachment" (unattachments phasedIn) (unattachments phasedOut)
-        Spec.assertEqWith s "CR 702.26i and the Wargear really did come back unattached" (attachedHostOf gearId phasedIn) Nothing
-        -- Without these the count above is vacuous: an equip that never happened,
-        -- or a permanent that never phased, reads zero either way.
-        Spec.assertEqWith s "the Wargear was equipping the Piker before the Ripple" (attachedHostOf gearId settled) (Just (Recipient.ToCreature pikerId))
-        Spec.assertEqWith s "CR 702.26b it phased out" (onBattlefield gearId phasedOut) False
-        Spec.assertEqWith s "CR 702.26a and phased back in at alice's untap step" (onBattlefield gearId phasedIn) True
-        Spec.assertEqWith s "and the host it left behind is gone" (onBattlefield pikerId phasedIn) False
 
 phaseOutSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phaseOutSpec s registry = Spec.describe s "PhaseOut" $ do

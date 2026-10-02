@@ -1,0 +1,163 @@
+{
+  "description": "CR 605.3a Void Winnower is cast off three activations of one Druid",
+  "note": "Six Elves are two activations, {6} and not {9}: the cast is refused and every Elf stays untapped.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Heritage Druid",
+            "label": "druid",
+            "ready": true
+          },
+          {
+            "card": "Glistener Elf",
+            "label": "elf1",
+            "ready": true
+          },
+          {
+            "card": "Glistener Elf",
+            "label": "elf2",
+            "ready": true
+          },
+          {
+            "card": "Glistener Elf",
+            "label": "elf3",
+            "ready": true
+          },
+          {
+            "card": "Glistener Elf",
+            "label": "elf4",
+            "ready": true
+          },
+          {
+            "card": "Glistener Elf",
+            "label": "elf5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Void Winnower",
+            "label": "winnower"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$winnower",
+          "mana": [
+            "$druid",
+            "$druid",
+            "$druid"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Void Winnower",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Void Winnower",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$druid",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$elf1",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$elf2",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$elf3",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$elf4",
+          "tapped": false
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$elf5",
+          "tapped": false
+        }
+      }
+    }
+  ]
+}

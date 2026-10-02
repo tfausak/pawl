@@ -15,6 +15,7 @@ import qualified Pawl.Codec.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Codec.SubtypesAre as SubtypesAre
 import qualified Pawl.Codec.TappedIs as TappedIs
 import qualified Pawl.Codec.TypesAre as TypesAre
+import qualified Pawl.Codec.ViewIs as ViewIs
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.Check as Check
@@ -38,6 +39,7 @@ codec =
       Arm.payload "PlayerCounters" PlayerCountersAre.codec Check.PlayerCounters (\x -> case x of Check.PlayerCounters y -> Just y; _ -> Nothing),
       Arm.payload "Subtypes" SubtypesAre.codec Check.Subtypes (\x -> case x of Check.Subtypes y -> Just y; _ -> Nothing),
       Arm.payload "Names" NamesAre.codec Check.Names (\x -> case x of Check.Names y -> Just y; _ -> Nothing),
+      Arm.payload "View" ViewIs.codec Check.View (\x -> case x of Check.View y -> Just y; _ -> Nothing),
       Arm.payload "Keywords" KeywordsAre.codec Check.Keywords (\x -> case x of Check.Keywords y -> Just y; _ -> Nothing)
     ]
 
@@ -57,4 +59,5 @@ tagOf x = case x of
   Check.PlayerCounters {} -> "PlayerCounters"
   Check.Subtypes {} -> "Subtypes"
   Check.Names {} -> "Names"
+  Check.View {} -> "View"
   Check.Keywords {} -> "Keywords"

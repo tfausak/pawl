@@ -43,7 +43,7 @@
 -- enters-or-planeswalker-dies trigger -- is Pawl.MassEffectSpec's CarthTheLion
 -- group. Its "loyalty abilities" is AddActivationCost.whichLoyalty, which asks CR
 -- 606.2 of the ability being activated where whichAbilities can only ask about
--- the source permanent; the LoyaltyAbilityOnly group is what proves the two are
+-- the source permanent; data/scenarios/planeswalker is what proves the two are
 -- not the same question.
 --
 -- A Realm Reborn -- {4}{G}{G} Enchantment, "Other permanents you control have
@@ -72,15 +72,12 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Mana as Mana.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
@@ -93,7 +90,6 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Choices as Choices
-import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -104,17 +100,9 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Label as Label
-import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSpending as ManaSpending
-import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.ManaType as ManaType
-import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Move as Move
-import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
-import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -127,7 +115,6 @@ import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- Jace Beleren's abilities in printed order: +2, -1, -10. Indexed rather than
@@ -215,22 +202,6 @@ burnAtJace island mountain jace burn =
       (burnId, gs) = S.addHandCard burn S.alice withMountain
    in (jaceId, burnId, gs)
 
--- burnAtJace's board with two Goblin Pikers of alice's added. They do double duty:
--- Goblin War Strike's damage is the number of Goblins their controller has, and a
--- pool widened to CR 115.4's four-way is exactly what would offer them as targets.
--- Two rather than one, so the damage the Strike deals is neither Jace's printed
--- loyalty nor zero.
-strikeAtJace ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-strikeAtJace island mountain jace strike piker =
-  let (jaceId, strikeId, gs) = burnAtJace island mountain jace strike
-   in (jaceId, strikeId, List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) gs [piker, piker])
-
 -- How many cards of a given name are in alice's graveyard.
 graveyardCount :: String -> GameState.GameState -> Int
 graveyardCount name gs =
@@ -315,35 +286,6 @@ useNissaAbility i p oid gs = case abilityAt i p of
   ability : _ -> S.runPure (announcingX 0) gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)
   [] -> gs
 
--- Chandra, Fire Artisan's abilities in printed order: +1, -7. Indexed for the
--- reason Jace's are.
-plusOne, minusSeven :: Int
-plusOne = 0
-minusSeven = 1
-
--- The planeswalker on the battlefield, found by name for theJace's reason.
-theChandra :: GameState.GameState -> ObjectId.ObjectId
-theChandra gs =
-  let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Chandra, Fire Artisan")
-   in case filter named (Set.toList (GameState.battlefield gs)) of
-        oid : _ -> oid
-        [] -> S.noSource
-
--- alice with `spare` Mountains left over after casting Chandra, Fire Artisan for
--- {2}{R}{R} through the ordinary path -- so her four loyalty counters come from
--- CR 306.5b's replacement rather than from a fixture.
---
--- Eight cards in alice's library, which the -7 needs: it exiles seven, and CR
--- 104.3c would end the game on an empty one before an assertion about the trigger
--- could run.
-chandraOnBattlefield :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
-chandraOnBattlefield mountain chandra spare =
-  let lands = S.landsInPlay mountain (4 + spare)
-      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) lands [1 :: Int .. 8]
-      (gs, handId) = S.handOne chandra stocked
-      after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
-   in (theChandra after, after)
-
 -- Fill every target slot with the candidate that names this PLAYER, filtering the
 -- set the engine offered rather than building a Recipient by hand -- aimedAt's
 -- posture one recipient shape over.
@@ -361,13 +303,6 @@ aimedAtPlayer pid p = case p of
             $ filter (== Recipient.ToPlayer pid) (Set.toList candidates) <> Set.toList candidates
      in fmap naming sets
   _ -> S.identityAnswer p
-
--- Gather the triggers the log has earned and resolve the top of the stack, with
--- the trigger's own target answered. Two steps and not one: CR 603.3b puts the
--- ability on the stack at the next CR 117.5 boundary, and CR 608.1 resolves it
--- only once a player would receive priority with it there.
-firedTrigger :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-firedTrigger answer gs = S.runPure answer gs (do Engine.settleForPriority; Stack.resolveTop)
 
 isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
@@ -388,12 +323,6 @@ attackingChandra p = case p of
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
   wanderingEmperorSpec s registry
-  Spec.it s "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (jaceId, after) = jaceOnBattlefield island jace
-    Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "on the battlefield"
-    Spec.assertEqWith s "loyalty 3" (S.counterOf CounterKind.Loyalty jaceId after) 3
 
   Spec.it s "CR 606.4 the +2 adds two loyalty counters and each player draws" $ do
     island <- S.printingOf s registry "Island"
@@ -412,20 +341,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "loyalty 3 - 1" (S.counterOf CounterKind.Loyalty jaceId after) 2
     Spec.assertEqWith s "exactly one player drew exactly one card" (S.handSize S.alice after + S.handSize S.bob after) 1
 
-  Spec.it s "CR 606.6 the -10 is not offered at 3 loyalty, while the other two are" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (jaceId, board) = jaceOnBattlefield island jace
-        offered = Action.legalActions S.alice board
-        isOffered i = not (null (activation jaceId i jace)) && all (`elem` offered) (activation jaceId i jace)
-    Spec.assertBool s (isOffered plusTwo) "the +2 is offered"
-    Spec.assertBool s (isOffered minusOne) "the -1 is offered"
-    Spec.assertBool s (not (isOffered minusTen)) "the -10 is NOT offered"
-    Spec.assertBool
-      s
-      (not (any (\ab -> Activatable.activatable S.alice jaceId ab board) (abilityAt minusTen jace)))
-      "and it is not activatable either"
-
   Spec.it s "CR 606.3 a second loyalty ability is not offered in the same turn" $ do
     island <- S.printingOf s registry "Island"
     jace <- S.printingOf s registry "Jace Beleren"
@@ -439,30 +354,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
       s
       (all (`elem` Action.legalActions S.alice (alicesNextTurn after)) (activation jaceId plusTwo jace))
       "but the limit expires with the turn"
-
-  Spec.it s "CR 606.3 a loyalty ability is not offered on an opponent's turn" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (jaceId, board) = jaceOnBattlefield island jace
-        theirTurn = board {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
-    Spec.assertBool
-      s
-      (all (`notElem` Action.legalActions S.alice theirTurn) (activation jaceId plusTwo jace))
-      "the +2 is not offered"
-
-  -- The proof that CR 306.5b's counters accumulate into GameState.enteringCounters
-  -- rather than landing straight onto the object, so CR 614.16 reaches them in the
-  -- entry's own CR 616.1 pool. CR 614.16's second sentence is the rule: a
-  -- counter-scaling replacement applies "even if the original event being
-  -- modified wasn't itself an effect", and CR 306.5b's entry counters are
-  -- placed by a replacement effect.
-  Spec.it s "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    doublingSeason <- S.printingOf s registry "Doubling Season"
-    let (gs, handId) = S.handOne jace (snd (S.addPermanent doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
-        after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
-    Spec.assertEqWith s "three doubled to six" (S.counterOf CounterKind.Loyalty (theJace after) after) 6
 
   -- The other half of the same rule, and the reason the two placements are
   -- deliberately different code paths: CR 614.16's FIRST sentence limits a
@@ -501,64 +392,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "six plus four, not six plus two" (S.counterOf CounterKind.Loyalty jaceId after) 10
     Spec.assertEqWith s "and the row was live on the way in: three doubled to six" (S.counterOf CounterKind.Loyalty jaceId board) 6
 
-  -- CR 115.4: "These targets may be creatures, players, planeswalkers, or
-  -- battles." Read off Lightning Bolt's OWN committed target slot rather than a
-  -- hand-built one, so what is under test is the pool the card data selects.
-  Spec.it s "CR 115.4 an 'any target' spell offers the planeswalker alongside the players" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    jace <- S.printingOf s registry "Jace Beleren"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (jaceId, _, gs) = burnAtJace island mountain jace lightningBolt
-        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) S.noSource theSlot gs) (S.spellTargetSlot lightningBolt)
-    Spec.assertEqWith s "the planeswalker is a legal target" (fmap (Set.member (Recipient.ToPlaneswalker jaceId)) offered) (Just True)
-    Spec.assertEqWith s "and so are both players" (fmap (Set.isSubsetOf (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) offered) (Just True)
-    -- CR 115.4's other half: "Other game objects, such as noncreature artifacts
-    -- or spells, can't be chosen." The Mountain and the Islands are on the same
-    -- battlefield, so widening the pool to planeswalkers must not have widened
-    -- it to permanents.
-    Spec.assertEqWith s "and nothing else on the battlefield is" (fmap (Set.size . Set.filter (Maybe.isJust . Recipient.objectOf)) offered) (Just 1)
-
-  -- The OTHER pool that offers a planeswalker, and the pair is the point: CR
-  -- 115.2's default already admits a permanent, and its clause (a) adds "or a
-  -- player", so a card can name both in one slot without reaching rule 115.4's
-  -- four-way at all. Goblin War Strike {R} Sorcery
-  -- -- "Goblin War Strike deals damage to target player or planeswalker equal to
-  -- the number of Goblins you control" (checked against Scryfall) -- is that
-  -- card, and Pool.PlayersAndPlaneswalkers is its slot.
-  --
-  -- Read off the Strike's OWN committed slot, as the case above is, so what is
-  -- under test is the pool the card data selects.
-  Spec.it s "CR 115.2 a 'player or planeswalker' spell offers neither Goblin" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    jace <- S.printingOf s registry "Jace Beleren"
-    goblinWarStrike <- S.printingOf s registry "Goblin War Strike"
-    goblinPiker <- S.printingOf s registry "Goblin Piker"
-    let (jaceId, _, gs) = strikeAtJace island mountain jace goblinWarStrike goblinPiker
-        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) S.noSource theSlot gs) (S.spellTargetSlot goblinWarStrike)
-    -- FIRST, because it is the one assertion that tells this pool from either
-    -- neighbour: CR 115.4's pool would offer alice's two Goblins alongside Jace,
-    -- and a players-only pool would offer no object at all.
-    Spec.assertEqWith s "exactly one object is offered, so the two Goblins are not" (fmap (Set.size . Set.filter (Maybe.isJust . Recipient.objectOf)) offered) (Just 1)
-    Spec.assertEqWith s "and that object is the planeswalker" (fmap (Set.member (Recipient.ToPlaneswalker jaceId)) offered) (Just True)
-    Spec.assertEqWith s "and both players are offered too" (fmap (Set.isSubsetOf (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) offered) (Just True)
-
-  -- And the pool is load-bearing all the way to the damage: the Strike is cast at
-  -- the planeswalker and resolved, so CR 306.8 removes loyalty rather than a
-  -- player losing life. NOT settled, for burnResolved's reason.
-  Spec.it s "CR 306.8 a Goblin War Strike aimed at the planeswalker removes its loyalty" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    jace <- S.printingOf s registry "Jace Beleren"
-    goblinWarStrike <- S.printingOf s registry "Goblin War Strike"
-    goblinPiker <- S.printingOf s registry "Goblin Piker"
-    let (jaceId, strikeId, gs) = strikeAtJace island mountain jace goblinWarStrike goblinPiker
-        resolved = burnResolved jaceId strikeId gs
-    Spec.assertEqWith s "CR 306.8: two Goblins, so 3 - 2" (S.counterOf CounterKind.Loyalty jaceId resolved) 1
-    Spec.assertEqWith s "and no life was lost: alice" (S.lifeOf S.alice resolved) (Just 20)
-    Spec.assertEqWith s "and bob" (S.lifeOf S.bob resolved) (Just 20)
-
   Spec.it s "CR 306.8 Lightning Bolt's 3 damage removes all three loyalty counters, and CR 704.5i buries Jace" $ do
     island <- S.printingOf s registry "Island"
     mountain <- S.printingOf s registry "Mountain"
@@ -577,29 +410,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     -- jaceId names nothing once the SBA has buried it.
     Spec.assertEqWith s "CR 704.5i: in its owner's graveyard" (graveyardCount "Jace Beleren" after) 1
 
-  Spec.it s "CR 306.8 Firebolt's 2 damage removes two of the three loyalty counters and Jace lives" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    jace <- S.printingOf s registry "Jace Beleren"
-    firebolt <- S.printingOf s registry "Firebolt"
-    let (jaceId, fireboltId, gs) = burnAtJace island mountain jace firebolt
-        after = S.settleSba (burnResolved jaceId fireboltId gs)
-    Spec.assertEqWith s "CR 306.8: 3 - 2, not 0 and not 3" (S.counterOf CounterKind.Loyalty jaceId after) 1
-    Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "CR 704.5i does not apply at loyalty 1"
-
-  Spec.it s "CR 704.5i three -1s across three turns bury Jace in his owner's graveyard" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (jaceId, board) = jaceOnBattlefield island jace
-        turn gs = S.settleSba (alicesNextTurn (useAbility minusOne jace jaceId gs))
-        afterOne = turn board
-        afterTwo = turn afterOne
-        afterThree = turn afterTwo
-    Spec.assertEqWith s "loyalty 2 after one activation" (S.counterOf CounterKind.Loyalty jaceId afterOne) 2
-    Spec.assertEqWith s "loyalty 1 after two" (S.counterOf CounterKind.Loyalty jaceId afterTwo) 1
-    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield afterThree))) "off the battlefield after three"
-    Spec.assertEqWith s "in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice afterThree)) 1
-
 -- CR 122's counter REMOVAL as an event a trigger can see, through the two
 -- removals a planeswalker performs: CR 606.4's loyalty cost (Pawl.Engine.Cost,
 -- routed through Pawl.Engine.Event.removeCounters) and CR 120.3c / 306.8's damage
@@ -616,54 +426,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
 -- Every board here leaves counters BEHIND, which is what separates this condition
 -- from TriggerCondition.SelfLastCounterRemoved: an implementation that read the
 -- after-count would match none of them.
-countersRemovedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+countersRemovedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 countersRemovedSpec s registry = Spec.describe s "CountersRemoved" $ do
-  -- The DAMAGE half. Lightning Bolt's 3 against printed loyalty 4: three counters
-  -- come off, one stays, and bob takes three. Every number here is distinct from
-  -- every other reading of the rule this board admits -- the loyalty is 4, the
-  -- damage 3, the remainder 1 -- so a trigger stamped with the wrong one cannot
-  -- land on 17.
-  Spec.it s "CR 306.8 / 603.2 the three loyalty counters Lightning Bolt takes off Chandra deal three to bob" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    chandra <- S.printingOf s registry "Chandra, Fire Artisan"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (chandraId, board) = chandraOnBattlefield mountain chandra 1
-        (boltId, withBolt) = S.addHandCard lightningBolt S.alice board
-        resolved = S.runPure (aimedAt chandraId) withBolt (do S.cast S.alice boltId; Stack.resolveTop)
-        after = firedTrigger (aimedAtPlayer S.bob) resolved
-    Spec.assertEqWith s "bob took three, the number of counters that came off" (S.lifeOf S.bob after) (Just 17)
-    Spec.assertEqWith s "CR 306.8: 4 - 3, so this was NOT the last counter" (S.counterOf CounterKind.Loyalty chandraId after) 1
-    Spec.assertBool s (Set.member chandraId (GameState.battlefield after)) "and Chandra is still on the battlefield"
-
-  -- The COST half, on the same card and a different removal path entirely. Ten
-  -- loyalty and not seven: CR 606.6 admits the -7 at either, but seven would take
-  -- her to zero and CR 704.5i would bury her mid-trigger, which is a case about
-  -- last known information rather than about the funnel.
-  Spec.it s "CR 606.4 / 603.2 paying Chandra's -7 removes seven loyalty counters and deals seven to bob" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    chandra <- S.printingOf s registry "Chandra, Fire Artisan"
-    let (chandraId, board) = chandraOnBattlefield mountain chandra 0
-        atTen = S.addCounter CounterKind.Loyalty 6 chandraId board
-        spent = useAbility minusSeven chandra chandraId atTen
-        after = firedTrigger (aimedAtPlayer S.bob) spent
-    Spec.assertEqWith s "bob took seven" (S.lifeOf S.bob after) (Just 13)
-    Spec.assertEqWith s "CR 606.4: 10 - 7" (S.counterOf CounterKind.Loyalty chandraId after) 3
-    Spec.assertEqWith s "and the -7 did resolve: seven cards left alice's library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
-
-  -- The control for the pair above: the +1 ADDS counters, so no removal happens
-  -- and the trigger does not fire. One board, one card, and the only difference
-  -- from the case above is which loyalty ability was activated -- which is what
-  -- makes the seven damage there the removal's and not the activation's.
-  Spec.it s "CR 606.4 Chandra's +1 removes nothing, so the trigger does not fire" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    chandra <- S.printingOf s registry "Chandra, Fire Artisan"
-    let (chandraId, board) = chandraOnBattlefield mountain chandra 0
-        atTen = S.addCounter CounterKind.Loyalty 6 chandraId board
-        after = firedTrigger (aimedAtPlayer S.bob) (useAbility plusOne chandra chandraId atTen)
-    Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "CR 606.4: 10 + 1" (S.counterOf CounterKind.Loyalty chandraId after) 11
-    Spec.assertEqWith s "and the +1 did resolve: one card left alice's library" (length (Game.zoneMembers Zone.Library S.alice after)) 7
-
   -- CR 510.2's simultaneity, which is the property the board diff in
   -- Pawl.Engine.Damage exists to keep and the reason that site is not routed
   -- through Pawl.Engine.Event.removeCounters. Two 2/1 Goblin Pikers attacking one
@@ -758,120 +522,6 @@ combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
     Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "CR 120.5: still there before the state-based action"
     Spec.assertBool s (not (Set.member jaceId (GameState.battlefield (S.settleSba after)))) "CR 704.5i: loyalty 0, so buried"
 
-  -- Carth taxes the ADDING half too, which is the other side of "as appropriate":
-  -- +2 and +1 combine to a single +3, so one activation of the +2 leaves Jace at
-  -- 3 + 3 rather than 3 + 2. This is the case a fix that only ever emitted a
-  -- RemoveLoyaltyFromThis would fail.
-  Spec.it s "CR 606.5 the +2 and the added +1 combine to a single +3" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    carth <- S.printingOf s registry "Carth the Lion"
-    let (jaceId, board) = jaceOnBattlefield island jace
-        withCarth = snd (S.addPermanent carth S.alice board)
-        after = useAbility plusTwo jace jaceId withCarth
-        without = useAbility plusTwo jace jaceId board
-    Spec.assertEqWith s "3 + 3 with Carth" (S.counterOf CounterKind.Loyalty jaceId after) 6
-    Spec.assertEqWith s "3 + 2 without him" (S.counterOf CounterKind.Loyalty jaceId without) 5
-
-  -- The net-zero combination, which Jace's -1 and Carth's +1 reach: the single
-  -- cost adjusts nothing, so the ability is free and the loyalty is untouched. A
-  -- FENCE rather than a proof of the choice Cost.combineLoyalty makes there --
-  -- emitting nothing instead of a zero component answers the same on every board
-  -- the rules admit, because the one place the two could differ is CR 606.6 at 0
-  -- loyalty and CR 704.5i has already buried a planeswalker there.
-  Spec.it s "CR 606.5 the -1 and the added +1 combine to a cost that adjusts nothing" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    carth <- S.printingOf s registry "Carth the Lion"
-    let (jaceId, board) = jaceOnBattlefield island jace
-        withCarth = snd (S.addPermanent carth S.alice board)
-        after = useAbility minusOne jace jaceId withCarth
-    Spec.assertEqWith s "still 3, neither 2 nor 4" (S.counterOf CounterKind.Loyalty jaceId after) 3
-    Spec.assertEqWith s "and the ability did resolve: exactly one player drew" (S.handSize S.alice after + S.handSize S.bob after) 1
-
--- Jace, Carth and A Realm Reborn, all alice's. ONE board on which Jace carries
--- both halves of CR 606.2: his three printed loyalty abilities, and the
--- "{T}: Add one mana of any color" A Realm Reborn grants every other permanent
--- alice controls.
---
--- The three Islands jaceOnBattlefield paid with are tapped, so the granted
--- ability leaves exactly two untapped mana sources -- Jace and Carth -- and the
--- source window is a real choice rather than an elided one.
-taxedBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, GameState.GameState)
-taxedBoard island jace carth realm =
-  let (jaceId, board) = jaceOnBattlefield island jace
-      withCarth = snd (S.addPermanent carth S.alice board)
-   in (jaceId, snd (S.addPermanent realm S.alice withCarth))
-
--- CR 601.2g's source window and CR 105.4's colour, both pinned -- Pawl.ManaSpec's
--- `prefersSource`, plus the yield the cost needs.
---
--- Pinned rather than searched: both untapped sources offer the same five
--- colours, so an answerer taking any legal one could tap Carth instead, and
--- Carth is not a permanent Carth's own filter matches -- the {R} would be paid
--- with no counter added on any implementation, mutated or not.
-tappingFor :: ObjectId.ObjectId -> ManaType.ManaType -> Prompt.Prompt r -> r
-tappingFor wanted wantedType p = case p of
-  Prompt.ChooseManaSource _ _ candidates ->
-    Just (if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates)
-  Prompt.ChooseManaYield _ _ _ options ->
-    case filter (any ((==) wantedType . ManaUnit.manaType) . Mana.Engine.yieldUnits) (NonEmpty.toList options) of
-      option : _ -> option
-      [] -> NonEmpty.head options
-  _ -> S.identityAnswer p
-
--- CR 606.2: "An activated ability with a loyalty symbol in its cost is a loyalty
--- ability." Carth the Lion taxes those and nothing else, so his addition has to
--- ask a question about the ABILITY -- which is the field CR 601.2f's gather
--- reads beside the source filter.
---
--- The pair is two abilities of ONE permanent on ONE board, differing in exactly
--- what CR 606.2 divides: Jace's +2 carries a loyalty symbol, the ability A Realm
--- Reborn grants him does not. A source-permanent filter cannot tell them apart --
--- both are abilities of the same planeswalker -- so a board with only one of them
--- would prove nothing about which question the gather asks.
---
--- What this board does NOT separate is CR 605.1a: the untaxed ability is a mana
--- ability as well as a non-loyalty one, so a criterion reading the kind instead
--- would answer alike here (gap #3323).
-loyaltyAbilityOnlySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-loyaltyAbilityOnlySpec s registry = Spec.describe s "LoyaltyAbilityOnly" $ do
-  Spec.it s "CR 606.2 / 601.2f Carth's added +1 reaches Jace's own +2" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    carth <- S.printingOf s registry "Carth the Lion"
-    realm <- S.printingOf s registry "A Realm Reborn"
-    let (jaceId, board) = taxedBoard island jace carth realm
-        after = useAbility plusTwo jace jaceId board
-    Spec.assertEqWith s "3 + 2 + Carth's 1" (S.counterOf CounterKind.Loyalty jaceId after) 6
-
-  -- The other half, on that same board: tapping Jace for mana is an activated
-  -- ability of a permanent Carth's filter matches, and CR 606.2 keeps the tax
-  -- off it. Red, which nothing else on the board produces, so a payment that
-  -- succeeded proves the granted ability is what paid.
-  Spec.it s "CR 606.2 the granted mana ability of that same Jace is untaxed" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    carth <- S.printingOf s registry "Carth the Lion"
-    realm <- S.printingOf s registry "A Realm Reborn"
-    let (jaceId, board) = taxedBoard island jace carth realm
-        red = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]
-        (paid, after) = S.runPureWith (tappingFor jaceId (ManaType.Colored Color.Red)) board (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice red)
-    -- The two preconditions the loyalty reading below rests on, asserted on the
-    -- board rather than assumed: an unpaid window leaves the counters alone too,
-    -- so a fixture that never reached Jace's ability would read 3 for the wrong
-    -- reason. Neither can absorb a mutation of the criterion: an added loyalty
-    -- counter is payable on any board, so a wrongly taxed activation still pays
-    -- and still taps, and only the count below moves.
-    Spec.assertBool s paid "A Realm Reborn's granted ability pays the {R}"
-    Spec.assertEqWith s "and Jace is what was tapped for it" (fmap Object.tapped (Game.lookupObject jaceId after)) (Just TapState.Tapped)
-    Spec.assertEqWith s "CR 606.2: no loyalty counter was added to pay for it" (S.counterOf CounterKind.Loyalty jaceId after) 3
-
 -- CR 306.5a's printed loyalty is a number on every planeswalker but one. Nissa,
 -- Steward of Elements prints CR 107.3's X there, and CR 107.3m says what it is
 -- worth: the value chosen for the spell that became the permanent, "although the
@@ -882,17 +532,6 @@ loyaltyAbilityOnlySpec s registry = Spec.describe s "LoyaltyAbilityOnly" $ do
 -- moves only the announcement.
 variableLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
-  Spec.it s "CR 306.5b / 107.3m Nissa enters with as many loyalty counters as the X she was cast for" $ do
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
-    let (nissaId, after) = nissaCastFor forest island nissa [] 5
-    Spec.assertBool s (Set.member nissaId (GameState.battlefield after)) "on the battlefield"
-    -- Five, and no other reading of the rule this board admits answers five: the
-    -- spell's mana value on the stack was seven, its printed symbols number
-    -- three, an unread announcement is zero, and nine lands were available.
-    Spec.assertEqWith s "loyalty 5" (S.counterOf CounterKind.Loyalty nissaId after) 5
-
   -- The pair. One board, one card, one difference -- the announced X -- so an
   -- implementation reading anything else off the spell (its mana value, its
   -- generic cost, a constant) cannot pass both halves.
@@ -1007,58 +646,6 @@ useLoyaltyAbility answer i p oid gs = case abilityAt i p of
   ability : _ -> S.runPure answer gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)
   [] -> gs
 
--- `decision` for the -2's CR 118.12 gate, and a target chosen by PREFERENCE over
--- the set the engine offered -- aimedAt's posture with a ranking instead of one
--- id, so a case can ask for a permanent it expects the pool to withhold and find
--- out. Filtering the offered set rather than building a Recipient is what keeps
--- CR 608.2b's re-read from dropping the choice.
---
--- The whole offered set follows as a fallback, which keeps the answerer total; a
--- board offering none of `prefer` then targets whatever the pool's Ord puts first,
--- and the case's own assertions are what catch it.
-gristAnswer :: PaymentDecision.PaymentDecision -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-gristAnswer decision prefer p = case p of
-  Prompt.ChooseToPay {} -> decision
-  Prompt.ChooseTargets _ _ _ sets ->
-    let ranked candidates = concatMap (\oid -> filter (\r -> Recipient.objectOf r == Just oid) (Set.toList candidates)) prefer
-        naming (n, candidates) =
-          Set.fromList
-            . take (Natural.toIntSaturating n)
-            $ ranked candidates <> Set.toList candidates
-     in fmap naming sets
-  _ -> S.identityAnswer p
-
--- alice holds Grist at 3 loyalty and ONE Goblin Piker; bob holds Jace Beleren at 3
--- loyalty, a Villainous Ogre and a Mountain. Returned as
--- (Grist, alice's Piker, bob's Jace, bob's Mountain).
---
--- One creature for alice because CR 118.12's cost then has exactly its count of
--- candidates and Pawl.Types.Prompt.ChooseSacrifices is elided -- there is nothing
--- to choose. Grist is not among them: its "as long as Grist isn't on the
--- battlefield" ability (CR 113.6c) is switched off exactly here.
---
--- The reflexive ability's slot then has more candidates than its count of one --
--- bob's Ogre and his Jace, and Grist itself, which is a planeswalker on the
--- battlefield and so a legal choice for its own ability -- so a prompt offered
--- exactly its count cannot short-circuit. The Mountain is the permanent the slot
--- must NOT offer, which is how "creature or planeswalker" is read as a
--- restriction rather than assumed.
-gristMinusTwoBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-gristMinusTwoBoard grist piker jace ogre mountain =
-  let (pikerId, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-      (jaceId, withJace) = S.addPermanent jace S.bob withPiker
-      loyal = S.addCounter CounterKind.Loyalty 3 jaceId withJace
-      (_, withOgre) = S.addPermanent ogre S.bob loyal
-      (mountainId, withMountain) = S.addPermanent mountain S.bob withOgre
-      (gristId, board) = gristWith 3 grist withMountain
-   in (gristId, pikerId, jaceId, mountainId, board)
-
 -- Grist, the Hunger Tide -- {1}{B}{G} Legendary Planeswalker -- Grist, printed
 -- loyalty 3 (Oracle text fetched from Scryfall 2026-09-29) -- carries all three
 -- of its loyalty abilities here:
@@ -1152,29 +739,6 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
     Spec.assertEqWith s "the fixture's six loyalty" (S.counterOf CounterKind.Loyalty gristId board) 6
     Spec.assertEqWith s "CR 606.4: five of them came off" (S.counterOf CounterKind.Loyalty gristId after) 1
 
-  -- The answerer PREFERS the Mountain and settles for the Jace. So a slot that
-  -- offered every permanent would destroy the land and leave the planeswalker
-  -- standing, which is the reading this case rules out; and one that offered only
-  -- creatures would leave the Jace standing too.
-  Spec.it s "CR 603.12 / 701.8a the -2's reflexive trigger destroys the planeswalker it targets, and no land is offered" $ do
-    grist <- S.printingOf s registry "Grist, the Hunger Tide"
-    piker <- S.printingOf s registry "Goblin Piker"
-    jace <- S.printingOf s registry "Jace Beleren"
-    ogre <- S.printingOf s registry "Villainous Ogre"
-    mountain <- S.printingOf s registry "Mountain"
-    let (gristId, pikerId, jaceId, mountainId, board) = gristMinusTwoBoard grist piker jace ogre mountain
-        answer :: Prompt.Prompt r -> r
-        answer = gristAnswer PaymentDecision.Pays [mountainId, jaceId]
-        after = firedTrigger answer (useLoyaltyAbility answer minusTwo grist gristId board)
-    Spec.assertEqWith
-      s
-      "the Jace died and the Mountain the answerer asked for first did not"
-      (S.onBattlefield jaceId after, S.onBattlefield mountainId after)
-      (False, True)
-    Spec.assertEqWith s "CR 701.8a: into its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-    Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.21a: alice's own creature paid for it"
-    Spec.assertEqWith s "CR 606.4: two of the three loyalty came off" (S.counterOf CounterKind.Loyalty gristId after) 1
-
 -- Ashiok, Wicked Manipulator -- {3}{B}{B} Legendary Planeswalker -- Ashiok,
 -- printed loyalty 5 (name, cost, type line, loyalty and Oracle text checked
 -- against api.scryfall.com 2026-09-05) -- carries two of its three loyalty
@@ -1221,8 +785,7 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 -- one is named, the origin, so the card-versus-token half is the filter's. The CR 111.6 pair below is what
 -- proves it: two boards holding the same objects, differing only in whether the
 -- one permanent exiled that turn was a card.
-ashiokPlusOne, ashiokMinusTwo :: Int
-ashiokPlusOne = 0
+ashiokMinusTwo :: Int
 ashiokMinusTwo = 1
 
 -- Ashiok on the battlefield under alice's control at the printed loyalty 5, with
@@ -1234,14 +797,6 @@ ashiokBoard ashiok stock =
   let stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) S.threePlayerGame stock
       (oid, placed) = S.addPermanent ashiok S.alice stocked
    in (oid, S.addCounter CounterKind.Loyalty 5 oid placed)
-
--- The +1's one ask, pinned by INDEX into the offered group rather than by a
--- search for a legal option, so a mutation cannot be silently repaired.
-takingNth :: Int -> Prompt.Prompt r -> r
-takingNth n p = case p of
-  Prompt.ChooseCardFromAmong _ _ _ offered ->
-    Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
-  _ -> S.identityAnswer p
 
 -- Whether a logged event is CR 603.2's record that an ability triggered.
 isAbilityTriggered :: GameEvent.GameEvent -> Bool
@@ -1273,54 +828,6 @@ throughBeginningOfCombat gs =
 
 ashiokLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
-  -- The +1's two destinations are DIFFERENT zones, so which card went where is
-  -- observable. The pair below runs the same board twice and differs in exactly
-  -- one thing -- which of the two the answerer names -- so an implementation that
-  -- exiled the top card regardless would agree with one leg and contradict the
-  -- other.
-  Spec.it s "CR 608.2d the +1 exiles the card that was chosen and the other goes to hand" $ do
-    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
-    maiden <- S.printingOf s registry "Bird Maiden"
-    moon <- S.printingOf s registry "Bad Moon"
-    swamp <- S.printingOf s registry "Swamp"
-    let named = Just . CardName.MkCardName . Text.pack
-        -- Bottom to top: Swamp, Bad Moon, Bird Maiden. The look offers the Bird
-        -- Maiden first and the Bad Moon second; the Swamp is never looked at.
-        (ashiokId, board) = ashiokBoard ashiok [swamp, moon, maiden]
-        after = useLoyaltyAbility (takingNth 1) ashiokPlusOne ashiok ashiokId board
-    Spec.assertEqWith s "the SECOND card the look offered is in exile" (namesIn Zone.Exile S.alice after) [named "Bad Moon"]
-    Spec.assertEqWith s "and the first is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
-    Spec.assertEqWith s "the third card was never looked at" (namesIn Zone.Library S.alice after) [named "Swamp"]
-    Spec.assertEqWith s "CR 606.4: one loyalty counter went on" (S.counterOf CounterKind.Loyalty ashiokId after) 6
-
-  Spec.it s "CR 400.7 the +1's remainder read finds the chosen card gone, so the other answer exiles the other card" $ do
-    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
-    maiden <- S.printingOf s registry "Bird Maiden"
-    moon <- S.printingOf s registry "Bad Moon"
-    swamp <- S.printingOf s registry "Swamp"
-    let named = Just . CardName.MkCardName . Text.pack
-        (ashiokId, board) = ashiokBoard ashiok [swamp, moon, maiden]
-        after = useLoyaltyAbility (takingNth 0) ashiokPlusOne ashiok ashiokId board
-    Spec.assertEqWith s "the FIRST card the look offered is in exile" (namesIn Zone.Exile S.alice after) [named "Bird Maiden"]
-    Spec.assertEqWith s "and the second is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bad Moon"]
-
-  -- CR 111.3: the creating ability defines the tokens, so the count and the
-  -- identity are both read here. A board that minted one token, or two 1/1 black
-  -- creatures with no subtype, would pass a count-only assertion.
-  Spec.it s "CR 111.3 the -2 creates two 1/1 black Nightmare creature tokens" $ do
-    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
-    swamp <- S.printingOf s registry "Swamp"
-    let (ashiokId, board) = ashiokBoard ashiok [swamp]
-        after = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId board
-        tokens = S.tokensOf after
-    Spec.assertEqWith s "no token before the ability resolved" (S.tokensOf board) []
-    Spec.assertEqWith s "exactly two tokens" (length tokens) 2
-    mapM_ (\oid -> Spec.assertEqWith s "each is 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "each is mono-black" (Projection.colorsOf oid after) (Set.singleton Color.Black)) tokens
-    mapM_ (\oid -> Spec.assertBool s (Set.member Subtype.Nightmare (Projection.subtypesOf oid after)) "each is a Nightmare") tokens
-    mapM_ (\oid -> Spec.assertBool s (Set.member CardType.Creature (PC.cardTypes (Projection.project oid after))) "each is a creature") tokens
-    Spec.assertEqWith s "CR 606.4: two loyalty counters came off" (S.counterOf CounterKind.Loyalty ashiokId after) 3
-
   -- The token's own trigger. The exile is out of alice's HAND, which is what makes
   -- this a claim about "put into exile" rather than about the library-to-exile
   -- move the rest of the card makes: a condition that pinned the ORIGIN would find
@@ -1507,7 +1014,7 @@ tamiyoMinusXSpec s registry = Spec.describe s "TamiyoMinusX" $ do
 --
 -- The pair differs in whether she entered this turn: the refusal's board has her
 -- on the battlefield already, with her loyalty and the same four Plains.
-wanderingEmperorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wanderingEmperorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
   let giant = S.aliasRef "giant"
       plains = fmap (\i -> S.settled ("plains" <> show i) "Plains") [1 .. 4 :: Int]
@@ -1518,7 +1025,6 @@ wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
           )
           S.bob
           S.beginningOfCombat
-      casting = Choices.none {Choices.manaSources = Seq.fromList (fmap (\i -> Just (S.aliasRef ("plains" <> show i))) [1 .. 4 :: Int])}
       -- The -2, her third printed ability.
       exiling = Choices.none {Choices.targets = Just [giant]}
       attacking = S.on S.declareAttackers S.bob (S.attack [giant])
@@ -1527,20 +1033,6 @@ wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
               gs <- State.get
               Monad.unless (n <= (0 :: Int) || GameState.phase gs == S.endOfCombat || Maybe.isJust (GameState.result gs)) (Engine.runStep >> go (n - 1))
          in go 8
-  Spec.it s "CR 606.3 flashed in on bob's turn, her -2 exiles his attacker" $ do
-    let script =
-          S.turn
-            1
-            [ attacking,
-              S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "emperor") casting),
-              S.on S.declareBlockers S.alice (S.activateAbility (S.namedRef "The Wandering Emperor" 1) 2 exiling)
-            ]
-    built <- S.buildBoardOrFail s registry (setup [] [S.aliased "emperor" (S.cardSetup "The Wandering Emperor")])
-    (_, after) <- S.runScriptOrFail s script built toEndOfCombat
-    -- CR 400.7: the exiled card is a new object, so it is counted by name.
-    Spec.assertEqWith s "the Hill Giant is in exile" (length (Game.zoneMembers Zone.Exile S.bob after), S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob after) (1, 0)
-    Spec.assertEqWith s "alice gained 2 life" (S.lifeOf S.alice after) (Just 22)
-    Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
   Spec.it s "CR 606.3 already on the battlefield, she is not offered on bob's turn" $ do
     let resident = (S.aliased "emperor" (S.permanent "The Wandering Emperor")) {Placement.counters = Map.singleton CounterKind.Loyalty 3}
         -- She is attackable now, so bob also names where the Giant attacks.

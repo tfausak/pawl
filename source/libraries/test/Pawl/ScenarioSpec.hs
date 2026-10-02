@@ -95,6 +95,20 @@ spec s registry = Spec.describe s "Scenario" $ do
     result <- Scenario.stage registry setup
     Spec.assertEqWith s "token in hand" result (Left (ScenarioFailure.MkTokenOffBattlefield (CardName.MkCardName (Text.pack "Goblin Piker"))))
 
+  Spec.it s "CR 712.8 a placement showing a face its card lacks is rejected" $ do
+    let shown = (S.permanent "Goblin Piker") {Placement.face = Just (CardName.MkCardName (Text.pack "Nightfall Predator"))}
+        alice = (S.playerSetup S.alice) {Seat.battlefield = Seq.singleton shown}
+        setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+    result <- Scenario.stage registry setup
+    Spec.assertEqWith s "unknown face" result (Left (ScenarioFailure.MkUnknownFace (CardName.MkCardName (Text.pack "Goblin Piker")) (CardName.MkCardName (Text.pack "Nightfall Predator"))))
+
+  Spec.it s "CR 310.9 a protector naming no seat is rejected" $ do
+    let battle = (S.permanent "Invasion of Dominaria") {Placement.protector = Just (Label.MkLabel (Text.pack "carol"))}
+        alice = (S.playerSetup S.alice) {Seat.battlefield = Seq.singleton battle}
+        setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+    result <- Scenario.stage registry setup
+    Spec.assertEqWith s "unknown protector" result (Left (ScenarioFailure.MkUnknownProtector (Label.MkLabel (Text.pack "carol"))))
+
   Spec.it s "unreached scheduled entries fail" $ do
     let setup = S.duel S.precombatMain [] []
         script = S.turn 1 [S.on S.precombatMain S.alice (S.attack [])]

@@ -1,0 +1,116 @@
+{
+  "description": "CR 707.2 a graveyard card offers the embalm of what it is a copy of, not its printed one (control: the Skirmisher becomes a Hill Giant)",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Tah-Crop Skirmisher",
+            "label": "own skirmisher"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "own piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Mirror of the Fallen",
+            "label": "mirror"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Tah-Crop Skirmisher",
+            "label": "their skirmisher"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "their giant"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$mirror",
+          "targetsBySlot": {
+            "mirrored": [
+              "$own skirmisher"
+            ],
+            "archetype": [
+              "$their giant"
+            ]
+          },
+          "mana": [
+            "Island",
+            "Island#2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility Island#3",
+            "ActivateManaAbility Island#4",
+            "ActivateManaAbility Island#5",
+            "ActivateManaAbility Island#6"
+          ]
+        }
+      }
+    }
+  ]
+}

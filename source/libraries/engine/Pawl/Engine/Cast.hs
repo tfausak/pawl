@@ -1314,9 +1314,9 @@ spendingWith offered pid oid gs = case (offered, spendingFor pid oid gs) of
 -- value 3 or less", which reaches an INSTANT -- and CR 117.1a hands an instant
 -- every priority its controller has. Every card the pool PRINTS plot on is a
 -- creature (Djinn of Fool's Fall, Aloe Alchemist), for which CR 307.5 would have
--- covered the clause anyway. Pawl.SpecialActionSpec's "CR 702.170d a plotted
--- instant is castable only in its owner's main phase with the stack empty" is
--- what proves the narrowing, one board per conjunct.
+-- covered the clause anyway. data/scenarios/special-action's "CR 702.170d a
+-- plotted instant is castable only in its owner's main phase with the stack
+-- empty" is what proves the narrowing, one board per conjunct.
 --
 -- permitsCastForetold below is the control: CR 702.143a fixes no window, so it
 -- takes none.
@@ -1678,9 +1678,9 @@ castable = castableGiven Nothing
 -- only the card being cast, which is off the battlefield, and
 -- Projection.projectGiven projects such a card afresh whatever the map holds.
 -- The supply SWEEP is not shared: CR 601.2a's move is part of the proposal
--- (Game.withoutBeingCast), and a mana ability's rider may read it -- Pawl.ManaSpec's
--- Synthetic Hollow Spring is the board -- so it is taken on each proposal's
--- board, off the shared projection.
+-- (Game.withoutBeingCast), and a mana ability's rider may read it --
+-- data/scenarios/mana's Synthetic Hollow Spring is the board -- so it is taken
+-- on each proposal's board, off the shared projection.
 castableGiven :: Maybe ([Projection.ControlGrant], Map.Map ObjectId PC.ProjectedCharacteristics) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> Bool
 castableGiven shared pid oid name facing gs =
   let proposed = asProposed oid name facing gs
@@ -3330,9 +3330,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- and handed to Cost.pay as a VALUE -- so an effect that
                       -- would change the total after this line, including the
                       -- cost's own additional cost eating the reducer that
-                      -- produced it, does nothing. Pawl.CostSpec's Altar's Reap
-                      -- group is the proof (Baral pays the sacrifice, and the
-                      -- Reap still costs {B}).
+                      -- produced it, does nothing. data/scenarios/cost's Altar's
+                      -- Reap cases are the proof (Baral pays the sacrifice, and
+                      -- the Reap still costs {B}).
                       pricedGs <- State.get
                       -- CR 601.2c's targets are fixed by now, so the spell's own
                       -- sentence reading them (Bury in Books) is asked here.

@@ -1,0 +1,87 @@
+{
+  "description": "CR 602.5e with Forge Anew alice equips in her own beginning of combat",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bonesplitter",
+            "label": "bonesplitter",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Forge Anew"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$bonesplitter",
+          "targets": [
+            "$goblin-piker"
+          ],
+          "cost": [],
+          "mana": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 4,
+        "toughness": 1
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "$bonesplitter",
+        "is": "$goblin-piker"
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Mountain",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forge Anew",
+        "tapped": false
+      }
+    }
+  ]
+}

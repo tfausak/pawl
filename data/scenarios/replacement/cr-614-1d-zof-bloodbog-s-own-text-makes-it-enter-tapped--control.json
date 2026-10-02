@@ -1,0 +1,76 @@
+{
+  "description": "CR 614.1d Zof Bloodbog's own text makes it enter TAPPED (control: the same land untapped)",
+  "note": "Zof Consumption placed showing its back face, Zof Bloodbog, untapped: its {B} pays for the Typhoid Rats.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Zof Consumption",
+            "label": "bog",
+            "face": "Zof Bloodbog"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Typhoid Rats",
+            "label": "rats"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$bog",
+          "names": [
+            "Zof Bloodbog"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$rats",
+          "mana": [
+            "$bog"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Typhoid Rats",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "description": "CR 601.3 the top card of the library is cast and resolves",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Garruk's Horde",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rampant Growth",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Llanowar Elves",
+            "label": "llanowar-elves"
+          },
+          {
+            "card": "Llanowar Elves"
+          },
+          {
+            "card": "Forest"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Llanowar Elves"
+          },
+          {
+            "card": "Forest"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Llanowar Elves"
+          },
+          {
+            "card": "Forest"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast Rampant Growth",
+            "Cast $llanowar-elves",
+            "ActivateManaAbility $forest",
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$llanowar-elves",
+          "mana": [
+            "$forest",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Llanowar Elves",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Llanowar Elves",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Llanowar Elves#4",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Llanowar Elves#4",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Llanowar Elves#4",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Llanowar Elves",
+          "Forest#4"
+        ]
+      }
+    }
+  ]
+}

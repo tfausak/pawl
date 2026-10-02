@@ -194,14 +194,6 @@ pleaForPowerSpec s registry = Spec.describe s "Plea for Power" $ do
       "each seat votes once, starting with alice and proceeding in turn order, between the two printed words"
       asked
       [(S.alice, [word "time", word "knowledge"]), (S.bob, [word "time", word "knowledge"]), (S.carol, [word "time", word "knowledge"])]
-  -- The same board with the ballots swapped, so the OTHER clause happens. A pair
-  -- differing in exactly one thing: without it a green first case could mean the
-  -- draw clause is ungated.
-  Spec.it s "CR 701.38b the other word winning runs the other clause instead" $ do
-    (spell, gs) <- pleaBoard s registry 0
-    let ballots = [word "time", word "time", word "knowledge"]
-        ((_, after), _) = State.runState (Engine.runGame votingWords gs (S.cast S.alice spell >> Stack.resolveTop)) (ballots, [])
-    Spec.assertEqWith s "time won, so alice took an extra turn and drew nothing" (outcome after) (0, [S.alice])
   -- CR 701.38d's extra vote makes FOUR ballots, which is the only way two words
   -- tie at this table. Alice's two go to different words, which Brago's
   -- Representative's reminder text allows, so the tally is two all and the "or

@@ -1,0 +1,127 @@
+{
+  "description": "CR 109.5 'you cast': an OPPONENT's instant fires nothing (control: alice casts her own Boil)",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "am1"
+          },
+          {
+            "card": "Mountain",
+            "label": "am2"
+          },
+          {
+            "card": "Mountain",
+            "label": "am3"
+          },
+          {
+            "card": "Mountain",
+            "label": "am4"
+          },
+          {
+            "card": "Young Pyromancer",
+            "label": "pyro"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boil",
+            "label": "aboil"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "bm1"
+          },
+          {
+            "card": "Mountain",
+            "label": "bm2"
+          },
+          {
+            "card": "Mountain",
+            "label": "bm3"
+          },
+          {
+            "card": "Mountain",
+            "label": "bm4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boil",
+            "label": "bboil"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$aboil",
+          "mana": [
+            "$am1",
+            "$am2",
+            "$am3",
+            "$am4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $pyro",
+            "Boil#2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Elemental Token",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

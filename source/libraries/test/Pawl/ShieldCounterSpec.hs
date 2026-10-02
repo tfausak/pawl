@@ -14,27 +14,21 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import Pawl.EntryReplacementSpec (hackAt)
-import Pawl.PreventionSpec (aimPlayer, answersFor, castAndResolve, countersOn, newestNamed, raceAnswer, settleDamage, theAbility, wasAskedToOrderDamage)
+import Pawl.PreventionSpec (answersFor, castAndResolve, countersOn, newestNamed, raceAnswer, settleDamage, theAbility, wasAskedToOrderDamage)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -45,7 +39,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 122.1c: the replacement and the prevention effect one or more shield counters
@@ -125,67 +118,6 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         Spec.assertEqWith s "unreplaced: the printed one" (shields once plain) 1
         Spec.assertEqWith s "bob's praetor halves alice's placement, rounded down" (shields half halved) 0
       _ -> Spec.assertFailure s "the bird did not reach the battlefield"
-  -- CR 122.1c's SECOND sentence: "if damage would be dealt to this permanent,
-  -- prevent that damage and remove a shield counter from it". Lightning Bolt's 3
-  -- would be lethal to a 2/1, so an unprevented point of it is visible twice over --
-  -- as marked damage and as a death.
-  Spec.it s "CR 122.1c a Bolt at the bird is prevented and takes the counter" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    (bird, entered) <- board ["Mountain"] Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid bolt entered)
-        Spec.assertBool s (Set.member oid (GameState.battlefield once)) "it survived the Bolt"
-        Spec.assertEqWith s "no damage was marked (CR 615.6)" (S.damageOf oid once) (Just 0)
-        Spec.assertEqWith s "and the counter paid for it" (shields oid once) 0
-  -- The discriminating twin, one difference from the case above: bob's praetor
-  -- halves the entry placement to nothing, so the same bird faces the same Bolt on
-  -- the same board with NO counter on it. Same mana, same seats, same spell.
-  Spec.it s "CR 122.1c the same Bolt kills the same bird with no counter on it" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    (bird, entered) <- board ["Mountain"] (Just ("Vorinclex, Monstrous Raider", S.bob))
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid bolt entered)
-        Spec.assertEqWith s "setup: the halving left no shield" (shields oid entered) 0
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield once))) "so the Bolt killed it"
-  -- CR 122.1c's FIRST sentence: "if this permanent would be destroyed as the result
-  -- of an effect, instead remove a shield counter from it". Doom Blade destroys
-  -- without dealing any damage, so nothing here can be mistaken for the prevention
-  -- half -- and the bird is left untapped, which is how this also shows the removal
-  -- is not a regeneration ("removing a shield counter in this way isn't the same as
-  -- regenerating a creature"; CR 701.19a taps).
-  Spec.it s "CR 122.1c Doom Blade is replaced by the counter, and the next one kills" $ do
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    (bird, entered) <- board (replicate 4 "Swamp") Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid doomBlade entered)
-            twice = S.settleSba (castAt oid doomBlade once)
-        Spec.assertBool s (Set.member oid (GameState.battlefield once)) "it survived the first Doom Blade"
-        Spec.assertEqWith s "the counter paid for it" (shields oid once) 0
-        Spec.assertEqWith s "and it was not regenerated" (fmap Object.tapped (Game.lookupObject oid once)) (Just TapState.Untapped)
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield twice))) "and the second Doom Blade killed it"
-  -- Two counters, two destructions, and the third kills: the count is how many
-  -- events the pair may still replace, and one counter comes off per application
-  -- however many are there ("if a permanent that would be dealt damage has more than
-  -- one shield counter on it ... only one shield counter is removed").
-  Spec.it s "CR 122.1c Doubling Season's two counters replace two destructions" $ do
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    (bird, entered) <- board (replicate 6 "Swamp") (Just ("Doubling Season", S.alice))
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid doomBlade entered)
-            twice = S.settleSba (castAt oid doomBlade once)
-            thrice = S.settleSba (castAt oid doomBlade twice)
-        Spec.assertEqWith s "one counter off, not both" (shields oid once) 1
-        Spec.assertBool s (Set.member oid (GameState.battlefield twice)) "the second destruction is replaced too"
-        Spec.assertEqWith s "and now there are none" (shields oid twice) 0
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield thrice))) "so the third kills it"
   -- CR 122.1c's "as the result of an EFFECT", as a pair of boards differing in
   -- nothing but the destruction's cause. Through the two doors rather than through
   -- gameplay because that is the only way to hold everything else equal: reaching CR
@@ -209,26 +141,6 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         -- exist with the incarnation that held them, so the id reads 0 whether the
         -- shield was spent or ignored, which tells the two apart not at all.
         Spec.assertEqWith s "and it reached its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice byRule)) 1
-  -- CR 122.1c is a RULE rather than an ability the permanent has: "if a creature
-  -- with a shield counter loses its abilities, the shield counter will still protect
-  -- it as normal". So the pair survives layer 6, which is what minting it from
-  -- Object.counters rather than from the projection's ability list buys. Humility
-  -- arrives AFTER the bird, so what is under test is the shield outliving the
-  -- abilities and not CR 614.12's question about an entry replacement under layer 6.
-  Spec.it s "CR 613.1f a Humility'd bird keeps its shield" $ do
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    humility <- S.printingOf s registry "Humility"
-    (bird, entered) <- board (replicate 2 "Swamp") Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let humbled = S.withHumility humility entered
-            once = S.settleSba (castAt oid doomBlade humbled)
-        Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid entered) "setup: the bird has flying"
-        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying oid humbled)) "setup: Humility took it away"
-        Spec.assertEqWith s "setup: the counter is still there" (shields oid humbled) 1
-        Spec.assertBool s (Set.member oid (GameState.battlefield once)) "and the shield still replaced the destruction"
-        Spec.assertEqWith s "spending the counter" (shields oid once) 0
   -- The gather's SHORT-CIRCUIT reads copiable rules text, and a shield counter is
   -- on none of it: Projection.replacementsAffecting would answer [] for a board whose only
   -- replacement is CR 122.1c's, so this case is what makes that disjunct
@@ -317,52 +229,6 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     Spec.assertEqWith s "nothing is marked" (S.damageOf giant after) (Just 0)
     Spec.assertEqWith s "and both counters paid for it" (shields giant after) 0
     Spec.assertBool s (Set.member giant (GameState.battlefield (S.settleSba after))) "the Giant is untouched"
-  -- CR 122.1c's "to THIS permanent": the pair protects the permanent its counters
-  -- are on and no other recipient. Two Bolts off one board, one at bob and one at
-  -- bob's Piker, so both shapes a wrongly scoped shield would reach are covered -- a
-  -- damage event naming a PLAYER, whose recipient is no object at all, and one
-  -- naming another creature.
-  Spec.it s "CR 122.1c the shield covers its own permanent and no other recipient" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    (bird, entered) <- board ["Mountain", "Mountain"] Nothing
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let (pikerId, staged) = S.addPermanent pikerPrinting S.bob entered
-            castAtBob gs =
-              let (held, g1) = S.addHandCard bolt S.alice gs
-               in S.runPure (aimPlayer S.bob) g1 (S.cast S.alice held >> Stack.resolveTop)
-            hitBob = S.settleSba (castAtBob staged)
-            hitPiker = S.settleSba (castAt pikerId bolt hitBob)
-        Spec.assertEqWith s "bob took the Bolt" (S.lifeOf S.bob hitBob) (fmap (subtract 3) (S.lifeOf S.bob staged))
-        Spec.assertEqWith s "and the bird's counter is untouched" (shields oid hitBob) 1
-        Spec.assertBool s (not (Set.member pikerId (GameState.battlefield hitPiker))) "the second Bolt killed bob's Piker"
-        Spec.assertEqWith s "and the counter is still untouched" (shields oid hitPiker) 1
-        Spec.assertBool s (Set.member oid (GameState.battlefield hitPiker)) "setup: the bird sat there through both"
-  -- CR 615.12 with CR 122.1c: the pair's prevention half says "prevent", so CR 615.1a
-  -- makes it a prevention effect and unpreventable damage is still MET by it and
-  -- still prevented none of -- the Bolt lands in full and kills the 2/1. The
-  -- discriminating twin is the first Bolt case above: same bird, same Bolt, and the
-  -- only difference is Spider-Punk on the board.
-  --
-  -- The rule's MIDDLE clause takes the bird's counter off with it ("if a permanent
-  -- with a shield counter is dealt unpreventable damage, that damage will be dealt
-  -- and a shield counter will still be removed"), so the bird reaches CR 704.5g
-  -- with nothing left to replace anything. The counter is unreadable after the
-  -- fact here -- CR 122.2 -- which is why the cases below use a body that
-  -- survives; the GAMEPLAY route to CR 122.1c's "as the result of an effect" is
-  -- the last of them, where two Bolts leave a still-shielded permanent facing CR
-  -- 704.5g.
-  Spec.it s "CR 615.12 an unpreventable Bolt kills the shielded bird" $ do
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    (bird, entered) <- board ["Mountain"] (Just ("Spider-Punk", S.bob))
-    case bird of
-      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
-      Just oid -> do
-        let once = S.settleSba (castAt oid bolt entered)
-        Spec.assertEqWith s "setup: the bird still entered with its counter" (shields oid entered) 1
-        Spec.assertBool s (not (Set.member oid (GameState.battlefield once))) "and the Bolt killed it through the shield"
   -- CR 615.12's MIDDLE clause -- "those effects won't prevent any damage, but any
   -- additional effects they have will take place" -- over CR 122.1c's "prevent
   -- that damage and remove a shield counter from it". The removal is
@@ -477,7 +343,7 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
 -- reaches it: a CR 604.2 replacement watching OTHER objects, so the permanent
 -- holding it is on the battlefield for a text change to point at. Every earlier
 -- replacement naming a subtype matches Filter.IsSource instead, and hacking the
--- SPELL that holds such a row is tidewalkerSpec's shape below -- so this is one
+-- SPELL that holds such a row is the shape data/scenarios/shield-counter proves -- so this is one
 -- of the two shapes the rule reaches, not the only one.
 --
 -- CR 612.2 licenses the swap: "Dragon" here is a creature type word used as a
@@ -525,18 +391,9 @@ evolveAt oid from to p = case p of
 -- printed word does not; Hoarding Dragon (4/4 Creature -- Dragon) is the object
 -- the printed word reaches and the hacked one does not. Distinct printed sizes,
 -- so no reading of the rule produces the same number as another.
-dragonstormGlobeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dragonstormGlobeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 dragonstormGlobeSpec s registry =
   Spec.describe s "Dragonstorm Globe (CR 612.1)" $ do
-    -- The control leg: the same board, the same Piker, no Artificial Evolution.
-    Spec.it s "unhacked, the printed Dragon leaves that same Goblin alone" $ do
-      (after, entered) <- globeChain s registry Nothing "Goblin Piker"
-      case entered of
-        Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
-        Just pikerId -> do
-          Spec.assertEqWith s "printed 2/1, so the Globe's row did not apply" (Projection.powerOf pikerId after) (Just 2)
-          Spec.assertEqWith s "printed 2/1, so the Globe's row did not apply" (Projection.toughnessOf pikerId after) (Just 1)
-          Spec.assertEqWith s "no counter" (countersOn CounterKind.PlusOnePlusOne pikerId after) 0
     Spec.it s "unhacked, that same Dragon does take the counter" $ do
       (after, entered) <- globeChain s registry Nothing "Hoarding Dragon"
       case entered of
@@ -544,75 +401,6 @@ dragonstormGlobeSpec s registry =
         Just dragonId -> do
           Spec.assertEqWith s "CR 614.1c the printed row applies to a Dragon" (Projection.powerOf dragonId after) (Just 5)
           Spec.assertEqWith s "through one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne dragonId after) 1
-
--- Tidewalker {2}{U} Creature -- Elemental */*, whole text: "This creature enters
--- with a time counter on it for each Island you control. / Vanishing (At the
--- beginning of your upkeep, remove a time counter from this creature. When the
--- last is removed, sacrifice it.) / Tidewalker's power and toughness are each
--- equal to the number of time counters on it." (oracle checked on Scryfall
--- 2026-08-26)
---
--- The shape the Globe and the Beacon above route AROUND: the row is the ENTERING
--- permanent's own (Filter.IsSource), and the text change is on the SPELL it was a
--- moment earlier. CR 400.7a keeps that change applying to the permanent the spell
--- becomes, and CR 614.12 says the entry row is decided against "continuous
--- effects that already exist and would apply to the permanent" -- so the swapped
--- word is the one the CR 616.1 loop must read. The re-key runs inside
--- Event.changeZoneAttaching, before the entry loop, for exactly this.
---
--- THE TWO LAND COUNTS ARE UNEQUAL, four Islands and six Swamps, and both are
--- nonzero: a row read before the re-key answers four, a row read after answers
--- six, and neither is the other. Nonzero on both readings keeps CR 702.63b's
--- "when the last time counter is removed" and a CR 704.5f death out of the leg
--- -- the permanent arrives either way, and what the pair tells apart is which
--- word its own row named.
---
--- Four Islands rather than the one the mana needs: {2}{U} spends at most three
--- lands, so an Island is left untapped for the Hack however the payment picks,
--- and a leg cannot pass because the Hack was uncastable.
-tidewalkerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-tidewalkerSpec s registry = Spec.describe s "Tidewalker (CR 400.7a / 614.12)" $ do
-  -- The control: the same board and the same spell, no Magical Hack. It pins the
-  -- printed reading, so the pair differs in exactly the text change.
-  Spec.it s "unhacked, the printed Island is what its row counts" $ do
-    (before, after, entered) <- tidewalkerChain s registry False
-    case entered of
-      Nothing -> Spec.assertFailure s "the Tidewalker did not reach the battlefield"
-      Just tideId -> do
-        Spec.assertEqWith s "four time counters, one for each Island" (countersOn CounterKind.Time tideId after) 4
-        Spec.assertEqWith s "a 4/4" (S.powerToughnessOf tideId after) (Just (4, 4))
-        Spec.assertEqWith s "the Tidewalker is the only thing on the stack" (length (GameState.stack before)) 1
-
--- alice controls four Islands and six Swamps and holds the Tidewalker and Magical
--- Hack ({U}). The Tidewalker is CAST and left ON THE STACK -- that is the whole
--- point, since hacking it after it resolved is the Globe's shape and reads the
--- same either way -- then the Hack is cast at the SPELL and resolved, and only
--- then does the Tidewalker resolve. Returns the state with the Tidewalker alone
--- on the stack, the state after it resolves, and the permanent it became.
-tidewalkerChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, GameState.GameState, Maybe ObjectId.ObjectId)
-tidewalkerChain s registry hack = do
-  island <- S.printingOf s registry "Island"
-  swamp <- S.printingOf s registry "Swamp"
-  tidewalker <- S.printingOf s registry "Tidewalker"
-  magicalHack <- S.printingOf s registry "Magical Hack"
-  let base = S.landsFor swamp S.alice 6 (S.landsInPlay island 4)
-      (tideId, g1) = S.addHandCard tidewalker S.alice base
-      (hackId, g2) = S.addHandCard magicalHack S.alice g1
-      ready =
-        g2
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      onStack = S.runPure S.identityAnswer ready (S.cast S.alice tideId)
-      -- The Hack's target is FILTERED out of the offered set rather than rebuilt,
-      -- hackAt's reason: a hand-built recipient would be dropped at CR 608.2b's
-      -- re-read with no error.
-      before = case (hack, GameState.stack onStack) of
-        (True, spellId : _) -> castAndResolve (hackAt spellId Subtype.Island Subtype.Swamp) onStack hackId
-        _ -> onStack
-      after = S.runPure S.identityAnswer before Stack.resolveTop
-  pure (before, after, newestNamed (S.printingName tidewalker) after)
 
 -- Hurr Jackal {R} Creature -- Jackal 1/1, whole text: "{T}: Target creature
 -- can't be regenerated this turn." (oracle checked on Scryfall)
@@ -704,85 +492,12 @@ hurrJackalSpec s registry = Spec.describe s "Hurr Jackal (CR 701.19c)" $ do
       Spec.assertBool s (Set.member victim (GameState.battlefield settled)) "the Piker regenerates when nothing forbade it"
       Spec.assertBool s (Set.member bystander (GameState.battlefield settled)) "and so does the Mammoth"
       Spec.assertEqWith s "nothing reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
-  Spec.it s "CR 514.2 the prohibition lasts exactly the turn, and the same shield saves the same creature next turn"
-    . withBoard
-    $ \_ (_, victim, _, activated) -> do
-      -- CR 514.2's own sweep, then the handoff into bob's turn. The shield is
-      -- RE-ARMED after both: Support.addRegenShield arms Expiry.AtCleanup, so
-      -- the one this turn put up is gone either way and a case that did not
-      -- re-arm would pass for the wrong reason.
-      let bobsTurn = S.runPure S.identityAnswer (Expiry.dropAtCleanup activated) Engine.handoffTurn
-          settled = S.settleSba (S.markDamage victim 1 (S.addRegenShield victim bobsTurn))
-      Spec.assertBool s (Set.member victim (GameState.battlefield settled)) "the same creature regenerates once the turn it was named in is over"
-      Spec.assertEqWith s "CR 701.19a removed its damage" (S.damageOf victim settled) (Just 0)
-      Spec.assertEqWith s "nothing reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
-      Spec.assertEqWith s "and the prohibition really is off the board" (GameState.unregeneratables bobsTurn) []
-      Spec.assertEqWith s "bob's turn really did begin" (GameState.activePlayer bobsTurn) S.bob
-
--- Queen Allenal of Ruadach, {G}{W}{W} Legendary Creature -- Elf Noble */*: "If
--- one or more creature tokens would be created under your control, those tokens
--- plus a 1/1 white Soldier creature token are created instead." Two things one
--- card proves: a token replacement scoped by WHAT the token is
--- (Pawl.Types.TokenPattern.whatToken), and one that APPENDS a differently-shaped
--- token to the event rather than resizing it (Pawl.Types.TokenR.plus).
---
--- Dragon Fodder ({1}{R}, two 1/1 Goblins) is the creature-token maker, and
--- Eliminate the Impossible ({1}{U}, investigate) the negative: a Clue is a
--- token and not a creature token, so the same Queen on the same lands appends
--- nothing. Both boards carry both colours of mana so neither cast fails for
--- want of it.
-queenAllenalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.1a)" $ do
-  let board mountain island queen =
-        let lands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) (S.landsInPlay mountain 2) [1 .. (2 :: Int)]
-         in S.addPermanent queen S.alice lands
-      soldierName = CardName.MkCardName (Text.pack "Soldier Token")
-      goblinName = CardName.MkCardName (Text.pack "Goblin Token")
-      namedTokens name gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just name) (S.tokensOf gs)
-  Spec.it s "CR 614.1a two Goblins would be created, so two Goblins plus a Soldier are" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
-    dragonFodder <- S.printingOf s registry "Dragon Fodder"
-    let (queenId, g1) = board mountain island queen
-        (g2, spellId) = S.handOne dragonFodder g1
-        after = castAndResolve S.identityAnswer g2 spellId
-    Spec.assertEqWith s "one Soldier the spell never named" (S.countOnBattlefieldByName soldierName S.alice after) 1
-    Spec.assertEqWith s "and the two Goblins it did" (S.countOnBattlefieldByName goblinName S.alice after) 2
-    -- The appended token is the card the ROW printed, not a third Goblin.
-    case namedTokens soldierName after of
-      [soldier] -> do
-        Spec.assertEqWith s "a 1/1" (S.powerToughnessOf soldier after) (Just (1, 1))
-        Spec.assertEqWith s "and white" (Projection.colorsOf soldier after) (Set.singleton Color.White)
-        Spec.assertEqWith s "under alice's control (CR 111.2)" (Projection.controllerOf soldier after) (Just S.alice)
-      other -> Spec.assertFailure s ("expected exactly one Soldier, got " <> show (length other))
-    -- The Queen's own CR 604.3 box, read live: herself and three tokens.
-    Spec.assertEqWith s "the Queen counts the creatures she controls" (S.powerToughnessOf queenId after) (Just (4, 4))
-  -- CR 616.1: the append is INSIDE the one creation event, which is what the
-  -- order against Doubling Season observes. Queen first: two Goblins plus a
-  -- Soldier, then doubled -- two Soldiers. Season first: four Goblins, then
-  -- the Soldier joins them -- one Soldier. A rider that created the Soldier as a
-  -- second event would answer one Soldier both ways.
-  Spec.it s "CR 616.1 racing Doubling Season: the Soldier is doubled only when the Queen applies first" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
-    doublingSeason <- S.printingOf s registry "Doubling Season"
-    dragonFodder <- S.printingOf s registry "Dragon Fodder"
-    let (queenId, g1) = board mountain island queen
-        (seasonId, g2) = S.addPermanent doublingSeason S.alice g1
-        (g3, spellId) = S.handOne dragonFodder g2
-        queenFirst = castAndResolve (raceAnswer queenId queenId) g3 spellId
-        seasonFirst = castAndResolve (raceAnswer seasonId queenId) g3 spellId
-    Spec.assertEqWith s "Queen then Season: (2 Goblins + 1 Soldier) * 2 -- two Soldiers" (S.countOnBattlefieldByName soldierName S.alice queenFirst) 2
-    Spec.assertEqWith s "and four Goblins" (S.countOnBattlefieldByName goblinName S.alice queenFirst) 4
-    Spec.assertEqWith s "Season then Queen: 2 Goblins * 2, plus one Soldier" (S.countOnBattlefieldByName soldierName S.alice seasonFirst) 1
-    Spec.assertEqWith s "and four Goblins" (S.countOnBattlefieldByName goblinName S.alice seasonFirst) 4
 
 -- Chatterfang, Squirrel General (Oracle text checked against Scryfall
 -- 2026-09-30): "If one or more tokens would be created under your control, those
 -- tokens plus that many 1/1 green Squirrel creature tokens are created
--- instead." Queen Allenal's append sized by the event (TokenPlus.ThatMany).
+-- instead." Queen Allenal's append (data/scenarios/shield-counter) sized by the
+-- event (TokenPlus.ThatMany).
 --
 -- Dragon Fodder's two Goblins are the creation. Against Doubling Season the
 -- two orders agree -- (2 + 2) * 2 and 2 * 2 + 4 -- where a one-token append
@@ -818,9 +533,7 @@ chatterfangSpec s registry = Spec.describe s "Chatterfang, Squirrel General (CR 
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
-  queenAllenalSpec s registry
   chatterfangSpec s registry
   shieldCounterSpec s registry
   dragonstormGlobeSpec s registry
-  tidewalkerSpec s registry
   hurrJackalSpec s registry

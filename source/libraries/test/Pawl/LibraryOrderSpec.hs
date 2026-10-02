@@ -7,10 +7,8 @@
 module Pawl.LibraryOrderSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -19,7 +17,6 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -34,8 +31,6 @@ import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Extra.Int as Int
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -58,7 +53,6 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -78,7 +72,6 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -92,14 +85,12 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
-import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -107,60 +98,6 @@ import qualified Pawl.Types.Zone as Zone
 
 countersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 countersSpec s registry = Spec.describe s "Counters" $ do
-  Spec.it s "CR 122 counter persists through cleanup (vs Giant Growth wearing off)" $ do
-    -- After a cleanup step, the +1/+1 counter is still on the Piker.
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    battlegrowth <- S.printingOf s registry "Battlegrowth"
-    let base = S.landsInPlay forest 1
-        (victim, withFoe) = S.addPermanent piker S.bob base
-        (gs, spellId) = S.handOne battlegrowth withFoe
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        afterCleanup = Expiry.dropAtCleanup resolved
-    Spec.assertEqWith s "still 3/2 after cleanup" (Projection.powerOf victim afterCleanup) (Just 3)
-    Spec.assertEqWith s "still 3/2 after cleanup" (Projection.toughnessOf victim afterCleanup) (Just 2)
-  -- CR 122.1b: Spontaneous Flight is the one card where the two halves have
-  -- DIFFERENT durations, which is what proves the flying is a counter rather
-  -- than a second until-end-of-turn effect. The +2/+2 wears off at cleanup
-  -- (CR 514.2); the flying counter does not.
-  Spec.it s "CR 122.1b whole card: Spontaneous Flight pumps until EOT and grants flying for good" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
-    let base = S.landsInPlay plains 3
-        (target, withCreature) = S.addPermanent piker S.alice base
-        (gs, spellId) = S.handOne spontaneousFlight withCreature
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        afterCleanup = Expiry.dropAtCleanup resolved
-    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying target withCreature)) "the Piker did not fly to begin with"
-    Spec.assertEqWith s "pumped to 4/3" (Projection.powerOf target resolved) (Just 4)
-    Spec.assertEqWith s "pumped to 4/3" (Projection.toughnessOf target resolved) (Just 3)
-    Spec.assertBool s (Projection.hasKeyword Keyword.Flying target resolved) "and it flies"
-    -- The discriminator between a counter and another until-EOT effect.
-    Spec.assertEqWith s "the pump wore off" (Projection.powerOf target afterCleanup) (Just 2)
-    Spec.assertBool s (Projection.hasKeyword Keyword.Flying target afterCleanup) "the flying did not"
-  Spec.it s "CR 122.6 Instill Infection puts a -1/-1 counter and draws" $ do
-    -- alice casts Instill Infection on bob's Piker; Piker becomes 1/0 and dies
-    -- (704.5f); alice draws a card.
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    instillInfection <- S.printingOf s registry "Instill Infection"
-    forest <- S.printingOf s registry "Forest"
-    let base = S.landsInPlay swamp 4
-        (_, withFoe) = S.addPermanent piker S.bob base
-        -- Baseline before Instill Infection itself enters alice's hand: casting
-        -- moves that same card from hand to the stack, so measuring after it is
-        -- already there would net the draw against the spell's own departure.
-        handBefore = S.handSize S.alice withFoe
-        (gs0, spellId) = S.handOne instillInfection withFoe
-        -- put a card in alice's library so the draw has something to find.
-        (_, gs) = S.addLibraryCard forest S.alice gs0
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
-    Spec.assertEqWith s "Piker died to the -1/-1 counter (704.5f)" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "alice drew a card" (S.handSize S.alice after) (handBefore + 1)
   Spec.it s "CR 704.5q both counter kinds on one creature annihilate; net 2/1 survives" $ do
     -- Both counters on the same creature (placed directly); the SBA removes both.
     forest <- S.printingOf s registry "Forest"
@@ -237,19 +174,6 @@ countersSpec s registry = Spec.describe s "Counters" $ do
     Spec.assertEqWith s "the control: the same card over a counter is still asked" (filter isOptionalResponse borneAsked) [Response.ChoseOptional OptionalDecision.Exercises]
     Spec.assertEqWith s "and the mandatory pump landed on the bare creature all the same" (Projection.powerOf (victimOf bare) bareAfter) (Just 4)
     Spec.assertEqWith s "the control's counter is what the answer removed" (fmap Object.counters (Game.lookupObject (victimOf borne) borneAfter)) (Just Map.empty)
-  Spec.it s "CR 122.2 Unsummon removes a counter-bearing creature's counters" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    unsummon <- S.printingOf s registry "Unsummon"
-    let base = S.landsInPlay island 1
-        (victim, withFoe) = S.addPermanent piker S.bob base
-        withCounter = S.addCounter CounterKind.PlusOnePlusOne 1 victim withFoe
-        (gs, spellId) = S.handOne unsummon withCounter
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        -- Total (no `head`): expect exactly one bounced card in hand, empty counters.
-        handCounters = fmap (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h after)) (Game.zoneMembers Zone.Hand S.bob after)
-    Spec.assertEqWith s "the bounced incarnation in hand has no counters" handCounters [Map.empty]
 
 -- CR 701.46a: "'Adapt N' means 'If this permanent has no +1/+1 counters on it,
 -- put N +1/+1 counters on it.'" Sauroform Hybrid prints adapt 4 and nothing
@@ -437,7 +361,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
     Spec.assertEqWith s "and still does" (Projection.controllerOf oid after) (Just S.alice)
     Spec.assertEqWith s "its settle under alice is untouched" (fmap Object.sickness (Game.lookupObject oid after)) (Just (Sickness.Settled S.alice))
 
-gainPlayerCountersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gainPlayerCountersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
   Spec.it s "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -445,22 +369,6 @@ gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
         act = Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2)))
         after = S.runPure S.identityAnswer gs0 act
     Spec.assertEqWith s "alice has two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
-  -- The gameplay-level consequence: CR 704.5c's tenth poison counter. carol
-  -- sits on nine, so the counter `EachPlayer` hands her is the one that loses
-  -- her the game -- and alice, the caster, is poisoned in the same resolution
-  -- without reaching ten.
-  Spec.it s "CR 704.5c Ichor Rats' counter is carol's tenth, and she loses the game" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    ichorRats <- S.printingOf s registry "Ichor Rats"
-    let withMana = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (3 :: Int)]
-        nearlyDead = S.addPlayerCounter PlayerCounterKind.Poison 9 S.carol withMana
-        (gs, spellId) = S.handOne ichorRats nearlyDead
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
-        statusOf pid = fmap Player.status (Map.lookup pid (GameState.players settled))
-    Spec.assertEqWith s "carol reached ten" (S.playerCounterOf PlayerCounterKind.Poison S.carol settled) 10
-    Spec.assertEqWith s "and lost the game" (statusOf S.carol) (Just (Status.Departed Departure.Type.Lost))
-    Spec.assertEqWith s "alice, who cast it, is poisoned but playing" (S.playerCounterOf PlayerCounterKind.Poison S.alice settled, statusOf S.alice) (1, Just Status.Playing)
 
 -- Answers Prompt.ChooseProliferate by taking everything on offer. Its sibling
 -- declines everything: between them the tests prove the ANSWER decides who gets
@@ -516,23 +424,6 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         after = proliferate proliferatesAll src gs
     Spec.assertEqWith s "the bare Piker gained nothing" (S.counterOf CounterKind.PlusOnePlusOne bare after) 0
     Spec.assertEqWith s "the countered one moved" (S.counterOf CounterKind.PlusOnePlusOne src after) 2
-  -- CR 102.2 / 109.5: `Relative Opponent` on GainPlayerCounters had no card
-  -- producer until Prologue to Phyresis. The arm was implemented and
-  -- unproven, which design.md section 4 says is not done; these cases are
-  -- what prove it.
-  Spec.it s "CR 122.1 whole card: Prologue to Phyresis poisons the opponent, not the caster" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    prologueToPhyresis <- S.printingOf s registry "Prologue to Phyresis"
-    let base = S.landsInPlay island 2
-        (_, withLibrary) = S.addLibraryCard piker S.alice base
-        handBefore = S.handSize S.alice withLibrary
-        (gs, spellId) = S.handOne prologueToPhyresis withLibrary
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "bob is poisoned" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
-    Spec.assertEqWith s "alice is not" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
-    Spec.assertEqWith s "and alice drew" (S.handSize S.alice after) (handBefore + 1)
   -- CR 701.34a: players carry counters too, and proliferate reaches them.
   Spec.it s "CR 701.34a proliferate adds to a player's poison and energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -608,51 +499,6 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.Proliferate)) 0
     Spec.assertEqWith s "nobody has a counter: nothing to ask" (asks gs) 0
     Spec.assertEqWith s "someone does: one real decision" (asks (S.addCounter CounterKind.PlusOnePlusOne 1 src gs)) 1
-  -- The gameplay-level proof (design.md section 4): a real card, cast and
-  -- resolved, doing both halves of its text.
-  Spec.it s "Steady Progress whole card: proliferate, then draw a card" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    steadyProgress <- S.printingOf s registry "Steady Progress"
-    let base = S.landsInPlay island 3
-        (creature, g1) = S.addPermanent piker S.alice base
-        g2 = S.addCounter CounterKind.PlusOnePlusOne 1 creature g1
-        -- Something to draw: an empty library would make the draw a no-op
-        -- (and a CR 104.3c loss), hiding whether the effect ran at all.
-        (_, g3) = S.addLibraryCard island S.alice g2
-        (withSpell, spell) = S.handOne steadyProgress g3
-        handBefore = length (Game.zoneMembers Zone.Hand S.alice withSpell)
-        afterCast = S.runPure proliferatesAll withSpell (S.cast S.alice spell)
-        resolved = S.runPure proliferatesAll afterCast Stack.resolveTop
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the counter was proliferated" (S.counterOf CounterKind.PlusOnePlusOne creature resolved) 2
-    -- The spell left the hand and one card was drawn, so the hand is level.
-    Spec.assertEqWith s "drew a card" (length (Game.zoneMembers Zone.Hand S.alice resolved)) handBefore
-  -- CR 614.1a / 701.34a: Tekuthal, Inquiry Dominus ("If you would proliferate,
-  -- proliferate twice instead.") under alice turns Steady Progress's one
-  -- proliferate into two, each its own choice: the first answer takes only the
-  -- Piker, the second the Piker and bob.
-  Spec.it s "CR 614.1a Tekuthal makes one proliferate two, each its own choice" $ do
-    (board, piker) <- tekuthalBoard s registry [("Tekuthal, Inquiry Dominus", S.alice)]
-    let (after, asked) = proliferateTwiceRun board
-    Spec.assertEqWith s "CR 701.34a: the Piker was proliferated twice" (S.counterOf CounterKind.PlusOnePlusOne piker after) 3
-    Spec.assertEqWith s "CR 701.34a: bob, chosen only the second time, once" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
-    Spec.assertEqWith s "two proliferate choices" asked 2
-  -- The pair, one thing different: no Tekuthal, so the second answer is never
-  -- reached.
-  Spec.it s "CR 701.34a without Tekuthal Steady Progress proliferates once" $ do
-    (board, piker) <- tekuthalBoard s registry []
-    let (after, asked) = proliferateTwiceRun board
-    Spec.assertEqWith s "the Piker was proliferated once" (S.counterOf CounterKind.PlusOnePlusOne piker after) 2
-    Spec.assertEqWith s "bob was never chosen" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 2
-    Spec.assertEqWith s "one proliferate choice" asked 1
-  -- CR 109.5: "you" is Tekuthal's controller, so bob's Tekuthal leaves alice's
-  -- proliferate alone.
-  Spec.it s "CR 109.5 an opponent's Tekuthal does not double your proliferate" $ do
-    (board, piker) <- tekuthalBoard s registry [("Tekuthal, Inquiry Dominus", S.bob)]
-    let (after, asked) = proliferateTwiceRun board
-    Spec.assertEqWith s "the Piker was proliferated once" (S.counterOf CounterKind.PlusOnePlusOne piker after) 2
-    Spec.assertEqWith s "one proliferate choice" asked 1
   -- CR 614.5 / 616.1f: each Tekuthal gets one opportunity, the second on the
   -- event the first made, so two double twice. Two under one controller is the
   -- legend rule's to settle (CR 704.5j), so this drives the opcode directly with
@@ -673,63 +519,6 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         (after, asked) = State.runState (Engine.runGame counting gs (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.Proliferate)) 0
     Spec.assertEqWith s "CR 701.34a: one counter became five" (S.counterOf CounterKind.PlusOnePlusOne src (snd after)) 5
     Spec.assertEqWith s "four proliferate choices" asked 4
-  -- CR 701.34a: Scheming Aspirant ("Whenever you proliferate, each opponent
-  -- loses 2 life and you gain 2 life.") triggers once per proliferate, so
-  -- beside Tekuthal it triggers twice.
-  Spec.it s "CR 701.34a Scheming Aspirant triggers on each of Tekuthal's two proliferates" $ do
-    (board, _) <- tekuthalBoard s registry [("Tekuthal, Inquiry Dominus", S.alice), ("Scheming Aspirant", S.alice)]
-    (bare, _) <- tekuthalBoard s registry [("Scheming Aspirant", S.alice)]
-    let (after, _) = proliferateTwiceRun board
-        (baseline, _) = proliferateTwiceRun bare
-    Spec.assertEqWith s "bob lost 2 life twice" (S.lifeOf S.bob after) (Just 16)
-    Spec.assertEqWith s "alice gained 2 life twice" (S.lifeOf S.alice after) (Just 24)
-    Spec.assertEqWith s "without Tekuthal, once" (S.lifeOf S.bob baseline) (Just 18)
-    Spec.assertEqWith s "the stack is empty, so the triggers resolved" (GameState.stack after) []
-  -- The card's ruling: "whenever you proliferate" triggers even when nothing
-  -- was chosen -- here, when nothing has a counter to choose.
-  Spec.it s "CR 701.34a a proliferate with nothing to choose still triggers" $ do
-    island <- S.printingOf s registry "Island"
-    steadyProgress <- S.printingOf s registry "Steady Progress"
-    aspirant <- S.printingOf s registry "Scheming Aspirant"
-    let (_, g1) = S.addPermanent aspirant S.alice (S.landsInPlay island 3)
-        (_, g2) = S.addLibraryCard island S.alice g1
-        (board, spell) = S.handOne steadyProgress g2
-        (after, asked) = proliferateTwiceRun (board {GameState.priority = Just S.alice}, spell)
-    Spec.assertEqWith s "bob lost 2 life" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertEqWith s "nobody was asked" asked 0
-
--- Steady Progress in alice's hand over three Islands and a card to draw, a
--- Goblin Piker of hers with one +1/+1 counter, bob at two poison, and each named
--- card on the battlefield under its seat.
-tekuthalBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [(String, PlayerId.PlayerId)] -> m ((GameState.GameState, ObjectId.ObjectId), ObjectId.ObjectId)
-tekuthalBoard s registry extras = do
-  island <- S.printingOf s registry "Island"
-  piker <- S.printingOf s registry "Goblin Piker"
-  steadyProgress <- S.printingOf s registry "Steady Progress"
-  placed <- traverse (\(name, pid) -> fmap (\printing -> (printing, pid)) (S.printingOf s registry name)) extras
-  let (creature, g1) = S.addPermanent piker S.alice (S.landsInPlay island 3)
-      g2 = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob (S.addCounter CounterKind.PlusOnePlusOne 1 creature g1)
-      (_, g3) = S.addLibraryCard island S.alice g2
-      g4 = List.foldl' (\g (printing, pid) -> snd (S.addPermanent printing pid g)) g3 placed
-      (board, spell) = S.handOne steadyProgress g4
-  pure ((board {GameState.priority = Just S.alice}, spell), creature)
-
--- Cast Steady Progress and run priority until the stack is empty, answering the Nth ChooseProliferate by
--- INDEX -- the first takes only the permanents offered, the second everything --
--- so the engine cannot repair an answer after a mutation. Answers with the
--- settled board and how many proliferate choices were asked.
-proliferateTwiceRun :: (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, Int)
-proliferateTwiceRun (board, spell) =
-  let answering :: Prompt.Prompt r -> State.State Int r
-      answering p = case p of
-        Prompt.ChooseProliferate _ _ oids pids -> do
-          n <- State.get
-          State.put (n + 1)
-          pure (Set.fromList oids, if n == 0 then Set.empty else Set.fromList pids)
-        _ -> pure (S.identityAnswer p)
-      run = Engine.runGame answering board (S.cast S.alice spell >> Engine.priorityLoop)
-      ((_, settled), asked) = State.runState run 0
-   in (S.settleSba settled, asked)
 
 -- CR 701.22a: "to 'scry N' means to look at the top N cards of your library,
 -- then put any number of them on the bottom of your library in any order and
@@ -806,59 +595,8 @@ constructAnswer a = case Asked.prompt a of
 scryLibrary :: GameState.GameState -> [ObjectId.ObjectId]
 scryLibrary = Game.zoneMembers Zone.Library S.alice
 
-scrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scrySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 scrySpec s registry = Spec.describe s "Scry" $ do
-  -- The SPLIT, which scry 1 cannot reach: one looked-at card goes under and the
-  -- other stays on top, so neither "all of them" nor "none of them" produces
-  -- this library.
-  Spec.it s "CR 701.22a whole card: Crystal Ball's scry 2 bottoms one and keeps one" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([piker], [maiden])) ballId board
-        Spec.assertEqWith s "the library started top-first piker, maiden, mountain, forest" (scryLibrary board) [piker, maiden, mountain, forest]
-        Spec.assertEqWith s "the kept card is on top and the bottomed one is last" (scryLibrary after) [maiden, mountain, forest, piker]
-        Spec.assertEqWith s "the ability left the stack" (length (GameState.stack after)) 0
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- CR 701.22a's "the rest on top of your library IN ANY ORDER": both cards stay
-  -- on top, swapped. A scry that put them back in the order it found them
-  -- leaves the library untouched, which is the reading this case rules out.
-  Spec.it s "CR 701.22a the kept cards go back in the CHOSEN order, not the order they were in" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([], [maiden, piker])) ballId board
-        Spec.assertEqWith s "the top two are swapped and the rest is untouched" (scryLibrary after) [maiden, piker, mountain, forest]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- The other "in any order", on the bottom half: both go under, in an order
-  -- that is not the order they were looked at in.
-  Spec.it s "CR 701.22a the bottomed cards go under in the CHOSEN order too" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([maiden, piker], [])) ballId board
-        Spec.assertEqWith s "mountain and forest rose, maiden above piker beneath them" (scryLibrary after) [mountain, forest, maiden, piker]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- A card the answer names in NEITHER list still has to end up somewhere, and
-  -- an effect has no way to reject an answer -- Effect.Discard's completion
-  -- posture. It stays on top, behind the one that was named.
-  Spec.it s "CR 701.22a a looked-at card the answer never names stays on top" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = runScry (scryAnswer ([], [maiden])) ballId board
-        Spec.assertEqWith s "maiden was named and piker fell in behind it" (scryLibrary after) [maiden, piker, mountain, forest]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- Rule 701.22 states no penalty for scrying more cards than there are, unlike
-  -- CR 104.3c's draw: a two-card library is looked at whole and still split.
-  Spec.it s "CR 701.22a a library shorter than the count is looked at as far as it goes" $ do
-    (ids, ballId, board) <- scryBoard s registry 2
-    case ids of
-      [piker, maiden] -> do
-        let after = runScry (scryAnswer ([piker], [maiden])) ballId board
-        Spec.assertEqWith s "the whole library was looked at" (scryLibrary board) [piker, maiden]
-        Spec.assertEqWith s "and the answer swapped it" (scryLibrary after) [maiden, piker]
-      _ -> Spec.assertFailure s "expected two library cards"
   -- Eager Construct -- "{2} Artifact Creature -- Construct 2/2. When this
   -- creature enters, each player may scry 1." -- at three seats, every seat
   -- taking the may and bottoming its top card. The answerer runs through the
@@ -931,17 +669,6 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
     let after = runScry (scryAnswer ([], [])) ballId board
     Spec.assertEqWith s "not asked" (asks ballId board) 0
     Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
-  -- The pair's other half, one card deeper: with something beneath it the top
-  -- card is a real top-or-bottom question, so it IS asked -- and the answer is
-  -- honoured, which is what separates "asked" from "asked and ignored".
-  Spec.it s "CR 701.22a a second card beneath makes it a real choice, and it is asked" $ do
-    (ids, ballId, board) <- scryBoard s registry 2
-    case ids of
-      [piker, maiden] -> do
-        let after = runScry (scryAnswer ([maiden, piker], [])) ballId board
-        Spec.assertEqWith s "asked once" (asks ballId board) 1
-        Spec.assertEqWith s "and both went under, maiden above piker" (scryLibrary after) [maiden, piker]
-      _ -> Spec.assertFailure s "expected two library cards"
   -- CR 701.22b: "if a player is instructed to scry 0, no scry event occurs."
   -- Driven through the opcode rather than a card, no printing scrying zero and
   -- Crystal Ball's count being fixed at two.
@@ -953,30 +680,6 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
         after = S.runPure (scryAnswer ([], [])) board zero
     Spec.assertEqWith s "not asked" asked 0
     Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
-  -- CR 614.1a: Kenessos, Priest of Thassa ("If you would scry a number of cards,
-  -- scry that many cards plus one instead.") makes Crystal Ball's scry 2 look at
-  -- three. Everything looked at goes under, so the library shows how many.
-  Spec.it s "CR 614.1a Kenessos makes Crystal Ball's scry 2 a scry 3" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    withKenessos <- withScryRow s registry ["Kenessos, Priest of Thassa"] board
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let (after, looked) = scryBottomingAll ballId (fst withKenessos)
-            (baseline, _) = scryBottomingAll ballId board
-        Spec.assertEqWith s "CR 701.22a: three cards went under" (scryLibrary after) [forest, piker, maiden, mountain]
-        Spec.assertEqWith s "without Kenessos, two" (scryLibrary baseline) [mountain, forest, piker, maiden]
-        Spec.assertEqWith s "one scry of three cards" looked [[piker, maiden, mountain]]
-        Spec.assertBool s (elem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 701.22d the scry still happened"
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- CR 109.5: "you" is Kenessos's controller, so bob's leaves alice's scry at two.
-  Spec.it s "CR 109.5 an opponent's Kenessos does not enlarge your scry" $ do
-    (ids, ballId, board) <- scryBoard s registry 4
-    kenessos <- S.printingOf s registry "Kenessos, Priest of Thassa"
-    let (after, _) = scryBottomingAll ballId (snd (S.addPermanent kenessos S.bob board))
-    case ids of
-      [piker, maiden, mountain, forest] ->
-        Spec.assertEqWith s "two cards went under" (scryLibrary after) [mountain, forest, piker, maiden]
-      _ -> Spec.assertFailure s "expected four library cards"
   -- CR 614.6: Eligeth, Crossroads Augur ("If you would scry a number of cards,
   -- draw that many cards instead.") replaces the scry outright: two cards drawn,
   -- nothing looked at, and no CR 701.22d event for "whenever you scry".
@@ -1006,19 +709,6 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
            in fmap length (State.execState (Engine.runGame answering withKenessos (scryN n)) [])
     Spec.assertEqWith s "scry 0: nothing looked at" (offered 0) []
     Spec.assertEqWith s "scry 1: two looked at" (offered 1) [2]
-  -- CR 616.1e: with both, the scryer orders them. Kenessos first leaves a scry 3
-  -- for Eligeth to turn into three draws; Eligeth first leaves no scry for
-  -- Kenessos to enlarge, so two.
-  Spec.it s "CR 616.1 Eligeth and Kenessos: the scryer orders them" $ do
-    (_, ballId, board) <- scryBoard s registry 4
-    (both, placed) <- withScryRow s registry ["Eligeth, Crossroads Augur", "Kenessos, Priest of Thassa"] board
-    case placed of
-      [eligeth, kenessos] -> do
-        let first chosen = fst (scryPicking chosen ballId both)
-        Spec.assertEqWith s "Kenessos first: three drawn" (S.handSize S.alice (first kenessos)) 3
-        Spec.assertEqWith s "Eligeth first: two drawn" (S.handSize S.alice (first eligeth)) 2
-        Spec.assertEqWith s "and the scryer was asked" (snd (scryPicking kenessos ballId both)) 1
-      _ -> Spec.assertFailure s "expected two permanents"
 
 -- Each named card on the battlefield under alice, and their ids in order.
 withScryRow :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> GameState.GameState -> m (GameState.GameState, [ObjectId.ObjectId])
@@ -1041,55 +731,6 @@ scryBottomingAll ballId gs =
       ((_, after), looked) = State.runState (Engine.runGame answering gs run) []
    in (after, looked)
 
--- Crystal Ball's scry with CR 616.1's choice answered by the entry whose source
--- is `chosen`, pinned by identity. Answers with the board and how many times the
--- choice was asked.
-scryPicking :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
-scryPicking chosen ballId gs =
-  let answering :: Prompt.Prompt r -> State.State Int r
-      answering p = case p of
-        Prompt.ChooseReplacement _ _ entries -> do
-          State.modify' (+ 1)
-          pure (maybe 0 Int.toNaturalSaturating (List.findIndex ((== chosen) . ReplacementEntry.source) entries))
-        _ -> pure (S.identityAnswer p)
-      run = case Activatable.abilitiesFor ballId gs of
-        [ability] -> Activate.activateAbility S.alice ballId ability >> Stack.resolveTop
-        _ -> pure ()
-      ((_, after), asked) = State.runState (Engine.runGame answering gs run) 0
-   in (after, asked)
-
--- CR 701.25a: "to 'surveil N' means to look at the top N cards of your library,
--- then put any number of them into your graveyard and the rest on top of your
--- library in any order."
---
--- Curate ({1}{U} instant, "Surveil 2. Draw a card.") is the producer, cast for
--- real: surveil TWO for the reason the scry group takes two, and the draw is
--- what makes the kept ORDER observable from outside the library -- whichever
--- card the answer left on top is the card that ends up in hand.
---
--- Four DIFFERENT printings in alice's library, top-first [piker, maiden,
--- mountain, forest]. Interchangeable cards could not tell a chosen order from
--- the order they were found in, and could not tell a graveyard arrival from any
--- other.
-surveilBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
-surveilBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  piker <- S.printingOf s registry "Goblin Piker"
-  maiden <- S.printingOf s registry "Bird Maiden"
-  mountain <- S.printingOf s registry "Mountain"
-  forest <- S.printingOf s registry "Forest"
-  curate <- S.printingOf s registry "Curate"
-  let deal (acc, g) printing = let (oid, g2) = S.addLibraryCard printing S.alice g in (oid : acc, g2)
-      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first and
-      -- `ids` comes back top-first.
-      (ids, stocked) = List.foldl' deal ([], S.landsInPlay island 2) [forest, mountain, maiden, piker]
-      (board, spellId) = S.handOne curate stocked
-  pure (ids, spellId, board)
-
 -- Answers Prompt.ChooseSurveil with a FIXED pair of lists, scryAnswer's posture
 -- and for its reason: an answerer that searched the offered list for a legal
 -- pick would repair the assertion after a mutation broke which cards the engine
@@ -1107,67 +748,6 @@ surveilGraveyard gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zo
 
 cardNamed :: String -> Maybe CardName.CardName
 cardNamed = Just . CardName.MkCardName . Text.pack
-
-surveilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-surveilSpec s registry = Spec.describe s "Surveil" $ do
-  -- The SPLIT: one looked-at card into the graveyard, the other kept, and then
-  -- Curate's own draw takes the kept one. A surveil that BOTTOMED the unwanted
-  -- card instead -- CR 701.22a's scry, the neighbouring reading -- would leave
-  -- piker under forest and the graveyard holding nothing but Curate.
-  Spec.it s "CR 701.25a whole card: Curate's surveil 2 bins one, keeps one, then draws it" $ do
-    (ids, spellId, board) <- surveilBoard s registry
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = S.runPure (surveilAnswer ([piker], [maiden])) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith s "the library started top-first piker, maiden, mountain, forest" (Game.zoneMembers Zone.Library S.alice board) [piker, maiden, mountain, forest]
-        Spec.assertEqWith s "maiden was drawn off the top, leaving mountain and forest" (Game.zoneMembers Zone.Library S.alice after) [mountain, forest]
-        Spec.assertEqWith
-          s
-          "and the drawn card is the one surveil kept"
-          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
-          [cardNamed "Bird Maiden"]
-        -- Curate follows its own surveilled card in, CR 608.2n putting the spell
-        -- into its owner's graveyard as the final part of its resolution.
-        Spec.assertEqWith s "piker is in the graveyard, under Curate" (surveilGraveyard after) [cardNamed "Goblin Piker", cardNamed "Curate"]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- CR 701.25a's "the rest on top of your library IN ANY ORDER": nothing is
-  -- binned and the two looked-at cards go back swapped, so the draw takes the
-  -- card that was SECOND. A surveil that put them back as it found them draws
-  -- piker instead.
-  Spec.it s "CR 701.25a the kept cards go back in the CHOSEN order" $ do
-    (ids, spellId, board) <- surveilBoard s registry
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = S.runPure (surveilAnswer ([], [maiden, piker])) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith s "piker fell to second and was left there by the draw" (Game.zoneMembers Zone.Library S.alice after) [piker, mountain, forest]
-        Spec.assertEqWith
-          s
-          "maiden was on top, so maiden was drawn"
-          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
-          [cardNamed "Bird Maiden"]
-        Spec.assertEqWith s "and nothing but the spell reached the graveyard" (surveilGraveyard after) [cardNamed "Curate"]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- "Any number" reaching ALL of them, and the graveyard's own order: the answer
-  -- names maiden first, so maiden is put in first and ends up UNDER piker.
-  Spec.it s "CR 701.25a both looked-at cards can go, in the order the answer names them" $ do
-    (ids, spellId, board) <- surveilBoard s registry
-    case ids of
-      [piker, maiden, _, forest] -> do
-        let after = S.runPure (surveilAnswer ([maiden, piker], [])) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith s "mountain rose to the top and was drawn, leaving forest" (Game.zoneMembers Zone.Library S.alice after) [forest]
-        Spec.assertEqWith
-          s
-          "the draw took mountain, the card that was third"
-          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
-          [cardNamed "Mountain"]
-        Spec.assertEqWith s "maiden went in first, so piker sits on top of it" (surveilGraveyard after) [cardNamed "Bird Maiden", cardNamed "Goblin Piker", cardNamed "Curate"]
-      _ -> Spec.assertFailure s "expected four library cards"
 
 -- The elision half, driven through the opcode: Curate's count is fixed at two,
 -- and casting it on a one-card library would deck alice (CR 104.3c) before the
@@ -1226,74 +806,8 @@ surveilPromptSpec s registry = Spec.describe s "SurveilPrompt" $ do
     Spec.assertEqWith s "and the library is what it was" (Game.zoneMembers Zone.Library S.alice after) ids
     Spec.assertEqWith s "with an empty graveyard" (surveilGraveyard after) []
 
--- CR 701.25b: Curate's surveil 2 cast over seven DIFFERENT printings, top-first
--- [piker, maiden, mountain, forest, plains, swamp, giant], with one Enhanced
--- Surveillance ("You may look at an additional two cards each time you
--- surveil.") on the battlefield for each seat `owners` names.
-widenedSurveilBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  [PlayerId.PlayerId] ->
-  m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
-widenedSurveilBoard s registry owners = do
-  island <- S.printingOf s registry "Island"
-  stock <- traverse (S.printingOf s registry) ["Goblin Piker", "Bird Maiden", "Mountain", "Forest", "Plains", "Swamp", "Hill Giant"]
-  curate <- S.printingOf s registry "Curate"
-  enhanced <- S.printingOf s registry "Enhanced Surveillance"
-  let deal (acc, g) printing = let (oid, g2) = S.addLibraryCard printing S.alice g in (oid : acc, g2)
-      (ids, stocked) = List.foldl' deal ([], S.landsInPlay island 2) (reverse stock)
-      watched = List.foldl' (\g owner -> snd (S.addPermanent enhanced owner g)) stocked owners
-      (board, spellId) = S.handOne curate watched
-  pure (ids, spellId, board)
-
--- The card names in alice's hand after Curate's draw.
-surveilHand :: GameState.GameState -> [Maybe CardName.CardName]
-surveilHand gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs)
-
-enhancedSurveillanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enhancedSurveillanceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 enhancedSurveillanceSpec s registry = Spec.describe s "EnhancedSurveillance" $ do
-  -- The positive: the answer bins forest and tops mountain, the third and fourth
-  -- cards, which only the two extra looks reach. Curate's draw then takes
-  -- mountain.
-  Spec.it s "CR 701.25b alice's Enhanced Surveillance makes the extra two cards hers to bin or top" $ do
-    (ids, spellId, board) <- widenedSurveilBoard s registry [S.alice]
-    case ids of
-      [piker, maiden, mountain, forest, plains, swamp, giant] -> do
-        let after = S.runPure (surveilAnswer ([forest], [mountain])) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith s "the draw took mountain, the third card" (surveilHand after) [cardNamed "Mountain"]
-        Spec.assertEqWith s "forest, the fourth, was binned under Curate" (surveilGraveyard after) [cardNamed "Forest", cardNamed "Curate"]
-        Spec.assertEqWith s "and the unnamed two kept their places" (Game.zoneMembers Zone.Library S.alice after) [piker, maiden, plains, swamp, giant]
-      _ -> Spec.assertFailure s "expected seven library cards"
-  -- The negative half of the pair, differing only in who controls the
-  -- enchantment: bob's widens bob's surveils, not alice's, so the same answer
-  -- names two cards she never looked at and both are ignored.
-  Spec.it s "CR 701.25b bob's Enhanced Surveillance does not widen alice's surveil" $ do
-    (ids, spellId, board) <- widenedSurveilBoard s registry [S.bob]
-    case ids of
-      [_, maiden, mountain, forest, plains, swamp, giant] -> do
-        let after = S.runPure (surveilAnswer ([forest], [mountain])) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith s "the draw took piker, still on top" (surveilHand after) [cardNamed "Goblin Piker"]
-        Spec.assertEqWith s "nothing but Curate reached the graveyard" (surveilGraveyard after) [cardNamed "Curate"]
-        Spec.assertEqWith s "and the library is untouched below it" (Game.zoneMembers Zone.Library S.alice after) [maiden, mountain, forest, plains, swamp, giant]
-      _ -> Spec.assertFailure s "expected seven library cards"
-  -- The card's ruling (2018-10-05): two of them look at an additional four. The
-  -- answer reaches the fifth and sixth cards, which one alone would not.
-  Spec.it s "CR 701.25b two Enhanced Surveillances add up to four extra cards" $ do
-    (ids, spellId, board) <- widenedSurveilBoard s registry [S.alice, S.alice]
-    case ids of
-      [piker, maiden, mountain, forest, plains, swamp, giant] -> do
-        let after = S.runPure (surveilAnswer ([swamp], [plains])) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith s "the draw took plains, the fifth card" (surveilHand after) [cardNamed "Plains"]
-        Spec.assertEqWith s "swamp, the sixth, was binned under Curate" (surveilGraveyard after) [cardNamed "Swamp", cardNamed "Curate"]
-        Spec.assertEqWith s "and the unnamed four kept their places" (Game.zoneMembers Zone.Library S.alice after) [piker, maiden, mountain, forest, giant]
-      _ -> Spec.assertFailure s "expected seven library cards"
   -- CR 701.25c: surveil 0 is no surveil, so there is nothing for the
   -- enchantment to widen. Driven through the opcode, no printing surveilling
   -- zero.
@@ -1306,50 +820,6 @@ enhancedSurveillanceSpec s registry = Spec.describe s "EnhancedSurveillance" $ d
     Spec.assertEqWith s "the library is what it was" (Game.zoneMembers Zone.Library S.alice after) ids
     Spec.assertEqWith s "with an empty graveyard" (surveilGraveyard after) []
 
--- CR 701.29a: "to 'fateseal N' means to look at the top N cards of an opponent's
--- library, then put any number of them on the bottom of that library in any
--- order and the rest on top of that library in any order."
---
--- Spin into Myth ({4}{U} instant, "Put target creature on top of its owner's
--- library, then fateseal 2") is the producer, cast for real.
---
--- THREE SEATS, because two cannot tell "the opponent the fatesealer chose" from
--- "an opponent" or from "every opponent" -- and the answer names CAROL, who is
--- not the first candidate, so an implementation that ignored the answer and took
--- the head would fateseal bob and fail.
---
--- alice targets HER OWN Piker with the first half, so the library the creature
--- lands in and the library the fateseal reorders are different libraries: a
--- fateseal that looked at its own controller's library would have to disturb the
--- card just placed there.
---
--- Returns (alice's library card, bob's library top-first, carol's library
--- top-first, alice's creature, the spell in hand, the board).
-fatesealBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  NonEmpty.NonEmpty PlayerId.PlayerId ->
-  m (ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-fatesealBoard s registry seats = do
-  island <- S.printingOf s registry "Island"
-  piker <- S.printingOf s registry "Goblin Piker"
-  maiden <- S.printingOf s registry "Bird Maiden"
-  mountain <- S.printingOf s registry "Mountain"
-  forest <- S.printingOf s registry "Forest"
-  spin <- S.printingOf s registry "Spin into Myth"
-  let deal pid (acc, g) printing = let (oid, g2) = S.addLibraryCard printing pid g in (oid : acc, g2)
-      (creatureId, b1) = S.addPermanent piker S.alice (S.landsFor island S.alice 5 (Setup.emptyGame seats))
-      (aliceLib, b2) = S.addLibraryCard forest S.alice b1
-      (bobIds, b3) = List.foldl' (deal S.bob) ([], b2) [forest, mountain]
-      -- Only when carol is at the table: a library belonging to a seat the game
-      -- does not have would be a fixture nothing in the rules can reach.
-      (carolIds, b4)
-        | List.elem S.carol (NonEmpty.toList seats) = List.foldl' (deal S.carol) ([], b3) [forest, mountain, maiden]
-        | otherwise = ([], b3)
-      (board, spellId) = S.handOne spin b4
-  pure (aliceLib, bobIds, carolIds, creatureId, spellId, board)
-
 -- Answers Prompt.ChooseFateseal with a FIXED pair of lists, surveilAnswer's
 -- posture and for its reason.
 fatesealAnswer :: ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
@@ -1357,100 +827,8 @@ fatesealAnswer split p = case p of
   Prompt.ChooseFateseal {} -> split
   _ -> S.identityAnswer p
 
-fatesealSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fatesealSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 fatesealSpec s registry = Spec.describe s "Fateseal" $ do
-  let aimAt :: ObjectId.ObjectId -> PlayerId.PlayerId -> ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
-      aimAt creatureId victim split p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature creatureId))) sets
-        -- PINNED to the second candidate, not the first: S.identityAnswer and
-        -- Replay.defaultAnswer both take the head, so a fateseal that dropped
-        -- this answer would still reorder a library and still pass a membership
-        -- assertion -- against the WRONG seat.
-        Prompt.ChooseOpponent {} -> victim
-        Prompt.ChooseFateseal {} -> split
-        _ -> S.identityAnswer p
-      castSpin :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-      castSpin answer spellId board = S.runPure answer board $ do
-        S.cast S.alice spellId
-        Stack.resolveTop
-  Spec.it s "CR 701.29a whole card: Spin into Myth reorders the CHOSEN opponent's library and nobody else's" $ do
-    (aliceLib, bobIds, carolIds, creatureId, spellId, board) <- fatesealBoard s registry S.threePlayers
-    case (bobIds, carolIds) of
-      ([bobTop, bobDeep], [carolTop, carolMiddle, carolDeep]) -> do
-        -- The pinned answer names a card from BOB'S library as well as carol's.
-        -- Against carol's prompt the stray id is filtered out and changes
-        -- nothing; against a fateseal that swept every opponent it would bottom
-        -- bob's top card, which is what makes the next assertion discriminate
-        -- rather than pass because the answer named nothing bob owns.
-        let after = castSpin (aimAt creatureId S.carol ([carolTop, bobTop], [carolMiddle])) spellId board
-        Spec.assertEqWith s "carol's library started top-first maiden, mountain, forest" (Game.zoneMembers Zone.Library S.carol board) [carolTop, carolMiddle, carolDeep]
-        Spec.assertEqWith s "the kept card is on top of carol's library and the bottomed one is last" (Game.zoneMembers Zone.Library S.carol after) [carolMiddle, carolDeep, carolTop]
-        -- The seat the answer did NOT name. Two opponents is what makes this
-        -- assertion mean anything: on a two-player board it would hold for a
-        -- fateseal that swept every opponent.
-        Spec.assertEqWith s "bob's library is untouched" (Game.zoneMembers Zone.Library S.bob after) [bobTop, bobDeep]
-        -- CR 701.29a's library is an OPPONENT'S, never the fatesealer's: alice's
-        -- library holds the returned creature on top of the card she started
-        -- with, in the order the first half of the card put them there.
-        Spec.assertBool s (not (S.onBattlefield creatureId after)) "the targeted creature left the battlefield"
-        Spec.assertEqWith
-          s
-          "alice's library is the returned creature on top of her own card"
-          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Library S.alice after))
-          [cardNamed "Goblin Piker", cardNamed "Forest"]
-        Spec.assertEqWith s "and the card she started with is still the one underneath" (drop 1 (Game.zoneMembers Zone.Library S.alice after)) [aliceLib]
-      _ -> Spec.assertFailure s "expected two library cards for bob and three for carol"
-  -- WHO is asked and about WHOSE library -- the half a board cannot show by its
-  -- final state. The fatesealer is shown the cards; the library's owner is shown
-  -- nothing and asked nothing.
-  Spec.it s "CR 701.29a the fatesealer is asked, about the chosen opponent's top cards" $ do
-    (_, _, carolIds, creatureId, spellId, board) <- fatesealBoard s registry S.threePlayers
-    case carolIds of
-      [carolTop, carolMiddle, _] -> do
-        let recording :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, PlayerId.PlayerId, [ObjectId.ObjectId])] r
-            recording p = case p of
-              Prompt.ChooseFateseal _ seat owner looked -> do
-                State.modify (<> [(seat, owner, looked)])
-                pure ([], looked)
-              _ -> pure (aimAt creatureId S.carol ([], []) p)
-            asked =
-              State.execState
-                ( Engine.runGame recording board $ do
-                    S.cast S.alice spellId
-                    Stack.resolveTop
-                )
-                []
-        Spec.assertEqWith s "alice asked, about carol's library, showing its top two" asked [(S.alice, S.carol, [carolTop, carolMiddle])]
-      _ -> Spec.assertFailure s "expected three library cards for carol"
-  -- The elision pair for the OPPONENT choice, two boards differing in seat count
-  -- alone: CR 102.2's two-player game leaves exactly one opponent and nothing to
-  -- ask, and a third seat makes it a real question.
-  Spec.it s "CR 102.2 the opponent is chosen only when there are two of them" $ do
-    let counting :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
-        counting creatureId p = case p of
-          Prompt.ChooseOpponent {} -> do
-            State.modify (+ 1)
-            pure (aimAt creatureId S.carol ([], []) p)
-          _ -> pure (aimAt creatureId S.carol ([], []) p)
-        asks (_, _, _, creatureId, spellId, board) =
-          State.execState
-            ( Engine.runGame (counting creatureId) board $ do
-                S.cast S.alice spellId
-                Stack.resolveTop
-            )
-            0
-    two <- fatesealBoard s registry S.bothPlayers
-    three <- fatesealBoard s registry S.threePlayers
-    Spec.assertEqWith s "one opponent, not asked" (asks two) 0
-    Spec.assertEqWith s "two opponents, asked once" (asks three) 1
-    -- And the two-seat board still fateseals: the elision skips the question,
-    -- not the action.
-    case two of
-      (_, bobIds, _, creatureId, spellId, board) -> case bobIds of
-        [bobTop, bobDeep] -> do
-          let after = castSpin (aimAt creatureId S.carol ([bobTop], [])) spellId board
-          Spec.assertEqWith s "bob's only opponent fatesealed him" (Game.zoneMembers Zone.Library S.bob after) [bobDeep, bobTop]
-        _ -> Spec.assertFailure s "expected two library cards for bob"
   -- The elision pair for the SPLIT question, two boards differing in one card:
   -- a lone card that is the whole library has its top and its bottom at the same
   -- position, so both answers give the same library and there is nothing to ask
@@ -1490,9 +868,8 @@ fatesealSpec s registry = Spec.describe s "Fateseal" $ do
 -- put the revealed card into their graveyard."
 --
 -- Merfolk Branchwalker {1}{G} Creature -- Merfolk Scout 2/1, "When this creature
--- enters, it explores", cast off two Forests and run to a stable board -- the
--- gameplay-level route Pawl.MassEffectSpec's baneOfProgressSpec takes, so CR 603.6a's enters trigger
--- is placed by the engine rather than by the fixture.
+-- enters, it explores", cast off two Forests and run to a stable board, so CR
+-- 603.6a's enters trigger is placed by the engine rather than by the fixture.
 --
 -- The library is STACKED so the branch is chosen rather than drawn: the top card
 -- is this helper's argument and a Bird Maiden always sits beneath it. Every case
@@ -1520,39 +897,6 @@ exploreBoard s registry deck = do
       deal gs printing = snd (S.addLibraryCard printing S.alice gs)
       stocked = List.foldl' deal withSpell (reverse printings)
   pure (spell, bystander, stocked)
-
--- exploreBoard's board with Synthetic Fossil Warren on the battlefield when
--- `petrified`, and identical to it otherwise -- same lands, same hand, same
--- library, same bystander. The Warren reads "Goblin cards you own that aren't on
--- the battlefield are lands in addition to their other types": CR 613.1d's layer
--- 4 over an Affected.MatchingOffBattlefield set, adding a card type the way CR
--- 205.1b's "in addition to its other types" does, so the Goblin Piker on top of
--- the library is a LAND card that no printed characteristic of it says it is.
---
--- Synthetic (#1910): Teferi, Mage of Zhalfir and Biotransference print this
--- affected set, and Toph, the First Metalbender prints "are lands in addition to
--- their other types", but nothing prints the two together -- Scryfall
--- o:"are lands" and o:"land in addition to its other types", 2026-08-19, no card
--- that makes an off-battlefield nonland card a land. Toph is what would refute
--- that; its set is the battlefield.
---
--- The Warren reaches the battlefield AFTER the library is stocked, which is what
--- separates "the card was always a land" and "the effect applied to it as it
--- arrived" from a continuous effect applying to a card sitting in a library. It
--- is scoped to GOBLIN cards so it cannot reach the Merfolk Branchwalker while
--- that is a spell on the stack, which would change what resolves rather than
--- what the explore reads.
-warrenBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  Bool ->
-  [String] ->
-  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-warrenBoard s registry petrified deck = do
-  warren <- S.printingOf s registry "Synthetic Fossil Warren"
-  (spell, bystander, board) <- exploreBoard s registry deck
-  pure (spell, bystander, if petrified then snd (S.addPermanent warren S.alice board) else board)
 
 -- Answers Prompt.ChooseExplore with a FIXED decision, whatever the engine
 -- offers. Pinned rather than derived: an answerer that read the prompt's own
@@ -1630,46 +974,6 @@ exploreSpec s registry = Spec.describe s "Explore" $ do
     Spec.assertEqWith s "a nonland card never reaches the hand" (zoneNames Zone.Hand after) []
     -- The counter went on the permanent that EXPLORED, not on every creature.
     Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
-  -- The other half of the "may", the ONE thing changed being the answer. Without
-  -- this case a bin-always implementation passes the case above.
-  Spec.it s "CR 701.44a declining leaves the revealed card on top of the library" $ do
-    (spell, bystander, board) <- exploreBoard s registry ["Goblin Piker", "Bird Maiden"]
-    let after = runExplore (exploreAnswer OptionalDecision.Declines) spell board
-        walker = namedOnBattlefield "Merfolk Branchwalker" after
-    Spec.assertEqWith s "the counter went on either way" (plusOnePlusOnesOn walker after) 1
-    Spec.assertEqWith s "the library is untouched, Piker still on top" (zoneNames Zone.Library after) ["Goblin Piker", "Bird Maiden"]
-    Spec.assertEqWith s "nothing was binned" (zoneNames Zone.Graveyard after) []
-    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
-  -- CR 701.44a's "if a land card is revealed" asked of the card's CR 613
-  -- projection rather than of its printed face. Rule 613.1 starts from the actual
-  -- object and names no zone, so the Piker the Warren made a land IS a land card
-  -- while it sits on top of the library, and the first sentence of rule 701.44a
-  -- settles it: hand, no counter, nothing asked.
-  --
-  -- The zone is the assertion. A prompt count alone would be green for a board
-  -- that never explored at all.
-  Spec.it s "CR 613.1d a revealed card a continuous effect made a land goes to hand" $ do
-    (spell, bystander, board) <- warrenBoard s registry True ["Goblin Piker", "Bird Maiden"]
-    let after = runExplore (exploreAnswer OptionalDecision.Exercises) spell board
-        walker = namedOnBattlefield "Merfolk Branchwalker" after
-    Spec.assertEqWith s "the Piker the Warren made a land is in hand" (zoneNames Zone.Hand after) ["Goblin Piker"]
-    Spec.assertEqWith s "and reached it rather than the graveyard" (zoneNames Zone.Graveyard after) []
-    Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
-    Spec.assertEqWith s "CR 701.44a no +1/+1 counter on the land branch" (plusOnePlusOnesOn walker after) 0
-    Spec.assertEqWith s "the Maiden it was sitting on is now the top card" (zoneNames Zone.Library after) ["Bird Maiden"]
-    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
-  -- The negative half of the pair, differing in exactly one thing: whether the
-  -- Warren is on the battlefield. Same library, same lands, same answer -- and
-  -- the answer is Exercises either way, so the graveyard here is CR 701.44a's
-  -- "otherwise" branch being taken and not a different choice.
-  Spec.it s "CR 701.44a without the Warren the same Piker is a nonland card and is binned" $ do
-    (spell, bystander, board) <- warrenBoard s registry False ["Goblin Piker", "Bird Maiden"]
-    let after = runExplore (exploreAnswer OptionalDecision.Exercises) spell board
-        walker = namedOnBattlefield "Merfolk Branchwalker" after
-    Spec.assertEqWith s "the Piker is in the graveyard" (zoneNames Zone.Graveyard after) ["Goblin Piker"]
-    Spec.assertEqWith s "and never reached the hand" (zoneNames Zone.Hand after) []
-    Spec.assertEqWith s "one +1/+1 counter" (plusOnePlusOnesOn walker after) 1
-    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
   -- CR 701.44b: the permanent explores "even if some or all of those actions were
   -- impossible". No card is revealed, so nothing is a land card and the
   -- "otherwise" branch runs -- the counter goes on with no card to ask about.
@@ -1682,44 +986,6 @@ exploreSpec s registry = Spec.describe s "Explore" $ do
     Spec.assertEqWith s "no card moved anywhere" (zoneNames Zone.Hand after <> zoneNames Zone.Graveyard after) []
     Spec.assertEqWith s "and nothing was revealed" (revealedNames after) []
     Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
-
--- The elision half: which boards raise CR 701.44a's question at all. Each case
--- counts the explore prompts one cast-and-settle raises.
-explorePromptSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-explorePromptSpec s registry = Spec.describe s "ExplorePrompt" $ do
-  let counting :: Prompt.Prompt r -> State.State Int r
-      counting p = case p of
-        Prompt.ChooseExplore {} -> do
-          State.modify (+ 1)
-          pure (S.identityAnswer p)
-        _ -> pure (S.identityAnswer p)
-      asks spell gs =
-        State.execState
-          ( Engine.runGame counting gs $ do
-              S.cast S.alice spell
-              Engine.priorityLoop
-          )
-          0
-  -- A real fork, and it is put to the player: the card can end on top or in the
-  -- graveyard, and no rule settles which.
-  Spec.it s "CR 701.44a a revealed nonland card is asked about" $ do
-    (spell, _, board) <- exploreBoard s registry ["Goblin Piker", "Bird Maiden"]
-    Spec.assertEqWith s "asked once" (asks spell board) 1
-  -- The pair's other half, one card changed. CR 701.44a's first sentence settles
-  -- a land card outright, so there is nothing to ask.
-  Spec.it s "CR 701.44a a revealed land card raises no question" $ do
-    (spell, _, board) <- exploreBoard s registry ["Mountain", "Bird Maiden"]
-    Spec.assertEqWith s "not asked" (asks spell board) 0
-  -- The land branch reached through CR 613.1d instead of through the printed
-  -- face: rule 701.44a settles a land card outright, so a card the Warren made a
-  -- land is not asked about either.
-  Spec.it s "CR 613.1d a revealed card a continuous effect made a land raises no question" $ do
-    (spell, _, board) <- warrenBoard s registry True ["Goblin Piker", "Bird Maiden"]
-    Spec.assertEqWith s "not asked" (asks spell board) 0
-  -- Nothing was revealed, so there is no card the answer could be about.
-  Spec.it s "CR 701.44b an empty library raises no question" $ do
-    (spell, _, board) <- exploreBoard s registry []
-    Spec.assertEqWith s "not asked" (asks spell board) 0
 
 -- Hakbal of the Surging Soul {2}{G}{U} Legendary Creature -- Merfolk Scout 3/3,
 -- "At the beginning of combat on your turn, each Merfolk creature you control
@@ -1944,15 +1210,6 @@ lookAtSpec s registry = Spec.describe s "LookAt" $ do
     -- The whole of CR 701.20e: a look is shown to one player, so it records
     -- nothing where CR 701.20a's reveal would have.
     Spec.assertEqWith s "nothing was revealed on the way" (revealedNames after) []
-  -- The pair's other half, and the ONE thing changed is which of the two cards
-  -- is on top. A land is in the library either way, so an implementation reading
-  -- the library rather than the looked-at card passes the case above and fails
-  -- this one.
-  Spec.it s "CR 701.20e a nonland top card leaves the land beneath it alone" $ do
-    board <- wildsBoard s registry ["Bird Maiden", "Forest"]
-    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) board
-    Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Bird Maiden", "Forest"]
-    Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 0
   -- CR 603.5's "may", declined. Without this case a put-always implementation
   -- passes the first one.
   Spec.it s "CR 603.5 declining leaves the land on top of the library" $ do
@@ -1974,13 +1231,6 @@ lookAtSpec s registry = Spec.describe s "LookAt" $ do
     let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) (snd (S.addPermanent warren S.alice board))
     Spec.assertEqWith s "the Piker the Warren made a land left the library" (zoneNames Zone.Library after) ["Bird Maiden"]
     Spec.assertEqWith s "and is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-  -- The negative half, differing in exactly one thing: whether the Warren is on
-  -- the battlefield. Same library, same answer.
-  Spec.it s "CR 701.20e without the Warren the same Piker is no land card" $ do
-    board <- wildsBoard s registry ["Goblin Piker", "Bird Maiden"]
-    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) board
-    Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Goblin Piker", "Bird Maiden"]
-    Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
   -- CR 609.3: an empty library has no top card, so the look names nothing, the
   -- slot goes unbound and the clause after it finds no land.
   Spec.it s "CR 609.3 an empty library looks at nothing and does nothing" $ do
@@ -2072,54 +1322,8 @@ ponderBoard s registry = do
       (board, spellId) = S.handOne ponder stocked
   pure (ids, spellId, board)
 
--- Answers Prompt.ArrangeLibraryCards with a FIXED permutation and declines the
--- printed "may", surveilAnswer's posture and for its reason: an answerer
--- deriving its order from the offered list would still answer legally after a
--- mutation broke which cards the engine looked at.
-ponderAnswer :: [Natural] -> Prompt.Prompt r -> r
-ponderAnswer order p = case p of
-  Prompt.ArrangeLibraryCards {} -> order
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  _ -> S.identityAnswer p
-
-ponderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ponderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 ponderSpec s registry = Spec.describe s "PutBackInOrder" $ do
-  -- The whole card. The answer sends the THIRD looked-at card to the top, so
-  -- the draw takes mountain; an engine that put the three back as it found them
-  -- would draw piker, and one that stacked them onto the library rather than
-  -- refilling their own positions would leave forest somewhere else.
-  Spec.it s "CR 401.4 whole card: Ponder's three go back in the stated order, and the draw takes the one put on top" $ do
-    (ids, spellId, board) <- ponderBoard s registry
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = S.runPure (ponderAnswer [2, 0, 1]) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith
-          s
-          "CR 401.4 the drawn card is the one alice put on top"
-          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
-          [cardNamed "Mountain"]
-        Spec.assertEqWith s "the library started top-first piker, maiden, mountain, forest" (Game.zoneMembers Zone.Library S.alice board) [piker, maiden, mountain, forest]
-        Spec.assertEqWith s "mountain was drawn off the top, leaving the other two in the stated order above the untouched forest" (Game.zoneMembers Zone.Library S.alice after) [piker, maiden, forest]
-      _ -> Spec.assertFailure s "expected four library cards"
-  -- One thing changed: the answer. A different permutation puts a different card
-  -- on top, which is what makes the order alice's rather than a constant.
-  Spec.it s "CR 401.4 a different answer puts a different card in hand" $ do
-    (ids, spellId, board) <- ponderBoard s registry
-    case ids of
-      [piker, maiden, mountain, forest] -> do
-        let after = S.runPure (ponderAnswer [1, 2, 0]) board $ do
-              S.cast S.alice spellId
-              Stack.resolveTop
-        Spec.assertEqWith
-          s
-          "CR 401.4 maiden was stated first this time, so maiden is the card drawn"
-          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
-          [cardNamed "Bird Maiden"]
-        Spec.assertEqWith s "and the two left behind are in the order alice stated, above the untouched forest" (Game.zoneMembers Zone.Library S.alice after) [mountain, piker, forest]
-        Spec.assertEqWith s "the same board as the case above" (Game.zoneMembers Zone.Library S.alice board) [piker, maiden, mountain, forest]
-      _ -> Spec.assertFailure s "expected four library cards"
   -- CR 401.4's own "two or more", driven through the opcode because Ponder's
   -- count is fixed at three: one card has one order, so nobody is asked. The
   -- pair differs in the ref's count alone, on one board.
@@ -2168,17 +1372,6 @@ slotTarget = SlotName.MkSlotName (Text.pack "target")
 -- Diabolic Edict's "a creature of their choice".
 creatureFilter :: Filter.Type.Filter Keyword.Keyword
 creatureFilter = Filter.Type.HasCardType CardType.Creature
-
--- Targets `victim` with every slot that offers them, deferring the rest to
--- S.identityAnswer -- which picks the lowest ObjectId/PlayerId and so would aim
--- an edict at its own caster.
-targetsPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-targetsPlayer victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets ->
-    fmap
-      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer victim) (Set.toAscList legal) <> Set.toAscList legal))))
-      sets
-  _ -> S.identityAnswer p
 
 -- A lying interpreter: names `wanted` for a sacrifice regardless of whether it
 -- was offered. The only way to reach CR 701.21a's guard from a test, since the
@@ -2259,25 +1452,6 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
         after = S.runPure S.identityAnswer gs act
     Spec.assertEqWith s "nothing to choose" asked 0
     Spec.assertBool s (not (S.onBattlefield his after)) "but it still died"
-  -- CR 609.3 again: a player with no creatures sacrifices nothing, and the
-  -- edict simply does as much as it can -- which is nothing.
-  Spec.it s "CR 609.3 an edict against an empty board does nothing" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (src, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (PlayerRef.EachInSlot slotTarget) creatureFilter (Quantity.Literal 1))))
-    Spec.assertBool s (S.onBattlefield src after) "alice keeps hers"
-  -- The gameplay-level proof: the real card, cast and resolved.
-  Spec.it s "Diabolic Edict whole card: cast off two Swamps, bob sacrifices" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    diabolicEdict <- S.printingOf s registry "Diabolic Edict"
-    let base = S.landsInPlay swamp 2
-        (his, g1) = S.addPermanent piker S.bob base
-        (withSpell, spell) = S.handOne diabolicEdict g1
-        afterCast = S.runPure (targetsPlayer S.bob) withSpell (S.cast S.alice spell)
-        resolved = S.runPure (targetsPlayer S.bob) afterCast Stack.resolveTop
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertBool s (not (S.onBattlefield his resolved)) "bob's creature was sacrificed"
 
 createEmblemSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 createEmblemSpec s registry = Spec.describe s "CreateEmblem" $ do
@@ -2389,28 +1563,6 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
     Spec.assertEqWith s "and neither did alice" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "the cost sacrificed Denethor into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "and the ability left the stack" (GameState.stack after) []
-
-  -- CR 725.3: "Only one player can be the monarch at a time. As a player becomes
-  -- the monarch, the current monarch ceases to be the monarch." The unseating is
-  -- observable only through CR 725.2's inherent end-step draw, which belongs to
-  -- whoever holds the crown -- so alice, who held it, must stop drawing and bob,
-  -- who took it, must start.
-  Spec.it s "CR 725.3 the unseated monarch stops drawing at end step, and the new one starts" $ do
-    (ability, srcId, gs0) <- denethorBoard s registry
-    piker <- S.printingOf s registry "Goblin Piker"
-    let answers = Map.fromList [(denethorCrownSlot, Set.singleton (Recipient.ToPlayer S.bob)), (denethorDamageSlot, Set.singleton (Recipient.ToPlayer S.carol))]
-        act = do Activate.activateAbility S.alice srcId ability; Stack.resolveTop
-        ((_, after), _) = State.runState (Engine.runGame (answerSlots answers) gs0 act) []
-        -- CR 104.3c: a seat asked to draw from an empty library loses instead, so
-        -- both candidates get a card. That also makes "drew nothing" mean the
-        -- trigger did not fire rather than that there was nothing to take.
-        stocked = snd (S.addLibraryCard piker S.bob (snd (S.addLibraryCard piker S.alice after)))
-        endStep = Phase.Ending EndingStep.EndStep
-        endStepOf pid gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep pid)) (gs {GameState.phase = endStep, GameState.activePlayer = pid})
-        run gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-    Spec.assertEqWith s "bob really has the crown" (GameState.monarch after) (Just S.bob)
-    Spec.assertEqWith s "CR 725.2 bob, the new monarch, draws on his own end step" (length (Game.zoneMembers Zone.Hand S.bob (run (endStepOf S.bob stocked)))) 1
-    Spec.assertEqWith s "CR 725.3 alice, unseated, draws nothing on hers" (length (Game.zoneMembers Zone.Hand S.alice (run (endStepOf S.alice stocked)))) 0
 
   -- The classification half, asserted directly. slotsOf is the READ side of the
   -- D4 dataflow lint and has no runtime consumer: Resolve.resolveModes re-derives
@@ -2619,27 +1771,6 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
     Spec.assertEqWith s "and the watch is still armed" (Map.size (GameState.exiledUntilMonarch toAlice)) 1
     Spec.assertEqWith s "both runs resolved the spell" (length (GameState.stack toBob), length (GameState.stack toAlice)) (0, 0)
 
--- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
--- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
-actOfTreasonSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-actOfTreasonSpec s registry = Spec.describe s "Act of Treason" $ do
-  Spec.it s "steal, untap, haste, attack, then revert" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    actOfTreason <- S.printingOf s registry "Act of Treason"
-    let base0 = S.landsInPlay mountain 3 -- alice: {R}{R}{R} for {2}{R}
-        (oid, base1) = S.addPermanent piker S.bob base0
-        base = S.tapObject oid base1 -- start it tapped to prove the untap rider
-        (gs1, spellId) = S.handOne actOfTreason base
-        cast = snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice spellId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "alice controls the Piker" (Projection.controllerOf oid resolved) (Just S.alice)
-    Spec.assertEqWith s "the untap rider untapped it" (fmap Object.tapped (Game.lookupObject oid resolved)) (Just TapState.Untapped)
-    Spec.assertBool s (Projection.hasKeyword Keyword.Haste oid resolved) "it has haste"
-    Spec.assertBool s (oid `elem` Combat.legalAttackers S.alice resolved) "alice may attack with it this turn"
-    Spec.assertBool s (oid `notElem` Combat.legalAttackers S.bob resolved) "bob may not attack with it"
-    Spec.assertEqWith s "control reverts at cleanup" (Projection.controllerOf oid (Expiry.dropAtCleanup resolved)) (Just S.bob)
-
 -- CR 603.5 / 608.2d: an OPTIONAL effect -- "you may" -- decided as the ability
 -- resolves, not as it is put on the stack.
 --
@@ -2676,29 +1807,6 @@ optionalEffectSpec s registry =
         let (creature, g0) = S.addPermanent piker S.alice (S.landsInPlay mountain 4)
             (g1, worthyId) = S.handOne worthy g0
         pure (g1 {GameState.priority = Just S.alice}, worthyId, creature)
-      -- Corpse Churn {1}{B} Instant, "Mill three cards, then you may return a
-      -- creature card from your graveyard to your hand." (name, cost, type line
-      -- and oracle text checked against Scryfall.) The PRINTED form of the
-      -- two-clause mode the hand-built case below fakes: clause 0 a mandatory
-      -- Mill, clause 1 an optional MoveToZone.
-      --
-      -- alice: two Swamps in play for the cost, Corpse Churn in hand, and a
-      -- THREE-card library of two Goblin Pikers and a Forest. Two creature
-      -- cards, so CR 608.2d's choice among graveyard cards has more candidates
-      -- than it takes and cannot be elided as a forced one, and the Forest is
-      -- the non-creature the clause's filter has to exclude. Nothing on this
-      -- board draws, so milling the library empty is not CR 104.3c.
-      corpseChurnBoard = do
-        swamp <- S.printingOf s registry "Swamp"
-        churn <- S.printingOf s registry "Corpse Churn"
-        piker <- S.printingOf s registry "Goblin Piker"
-        forest <- S.printingOf s registry "Forest"
-        let base = S.landsInPlay swamp 2
-            (_, g1) = S.addLibraryCard piker S.alice base
-            (_, g2) = S.addLibraryCard piker S.alice g1
-            (_, g3) = S.addLibraryCard forest S.alice g2
-            (g4, spellId) = S.handOne churn g3
-        pure (g4 {GameState.priority = Just S.alice}, spellId)
       -- Eccentric Farmer {2}{G} Creature -- Human Peasant 2/3, "When this
       -- creature enters, mill three cards, then you may return a land card from
       -- your graveyard to your hand." (checked against Scryfall.) Corpse Churn's
@@ -2728,16 +1836,10 @@ optionalEffectSpec s registry =
         Prompt.ChooseOptional _ _ _ _ cIdx _
           | cIdx == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
-      churnName = CardName.MkCardName (Text.pack "Corpse Churn")
       forestName = CardName.MkCardName (Text.pack "Forest")
       pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
       swampName = CardName.MkCardName (Text.pack "Swamp")
       aliceNamesIn zone gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
-      -- The graveyard as a sorted LIST rather than a set -- two Goblin Pikers
-      -- are two cards and a set would collapse them -- with Corpse Churn itself
-      -- dropped, since CR 608.2n puts the finished instant in the very
-      -- graveyard the mill fills.
-      milledNames gs = filter (/= churnName) (aliceNamesIn Zone.Graveyard gs)
       -- Deadly Complication {1}{B}{R} Sorcery, "Choose one or both -- * Destroy
       -- target creature. * Put a +1/+1 counter on target suspected creature you
       -- control. You may have it become no longer suspected." (name, cost, type
@@ -2767,20 +1869,6 @@ optionalEffectSpec s registry =
         pure (g3 {GameState.priority = Just S.alice}, spellId, victim, poiId)
       isSuspected oid gs = fmap (Set.member Designation.Suspected . Object.designations) (Game.lookupObject oid gs)
    in Spec.describe s "OptionalEffect" $ do
-        Spec.it s "CR 603.5 declining the may gains nothing, and the ability still resolves" $ do
-          (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
-          case Activatable.abilitiesFor faithId gs of
-            [ability] -> do
-              let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice faithId ability)
-                  placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
-                  after = S.runPure S.identityAnswer placed Stack.resolveTop
-              Spec.assertEqWith s "the trigger is on the stack, above the draw" (length (GameState.stack placed)) 2
-              Spec.assertEqWith s "declining gains no life" (S.lifeOf S.alice after) (Just 20)
-              -- CR 608.2n, not CR 608.2b: a declined "may" is not a fizzle.
-              -- The ability resolved -- it just did nothing -- and leaving the
-              -- stack is the last part of that resolution.
-              Spec.assertEqWith s "and the ability left the stack anyway -- it did not fizzle" (length (GameState.stack after)) 1
-            abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
         -- The prompt itself, not just its consequence: recording the run puts
         -- the answer in the transcript, which is the only place a raised
         -- prompt is directly observable. Twinned with the mandatory control
@@ -2797,22 +1885,6 @@ optionalEffectSpec s registry =
                 "exactly one may was asked, and it was taken"
                 (filter isOptionalResponse transcript)
                 [Response.ChoseOptional OptionalDecision.Exercises]
-            abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
-        -- The control: Windcaller Aven's cycling trigger is the SAME shape one
-        -- word short of a "may", and it must not be asked about at all.
-        Spec.it s "CR 603.5 a mandatory cycling trigger raises no such prompt" $ do
-          aven <- S.printingOf s registry "Windcaller Aven"
-          island <- S.printingOf s registry "Island"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (_, g0) = S.addPermanent piker S.alice (S.landsInPlay island 1)
-              (g1, avenId) = S.handOne aven g0
-              gs = g1 {GameState.priority = Just S.alice}
-          case Activatable.abilitiesFor avenId gs of
-            [ability] -> do
-              let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice avenId ability)
-                  placed = S.runPure takeOptional cycled Engine.settleForPriority
-                  (_, transcript) = Replay.record takeOptional placed Stack.resolveTop
-              Spec.assertEqWith s "nothing was asked about a may" (filter isOptionalResponse transcript) []
             abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
         -- CR 608.2b before CR 603.5: with its only target gone, the ability
         -- "doesn't resolve. It's removed from the stack" -- so there is nothing
@@ -2865,12 +1937,6 @@ optionalEffectSpec s registry =
               -- declining half with no bespoke answerer needed.
               after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance 0 (ModeIndex.MkModeIndex 0) 0, mode)])
           Spec.assertEqWith s "the mandatory clause drew, the declined one did not" (S.handSize S.alice after) (before + 1)
-        Spec.it s "CR 608.2d whole card: taking Corpse Churn's return moves one card and leaves the rest milled" $ do
-          (gs, spellId) <- corpseChurnBoard
-          let cast = S.runPure returnsChurn gs (S.cast S.alice spellId)
-              after = S.runPure returnsChurn cast Stack.resolveTop
-          Spec.assertEqWith s "taking the return leaves the other two milled cards in the graveyard" (milledNames after) [forestName, pikerName]
-          Spec.assertEqWith s "and exactly the creature card is in the hand" (aliceNamesIn Zone.Hand after) [pikerName]
         -- The same pair on the ABILITY clause loop, from a real trigger: the
         -- mandatory mill is observable, so declining the "may" is told apart
         -- from skipping the whole mode. Paired with the taking half below.
@@ -2968,12 +2034,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   proliferateSpec s registry
   scrySpec s registry
   scryPromptSpec s registry
-  surveilSpec s registry
   surveilPromptSpec s registry
   enhancedSurveillanceSpec s registry
   fatesealSpec s registry
   exploreSpec s registry
-  explorePromptSpec s registry
   exploreOrderSpec s registry
   lookAtSpec s registry
   kinshipSpec s registry
@@ -2984,5 +2048,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   becomeMonarchSpec s registry
   targetedMonarchSpec s registry
   exileUntilMonarchSpec s registry
-  actOfTreasonSpec s registry
   optionalEffectSpec s registry

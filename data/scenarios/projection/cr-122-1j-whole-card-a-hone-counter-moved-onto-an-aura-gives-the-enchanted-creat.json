@@ -1,0 +1,167 @@
+{
+  "description": "CR 122.1j whole card: a hone counter moved onto an Aura gives the enchanted creature nothing",
+  "note": "A Goblin Piker wears Bonesplitter bearing a hone counter and Unholy Strength: 2 + 2 + 1 + 2 = 7 power. Resourceful Defense moves the hone counter onto the Aura, where CR 122.1j gives nothing, so the Piker is 6.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "Plains",
+            "label": "p4"
+          },
+          {
+            "card": "Plains",
+            "label": "p5"
+          },
+          {
+            "card": "Resourceful Defense",
+            "label": "defense"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          },
+          {
+            "card": "Bonesplitter",
+            "label": "splitter",
+            "attached": "piker",
+            "counters": [
+              {
+                "key": {
+                  "type": "Hone"
+                },
+                "value": 1
+              }
+            ]
+          },
+          {
+            "card": "Unholy Strength",
+            "label": "aura",
+            "attached": "piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker",
+          "power": 7,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$defense",
+          "targetsBySlot": {
+            "from": [
+              "$splitter"
+            ],
+            "to": [
+              "$aura"
+            ]
+          },
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$p4",
+            "$p5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseMovedCounters",
+          "with": [
+            [
+              {
+                "type": "Hone"
+              },
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$aura",
+          "kind": {
+            "type": "Hone"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$splitter",
+          "kind": {
+            "type": "Hone"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker",
+          "power": 6,
+          "toughness": 2
+        }
+      }
+    }
+  ]
+}

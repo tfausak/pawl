@@ -1,0 +1,127 @@
+{
+  "description": "CR 109.5 'you cast': an OPPONENT's instant pumps nothing",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "am1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "am2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "am3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "am4",
+            "ready": true
+          },
+          {
+            "card": "Monastery Swiftspear",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boil",
+            "label": "alice-boil"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "bm1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "bm2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "bm3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "bm4",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boil",
+            "label": "bob-boil"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$bob-boil",
+          "mana": [
+            "$bm1",
+            "$bm2",
+            "$bm3",
+            "$bm4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Boil",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "PowerToughness": {
+          "object": "Monastery Swiftspear",
+          "power": 1,
+          "toughness": 2
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "description": "CR 801.10 proliferate offers only players within its controller's range",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "range": 1,
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Island",
+            "label": "i3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Steady Progress",
+            "label": "sp"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 1
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "carol",
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 1
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "dave",
+        "range": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseProliferate",
+          "with": [
+            [],
+            [
+              "carol"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseProliferate",
+          "with": [
+            [],
+            [
+              "bob"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$sp",
+          "mana": [
+            "$i1",
+            "$i2",
+            "$i3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PlayerCounters": {
+          "player": "bob",
+          "kind": {
+            "type": "Poison"
+          },
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PlayerCounters": {
+          "player": "carol",
+          "kind": {
+            "type": "Poison"
+          },
+          "count": 1
+        }
+      }
+    }
+  ],
+  "note": "Range 1, four seats, bob and carol poisoned: carol, two seats from alice, is the non-member the rule is about, and a proliferate choice naming her is refused as unoffered; bob, the member, is chosen and his poison goes to 2 while carol's stays 1. The control is the unlimited board, where both are chosen and both go to 2."
+}

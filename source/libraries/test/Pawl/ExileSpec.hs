@@ -621,19 +621,6 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
         Spec.assertEqWith s "exactly one card is in exile face down" (length (faceDownExiled board)) 1
       Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
 
-  -- THE COPY TRIPWIRE. Vesuva enters as a copy of the Windbrisk Heights already
-  -- on the battlefield, so its hideaway is read off CR 707.2's copiable values
-  -- rather than off the printed card -- which Vesuva's own face does not have.
-  -- A read of Game.cardOf anywhere on this path answers "Vesuva", which has no
-  -- keywords at all, and nothing is exiled.
-  Spec.it s "CR 707.2 a land that entered as a copy of Windbrisk Heights hides a card of its own" $ do
-    (_, hidden, _, _, board) <- playHeights s registry (Just "Vesuva")
-    Spec.assertEqWith
-      s
-      "the copy's hideaway ran, and the card its controller named is in exile face down"
-      (namesOf (faceDownExiled board) board)
-      (Set.singleton hidden)
-
   -- CR 702.75a's granted ability names whoever controls the exiling permanent
   -- when the question is ASKED, so a steal moves the look with the land.
   -- Confiscate {4}{U}{U} Enchantment -- Aura -- "Enchant permanent / You control
@@ -943,8 +930,8 @@ attackedHeightsHiding s registry copier hidden = do
         _ -> S.noSource
       -- CR 502.3 on a later turn: the land entered tapped, so nothing can pay its
       -- {T} until alice's next untap step. Two handoffs and that step's
-      -- turn-based actions alone, which is ManaSpec's nextTurnOfAlice -- a whole
-      -- turn of priority would draw this fixture's library empty (CR 104.3c).
+      -- turn-based actions alone -- a whole turn of priority would draw this
+      -- fixture's library empty (CR 104.3c).
       untapped =
         S.runPure
           S.identityAnswer
@@ -1096,7 +1083,7 @@ orderedNames oids gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs
 -- candidates could not pass it. `OwnedBy You` is the slot's other conjunct and
 -- is untouched either way -- CR 406.3a blanks CHARACTERISTICS, and CR 108.3's
 -- owner is not one.
-runicRepetition :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+runicRepetition :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 runicRepetition s registry = Spec.describe s "Runic Repetition" $ do
   Spec.it s "CR 406.3a the flashback card exiled face down has no flashback to be targeted by, so the casting is reversed" $ do
     repetition <- S.printingOf s registry "Runic Repetition"
@@ -1121,53 +1108,6 @@ runicRepetition s registry = Spec.describe s "Runic Repetition" $ do
         Spec.assertEqWith s "the pile the slot could not admit held both cards" (fmap (length . membersOfPile board) (pilesIn board)) [2]
         Spec.assertEqWith s "and it is Think Twice that carried the flashback" (namesOf [wanted] board) (Set.singleton (S.printingName think))
       _ -> Spec.assertFailure s "the casting should hide a card with flashback and a card without, and Runic Repetition print one target slot"
-  Spec.it s "CR 406.3 the same two cards exiled face up leave the flashback one targetable, and it returns to her hand" $ do
-    repetition <- S.printingOf s registry "Runic Repetition"
-    think <- S.printingOf s registry "Think Twice"
-    (upThink, spellId, board) <- flashbackUpBoard s registry
-    case S.spellTargetSlot repetition of
-      Nothing -> Spec.assertFailure s "Runic Repetition should print one target slot"
-      Just theSlot -> do
-        let after = resolveAll (S.runPure S.identityAnswer board (S.cast S.alice spellId))
-        Spec.assertEqWith
-          s
-          "CR 406.3's face-up default leaves the flashback card targetable, and the sorcery returns it"
-          (namesIn Zone.Hand S.alice after)
-          (Set.singleton (S.printingName think))
-        -- Proxies, AFTER the behaviour: the Goblin Piker is the card still in
-        -- exile, and the ONE recipient alice was offered is the flashback card
-        -- by name.
-        Spec.assertEqWith s "the card with no flashback is the one left in exile" (Set.size (GameState.exile after)) 1
-        Spec.assertEqWith s "alice was offered the flashback card by name" (offerTo S.alice theSlot board) (Set.singleton (Recipient.ToObject upThink))
-        Spec.assertEqWith s "and the sorcery is the one card her hand started with" (namesIn Zone.Hand S.alice board) (Set.singleton (S.printingName repetition))
-
--- flashbackPileBoard's second case: the same Think Twice and Goblin Piker in
--- alice's exile FACE UP, by the route every other face-up exile test takes, with
--- the {2}{U} Runic Repetition costs on the battlefield and a stocked library so
--- CR 104.3c never fires. Returns the exiled Think Twice, the sorcery and the
--- slot it prints.
-flashbackUpBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-flashbackUpBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  think <- S.printingOf s registry "Think Twice"
-  piker <- S.printingOf s registry "Goblin Piker"
-  sentry <- S.printingOf s registry "Ogre Sentry"
-  repetition <- S.printingOf s registry "Runic Repetition"
-  let (upThink, g1) = S.addExiledCard think S.alice (S.landsInPlay island 3)
-      (_, g2) = S.addExiledCard piker S.alice g1
-      (_, g3) = S.addLibraryCard sentry S.alice g2
-      (spellId, g4) = S.addHandCard repetition S.alice g3
-      board =
-        g4
-          { GameState.activePlayer = S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.priority = Just S.alice
-          }
-  pure (upThink, spellId, board)
 
 -- alice casts Ignorant Bliss with Think Twice (flashback {2}{U}) and Goblin Piker
 -- in hand, so ONE pile holds a card Runic Repetition's slot admits and a card it
@@ -1220,14 +1160,6 @@ drawing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 drawing oid p = case p of
   Prompt.RandomObject _ -> oid
   _ -> throughPile p
-
--- Pawl.CopySpec's pinTarget: an announcement answered by FILTERING the offer down
--- to one recipient, never by building one, since CR 608.2b re-reads what was
--- chosen and a hand-built recipient of the same object is a different one.
-pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
-pinTarget recipient p = case p of
-  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
-  _ -> S.identityAnswer p
 
 -- What CR 601.2c would put in front of this player: the slot's legal set with CR
 -- 406.4's substitution taken over it, which is the pair Pawl.Engine.Target's

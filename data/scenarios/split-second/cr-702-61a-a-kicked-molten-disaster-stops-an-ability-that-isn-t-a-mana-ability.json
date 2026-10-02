@@ -1,0 +1,181 @@
+{
+  "description": "CR 702.61a a kicked Molten Disaster stops an ability that isn't a mana ability",
+  "note": "alice casts Molten Disaster kicked for X=1; bob's Offered actions are Pass and the eight Mountains' mana abilities, so the Sorcerer's ability is gone while CR 702.61b keeps every mana ability. The control file declines the kicker.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "a1"
+          },
+          {
+            "card": "Mountain",
+            "label": "a2"
+          },
+          {
+            "card": "Mountain",
+            "label": "a3"
+          },
+          {
+            "card": "Mountain",
+            "label": "a4"
+          },
+          {
+            "card": "Mountain",
+            "label": "a5"
+          },
+          {
+            "card": "Mountain",
+            "label": "a6"
+          },
+          {
+            "card": "Mountain",
+            "label": "a7"
+          },
+          {
+            "card": "Mountain",
+            "label": "a8"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Molten Disaster",
+            "label": "disaster"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt1"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt2"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "b1"
+          },
+          {
+            "card": "Mountain",
+            "label": "b2"
+          },
+          {
+            "card": "Mountain",
+            "label": "b3"
+          },
+          {
+            "card": "Mountain",
+            "label": "b4"
+          },
+          {
+            "card": "Mountain",
+            "label": "b5"
+          },
+          {
+            "card": "Mountain",
+            "label": "b6"
+          },
+          {
+            "card": "Mountain",
+            "label": "b7"
+          },
+          {
+            "card": "Mountain",
+            "label": "b8"
+          },
+          {
+            "card": "Prodigal Sorcerer",
+            "label": "sorcerer",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bobbolt"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$disaster",
+          "x": 1,
+          "mana": [
+            "$a1",
+            "$a2",
+            "$a3",
+            "$a4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseKicker",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Molten Disaster"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "ActivateManaAbility $b1",
+            "ActivateManaAbility $b2",
+            "ActivateManaAbility $b3",
+            "ActivateManaAbility $b4",
+            "ActivateManaAbility $b5",
+            "ActivateManaAbility $b6",
+            "ActivateManaAbility $b7",
+            "ActivateManaAbility $b8"
+          ]
+        }
+      }
+    }
+  ]
+}

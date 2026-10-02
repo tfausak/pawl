@@ -1,0 +1,108 @@
+{
+  "description": "CR 804.2 a creature taps to hand itself to a teammate",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 0,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 0
+      },
+      {
+        "name": "carol",
+        "team": 0
+      },
+      {
+        "name": "dave",
+        "team": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "deployCreatures": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$goblin-piker",
+          "ability": 0,
+          "targets": [
+            "$dave"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$goblin-piker",
+          "ability": 0,
+          "targets": [
+            "$alice"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$goblin-piker",
+          "ability": 0,
+          "targets": [
+            "$carol"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Controller",
+        "object": "$goblin-piker",
+        "is": "carol"
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Battlefield",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": true
+      }
+    }
+  ]
+}

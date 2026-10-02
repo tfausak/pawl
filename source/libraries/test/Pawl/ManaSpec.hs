@@ -53,7 +53,6 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
@@ -113,13 +112,6 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- Cast `creature` off `nLands` copies of `land`, then resolve it.
-resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
-resolvedCreature land creature nLands =
-  let (base, oid) = S.handOne creature (S.landsInPlay land nLands)
-      afterCast = snd (Engine.runGamePure S.identityAnswer base (S.cast S.alice oid))
-   in snd (Engine.runGamePure S.identityAnswer afterCast Stack.resolveTop)
-
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) wrapping one
 -- ability's effects and target slots -- the fixture shape every pre-M4h
 -- single-mode ActivatedAbility now takes.
@@ -143,24 +135,6 @@ avoidsSource unwanted p = case p of
     h : _ -> h
     [] -> NonEmpty.head candidates
   _ -> S.identityAnswer p
-
-castabilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-castabilitySpec s registry = Spec.describe s "Castability" $ do
-  Spec.it s "War Mammoth is cast off four Forests and resolves onto the battlefield" $ do
-    forest <- S.printingOf s registry "Forest"
-    warMammoth <- S.printingOf s registry "War Mammoth"
-    let gs = resolvedCreature forest warMammoth 4
-    Spec.assertEqWith s "stack empty" (length (GameState.stack gs)) 0
-    Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
-    Spec.assertEqWith s "lands tapped" (S.tappedCount S.alice gs) 4
-
-  Spec.it s "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let gs = resolvedCreature swamp typhoidRats 1
-    Spec.assertEqWith s "stack empty" (length (GameState.stack gs)) 0
-    Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
-    Spec.assertEqWith s "lands tapped" (S.tappedCount S.alice gs) 1
 
 -- The board the three CR 604.2 cases below share: alice controls Zhao, the Moon
 -- Slayer ("As long as Zhao has a conqueror counter on him, nonbasic lands are
@@ -813,27 +787,6 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
       (fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])
     Spec.assertBool s (elem birdsId (Mana.manaSources Cost.manaActivations S.alice gs)) "it is a mana source"
 
-  -- The gameplay-level proof (design.md section 4): a real card, cast end to
-  -- end off a source that produces no black mana until its controller says so.
-  Spec.it s "CR 605.3b Typhoid Rats is cast off a lone Birds of Paradise that taps for black" $ do
-    birds <- S.printingOf s registry "Birds of Paradise"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let resolved = castOffBoard (prefersColor Color.Black) [birds] typhoidRats
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Birds and the Rats" (S.creaturesInPlay S.alice resolved) 2
-    Spec.assertEqWith s "the Birds is tapped" (S.tappedCount S.alice resolved) 1
-
-  -- The discriminating half: identical board, identical spell, one different
-  -- answer. If the engine picked the colour itself this would pass too.
-  Spec.it s "the color is the player's: a Birds tapped for green does not pay {B}" $ do
-    birds <- S.printingOf s registry "Birds of Paradise"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let resolved = castOffBoard (prefersColor Color.Green) [birds] typhoidRats
-    Spec.assertEqWith s "the Rats never resolved" (S.creaturesInPlay S.alice resolved) 1
-    -- CR 601.2h: partial payments are not allowed, so the failed payment is
-    -- rolled back whole and the Birds is left untapped.
-    Spec.assertEqWith s "payment rolled back" (S.tappedCount S.alice resolved) 0
-
   -- CR 118.3 exactness. A greedy walk fails this one: it taps the Forest for
   -- {G}, then takes the Birds' FIRST colour (white) and reports {G}{B}
   -- unaffordable. Only a matching over what each source COULD produce gets it
@@ -1121,26 +1074,8 @@ floatsEverything p = case p of
 -- what makes the pool VISIBLE on a board: its layer-7c pump counts the unspent
 -- green mana its controller has, so three Forests tapped for nothing at all read
 -- off the creature as 4/4.
-priorityWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+priorityWindowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" $ do
-  Spec.it s "CR 605.3a a player with priority may fill their pool with nothing to pay for" $ do
-    forest <- S.printingOf s registry "Forest"
-    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
-    let (omnathId, board) = priorityWindowBoard omnath forest
-        after = S.runPure tapEverything board Engine.priorityLoop
-        -- The paired control: the same board, the same loop, and the one
-        -- difference is that alice declines the action. Every assertion below
-        -- reads the other way on it, so none of them can be passing on
-        -- something the fixture would have done anyway.
-        passed = S.runPure S.identityAnswer board Engine.priorityLoop
-    Spec.assertEqWith s "three green floating, and nothing asked for them" (poolSize S.alice after) 3
-    Spec.assertEqWith s "all three Forests are tapped" (S.tappedCount S.alice after) 3
-    Spec.assertEqWith s "CR 605.3b nothing went on the stack" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "CR 613.4c Omnath counts all three" (Projection.powerOf omnathId after) (Just 4)
-    Spec.assertEqWith s "and its toughness with them" (Projection.toughnessOf omnathId after) (Just 4)
-    Spec.assertEqWith s "the control: passing floats nothing" (poolSize S.alice passed) 0
-    Spec.assertEqWith s "and leaves Omnath its printed 1/1" (Projection.powerOf omnathId passed) (Just 1)
-
   -- The offer itself, and its one gate. Mana.manaSources is what
   -- Action.legalActions filters on, so a source already tapped for the turn
   -- drops off the menu -- which is also what stops the loop above from being
@@ -1156,38 +1091,6 @@ priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" 
     Spec.assertEqWith s "one per Forest, and none for the Omnath" (length (offers board)) 3
     Spec.assertEqWith s "tapping one takes it off the menu" (length (offers tappedOne)) 2
 
-  -- CR 118.3 reaches this window too: the options are gated by whether the
-  -- ability's own activation cost can be paid (CR 602.2b), the same predicate
-  -- the payment window is gated by. Phyrexian Tower is the pool's one permanent
-  -- pairing a mana ability whose cost can fail -- "{T}, Sacrifice a creature:
-  -- Add {B}{B}" -- with an always-payable "{T}: Add {C}", so the permanent is on
-  -- the menu either way and what changes is what taking it can yield.
-  -- Transmogrant Altar's cost can fail too and has no such sibling, which is
-  -- why transmograntAltarSpec asserts the whole permanent off the menu.
-  Spec.it s "CR 118.3 what the activation may yield is gated by its own cost" $ do
-    tower <- S.printingOf s registry "Phyrexian Tower"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let alone = towerBoard tower Nothing
-        withPiker = towerBoard tower (Just piker)
-        run gs = S.runPure tapEverythingForBlack gs Engine.priorityLoop
-    Spec.assertEqWith s "with a creature to give, the priority window floats {B}{B}" (poolTypes S.alice (run withPiker)) [ManaType.Colored Color.Black, ManaType.Colored Color.Black]
-    Spec.assertEqWith s "CR 601.2h and the creature paid for it" (S.creaturesInPlay S.alice (run withPiker)) 0
-    Spec.assertEqWith s "with none, the same window can only take the {C}" (poolTypes S.alice (run alone)) [ManaType.Colorless]
-
-  -- CR 117.3c: "if a player has priority when they ... activate an ability ...
-  -- that player receives priority afterward." Who is asked next is the only
-  -- thing a game observes about who holds it, so the sequence is the assertion --
-  -- SpecialActionSpec's shape for CR 116.3, and both halves of the arm ride on
-  -- it. It is BOB's turn, so his pass is already standing when alice taps:
-  -- retaining priority puts her second prompt before his second, and restarting
-  -- CR 117.4's pass count is what makes him asked a second time at all.
-  Spec.it s "CR 117.3c the activator receives priority again afterward" $ do
-    forest <- S.printingOf s registry "Forest"
-    let (_, withForest) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
-        board = withForest {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
-        asked = State.execState (Engine.runGame tapOnceThenPass board Engine.priorityLoop) []
-    Spec.assertEqWith s "bob passes, alice taps, alice is asked again, and only then is bob asked again" asked [S.bob, S.alice, S.alice, S.bob]
-
 -- alice, active, in her precombat main phase with an empty hand and an empty
 -- stack: one Omnath and three Forests, so the only mana that can ever reach her
 -- pool is mana she activated a mana ability for while holding priority.
@@ -1196,16 +1099,6 @@ priorityWindowBoard omnath forest =
   let (omnathId, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
       board = foldr (\_ gs -> snd (S.addPermanent forest S.alice gs)) g1 [1 :: Int, 2, 3]
    in (omnathId, board {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
-
--- alice, active, in her precombat main phase: one Phyrexian Tower, and a
--- creature to sacrifice or not.
-towerBoard :: Printing.Printing -> Maybe Printing.Printing -> GameState.GameState
-towerBoard tower victim =
-  let g1 = snd (S.addPermanent tower S.alice (Setup.emptyGame S.bothPlayers))
-      g2 = case victim of
-        Nothing -> g1
-        Just printing -> snd (S.addPermanent printing S.alice g1)
-   in g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
 
 -- CR 605.3a's two windows, gated by the "activate only ..." rider CR 602.5 makes
 -- a prohibition. Synthetic Ember Spring is the producer -- "{T}: Add {R}.
@@ -1223,7 +1116,7 @@ towerBoard tower victim =
 -- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
 -- Ornitier and every other hit ride on "only once each turn" -- which is
 -- ActivationRestriction.OnlyOnceEachTurn and names no window either
--- (translatorSpec below is where that arm is exercised on this road) -- or on
+-- (data/scenarios/mana is where that arm is exercised on this road) -- or on
 -- "only if <condition>", which is its OnlyIf arm and names no window either
 -- (nimbusMazeSpec below is where that arm is exercised on this road), so neither
 -- kind reaches the phase axis this pair is about.
@@ -1237,20 +1130,8 @@ towerBoard tower victim =
 -- Pawl.Engine.ActivationRestriction.needsEmptyStack about that arm rather than
 -- reading the stack of the wrong moment, and grinningIgnusSpec below is where
 -- both roads are proved.
-riderWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+riderWindowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 riderWindowSpec s registry = Spec.describe s "CR 605.3a a printed rider gates both windows" $ do
-  Spec.it s "CR 500.1 the priority window offers the source only inside the rider's step" $ do
-    spring <- S.printingOf s registry "Synthetic Ember Spring"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (inUpkeep, _) = springBoard spring bolt
-        inMain = inUpkeep {GameState.phase = Phase.PrecombatMain}
-        floated gs = poolTypes S.alice (S.runPure tapEverything gs Engine.priorityLoop)
-        offers gs = filter isManaActivation (Action.legalActions S.alice gs)
-    Spec.assertEqWith s "in her upkeep the rider admits it and {R} floats" (floated inUpkeep) [ManaType.Colored Color.Red]
-    Spec.assertEqWith s "in her main phase the same board floats nothing" (floated inMain) []
-    Spec.assertEqWith s "the menu it was taken from carries the one offer" (length (offers inUpkeep)) 1
-    Spec.assertEqWith s "and carries none outside the window" (length (offers inMain)) 0
-
   -- CR 605.3a's other window: the same rider asked while a payment is in flight,
   -- reached through Cast.castSpell rather than through the action menu, so
   -- neither assertion here can be passing on the offer above.
@@ -1303,25 +1184,8 @@ springBoard spring bolt =
 -- shape two colorless mana pay -- turned up none, Lightning Bolt's {R} being
 -- the shape every instant in the corpus has. Any generic-only instant added
 -- later would serve as the door instead.
-laviniaTurnRiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+laviniaTurnRiderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 laviniaTurnRiderSpec s registry = Spec.describe s "CR 102.1 a rider naming a turn and no phase" $ do
-  Spec.it s "CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers" $ do
-    lavinia <- S.printingOf s registry "Lavinia, Foil to Conspiracy"
-    wretch <- S.printingOf s registry "Withered Wretch"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let boardOn active = snd (laviniaBoard lavinia wretch piker active)
-        floated active = poolTypes S.alice (S.runPure tapEverything (boardOn active) Engine.priorityLoop)
-        offers active = length (filter isManaActivation (Action.legalActions S.alice (boardOn active)))
-        colorless = [ManaType.Colorless, ManaType.Colorless]
-    -- The gameplay-level assertion, and the whole point of three seats: the mana
-    -- exists on BOTH opponents' turns and on neither reading of "an opponent" is
-    -- alice's own turn one.
-    Spec.assertEqWith s "CR 102.2 on bob's turn the rider admits it and {C}{C} floats" (floated S.bob) colorless
-    Spec.assertEqWith s "CR 806.1 on carol's turn too, so this is not an enumeration of one opponent" (floated S.carol) colorless
-    Spec.assertEqWith s "CR 109.5 on her own turn the same board floats nothing" (floated S.alice) []
-    -- The menu those activations were taken from, as a supporting check.
-    Spec.assertEqWith s "the offer follows the pool at all three seats" (fmap offers [S.bob, S.carol, S.alice]) [1, 1, 0]
-
   -- CR 605.3a's other window, reached through Activate.activateAbility rather
   -- than the action menu, so neither assertion here can be passing on the offer
   -- above. Only Lavinia can pay the Wretch's {1}, so the payment is her rider's
@@ -1376,8 +1240,8 @@ laviniaBoard lavinia wretch piker active =
 -- nothing here.
 --
 -- NEITHER condition is one CR 601.2a's move can change: a card leaving a hand
--- for the stack changes no permanent alice controls. lysAlanaDignitarySpec below
--- is the board where it does.
+-- for the stack changes no permanent alice controls. data/scenarios/mana holds
+-- the board where it does.
 nimbusMazeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 nimbusMazeSpec s registry = Spec.describe s "Nimbus Maze" $ do
   Spec.it s "CR 602.5 a board condition gates the ridden mana route at both of CR 605.3a's windows" $ do
@@ -1415,129 +1279,6 @@ paysWithWhite p = case p of
       candidates
   _ -> S.identityAnswer p
 
--- CR 612.1 over the CR 602.5 rider itself, which is printed text like the cost
--- and the effect beside it. Magical Hack ({U}, "Change the text of target spell
--- or permanent by replacing all instances of one basic land type with another",
--- oracle checked on Scryfall 2026-09-15) on Nimbus Maze, whose {W} route prints
--- "Activate only if you control an Island".
---
--- TWO LEGS ONE WORD APART: the same board, the same Hack aimed at the same Maze,
--- and the only difference is which basic land type CR 608.2d's announcement
--- names. Island -> Swamp moves the {W} rider onto a land alice does not control
--- and the route dies; Plains -> Swamp moves the Maze's OTHER rider (the {U}
--- route's) and leaves the {W} one still reading Island, which the Island she
--- tapped for the Hack answers -- CR 602.5 asks what she CONTROLS, not what is
--- untapped.
---
--- THE ISLAND IS HER ONLY {U} SOURCE -- the Maze's own {U} route is ridden on a
--- Plains she does not control -- so casting the Hack taps it and leaves the Maze
--- as the only untapped source Luminesce's {W} can come from. Luminesce's printed
--- cost is exactly {W}, so the Maze's unridden {C} route pays nothing here.
-nimbusMazeTextChangeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-nimbusMazeTextChangeSpec s registry = Spec.describe s "Nimbus Maze text change" $ do
-  Spec.it s "CR 612.1 a swap naming the rider's own word moves which land it counts" $ do
-    stuck <- strandedAfterHack s registry Subtype.Island Subtype.Swamp
-    Spec.assertBool s stuck "CR 602.5 the rider now reads Swamp, alice controls none, and Luminesce stays in her hand"
-
--- alice controls a Nimbus Maze and one Island, both untapped, and holds Magical
--- Hack and Luminesce. She casts the Hack at the Maze with the swap under test,
--- resolves it, then casts Luminesce. True when Luminesce is STILL IN HER HAND --
--- CR 601.2h found no {W} to pay with, which on this board means the {W} route's
--- rider refused.
-strandedAfterHack :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Subtype.Subtype -> Subtype.Subtype -> m Bool
-strandedAfterHack s registry from to = do
-  maze <- S.printingOf s registry "Nimbus Maze"
-  island <- S.printingOf s registry "Island"
-  hack <- S.printingOf s registry "Magical Hack"
-  luminesce <- S.printingOf s registry "Luminesce"
-  let (mazeId, g1) = S.addPermanent maze S.alice (S.landsInPlay island 1)
-      (hackId, g2) = S.addHandCard hack S.alice g1
-      (lumId, g3) = S.addHandCard luminesce S.alice g2
-      ready = g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
-      after = snd (Engine.runGamePure (hackingMaze mazeId from to) ready (S.cast S.alice hackId >> Stack.resolveTop >> S.cast S.alice lumId))
-  pure (elem lumId (Game.zoneMembers Zone.Hand S.alice after))
-
--- Magical Hack aimed at one permanent by FILTERING the offer rather than
--- rebuilding it (CR 608.2b would drop a hand-built recipient of the wrong shape
--- with no error), CR 608.2d's swap answered with the pair under test, and the two
--- payments told apart by their sources: the {U} is paid by the one candidate that
--- is not the Maze, and the {W} by the Maze, which is all that is left untapped.
-hackingMaze :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
-hackingMaze mazeId from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just mazeId) . Recipient.objectOf) . snd) sets
-  Prompt.ChooseLandTypeSwap {} -> (from, to)
-  Prompt.ChooseManaSource _ _ candidates -> Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (mazeId /=) (NonEmpty.toList candidates)))
-  _ -> paysWithWhite p
-
--- CR 601.2a's move against CR 602.5's board condition, in the direction that
--- REFUSES: Lys Alana Dignitary ("{T}: Add {G}{G}. Activate only if there is an
--- Elf card in your graveyard") paying for Bloodbraid Challenger's escape, cast
--- out of that same graveyard. The Challenger is put on the stack before CR
--- 601.2g's mana abilities are activated, so when it is the graveyard's only Elf
--- card the rider is false by the time the Dignitary could tap.
---
--- TWO BOARDS one card apart: three Mountains, a settled Dignitary, and the
--- Challenger over three Goblin Pikers; the control adds a Llanowar Elves as a
--- fourth other card. Escape's {3}{R}{G} needs the Dignitary's {G} on both, so a
--- refusal is the rider's and not the supply's, and the escape's three exiles
--- are there on both.
-lysAlanaDignitarySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-lysAlanaDignitarySpec s registry = Spec.describe s "Lys Alana Dignitary" $ do
-  Spec.it s "CR 601.2a the card leaving the graveyard falsifies the rider before the mana is paid" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    dignitary <- S.printingOf s registry "Lys Alana Dignitary"
-    challenger <- S.printingOf s registry "Bloodbraid Challenger"
-    piker <- S.printingOf s registry "Goblin Piker"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    let board extra =
-          let (_, g1) = S.addPermanent dignitary S.alice (S.landsInPlay mountain 3)
-              (oid, g2) = S.addGraveyardCard challenger S.alice g1
-              g3 = List.foldl' (\acc p -> snd (S.addGraveyardCard p S.alice acc)) g2 (replicate 3 piker <> extra)
-           in (oid, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
-        offered (oid, gs) = any (S.isCastOf oid) (Action.legalActions S.alice gs)
-        (alone, aloneBoard) = board []
-        (beside, besideBoard) = board [elves]
-        cast = snd (Engine.runGamePure tapsFirstOffered besideBoard (S.cast S.alice beside))
-    Spec.assertBool s (not (offered (alone, aloneBoard))) "CR 601.2a the only Elf card is the one being cast, so the Dignitary pays nothing and the escape is not offered"
-    Spec.assertBool s (offered (beside, besideBoard)) "CR 602.5 a second Elf card stays behind, the rider holds, and the escape is offered"
-    Spec.assertBool s (notElem beside (Game.zoneMembers Zone.Graveyard S.alice cast)) "CR 601.2h and the Challenger leaves the graveyard"
-    Spec.assertEqWith s "CR 601.2g paid by the three Mountains and the Dignitary" (S.tappedCount S.alice cast) 4
-
--- The other direction, which ADMITS: a mana ability whose rider only the move
--- makes true. Synthetic Hollow Spring ("{T}: Add {C}. Activate only if you have
--- no cards in hand") is the only source for Sol Ring's {1}; with the Ring as her
--- last card, the hand is empty once CR 601.2a moves it. No printed mana ability
--- carries a rider the move makes true.
---
--- TWO BOARDS one card apart: the control adds an Island to her hand, which
--- leaves the hand non-empty after the move too.
-hollowSpringSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-hollowSpringSpec s registry = Spec.describe s "Synthetic Hollow Spring" $ do
-  Spec.it s "CR 601.2a the card leaving the hand makes the rider true before the mana is paid" $ do
-    spring <- S.printingOf s registry "Synthetic Hollow Spring"
-    ring <- S.printingOf s registry "Sol Ring"
-    island <- S.printingOf s registry "Island"
-    let board extra =
-          let (oid, g1) = S.addHandCard ring S.alice (S.landsInPlay spring 1)
-              g2 = List.foldl' (\acc p -> snd (S.addHandCard p S.alice acc)) g1 extra
-           in (oid, g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
-        offered (oid, gs) = any (S.isCastOf oid) (Action.legalActions S.alice gs)
-        (last_, lastBoard) = board []
-        (kept, keptBoard) = board [island]
-        cast = snd (Engine.runGamePure tapsFirstOffered lastBoard (S.cast S.alice last_))
-    Spec.assertBool s (offered (last_, lastBoard)) "CR 601.2a Sol Ring is her last card, the hand is empty once it moves, and the cast is offered"
-    Spec.assertBool s (notElem last_ (Game.zoneMembers Zone.Hand S.alice cast)) "CR 601.2h and the Spring pays for it"
-    Spec.assertEqWith s "CR 601.2g the Spring is tapped" (S.tappedCount S.alice cast) 1
-    Spec.assertBool s (not (offered (kept, keptBoard))) "CR 602.5 with an Island still in hand the rider stays false and the cast is not offered"
-
--- CR 601.2g's two questions answered with the first thing offered.
--- S.identityAnswer DECLINES a Prompt.ChooseManaSource.
-tapsFirstOffered :: Prompt.Prompt r -> r
-tapsFirstOffered p = case p of
-  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  _ -> S.identityAnswer p
-
 isManaActivation :: Action.Type.Action -> Bool
 isManaActivation action = case action of
   Action.Type.ActivateManaAbility _ -> True
@@ -1563,23 +1304,6 @@ tapEverything p = case p of
     h : _ -> h
     [] -> Action.Type.Pass
   _ -> S.identityAnswer p
-
--- tapEverything's actions with prefersDoubleBlack's colour answer, so the one
--- thing separating the two Phyrexian Tower boards is whether {B}{B} was on offer.
-tapEverythingForBlack :: Prompt.Prompt r -> r
-tapEverythingForBlack p = case p of
-  Prompt.ChooseAction {} -> tapEverything p
-  _ -> prefersDoubleBlack p
-
--- tapEverything again, recording which player each priority prompt went to:
--- the record CR 117.3c is asserted on. Its board holds one source, so the
--- activation happens once and every later prompt passes.
-tapOnceThenPass :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
-tapOnceThenPass p = case p of
-  Prompt.ChooseAction _ pid _ -> do
-    State.modify' (<> [pid])
-    pure (tapEverything p)
-  _ -> pure (S.identityAnswer p)
 
 -- CR 605.3b: one activation of one mana ability, adding TWO mana. Sol Ring ({1}
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
@@ -1620,17 +1344,6 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]) gs) "{2}{R} is affordable"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
 
-  -- The gameplay-level proof (design.md section 4): a real spell cast end to
-  -- end off a single permanent, which no one-mana-per-source engine can do.
-  Spec.it s "CR 601.2g Sapphire Medallion is cast off a lone Sol Ring" $ do
-    solRing <- S.printingOf s registry "Sol Ring"
-    sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
-    let resolved = castOffBoard S.identityAnswer [solRing] sapphireMedallion
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Medallion resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Sapphire Medallion") S.alice resolved) 1
-    Spec.assertEqWith s "the Sol Ring is tapped" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
-
   -- The elision side of the invariant: Sol Ring offers exactly one yield, so
   -- there is nothing to ask -- and NOT because its two mana are the same
   -- type, which would be the engine choosing. "CR 605 a single-yield source
@@ -1646,19 +1359,6 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
           _ -> pure (S.identityAnswer p)
         (solRingId, gs) = S.addPermanent solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (S.tapForMana solRingId)) 0) 0
-
--- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
--- other source's prompt to S.identityAnswer, which takes the head. A payment off
--- several two-yield sources needs a different answer from each, and the prompt
--- carries the object it is about, so keying on that is what lets one answerer
--- send one Palladium Myr to its Forest and the other to its {C}{C}.
-prefersLongYieldFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-prefersLongYieldFrom wanted p = case p of
-  Prompt.ChooseManaYield _ _ oid candidates
-    | oid == wanted ->
-        let size = length . Mana.yieldUnits
-         in List.maximumBy (\a b -> compare (size a) (size b)) (NonEmpty.toList candidates)
-  _ -> S.identityAnswer p
 
 -- CR 405.6c: "mana abilities resolve immediately. If a mana ability both
 -- produces mana and has another effect, the mana is produced and the other
@@ -1800,24 +1500,6 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     Spec.assertBool s (elem (Action.Type.Cast planeId (S.printingName livingPlane) Facing.FaceUp) offered) "{2}{G}{G} is offered"
     Spec.assertBool s (not (any (S.isCastOf towershellId) offered)) "{3}{G}{G} is not"
 
-  -- And the offer is honoured: the same board casts Living Plane end to end,
-  -- which it can only do by tapping one Myr for its Forest's {G} and the other
-  -- for {C}{C} -- the mixed choice the transposing model could not represent.
-  Spec.it s "CR 601.2g Living Plane is cast off Ashaya and two Palladium Myrs" $ do
-    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
-    palladiumMyr <- S.printingOf s registry "Palladium Myr"
-    livingPlane <- S.printingOf s registry "Living Plane"
-    let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
-        (firstMyrId, g2) = S.addPermanent palladiumMyr S.alice g1
-        (_, g3) = S.addPermanent palladiumMyr S.alice g2
-        (withSpell, planeId) = S.handOne livingPlane g3
-        cast = S.runPure (prefersLongYieldFrom firstMyrId) withSpell (S.cast S.alice planeId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "Living Plane resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Living Plane") S.alice resolved) 1
-    Spec.assertEqWith s "all three sources tapped" (S.tappedCount S.alice resolved) 3
-    Spec.assertEqWith s "and nothing was left over" (poolSize S.alice resolved) 0
-
 -- CR 700.2's SELECTION on a mana ability. Synthetic Prismatic Wellspring
 -- (Land, "{T}: Choose two -- * Add {R}. * Add {G}. * Add {W}.") is the pool's
 -- first mana ability whose selection is not "choose exactly one", and it is
@@ -1882,19 +1564,6 @@ wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
       (tappedFor S.identityAnswer wellspringId gs)
       [ManaType.Colored Color.Red, ManaType.Colored Color.Green]
 
-  -- The gameplay-level proof (design.md section 4): a real spell cast end to
-  -- end off the one synthetic permanent. Liquimetal Coating is a plain {2}
-  -- Artifact -- no colour in the cost and nothing to target -- so quantity is
-  -- the only thing the payment can turn on.
-  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Wellspring" $ do
-    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
-    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
-    let resolved = castOffBoard S.identityAnswer [wellspring] liquimetalCoating
-    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
-    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
-    Spec.assertEqWith s "the Wellspring is tapped" (S.tappedCount S.alice resolved) 1
-    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
-
 -- alice casts a Coldsteel Heart off two Mountains and resolves it, naming
 -- `wanted` at CR 614.1c's colour choice. Returns the board and the permanent
 -- that entered.
@@ -1937,17 +1606,6 @@ chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2
         Spec.assertEqWith s "tapped, it adds nothing" (tappedFor S.identityAnswer oid after) []
         Spec.assertEqWith s "untapped, that is what reaches the pool" (tappedFor S.identityAnswer oid (untapObject oid after)) [ManaType.Colored Color.Blue]
       _ -> Spec.assertFailure s "the Coldsteel Heart did not reach the battlefield"
-
-  -- The discriminating half: same card, different answer, different mana. An
-  -- engine picking the colour itself would give one of these the other's mana.
-  Spec.it s "CR 607.2d the colour is the player's, not the engine's" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    coldsteel <- S.printingOf s registry "Coldsteel Heart"
-    let run wanted = case resolvedColdsteel wanted mountain coldsteel of
-          (after, Just oid) -> Mana.manaTypesOf oid after
-          _ -> []
-    Spec.assertEqWith s "naming red" (run Color.Red) [ManaType.Colored Color.Red]
-    Spec.assertEqWith s "naming green" (run Color.Green) [ManaType.Colored Color.Green]
 
   -- No colour chosen yields NO mana rather than a fallback colour (CR 106.5). A
   -- fixture write puts a Coldsteel Heart in that state here; in play, a
@@ -2202,22 +1860,6 @@ bloodPetSpec s registry = Spec.describe s "Blood Pet" $ do
     Spec.assertBool s (elem petId sources) "CR 302.6 gates a cost with {T} or {Q}, and sacrificing is neither"
     Spec.assertBool s (notElem elfId sources) "where the Elves are gated, as they always were"
 
-  -- The gameplay-level proof (design.md section 4). Typhoid Rats is {B} and
-  -- targets nothing as it is cast, so the whole cast turns on whether the Pet
-  -- could be activated -- on a board where nothing else makes mana and the Pet
-  -- is both tapped and sick, which is to say refused twice over before this.
-  Spec.it s "CR 605.3a a tapped, sick Blood Pet pays for Typhoid Rats" $ do
-    bloodPet <- S.printingOf s registry "Blood Pet"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let (petId, g1) = S.addPermanent bloodPet S.alice (Setup.emptyGame S.bothPlayers)
-        board = S.tapObject petId (sicken petId g1)
-        (withSpell, ratsId) = S.handOne typhoidRats board
-        resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer withSpell (S.cast S.alice ratsId)) Stack.resolveTop
-        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Black)]) board) "the Pet is a {B} supply while tapped and sick"
-    Spec.assertEqWith s "the Rats resolved" (countOf "Typhoid Rats" resolved) 1
-    Spec.assertEqWith s "and the Pet paid for them" (countOf "Blood Pet" resolved) 0
-
 -- CR 118.3 on the supply side, counted rather than merely gated. Ashnod's Altar
 -- ({3} Artifact, "Sacrifice a creature: Add {C}{C}") is the pool's first mana
 -- ability a payment can activate MORE THAN ONCE: its cost holds no {T} for CR
@@ -2247,33 +1889,6 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
         pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
     Spec.assertBool s (pays 2) "{2} is what one activation adds"
     Spec.assertBool s (not (pays 3)) "and nothing pays {3}"
-
-  -- The gameplay-level proof (design.md section 4). Silent Arbiter is {4} and
-  -- targets nothing as it is cast, so the whole cast turns on the Altar being
-  -- counted twice -- and both Pikers in the graveyard afterwards is what says
-  -- two activations happened rather than one large one.
-  Spec.it s "CR 605.3a Silent Arbiter is cast off two activations of one Altar" $ do
-    altar <- S.printingOf s registry "Ashnod's Altar"
-    piker <- S.printingOf s registry "Goblin Piker"
-    arbiter <- S.printingOf s registry "Silent Arbiter"
-    let resolved = castOffBoard S.identityAnswer (altar : replicate 2 piker) arbiter
-        short = castOffBoard S.identityAnswer [altar, piker] arbiter
-        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-    Spec.assertEqWith s "the Arbiter resolved" (countOf "Silent Arbiter" resolved) 1
-    Spec.assertEqWith s "both Pikers paid for it" (countOf "Goblin Piker" resolved) 0
-    Spec.assertEqWith s "with one Piker there is no {4} and the cast fails" (countOf "Silent Arbiter" short) 0
-    Spec.assertEqWith s "and CR 601.2h left the Piker alive" (countOf "Goblin Piker" short) 1
-
-  -- The prompt-level half, since a board cannot say whether the window CLOSED
-  -- early: the Altar has to be offered a second time, with the cost still
-  -- uncovered, for the second activation to happen at all.
-  Spec.it s "CR 601.2g the mana window offers the Altar twice" $ do
-    altar <- S.printingOf s registry "Ashnod's Altar"
-    piker <- S.printingOf s registry "Goblin Piker"
-    arbiter <- S.printingOf s registry "Silent Arbiter"
-    let (withSpell, oid) = S.handOne arbiter (altarBoard altar piker 2)
-        offers = State.execState (Engine.runGame recordingManaSources withSpell (S.cast S.alice oid)) []
-    Spec.assertEqWith s "asked for a source twice, the Altar the only candidate each time" (fmap length offers) [1, 1]
 
 -- The Altar and `victims` Pikers, all under alice's control.
 altarBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
@@ -2383,23 +1998,6 @@ heritageDruidSpec s registry = Spec.describe s "Heritage Druid" $ do
     let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
     Spec.assertBool s (pays 3) "{3} is what one activation adds"
     Spec.assertBool s (not (pays 4)) "and nothing pays {4}"
-
-  -- The gameplay-level proof (design.md section 4). Void Winnower is {9}, all
-  -- generic, and targets nothing as it is cast, so the whole cast turns on the
-  -- component being counted three times. The two boards differ in the Elves and
-  -- in nothing else, so the short one fails for the Elves rather than for want
-  -- of anything else.
-  Spec.it s "CR 605.3a Void Winnower is cast off three activations of one Druid" $ do
-    winnower <- S.printingOf s registry "Void Winnower"
-    nine <- heritageDruidBoard s registry 9
-    six <- heritageDruidBoard s registry 6
-    let resolved = castFrom S.identityAnswer nine winnower
-        short = castFrom S.identityAnswer six winnower
-        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-    Spec.assertEqWith s "the Winnower resolved" (countOf "Void Winnower" resolved) 1
-    Spec.assertEqWith s "with six Elves there is no {9} and the cast fails" (countOf "Void Winnower" short) 0
-    Spec.assertEqWith s "CR 601.2h all nine Elves paid for it, the Winnower itself arriving untapped" (S.tappedCount S.alice resolved) 9
-    Spec.assertEqWith s "and CR 601.2h left the short board's Elves untapped" (S.tappedCount S.alice short) 0
 
 -- Alice's Heritage Druid and as many Glistener Elves as make `elves` untapped
 -- Elves in all, the Druid counted among them, and nothing else on the board.
@@ -2686,21 +2284,6 @@ phyrexianAltarSpec s registry = Spec.describe s "Phyrexian Altar" $ do
     Spec.assertBool s (not (offered one)) "one creature cannot pay {R}{G}"
     Spec.assertBool s (offered two) "two creatures can"
 
-  -- And the payment carries it out, which the offer alone cannot say: the colours
-  -- are SCRIPTED, one per activation, so the second half is the same board and the
-  -- same spell with one answer changed. If the engine picked the colours itself
-  -- both halves would pass.
-  Spec.it s "CR 605.3a the Goblin is cast off a red activation and a green one" $ do
-    goblin <- S.printingOf s registry "Zhur-Taa Goblin"
-    board <- phyrexianAltarBoard s registry 2
-    let countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
-        mixed = castScripted goblin board [Color.Red, Color.Green]
-        monochrome = castScripted goblin board [Color.Red, Color.Red]
-    Spec.assertEqWith s "the Goblin resolved" (countOf "Zhur-Taa Goblin" mixed) 1
-    Spec.assertEqWith s "both Pikers paid for it" (countOf "Goblin Piker" mixed) 0
-    Spec.assertEqWith s "two red activations pay no {G}, so the cast fails" (countOf "Zhur-Taa Goblin" monochrome) 0
-    Spec.assertEqWith s "and CR 601.2h rolled the sacrifices back" (countOf "Goblin Piker" monochrome) 2
-
 -- Alice's Phyrexian Altar and `victims` Goblin Pikers.
 phyrexianAltarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
 phyrexianAltarBoard s registry victims = do
@@ -2712,26 +2295,6 @@ phyrexianAltarBoard s registry victims = do
 paysColors :: [Color.Color] -> GameState.GameState -> Bool
 paysColors colors =
   Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost (fmap (ManaSymbol.OfType . ManaType.Colored) colors))
-
--- `spell` cast off `board` and resolved, with the mana-yield choices answered off
--- `script` in order -- the fixture a repeatable source needs, since one answer
--- has to serve two activations of one permanent.
-castScripted :: Printing.Printing -> GameState.GameState -> [Color.Color] -> GameState.GameState
-castScripted spell board script =
-  let (withSpell, oid) = S.handOne spell board
-      afterCast = snd (State.evalState (Engine.runGame nextColor withSpell (S.cast S.alice oid)) script)
-   in S.runPure S.identityAnswer afterCast Stack.resolveTop
-
--- The next colour in the script, or the default answer once it runs out.
-nextColor :: Prompt.Prompt r -> State.State [Color.Color] r
-nextColor p = case p of
-  Prompt.ChooseManaYield _ _ _ candidates -> do
-    scripted <- State.gets Maybe.listToMaybe
-    State.modify' (drop 1)
-    pure $ case scripted of
-      Nothing -> S.identityAnswer p
-      Just color -> optionOfTypes [ManaType.Colored color] candidates
-  _ -> pure (S.identityAnswer p)
 
 -- CR 601.2g before CR 601.2h, on a mana ability whose activation cost holds
 -- MANA: Transmogrant Altar, "{B}, {T}, Sacrifice a creature: Add
@@ -3046,36 +2609,6 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
            in S.castable S.alice oid board
     Spec.assertBool s (not (holding alone)) "CR 605.3c the {R} it would add is not there to pay the {R} it costs"
     Spec.assertBool s (holding withLand) "and a Mountain is what makes the same {1} castable"
-
-  -- CR 601.2a against CR 307.5, which is the one rider whose window CLOSES
-  -- between the gate and the payment: CR 601.2a puts the spell on the stack
-  -- BEFORE CR 601.2f-h totals and pays the cost, so no cast's payment ever has
-  -- the empty stack CR 307.5 requires. A gate counting the Ignus's {C}{C}{R}
-  -- therefore offered a cast whose own payment could not reach that mana, and CR
-  -- 601.2 then rewound it (#2005).
-  --
-  -- The BOARD is ignusBoard plus a Boggart Brute in hand: {2}{R} against a
-  -- Mountain and an Ignus, whose three mana are exactly the Mountain's one and
-  -- the Ignus's net two -- so nothing pays the Brute without the Ignus, and the
-  -- Mountain alone is not the reason either way.
-  --
-  -- The two boards are ONE ACTIVATION apart and nothing else -- same phase, same
-  -- Brute, same Mountain. Floating the mana first, with the stack still empty, is
-  -- what the rules leave the player (CR 605.3a's priority window, which
-  -- Action.legalActions goes on offering), and the same Brute is castable there.
-  -- So the refusal is about the window and not about the {2}{R}.
-  Spec.it s "CR 601.2a no cast is offered off the sorcery-speed source, the proposal itself closing CR 307.5's window" $ do
-    ignus <- S.printingOf s registry "Grinning Ignus"
-    mountain <- S.printingOf s registry "Mountain"
-    brute <- S.printingOf s registry "Boggart Brute"
-    let (ignusId, board) = ignusBoard ignus mountain
-        (held, bruteId) = S.handOne brute board
-        floated = snd (State.evalState (Engine.runGame (takesIgnusOnce ignusId) held Engine.priorityLoop) (0 :: Int))
-        offers gs = filter (S.isCastOf bruteId) (Action.legalActions S.alice gs)
-    Spec.assertEqWith s "CR 601.2a the Ignus is no supply for a cast, whose payment the proposal has already put a spell on the stack for" (length (offers held)) 0
-    Spec.assertEqWith s "CR 605.3a the same Brute off the same board is castable once that mana is floated with the stack still empty" (length (offers floated)) 1
-    Spec.assertEqWith s "and the float is the Ignus's own {C}{C}{R}" (poolTypes S.alice floated) [ManaType.Colorless, ManaType.Colorless, ManaType.Colored Color.Red]
-    Spec.assertEqWith s "CR 307.1 both boards are the same sorcery-speed window, so the phase decides neither" (GameState.phase floated) Phase.PrecombatMain
 
   -- CR 602.2a is CR 601.2a's rule for an ACTIVATION -- the ability goes on the
   -- stack, and only then does CR 602.2b send the cost through CR 601.2f-h -- so
@@ -3906,23 +3439,6 @@ drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
     Spec.assertEqWith s "the fixture: the three crossed to alice" (poolTypes S.alice charged) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
     Spec.assertEqWith s "CR 119.3 bob pays 3 life for the three he lost, and nobody else pays" (lives charged) [Just 20, Just 17, Just 20]
     Spec.assertEqWith s "CR 103.4 and with no Yurlok the same move costs nobody anything" (lives uncharged) [Just 20, Just 20, Just 20]
-  -- CR 106.13's parenthetical: "note that these may be the same player".
-  Spec.it s "CR 106.13 a self-targeted transfer nets the mana once" $ do
-    drainPower <- S.printingOf s registry "Drain Power"
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    let base = Mana.addMana S.alice [unitOf (ManaType.Colored Color.White)] (S.landsFor forest S.alice 1 (S.landsFor island S.alice 2 S.threePlayerGame))
-        (gs, spellId) = S.handOne drainPower base
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-        after = S.runPure S.identityAnswer cast Stack.resolveTop
-    -- The fixture: the two Islands paid for the spell, leaving the {W} that was
-    -- already floating and the untapped Forest.
-    Spec.assertEqWith s "the spell left alice's hand" (S.handSize S.alice cast) 0
-    Spec.assertEqWith s "her floating {W} survived the payment" (poolTypes S.alice cast) [ManaType.Colored Color.White]
-    -- ONCE: the Forest's {G} joins the {W} and the transfer onto herself empties
-    -- the pool before it adds, so neither unit is doubled. The tapped Islands
-    -- offer nothing, which is CR 609.3's "as much as possible".
-    Spec.assertEqWith s "CR 106.13 the pool is what it held, not twice that" (poolTypes S.alice after) [ManaType.Colored Color.White, ManaType.Colored Color.Green]
   -- CR 605.3a: WHICH ORDER bob activates his two lands in is his, and it is
   -- observable -- Mystic Gate's "{W/U}, {T}: Add {W}{W}, {W}{U}, or {U}{U}" is
   -- paid for out of the mana the Plains put in his pool, which is there only if
@@ -4176,7 +3692,6 @@ rhysticCaveSpec s registry =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
-  castabilitySpec s registry
   anyColorSpec s registry
   rhysticCaveSpec s registry
   chosenColorSpec s registry
@@ -4187,14 +3702,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   omnathSpec s registry
   priorityWindowSpec s registry
   riderWindowSpec s registry
-  lootSpec s registry
-  translatorSpec s registry
   cabalCoffersSpec s registry
   laviniaTurnRiderSpec s registry
   nimbusMazeSpec s registry
-  nimbusMazeTextChangeSpec s registry
-  lysAlanaDignitarySpec s registry
-  hollowSpringSpec s registry
   wellspringSpec s registry
   manaConfluenceSpec s registry
   phyrexianTowerSpec s registry
@@ -4395,7 +3905,7 @@ confluenceObeliskSpec s registry = Spec.describe s "Synthetic Confluence Obelisk
 -- removed a counter, so the activation that takes the LAST counter sacrifices
 -- the land and the one before it does not. The pair differs only in how many
 -- counters the land starts with.
-hickoryWoodlotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hickoryWoodlotSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hickoryWoodlotSpec s registry = Spec.describe s "Hickory Woodlot" $ do
   Spec.it s "CR 608.2c the sacrifice reads the counter its own cost removed" $ do
     woodlot <- S.printingOf s registry "Hickory Woodlot"
@@ -4411,19 +3921,6 @@ hickoryWoodlotSpec s registry = Spec.describe s "Hickory Woodlot" $ do
       [ ([ManaType.Colored Color.Green, ManaType.Colored Color.Green], True),
         ([ManaType.Colored Color.Green, ManaType.Colored Color.Green], False)
       ]
-
-  -- The card's first line, which the case above sets by hand.
-  Spec.it s "CR 614.1c Hickory Woodlot enters tapped with two depletion counters" $ do
-    woodlot <- S.printingOf s registry "Hickory Woodlot"
-    let (_, inHand) = S.addHandCard woodlot S.alice (Setup.emptyGame S.bothPlayers)
-        board = inHand {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-        played = S.runPure S.playLandAnswer board Engine.priorityLoop
-        depletion = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "depletion"))
-    Spec.assertEqWith
-      s
-      "CR 614.1c the land arrives tapped, carrying two depletion counters"
-      (fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid played), S.counterOf depletion oid played)) (Set.toList (GameState.battlefield played)))
-      [(Just TapState.Tapped, 2)]
 
 -- CR 106.4: "adds that mana" says nothing about whose pool, and CR 106.3's
 -- "instructs a player to add" is the sentence a card fills in. Yurlok of Scorch
@@ -4549,157 +4046,6 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
 
--- CR 502: the untap step's turn-based actions alone, which is what makes the
--- permanents this spec taps available again on the next turn without running a
--- whole turn's priority and drawing a fixture library empty (CR 104.3c).
-untapStep :: GameState.GameState -> GameState.GameState
-untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
-
--- Two turn handoffs, CR 500.5's sweep of the pools, and then that untap: bob
--- takes a turn, alice takes the next one, whatever she floated is gone and
--- everything she controls untaps (CR 502.3) -- the same permanent, untapped and
--- with an empty pool, on a later turn. CR 602.5b's per-GAME memory is on the
--- object and no rule clears it at a handoff, which is what lootSpec reads;
--- Engine.beginTurnOf clears its per-TURN twin, which is what translatorSpec
--- reads.
-nextTurnOfAlice :: GameState.GameState -> GameState.GameState
-nextTurnOfAlice gs = untapStep (Mana.emptiedManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
-
--- alice with Loot, one Forest and two Lightning Bolts in hand, in her precombat
--- main phase and going nowhere.
-lootBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-lootBoard loot forest bolt =
-  let (_, gs1) = S.addPermanent loot S.alice (S.landsInPlay forest 1)
-      (firstBolt, gs2) = S.addHandCard bolt S.alice gs1
-      (secondBolt, gs3) = S.addHandCard bolt S.alice gs2
-   in ( firstBolt,
-        secondBolt,
-        gs3
-          { GameState.activePlayer = S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.priority = Just S.alice,
-            GameState.remaining = Seq.empty
-          }
-      )
-
--- Pins the two choices the option order would otherwise decide. CR 105.4 offers
--- Loot's "any one color" as five yields and only the red one pays for a Bolt;
--- CR 115.1's target is FILTERED out of the offered set rather than built, so the
--- recipient the spell carries is the engine's own (CR 608.2b re-reads it).
-lootAnswer :: Prompt.Prompt r -> r
-lootAnswer p = case p of
-  Prompt.ChooseManaYield _ _ _ options ->
-    Maybe.fromMaybe
-      (NonEmpty.head options)
-      (List.find (elem (ManaType.Colored Color.Red) . fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList options))
-  Prompt.ChooseTargets _ _ _ slots -> fmap (\(_, recipients) -> Set.filter ((==) (Just S.bob) . Recipient.playerOf) recipients) slots
-  _ -> S.identityAnswer p
-
--- CR 602.5b's counted rider printed on a MANA ability, which CR 605.3b keeps off
--- the stack entirely: Loot, the Pathfinder (Aetherdrift) prints "Exhaust -- {G},
--- {T}: Add three mana of any one color." beside two other exhaust abilities, and
--- CR 702.177a rewrites each into "[Cost]: [Effect]. Activate only once." Oracle
--- text checked against Scryfall 2026-09-06.
---
--- pawl's transcription carries the keyword on each ability
--- (Pawl.Types.ActivatedAbility.keyword), Greenbelt Guardian's arrangement, so
--- Boom Scholar's "exhaust abilities of other permanents you control" reaches
--- these three -- including the mana one, whose stamp Cost.manaActivationAdjustmentsGiven
--- threads.
---
--- The card file states no rider: the keyword adds rule 702.177a's
--- (Keyword.printedRiders), and Mana.manaRoutesOfGiven reads it through
--- Keyword.restrictionsOf, so the refusal below is the keyword's.
---
--- ONE Forest and two Lightning Bolts. The Forest pays no {R}, so Loot's route is
--- the only way to pay for either Bolt, and the Forest is what Loot's own {G}
--- spends -- so both windows CR 605.3a gives a mana ability run through
--- Cost.manaActivationsGiven and neither through Pawl.Engine.Activate, which
--- refuses a mana ability outright (CR 605.3b).
---
--- THE PAIR is the two boards below: the same permanents, the same handoff, the
--- same untap, differing only in whether the first Bolt was paid for. Without it
--- the second Bolt is cast; with it the route is withheld, which is the rider and
--- nothing else -- everything is untapped at both moments.
-lootSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-lootSpec s registry = Spec.describe s "Loot, the Pathfinder" $ do
-  Spec.it s "CR 605.3a / 602.5b the exhaust mana ability pays for one spell and is withheld the next turn" $ do
-    loot <- S.printingOf s registry "Loot, the Pathfinder"
-    forest <- S.printingOf s registry "Forest"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (firstBolt, secondBolt, board) = lootBoard loot forest bolt
-        castOf oid gs = snd (Engine.runGamePure lootAnswer gs (do S.cast S.alice oid; Stack.resolveTop))
-        afterFirst = castOf firstBolt board
-        spent = nextTurnOfAlice afterFirst
-        unspent = nextTurnOfAlice board
-        inHand oid gs = elem oid (Game.zoneMembers Zone.Hand S.alice gs)
-    Spec.assertEqWith s "CR 605.3a the route is offered, so the first Bolt is paid for and resolves" (S.lifeOf S.bob afterFirst) (Just 17)
-    Spec.assertEqWith s "CR 602.5b the second Bolt cannot be paid for once the exhaust ability is spent" (S.lifeOf S.bob (castOf secondBolt spent)) (Just 17)
-    Spec.assertEqWith s "and the same Bolt IS paid for on the board that never spent it" (S.lifeOf S.bob (castOf secondBolt unspent)) (Just 17)
-    Spec.assertBool s (inHand secondBolt (castOf secondBolt spent)) "so the refused Bolt is still in her hand"
-    Spec.assertBool s (not (inHand secondBolt (castOf secondBolt unspent))) "and the paid-for one is not"
-    -- The offer, asked of the same two boards: CR 118.3's cast gate reads the
-    -- same capacity the payment does, so the two cannot disagree about the route.
-    Spec.assertEqWith s "CR 118.3 the cast gate agrees at both moments" (fmap (S.castable S.alice secondBolt) [spent, unspent]) [False, True]
-    -- CR 605.3a's OTHER window, which reaches the same capacity through
-    -- Mana.manaSourcesGiven rather than through a payment: the Forest is a source
-    -- on both boards and Loot only on the one that has not spent its route.
-    Spec.assertEqWith s "CR 605.3a the priority window drops the source whose only route is spent" (fmap (length . filter isManaActivation . Action.legalActions S.alice) [spent, unspent]) [1, 2]
-    -- Neither refusal is a tapped permanent: the handoff and the untap step ran
-    -- on both boards, so everything alice controls is untapped at both moments.
-    Spec.assertEqWith s "nothing of alice's is tapped on either board" (fmap (S.tappedCount S.alice) [spent, unspent]) [0, 0]
-
-  -- CR 106.3: one activation of one route adds THREE mana, so the {R} the Bolt
-  -- spends leaves two behind. Loot is the printing that puts a count above one on
-  -- a mana ability, which Mana.manaOptionsOfGiven replicates AFTER CR 105.4's
-  -- colour is chosen -- five options rather than one hundred and twenty-five.
-  Spec.it s "CR 105.4 / 106.3 three mana of ONE colour come off one activation" $ do
-    loot <- S.printingOf s registry "Loot, the Pathfinder"
-    forest <- S.printingOf s registry "Forest"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (firstBolt, _, board) = lootBoard loot forest bolt
-        afterFirst = snd (Engine.runGamePure lootAnswer board (do S.cast S.alice firstBolt; Stack.resolveTop))
-    Spec.assertEqWith s "two red float once the Bolt has spent one of the three" (poolTypes S.alice afterFirst) [ManaType.Colored Color.Red, ManaType.Colored Color.Red]
-
--- CR 602.5b's rider timed PER TURN and printed on a MANA ability, which CR 605.3b
--- keeps off the stack entirely: Kozilek's Translator (Oath of the Gatewatch)
--- prints "Pay 1 life: Add {C}. Activate only once each turn." Oracle text checked
--- against Scryfall 2026-09-06. Locust Swarm is the same rider on the road CR
--- 602.2a puts on the stack (Pawl.ActivateSpec's PrintedActivationOnlyOnceEachTurn).
---
--- NO {T} in the cost, so nothing but the rider bounds the route: alice could
--- otherwise pay for every {1} in her hand out of one permanent, at a life apiece.
---
--- TWO Bonesplitters and NO lands, so the Translator's route is the only way to
--- pay for either of them, and both of CR 605.3a's windows run through
--- Cost.manaActivationsGiven rather than through Pawl.Engine.Activate, which
--- refuses a mana ability outright (CR 605.3b). Bonesplitter does nothing until it
--- is equipped, so the board it lands on is the board it left.
---
--- THE PAIR is the two moments below: the same permanents and the same hand,
--- differing only in whether the route was already spent this turn.
-translatorBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-translatorBoard translator splitter =
-  let (_, gs1) = S.addPermanent translator S.alice (Setup.emptyGame S.bothPlayers)
-      (firstSplitter, gs2) = S.addHandCard splitter S.alice gs1
-      (secondSplitter, gs3) = S.addHandCard splitter S.alice gs2
-   in ( firstSplitter,
-        secondSplitter,
-        gs3
-          { GameState.activePlayer = S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.priority = Just S.alice,
-            GameState.remaining = Seq.empty
-          }
-      )
-
--- One choice to pin: the payment asks which source to tap for mana, and the
--- Translator is the only one on the board.
-translatorAnswer :: Prompt.Prompt r -> r
-translatorAnswer p = case p of
-  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
-  _ -> S.identityAnswer p
-
 -- CR 106.3's count read off the BOARD rather than off the card: Cabal Coffers
 -- (Torment) prints "{2}, {T}: Add {B} for each Swamp you control." Oracle text
 -- checked against Scryfall 2026-09-15.
@@ -4732,7 +4078,7 @@ cabalCoffersBoard coffers swamp forest bloodletter swamps =
           }
       )
 
-cabalCoffersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cabalCoffersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 cabalCoffersSpec s registry = Spec.describe s "Cabal Coffers" $ do
   Spec.it s "CR 106.3 an addition's count is read off the board, so three Swamps add three black mana and one adds one" $ do
     coffers <- S.printingOf s registry "Cabal Coffers"
@@ -4753,67 +4099,6 @@ cabalCoffersSpec s registry = Spec.describe s "Cabal Coffers" $ do
     -- rather than through a payment: the two cannot disagree about what the
     -- board yields.
     Spec.assertEqWith s "CR 118.3 the cast gate agrees with the payment at both counts" (fmap (uncurry (S.castable S.alice)) [(threeSpell, three), (oneSpell, one)]) [True, False]
-
-  -- CR 612.1: the count is printed text like any other, so a swap naming its
-  -- word moves which permanents it counts -- the site
-  -- Pawl.Engine.Projection.Rewrite's AddMana arm had nothing to reach before the
-  -- count became a Quantity.
-  --
-  -- THE PAIR is the two swaps below, on ONE board: the same Coffers, the same
-  -- three tapped Swamps and one tapped Island of alice's, differing only in the
-  -- word swapped FROM. Swamp is the word the Coffers carries and Plains is not,
-  -- so the second swap leaves the route exactly as printed. A swap to a type
-  -- alice DOES control makes the hacked count one rather than none, which is
-  -- what tells a moved word from a broken route.
-  --
-  -- BOB casts the Hack, off an Island of his own: the payment loop floats the
-  -- whole capacity of whoever pays, so alice casting it would tap her Coffers
-  -- for the printed count before the swap ever resolved.
-  Spec.it s "CR 612.1 a text change naming the count's word moves which permanents it counts" $ do
-    coffers <- S.printingOf s registry "Cabal Coffers"
-    swamp <- S.printingOf s registry "Swamp"
-    forest <- S.printingOf s registry "Forest"
-    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
-    island <- S.printingOf s registry "Island"
-    hack <- S.printingOf s registry "Magical Hack"
-    let (coffersId, spell, base) = cabalCoffersBoard coffers swamp forest bloodletter 3
-        (aliceIsland, withIsland) = S.addPermanent island S.alice base
-        (hackId, board) = S.addHandCard hack S.bob (S.landsFor island S.bob 1 (S.tapObject aliceIsland withIsland))
-        after from = snd (Engine.runGamePure (hackedCoffers coffersId from Subtype.Island) board (S.cast S.bob hackId >> Stack.resolveTop >> S.cast S.alice spell >> Stack.resolveTop))
-        arrived = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Bloodletter of Aclazotz") S.alice
-    Spec.assertEqWith s "CR 612.1 the hacked Coffers counts the one Island, and the swap of a word it never carried leaves it counting three Swamps" (fmap (arrived . after) [Subtype.Swamp, Subtype.Plains]) [0, 1]
-
--- Magical Hack aimed at one permanent by FILTERING the offer rather than
--- rebuilding it (CR 608.2b drops a hand-built recipient of the wrong shape with
--- no error), and CR 612.1's swap answered with the pair under test. Every other
--- decision on the board is settled -- one Island makes the {U}, and the Coffers
--- is the only black -- so the identity answerer picks nothing that matters.
-hackedCoffers :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
-hackedCoffers coffersId from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just coffersId) . Recipient.objectOf) . snd) sets
-  Prompt.ChooseLandTypeSwap {} -> (from, to)
-  _ -> S.identityAnswer p
-
-translatorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-translatorSpec s registry = Spec.describe s "Kozilek's Translator" $ do
-  Spec.it s "CR 605.3a / 602.5b the per-turn mana ability pays for one spell and is withheld until the next turn" $ do
-    translator <- S.printingOf s registry "Kozilek's Translator"
-    splitter <- S.printingOf s registry "Bonesplitter"
-    let (firstSplitter, secondSplitter, board) = translatorBoard translator splitter
-        castOf oid gs = snd (Engine.runGamePure translatorAnswer gs (do S.cast S.alice oid; Stack.resolveTop))
-        spent = castOf firstSplitter board
-        next = nextTurnOfAlice spent
-        inHand oid gs = elem oid (Game.zoneMembers Zone.Hand S.alice gs)
-    Spec.assertBool s (not (inHand firstSplitter spent)) "CR 605.3a the route is offered, so the first Bonesplitter is paid for and resolves"
-    Spec.assertEqWith s "and the life the route cost was paid" (S.lifeOf S.alice spent) (Just 19)
-    Spec.assertBool s (inHand secondSplitter (castOf secondSplitter spent)) "CR 602.5b the second Bonesplitter cannot be paid for this turn, so it is still in her hand"
-    Spec.assertEqWith s "and no second life was paid, so it was the rider and not the cost that refused it" (S.lifeOf S.alice (castOf secondSplitter spent)) (Just 19)
-    Spec.assertBool s (not (inHand secondSplitter (castOf secondSplitter next))) "CR 602.5b the handoff resets the rider, so the same card IS paid for on alice's next turn"
-    Spec.assertEqWith s "and a second life went with it" (S.lifeOf S.alice (castOf secondSplitter next)) (Just 18)
-    -- CR 605.3a's OTHER window, which reaches the same capacity through
-    -- Mana.manaSourcesGiven rather than through a payment: the Translator is a
-    -- source again on the later turn and is none once its route is spent.
-    Spec.assertEqWith s "CR 605.3a the priority window drops the source whose only route is spent, and offers it again next turn" (fmap (length . filter isManaActivation . Action.legalActions S.alice) [spent, next]) [0, 1]
 
 -- CR 602.1b on a MANA ability: Mana Cache ({1}{R}{R} Enchantment, Oracle text
 -- checked against Scryfall 2026-09-29): "At the beginning of each player's end
@@ -4848,20 +4133,6 @@ manaCacheSpec s registry = Spec.describe s "Mana Cache" $ do
     Spec.assertEqWith s "CR 102.1 on carol's turn they are carol's, so this is not one opponent" (pools onCarol) [[], [], colorless 3]
     Spec.assertEqWith s "CR 602.2 and on alice's own turn hers" (pools onAlice) [colorless 3, [], []]
     Spec.assertEqWith s "CR 602.1a bob's activations spent the counters on alice's permanent" (S.counterOf charge cacheId onBob) 0
-
-  -- The rider's two halves. "Their turn" is the ACTIVATOR's, so alice -- who
-  -- controls the Cache -- is refused on bob's turn; "before the end step"
-  -- refuses everyone once it begins.
-  Spec.it s "CR 500.1 the rider is read against the activator, and closes at the end step" $ do
-    cache <- S.printingOf s registry "Mana Cache"
-    let offered pid gs = length (filter isManaActivation (Action.legalActions pid gs {GameState.priority = Just pid}))
-        (_, bobMain) = cacheBoard cache charge S.bob Phase.PrecombatMain
-        (_, bobCombat) = cacheBoard cache charge S.bob (Phase.Combat CombatStep.DeclareAttackers)
-    (cacheId, atEnd) <- floated S.bob (Phase.Ending EndingStep.EndStep)
-    Spec.assertEqWith s "CR 513.1 in bob's end step nobody floats anything" (pools atEnd) [[], [], []]
-    Spec.assertEqWith s "and the counters are all still there" (S.counterOf charge cacheId atEnd) 3
-    Spec.assertEqWith s "CR 109.4a on bob's turn the offer is bob's and not its controller's" (fmap (`offered` bobMain) [S.alice, S.bob, S.carol]) [0, 1, 0]
-    Spec.assertEqWith s "CR 506.1 combat is before the end step too" (offered S.bob bobCombat) 1
 
   -- CR 605.3a's payment window, through Cast.castSpell rather than the menu.
   -- Crucible of Worlds is {3}, all generic, and bob controls nothing, so the

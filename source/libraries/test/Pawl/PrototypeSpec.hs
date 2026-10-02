@@ -27,7 +27,6 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -35,7 +34,6 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -49,7 +47,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Zone as Zone
@@ -99,27 +96,6 @@ settleUnderAlice oid gs =
     { GameState.objects =
         Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)
     }
-
--- CR 601.2c / CR 602.2b answered by FILTERING the offered set down to one
--- recipient rather than building one: a hand-built Recipient.ToObject of the same
--- object is a different recipient, and CR 608.2b's re-read drops it silently.
-pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
-pinTarget recipient p = case p of
-  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
-  _ -> S.identityAnswer p
-
--- Resolve the top of the stack and settle back to priority.
-resolveOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-resolveOne answer gs = snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
-
--- Every permanent named for that printing alice controls -- a LIST, so a copy
--- that never arrived and a copy that arrived with the wrong values are different
--- readings.
-assemblersOn :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
-assemblersOn printing gs =
-  filter
-    (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing))
-    (Game.zoneMembers Zone.Battlefield S.alice gs)
 
 plusOnePlusOne :: CounterKind.CounterKind Keyword.Keyword
 plusOnePlusOne = CounterKind.PlusOnePlusOne
@@ -255,32 +231,6 @@ spec s registry = Spec.describe s "Prototype" $ do
               "and the counter is on it"
               (fmap (Map.lookup plusOnePlusOne . Object.counters) (Game.lookupObject oid counted))
               (Just (Just 1))
-  -- CR 718.3a: "while casting a prototyped spell, use only its alternative power,
-  -- toughness, and mana cost when evaluating those characteristics to see if it
-  -- can be cast." Read as a PAIR of boards differing in exactly one thing -- how
-  -- many Plains alice has -- since a board that could pay neither cost and a board
-  -- that could pay both would each pass for the wrong reason.
-  Spec.it s "CR 718.3a two Plains pay the inset cost and offer the cast; one Plains pays neither" $ do
-    assembler <- S.printingOf s registry "Autonomous Assembler"
-    plains <- S.printingOf s registry "Plains"
-    let (two, twoId) = S.handOne assembler (S.landsInPlay plains 2)
-        (one, oneId) = S.handOne assembler (S.landsInPlay plains 1)
-        (five, fiveId) = S.handOne assembler (S.landsInPlay plains 5)
-    Spec.assertBool s (S.castable S.alice twoId two) "CR 718.3a: two Plains pay the inset {1}{W}, so the cast is offered"
-    Spec.assertBool s (not (S.castable S.alice oneId one)) "one Plains pays neither cost, so it is not"
-    Spec.assertBool s (S.castable S.alice fiveId five) "five Plains pay both"
-    -- And the cast two Plains offer really is the prototyped one: an engine that
-    -- offered the cast off the printed {5} and then could not pay it would pass
-    -- the castability assertion above and fail here.
-    let cast = S.runPure prototyping two (S.cast S.alice twoId)
-    Spec.assertEqWith
-      s
-      "CR 718.3a: the spell two Plains put on the stack is the white 2/2"
-      ( (,)
-          <$> fmap (\oid -> Projection.colorsOf oid cast) (topOfStack cast)
-          <*> (topOfStack cast >>= \oid -> S.powerToughnessOf oid cast)
-      )
-      (Just (Set.singleton Color.White, (2, 2)))
   -- CR 718.4: "in every zone except the stack or the battlefield, and while on the
   -- stack or the battlefield when not cast as a prototyped spell, a prototype card
   -- has only its normal characteristics."
@@ -311,47 +261,3 @@ spec s registry = Spec.describe s "Prototype" $ do
           "CR 718.4: the card in its owner's graveyard is a colourless 4/5 again"
           (fmap (\card -> (Projection.colorsOf card dead, S.powerToughnessOf card dead)) inGraveyard)
           [(Set.empty, Just (4, 5))]
-
-  -- CR 718.2a: "the existence and values of these alternative characteristics are
-  -- part of the object's copiable values", and CR 718.3c: "if a prototyped spell
-  -- is copied, the copy is also a prototyped spell. It has the alternative power,
-  -- toughness, and mana cost characteristics of the spell and not the normal
-  -- power, toughness, and mana cost characteristics of the card."
-  --
-  -- Lithoform Engine's "{4}, {T}: Copy target spell you control" is the producer.
-  -- The copy is a TOKEN with the spell's characteristics (CR 707.10f, CR 111.13),
-  -- so a reading that copied the card rather than the object gives a colourless
-  -- 4/5 and this pair of assertions separates the two.
-  Spec.it s "CR 718.2a / 718.3c a copy of the prototyped spell is a white 2/2 too" $ do
-    assembler <- S.printingOf s registry "Autonomous Assembler"
-    plains <- S.printingOf s registry "Plains"
-    engine <- S.printingOf s registry "Lithoform Engine"
-    let (engineId, withEngine) = S.addPermanent engine S.alice (S.landsInPlay plains 6)
-        (board, spellId) = S.handOne assembler withEngine
-        cast = S.runPure prototyping board (S.cast S.alice spellId)
-        ready = cast {GameState.priority = Just S.alice}
-    case (topOfStack cast, List.find ((== Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) . Cost.Type.mana . ActivatedAbility.cost) (Projection.abilitiesOf engineId ready)) of
-      (Just spell, Just copier) -> do
-        let activated = S.runPure (pinTarget (Recipient.ToObject spell)) ready (Activate.activateAbility S.alice engineId copier)
-            copied = resolveOne S.identityAnswer activated
-            afterCopy = resolveOne S.identityAnswer copied
-            afterBoth = resolveOne S.identityAnswer afterCopy
-        Spec.assertEqWith
-          s
-          "CR 718.3c: the copy resolves as a WHITE Assembler"
-          (fmap (\oid -> Projection.colorsOf oid afterCopy) (assemblersOn assembler afterCopy))
-          [Set.singleton Color.White]
-        Spec.assertEqWith
-          s
-          "CR 718.2a: with the inset box, a 2/2, not the printed 4/5"
-          (fmap (\oid -> S.powerToughnessOf oid afterCopy) (assemblersOn assembler afterCopy))
-          [Just (2, 2)]
-        -- CR 608.3a: the spell itself then resolves beside its copy, so the board
-        -- holds one token and one card -- which is what makes the readings above
-        -- about the COPY rather than about the only Assembler in play.
-        Spec.assertEqWith
-          s
-          "CR 707.10f: one token and one card, both white 2/2s"
-          (List.sort (fmap (\oid -> (Game.isToken oid afterBoth, Projection.colorsOf oid afterBoth, S.powerToughnessOf oid afterBoth)) (assemblersOn assembler afterBoth)))
-          [(False, Set.singleton Color.White, Just (2, 2)), (True, Set.singleton Color.White, Just (2, 2))]
-      _ -> Spec.assertFailure s "the Assembler never reached the stack, or the Engine offered no {4} ability"

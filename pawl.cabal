@@ -152,6 +152,8 @@ library codec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
     Pawl.Codec.Amass
+    Pawl.Codec.Answer
+    Pawl.Codec.AnswerSpec
     Pawl.Codec.AnyNumberDiscard
     Pawl.Codec.AnyNumberDiscardSpec
     Pawl.Codec.AnyNumberMatching
@@ -1055,6 +1057,7 @@ library codec
     Pawl.Codec.ReplacementProvenance
     Pawl.Codec.ReplacementProvenanceSpec
     Pawl.Codec.ReplaceSpec
+    Pawl.Codec.Reply
     Pawl.Codec.RequireAttack
     Pawl.Codec.RequireAttackSpec
     Pawl.Codec.RequireBlock
@@ -1187,6 +1190,8 @@ library codec
     Pawl.Codec.SuspendSpec
     Pawl.Codec.TakeExtraTurn
     Pawl.Codec.TakeExtraTurnSpec
+    Pawl.Codec.Taking
+    Pawl.Codec.TakingSpec
     Pawl.Codec.TapForTotalPower
     Pawl.Codec.TapForTotalPowerSpec
     Pawl.Codec.TappedForMana
@@ -1270,6 +1275,8 @@ library codec
     Pawl.Codec.VanguardSpec
     Pawl.Codec.VentureMarkerEntered
     Pawl.Codec.VentureMarkerEnteredSpec
+    Pawl.Codec.ViewIs
+    Pawl.Codec.ViewIsSpec
     Pawl.Codec.VillainousChoiceR
     Pawl.Codec.VillainousChoiceRewrite
     Pawl.Codec.VillainousChoiceRewriteSpec
@@ -1682,6 +1689,7 @@ library scenario
     Pawl.Scenario
     Pawl.Scenario.Load
     Pawl.Scenario.Prompt
+    Pawl.Scenario.Reply
 
 -- Converts text (card names) into slugs, which can be used for convenient file
 -- names.
@@ -1869,7 +1877,6 @@ library test
     Pawl.TargetSpec
     Pawl.TeamSpec
     Pawl.Test
-    Pawl.TimeTravelSpec
     Pawl.TransformSpec
     Pawl.TriggerSpec
     Pawl.TurnSpec
@@ -1928,6 +1935,7 @@ library types
     Pawl.Types.AlternativeActivationCost
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
+    Pawl.Types.Answer
     Pawl.Types.AnyNumberDiscard
     Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction
@@ -2440,6 +2448,7 @@ library types
     Pawl.Types.ReplacementEntry
     Pawl.Types.ReplacementOrigin
     Pawl.Types.ReplacementProvenance
+    Pawl.Types.Reply
     Pawl.Types.RequireAttack
     Pawl.Types.RequireBlock
     Pawl.Types.RequiredDefender
@@ -2512,6 +2521,7 @@ library types
     Pawl.Types.Suspend
     Pawl.Types.SuspendCounters
     Pawl.Types.TakeExtraTurn
+    Pawl.Types.Taking
     Pawl.Types.TapForTotalPower
     Pawl.Types.TappedForMana
     Pawl.Types.TappedIs
@@ -2559,6 +2569,8 @@ library types
     Pawl.Types.Vanguard
     Pawl.Types.VariableChoice
     Pawl.Types.VentureMarkerEntered
+    Pawl.Types.View
+    Pawl.Types.ViewIs
     Pawl.Types.VillainousChoiceR
     Pawl.Types.VillainousChoiceRewrite
     Pawl.Types.Vote

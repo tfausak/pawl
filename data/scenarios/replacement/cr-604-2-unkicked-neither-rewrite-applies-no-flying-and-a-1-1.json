@@ -1,0 +1,144 @@
+{
+  "description": "CR 604.2 unkicked, neither rewrite applies: no flying and a 1/1",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rite of Replication",
+            "ready": true
+          },
+          {
+            "card": "Faerie Squadron",
+            "label": "faerie-squadron",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseKicker",
+          "with": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$faerie-squadron",
+          "mana": [
+            "$island",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Faerie Squadron",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Faerie Squadron",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Faerie Squadron",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Faerie Squadron",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Faerie Squadron",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Keywords": {
+        "object": "Faerie Squadron",
+        "keyword": {
+          "type": "Flying"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

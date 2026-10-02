@@ -40,13 +40,11 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
-import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -210,27 +208,6 @@ creatureSbaSpec s registry =
       Spec.assertEqWith s "off the battlefield" (Game.zoneMembers Zone.Battlefield S.alice after) []
       Spec.assertEqWith s "in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
-    Spec.it s "CR 704.5g damage below toughness is not lethal" $ do
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-          -- A Piker is 2/1, so 0 marked damage is survivable and 1 is not.
-          after = S.settleSba (S.markDamage oid 0 gs)
-      Spec.assertEqWith s "still there" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
-
-    Spec.it s "CR 704.5g a Mountain with damage marked is not destroyed" $ do
-      -- Not a creature: 704.5f/g do not apply. This is the classification
-      -- doing its job -- the check never asks WHICH card it is.
-      mountain <- S.printingOf s registry "Mountain"
-      let gs = S.landsInPlay mountain 1
-      case Game.zoneMembers Zone.Battlefield S.alice gs of
-        [] -> Spec.assertFailure s "fixture should have one Mountain"
-        oid : _ ->
-          Spec.assertEqWith
-            s
-            "survives"
-            (length (Game.zoneMembers Zone.Battlefield S.alice (S.settleSba (S.markDamage oid 5 gs))))
-            1
-
     Spec.it s "a destroyed creature conserves objects" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
@@ -390,28 +367,6 @@ infectSpec s registry =
       Spec.assertEqWith s "two -1/-1 counters" (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject victim after)) (Just 2)
       Spec.assertEqWith s "no marked damage" (S.damageOf victim after) (Just 0)
 
-    -- CR 120.3c AND NOT CR 120.3d: rule 120.3d names a CREATURE recipient, so an
-    -- infect source damaging a planeswalker takes loyalty counters off it like any
-    -- other source and gives it no -1/-1 counters. The results are the recipient's
-    -- card types (CR 120.3), never the source's keyword.
-    --
-    -- Jace Beleren is CAST rather than arranged, so his three loyalty counters come
-    -- from CR 306.5b's replacement and the removal has something to take.
-    Spec.it s "CR 120.3c infect damage to a planeswalker takes loyalty, not -1/-1 counters" $ do
-      island <- S.printingOf s registry "Island"
-      jace <- S.printingOf s registry "Jace Beleren"
-      ichorRats <- S.printingOf s registry "Ichor Rats"
-      let (handGs, jaceInHand) = S.handOne jace (S.landsInPlay island 3)
-          board = S.runPure S.identityAnswer handGs (do S.cast S.alice jaceInHand; Stack.resolveTop)
-          walker = permanentNamed "Jace Beleren" board
-          (src, withRats) = S.addPermanent ichorRats S.alice board
-          ev = DamageEvent.MkDamageEvent src (Recipient.ToPlaneswalker walker) 2 False True False 0 Nothing Nothing mempty False DamageKind.Combat
-          after = S.runPure S.identityAnswer withRats (Damage.applyDamage [ev])
-      Spec.assertEqWith s "CR 306.5b: three loyalty counters to start" (S.counterOf CounterKind.Loyalty walker board) 3
-      Spec.assertEqWith s "CR 120.3c: loyalty 3 -> 1" (S.counterOf CounterKind.Loyalty walker after) 1
-      Spec.assertEqWith s "CR 120.3d reaches no planeswalker" (S.counterOf CounterKind.MinusOneMinusOne walker after) 0
-      Spec.assertEqWith s "and CR 120.3e reaches none either" (S.damageOf walker after) (Just 0)
-
     Spec.it s "CR 702.90c Glistener Elf shrinks and kills a blocker with -1/-1 counters" $ do
       glistenerElf <- S.printingOf s registry "Glistener Elf"
       piker <- S.printingOf s registry "Goblin Piker"
@@ -528,51 +483,6 @@ toxicSpec s registry =
         blocker : _ -> do
           Spec.assertEqWith s "three damage marked on the blocker" (S.damageOf blocker fought) (Just 3)
           Spec.assertEqWith s "no -1/-1 counters" (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject blocker fought)) (Just 0)
-
-    -- CR 702.4b deals combat damage TWICE, and CR 120.3g fires per instance of
-    -- combat damage, not once per combat: two waves, two lots of poison. The
-    -- grant is a layer-6 GainKeyword rather than a card, since no printing in
-    -- the pool has both double strike and toxic.
-    Spec.it s "CR 702.4b/120.3g a double-striking Branchblight Stalker poisons twice" $ do
-      stalker <- S.printingOf s registry "Branchblight Stalker"
-      let (gs0, attackers, _) = S.combatBoardOf [stalker] []
-      case attackers of
-        [] -> Spec.assertFailure s "fixture should have an attacker"
-        attacker : _ -> do
-          let gs = S.withEffectAt attacker (Timestamp.MkTimestamp 100) (Modification.GainKeyword Keyword.DoubleStrike) gs0
-              after = S.runCombat S.aggressiveAnswer gs
-          Spec.assertEqWith s "toxic 2 twice is four poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 4
-          Spec.assertEqWith s "and three damage twice" (S.lifeOf S.bob after) (Just 14)
-
-    -- Two Aspirant's Ascents on one Branchblight Stalker: toxic 2 printed plus
-    -- toxic 1 granted twice is a total toxic value of 4 (CR 702.164b sums N
-    -- over every toxic ability, and rule 702.164 has no redundancy clause of
-    -- the CR 702.3c/702.9c kind). The falsifier is a projection that keeps
-    -- keywords in a set, where the second toxic 1 collapses into the first and
-    -- bob takes 3 poison instead of 4.
-    --
-    -- The same two casts grant flying twice, which CR 702.9c DOES make
-    -- redundant: the Stalker simply flies, and bob (with no creatures) is not
-    -- blocking either way.
-    Spec.it s "CR 702.164b two Aspirant's Ascents make Branchblight Stalker toxic 4" $ do
-      stalker <- S.printingOf s registry "Branchblight Stalker"
-      island <- S.printingOf s registry "Island"
-      ascent <- S.printingOf s registry "Aspirant's Ascent"
-      let (gs0, attackers, _) = S.combatBoardOf [stalker] []
-      case attackers of
-        [] -> Spec.assertFailure s "fixture should have an attacker"
-        attacker : _ -> do
-          let withIsland g = snd (S.addPermanent island S.alice g)
-              castAscent g =
-                let (oid, g1) = S.addHandCard ascent S.alice g
-                    g2 = g1 {GameState.priority = Just S.alice}
-                 in S.runPure S.identityAnswer g2 (S.cast S.alice oid Monad.>> Stack.resolveTop)
-              gs = castAscent (castAscent (withIsland (withIsland gs0)))
-              after = S.fightWith S.aggressiveAnswer gs
-          Spec.assertEqWith s "toxic 2 plus toxic 1 twice" (Projection.totalToxic attacker gs) 4
-          Spec.assertBool s (Projection.hasKeyword Keyword.Flying attacker gs) "CR 702.9c: two flying grants still just fly"
-          Spec.assertEqWith s "bob has four poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 4
-          Spec.assertEqWith s "and took the 3/1 Stalker's twice-pumped five damage" (S.lifeOf S.bob after) (Just 15)
 
     -- CR 615.6: a prevented event never happens, so no combat damage was
     -- "dealt to a player" for CR 120.3g to hang poison off. The falsifier is a
@@ -795,32 +705,6 @@ lastKnownRiderSpec s registry =
           Spec.assertEqWith s "no Collar, no life" (S.lifeOf S.alice without) (Just 20)
           Spec.assertEqWith s "no Collar, no lifelink rider" (fmap DamageEvent.dealtByLifelink (eventOf without)) (Just Nothing)
           Spec.assertEqWith s "no Collar, no deathtouch rider" (fmap DamageEvent.dealtByDeathtouch (eventOf without)) (Just False)
-
-    -- CR 613.1b, the half the test above cannot see: alice both OWNS and
-    -- controls her Fire-Eater, so LastKnown.controller and Object.owner give the
-    -- same answer there and a reader that took the owner would pass. Here bob
-    -- owns it and alice has stolen it, so CR 702.15b's "that source's
-    -- CONTROLLER" pays the thief -- and the record has to keep control
-    -- separately from the characteristics, which is why LastKnown does (CR 109.3
-    -- says control is not a characteristic).
-    Spec.it s "CR 702.15b/613.1b a stolen Fire-Eater's lifelink pays the THIEF, not its owner" $ do
-      ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
-      basiliskCollar <- S.printingOf s registry "Basilisk Collar"
-      case Face.activatedAbilities (S.combinedFace ghituFireEater) of
-        [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
-        ability : _ -> do
-          let (srcId, g0) = S.addPermanent ghituFireEater S.bob (Setup.emptyGame S.bothPlayers)
-              (collarId, g1) = S.addPermanent basiliskCollar S.alice g0
-              equipped = S.attach collarId srcId g1
-              stolen = (S.giveControl srcId S.alice equipped) {GameState.priority = Just S.alice}
-              after = S.runPure pingsBob stolen (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-              rider = fmap DamageEvent.dealtByLifelink (List.find (\ev -> DamageEvent.source ev == srcId) (S.damageEventsOf after))
-          Spec.assertEqWith s "bob owns it" (fmap Object.owner (Game.lookupObject srcId stolen)) (Just S.bob)
-          Spec.assertEqWith s "but alice controls it as it is sacrificed" (Projection.controllerOf srcId stolen) (Just S.alice)
-          Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId after)) "and by resolution its id names nothing"
-          Spec.assertEqWith s "the rider names the thief" rider (Just (Just S.alice))
-          Spec.assertEqWith s "so alice gained the 2" (S.lifeOf S.alice after) (Just 22)
-          Spec.assertEqWith s "and its owner gained nothing" (S.lifeOf S.bob after) (Just 18)
 
     -- The fallback is only a fallback: CR 608.2h's FIRST clause uses current
     -- information while the source is where it is expected to be, and only its
@@ -1481,38 +1365,6 @@ worldRuleSpec s registry =
       -- rule buried the OLD one rather than the new arrival.
       Spec.assertEqWith s "and the four Forests are creatures now" (length (filter (\oid -> Projection.isCreatureOf oid after) (Set.toList (GameState.battlefield after)))) 4
 
-    -- THE discriminating board for CR 704.5k's clock: a permanent that entered
-    -- EARLIER but became world LATER. The Forest was on the battlefield first and
-    -- the Living Plane second, so the entry timestamp says the Living Plane has
-    -- been world for the shortest time -- and the rule says the Forest has, since
-    -- it only became world when the Charter resolved. The two readings pick
-    -- opposite survivors, so both assertions flip if the clock goes back to
-    -- Object.timestamp.
-    --
-    -- Synthetic World Charter ("Target permanent becomes world until end of turn",
-    -- CR 205.4a, CR 613.1d) is the producer: no printing grants or removes the
-    -- world supertype.
-    Spec.it s "CR 704.5k the clock is when it became world, not when it entered" $ do
-      (_, livingPlane) <- worldPair s registry
-      forest <- S.printingOf s registry "Forest"
-      charter <- S.printingOf s registry "Synthetic World Charter"
-      let (old, g0) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
-          -- Two more Forests, which is the Charter's {1}{G}.
-          (_, g1) = S.addPermanent forest S.alice g0
-          (_, g2) = S.addPermanent forest S.alice g1
-          (plane, g3) = S.addPermanent livingPlane S.alice g2
-          (g4, spell) = S.handOne charter g3
-          -- The Living Plane is stamped on this settle; the Forest is not world
-          -- yet, so nothing is buried.
-          settled = S.runPure S.identityAnswer g4 Engine.settleForPriority
-          resolved = S.runPure (aimedAt old) settled (S.cast S.alice spell >> Stack.resolveTop)
-          after = S.runPure S.identityAnswer resolved Engine.settleForPriority
-      -- Without this the whole group could pass on a Charter that grants nothing:
-      -- one world permanent is no rule at all.
-      Spec.assertBool s (Set.member Supertype.World (PC.supertypes (Projection.project old resolved))) "the Charter really did make the Forest world"
-      Spec.assertBool s (inPlay old after) "the Forest became world last, so it survives"
-      Spec.assertBool s (not (inPlay plane after)) "the Living Plane has been world longer, so it is buried"
-
     -- CR 704.5k's second sentence: "in the event of a tie for the shortest amount
     -- of time, all are put into their owners' graveyards." Two permanents that
     -- become world in the SAME settle pass share one stamp and so tie.
@@ -1958,7 +1810,7 @@ trampleSpec s registry =
     Spec.it s "CR 702.19b a non-trample control spills nothing" $ do
       -- Ogre Sentry is a 3/3 that cannot attack (defender), so use the Piker's
       -- existing behavior as the control: a blocked non-trample attacker deals
-      -- nothing to the player. (combatDamageSpec already asserts bob = 20.)
+      -- nothing to the player.
       piker <- S.printingOf s registry "Goblin Piker"
       let (gs, _, _) = S.combatBoardOf [piker] [piker]
           after = S.fightWith tramplingAnswer gs
@@ -2124,7 +1976,7 @@ boltBlockerMidCombat blocks bolt blocker gs =
 -- Both end at the same observable: the attacker assigns no combat damage at all
 -- (CR 510.1c), so the defending player takes nothing. Reading emptiness as
 -- unblocked -- the bug this group pins -- lets the attacker through instead.
-blockedStaysBlockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blockedStaysBlockedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 blockedStaysBlockedSpec s registry =
   Spec.describe s "Blocked stays blocked (CR 509.1h)" $ do
     Spec.it s "CR 510.1c a blocker Bolted after blocks are declared leaves the attacker blocked, so the defender takes nothing" $ do
@@ -2148,36 +2000,6 @@ blockedStaysBlockedSpec s registry =
           Spec.assertEqWith s "so bob takes nothing" (S.lifeOf S.bob after) (Just 20)
           Spec.assertBool s (not (Combat.isBlocked attacker unblocked)) "unblocked control leg: not blocked"
           Spec.assertEqWith s "unblocked control leg: bob takes the Piker's 2" (S.lifeOf S.bob unblocked) (Just 18)
-        _ -> Spec.assertFailure s "fixture did not build an attacker and a blocker"
-
-    Spec.it s "CR 701.19a a blocker that regenerates is removed from combat, and the attacker is STILL blocked" $ do
-      -- Drudge Skeletons blocks, then regenerates off alice's Bolt. CR 701.19a's
-      -- rewrite ends with "If it's an attacking or blocking creature, remove it
-      -- from combat," so unlike the destroyed blocker above this one is still on
-      -- the battlefield and is genuinely removed from combat rather than merely
-      -- dead. The shield is seeded rather than activated: what is under test is
-      -- CR 509.1h, and bob paying {B} for his own ability is ActivateSpec's
-      -- subject.
-      piker <- S.printingOf s registry "Goblin Piker"
-      mountain <- S.printingOf s registry "Mountain"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
-      let (board, mine, theirs) = S.combatBoardOf [piker] [drudgeSkeletons]
-          (_, withLand) = S.addPermanent mountain S.alice board
-          (bolt, gs0) = S.addHandCard lightningBolt S.alice withLand
-      case (mine, theirs) of
-        (attacker : _, blocker : _) -> do
-          let after = boltBlockerMidCombat True bolt blocker (S.addRegenShield blocker gs0)
-          Spec.assertBool s (Set.member blocker (GameState.battlefield after)) "CR 701.19a: the Skeletons survived the Bolt"
-          Spec.assertEqWith s "CR 701.19a: and its damage was removed" (S.damageOf blocker after) (Just 0)
-          Spec.assertEqWith s "CR 506.4: it is no longer blocking anything" (Combat.blockersOf attacker after) Set.empty
-          Spec.assertBool s (Combat.isBlocked attacker after) "CR 509.1h: but the attacker remains blocked"
-          Spec.assertEqWith s "CR 510.1c: so it assigns no combat damage and bob takes nothing" (S.lifeOf S.bob after) (Just 20)
-          Spec.assertEqWith s "CR 510.1d: and the regenerated blocker assigns nothing back" (S.damageOf attacker after) (Just 0)
-          -- The Bolt's own 3 is in the history too, so this filters to combat
-          -- damage: what must be absent is the attacker hitting a creature the
-          -- rules say is no longer blocking it (CR 510.1c).
-          Spec.assertEqWith s "and no COMBAT damage was addressed to it either" (filter (\ev -> DamageEvent.kind ev == DamageKind.Combat) (damageEventsTo blocker after)) []
         _ -> Spec.assertFailure s "fixture did not build an attacker and a blocker"
 
 -- The mirror of killBlockerMidCombat: the ATTACKER is gone by the combat damage
@@ -2272,40 +2094,7 @@ departedAttackerSpec s registry =
       Spec.assertEqWith s "no assignment names the departed attacker" (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature attacker) assignedAfter) []
       Spec.assertEqWith s "and with alice still in the game the blocker's hit is assigned -- the filter is what did it" (fmap DamageEvent.amount (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature attacker) assignedBefore)) [2]
 
--- CR 800.4e: "If combat damage would be assigned to a player who has left the
--- game, that damage isn't assigned." attackerAssignment reads the defender's
--- status at two independent sites -- the unblocked/trample-through toDefender
--- list, and the CR 702.19b threshold map the assignment prompt offers -- and
--- both need coverage.
---
--- S.identityAnswer's AssignCombatDamage arm dumps the WHOLE amount onto the
--- first CREATURE recipient it finds (Support.hs), never a player one, so it
--- cannot tell whether a ToPlayer entry is present in the threshold map at all:
--- guarded or not, a blocked trampler's excess lands on the blocker either way
--- under that answerer. It is fine for the unblocked path (no prompt is ever
--- issued there), but the trample threshold map needs an answerer that actually
--- spends the excess on a player recipient when one is offered.
--- defenderOrBlockerAnswer assigns each blocker exactly its threshold and routes
--- the leftover to a player recipient if the threshold map offers one, falling
--- back onto the blocker (over-lethal, still legal -- a threshold is a floor and
--- Damage.tiersCleared has no upper bound) when it does not. That is what actually
--- surfaces whether the departed defender was offered.
-defenderOrBlockerAnswer :: Prompt.Prompt r -> r
-defenderOrBlockerAnswer p = case p of
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    let blockerEntries = Map.toList (Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds)
-        toBlockers = Map.fromList blockerEntries
-        spent = sum (fmap snd blockerEntries)
-        leftover = if n >= spent then n - spent else 0
-        defenders = filter (not . S.isCreatureRecipient) (Map.keys thresholds)
-     in case defenders of
-          d : _ -> Map.insert d leftover toBlockers
-          [] -> case blockerEntries of
-            (r, _) : _ -> Map.insertWith (+) r leftover toBlockers
-            [] -> toBlockers
-  _ -> S.aggressiveAnswer p
-
-departedDefenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+departedDefenderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedDefenderSpec s registry =
   Spec.describe s "Departed defender (CR 800.4e)" $ do
     Spec.it s "CR 800.4e no combat damage is assigned to a player who has left the game" $ do
@@ -2352,98 +2141,9 @@ departedDefenderSpec s registry =
       Spec.assertEqWith s "and with bob still in the game the same board assigns one hit -- the guard is what did it" (length assignedBefore) 1
       Spec.assertEqWith s "to bob" (fmap DamageEvent.target assignedBefore) [Recipient.ToPlayer S.bob]
 
-    Spec.it s "CR 800.4e a departed defender is not offered as a trample recipient either" $ do
-      -- CR 702.19b assigns trample's excess "as its controller chooses", and the
-      -- defending player is one of the choices Prompt.AssignCombatDamage offers.
-      -- CR 800.4e removes the damage, so the choice must not be offered: an
-      -- assignment the engine then discards would silently take damage away from
-      -- the blockers it could otherwise have gone to.
-      --
-      -- CAROL is the defender and the one who leaves, and BOB's Piker blocks, so
-      -- the blocker survives the departure and the board stays in the prompt arm.
-      -- (Making the defender the blocker's controller would work too, right up
-      -- to the point where CR 800.4a's first clause removes their blocker and
-      -- the board falls out of that arm entirely.) War Mammoth is a 3/3 with
-      -- trample; the Piker is a 2/1, so there is excess and a real choice.
-      --
-      -- S.identityAnswer is not the discriminating answerer here (see the
-      -- group comment above): it never picks a player recipient, so a blocked
-      -- trampler's excess lands on the blocker whether the defender is offered
-      -- or not. defenderOrBlockerAnswer is used for both legs instead.
-      warMammoth <- S.printingOf s registry "War Mammoth"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (attacker, b1) = S.addPermanent warMammoth S.alice S.threePlayerGame
-          (blocker, b2) = S.addPermanent piker S.bob b1
-          attacking =
-            b2
-              { GameState.combat =
-                  Combat.Type.MkCombat
-                    { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.carol),
-                      Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
-                      Combat.Type.struckFirst = Nothing,
-                      Combat.Type.attackedUnder = Map.singleton attacker S.carol,
-                      Combat.Type.attackedControlledBy = Map.empty,
-                      Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
-                      Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.carol),
-                      Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.carol),
-                      Combat.Type.declaredAttackedBy = Map.singleton S.alice (Set.singleton (AttackTarget.OfPlayer S.carol)),
-                      -- Empty, because this board stands after the declare attackers
-                      -- step ended: CR 500.1 scopes this half to the step, and
-                      -- Combat.clearAttackedThisStep empties it as one ends.
-                      Combat.Type.declaredAttackedThisStep = Set.empty,
-                      -- CR 508.1a / 509.1a: this board is hand-built rather
-                      -- than declared, so nothing was declared on it.
-                      Combat.Type.declaredAttackers = Set.empty,
-                      Combat.Type.declaredBlockers = Set.empty,
-                      Combat.Type.blockersDeclared = True,
-                      Combat.Type.attackingNothing = Set.empty,
-                      Combat.Type.blockingNothing = Set.empty,
-                      Combat.Type.removedDefending = Map.empty,
-                      Combat.Type.defenders = [S.carol]
-                    }
-              }
-          gone = S.departs Departure.Type.Conceded S.carol attacking
-          (assignedAfter, _) = S.runPureWith defenderOrBlockerAnswer gone (Damage.gatherCombatDamage (const True))
-          (assignedBefore, _) = S.runPureWith defenderOrBlockerAnswer attacking (Damage.gatherCombatDamage (const True))
-      Spec.assertBool s (Maybe.isJust (Game.lookupObject blocker gone)) "the blocker survived carol's departure, so the board is still in the prompt arm"
-      Spec.assertBool s (notElem (Recipient.ToPlayer S.carol) (fmap DamageEvent.target assignedAfter)) "no assignment names the departed defender"
-      Spec.assertEqWith s "all three points land on the blocker instead" (fmap DamageEvent.amount (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature blocker) assignedAfter)) [3]
-      Spec.assertBool s (Maybe.isJust (List.find (\ev -> DamageEvent.target ev == Recipient.ToPlayer S.carol) assignedBefore)) "with carol still in the game the threshold map DOES offer her -- the guard is what did it"
-
--- Grant deathtouch to `oid` the way Serpent's Gift does: a stored continuous
--- effect over just that object. Timestamp is arbitrary (no competing layer-6
--- effect in these fixtures).
-grantDeathtouch :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-grantDeathtouch oid gs =
-  let eff =
-        ContinuousEffect.MkContinuousEffect
-          { ContinuousEffect.source = ObjectId.MkObjectId 997,
-            ContinuousEffect.timestamp = Timestamp.MkTimestamp 500,
-            ContinuousEffect.expiry = Expiry.Type.AtCleanup,
-            ContinuousEffect.modification = Modification.GainKeyword Keyword.Deathtouch,
-            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-          }
-   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
-
-trampleDeathtouchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+trampleDeathtouchSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 trampleDeathtouchSpec s registry =
   Spec.describe s "TrampleDeathtouch" $ do
-    Spec.it s "CR 702.2c a deathtouch-granted trampler needs only 1 on the blocker, spilling the rest" $ do
-      -- War Mammoth (3/3 trample) GRANTED deathtouch into Ogre Sentry (3/3):
-      -- lethal collapses to 1, so 1 to the Ogre and 2 tramples to bob; the Ogre
-      -- still dies (704.5h, via the deal-time bit). Real cards replace M2c's
-      -- synthetic deathtrampler.
-      warMammoth <- S.printingOf s registry "War Mammoth"
-      ogreSentry <- S.printingOf s registry "Ogre Sentry"
-      let (gs0, mammoths, _) = S.combatBoardOf [warMammoth] [ogreSentry]
-          mammothId = case mammoths of
-            m : _ -> m
-            [] -> ObjectId.MkObjectId 999
-          gs = grantDeathtouch mammothId gs0
-          after = S.settleSba (S.fightWith tramplingAnswer gs)
-      Spec.assertEqWith s "bob took the 2 overflow" (S.lifeOf S.bob after) (Just 18)
-      Spec.assertEqWith s "the Ogre is dead" (S.creaturesInPlay S.bob after) 0
-
     Spec.it s "CR 702.19b the control: plain trample into the same 3/3 spills nothing" $ do
       -- War Mammoth (3/3 trample, NO deathtouch) into Ogre Sentry (3/3): lethal
       -- is 3, all 3 go to the Ogre, 0 tramples. Only deathtouch changes the spill.
@@ -2748,14 +2448,6 @@ excessDamageSpec s registry = Spec.describe s "ExcessDamage" $ do
     Spec.assertEqWith s "CR 120.6: 1 was lethal, so 1 is what is marked" (S.damageOf pikerId after) (Just 1)
     Spec.assertEqWith s "and the spell's controller took none of it" (S.lifeOf S.alice after) (S.lifeOf S.alice before)
     Spec.assertBool s (not (S.onBattlefield pikerId (S.settleSba after))) "CR 704.5g: 1 is still lethal to a 2/1"
-  Spec.it s "CR 120.4a nothing is excess on an undamaged Wall of Stone, so nothing is redirected" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    flameSpill <- S.printingOf s registry "Flame Spill"
-    wall <- S.printingOf s registry "Wall of Stone"
-    let (wallId, before, after) = spillBoard mountain flameSpill wall (\_ gs -> gs)
-    Spec.assertEqWith s "CR 120.4a: 4 is under the 0/8's bar, so bob loses nothing" (S.lifeOf S.bob after) (S.lifeOf S.bob before)
-    Spec.assertEqWith s "and all 4 are marked on the Wall" (S.damageOf wallId after) (Just 4)
-    Spec.assertBool s (S.onBattlefield wallId (S.settleSba after)) "CR 704.5g: 4 is not lethal to a 0/8"
   -- CR 120.4a's last clause: "if the first permanent has multiple card types
   -- from among the list of creature, planeswalker, and battle, the excess damage
   -- is the greatest of the calculated amounts for each of the card types it
@@ -2915,7 +2607,7 @@ protectionSpec s registry = Spec.describe s "Protection" $ do
 -- lets the Nemesis (3/1) take a lethal 2 without a state-based pass deciding the
 -- case: the MARKS are what discriminate, and CR 615.6 leaves none where the
 -- shield fired.
-trueNameNemesisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+trueNameNemesisSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 trueNameNemesisSpec s registry =
   let noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       -- alice casts the Nemesis off three Islands on a three-seat board and
@@ -2963,62 +2655,6 @@ trueNameNemesisSpec s registry =
                 (Just S.bob, Just S.carol)
             _ -> Spec.assertFailure s "the Nemesis did not reach the battlefield"
 
-        -- CR 702.16k's damage clause against a DEPARTED source. bob owns the
-        -- Fire-Eater, carol has stolen it, and its cost sacrifices it. CR 113.7a
-        -- and 608.2h make the source the object as it most recently existed --
-        -- carol's -- so the owner clause does not reach it, as CR 702.15b pays
-        -- the thief in "a stolen Fire-Eater's lifelink pays the THIEF" above. The
-        -- falsifier is a shield reading the card in bob's graveyard, where CR
-        -- 108.4a would answer bob.
-        Spec.it s "CR 702.16k/113.7a a stolen Fire-Eater sacrificed at a Nemesis naming its owner still deals its damage" $ do
-          nemesis <- S.printingOf s registry "True-Name Nemesis"
-          island <- S.printingOf s registry "Island"
-          ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
-          case (castNemesis nemesis island S.bob, Face.activatedAbilities (S.combinedFace ghituFireEater)) of
-            (Just (gs, nemesisId), ability : _) -> do
-              let (srcId, owned) = S.addPermanent ghituFireEater S.bob gs
-                  stolen = (S.giveControl srcId S.carol owned) {GameState.priority = Just S.carol}
-                  atNemesis :: Prompt.Prompt r -> r
-                  atNemesis p = case p of
-                    Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just nemesisId) sets
-                    _ -> S.identityAnswer p
-                  after = S.runPure atNemesis stolen (Activate.activateAbility S.carol srcId ability Monad.>> Stack.resolveTop)
-                  dealt = [DamageEvent.amount ev | ev <- S.damageEventsOf after, DamageEvent.source ev == srcId, Recipient.objectOf (DamageEvent.target ev) == Just nemesisId]
-              Spec.assertEqWith s "bob owns it" (fmap Object.owner (Game.lookupObject srcId stolen)) (Just S.bob)
-              Spec.assertEqWith s "carol controls it as it is sacrificed" (Projection.controllerOf srcId stolen) (Just S.carol)
-              Spec.assertEqWith s "and the Nemesis named bob" (Game.lookupObject nemesisId stolen >>= Object.chosenPlayer) (Just S.bob)
-              Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId after)) "by resolution the source's id names nothing"
-              Spec.assertEqWith s "CR 113.7a the thief's departed Fire-Eater dealt its 2 to the Nemesis" dealt [2]
-            _ -> Spec.assertFailure s "the Nemesis did not reach the battlefield, or the Fire-Eater has no ability"
-
--- Fill every target slot with whichever of the two named permanents that slot's
--- own filter admits. Prey Upon's slots are disjointly filtered by controller, so
--- one predicate over both ids aims each slot at exactly one candidate.
-aimedAtEither :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAtEither a b p = case p of
-  Prompt.ChooseTargets _ _ _ sets ->
-    S.preferring (\r -> Recipient.objectOf r == Just a || Recipient.objectOf r == Just b) sets
-  _ -> S.identityAnswer p
-
--- alice holds Prey Upon over one Forest, controls a Goblin Piker and faces bob's
--- Hill Giant, returned as (the board, the spell in hand, alice's fighter, bob's).
---
--- The two bodies are chosen so every reading of CR 701.14a produces a different
--- board. The powers differ (2 against 3) so a fight that ran one blow twice, or
--- swapped the dealers, reads wrong; the toughnesses differ (1 against 3) so
--- exactly one creature dies, and WHICH one is the rule's answer rather than a
--- coincidence. Two 2/2s could not tell any of that apart.
-preyBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
-preyBoard s registry = do
-  prey <- S.printingOf s registry "Prey Upon"
-  forest <- S.printingOf s registry "Forest"
-  piker <- S.printingOf s registry "Goblin Piker"
-  giant <- S.printingOf s registry "Hill Giant"
-  let (g0, spell) = S.handOne prey (S.landsInPlay forest 1)
-      (mine, g1) = S.addPermanent piker S.alice g0
-      (theirs, g2) = S.addPermanent giant S.bob g1
-  pure (g2, spell, mine, theirs)
-
 -- CR 701.14, through Prey Upon: "target creature you control fights target
 -- creature you don't control". The whole card is the keyword action, which is
 -- why it is the producer -- Wolverine, Fierce Fighter drags CR 701.69's heal in
@@ -3028,34 +2664,6 @@ preyBoard s registry = do
 -- combat damage, and this module owns the damage funnel.
 fightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
-  -- CR 701.14d: "the damage dealt when a creature fights ISN'T COMBAT DAMAGE."
-  --
-  -- Read through a Fog-shaped shield -- CR 615.1's prevention, scoped to
-  -- DamageKind.Combat and to no recipient in particular -- so the rule is a
-  -- board on which combat damage cannot land and the fight's damage does anyway.
-  -- THE PAIR with cr-701-14b-one-illegal-target-and-neither-creature-deals.json,
-  -- differing only in that shield: every number below is the same one it
-  -- asserts.
-  Spec.it s "CR 701.14d fight damage is not combat damage, so a combat-only prevention misses it" $ do
-    (base, spell, mine, theirs) <- preyBoard s registry
-    let shield =
-          ActiveReplacement.MkActiveReplacement
-            { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
-              ActiveReplacement.source = theirs,
-              ActiveReplacement.controller = S.alice,
-              ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
-              ActiveReplacement.expiry = Expiry.Type.AtCleanup,
-              ActiveReplacement.uses = Uses.Unlimited,
-              ActiveReplacement.origin = ReplacementOrigin.Other,
-              ActiveReplacement.condition = Nothing,
-              ActiveReplacement.rider = Nothing,
-              ActiveReplacement.slots = Map.empty
-            }
-        before = S.addReplacement shield base
-        after = S.settleSba (S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell >> Stack.resolveTop))
-    Spec.assertEqWith s "CR 701.14d the Piker's 2 still landed on the Giant" (S.damageOf theirs after) (Just 2)
-    Spec.assertBool s (not (S.onBattlefield mine after)) "CR 701.14d and the Giant's 3 still killed the Piker"
-
   -- CR 701.14c: "if a creature fights itself, it deals damage to itself equal to
   -- twice its power". ONE blow of 2P, not two of P.
   --
@@ -3195,38 +2803,6 @@ dealtDamageThisTurnSpec s registry =
           Spec.assertBool s (Set.member hurtId (GameState.battlefield board)) "CR 704.5g: 1 is not lethal to a 3/3, so it is still there to target"
           Spec.assertBool s (Set.member wholeId (GameState.battlefield board)) "and its twin is on the battlefield too, undamaged"
         _ -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability, and Fatal Blow a 'target' slot"
-
-    -- The board Object.damage cannot answer, and the rules question the issue
-    -- names. CR 120.6: "All damage marked on a permanent is removed when it
-    -- regenerates" -- so a regenerated Uthden Troll carries no marks and was
-    -- still dealt damage this turn. A marks-reading implementation offers
-    -- nothing here; the log reading offers the Troll.
-    Spec.it s "CR 120.6 a regenerated creature carries no marked damage and is still a legal target" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      uthdenTroll <- S.printingOf s registry "Uthden Troll"
-      bolt <- S.printingOf s registry "Lightning Bolt"
-      fatalBlow <- S.printingOf s registry "Fatal Blow"
-      case (Face.activatedAbilities (S.combinedFace uthdenTroll), S.spellTargetSlot fatalBlow) of
-        (regenerate : _, Just theSlot) -> do
-          let (hurtId, gs1) = S.addPermanent uthdenTroll S.alice (S.landsInPlay mountain 2)
-              (wholeId, gs2) = S.addPermanent uthdenTroll S.alice gs1
-              -- {R}: Regenerate this creature -- really activated, so the shield
-              -- comes from the card rather than from a fixture.
-              armed = S.runPure S.identityAnswer gs2 (do Activate.activateAbility S.alice hurtId regenerate; Stack.resolveTop)
-              (withBolt, boltId) = S.handOne bolt armed
-              cast = S.runPure (aimedAt hurtId) withBolt (S.cast S.alice boltId)
-              -- 3 damage to a 2/2 is lethal (CR 704.5g); CR 701.19a's shield
-              -- replaces the destruction and removes the marks.
-              board = S.settleSba (S.runPure (aimedAt hurtId) cast Stack.resolveTop)
-          Spec.assertEqWith
-            s
-            "CR 120.1 / 120.6: the regenerated Troll is the only legal target"
-            (Set.toList (Target.legalRecipients Nothing S.noSource theSlot board))
-            [Recipient.ToCreature hurtId]
-          Spec.assertEqWith s "CR 120.6: and it carries NO marked damage, so Object.damage cannot be what answered" (S.damageOf hurtId board) (Just 0)
-          Spec.assertBool s (Set.member hurtId (GameState.battlefield board)) "CR 701.19a: the shield saved it"
-          Spec.assertBool s (Set.member wholeId (GameState.battlefield board)) "and its twin, which nothing damaged, is standing too"
-        _ -> Spec.assertFailure s "Uthden Troll should print an activated ability, and Fatal Blow a 'target' slot"
 
     -- A FENCE rather than a proof of the log reading: what it holds is that the
     -- atom is turn-scoped at all, Engine.beginTurnOf clearing the event log at

@@ -1,0 +1,200 @@
+{
+  "description": "CR 601.2f one other spell takes only {3} off, and that does not pay",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Glistener Elf",
+            "label": "glistener-elf",
+            "ready": true
+          },
+          {
+            "card": "Thrasta, Tempest's Roar",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$glistener-elf",
+          "mana": [
+            "$forest",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility Forest#2",
+            "ActivateManaAbility Forest#3",
+            "ActivateManaAbility Forest#4",
+            "ActivateManaAbility Forest#5",
+            "ActivateManaAbility Forest#6",
+            "ActivateManaAbility Forest#7",
+            "ActivateManaAbility Forest#8",
+            "ActivateManaAbility Forest#9"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Glistener Elf",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Glistener Elf",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Glistener Elf",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Glistener Elf",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Glistener Elf",
+        "power": 1,
+        "toughness": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#2",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#3",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#4",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#5",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#6",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#7",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#8",
+        "tapped": false
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Forest#9",
+        "tapped": false
+      }
+    }
+  ]
+}

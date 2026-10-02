@@ -1,0 +1,67 @@
+{
+  "description": "CR 612.6 the Shapeshifter has the full text of the top card of its controller's graveyard (the ping)",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "manaPool": "UU",
+        "battlefield": [
+          {
+            "card": "Volrath's Shapeshifter",
+            "label": "shifter",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Prodigal Sorcerer"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ogre Sentry",
+            "label": "sentry"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$shifter",
+          "ability": 0,
+          "targets": [
+            "$bob"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 19
+        }
+      }
+    }
+  ]
+}

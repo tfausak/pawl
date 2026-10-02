@@ -1,0 +1,283 @@
+{
+  "description": "CR 611.1 the until-end-of-turn prohibition outlives the phase it ended",
+  "note": "Reached by moves: alice's Piker attacks and bob's blocks, alice animates Jade Statue (3/6 Golem until end of combat), bob casts a Burst Lightning at alice, and alice casts Mandate of Peace over it in the declare blockers step. In the postcombat main phase alice is still offered her Burst Lightning and bob is not offered his.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "attacker",
+            "ready": true
+          },
+          {
+            "card": "Jade Statue",
+            "label": "jade"
+          },
+          {
+            "card": "Plains",
+            "label": "plains1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains3"
+          },
+          {
+            "card": "Plains",
+            "label": "plains4"
+          },
+          {
+            "card": "Mountain",
+            "label": "amountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mandate of Peace",
+            "label": "mandate"
+          },
+          {
+            "card": "Burst Lightning",
+            "label": "hers"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "blocker",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "bmountain1"
+          },
+          {
+            "card": "Mountain",
+            "label": "bmountain2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Burst Lightning",
+            "label": "his"
+          },
+          {
+            "card": "Burst Lightning",
+            "label": "stacked"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$attacker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$blocker": [
+            "$attacker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$jade",
+          "mana": [
+            "$plains1",
+            "$plains2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$stacked",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$bmountain1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$mandate",
+          "mana": [
+            "$plains3",
+            "$plains4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $hers",
+            "ActivateManaAbility $amountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "ActivateManaAbility $bmountain2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "refuse": {
+        "Cast": {
+          "object": "$his",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$bmountain2",
+            null
+          ]
+        }
+      }
+    }
+  ]
+}

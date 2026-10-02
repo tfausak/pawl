@@ -1,0 +1,103 @@
+{
+  "description": "CR 118.7e a cast the gate allows is one both halves can pay",
+  "note": "Two Swamps cannot pay Khabál Ghoul's printed {2}{B}; Synthetic Monocolored Hybrid Discount's {2/B} reduction makes the cast offered, and taking it as {2} leaves {B}, so one Swamp is tapped.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "s1"
+          },
+          {
+            "card": "Swamp",
+            "label": "s2"
+          },
+          {
+            "card": "Synthetic Monocolored Hybrid Discount"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Sol Ring"
+          },
+          {
+            "card": "Khabál Ghoul",
+            "label": "ghoul"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseReductionHalf",
+          "with": {
+            "type": "Generic",
+            "value": 2
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ghoul",
+          "mana": [
+            "$s1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Khabál Ghoul"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$s1",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$s2",
+          "tapped": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "description": "CR 612.1 the swap reaches the word the shield's RECIPIENT predicate names",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Pack Leader",
+            "label": "leader",
+            "ready": true
+          },
+          {
+            "card": "Ainok Tracker",
+            "label": "dog",
+            "ready": true
+          },
+          {
+            "card": "Pouncing Cheetah",
+            "label": "cat",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i1"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Artificial Evolution",
+            "label": "evo"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "giant",
+            "ready": true
+          },
+          {
+            "card": "Jedit Ojanen",
+            "label": "jedit",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$evo",
+          "mana": [
+            "$i1"
+          ],
+          "targets": [
+            "$leader"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTypeSwap": {
+          "from": {
+            "type": "Dog"
+          },
+          "to": {
+            "type": "Cat"
+          }
+        }
+      },
+      "source": "Artificial Evolution"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$leader",
+          "$dog",
+          "$cat"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $leader"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$giant": [
+            "$cat"
+          ],
+          "$jedit": [
+            "$dog"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$cat",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Ainok Tracker",
+          "count": 1
+        }
+      }
+    }
+  ],
+  "note": "The Pack Leader test of this name (the Synthetic Warding Chant test of the same name is its own file). alice's Artificial Evolution swaps Dog for Cat on Pack Leader before it attacks with her Dog (Ainok Tracker) and Cat (Pouncing Cheetah); the trigger's shield then covers Cats. bob's Hill Giant blocks the Cat, whose 3 is prevented (0 marked); his Jedit Ojanen blocks the Dog, whose 5 lands and kills it. The --control file casts no Evolution: the Dog takes none and the Cat dies."
+}

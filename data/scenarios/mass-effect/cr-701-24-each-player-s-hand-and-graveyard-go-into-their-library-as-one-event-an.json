@@ -1,0 +1,518 @@
+{
+  "description": "CR 701.24 each player's hand and graveyard go into their library as ONE event and ONE shuffle, then each draws seven",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          },
+          {
+            "card": "Timetwister",
+            "label": "timetwister",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Lightning Bolt"
+          }
+        ],
+        "library": [
+          {
+            "card": "Forest",
+            "label": "forest"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-5"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-6"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-7"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-8"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-9"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Dutiful Knowledge Seeker",
+            "label": "dutiful-knowledge-seeker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Lightning Bolt"
+          },
+          {
+            "card": "Island"
+          }
+        ],
+        "library": [
+          {
+            "card": "Forest",
+            "label": "forest-10"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-11"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-12"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-13"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-14"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-15"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-16"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-17"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "graveyard": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Lightning Bolt"
+          }
+        ],
+        "library": [
+          {
+            "card": "Forest",
+            "label": "forest-18"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-19"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-20"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-21"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-22"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-23"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-24"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-25"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-26"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-27"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            "$forest-5",
+            "$forest-6",
+            "$forest-7",
+            "$forest-8",
+            "$forest-9",
+            "Goblin Piker",
+            "Lightning Bolt#2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
+            "$forest-10",
+            "$forest-11",
+            "$forest-12",
+            "$forest-13",
+            "$forest-14",
+            "$forest-15",
+            "$forest-16",
+            "$forest-17",
+            "Lightning Bolt",
+            "Goblin Piker#2",
+            "Goblin Piker#3",
+            "Lightning Bolt#3",
+            "Island#4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "Shuffle",
+          "with": [
+            "$forest-18",
+            "$forest-19",
+            "$forest-20",
+            "$forest-21",
+            "$forest-22",
+            "$forest-23",
+            "$forest-24",
+            "$forest-25",
+            "$forest-26",
+            "$forest-27",
+            "Goblin Piker#4",
+            "Lightning Bolt#4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$timetwister",
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "$dutiful-knowledge-seeker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Forest",
+        "count": 7
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Timetwister",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Timetwister",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Forest",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Lightning Bolt",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Forest",
+        "count": 7
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Island",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Forest",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Island",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Library",
+        "card": "Lightning Bolt",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Hand",
+        "card": "Forest",
+        "count": 7
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Graveyard",
+        "card": "Lightning Bolt",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Library",
+        "card": "Forest",
+        "count": 3
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "carol",
+        "zone": "Library",
+        "card": "Lightning Bolt",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$island-3",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$dutiful-knowledge-seeker",
+        "power": 3,
+        "toughness": 3
+      }
+    }
+  ]
+}

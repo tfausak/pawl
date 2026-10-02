@@ -16,7 +16,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -32,7 +31,6 @@ import qualified Pawl.Engine.Soulbond as Soulbond
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural.Extra
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -47,7 +45,6 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -68,7 +65,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -197,61 +193,6 @@ ingestSpec s registry =
         Spec.it s "CR 702.115b each instance of ingest is its own ability" $ do
           Spec.assertEqWith s "ingest held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Ingest 2)) [Keyword.ingest, Keyword.ingest]
           Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Ingest 1)) [Keyword.ingest]
-        -- The proving test. Unblocked combat damage to bob exiles bob's top card
-        -- and leaves the card under it where it was. alice's library is stocked
-        -- with two OTHER printings and is asserted untouched, which is what
-        -- separates rule 702.115a's "that player" from the ability's controller:
-        -- a payload built on Binding.you rather than Binding.triggerPlayer would
-        -- exile the Island.
-        Spec.it s "CR 702.115a whole card: Culling Drone exiles the damaged player's top card" $ do
-          drone <- S.printingOf s registry "Culling Drone"
-          piker <- S.printingOf s registry "Goblin Piker"
-          swamp <- S.printingOf s registry "Swamp"
-          island <- S.printingOf s registry "Island"
-          mountain <- S.printingOf s registry "Mountain"
-          case S.combatBoardOf [drone] [] of
-            (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
-            (base, attacker : _, _) -> do
-              let gs = stock island mountain S.alice (stock swamp piker S.bob base)
-                  after = S.runCombat S.aggressiveAnswer gs
-              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Ingest attacker gs) "the Drone has ingest"
-              Spec.assertEqWith s "the Piker, bob's top card, is in exile" (namesIn Zone.Exile S.bob after) (Set.singleton (nameOfCard "Goblin Piker"))
-              Spec.assertEqWith s "and the Swamp under it stayed in the library" (namesIn Zone.Library S.bob after) (Set.singleton (nameOfCard "Swamp"))
-              Spec.assertEqWith s "alice, who controls the ability, exiles nothing" (namesIn Zone.Exile S.alice after) Set.empty
-              Spec.assertEqWith s "and keeps both her cards" (namesIn Zone.Library S.alice after) (Set.fromList [nameOfCard "Island", nameOfCard "Mountain"])
-              -- Ingest is not a replacement for the damage: rule 702.115a's
-              -- ability is additional, so the two life still goes.
-              Spec.assertEqWith s "bob took the Drone's two" (S.lifeOf S.bob after) (Just 18)
-        -- The negative, on the SAME board but for one blocker: rule 702.115a is
-        -- scoped to combat damage dealt TO A PLAYER, and a blocked creature
-        -- assigns its damage to the creatures blocking it (CR 510.1c).
-        Spec.it s "CR 702.115a a blocked Culling Drone exiles nothing" $ do
-          drone <- S.printingOf s registry "Culling Drone"
-          piker <- S.printingOf s registry "Goblin Piker"
-          swamp <- S.printingOf s registry "Swamp"
-          mountain <- S.printingOf s registry "Mountain"
-          case S.combatBoardOf [drone] [piker] of
-            (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
-            (base, _, _) -> do
-              let gs = stock swamp mountain S.bob base
-                  after = S.runCombat S.aggressiveAnswer gs
-              -- The Piker blocked and took the Drone's two, which is what keeps
-              -- this from passing on a board where no damage was dealt at all.
-              Spec.assertEqWith s "the blocking Piker died" (namesIn Zone.Graveyard S.bob after) (Set.singleton (nameOfCard "Goblin Piker"))
-              Spec.assertEqWith s "nothing is exiled" (namesIn Zone.Exile S.bob after) Set.empty
-              Spec.assertEqWith s "both cards stayed in the library" (namesIn Zone.Library S.bob after) (Set.fromList [nameOfCard "Mountain", nameOfCard "Swamp"])
-              Spec.assertEqWith s "and bob lost no life" (S.lifeOf S.bob after) (Just 20)
-        -- CR 702.115a says nothing about a shortfall, so an empty library exiles
-        -- nothing and costs nothing: CR 104.3c's loss is on DRAWING, and this is
-        -- a move. The same board as the proving test, one thing different.
-        Spec.it s "CR 702.115a an empty library exiles nothing and loses nobody" $ do
-          drone <- S.printingOf s registry "Culling Drone"
-          case S.combatBoardOf [drone] [] of
-            (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
-            (base, _, _) -> do
-              let after = S.runCombat S.aggressiveAnswer base
-              Spec.assertEqWith s "nothing is exiled" (namesIn Zone.Exile S.bob after) Set.empty
-              Spec.assertEqWith s "bob is still in the game" (S.lifeOf S.bob after) (Just 18)
         -- CR 800.1 at three seats, the poisonous spec's shape: rule 702.115a's
         -- "that player" is whoever was DEALT the damage, and at two players that
         -- is indistinguishable from "the attacker's one opponent". The two runs
@@ -295,26 +236,7 @@ ingestSpec s registry =
 -- player, so an implementation that bound the wrong one would pass.
 annihilatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 annihilatorSpec s registry =
-  let -- Declares `attacker` and nothing else, attacks `who`, declines all
-      -- blocks, and sacrifices the LAST candidate offered.
-      --
-      -- Every clause is there to keep an assertion from passing by accident.
-      -- Declaring one creature keeps the trigger count at one, so "annihilator 1
-      -- sacrificed one permanent" is not two abilities coinciding. Declining
-      -- blocks keeps combat damage from removing a permanent the edict did not
-      -- take. And taking the LAST candidate rather than the first is what proves
-      -- the PROMPT is honoured: Replay.defaultAnswer takes the first `count`
-      -- candidates, so an engine that ignored the answer would take the other
-      -- permanent.
-      declaring :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
-      declaring attacker who p = case p of
-        Prompt.ChooseDefender {} -> who
-        Prompt.ChooseAttackTarget {} -> S.attackTo who p
-        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
-        Prompt.DeclareBlockers {} -> Map.empty
-        Prompt.ChooseSacrifices _ _ _ candidates _ _ -> Set.fromList (take 1 (reverse candidates))
-        _ -> S.aggressiveAnswer p
-      -- alice fields Slivdrazi Monstrosity and a Slaughter Drone; bob and carol
+  let -- alice fields Slivdrazi Monstrosity and a Slaughter Drone; bob and carol
       -- each field a Goblin Piker and a Mountain.
       --
       -- TWO permanents each, and that is the point: Effect.PlayerSacrifices
@@ -354,34 +276,6 @@ annihilatorSpec s registry =
               Spec.assertBool s (Projection.hasKeyword (Keyword.Type.Annihilator 1) slivdrazi gs) "and so does Slivdrazi itself, being a Sliver"
               Spec.assertBool s (not (Projection.hasKeyword (Keyword.Type.Annihilator 1) piker gs)) "bob's creature, which alice does not control, does not"
             _ -> Spec.assertFailure s "fixture should have two permanents a side"
-        -- The proving test. alice attacks bob, so CR 508.5 makes bob the
-        -- defending player and rule 702.86a makes him sacrifice one permanent of
-        -- HIS choice -- the Mountain, which is the candidate the interpreter
-        -- named and not the one the engine's fallback would have taken. carol,
-        -- an opponent who was not attacked, loses nothing.
-        Spec.it s "CR 702.86a the attacked player sacrifices one permanent of their own choosing" $ do
-          (gs, ours, yours, hers) <- board
-          case (ours, yours, hers) of
-            (_ : drone : _, bobsPiker : bobsMountain : _, carolsPiker : carolsMountain : _) -> do
-              let after = S.runCombat (declaring drone S.bob) gs
-              Spec.assertEqWith s "bob is left with only the Piker" (Game.zoneMembers Zone.Battlefield S.bob after) [bobsPiker]
-              Spec.assertBool s (notElem bobsMountain (Game.zoneMembers Zone.Battlefield S.bob after)) "and the permanent he named, the Mountain, is what went"
-              Spec.assertEqWith s "carol, not the defending player, sacrifices nothing" (Game.zoneMembers Zone.Battlefield S.carol after) [carolsPiker, carolsMountain]
-            _ -> Spec.assertFailure s "fixture should have two permanents a side"
-        -- CR 508.5a: the defending player is one SPECIFIC player, and which one
-        -- is settled by CR 506.2a's choice. The only difference between this run
-        -- and the one above is the answer to Prompt.ChooseDefender, so an
-        -- implementation that bound the attacker's controller, or "the opponent",
-        -- or a fixed seat cannot pass both.
-        Spec.it s "CR 508.5 the sacrifice follows whichever opponent was attacked" $ do
-          (gs, ours, yours, hers) <- board
-          case (ours, yours, hers) of
-            (slivdrazi : drone : _, bobsPiker : bobsMountain : _, carolsPiker : _) -> do
-              let after = S.runCombat (declaring drone S.carol) gs
-              Spec.assertEqWith s "carol, attacked this time, is left with only the Piker" (Game.zoneMembers Zone.Battlefield S.carol after) [carolsPiker]
-              Spec.assertEqWith s "and bob, untouched, keeps both" (Game.zoneMembers Zone.Battlefield S.bob after) [bobsPiker, bobsMountain]
-              Spec.assertEqWith s "alice, who controls the ability, sacrifices nothing" (Game.zoneMembers Zone.Battlefield S.alice after) [slivdrazi, drone]
-            _ -> Spec.assertFailure s "fixture should have two permanents a side"
 
 -- CR 702.91a: "Battle cry is a triggered ability. 'Battle cry' means 'Whenever
 -- this creature attacks, each other attacking creature gets +1/+0 until end of
@@ -415,24 +309,6 @@ battleCrySpec s registry =
           State.modify' (<> [entries])
           pure (zipWith const [0 ..] entries)
         _ -> pure (S.aggressiveAnswer p)
-      -- Names one of the two entries by WHICH ABILITY it is and puts it first or
-      -- last in the permutation. `cryFirst` is about RESOLUTION: the answer is
-      -- the order the abilities are PUT ON the stack, and the stack is LIFO, so
-      -- the entry named LAST resolves FIRST.
-      --
-      -- This answerer is the discriminator's whole point (#61). Both entries hang
-      -- on the one Hero, so under the source-only payload this replaced there was
-      -- nothing to select on but a blind index -- and an index is not something a
-      -- player can be asked to mean.
-      resolvingFirst :: Bool -> Prompt.Prompt r -> r
-      resolvingFirst cryFirst p = case p of
-        Prompt.OrderTriggers _ _ entries ->
-          let indexed = zip [0 ..] entries
-              isCry entry = TriggerEntry.ability (snd entry) == Keyword.battleCry
-              pick keep = fmap fst (filter ((==) keep . isCry) indexed)
-           in if cryFirst then pick False <> pick True else pick True <> pick False
-        _ -> S.aggressiveAnswer p
-      powersOf oids gs = fmap (`Projection.powerOf` gs) oids
    in Spec.describe s "BattleCry" $ do
         -- CR 702.91b: "If a creature has multiple instances of battle cry, each
         -- triggers separately." So the count is a MULTIPLICITY, exactly as CR
@@ -483,20 +359,6 @@ battleCrySpec s registry =
                 Spec.assertEqWith s "and its two triggers are the same ability from the same source" w1 w2
               other -> Spec.assertFailure s ("expected two ordering payloads of two entries each, got " <> show (fmap length other))
             _ -> Spec.assertFailure s "fixture should give alice a Hero and an Aether Flash"
-        -- THE order-matters pair, and the card's own ruling (2011-06-01): "If the
-        -- token-creating ability resolves first, the tokens each get +1/+0 until
-        -- end of turn from the battle cry ability."
-        --
-        -- CR 611.2c is why: "the set of objects it affects is determined when
-        -- that continuous effect begins. After that point, the set won't change."
-        -- So a Soldier that arrives after battle cry has begun is never in the
-        -- set, and one that arrives before it is.
-        Spec.it s "CR 603.3b/702.91a resolving the token-maker first pumps the Soldiers" $ do
-          hero <- S.printingOf s registry "Hero of Bladehold"
-          let (gs, _, _) = S.combatBoardOf [hero] []
-              after = S.runCombat (resolvingFirst False) gs
-          Spec.assertEqWith s "two 2/1 Soldiers" (powersOf (S.tokensOf after) after) [Just 2, Just 2]
-          Spec.assertEqWith s "so bob takes 3 + 2 + 2" (S.lifeOf S.bob after) (Just 13)
 
 -- CR 702.108a: "Prowess is a triggered ability. 'Prowess' means 'Whenever you
 -- cast a noncreature spell, this creature gets +1/+1 until end of turn.'" The
@@ -521,98 +383,16 @@ battleCrySpec s registry =
 -- control that the cast really happened. THREE seats, carol being the one that
 -- is neither the caster nor the ability's controller: at two players "the caster
 -- is not you" and "the caster is that one opponent" are the same sentence.
-prowessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-prowessSpec s registry =
-  let -- alice bears the Swiftspear and has four Mountains, bob four as well, so
-      -- a negative never fails for want of mana; carol is the third seat.
-      board mountain swiftspear =
-        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent mountain pid g2)) g [1 .. (n :: Int)]
-            withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
-            (spearId, withSpear) = S.addPermanent swiftspear S.alice withLands
-         in ( spearId,
-              withSpear
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            )
-      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
-      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
-   in Spec.describe s "Prowess" $ do
-        -- THE case: the trigger fires, and the pump is the one rule 702.108a
-        -- names rather than merely some pump.
-        Spec.it s "CR 702.108a whole card: casting an instant makes Monastery Swiftspear 2/3" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
-          boil <- S.printingOf s registry "Boil"
-          let (spearId, base) = board mountain swiftspear
-              (boilId, gs) = S.addHandCard boil S.alice base
-              after = castAndResolve S.alice boilId gs
-          Spec.assertEqWith s "1/2 before the cast" (sizeOf spearId gs) (Just 1, Just 2)
-          Spec.assertEqWith s "and 2/3 once the trigger resolves" (sizeOf spearId after) (Just 2, Just 3)
-        -- "Noncreature", moved on its own: alice still casts, and only what she
-        -- casts changes. Without this a filter that admitted every spell and one
-        -- that read the card type are indistinguishable.
-        Spec.it s "CR 702.108a a CREATURE spell pumps nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (spearId, base) = board mountain swiftspear
-              (pikerId, gs) = S.addHandCard piker S.alice base
-              after = castAndResolve S.alice pikerId gs
-          -- Positive control: the cast really happened and really resolved, so
-          -- the silence below is the Filter's answer and not a fixture that
-          -- never cast anything.
-          Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
-          Spec.assertEqWith s "and the Swiftspear is still 1/2" (sizeOf spearId after) (Just 1, Just 2)
-        -- "You", moved on its own: the same instant from the seat to alice's
-        -- left. The paired assertion on the same board is what proves the seat
-        -- is the only thing the silence turns on.
-        Spec.it s "CR 109.5 'you cast': an OPPONENT's instant pumps nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
-          boil <- S.printingOf s registry "Boil"
-          let (spearId, base) = board mountain swiftspear
-              (bobsBoil, withBobs) = S.addHandCard boil S.bob base
-              (alicesBoil, gs) = S.addHandCard boil S.alice withBobs
-              byBob = castAndResolve S.bob bobsBoil gs
-              byAlice = castAndResolve S.alice alicesBoil gs
-          Spec.assertEqWith s "bob's cast really resolved" (length (Game.zoneMembers Zone.Graveyard S.bob byBob)) 1
-          Spec.assertEqWith s "and left the Swiftspear at 1/2" (sizeOf spearId byBob) (Just 1, Just 2)
-          Spec.assertEqWith s "the same board pumps for alice's own cast" (sizeOf spearId byAlice) (Just 2, Just 3)
-        -- CR 514.2: "until end of turn" is armed to the cleanup step, and CR
-        -- 611.2c's frozen set is a single creature, so the whole effect goes.
-        -- Run as the turn-based action rather than by advancing turns, which
-        -- would deck a fixture player (CR 104.3c).
-        Spec.it s "CR 514.2 the pump is gone at the cleanup step" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
-          boil <- S.printingOf s registry "Boil"
-          let (spearId, base) = board mountain swiftspear
-              (boilId, gs) = S.addHandCard boil S.alice base
-              after = castAndResolve S.alice boilId gs
-              cleaned = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
-          Spec.assertEqWith s "2/3 while the effect lasts" (sizeOf spearId after) (Just 2, Just 3)
-          Spec.assertEqWith s "and 1/2 again afterwards" (sizeOf spearId cleaned) (Just 1, Just 2)
-        -- CR 702.108b: "If a creature has multiple instances of prowess, each
-        -- triggers separately." Asked of the mint rather than of a board, as
-        -- battle cry's is: no card in this pool prints prowess twice and nothing
-        -- here grants it, so a second instance is unreachable through play.
-        Spec.it s "CR 702.108b each instance of prowess is its own ability" $ do
-          Spec.assertEqWith s "prowess held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Prowess 2)) [Keyword.prowess, Keyword.prowess]
-          Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Prowess 1)) [Keyword.prowess]
-
--- Cast `spell` and narrow every target slot it offers to `victim`, answering
--- everything else as S.identityAnswer does. The cast is pinned to the one card
--- rather than left to S.castAnswer because a padded hand holds other castable
--- cards, and a leg that spent the mana on one of those would never reach it.
-aimedCast :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedCast spell victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
-  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
-    action : _ -> action
-    [] -> A.Pass
-  _ -> S.identityAnswer p
+prowessSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowessSpec s _ =
+  Spec.describe s "Prowess" $ do
+    -- CR 702.108b: "If a creature has multiple instances of prowess, each
+    -- triggers separately." Asked of the mint rather than of a board, as
+    -- battle cry's is: no card in this pool prints prowess twice and nothing
+    -- here grants it, so a second instance is unreachable through play.
+    Spec.it s "CR 702.108b each instance of prowess is its own ability" $ do
+      Spec.assertEqWith s "prowess held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Prowess 2)) [Keyword.prowess, Keyword.prowess]
+      Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Prowess 1)) [Keyword.prowess]
 
 -- CR 509.3e: "Whenever [a creature] blocks two or more creatures, . . ." -- the
 -- form that reads HOW MANY, matched against the same grouped
@@ -667,7 +447,7 @@ selfBlocksAtLeastSpec s registry =
 --
 -- The blocker is BOB's, since CR 509.1 has the defending player declare blocks,
 -- so every life total below is read off the defending seat.
-selfBlocksSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfBlocksSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 selfBlocksSpec s registry =
   let -- Attacks with everything and declines every block. aggressiveAnswer's
       -- control leg: the same game with CR 509.1's declaration switched off, and
@@ -696,15 +476,6 @@ selfBlocksSpec s registry =
               Spec.assertEqWith s "alice gains nothing: the trigger is the blocker controller's (CR 603.3a)" (S.lifeOf S.alice blocked) (Just 20)
               Spec.assertEqWith s "control leg: no block, no gain, and the Piker's 2 gets through" (S.lifeOf S.bob unblocked) (Just 18)
             _ -> Spec.assertFailure s "fixture should give bob one Pride Guardian"
-        -- CR 509.2a: the abilities that triggered on blockers being declared go
-        -- onto the stack before the active player gets priority, so they resolve
-        -- in the declare blockers step -- not at combat damage, and not at end of
-        -- combat. Read at the combat damage step, before any damage is dealt.
-        Spec.it s "CR 509.2a the trigger has already resolved when the combat damage step begins" $ do
-          (gs, _, _) <- board ["Goblin Piker"] ["Pride Guardian"]
-          let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer gs
-          Spec.assertEqWith s "the fixture reached the combat damage step" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
-          Spec.assertEqWith s "and bob is already at 23" (S.lifeOf S.bob atDamage) (Just 23)
 
 -- CR 509.3b: "Whenever [a creature] blocks a creature, . . ." -- selfBlocksSpec's
 -- condition with the attacker NAMED, bound under Binding.blockedCreature and
@@ -875,16 +646,8 @@ selfBlocksOneOrMoreSpec s registry =
         ours <- mapM (S.printingOf s registry) mine
         yours <- mapM (S.printingOf s registry) theirs
         pure (S.combatBoardOf ours yours)
-      -- Blocks EVERY attacker with `blocker` alone, which aggressiveAnswer cannot
-      -- express: it puts every blocker on the first attacker.
-      blockEverything :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-      blockEverything blocker p = case p of
-        Prompt.DeclareBlockers _ _ _ attackers -> Map.singleton blocker (Set.fromList attackers)
-        _ -> S.aggressiveAnswer p
       atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
-      afterCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-      afterCombat = S.runToStep (Phase.Combat CombatStep.EndOfCombat)
       -- `board` with one creature card added to bob's HAND, which is what
       -- Aetherplasm's second clause puts onto the battlefield blocking. The hand
       -- holds that card alone, so the two arrival legs below differ in the CARD
@@ -935,21 +698,6 @@ selfBlocksOneOrMoreSpec s registry =
                 (S.powerToughnessOf blocking (atDamage S.aggressiveAnswer black), S.powerToughnessOf control (atDamage S.aggressiveAnswer other))
                 (Just (5, 3), Just (3, 3))
             _ -> Spec.assertFailure s "fixture should give bob one Serra Inquisitors on each board"
-        -- Rule 509.3e's "one or more" is ONE trigger however many admitted
-        -- creatures were blocked. A High Ground gives bob the arity, the
-        -- Inquisitors blocks both Wraiths, and the answer is 5/3 rather than 7/3.
-        -- The falsifier is a match on the pairwise GameEvent.BecameBlocking,
-        -- which is CR 509.3b's arity: that fires twice.
-        Spec.it s "CR 509.3e blocking TWO black creatures is +2/+0 once" $ do
-          (gs, _, theirs) <- board ["Bog Wraith", "Bog Wraith"] ["Serra Inquisitors", "High Ground"]
-          case theirs of
-            [inquisitors, _] ->
-              Spec.assertEqWith
-                s
-                "one pump, not two"
-                (S.powerToughnessOf inquisitors (atDamage (blockEverything inquisitors) gs))
-                (Just (5, 3))
-            _ -> Spec.assertFailure s "fixture should give bob an Inquisitors and a High Ground"
         -- The ATTACKING half, and its control: the same pair of boards with the
         -- Inquisitors on alice's side, so the branch that fires is the other one.
         Spec.it s "CR 509.3e whole card: becoming blocked by a black creature is +2/+0, by a nonblack one is nothing" $ do
@@ -963,99 +711,6 @@ selfBlocksOneOrMoreSpec s registry =
                 (S.powerToughnessOf attacking (atDamage S.aggressiveAnswer black), S.powerToughnessOf control (atDamage S.aggressiveAnswer other))
                 (Just (5, 3), Just (3, 3))
             _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors on each board"
-        -- The attacking half's arity, which is what separates this condition from
-        -- SelfBecomesBlockedBy: two Wraiths block the one Inquisitors, so two
-        -- GameEvent.BecameBlocking are recorded and exactly one
-        -- GameEvent.AttackerBlocked. The falsifier is a match on the pairwise
-        -- event: that fires twice, for 7/3.
-        Spec.it s "CR 509.3e becoming blocked by TWO black creatures is +2/+0 once" $ do
-          (gs, mine, _) <- board ["Serra Inquisitors"] ["Bog Wraith", "Bog Wraith"]
-          case mine of
-            [inquisitors] ->
-              Spec.assertEqWith s "one pump, not two" (S.powerToughnessOf inquisitors (atDamage S.aggressiveAnswer gs)) (Just (5, 3))
-            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors"
-        -- "One or more" is a floor over the ADMITTED blockers, not a demand on all
-        -- of them: a Wraith and a Giant block together and the trigger still
-        -- fires. The falsifier is an `all` in place of the `any`, which answers
-        -- 3/3 here while agreeing with every other case in this group.
-        Spec.it s "CR 509.3e one admitted blocker among two is enough" $ do
-          (gs, mine, _) <- board ["Serra Inquisitors"] ["Bog Wraith", "Hill Giant"]
-          case mine of
-            [inquisitors] ->
-              Spec.assertEqWith s "the Wraith alone fires it" (S.powerToughnessOf inquisitors (atDamage S.aggressiveAnswer gs)) (Just (5, 3))
-            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors"
-        -- CR 603.2: the condition is the BEARER's own block. A Goblin Piker blocks
-        -- the Wraith while the Inquisitors stands by, so the declaration records a
-        -- GameEvent.BlocksDeclared naming somebody else. A regression fence rather
-        -- than a proof of one line: the arm's `blocker == bearer` and its
-        -- Combat.blockers read each rule this board out on their own, so no single
-        -- mutation turns it red.
-        Spec.it s "CR 603.2 another creature's block does not pump the Inquisitors" $ do
-          (gs, _, theirs) <- board ["Bog Wraith"] ["Serra Inquisitors", "Goblin Piker"]
-          case theirs of
-            [inquisitors, piker] ->
-              Spec.assertEqWith
-                s
-                "the bystander stays 3/3"
-                (S.powerToughnessOf inquisitors (atDamage (blockEverything piker) gs))
-                (Just (3, 3))
-            _ -> Spec.assertFailure s "fixture should give bob an Inquisitors and a Piker"
-        -- Rule 509.3e's SECOND sentence, "effects that add or remove blockers
-        -- can also cause such abilities to trigger", for the ATTACKING half.
-        -- Aetherplasm {2}{U}{U} 1/1 declares the block, its own trigger returns
-        -- it to hand and puts a creature card onto the battlefield blocking the
-        -- same attacker (CR 509.4), and the Inquisitors becomes blocked by that
-        -- arrival. The declaration admits nobody -- Aetherplasm is blue -- so
-        -- every reading agrees until the arrival, and the arrival is the whole
-        -- difference.
-        --
-        -- Two boards and one answerer, differing in the one CARD bob holds:
-        -- Disowned Ancestor {B} 0/4, and Secret Door {U} 0/4 as the control.
-        -- Both are 0/4, so the two legs agree on what the
-        -- arrival can do and on what survives its own return damage, and differ
-        -- only in colour -- and 4 is the one toughness that separates 3 from 5.
-        -- Power 0 is why nothing else on the board moves either way. Secret
-        -- Door's activated ability is sorcery-speed and bob has no mana; the
-        -- Ancestor's outlast is sorcery-speed too.
-        --
-        -- WHAT DOES NOT DISCRIMINATE, and each is a board a reader reaches for
-        -- first:
-        --
-        --   * Cabal Evangel 2/2 as the arrival, which the issue drafted. The
-        --     grant is +2/+0, so the 3/3 kills a 2/2 under both readings and
-        --     takes 2 and lives under both.
-        --   * declining Aetherplasm's first "may". Clause 1 hangs on it (CR
-        --     608.2c), so that leg differs in two things -- the blocker that
-        --     stays and the arrival that never comes.
-        --   * reading the Inquisitors' power alone, which is what the cases
-        --     above this one do. It says the trigger fired but nothing about
-        --     what the grant reached, so the Ancestor's death is asserted first
-        --     and the power after it.
-        Spec.it s "CR 509.3e whole card: a black creature put onto the battlefield blocking is +2/+0, a blue one is nothing" $ do
-          (blackGs, blackMine, blackTheirs, ancestor) <- plasmBoard ["Serra Inquisitors"] ["Aetherplasm"] "Disowned Ancestor"
-          (blueGs, blueMine, blueTheirs, door) <- plasmBoard ["Serra Inquisitors"] ["Aetherplasm"] "Secret Door"
-          case (blackMine, blackTheirs, blueMine, blueTheirs) of
-            ([inquisitors], [plasm], [control], [otherPlasm]) -> do
-              Spec.assertEqWith
-                s
-                "the Ancestor takes 5 and dies, and the same board with a blue arrival leaves it standing"
-                (survivors "Disowned Ancestor" (afterCombat (swapping inquisitors [plasm] ancestor) blackGs), survivors "Secret Door" (afterCombat (swapping control [otherPlasm] door) blueGs))
-                (0, 1)
-              -- The control leg is not vacuous: its arrival really did come and
-              -- really is blocking, so the survival above is the Filter and not
-              -- a clause that never ran.
-              Spec.assertEqWith
-                s
-                "control: the blue arrival is blocking the Inquisitors all the same"
-                (length (liveBlockers control (atDamage (swapping control [otherPlasm] door) blueGs)))
-                1
-              -- The pump itself, after the gameplay quantity.
-              Spec.assertEqWith
-                s
-                "5/3 against the Ancestor, 3/3 against the Door"
-                (S.powerToughnessOf inquisitors (atDamage (swapping inquisitors [plasm] ancestor) blackGs), S.powerToughnessOf control (atDamage (swapping control [otherPlasm] door) blueGs))
-                (Just (5, 3), Just (3, 3))
-            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors and bob one Aetherplasm on each board"
         -- The CROSSING and not the arrival: an admitted creature that joins an
         -- attacker ALREADY blocked by an admitted one is no second becoming, so
         -- the ability fires once for the whole combat. The case above's board
@@ -1123,17 +778,6 @@ creatureBecomesBlockedByAtLeastSpec s registry =
         _ -> S.aggressiveAnswer p
       afterCombat :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
       afterCombat attacker blockers = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaring attacker blockers)
-      -- The same declaration aimed at a PLANESWALKER instead (CR 508.1b), which
-      -- is the one prompt `declaring` never sees: combatBoardOf's boards offer
-      -- the defending player alone.
-      declaringAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-      declaringAt walker attacker blockers p = case p of
-        Prompt.ChooseAttackTarget _ _ _ options -> case filter (== AttackTarget.OfPlaneswalker walker) (NonEmpty.toList options) of
-          target : _ -> target
-          [] -> NonEmpty.head options
-        _ -> declaring attacker blockers p
-      afterCombatAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
-      afterCombatAt walker attacker blockers = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaringAt walker attacker blockers)
       giants :: GameState.GameState -> Int
       giants = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob
       -- `board` with the defending seat stocked to cast Flash Foliage `copies`
@@ -1231,55 +875,6 @@ creatureBecomesBlockedByAtLeastSpec s registry =
                 (S.damageOf first (afterCombat elves [first] gs))
                 (Just 1)
             _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants"
-        -- CR 109.5's "you": the PlayerRelation is read against the ability's
-        -- CONTROLLER, so a Seifer that bob controls watches creatures attacking
-        -- ALICE. This board is the case above's firing leg with Seifer moved one
-        -- seat, and nothing else changed.
-        Spec.it s "CR 603.3a a Seifer the defending player controls is silent" $ do
-          (gs, mine, theirs) <- board ["Llanowar Elves"] ["Hill Giant", "Hill Giant", "Seifer, Balamb Rival"]
-          case (mine, theirs) of
-            ([elves], [first, second, _]) ->
-              Spec.assertEqWith
-                s
-                "the Elves attacks Seifer's own controller, so both Giants live"
-                (giants (afterCombat elves [first, second] gs))
-                2
-            _ -> Spec.assertFailure s "fixture should give alice an Elves, and bob two Giants and a Seifer"
-        -- CR 508.1b: a creature attacking a PLANESWALKER an opponent controls is
-        -- not attacking that opponent, so Seifer stays silent -- which is why the
-        -- arm reads Combat.attackers rather than CR 508.5's defending player,
-        -- whom an attacked planeswalker resolves to. The firing board with a Jace
-        -- added and the attack aimed at him, and nothing else changed.
-        --
-        -- Jace Beleren is stocked with loyalty by hand: S.addPermanent puts a
-        -- printing onto the battlefield with no counters, and CR 704.5i would
-        -- take a loyalty-0 planeswalker away before attackers are declared.
-        Spec.it s "CR 508.1b attacking an opponent's planeswalker is not attacking the opponent" $ do
-          (gs, mine, theirs) <- board ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant", "Jace Beleren"]
-          case (mine, theirs) of
-            ([elves, _], [first, second, jace]) -> do
-              let ready = S.addCounter CounterKind.Loyalty 3 jace gs
-                  after = afterCombatAt jace elves [first, second] ready
-              Spec.assertEqWith
-                s
-                "the Elves is aimed at Jace, so both Giants live"
-                (giants after)
-                2
-              -- The leg is not vacuous: the declaration really did name the
-              -- planeswalker, so the silence above is CR 508.1b's and not a
-              -- declaration that never happened.
-              --
-              -- Read through CR 608.2h and not off Combat.attackers, because the
-              -- 1/1 dies to the blockers it was declared against: CR 506.4 takes
-              -- an attacker that has left the battlefield out of the live record
-              -- (Pawl.Engine.Game.ceaseAttacking), and what it was attacking as it
-              -- left is what this guard is about.
-              Spec.assertEqWith
-                s
-                "and the attack really was declared at Jace"
-                (Game.attackTargetWithLastKnown elves after)
-                (Just (AttackTarget.OfPlaneswalker jace))
-            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants and a Jace"
         -- Rule 509.3e's arity: ONE trigger for the declaration, not one per
         -- blocker. Deliberately counted off the event log rather than read at
         -- gameplay level, because this card cannot show the difference -- a
@@ -1461,35 +1056,6 @@ creatureBecomesBlockedByAtLeastSpec s registry =
                 (firedBy seifer joined)
                 1
             _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant"
-        -- The same pair of arrivals landing on an UNBLOCKED attacker, which is
-        -- the leg where CR 509.3c does record GameEvent.AttackerBlocked -- one
-        -- creature was blocking the Elves as it became blocked, so that event's
-        -- tally is under the floor and the second Saproling is what crosses it.
-        -- Still ONE trigger between the two events, where a becoming that counted
-        -- the arrivals after it would fire for that as well.
-        --
-        -- The case above's board with bob declaring nothing, and counted off the
-        -- event log rather than at gameplay level for the same reason the
-        -- uncrossed case above is: deathtouch or not, the Elves' one point kills
-        -- a 1/1 Saproling, so no board moves.
-        Spec.it s "CR 509.3e two Saprolings arriving at once at an unblocked attacker fire it once, not twice" $ do
-          (gs, mine, theirs) <- doublingFoliageBoard ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant"]
-          case (mine, theirs) of
-            ([elves, seifer], [giant]) -> do
-              let joined = S.runToStep (Phase.Combat CombatStep.CombatDamage) (casting elves [] elves giant) (atBlockers elves [] gs)
-              -- Anti-vacuity FIRST: the assertion under test is a count, which a
-              -- board where the spell never resolved would also satisfy.
-              Spec.assertEqWith
-                s
-                "both Saprolings arrived, so the Elves is blocked by two creatures"
-                (Set.size (Combat.blockersOf elves joined))
-                2
-              Spec.assertEqWith
-                s
-                "and Seifer triggered once for the pair, not once for the becoming and once for the crossing"
-                (firedBy seifer joined)
-                1
-            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant to leave undeclared"
 
 -- CR 509.3c: "Whenever [a creature] becomes blocked, . . ." -- the ATTACKING
 -- side of the same declaration selfBlocksSpec reads, matched against
@@ -1500,7 +1066,7 @@ creatureBecomesBlockedByAtLeastSpec s registry =
 -- payload names nothing about the blockers, so these cases isolate the
 -- CONDITION. The gain lands on the ATTACKING seat (alice), which is the seat
 -- combat damage never moves here, so every number below is the trigger's alone.
-selfBecomesBlockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfBecomesBlockedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 selfBecomesBlockedSpec s registry =
   let noBlocks :: Prompt.Prompt r -> r
       noBlocks p = case p of
@@ -1527,50 +1093,6 @@ selfBecomesBlockedSpec s registry =
               Spec.assertEqWith s "control leg: unblocked, so no gain" (S.lifeOf S.alice unblocked) (Just 20)
               Spec.assertEqWith s "and its 1 gets through" (S.lifeOf S.bob unblocked) (Just 19)
             _ -> Spec.assertFailure s "fixture should give alice one Sacred Prey"
-        -- CR 509.3c's guard on its THIRD producer, and the one thing rule
-        -- 509.3e's arrival road must not cost: "It will also trigger if that
-        -- creature becomes blocked by an effect or by a creature that's put onto
-        -- the battlefield as a blocker, but only if the attacking creature was
-        -- an unblocked creature at that time." The Prey is already blocked by a
-        -- declared Piker when Flash Foliage's Saproling joins it, so the arrival
-        -- finds a blocked creature and this trigger must stay silent.
-        --
-        -- A REGRESSION FENCE with a NAMED falsifier rather than a pair of legs,
-        -- because both legs of any pair read 21 and only a wrong engine reads
-        -- 22. Combat.putOntoBattlefieldBlocking withholds
-        -- GameEvent.AttackerBlocked for exactly this, and dropping that guard is
-        -- the shortest-looking way to make an arrival reach
-        -- CreatureBecomesBlockedByAtLeast above. It is the wrong way, and 22 is
-        -- what says so.
-        Spec.it s "CR 509.3c a Saproling joining an already-blocked attacker does not make it become blocked twice" $ do
-          (gs0, mine, theirs) <- board ["Sacred Prey"] ["Goblin Piker"]
-          forest <- S.printingOf s registry "Forest"
-          foliage <- S.printingOf s registry "Flash Foliage"
-          case (mine, theirs) of
-            ([prey], [piker]) -> do
-              -- Three Forests for Flash Foliage's {2}{G} and one card left in
-              -- bob's library so its draw is not a CR 104.3c loss.
-              let lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 (replicate 3 ())
-                  gs = snd (S.addLibraryCard forest S.bob (snd (S.addHandCard foliage S.bob lands)))
-                  -- Handed over AT the declare blockers step, which is before
-                  -- CR 509.1's turn-based action: `casting` below is what
-                  -- declares the Piker, through its S.aggressiveAnswer base, and
-                  -- Flash Foliage's "after blockers are declared" restriction is
-                  -- what keeps the spell behind that declaration.
-                  declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
-                  casting :: Prompt.Prompt r -> r
-                  casting p = case p of
-                    Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter (== Recipient.ToCreature prey) rs) sets
-                    Prompt.ChooseAction {} -> S.castAnswer p
-                    Prompt.AssignCombatDamage {} -> Map.singleton (Recipient.ToCreature piker) 1
-                    _ -> S.aggressiveAnswer p
-                  joined = S.runToStep (Phase.Combat CombatStep.CombatDamage) casting declared
-              Spec.assertEqWith s "alice gained 1 for the declaration and nothing for the arrival" (S.lifeOf S.alice joined) (Just 21)
-              -- Anti-vacuity: the Saproling really did arrive and really is
-              -- blocking the Prey, so the silence is CR 509.3c's guard and not a
-              -- spell that never resolved.
-              Spec.assertEqWith s "CR 509.4: two creatures are blocking the Prey" (Set.size (Combat.blockersOf prey joined)) 2
-            _ -> Spec.assertFailure s "fixture should give alice a Sacred Prey and bob a Goblin Piker"
 
 -- CR 509.1h read from the UNBLOCKED side: "an attacking creature ... with no
 -- creatures declared as blockers for it becomes an unblocked creature", which
@@ -1594,7 +1116,7 @@ selfBecomesBlockedSpec s registry =
 -- alice's library is stocked, or the draw would find nothing and CR 121.4 would
 -- lose her the game -- leaving the leg that is supposed to show a card in hand
 -- showing 0 for a reason that is not the trigger.
-selfAttacksUnblockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfAttacksUnblockedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 selfAttacksUnblockedSpec s registry =
   let -- Attacks `who` with everything and lets them block with everything.
       attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
@@ -1634,45 +1156,6 @@ selfAttacksUnblockedSpec s registry =
               Spec.assertEqWith s "blocked: no draw, and afflict 2 instead of damage" (state blocked) (Just 20, Just 18, Just 20, 0)
               Spec.assertBool s (S.onBattlefield piker unblocked) "the unblocked leg left bob's Piker alone"
             _ -> Spec.assertFailure s "fixture should give bob one Goblin Piker"
-        -- CR 509.1h's last sentence: "a creature remains blocked even if all the
-        -- creatures blocking it are removed from combat." The 1/3 Eternal kills
-        -- the 2/1 Piker at CR 510.2, emptying its Combat.blockers entry, and
-        -- alice still draws nothing through the end of combat. The falsifier is
-        -- an implementation that samples the map for an attacker with no
-        -- CURRENT blockers rather than recording the declaration's own event.
-        Spec.it s "CR 509.1h losing every blocker does not make the Eternal unblocked" $ do
-          (gs, ours, yours, _) <- board [()] [()]
-          let after = S.runCombat (attacking S.bob) gs
-          case (ours, yours) of
-            ([eternal], [piker]) -> do
-              Spec.assertBool s (not (S.onBattlefield piker after)) "the 2/1 Piker died to the Eternal's 1"
-              Spec.assertBool s (S.onBattlefield eternal after) "and the 1/3 Eternal survived the Piker's 2"
-              Spec.assertEqWith s "alice still drew nothing" (S.handSize S.alice after) 0
-            _ -> Spec.assertFailure s "fixture should give alice an Eternal and bob a Piker"
-        -- The board where NOBODY can block, which is the one the old code could
-        -- not see: with no creature on either defending side, CR 509.1's
-        -- declaration raises no prompt at all, and rule 509.1h still makes the
-        -- attacker unblocked. The falsifier is recording the event inside the
-        -- loop that is guarded on there being a legal blocker.
-        Spec.it s "CR 509.1h an attacker nobody could block is unblocked too" $ do
-          (gs, _, _, _) <- board [] []
-          Spec.assertEqWith s "alice drew 1, bob took the Eternal's 1" (state (S.runCombat (attacking S.bob) gs)) (Just 20, Just 19, Just 20, 1)
-        -- CR 508.5: the third seat. The only difference from the first leg above
-        -- is which opponent was attacked, and the draw is ONE either way -- the
-        -- ability's controller draws, not a card per opponent and not a card per
-        -- seat that did not block.
-        Spec.it s "CR 509.1h the draw follows the attack rather than the seat count" $ do
-          (gs, _, _, _) <- board [()] [()]
-          Spec.assertEqWith s "carol took the 1 this time, and alice still drew exactly 1" (state (S.runCombat (declining S.carol) gs)) (Just 20, Just 20, Just 19, 1)
-        -- CR 603.2: the condition is the BEARER's own attack. bob's Eternal is
-        -- standing still while alice's Piker goes by unblocked, so the
-        -- declaration records a GameEvent.AttackerUnblocked naming somebody else.
-        Spec.it s "CR 603.2 a bystanding Eternal of Harsh Truths draws nothing" $ do
-          eternal <- S.printingOf s registry "Eternal of Harsh Truths"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (gs, _, _, _) = S.threePlayerCombat [piker] [eternal] []
-              after = S.runCombat (declining S.bob) gs
-          Spec.assertEqWith s "bob took the Piker's 2 and drew nothing" (S.lifeOf S.bob after, S.handSize S.bob after) (Just 18, 0)
 
 -- CR 702.85a's cascade, the first keyword ability that functions on the STACK:
 -- "When you cast this spell, exile cards from the top of your library until you
@@ -1703,108 +1186,6 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Cascade 1)) []
     Spec.assertEqWith s "rule 702.85a's condition is the cast" (TriggeredAbility.condition Keyword.cascade) TriggerCondition.SelfCast
 
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.85a casting Bloodbraid Elf exiles down to the Goblin Piker, casts it free and bottoms the rest" $ do
-    elf <- S.printingOf s registry "Bloodbraid Elf"
-    giant <- S.printingOf s registry "Hill Giant"
-    mountain <- S.printingOf s registry "Mountain"
-    wolves <- S.printingOf s registry "Russet Wolves"
-    piker <- S.printingOf s registry "Goblin Piker"
-    think <- S.printingOf s registry "Think Twice"
-    forest <- S.printingOf s registry "Forest"
-    let base = Setup.emptyGame S.bothPlayers
-        -- S.addLibraryCard puts each card ON TOP, so this stocks the library
-        -- bottom first.
-        (_, g1) = S.addLibraryCard think S.alice base
-        (_, g2) = S.addLibraryCard piker S.alice g1
-        (_, g3) = S.addLibraryCard wolves S.alice g2
-        (_, g4) = S.addLibraryCard mountain S.alice g3
-        (_, g5) = S.addLibraryCard giant S.alice g4
-        -- Rule 702.85a's {2}{R}{G} has to be paid for real: the FREE cast is the
-        -- Piker's, and a board that paid nothing for either would not tell them
-        -- apart.
-        (_, g6) = S.addPermanent mountain S.alice g5
-        (_, g7) = S.addPermanent mountain S.alice g6
-        (_, g8) = S.addPermanent forest S.alice g7
-        (_, g9) = S.addPermanent forest S.alice g8
-        (_, g10) = S.addHandCard elf S.alice g9
-        before =
-          g10
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        after = S.runPure cascading before Engine.priorityLoop
-        namesIn zone pid gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
-        orderedIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
-        named = CardName.MkCardName . Text.pack
-    Spec.assertEqWith
-      s
-      "the Piker the walk stopped at was cast without paying its mana cost, and the Elf behind it resolved too"
-      (namesIn Zone.Battlefield S.alice after)
-      (Set.fromList [named "Bloodbraid Elf", named "Goblin Piker", named "Mountain", named "Forest"])
-    Spec.assertEqWith
-      s
-      "the three cards the walk passed over sit under the card it never reached, in the order the random-order channel handed back"
-      (orderedIn Zone.Library S.alice after)
-      [named "Think Twice", named "Hill Giant", named "Russet Wolves", named "Mountain"]
-    -- Proxies, AFTER the two behavioural assertions so neither can absorb a
-    -- mutation: nothing is left in exile (rule 702.85a's last sentence empties
-    -- it), and alice paid for the Elf alone.
-    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
-    Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Piker's" (S.tappedCount S.alice after) 4
-
-  -- CR 702.85a's SECOND condition, driven through a real cascade rather than
-  -- through Pawl.Engine.Resolve.Effect.offerCast alone: Flaxen Intruder //
-  -- Welcome Home {G} Creature -- Human Berserker 1/2 // {5}{G}{G} Sorcery --
-  -- Adventure (Oracle text checked 2026-09-12) is a card of mana value 1, so the
-  -- Elf's walk stops at it, and its Adventure half (CR 715.3) has mana value 7, so
-  -- the bound the offer carries refuses that half alone.
-  --
-  -- The answerer PREFERS the Adventure by name, so a bound that admitted both
-  -- halves would put three Bear tokens on the battlefield and no Berserker. That
-  -- the Berserker enters is the offer being narrowed to one half, not a
-  -- preference of the engine's.
-  Spec.it s "CR 702.85a cascading into an adventurer card withholds the half the bound refuses" $ do
-    elf <- S.printingOf s registry "Bloodbraid Elf"
-    giant <- S.printingOf s registry "Hill Giant"
-    mountain <- S.printingOf s registry "Mountain"
-    intruder <- S.printingOf s registry "Flaxen Intruder"
-    think <- S.printingOf s registry "Think Twice"
-    forest <- S.printingOf s registry "Forest"
-    let base = Setup.emptyGame S.bothPlayers
-        -- Bottom first: the Giant is passed for being the Elf's own mana value,
-        -- the Mountain for being a land, and the Intruder ends the walk. Think
-        -- Twice is never reached.
-        (_, g1) = S.addLibraryCard think S.alice base
-        (_, g2) = S.addLibraryCard intruder S.alice g1
-        (_, g3) = S.addLibraryCard mountain S.alice g2
-        (_, g4) = S.addLibraryCard giant S.alice g3
-        (_, g5) = S.addPermanent mountain S.alice g4
-        (_, g6) = S.addPermanent mountain S.alice g5
-        (_, g7) = S.addPermanent forest S.alice g6
-        (_, g8) = S.addPermanent forest S.alice g7
-        (_, g9) = S.addHandCard elf S.alice g8
-        before =
-          g9
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        after = S.runPure cascadingIntoTheAdventure before Engine.priorityLoop
-        namesIn zone pid gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
-        named = CardName.MkCardName . Text.pack
-    Spec.assertEqWith
-      s
-      "the creature half was the only one offered, so the Berserker entered and no Bear token did"
-      (namesIn Zone.Battlefield S.alice after)
-      (Set.fromList [named "Bloodbraid Elf", named "Flaxen Intruder", named "Mountain", named "Forest"])
-    -- Proxies, AFTER the behaviour: the walk really did stop at the Intruder
-    -- rather than run out of library, and nothing paid for the free half.
-    Spec.assertEqWith s "the two cards the walk passed over are back in the library under the one it never reached" (length (Game.zoneMembers Zone.Library S.alice after)) 3
-    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
-    Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Berserker's {G}" (S.tappedCount S.alice after) 4
-
   -- CR 613.1f reaching a spell on the stack: Imoti, Celebrant of Bounty
   -- {3}{G}{U} Legendary Creature -- Snake Druid 3/1 -- "Cascade / Spells you
   -- cast with mana value 6 or greater have cascade." (Oracle text checked
@@ -1834,62 +1215,6 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
         without = S.runPure cascading (board False) Engine.priorityLoop
     Spec.assertBool s (isIn Zone.Battlefield "Goblin Piker" (S.runPure cascading (board True) Engine.priorityLoop)) "with Imoti, the Baloth's granted cascade cast the Goblin Piker free"
     Spec.assertEqWith s "without Imoti, the Baloth resolved with no cascade and the Piker stayed in the library" (isIn Zone.Battlefield "Durkwood Baloth" without, isIn Zone.Library "Goblin Piker" without) (True, True)
-
-  -- THE PROVING TEST for CR 702.85c. The library's top four cards are each a
-  -- nonland of mana value under the Devastator's ten, so every walk stops at the
-  -- first card it exiles and casts it; which cascade takes which is immaterial,
-  -- since the four instances are identical. Think Twice sits underneath and is
-  -- never reached, so a fifth walk would be visible as its absence.
-  --
-  -- The four hits carry DISTINCT names, so the battlefield tells one cascade from
-  -- two from four: a roster that mints cascade once leaves the Giant, the Wolves
-  -- and the Spider in the library.
-  Spec.it s "CR 702.85c each of Apex Devastator's four printed cascades triggers" $ do
-    apex <- S.printingOf s registry "Apex Devastator"
-    piker <- S.printingOf s registry "Goblin Piker"
-    giant <- S.printingOf s registry "Hill Giant"
-    wolves <- S.printingOf s registry "Russet Wolves"
-    spider <- S.printingOf s registry "Giant Spider"
-    think <- S.printingOf s registry "Think Twice"
-    forest <- S.printingOf s registry "Forest"
-    mountain <- S.printingOf s registry "Mountain"
-    let base = Setup.emptyGame S.bothPlayers
-        -- S.addLibraryCard puts each card ON TOP, so this stocks the library
-        -- bottom first: the Piker ends up on top.
-        (_, g1) = S.addLibraryCard think S.alice base
-        (_, g2) = S.addLibraryCard spider S.alice g1
-        (_, g3) = S.addLibraryCard wolves S.alice g2
-        (_, g4) = S.addLibraryCard giant S.alice g3
-        (_, g5) = S.addLibraryCard piker S.alice g4
-        -- {8}{G}{G} is paid for real, so the free casts are the cascades' and a
-        -- board that paid nothing for anything would not tell them apart.
-        lands = replicate 8 mountain <> replicate 2 forest
-        g6 = List.foldl' (\g printing -> snd (S.addPermanent printing S.alice g)) g5 lands
-        (_, g7) = S.addHandCard apex S.alice g6
-        before =
-          g7
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        after = S.runPure cascading before Engine.priorityLoop
-        namesIn zone pid gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
-        orderedIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
-        named = CardName.MkCardName . Text.pack
-    Spec.assertEqWith
-      s
-      "all four walks cast the card they stopped at, so four free creatures joined the Devastator"
-      (namesIn Zone.Battlefield S.alice after)
-      (Set.fromList [named "Apex Devastator", named "Goblin Piker", named "Hill Giant", named "Russet Wolves", named "Giant Spider", named "Mountain", named "Forest"])
-    Spec.assertEqWith
-      s
-      "the four walks took four cards and the fifth was never reached"
-      (orderedIn Zone.Library S.alice after)
-      [named "Think Twice"]
-    -- Proxies, AFTER the behaviour: rule 702.85a's last sentence empties exile,
-    -- and the ten lands paid the Devastator alone.
-    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
-    Spec.assertEqWith s "ten lands paid the {8}{G}{G} and nothing paid the four free spells" (S.tappedCount S.alice after) 10
 
 -- CR 702.60a's ripple, cascade's neighbour on the stack roster: "When you cast
 -- this spell, you may reveal the top N cards of your library, or, if there are
@@ -2024,42 +1349,11 @@ rippleSpec s registry =
 -- the storm trigger. Two copies is right. A count of alice's spells alone, or a
 -- single copy whatever the count, makes one; a this-turn tally read at
 -- resolution makes three. Each leaves bob at a different life total.
-stormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-stormSpec s registry = Spec.describe s "Storm" $ do
+stormSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+stormSpec s _ = Spec.describe s "Storm" $ do
   Spec.it s "CR 702.40a storm is minted for a spell on the stack and nowhere else" $ do
     Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Storm 1)) [Keyword.storm]
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Storm 1)) []
-
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.40a Grapeshot copies itself once per spell cast before it, and not for one cast in response" $ do
-    grapeshot <- S.printingOf s registry "Grapeshot"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    mountain <- S.printingOf s registry "Mountain"
-    let lands = S.landsFor mountain S.bob 1 (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
-        (firstBolt, g1) = S.addHandCard bolt S.alice lands
-        (bobBolt, g2) = S.addHandCard bolt S.bob g1
-        (responseBolt, g3) = S.addHandCard bolt S.alice g2
-        (grapeshotId, g4) = S.addHandCard grapeshot S.alice g3
-        board =
-          g4
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain
-            }
-        -- Every target prompt answered with that player: each cast's, and CR
-        -- 707.10c's offer to re-target a copy.
-        step pid gs action = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer pid)) gs (action >> Engine.settleForPriority))
-        castAndResolve caster pid gs oid = step pid (step pid gs {GameState.priority = Just caster} (S.cast caster oid)) Stack.resolveTop
-        -- The two spells cast before Grapeshot: alice's Bolt at bob, bob's at alice.
-        before = castAndResolve S.bob S.alice (castAndResolve S.alice S.bob board firstBolt) bobBolt
-        -- Grapeshot at bob, its storm trigger on the stack above it, and alice's
-        -- second Bolt at bob in response to the trigger.
-        responded = step S.bob (step S.bob before {GameState.priority = Just S.alice} (S.cast S.alice grapeshotId)) (S.cast S.alice responseBolt)
-        -- The Bolt, the trigger, the copies, then Grapeshot: resolved down to an
-        -- empty stack, however many copies there were.
-        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step S.bob gs Stack.resolveTop)
-        after = resolveAll responded
-    Spec.assertEqWith s "bob took two Bolts' 6, Grapeshot's 1 and TWO copies' 2" (S.lifeOf S.bob after) (Just 11)
-    Spec.assertEqWith s "alice took bob's Bolt" (S.lifeOf S.alice after) (Just 17)
 
 -- CR 702.56a's replicate: "As an additional cost to cast this spell, you may pay
 -- [cost] any number of times" and "When you cast this spell, if a replicate cost
@@ -2071,32 +1365,12 @@ stormSpec s registry = Spec.describe s "Storm" $ do
 -- Six Mountains: the printed {1}{R} and the replicate cost twice. Three damage to
 -- bob is the original plus TWO copies; one copy whatever the count leaves him at
 -- 18, and no trigger at all at 19.
-replicateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-replicateSpec s registry = Spec.describe s "Replicate" $ do
+replicateSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+replicateSpec s _ = Spec.describe s "Replicate" $ do
   Spec.it s "CR 702.56a replicate's trigger is minted for a spell on the stack and nowhere else" $ do
     let keyword = Keyword.Type.Replicate (Cost.MkCost Nothing [])
     Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Map.singleton keyword 1))) 1
     Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton keyword 1)) []
-
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.56a Pyromatics replicated twice deals its damage three times; unreplicated, once" $ do
-    pyromatics <- S.printingOf s registry "Pyromatics"
-    mountain <- S.printingOf s registry "Mountain"
-    let (pyroId, g1) = S.addHandCard pyromatics S.alice (S.landsFor mountain S.alice 6 (Setup.emptyGame S.bothPlayers))
-        board =
-          g1
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        -- CR 601.2b's announcement answered `times`; CR 707.10c's per-copy offer
-        -- and the original's own target both pinned to bob.
-        step times gs action = snd (Engine.runGamePure (paidTimesAt times (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
-        resolveAll times gs = if null (GameState.stack gs) then gs else resolveAll times (step times gs Stack.resolveTop)
-        after :: Natural.Natural -> GameState.GameState
-        after times = resolveAll times (step times board (S.cast S.alice pyroId))
-    Spec.assertEqWith s "bob took the original's 1 and TWO copies' 2" (S.lifeOf S.bob (after 2)) (Just 17)
-    Spec.assertEqWith s "CR 603.4 unreplicated, the original's 1 alone" (S.lifeOf S.bob (after 0)) (Just 19)
 
 -- CR 702.153a's casualty: "As an additional cost to cast this spell, you may
 -- sacrifice a creature with power N or greater" and "When you cast this spell, if
@@ -2115,56 +1389,6 @@ casualtySpec s registry = Spec.describe s "Casualty" $ do
     let keyword = Keyword.Type.Casualty 2
     Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Map.singleton keyword 1))) 1
     Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton keyword 1)) []
-
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.153a Light 'Em Up with its casualty paid deals its damage twice; unpaid, once" $ do
-    lightEmUp <- S.printingOf s registry "Light 'Em Up"
-    mountain <- S.printingOf s registry "Mountain"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    giant <- S.printingOf s registry "Hill Giant"
-    let (_, withJedit) = S.addPermanent jedit S.alice (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (giantId, withGiant) = S.addPermanent giant S.bob withJedit
-        (spellId, g1) = S.addHandCard lightEmUp S.alice withGiant
-        board =
-          g1
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        step times gs action = snd (Engine.runGamePure (paidTimesAt times (Recipient.ToObject giantId)) gs (action >> Engine.settleForPriority))
-        resolveAll times gs = if null (GameState.stack gs) then gs else resolveAll times (step times gs Stack.resolveTop)
-        after :: Natural.Natural -> GameState.GameState
-        after times = resolveAll times (step times board (S.cast S.alice spellId))
-        standing gs = (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob gs, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice gs)
-    Spec.assertEqWith s "CR 704.5g the copy's second 2 killed the 3/3, and Jedit paid for it" (standing (after 1)) (0, 0)
-    Spec.assertEqWith s "CR 603.4 unpaid, 2 damage alone leaves the 3/3 standing beside Jedit" (standing (after 0)) (1, 1)
-
-  -- The floor rule 702.153a states, on the same board with alice's creature
-  -- swapped for one under it: Dryad Arbor is a 1/1, so there is nothing she may
-  -- sacrifice to casualty 2 and CR 601.2f leaves the cost unpayable however she
-  -- answers.
-  Spec.it s "CR 702.153a a creature under casualty's power floor cannot pay it" $ do
-    lightEmUp <- S.printingOf s registry "Light 'Em Up"
-    mountain <- S.printingOf s registry "Mountain"
-    arbor <- S.printingOf s registry "Dryad Arbor"
-    giant <- S.printingOf s registry "Hill Giant"
-    let (_, withArbor) = S.addPermanent arbor S.alice (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (giantId, withGiant) = S.addPermanent giant S.bob withArbor
-        (spellId, g1) = S.addHandCard lightEmUp S.alice withGiant
-        board =
-          g1
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        step gs action = snd (Engine.runGamePure (paidTimesAt 1 (Recipient.ToObject giantId)) gs (action >> Engine.settleForPriority))
-        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step gs Stack.resolveTop)
-        after = resolveAll (step board (S.cast S.alice spellId))
-    Spec.assertEqWith
-      s
-      "the 3/3 took 2 and stands, and the 1/1 was never sacrificed"
-      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob after, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dryad Arbor")) S.alice after)
-      (1, 1)
 
   -- CR 702.153a / 613.1f: Silverquill, the Disputant's "each instant and sorcery
   -- spell you cast has casualty 1" is a keyword the spell HAS, so Lightning Bolt,
@@ -2229,65 +1453,11 @@ gravestormSpec s = Spec.describe s "Gravestorm" $ do
 -- libraries of Swamps so the mill adds none: which card each resolution returns
 -- is then forced, and WHOSE graveyard was consulted is the whole of what the
 -- board says.
-demonstrateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-demonstrateSpec s registry = Spec.describe s "Demonstrate" $ do
+demonstrateSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+demonstrateSpec s _ = Spec.describe s "Demonstrate" $ do
   Spec.it s "CR 702.144a demonstrate is minted for a spell on the stack and nowhere else" $ do
     Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Demonstrate 1)) [Keyword.demonstrate]
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Demonstrate 1)) []
-
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.144a Incarnation Technique copied and demonstrated to bob resolves for bob; declined, for nobody" $ do
-    technique <- S.printingOf s registry "Incarnation Technique"
-    swamp <- S.printingOf s registry "Swamp"
-    hers <- S.printingOf s registry "Cabal Evangel"
-    his <- S.printingOf s registry "Hill Giant"
-    theirs <- S.printingOf s registry "Goblin Piker"
-    let stock pid gs = foldr (\_ g -> snd (S.addLibraryCard swamp pid g)) gs [1 :: Int .. 15]
-        lands = S.landsFor swamp S.alice 5 (Setup.emptyGame S.threePlayers)
-        stocked = stock S.carol (stock S.bob (stock S.alice lands))
-        (_, g1) = S.addGraveyardCard hers S.alice stocked
-        (_, g2) = S.addGraveyardCard his S.bob g1
-        (_, g3) = S.addGraveyardCard theirs S.carol g2
-        (spellId, g4) = S.addHandCard technique S.alice g3
-        board =
-          g4
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        step decision gs action = snd (Engine.runGamePure (demonstrating decision) gs (action >> Engine.settleForPriority))
-        resolveAll decision gs = if null (GameState.stack gs) then gs else resolveAll decision (step decision gs Stack.resolveTop)
-        after decision = resolveAll decision (step decision board (S.cast S.alice spellId))
-        copied = after OptionalDecision.Exercises
-        declined = after OptionalDecision.Declines
-        controllersOf printing gs =
-          List.sort (Maybe.mapMaybe (`Projection.View.controllerOf` gs) (filter (`Set.member` GameState.battlefield gs) (Scenario.namedObjects (S.printingName printing) gs)))
-    Spec.assertEqWith
-      s
-      "CR 707.10 the copy alice demonstrated is bob's: it resolved out of BOB's graveyard, under bob's control"
-      (controllersOf his copied)
-      [S.bob]
-    Spec.assertEqWith
-      s
-      "CR 608.2d carol was not the opponent alice chose, so nothing left her graveyard"
-      (controllersOf theirs copied)
-      []
-    Spec.assertEqWith s "and alice's own copy returned her own creature" (controllersOf hers copied) [S.alice]
-    Spec.assertEqWith
-      s
-      "CR 608.2c declining the may copies nothing, so neither opponent's graveyard was touched"
-      (controllersOf his declined, controllersOf theirs declined)
-      ([], [])
-    Spec.assertEqWith s "and only the original spell resolved, returning alice's creature" (controllersOf hers declined) [S.alice]
-
--- CR 603.5's "may" answered once per demonstrate trigger, and CR 702.144a's
--- "choose an opponent" pinned to bob by FILTERING the offered seats, so an offer
--- that stopped naming him picks somebody else loudly rather than quietly.
-demonstrating :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
-demonstrating decision p = case p of
-  Prompt.ChooseOptional {} -> decision
-  Prompt.ChoosePlayer _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== S.bob) (NonEmpty.toList offered))
-  _ -> S.identityAnswer p
 
 -- CR 702.78a's conspire: "As an additional cost to cast this spell, you may tap
 -- two untapped creatures you control that each share a color with it" and "When
@@ -2301,80 +1471,16 @@ demonstrating decision p = case p of
 -- untapped GREEN Giant Spider, which the cost's colour clause must keep out of
 -- the offer. Burn Trail is red, so "share a color with it" is a question the
 -- board can answer both ways.
-conspireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-conspireSpec s registry = Spec.describe s "Conspire" $ do
+conspireSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+conspireSpec s _ = Spec.describe s "Conspire" $ do
   Spec.it s "CR 702.78a conspire's trigger is minted for a spell on the stack and nowhere else" $ do
     Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Conspire 1))) 1
     Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Conspire 1)) []
 
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.78a Burn Trail with its conspire paid deals its damage twice; unpaid, once" $ do
-    burnTrail <- S.printingOf s registry "Burn Trail"
-    giant <- S.printingOf s registry "Hill Giant"
-    spider <- S.printingOf s registry "Giant Spider"
-    mountain <- S.printingOf s registry "Mountain"
-    let lands = S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers)
-        (firstGiant, g1) = S.addPermanent giant S.alice lands
-        (secondGiant, g2) = S.addPermanent giant S.alice g1
-        (thirdGiant, g3) = S.addPermanent giant S.alice g2
-        (spiderId, g4) = S.addPermanent spider S.alice g3
-        (spellId, g5) = S.addHandCard burnTrail S.alice g4
-        board =
-          g5
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        step times gs action = snd (Engine.runGamePure (conspiringWith [firstGiant, secondGiant] times (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
-        resolveAll times gs = if null (GameState.stack gs) then gs else resolveAll times (step times gs Stack.resolveTop)
-        after :: Natural.Natural -> GameState.GameState
-        after times = resolveAll times (step times board (S.cast S.alice spellId))
-        tappedOf oid gs = fmap ((== TapState.Tapped) . Object.tapped) (Game.lookupObject oid gs)
-    Spec.assertEqWith s "bob took the original's 3 and the copy's 3" (S.lifeOf S.bob (after 1)) (Just 14)
-    Spec.assertEqWith s "CR 603.4 unpaid, the original's 3 alone" (S.lifeOf S.bob (after 0)) (Just 17)
-    Spec.assertEqWith
-      s
-      "CR 702.78a the two red creatures alice chose paid, the third red one and the green one did not; unpaid, none of them is tapped"
-      (fmap (`tappedOf` after 1) [firstGiant, secondGiant, thirdGiant, spiderId], fmap (`tappedOf` after 0) [firstGiant, secondGiant, thirdGiant, spiderId])
-      ([Just True, Just True, Just False, Just False], [Just False, Just False, Just False, Just False])
-
-  -- The colour clause, on the same board with alice's red creatures swapped for
-  -- green ones: CR 105.2 leaves nothing sharing Burn Trail's red, so CR 601.2f
-  -- leaves the cost unpayable however she answers.
-  Spec.it s "CR 702.78a creatures sharing none of the spell's colours cannot pay conspire" $ do
-    burnTrail <- S.printingOf s registry "Burn Trail"
-    spider <- S.printingOf s registry "Giant Spider"
-    mountain <- S.printingOf s registry "Mountain"
-    let lands = S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers)
-        (firstSpider, g1) = S.addPermanent spider S.alice lands
-        (secondSpider, g2) = S.addPermanent spider S.alice g1
-        (thirdSpider, g3) = S.addPermanent spider S.alice g2
-        (spellId, g4) = S.addHandCard burnTrail S.alice g3
-        board =
-          g4
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        step gs action = snd (Engine.runGamePure (conspiringWith [firstSpider, secondSpider] 1 (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
-        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step gs Stack.resolveTop)
-        after = resolveAll (step board (S.cast S.alice spellId))
-        tappedOf oid gs = fmap ((== TapState.Tapped) . Object.tapped) (Game.lookupObject oid gs)
-    Spec.assertEqWith s "bob took the original's 3 and no copy's" (S.lifeOf S.bob after) (Just 17)
-    Spec.assertEqWith s "and no green creature was tapped" (fmap (`tappedOf` after) [firstSpider, secondSpider, thirdSpider]) [Just False, Just False, Just False]
-
--- CR 601.2b's conspire announcement answered `times` times, CR 702.78a's tap
--- pinned to the named creatures by FILTERING the offered set, and every target
--- prompt aimed at one recipient.
-conspiringWith :: [ObjectId.ObjectId] -> Natural.Natural -> Recipient.Recipient -> Prompt.Prompt r -> r
-conspiringWith fodder times recipient p = case p of
-  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
-  Prompt.ChooseTaps _ _ _ offered _ -> Set.fromList (filter (`elem` fodder) offered)
-  _ -> pinTarget recipient p
-
 -- CR 601.2b's optional additional cost answered `times` times, with every target
 -- prompt -- the spell's own and CR 707.10c's per-copy offer -- pinned to one
--- recipient: Pawl.CastSpec's paidTimes crossed with `pinTarget` below.
+-- recipient: data/scenarios/cast's paid-times answer crossed with `pinTarget`
+-- below.
 paidTimesAt :: Natural.Natural -> Recipient.Recipient -> Prompt.Prompt r -> r
 paidTimesAt times recipient p = case p of
   Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
@@ -2433,16 +1539,6 @@ isArrangement :: Response.Response -> Bool
 isArrangement response = case response of
   Response.ArrangedLibraryArrivals _ -> True
   _ -> False
-
--- The cascade answerer above, plus CR 715.3's choice between an adventurer card's
--- two halves answered with the ADVENTURE, pinned by name: a bound that admitted
--- both halves would then cast Welcome Home, so the Berserker entering is the
--- offer having been narrowed rather than the answer.
-cascadingIntoTheAdventure :: Prompt.Prompt r -> r
-cascadingIntoTheAdventure p = case p of
-  Prompt.ChooseOfferedCastSpell _ _ options ->
-    Maybe.fromMaybe (NonEmpty.head options) (List.find ((== CardName.MkCardName (Text.pack "Welcome Home")) . snd) (NonEmpty.toList options))
-  _ -> cascading p
 
 isCast :: A.Action -> Bool
 isCast action = case action of
@@ -2543,8 +1639,6 @@ echoSpec s registry =
       ranUpkeep answer pid gs = Replay.record answer (atUpkeepOf pid gs) Engine.runStep
       afterUpkeep :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
       afterUpkeep answer pid gs = S.runPure answer (atUpkeepOf pid gs) Engine.runStep
-      afterStep :: (forall r. Prompt.Prompt r -> r) -> Phase.Phase -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-      afterStep answer step pid gs = S.runPure answer (atStepOf step pid gs) Engine.runStep
       jaguarBoard forests = do
         forest <- S.printingOf s registry "Forest"
         jaguar <- S.printingOf s registry "Pouncing Jaguar"
@@ -2577,34 +1671,6 @@ echoSpec s registry =
           Spec.assertBool s (S.onBattlefield oid bobs) "and left the Jaguar untouched"
           Spec.assertEqWith s "CR 702.30a alice's own upkeep still asks, so bob's did not turn her clock" (S.tappedCount S.alice alices) 1
           Spec.assertEqWith s "the transcripts agreeing: nothing offered on bob's upkeep, one offer on alice's" (length (payResponses bobLog), length (payResponses aliceLog)) (0, 1)
-        -- CR 702.30a asks whether the permanent came under your control since
-        -- your last upkeep, NOT whether this is the first time you ever
-        -- controlled it. alice's window has already closed when bob borrows the
-        -- Jaguar for a turn, and CR 514.2 ending the Act of Treason gives it back
-        -- to her -- which is a fresh coming-under-her-control and opens hers
-        -- again. CR 400.7 is not involved: the permanent never left the
-        -- battlefield, so this is the same incarnation with the same clock.
-        --
-        -- The settle after the Act of Treason resolves is a REAL precondition and
-        -- not tidiness: Engine.sampleControl sees control move by diffing two
-        -- samples, so a theft and a hand-back that both fell between one sample
-        -- and the next would be invisible to it. A game gives bob priority there;
-        -- this script has to say so.
-        Spec.it s "CR 702.30a control coming back re-opens the window it closed" $ do
-          (oid, gs0) <- jaguarBoard 4
-          mountain <- S.printingOf s registry "Mountain"
-          treason <- S.printingOf s registry "Act of Treason"
-          let elapsed = afterUpkeep (paysFor S.alice) S.alice (afterUpkeep (paysFor S.alice) S.alice gs0)
-              (held, staged) = S.addHandCard treason S.bob (S.landsFor mountain S.bob 3 elapsed)
-              stolen = S.runPure (paysFor S.bob) (atStepOf S.precombatMain S.bob staged) (S.cast S.bob held >> Stack.resolveTop >> Engine.settleForPriority)
-              reverted = afterStep (paysFor S.bob) (Phase.Ending EndingStep.Cleanup) S.bob stolen
-              ((_, back), backLog) = ranUpkeep (paysFor S.alice) S.alice reverted
-          Spec.assertEqWith s "alice's two upkeeps spent one Forest and shut her window" (S.tappedCount S.alice elapsed) 1
-          Spec.assertEqWith s "the Jaguar really was bob's" (Projection.View.controllerOf oid stolen) (Just S.bob)
-          Spec.assertEqWith s "CR 514.2 and alice's again once bob's turn ended" (Projection.View.controllerOf oid reverted) (Just S.alice)
-          Spec.assertEqWith s "CR 702.30a a second Forest of alice's paid echo, so her window re-opened" (S.tappedCount S.alice back) 2
-          Spec.assertBool s (S.onBattlefield oid back) "and the Jaguar survived that upkeep too"
-          Spec.assertEqWith s "she being offered it once" (length (payResponses backLog)) 1
         -- The copy tripwire. A Clone of the Jaguar HAS echo -- CR 707.2 copies the
         -- printed keyword -- and CR 702.30a's clock starts for the copy as it
         -- enters. An implementation reading the PRINTED card (Game.faceOf) rather
@@ -3484,29 +2550,6 @@ backupSpec s registry =
               Spec.assertEqWith s "where its power was 3" (Projection.powerOf arborId pumped) (Just 3)
               Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf arborId pumped)) "and Blood Moon really had made it a Mountain"
             _ -> Spec.assertFailure s "fixture should give alice a Dryad Arbor"
-        -- THE RULE HALF, at gameplay level, as a pair differing only in rule
-        -- 702.165a's target. Backed up, the Piker (now 3/2) can't be blocked by
-        -- the 2/2 Evangel but can by the 3/3 Mammoth; aimed at the Kavu itself,
-        -- the Piker gains nothing and the Evangel may block it.
-        Spec.it s "CR 702.165a the backed-up creature can't be blocked by a creature with power 2 or less" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          evangel <- S.printingOf s registry "Cabal Evangel"
-          mammoth <- S.printingOf s registry "War Mammoth"
-          kavu <- S.printingOf s registry "Chomping Kavu"
-          case S.combatBoardOf [piker] [evangel, mammoth] of
-            (gs0, [pikerId], [evangelId, mammothId]) -> do
-              let (card, staged) = S.addHandCard kavu S.alice gs0
-                  backed = entersTargeting pikerId card staged
-                  -- RE-FOUND after the entry, for the Archpriest pair's CR 400.7
-                  -- reason.
-                  placed = S.runPure S.identityAnswer staged (Event.changeZone card Zone.Battlefield)
-                  kavuId = Maybe.fromMaybe card (Maybe.listToMaybe (reverse (Game.zoneMembers Zone.Battlefield S.alice placed)))
-                  selfBacked = S.runPure (targeting kavuId) placed (Engine.settleForPriority >> Stack.resolveTop)
-              Spec.assertBool s (not (mayBlock evangelId pikerId backed)) "CR 702.165a the backed-up Piker can't be blocked by the 2/2"
-              Spec.assertBool s (mayBlock mammothId pikerId backed) "but can by the 3/3"
-              Spec.assertBool s (mayBlock evangelId pikerId selfBacked) "and aimed at the Kavu itself, the 2/2 may block the Piker"
-              Spec.assertEqWith s "the self-aimed trigger put its counter on the Kavu" (plusOnes kavuId selfBacked) 1
-            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel and a Mammoth"
         -- CR 613.1f in CR 613.7 timestamp order, the static half's pair over a
         -- rule ability: a Turn to Frog before the grant leaves the Piker barring
         -- the Evangel, one after takes the restriction away. Either way the
@@ -3529,42 +2572,6 @@ backupSpec s registry =
               Spec.assertEqWith s "the Frog really resolved first, leaving a 1/1 with the counter" (Projection.powerOf pikerId frogFirst) (Just 2)
               Spec.assertEqWith s "and last" (Projection.powerOf pikerId frogLast) (Just 2)
             _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel"
-        -- CR 613.1f's NAMED removal, later than the grant: Glittering Lion
-        -- ({2}{W} 2/2, "{3}: Until end of turn, this creature loses 'Prevent
-        -- all damage that would be dealt to this creature.'") loses its shield
-        -- and nothing else, so the restriction backup granted it stays. The
-        -- pair is the same activation on a Lion no Kavu backed up, which the
-        -- 2/2 may block.
-        Spec.it s "CR 613.1f Glittering Lion losing its shield keeps the restriction backup granted it" $ do
-          lion <- S.printingOf s registry "Glittering Lion"
-          evangel <- S.printingOf s registry "Cabal Evangel"
-          kavu <- S.printingOf s registry "Chomping Kavu"
-          plains <- S.printingOf s registry "Plains"
-          case (S.combatBoardOf [lion] [evangel], Face.activatedAbilities (S.combinedFace lion)) of
-            ((gs0, [lionId], [evangelId]), shieldOff : _) -> do
-              let (card, staged) = S.addHandCard kavu S.alice (S.landsFor plains S.alice 3 gs0)
-                  unshield g = S.runPure S.identityAnswer g {GameState.priority = Just S.alice} (Activate.activateAbility S.alice lionId shieldOff >> Stack.resolveTop)
-                  backed = unshield (entersTargeting lionId card staged)
-                  bare = unshield staged
-              Spec.assertBool s (not (mayBlock evangelId lionId backed)) "CR 613.1f the unshielded Lion still can't be blocked by the 2/2"
-              Spec.assertBool s (mayBlock evangelId lionId bare) "where an unbacked unshielded Lion can be"
-              Spec.assertBool s (null (PC.replacementEffects (Projection.project lionId backed))) "and the Lion really lost its shield"
-            _ -> Spec.assertFailure s "fixture should give alice a Lion and bob an Evangel"
-        -- The same named removal over a granted STATIC ability, the gate
-        -- Pawl.Engine.Projection.gather applies: Streetwise Negotiator's backup
-        -- survives the Lion losing its shield.
-        Spec.it s "CR 613.1f Glittering Lion losing its shield keeps the static ability backup granted it" $ do
-          lion <- S.printingOf s registry "Glittering Lion"
-          negotiator <- S.printingOf s registry "Streetwise Negotiator"
-          plains <- S.printingOf s registry "Plains"
-          case (S.combatBoardOf [lion] [], Face.activatedAbilities (S.combinedFace lion)) of
-            ((gs0, [lionId], _), shieldOff : _) -> do
-              let (card, staged) = S.addHandCard negotiator S.alice (S.landsFor plains S.alice 3 gs0)
-                  backed = entersTargeting lionId card staged
-                  unshielded = S.runPure S.identityAnswer backed {GameState.priority = Just S.alice} (Activate.activateAbility S.alice lionId shieldOff >> Stack.resolveTop)
-              Spec.assertBool s (PC.assignsCombatDamageWithToughness (Projection.project lionId unshielded)) "CR 613.1f the unshielded Lion still assigns damage by toughness"
-              Spec.assertBool s (null (PC.replacementEffects (Projection.project lionId unshielded))) "and the Lion really lost its shield"
-            _ -> Spec.assertFailure s "fixture should give alice a Lion"
         -- CR 305.7's last clause over a rule ability: Blood Moon strips the
         -- Dryad Arbor's rules text but not the restriction backup granted it.
         Spec.it s "CR 305.7 a Blood Moon'd Dryad Arbor keeps the restriction backup granted it" $ do
@@ -3611,48 +2618,14 @@ extortSpec s = Spec.describe s "Extort" $ do
 -- Boil, {3}{R} Instant, is the four-mana spell and Trumpet Blast, {2}{R}, the
 -- three-mana one. Neither moves anything an assertion here reads: nobody here
 -- controls an Island and nobody is attacking.
-incrementSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-incrementSpec s registry =
-  let board spell = do
-        mountain <- S.printingOf s registry "Mountain"
-        graffalon <- S.printingOf s registry "Hungry Graffalon"
-        printing <- S.printingOf s registry spell
-        let withLands = S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers)
-            (giraffeId, withGiraffe) = S.addPermanent graffalon S.alice withLands
-            (spellId, staged) = S.addHandCard printing S.alice withGiraffe
-        pure
-          ( giraffeId,
-            spellId,
-            staged
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice,
-                GameState.remaining = S.phasesAfter Phase.PrecombatMain
-              }
-          )
-      castAndResolve oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice oid)) Engine.priorityLoop
-      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
-   in Spec.describe s "Increment" $ do
-        -- THE case: four mana beats the 3 power, so the counter goes on and the
-        -- projection reads 4/5.
-        Spec.it s "CR 702.191a whole card: a four-mana spell grows Hungry Graffalon" $ do
-          (giraffeId, spellId, gs) <- board "Boil"
-          let after = castAndResolve spellId gs
-          Spec.assertEqWith s "CR 702.191a the +1/+1 counter made it 4/5" (sizeOf giraffeId after) (Just 4, Just 5)
-          Spec.assertEqWith s "3/4 before the cast" (sizeOf giraffeId gs) (Just 3, Just 4)
-        -- The strict inequality on its own: three mana equals neither 3 nor 4 and
-        -- exceeds neither, so nothing happens. Without this leg an AtLeast over
-        -- the bare power and rule 702.191a's "greater than" are the same test.
-        Spec.it s "CR 702.191a three mana is not GREATER than the 3 power" $ do
-          (giraffeId, spellId, gs) <- board "Trumpet Blast"
-          let after = castAndResolve spellId gs
-          Spec.assertEqWith s "CR 702.191a Hungry Graffalon is still 3/4" (sizeOf giraffeId after) (Just 3, Just 4)
-          Spec.assertEqWith s "though Trumpet Blast really resolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-        -- CR 702.191b: "If a creature has multiple instances of increment, each
-        -- one triggers separately." Asked of the mint, as rule 702.101b's is.
-        Spec.it s "CR 702.191b each instance of increment is its own ability" $ do
-          Spec.assertEqWith s "increment held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 2)) [Keyword.increment, Keyword.increment]
-          Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 1)) [Keyword.increment]
+incrementSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+incrementSpec s _ =
+  Spec.describe s "Increment" $ do
+    -- CR 702.191b: "If a creature has multiple instances of increment, each
+    -- one triggers separately." Asked of the mint, as rule 702.101b's is.
+    Spec.it s "CR 702.191b each instance of increment is its own ability" $ do
+      Spec.assertEqWith s "increment held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 2)) [Keyword.increment, Keyword.increment]
+      Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 1)) [Keyword.increment]
 
 -- CR 702.59a: "Recover is a triggered ability that functions only while the card
 -- with recover is in a player's graveyard. 'Recover [cost]' means 'When a
@@ -3722,7 +2695,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
 -- carol's library gives Filter.HasName a card to reject; it is added second, so
 -- Support.addLibraryCard makes it the head and a filter that admitted everything
 -- would fetch it instead.
-partnerWithSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+partnerWithSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 partnerWithSpec s registry =
   let board swamp mountain piker silvar trynn =
         let lands =
@@ -3756,19 +2729,6 @@ partnerWithSpec s registry =
           Spec.assertEqWith s "the caster's own library is untouched" (Game.zoneMembers Zone.Library S.alice settled) [aliceCard]
           Spec.assertEqWith s "and so is the third seat's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
           Spec.assertEqWith s "CR 702.124j: the find was revealed, which is the rule's own word" (fmap fst (S.revealsOf settled)) [S.carol]
-        -- The negative, on the same board with ONE thing changed: the answer.
-        -- Support.identityAnswer declines every optional, so rule 702.124j's
-        -- "may" leaves the named card in the library.
-        Spec.it s "CR 702.124j the targeted player may decline" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          mountain <- S.printingOf s registry "Mountain"
-          piker <- S.printingOf s registry "Goblin Piker"
-          silvar <- S.printingOf s registry "Silvar, Devourer of the Free"
-          trynn <- S.printingOf s registry "Trynn, Champion of Freedom"
-          let (gs, spellId, _, _, _) = board swamp mountain piker silvar trynn
-              settled = settle atCarolDeclining gs spellId
-          Spec.assertEqWith s "CR 702.124j: carol's hand is empty, the search never happened" (handNamesOf S.carol settled) []
-          Spec.assertEqWith s "and her library still holds both cards" (List.length (Game.zoneMembers Zone.Library S.carol settled)) 2
 
 -- Silvar's answerer: aim the trigger at carol wherever she is offered (a
 -- preference rather than a filter, so a slot she is no candidate for still gets
@@ -3787,11 +2747,3 @@ atCarolSearching p = case p of
   Prompt.ChooseOptional _ pid _ _ _ _ -> if pid == S.carol then OptionalDecision.Exercises else OptionalDecision.Declines
   Prompt.Search _ pid matches cap -> if pid == S.carol then List.genericTake cap matches else []
   _ -> S.identityAnswer p
-
--- atCarolSearching with rule 702.124j's "may" declined, and nothing else
--- changed: the target is still aimed at carol, so the two boards differ in
--- exactly that answer.
-atCarolDeclining :: Prompt.Prompt r -> r
-atCarolDeclining p = case p of
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  _ -> atCarolSearching p

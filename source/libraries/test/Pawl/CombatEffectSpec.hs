@@ -17,7 +17,6 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
@@ -26,13 +25,11 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
@@ -40,7 +37,6 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -55,7 +51,6 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
@@ -712,19 +707,6 @@ exampleBoard s registry theirs = do
 
 vigilanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
-  Spec.it s "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $ do
-    -- Both creatures in ONE declaration, so a blanket "nothing taps" bug
-    -- cannot pass: the Piker must still tap.
-    windseekerCentaur <- S.printingOf s registry "Windseeker Centaur"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [windseekerCentaur, piker] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
-    case mine of
-      [centaur, p] -> do
-        Spec.assertEqWith s "both attacking" (length (attackersOf after)) 2
-        Spec.assertEqWith s "the centaur is untapped" (tapStateOf centaur after) (Just TapState.Untapped)
-        Spec.assertEqWith s "the piker is tapped" (tapStateOf p after) (Just TapState.Tapped)
-      _ -> Spec.assertFailure s "fixture should have two attackers"
   Spec.it s "CR 702.20b vigilance still attacks" $ do
     -- Vigilance is not a legality question: the creature is declared as an
     -- attacker exactly as normal. It simply skips CR 508.1f's tap.
@@ -912,24 +894,6 @@ runToFirstStrikeDone answer gs0 =
 
 firstStrikeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
-  Spec.it s "CR 702.7b a first striker kills a vanilla blocker and lives" $ do
-    -- The tiger (2/1 first strike) kills the Piker (2/1) in the first-strike
-    -- step; the SBA between steps buries it before it can deal, so the tiger
-    -- survives at zero damage.
-    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [sabretoothTiger] [piker]
-        after = S.runCombat S.aggressiveAnswer gs
-    Spec.assertEqWith s "the blocker is dead" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "the first striker lives" (S.creaturesInPlay S.alice after) 1
-  Spec.it s "CR 510.2 the control: two vanilla 2/1s trade" $ do
-    -- With a Piker in the tiger's place there is one combat damage step and
-    -- both die. So first strike is the sole cause above.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [piker] [piker]
-        after = S.runCombat S.aggressiveAnswer gs
-    Spec.assertEqWith s "alice's is dead" (S.creaturesInPlay S.alice after) 0
-    Spec.assertEqWith s "bob's is dead" (S.creaturesInPlay S.bob after) 0
   Spec.it s "CR 510.4 double strike kills a 3/3 across two steps; first strike does not" $ do
     -- The raptor deals 2 + 2 = 4 to the Ogre (3/3), killing it. A first
     -- striker deals 2 once, and the Ogre lives.
@@ -942,16 +906,6 @@ firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
         afterTiger = S.runCombat S.aggressiveAnswer (frst tigerVs)
     Spec.assertEqWith s "double strike kills the Ogre" (S.creaturesInPlay S.bob afterRaptor) 0
     Spec.assertEqWith s "first strike leaves the Ogre" (S.creaturesInPlay S.bob afterTiger) 1
-  Spec.it s "CR 510.4 a striker killed in the first step does not deal in the second" $ do
-    -- Raptor (double strike) and tiger (first strike) each block-kill the
-    -- other in the first step. Neither is "remaining" for the second step, so
-    -- no second-wave damage; both are simply dead.
-    ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
-    sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
-    let (gs, _, _) = S.combatBoardOf [ridgetopRaptor] [sabretoothTiger]
-        after = S.runCombat S.aggressiveAnswer gs
-    Spec.assertEqWith s "attacker dead" (S.creaturesInPlay S.alice after) 0
-    Spec.assertEqWith s "blocker dead" (S.creaturesInPlay S.bob after) 0
   Spec.it s "CR 510.4 the mixed board: first strike once, vanilla once, double strike twice" $ do
     -- Tiger (first strike), raptor (double strike) and Piker (vanilla) all
     -- attack unblocked. First-strike step: tiger 2 + raptor 2 = 4. Second
@@ -967,76 +921,11 @@ firstStrikeSpec s registry = Spec.describe s "FirstStrike" $ do
     Spec.assertEqWith s "after the first-strike step, bob took 4" (S.lifeOf S.bob mid) (Just 16)
     Spec.assertEqWith s "after both steps, bob took 8" (S.lifeOf S.bob after) (Just 12)
 
--- Attacks and blocks with everything, and casts whenever a cast is legal --
--- aggressiveAnswer's combat decisions with castAnswer's priority decision. The
--- end-of-combat group needs both: the attack has to happen for there to be an
--- attacking creature, and the spell has to be cast for the attacking-ness to be
--- observable.
-attackAndCast :: Prompt.Prompt r -> r
-attackAndCast p = case p of
-  Prompt.ChooseAction {} -> S.castAnswer p
-  _ -> S.aggressiveAnswer p
-
--- alice attacks with one Piker while holding a Kill Shot and exactly the three
--- Plains that pay for it; bob has nothing, so the attack is unblocked. Sits at
--- the declare attackers step like every combatBoardOf board, so the ENGINE
--- declares the attack and carries it forward -- the combat record this group
--- observes is never hand-written. S.addPermanent is what puts the Plains out: it
--- is the "any printing, on the battlefield, untapped and Settled" helper its
--- haddock says it is, and lands need exactly that.
-killShotBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
-killShotBoard plains piker killShot =
-  let (gs0, _, _) = S.combatBoardOf [piker] []
-      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent plains S.alice g))
-      (withCard, _) = S.handOne killShot (addLands 3 gs0)
-   in -- handOne parks its state in a precombat main phase; this board is mid-combat.
-      withCard {GameState.phase = GameState.phase gs0, GameState.priority = GameState.priority gs0}
-
 -- Run whole steps until the end of combat step is the current phase, WITHOUT
 -- running it, so a test can play that one step itself under a different
 -- answerer.
 runToEndOfCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 runToEndOfCombat = S.runToStep (Phase.Combat CombatStep.EndOfCombat)
-
--- CR 511.3: creatures are removed from combat as the end of combat step ENDS, so
--- they are still attacking for the whole of that step -- including its priority
--- round (CR 511.1), where the active player may cast an instant. Kill Shot
--- ("Destroy target attacking creature") is what makes the window observable: it
--- has a legal target during the end of combat step and none after it.
-endOfCombatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-endOfCombatSpec s registry = Spec.describe s "EndOfCombat" $ do
-  Spec.it s "CR 511.3 whole card: Kill Shot destroys an attacker during the end of combat step" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    killShot <- S.printingOf s registry "Kill Shot"
-    let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
-        after = snd (Engine.runGamePure attackAndCast atEnd Engine.runStep)
-    Spec.assertEqWith s "the step under test is the end of combat step" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
-    Spec.assertBool s (not (Map.null (Combat.Type.attackers (GameState.combat atEnd)))) "the Piker is still attacking as the step begins"
-    Spec.assertEqWith s "the attacker was destroyed" (S.creaturesInPlay S.alice after) 0
-  Spec.it s "CR 511.3 the removal still happens, one step later: combat is empty once the step ends" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    killShot <- S.printingOf s registry "Kill Shot"
-    let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
-        after = snd (Engine.runGamePure S.aggressiveAnswer atEnd Engine.runStep)
-    Spec.assertEqWith s "the combat phase is over" (GameState.phase after) Phase.PostcombatMain
-    Spec.assertEqWith s "no attackers" (Combat.Type.attackers (GameState.combat after)) Map.empty
-    -- CR 506.2's designation is scoped to the combat phase, and clearCombat
-    -- resets it alongside the attackers.
-    Spec.assertEqWith s "no defending player" (Combat.Type.defenders (GameState.combat after)) []
-  Spec.it s "CR 511.3 the twin: the same Kill Shot has no target in the postcombat main phase" $ do
-    -- The discriminator for the case above. If IsAttacking simply read True
-    -- for every creature, or if combat were never cleared at all, this would
-    -- kill the Piker too.
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    killShot <- S.printingOf s registry "Kill Shot"
-    let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
-        postcombat = snd (Engine.runGamePure S.aggressiveAnswer atEnd Engine.runStep)
-        after = snd (Engine.runGamePure attackAndCast postcombat Engine.runStep)
-    Spec.assertEqWith s "the step under test is the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
-    Spec.assertEqWith s "the Piker survives" (S.creaturesInPlay S.alice after) 1
 
 -- The state out of a combatBoardOf triple.
 frst :: (a, b, c) -> a
@@ -1055,94 +944,6 @@ m2bExitSpec s registry = Spec.describe s "M2bExit" $ do
     Spec.assertEqWith s "its would-be killer is dead" (S.creaturesInPlay S.bob trade) 0
     Spec.assertEqWith s "double striker deals 4" (S.lifeOf S.bob doubled) (Just 16)
     Spec.assertEqWith s "an attacker-less turn deals nothing" (S.lifeOf S.bob quiet) (Just 20)
-
--- alice is mid-combat with three Pikers; bob holds a Ray of Command and exactly
--- the four Islands that pay for it, and controls nothing else. The board sits at
--- the declare attackers step like every combatBoardOf board, so the ENGINE
--- declares the attack and carries it forward: no test here writes the combat
--- record. S.addPermanent is what puts the Islands out -- the "any printing, on the
--- battlefield, untapped and Settled" helper its haddock says it is.
-rayBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, [ObjectId.ObjectId])
-rayBoard island piker ray =
-  let (gs0, mine, _) = S.combatBoardOf [piker, piker, piker] []
-      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent island S.bob g))
-   in (snd (S.addHandCard ray S.bob (addLands 4 gs0)), mine)
-
--- Attack with everything except `homebody`, never block, cast whenever a cast is
--- offered, and aim every target at `victim`.
---
--- Blocks are DECLINED rather than routed, and that is what keeps the two legs
--- comparable: a stolen attacker arrives untapped (Ray of Command untaps it) and
--- hasty under its new controller, so an aggressive blocker answer would have bob
--- block with the very creature the case is about and hide the damage question
--- behind CR 509.1's routing.
-steal :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-steal homebody victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
-  Prompt.ChooseAction {} -> S.castAnswer p
-  Prompt.DeclareAttackers _ _ ids -> filter (/= homebody) ids
-  Prompt.DeclareBlockers {} -> Map.empty
-  _ -> S.aggressiveAnswer p
-
--- CR 506.4: "A permanent is removed from combat if it leaves the battlefield, if
--- its controller changes, ..." -- and a creature so removed "stops being an
--- attacking, blocking, blocked, and/or unblocked creature".
---
--- Ray of Command is this group's producer for the control-change clause: {3}{U},
--- INSTANT, "Untap target creature an opponent controls and gain control of it
--- until end of turn. That creature gains haste until end of turn." Act of Treason
--- has the same three effects and cannot reach this window at all, because it is a
--- sorcery -- which is why this clause was worked card-driven rather than built
--- speculatively. Ray of Command's third sentence, the delayed trigger that taps the
--- creature when its controller loses it, does not reach these legs: every one of
--- them stops at the end of combat step, well before the CR 514.2 sweep that ends
--- the control effect. Pawl.TriggerSpec's "RayOfCommand" group is what proves it.
---
--- Every leg runs whole steps through Engine.runStep, so the combat record under
--- test is the engine's own and the removal is observed where a player would see
--- it: at the CR 117.5 settle that follows the spell resolving. Each leg stops at
--- the end of combat step, where CR 511.3 says the record still reads live.
-controlChangeRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ do
-  Spec.it s "CR 506.4 whole card: Ray of Command on an attacker removes THAT attacker from combat, and it deals no combat damage" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    rayOfCommand <- S.printingOf s registry "Ray of Command"
-    killShot <- S.printingOf s registry "Kill Shot"
-    case (rayBoard island piker rayOfCommand, S.spellTargetSlot killShot) of
-      ((gs, [stolen, other, homebody]), Just attackingSlot) -> do
-        let atEnd = runToEndOfCombat (steal homebody stolen) gs
-            attackers = Combat.Type.attackers (GameState.combat atEnd)
-            legal = Target.legalRecipients Nothing S.noSource attackingSlot atEnd
-        Spec.assertEqWith s "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
-        Spec.assertEqWith s "bob really did gain control of it" (Projection.controllerOf stolen atEnd) (Just S.bob)
-        Spec.assertBool s (Map.notMember stolen attackers) "CR 506.4: so it is no longer an attacking creature"
-        Spec.assertBool s (Map.member other attackers) "the attacker bob left alone is untouched"
-        -- The discriminating assertion: the unfixed engine keeps the stolen
-        -- Piker in the record and deals its 2 alongside the other's.
-        Spec.assertEqWith s "CR 510.1: bob takes only the surviving attacker's 2" (S.lifeOf S.bob atEnd) (Just 18)
-        -- CR 508.1k through the door a card actually uses: Kill Shot's own
-        -- committed target slot is Pool.Creatures narrowed by IsAttacking.
-        Spec.assertBool s (not (Set.member (Recipient.ToCreature stolen) legal)) "Filter.IsAttacking no longer finds the stolen creature"
-        Spec.assertBool s (Set.member (Recipient.ToCreature other) legal) "and still finds the one that is attacking"
-      _ -> Spec.assertFailure s "fixture should have three Pikers and Kill Shot a 'target' slot"
-  Spec.it s "CR 506.4 the twin: the same Ray of Command on a creature that is not in combat leaves combat intact" $ do
-    -- The control leg, and the reason the case above is not passing for a
-    -- trivial reason. The SAME card resolves, the SAME settle runs, and
-    -- control really does change -- just not for a combatant. A sampler that
-    -- cleared combat whenever it saw a control change, or whenever anything
-    -- resolved, would take the attackers out here too.
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    rayOfCommand <- S.printingOf s registry "Ray of Command"
-    case rayBoard island piker rayOfCommand of
-      (gs, [one, two, homebody]) -> do
-        let atEnd = runToEndOfCombat (steal homebody homebody) gs
-            attackers = Combat.Type.attackers (GameState.combat atEnd)
-        Spec.assertEqWith s "bob gained control of the creature that stayed home" (Projection.controllerOf homebody atEnd) (Just S.bob)
-        Spec.assertBool s (Map.member one attackers && Map.member two attackers) "both attackers are still attacking"
-        Spec.assertEqWith s "so bob takes both hits" (S.lifeOf S.bob atEnd) (Just 16)
-      _ -> Spec.assertFailure s "fixture should have three Pikers"
 
 -- Labyrinth of Skophos' SECOND activated ability -- "{4}, {T}: Remove target
 -- attacking or blocking creature from combat" -- read off the JSON-loaded
@@ -1235,14 +1036,6 @@ runToEndOfCombatWith answer gs0 =
              in go (n - 1) g1 s1
    in go 8 gs0 False
 
--- Attack with everything except `homebody`, and otherwise behave aggressively --
--- so the board carries an attacking creature, a blocking creature and a creature
--- that is neither, which is what the target filter has to tell apart.
-stayHomeAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-stayHomeAnswer homebody p = case p of
-  Prompt.DeclareAttackers _ _ ids -> filter (/= homebody) ids
-  _ -> S.aggressiveAnswer p
-
 -- CR 506.4: "A permanent is removed from combat if ... an effect specifically
 -- removes it from combat." The rule's one clause a card ASKS for, rather than a
 -- condition the engine has to notice -- and Labyrinth of Skophos is the pool's
@@ -1259,7 +1052,7 @@ stayHomeAnswer homebody p = case p of
 -- Removal is removal only. Nothing here puts a creature back into combat, which
 -- is what the rules say too -- the glossary's "removed from combat" entry has
 -- the permanent take "no further involvement in that combat phase".
-effectRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+effectRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
   Spec.it s "CR 506.4 whole card: Labyrinth of Skophos removes target ATTACKING creature, and it deals no combat damage" $ do
     island <- S.printingOf s registry "Island"
@@ -1280,133 +1073,6 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
         Spec.assertBool s (Map.member attacker (Combat.Type.attackers (GameState.combat quiet))) "control leg: unactivated, the Piker is still attacking"
         Spec.assertEqWith s "and bob takes its 2" (S.lifeOf S.bob quiet) (Just 18)
       _ -> Spec.assertFailure s "fixture should give bob a Labyrinth with two abilities and alice one Piker"
-  Spec.it s "CR 601.2c the card's filter admits the attacker and the blocker and rejects the creature that stayed home" $ do
-    -- Or [IsAttacking, IsBlocking], and both halves are load-bearing: with
-    -- IsAttacking alone the blocker would be rejected, and with no filter at
-    -- all the homebody would be admitted.
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
-    case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker, piker] [piker]) of
-      (Just ability, (gs, [attacker, homebody], [blocker], _)) -> do
-        -- The combat damage step is the vantage point: blockers have been
-        -- declared and nothing has died yet.
-        let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) (stayHomeAnswer homebody) gs
-            legal = fmap (\theSlot -> Target.legalRecipients Nothing S.noSource theSlot atDamage) (removalTargetSlot ability)
-            admits oid = fmap (Set.member (Recipient.ToCreature oid)) legal
-        Spec.assertEqWith s "the fixture reached the combat damage step with blocks declared" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
-        Spec.assertBool s (Set.member blocker (Combat.blockersOf attacker atDamage)) "the blocker really is blocking the attacker"
-        Spec.assertEqWith s "IsAttacking admits the attacker" (admits attacker) (Just True)
-        Spec.assertEqWith s "IsBlocking admits the blocker" (admits blocker) (Just True)
-        Spec.assertEqWith s "and the creature in neither role is rejected" (admits homebody) (Just False)
-      _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Labyrinth, and bob a blocker"
-
--- Save Point's only activated ability, read off the JSON-loaded printing for
--- removalAbility's reason.
-savePointAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-savePointAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
-  [ability] -> Just ability
-  _ -> Nothing
-
--- mazeAnswer's shape, and stateful for mazeAnswer's reason -- but with no target
--- and no mana to choose: Save Point's whole cost is sacrificing itself, so the
--- activation either happens or the rider refused it, and nothing else can
--- explain a leg where it did not.
-savePointAnswer ::
-  ObjectId.ObjectId ->
-  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
-  Prompt.Prompt r ->
-  State.State Bool r
-savePointAnswer pointId ability p = case p of
-  Prompt.ChooseAction _ _ actions -> do
-    tried <- State.get
-    if tried || notElem (A.Activate pointId ability) actions
-      then pure A.Pass
-      else do
-        State.put True
-        pure (A.Activate pointId ability)
-  _ -> pure (S.aggressiveAnswer p)
-
--- CR 506.4 read over a SET rather than one named permanent, which is what
--- Effect.RemoveFromCombat's ObjectRef payload buys and what Labyrinth of Skophos
--- above cannot show: its ability names one target, so a fold over a one-element
--- group and a reader that takes the head agree on every board it builds.
---
--- Save Point, {1}{W} Enchantment (Unknown Event, a Mystery-Booster-style
--- playtest card; oracle text checked against Scryfall): "When this enchantment
--- enters, draw a card. / Sacrifice this enchantment: Remove each creature from
--- combat and untap each creature that attacked this turn. There is an additional
--- combat phase after this one. Activate only during combat before combat damage
--- has been dealt."
---
--- "Each creature" is CR 109.2's unqualified description -- every creature on the
--- battlefield, both players' -- so ObjectRef.EachMatching carries it with no
--- context-relative atom in the filter at all.
---
--- THE BOARD: alice attacks with two Goblin Pikers and bob blocks the first with
--- one of his own. TWO attackers, because one cannot tell a sweep from a reader
--- that removed the head and stopped; a blocker, so CR 509.1h's asymmetry is on
--- the board; and bob's life is the falsifier -- the UNBLOCKED Piker is the one a
--- head-only reader would leave in combat, so 20 against 18 separates the sweep
--- from both a partial removal and a no-op.
---
--- The activation happens in the declare blockers step, which is inside the
--- rider's window (Pawl.ActivateSpec's Save Point case is what pins the window
--- itself).
-savePointSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-savePointSpec s registry = Spec.describe s "Save Point" $ do
-  Spec.it s "CR 701.26b/500.8 the same activation untaps both attackers and adds a combat phase after this one" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    savePoint <- S.printingOf s registry "Save Point"
-    let (gs0, ours, theirs) = S.combatBoardOf [piker, piker] [piker]
-    case (savePointAbility savePoint, ours, theirs) of
-      (Just ability, [blocked, unblocked], [_]) -> do
-        let (pointId, staged) = S.addPermanent savePoint S.alice gs0
-            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer staged
-            atEnd = runToEndOfCombatWith (savePointAnswer pointId ability) atBlockers
-            idle = runToEndOfCombat S.aggressiveAnswer atBlockers
-            nextPhase g = GameState.phase (S.runPure S.identityAnswer g Engine.runStep)
-        Spec.assertEqWith s "CR 508.1f: attacking tapped them both" (fmap (`tapStateOf` atBlockers) [blocked, unblocked]) [Just TapState.Tapped, Just TapState.Tapped]
-        Spec.assertEqWith s "CR 701.26b: both are untapped, so the sweep reached the blocked one and the unblocked one" (fmap (`tapStateOf` atEnd) [blocked, unblocked]) [Just TapState.Untapped, Just TapState.Untapped]
-        Spec.assertEqWith s "CR 500.8: a second combat phase follows this one" (nextPhase atEnd) (Phase.Combat CombatStep.BeginningOfCombat)
-        Spec.assertEqWith s "control leg: unactivated, the surviving attacker stays tapped" (tapStateOf unblocked idle) (Just TapState.Tapped)
-        Spec.assertEqWith s "control leg: and the postcombat main phase follows" (nextPhase idle) Phase.PostcombatMain
-      _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Save Point, and bob a blocker"
-
--- alice is mid-combat with Opalescence, Living Plane and a Goblin Piker, plus one
--- Forest that Living Plane has made a 1/1 creature; bob defends with nothing but
--- the two Swamps that pay for the Doom Blade in his hand. The board sits at the
--- declare attackers step like every combatBoardOf board, so the ENGINE declares
--- the attack: no test here writes the combat record.
---
--- Returns alice's three combatBoardOf permanents in printing order alongside the
--- Forest, which is added separately because it is not one of them.
-unmakeBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId)
-unmakeBoard opalescence livingPlane piker forest swamp doomBlade =
-  let (gs0, mine, _) = S.combatBoardOf [opalescence, livingPlane, piker] []
-      (land, gs1) = S.addPermanent forest S.alice gs0
-      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addPermanent swamp S.bob g))
-   in (snd (S.addHandCard doomBlade S.bob (addSwamps 2 gs1)), mine, land)
-
--- alice attacks with `land` alone, nobody blocks, and whoever is offered a cast
--- takes it and aims every target at `victim`. The shape of `steal` above, with a
--- reason of its own for declining blocks: bob's own lands are 1/1 creatures while
--- Living Plane lives, so an aggressive blocker answer would put them in front of
--- the attacker and hide the question this asks behind CR 509.1's routing.
-unmake :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-unmake land victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
-  Prompt.ChooseAction {} -> S.castAnswer p
-  Prompt.DeclareAttackers _ _ ids -> filter (== land) ids
-  Prompt.DeclareBlockers {} -> Map.empty
-  _ -> S.aggressiveAnswer p
 
 -- alice attacks with one Goblin Piker and holds the Doom Blade and the two
 -- Swamps that pay for it; bob defends with Opalescence, Living Plane and the
@@ -1488,52 +1154,8 @@ unblock blocker victim p = case p of
 --
 -- Every leg runs whole steps through Engine.runStep and stops at the end of
 -- combat step, where CR 511.3 says the record still reads live.
-typeChangeRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+typeChangeRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
-  Spec.it s "CR 506.4 whole cards: an attacking Forest that stops being a creature is removed from combat" $ do
-    forest <- S.printingOf s registry "Forest"
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    opalescence <- S.printingOf s registry "Opalescence"
-    livingPlane <- S.printingOf s registry "Living Plane"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    case unmakeBoard opalescence livingPlane piker forest swamp doomBlade of
-      (gs, [_, plane, _], land) -> do
-        let atEnd = runToEndOfCombat (unmake land plane) gs
-            attackers = Combat.Type.attackers (GameState.combat atEnd)
-        Spec.assertEqWith s "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
-        Spec.assertBool s (elem land (S.attackerDeclarationsOf atEnd)) "the Forest really was attacking: the declaration happened while it was a creature"
-        Spec.assertBool s (not (S.onBattlefield plane atEnd)) "the Doom Blade really did kill Living Plane"
-        Spec.assertBool s (not (Projection.isCreatureOf land atEnd)) "CR 611.3b: so the Forest stopped being a creature"
-        Spec.assertBool s (S.onBattlefield land atEnd) "and is still on the battlefield, so this is the types clause and not the leaves-the-battlefield one"
-        -- The discriminating assertion: the unfixed engine leaves the Forest
-        -- in the record as an attacking creature, which CR 506.3 says a
-        -- noncreature permanent cannot be.
-        Spec.assertBool s (Map.notMember land attackers) "CR 506.4: it is no longer an attacking creature"
-        Spec.assertEqWith s "CR 510.1: and bob takes nothing" (S.lifeOf S.bob atEnd) (Just 20)
-      _ -> Spec.assertFailure s "fixture should give alice Opalescence, Living Plane and a Piker"
-  Spec.it s "CR 506.4 the twin: the same Doom Blade on a creature that is not the animator leaves combat intact" $ do
-    -- The control leg, and the reason the case above is not passing for a
-    -- trivial reason. The SAME card resolves, the SAME settle runs, and a
-    -- creature really does die -- just not the one the Forest's creature-ness
-    -- hangs on. A sampler that cleared combat whenever anything died, or
-    -- whenever anything resolved, would take the Forest out here too.
-    forest <- S.printingOf s registry "Forest"
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    opalescence <- S.printingOf s registry "Opalescence"
-    livingPlane <- S.printingOf s registry "Living Plane"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    case unmakeBoard opalescence livingPlane piker forest swamp doomBlade of
-      (gs, [_, plane, homebody], land) -> do
-        let atEnd = runToEndOfCombat (unmake land homebody) gs
-            attackers = Combat.Type.attackers (GameState.combat atEnd)
-        Spec.assertBool s (not (S.onBattlefield homebody atEnd)) "the Piker that stayed home died instead"
-        Spec.assertBool s (S.onBattlefield plane atEnd) "Living Plane survives"
-        Spec.assertBool s (Projection.isCreatureOf land atEnd) "so the Forest is still a creature"
-        Spec.assertBool s (Map.member land attackers) "and still attacking"
-        Spec.assertEqWith s "so bob takes its 1" (S.lifeOf S.bob atEnd) (Just 19)
-      _ -> Spec.assertFailure s "fixture should give alice Opalescence, Living Plane and a Piker"
   Spec.it s "CR 509.1h a BLOCKER that stops being a creature leaves the attacker blocked, so nothing is dealt combat damage" $ do
     -- The blocker side of the same clause, through the same performer: the
     -- Forest leaves the SET while the attacker's KEY survives, so the Piker
@@ -1685,33 +1307,6 @@ blockAndWane jaceId atBob marchId p = case p of
     [] -> A.Pass
   _ -> blockWithJace jaceId atBob p
 
--- blockWithJace, plus: whoever is offered the cast of the Aura named `aura`
--- takes it and enchants Jace with it -- the other half of the pair blockAndWane
--- makes, stripping card types by CR 205.1a's set rather than by ending an
--- animation. Song of the Dryads strips both at once; Kenrith's Transformation
--- only the planeswalker type.
---
--- The recipient is FILTERED out of what the prompt offers rather than built, and
--- the caller names its tag: Song's "enchant permanent" is a Pool.Permanents slot
--- offering Recipient.ToObject, Kenrith's "enchant creature" a Pool.Creatures one
--- offering Recipient.ToCreature. A hand-built recipient of the wrong tag would be
--- dropped with no error by CR 608.2b's re-read at resolution, where a filter that
--- matches nothing leaves the slot empty and reddens loudly.
---
--- Wax // Wane is in the same hand and both its halves are affordable once the
--- Forests are seated, so unlike blockAndWane the name filter is load-bearing here.
-blockAndEnchant :: Text.Text -> Recipient.Recipient -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-blockAndEnchant aura onJace jaceId atBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (onJace ==) . snd) sets
-  Prompt.ChooseAction _ _ actions -> case filter isAuraCast actions of
-    a : _ -> a
-    [] -> A.Pass
-  _ -> blockWithJace jaceId atBob p
-  where
-    isAuraCast a = case a of
-      A.Cast _ name _ -> name == CardName.MkCardName aura
-      _ -> False
-
 isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
   AttackTarget.OfPlaneswalker _ -> True
@@ -1756,50 +1351,6 @@ addForests :: Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.Obje
 addForests forest n gs =
   let add (ids, g) _ = let (oid, g1) = S.addPermanent forest S.alice g in (ids <> [oid], g1)
    in List.foldl' add ([], gs) [1 .. n]
-
--- CR 506.4's becomes-a-battle clause: "A permanent is removed from combat if ...
--- it's an attacking or blocking creature that ... becomes a battle."
---
--- data/cards/synthetic-besiege-the-front.json is the producer -- "Until end of
--- turn, target creature is a battle in addition to its other types. Put five
--- defense counters on it." -- and it is synthetic because nothing printed adds
--- the battle card type in addition to what a permanent already is (Scryfall
--- o:/battle in addition/ and o:/becomes a battle/ both empty, 2026-09-08). The
--- five defense counters are load-bearing: CR 310.4c reads a battle's defense off
--- its counters and CR 704.5w buries a non-Siege battle at defense 0, which would
--- take the permanent off the battlefield and make this the leaves-the-battlefield
--- clause instead.
---
--- Two attacking Goblin Pikers, one of them granted the type after the
--- declaration: the pair differs in that grant alone, so bob's life delta cannot
--- be a failed declaration.
-battleGrantRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-battleGrantRemovalSpec s registry = Spec.describe s "BattleGrantRemoval" $ do
-  Spec.it s "CR 506.4 whole cards: an attacking creature that becomes a battle is removed from combat" $ do
-    let mine =
-          (S.battlefield S.alice [S.settled "grantee" "Goblin Piker", S.settled "other" "Goblin Piker", S.settled "first" "Island", S.settled "second" "Island", S.settled "third" "Island"])
-            { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
-            }
-        setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.beginningOfCombat
-        choices =
-          Choices.none
-            { Choices.targets = Just [S.aliasRef "grantee"],
-              Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
-            }
-        script =
-          S.turn
-            1
-            [ S.on S.declareAttackers S.alice (S.attack [S.aliasRef "grantee", S.aliasRef "other"]),
-              S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "spell") choices)
-            ]
-    after <- S.play s registry setup script S.combatGame
-    let pikers = Scenario.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) after
-        battles = filter (\oid -> Projection.isBattleOf oid after) pikers
-    -- The discriminating assertion: without the clause the grantee is still an
-    -- attacking creature and bob takes both Pikers' two, for 16.
-    Spec.assertEqWith s "CR 510.1 bob takes only the Piker that stayed in combat" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertEqWith s "CR 508.1k both Pikers really were declared, so this is the removal and not a failed declaration" (length (S.attackerDeclarationsOf after)) 2
-    Spec.assertEqWith s "and the grantee is on the battlefield as a battle at defense five, so CR 704.5w did not bury it" (fmap (\oid -> (S.onBattlefield oid after, S.counterOf CounterKind.Defense oid after)) battles) [(True, 5)]
 
 -- Declare every creature as an attacker and announce CR 508.1b's target by
 -- attacker: `atJace` at the planeswalker, every other at the defending player.
@@ -1903,14 +1454,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
   keywordSpec s registry
   firstStrikeSpec s registry
-  endOfCombatSpec s registry
   m2bExitSpec s registry
   vigilanceSpec s registry
   attacksAloneSpec s registry
   boundedDeclarationSpec s registry
-  controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry
-  battleGrantRemovalSpec s registry
   effectRemovalSpec s registry
-  savePointSpec s registry
   attackerCountSpec s registry

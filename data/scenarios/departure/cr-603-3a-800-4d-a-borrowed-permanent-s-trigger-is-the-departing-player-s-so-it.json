@@ -1,0 +1,207 @@
+{
+  "description": "CR 603.3a/800.4d a borrowed permanent's trigger is the departing player's, so it is never put on the stack",
+  "note": "Bob, at 1 life, controls carol's Soul Warden through his Control Magic (a placed static ability standing for the test's hand-built layer-2 loan) and starts his turn: Bitterblossom's upkeep trigger takes him to 0 and makes a Faerie, which the Warden sees under bob. CR 704.5a then takes bob out of the game, his Control Magic and Faerie leave with him and the Warden is carol's again, yet the trigger was bob's and never reaches the stack: carol stays on 20 and the game goes on. The --control file is the same board without the Control Magic: carol's own Warden's trigger goes on the stack and she gains 1, which shows the departing player's Faerie was seen at all.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 1,
+        "battlefield": [
+          {
+            "card": "Bitterblossom",
+            "label": "blossom"
+          },
+          {
+            "card": "Control Magic",
+            "label": "magic",
+            "attached": "warden"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Soul Warden",
+            "label": "warden"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "Untap"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$warden",
+          "is": "bob"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $blossom"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$warden",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Faerie Rogue Token",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Result",
+          "is": null
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "check": {
+        "Life": {
+          "player": "carol",
+          "life": 20
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "carol",
+        "life": 20
+      }
+    },
+    {
+      "Life": {
+        "player": "bob",
+        "life": 0
+      }
+    },
+    {
+      "View": {
+        "of": "Result",
+        "is": null
+      }
+    }
+  ]
+}

@@ -80,7 +80,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -93,10 +92,8 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -114,7 +111,6 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.TapState as TapState
@@ -370,7 +366,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
       [oid] -> Spec.assertEqWith s "not castable once it is nobody's commander" (S.castable S.alice oid undesignated) False
       _ -> Spec.assertBool s False "expected one commander"
 
-taxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+taxSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 taxSpec s registry = Spec.describe s "Tax" $ do
   -- CR 903.8's second sentence, at zero: the FIRST cast from the command zone has
   -- no previous cast to pay for, so it costs the printed {3}{R} and nothing more.
@@ -384,54 +380,6 @@ taxSpec s registry = Spec.describe s "Tax" $ do
         let after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
         Spec.assertEqWith s "four Mountains paid" (tappedCount after) 4
         Spec.assertEqWith s "and the cast is counted" (commanderCastsOf after) [1]
-      _ -> Spec.assertBool s False "expected one commander"
-  -- CR 903.9a: Shimatsu resolves as a 0/0, CR 704.5f buries it, and the same CR
-  -- 704.3 settle loop then offers its owner the command zone. The whole rule in one
-  -- board.
-  Spec.it s "CR 903.9a a commander that dies is offered back to the command zone" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let gs = commanderBoard mountain shimatsu 10
-    case inCommandZone gs of
-      [oid] -> do
-        let back = castAndSettle reclaiming oid gs
-        Spec.assertEqWith s "it is in the command zone again" (length (inCommandZone back)) 1
-        Spec.assertEqWith s "and not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice back)) 0
-        Spec.assertEqWith s "nor on the battlefield" (S.creaturesInPlay S.alice back) 0
-      _ -> Spec.assertBool s False "expected one commander"
-  -- CR 903.9a is a "may". The default answerer declines, and the commander then
-  -- stays in the graveyard -- the falsifier for an engine that moved it without
-  -- asking, which would make the case above pass for the wrong reason.
-  Spec.it s "CR 903.9a declining leaves it in the graveyard" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let gs = commanderBoard mountain shimatsu 10
-    case inCommandZone gs of
-      [oid] -> do
-        let after = castAndSettle S.identityAnswer oid gs
-        Spec.assertEqWith s "the command zone is empty" (length (inCommandZone after)) 0
-        Spec.assertEqWith s "and it is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-      _ -> Spec.assertBool s False "expected one commander"
-  -- CR 903.8's whole point: the SECOND cast from the
-  -- command zone costs {2} more. Ten Mountains, four spent on the first cast and
-  -- six on the second -- {3}{R} then {5}{R}.
-  Spec.it s "CR 903.8 the second cast from the command zone costs {2} more" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let gs = commanderBoard mountain shimatsu 10
-    case inCommandZone gs of
-      [oid] -> do
-        let back = castAndSettle reclaiming oid gs
-        Spec.assertEqWith s "one cast so far" (commanderCastsOf back) [1]
-        Spec.assertEqWith s "four Mountains spent on it" (tappedCount back) 4
-        case inCommandZone back of
-          [oid2] -> do
-            Spec.assertEqWith s "the tax is now {2}" (Commander.tax S.alice oid2 back) 2
-            let twice = castAndSettle reclaiming oid2 back
-            Spec.assertEqWith s "two casts now" (commanderCastsOf twice) [2]
-            Spec.assertEqWith s "ten Mountains spent in total: four then six" (tappedCount twice) 10
-            Spec.assertEqWith s "and the tax is {4} for the next one" (fmap (\o -> Commander.tax S.alice o twice) (inCommandZone twice)) [4]
-          _ -> Spec.assertBool s False "expected it back in the command zone"
       _ -> Spec.assertBool s False "expected one commander"
 
 -- Alice's board with TWO commanders designated (CR 702.124h), built through
@@ -461,9 +409,9 @@ inCommandZoneNamed printing gs =
   filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.nameOf (Printing.card printing))) (inCommandZone gs)
 
 -- Cast this commander, resolve it, bin the permanent it became, and settle --
--- which is CR 903.9a's offer, accepted by `reclaiming`. castAndSettle above
--- cannot serve: Shimatsu resolves as a 0/0 that CR 704.5f buries on its own,
--- and Rograkh is a 0/1 that lives, so the trip back has to be made explicitly.
+-- which is CR 903.9a's offer, accepted by `reclaiming`. Shimatsu resolves as a
+-- 0/0 that CR 704.5f buries on its own, and Rograkh is a 0/1 that lives, so the
+-- trip back has to be made explicitly.
 castAndReclaim :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 castAndReclaim printing oid gs =
   let resolved = S.runPure reclaiming (S.runPure reclaiming gs (S.cast S.alice oid)) Stack.resolveTop
@@ -967,12 +915,6 @@ orderingSpec s registry = Spec.describe s "Ordering" $ do
     (board, bounceId, _) <- interdicted s registry
     let after = bouncing S.identityAnswer bounceId board
     Spec.assertEqWith s "it is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
-  -- CR 616.1: the affected object's CONTROLLER picks the order, so bob, who took
-  -- the commander, may let the redirect go first although alice would accept.
-  Spec.it s "CR 616.1 the controller of a stolen commander orders the offer" $ do
-    (board, bounceId, commander) <- interdicted s registry
-    let after = bouncing (returningOnly commander) bounceId (S.giveControl commander S.bob board)
-    Spec.assertEqWith s "bob declined to put the offer first, so it is in exile" (length (Game.zoneMembers Zone.Exile S.alice after), length (inCommandZone after)) (1, 0)
 
 -- bounceBoard with Synthetic Hand Interdiction on the battlefield, and alice's
 -- commander's id there.
@@ -1062,42 +1004,11 @@ tallyFrom owner victim gs =
       tally = foldMap Player.commanderDamage (Map.lookup victim (GameState.players gs))
    in fmap (\printingId -> Map.findWithDefault 0 printingId tally) (Set.toAscList designated)
 
--- One more combat with `attacker` active: CR 502.3's untap, which also ends CR
--- 302.6's summoning sickness, and then the combat phase run step by step through
--- the engine. Everything else on the board carries over, which is what rule
--- 903.10a's "over the course of the game" is about.
---
--- The steps between combats are skipped rather than played, so nobody draws and
--- CR 104.3c cannot decide a case here.
-swing :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-swing answer attacker gs =
-  let untapped =
-        S.runPure answer gs {GameState.activePlayer = attacker} $
-          Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)
-   in S.runCombat
-        answer
-        untapped
-          { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
-            GameState.combat = Combat.emptyCombat,
-            GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.BeginningOfCombat)
-          }
-
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 
-commanderDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+commanderDamageSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
-  -- CR 903.10a counts damage "by the same commander", so a creature that is not
-  -- one contributes nothing however much it deals. Both attack in one combat, so
-  -- the two amounts are told apart by the tally alone.
-  Spec.it s "CR 903.10a only the commander's combat damage is tallied" $ do
-    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_, board) = S.addPermanent piker S.alice (commanderDuel kalakscion jedit)
-        after = swing S.aggressiveAnswer S.alice board
-    Spec.assertEqWith s "bob took 7 from the commander and 2 from the Piker" (S.lifeOf S.bob after) (Just 31)
-    Spec.assertEqWith s "and only the 7 was tallied" (tallyFrom S.alice S.bob after) [7]
   -- CR 903.10a counts COMBAT damage, so the same commander dealing the same
   -- twenty-one points outside combat tallies nothing -- and the victim, at the
   -- same 19 the lethal case below leaves them at, is still playing.
@@ -1113,59 +1024,10 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
         Spec.assertEqWith s "bob lost the 21 life" (S.lifeOf S.bob after) (Just 19)
         Spec.assertEqWith s "nothing was tallied" (tallyFrom S.alice S.bob after) [0]
         Spec.assertEqWith s "and he is still playing" (statusOf S.bob after) (Just Status.Playing)
-  -- CR 903.10a itself: three 7-point swings are exactly 21.
-  Spec.it s "CR 903.10a twenty-one combat damage from one commander loses the game" $ do
-    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    let board = commanderDuel kalakscion jedit
-        after = List.foldl' (\g _ -> swing S.aggressiveAnswer S.alice g) board [1 .. 3 :: Int]
-    Spec.assertEqWith s "bob's tally is 21" (tallyFrom S.alice S.bob after) [21]
-    -- CR 903.7's forty is what makes this assertion the load-bearing one: at 19
-    -- CR 704.5a has not fired, so rule 903.10a is the only rule that can have.
-    Spec.assertEqWith s "and his life is 19, so CR 704.5a did not kill him" (S.lifeOf S.bob after) (Just 19)
-    Spec.assertEqWith s "bob lost" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
-    Spec.assertEqWith s "so alice won" (GameState.result after) (Just (Result.Won S.alice))
-  -- The negative control, on the board above stopped one swing earlier: 14 is not
-  -- 21, and nothing else about the board differs.
-  Spec.it s "CR 903.10a fourteen does not" $ do
-    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    let board = commanderDuel kalakscion jedit
-        after = List.foldl' (\g _ -> swing S.aggressiveAnswer S.alice g) board [1 .. 2 :: Int]
-    Spec.assertEqWith s "bob's tally is 14" (tallyFrom S.alice S.bob after) [14]
-    Spec.assertEqWith s "he is at 26" (S.lifeOf S.bob after) (Just 26)
-    Spec.assertEqWith s "still playing" (statusOf S.bob after) (Just Status.Playing)
-    Spec.assertEqWith s "and the game has no result" (GameState.result after) Nothing
-  -- "By the SAME commander", which two seats cannot tell from "by commanders":
-  -- carol is dealt 14 by alice's Kalakscion and 10 by bob's Jedit, which is 24 in
-  -- all and neither tally at 21.
-  Spec.it s "CR 903.10a damage from two different commanders does not combine" $ do
-    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let seated = designating [(S.alice, kalakscion), (S.bob, jedit), (S.carol, shimatsu)] S.threePlayerGame
-        board = intoPlay S.bob (intoPlay S.alice seated)
-        after = List.foldl' (flip (swing (S.attackTo S.carol))) board [S.alice, S.alice, S.bob, S.bob]
-    Spec.assertEqWith s "alice's commander dealt carol 14" (tallyFrom S.alice S.carol after) [14]
-    Spec.assertEqWith s "bob's dealt her 10" (tallyFrom S.bob S.carol after) [10]
-    Spec.assertEqWith s "24 in all, so she is at 16" (S.lifeOf S.carol after) (Just 16)
-    Spec.assertEqWith s "and neither tally reaches 21, so she is still playing" (statusOf S.carol after) (Just Status.Playing)
-    Spec.assertEqWith s "with no result" (GameState.result after) Nothing
-
--- CR 903.12a: alice's commander on the battlefield and bob's in the command
--- zone, exactly as commanderDuel leaves them, but with the Brawl option turned
--- on BEFORE the decks are built -- CR 903.12f's life total is set by
--- Setup.createDeck, so a board that turned it on afterwards would still start
--- at CR 903.7's forty.
-brawlDuel :: Printing.Printing -> Printing.Printing -> GameState.GameState
-brawlDuel mine theirs =
-  let empty = Setup.emptyGame S.bothPlayers
-      brawling = empty {GameState.settings = (GameState.settings empty) {GameSettings.brawl = True}}
-   in intoPlay S.alice (designating [(S.alice, mine), (S.bob, theirs)] brawling)
 
 -- Alice's Brawl deck with one commander, built through Setup.createDeck like
--- commanderBoard -- CR 903.12a's option turned on before the deck is built, for
--- brawlDuel's reason.
+-- commanderBoard -- CR 903.12a's option turned on before the deck is built,
+-- since CR 903.12f's life total is set by Setup.createDeck.
 brawlDesignating :: Printing.Printing -> GameState.GameState
 brawlDesignating commander =
   let empty = Setup.emptyGame S.bothPlayers
@@ -1173,7 +1035,7 @@ brawlDesignating commander =
       deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.singleton commander, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty, Deck.attractions = Map.empty, Deck.planes = Set.empty, Deck.schemes = Map.empty}
    in S.runPure S.identityAnswer brawling (Setup.createDeck S.alice deck)
 
-brawlSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brawlSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 brawlSpec s registry = Spec.describe s "Brawl" $ do
   -- CR 903.12c adds "(b) a planeswalker card" to the three kinds CR 903.3 allows,
   -- and that is the whole of rule 903.12c's difference from rule 903.3. The same
@@ -1184,26 +1046,6 @@ brawlSpec s registry = Spec.describe s "Brawl" $ do
     serra <- S.printingOf s registry "Serra the Benevolent"
     let board = brawlDesignating serra
     Spec.assertEqWith s "Serra is alice's commander in the command zone" (fmap (\oid -> Commander.isCommander oid board) (inCommandZone board)) [True]
-  -- CR 903.12h: "Brawl games do not use the state-based action described in
-  -- rule 704.6c". The same three swings that kill bob in the CR 903.10a group
-  -- above, on a board differing only in GameState.settings.
-  --
-  -- CR 903.12f is what makes the assertion able to differ rather than vacuous:
-  -- at twenty-five, twenty-one combat damage leaves bob at 4, so rule 704.6c is
-  -- the only rule that could have taken him out and switching it off is the
-  -- only thing that can have spared him.
-  Spec.it s "CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game" $ do
-    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
-    jedit <- S.printingOf s registry "Jedit Ojanen"
-    let board = brawlDuel kalakscion jedit
-        after = List.foldl' (\g _ -> swing S.aggressiveAnswer S.alice g) board [1 .. 3 :: Int]
-    Spec.assertEqWith s "CR 903.12f started bob at twenty-five" (S.lifeOf S.bob board) (Just 25)
-    Spec.assertEqWith s "bob is still playing" (statusOf S.bob after) (Just Status.Playing)
-    Spec.assertEqWith s "and the game has no result" (GameState.result after) Nothing
-    Spec.assertEqWith s "he is at 4, so CR 704.5a was never in the race either" (S.lifeOf S.bob after) (Just 4)
-    -- CR 903.12h switches off the state-based action, not CR 903.10a's tally,
-    -- which a card may still read.
-    Spec.assertEqWith s "and the tally still reached 21" (tallyFrom S.alice S.bob after) [21]
 
 -- Accepts CR 903.9a's offer; everything else is the identity answerer. The
 -- default (Script.declining, via Replay.defaultAnswer) LEAVES the commander where
@@ -1213,14 +1055,6 @@ reclaiming :: Prompt.Prompt r -> r
 reclaiming p = case p of
   Prompt.ReturnCommander {} -> CommandZoneDecision.Returns
   _ -> S.identityAnswer p
-
--- Cast the commander and let it resolve, then settle state-based actions -- which
--- is where CR 704.5f buries the 0/0 and CR 903.9a offers it back.
-castAndSettle :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-castAndSettle answer oid gs =
-  let cast = S.runPure answer gs (S.cast S.alice oid)
-      resolved = S.runPure answer cast Stack.resolveTop
-   in S.runPure answer resolved Engine.settleForPriority
 
 -- Alice's board with her LIBRARY stocked, which commanderBoard's is not: its
 -- deck holds nothing but the commander, so every library count below would

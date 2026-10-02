@@ -24,9 +24,6 @@ import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Data.Text as Text
-import qualified Pawl.Engine.Action as Action.Engine
-import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
@@ -46,12 +43,10 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
@@ -62,14 +57,12 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -368,68 +361,6 @@ skipSpec s registry = Spec.describe s "Skip" $ do
           "only this phase's steps dropped"
           (Turn.dropSkippedCombatSteps (Phase.Combat CombatStep.DeclareAttackers) full)
           expected
-  Spec.it s "CR 508.8 no attacker declared skips to end of combat" $
-    -- Nobody has a creature, so no attackers are declared: the declare
-    -- blockers and combat damage steps must not run at all.
-    let (gs, _, _) = S.combatBoardOf [] []
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
-     in Spec.assertEqWith s "jumped past the two dead steps" (GameState.phase after) (Phase.Combat CombatStep.EndOfCombat)
-  Spec.it s "CR 508.8 an attacker keeps the declare blockers step" $ do
-    -- The control: with an attacker, the step after declare attackers is
-    -- declare blockers, exactly as before. So the skip is not "always skip".
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [piker] []
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
-    Spec.assertEqWith s "declare blockers still next" (GameState.phase after) (Phase.Combat CombatStep.DeclareBlockers)
-  Spec.it s "CR 508.8 an attacker-less combat changes no life total" $
-    -- End to end: run the whole combat region. No attackers means no damage,
-    -- and the turn still leaves combat cleanly.
-    let (gs, _, _) = S.combatBoardOf [] []
-        after = S.runCombat S.aggressiveAnswer gs
-     in do
-          Spec.assertEqWith s "bob untouched" (S.lifeOf S.bob after) (Just 20)
-          Spec.assertEqWith s "alice untouched" (S.lifeOf S.alice after) (Just 20)
-          Spec.assertBool s (not (S.inCombatPhase (GameState.phase after))) "left combat"
-  Spec.it s "CR 508.8 the skip stands even when an instant could have been cast" $ do
-    -- bob holds a castable Bolt; nobody attacks. The blockers and damage
-    -- steps are still dropped -- the priority windows an instant would use
-    -- in them do not exist (CR 500.11: proceed as though they don't).
-    --
-    -- The WHOLE step, not just its turn-based actions: CR 508.8's condition
-    -- is settled as the declare attackers step ends, because its second
-    -- clause ("or put onto the battlefield attacking") can only come true in
-    -- that step's priority round -- which is also the round this test's Bolt
-    -- would be cast in.
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (base, _) = S.boltInHand mountain bolt 1 (Phase.Combat CombatStep.DeclareAttackers)
-        armed = base {GameState.activePlayer = S.bob}
-        after = snd (Engine.runGamePure S.identityAnswer armed Engine.runStep)
-        remaining = foldr (:) [] (GameState.remaining after)
-    Spec.assertBool s (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining) "no blockers step"
-    Spec.assertBool s (notElem (Phase.Combat CombatStep.CombatDamage) remaining) "no damage step"
-  Spec.it s "CR 508.8 an attacker removed from combat still keeps the two steps" $ do
-    -- The whole card: alice attacks with her only creature, and bob answers
-    -- with Ray of Command, whose "gain control of it" is CR 506.4's
-    -- control-change clause -- so the Goblin Piker is REMOVED FROM COMBAT
-    -- before the step ends and Combat.Type.attackers is empty when CR 508.8 is
-    -- asked.
-    --
-    -- The steps stay anyway, because CR 508.8's condition is HISTORICAL: "if
-    -- no creatures are DECLARED as attackers". One was. CR 508.1k is the
-    -- rule that keeps the two apart -- a declared creature "remains an
-    -- attacking creature until it's removed from combat", which ends its
-    -- attacking, not its having been declared.
-    piker <- S.printingOf s registry "Goblin Piker"
-    island <- S.printingOf s registry "Island"
-    ray <- S.printingOf s registry "Ray of Command"
-    let (base, _, _) = S.combatBoardOf [piker] []
-        -- {3}{U}, so four.
-        withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) base [1 :: Int .. 4]
-        (_, armed) = S.addHandCard ray S.bob withLands
-        after = snd (Engine.runGamePure castingDefender armed Engine.runStep)
-    Spec.assertEqWith s "the attacker really left combat" (Map.keys (Combat.Type.attackers (GameState.combat after))) []
-    Spec.assertEqWith s "declare blockers still next" (GameState.phase after) (Phase.Combat CombatStep.DeclareBlockers)
   Spec.it s "CR 508.8 a creature put onto the battlefield attacking keeps the two steps" $ do
     -- The rule's SECOND clause on its own, with nothing declared. A DIRECT
     -- call, so the clause is stated with no card in the way: it is what
@@ -446,21 +377,6 @@ skipSpec s registry = Spec.describe s "Skip" $ do
     Spec.assertEqWith s "no declaration was made" (S.attackerDeclarationsOf after) []
     Spec.assertBool s (elem (Phase.Combat CombatStep.DeclareBlockers) remaining) "blockers step kept"
     Spec.assertBool s (elem (Phase.Combat CombatStep.CombatDamage) remaining) "damage step kept"
-
--- aggressiveAnswer, except that it takes any cast on offer instead of passing --
--- the shape the Ray of Command fixture above needs, where alice must attack and
--- bob must then cast. Pawl.Support's castAnswer is the other half of the same
--- pair and declines to attack, so neither one alone will do.
-castingDefender :: Prompt.Prompt r -> r
-castingDefender p = case p of
-  Prompt.ChooseAction _ _ actions ->
-    let isCast a = case a of
-          Action.Cast {} -> True
-          _ -> False
-     in case filter isCast actions of
-          h : _ -> h
-          [] -> Action.Pass
-  _ -> S.aggressiveAnswer p
 
 -- The schedule Engine.advance leaves once the precombat main phase is current:
 -- everything after it in an ordinary turn (Turn.allPhases).
@@ -520,34 +436,6 @@ runTurn answer gs0 =
             let (final, later) = go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
              in (final, GameState.phase g : later)
    in go 32 gs0
-
--- alice at her declare attackers step, defending player bob, with two Settled
--- creatures of the given printing -- the first untapped and free to attack, the
--- second TAPPED so CR 508.1a keeps it out of combat -- four untapped Mountains
--- (exactly Relentless Assault's {2}{R}{R}) and the spell in hand.
-relentlessBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (GameState.GameState, ObjectId, ObjectId, ObjectId)
-relentlessBoard mountain assault piker =
-  let (base, ours, _) = S.combatBoardOf [piker, piker] []
-      (attacker, bystander) = case ours of
-        [a, b] -> (a, b)
-        _ -> error "combatBoardOf should return two creatures"
-      withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) base [1 :: Int .. 4]
-      (gs, spell) = S.handOne assault (S.tapObject bystander withLands)
-   in ( gs
-          { GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice,
-            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = GameState.combat base,
-            GameState.remaining = GameState.remaining base
-          },
-        spell,
-        attacker,
-        bystander
-      )
 
 -- alice in her precombat main phase with priority, six untapped Mountains
 -- (exactly Full Throttle's {4}{R}{R}), one Settled creature of the given
@@ -631,61 +519,6 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
       "two combat phases, back to back"
       (Turn.splicePhases Phase.PrecombatMain [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat] Seq.empty)
       (Turn.expandExtraPhase ExtraPhase.ExtraCombat <> Turn.expandExtraPhase ExtraPhase.ExtraCombat)
-  Spec.it s "CR 500.8 whole card: Aggravated Assault untaps your creatures and adds a combat and a main phase" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    assault <- S.printingOf s registry "Aggravated Assault"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, enchantment, ours, theirs) = assaultBoard mountain assault piker piker
-    case assaultAbility assault of
-      Nothing -> Spec.assertFailure s "Aggravated Assault should print one activated ability"
-      Just ability -> do
-        -- CR 307.5: "Activate only as a sorcery" is a real gate, not decoration
-        -- -- offered in alice's main phase with an empty stack, withheld in her
-        -- combat phase. Asked of Activatable.activatable, because that is what
-        -- Action.legalActions consults; activateAbility itself goes around it.
-        Spec.assertBool s (Activatable.activatable S.alice enchantment ability gs) "offered in the main phase"
-        Spec.assertBool
-          s
-          (not (Activatable.activatable S.alice enchantment ability gs {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}))
-          "withheld in the combat phase"
-        let after = activateAssault ability enchantment gs
-        -- CR 701.26b over the swept set: alice's creature, and only it.
-        Spec.assertEqWith s "alice's creature untapped" (fmap Object.tapped (Game.lookupObject ours after)) (Just TapState.Untapped)
-        Spec.assertEqWith s "bob's creature still tapped" (fmap Object.tapped (Game.lookupObject theirs after)) (Just TapState.Tapped)
-        -- The five Mountains paid the cost, so they are tapped -- and they
-        -- are lands, so "all creatures you control" must leave them alone.
-        Spec.assertEqWith s "the lands that paid stay tapped" (S.tappedCount S.alice after) 5
-        -- CR 500.8: "directly after the specified phase", not at the end of
-        -- the turn. The whole of the ordinary remainder still follows.
-        Spec.assertEqWith
-          s
-          "the phases went in directly after this main phase"
-          (GameState.remaining after)
-          (Turn.combatAndMainPhase <> afterPrecombatMain)
-        Spec.assertEqWith s "and the main phase it was activated in is still current" (GameState.phase after) Phase.PrecombatMain
-  Spec.it s "CR 508.8 + 500.8 skipping the added combat phase leaves the turn's own combat phase whole" $ do
-    -- The falsifier for #31. The added combat phase runs FIRST (it goes in
-    -- directly after the precombat main phase), nobody attacks in it, so CR
-    -- 508.8 skips its declare blockers and combat damage steps -- and the
-    -- turn's own combat phase, still ahead in the schedule, must keep both.
-    mountain <- S.printingOf s registry "Mountain"
-    assault <- S.printingOf s registry "Aggravated Assault"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, enchantment, _, _) = assaultBoard mountain assault piker piker
-    case assaultAbility assault of
-      Nothing -> Spec.assertFailure s "Aggravated Assault should print one activated ability"
-      Just ability -> do
-        -- Three steps: the main phase ends, then beginning of combat, then
-        -- declare attackers -- which is where Combat.skipEmptyCombat fires.
-        let resolved = activateAssault ability enchantment gs
-            step g = snd (Engine.runGamePure S.identityAnswer g Engine.runStep)
-            after = step (step (step resolved))
-        Spec.assertEqWith s "the added combat jumped to its end of combat step" (GameState.phase after) (Phase.Combat CombatStep.EndOfCombat)
-        Spec.assertEqWith
-          s
-          "the turn's own combat phase kept every step"
-          (GameState.remaining after)
-          (Seq.fromList [Phase.PostcombatMain] <> afterPrecombatMain)
   Spec.it s "CR 500.8 whole card: a vigilant creature attacks in the added combat phase AND the turn's own" $ do
     -- CR 506.1's five steps really run twice: Windseeker Centaur has
     -- vigilance (CR 702.20b: attacking does not tap it), so it is a legal
@@ -721,26 +554,6 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
             Phase.Ending EndingStep.Cleanup
           ]
         Spec.assertEqWith s "bob took 2 in each of the two combats" (S.lifeOf S.bob played) (Just 16)
-  Spec.it s "CR 500.8 whole card: Relentless Assault untaps only what ATTACKED" $ do
-    -- The assertion that distinguishes Filter.AttackedThisTurn from
-    -- "creatures you control": both creatures are alice's and both are
-    -- tapped by the time the spell resolves, and only the one that was
-    -- DECLARED as an attacker (CR 508.3a) may untap.
-    mountain <- S.printingOf s registry "Mountain"
-    assault <- S.printingOf s registry "Relentless Assault"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, spell, attacker, bystander) = relentlessBoard mountain assault piker
-        fought = S.runCombat (S.attackTo S.bob) gs
-        after = castAndResolve spell fought
-    Spec.assertEqWith s "the spell was cast in the postcombat main phase" (GameState.phase fought) Phase.PostcombatMain
-    Spec.assertEqWith s "it really attacked" (S.attackerDeclarationsOf fought) [attacker]
-    Spec.assertEqWith s "the attacker untapped" (fmap Object.tapped (Game.lookupObject attacker after)) (Just TapState.Untapped)
-    Spec.assertEqWith s "the non-attacker stayed tapped" (fmap Object.tapped (Game.lookupObject bystander after)) (Just TapState.Tapped)
-    Spec.assertEqWith
-      s
-      "and the phases went in directly after this main phase"
-      (GameState.remaining after)
-      (Turn.combatAndMainPhase <> Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup])
   Spec.it s "CR 500.8 Aurelia's added combat phase goes AFTER this one, not inside it" $ do
     -- The falsifier for splicing at the head of GameState.remaining.
     -- Aurelia's trigger resolves in the declare attackers step, where this
@@ -795,24 +608,6 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
       ]
     -- 3 + 2 in each of the two combats.
     Spec.assertEqWith s "bob took both combats" (S.lifeOf S.bob played) (Just 10)
-  Spec.it s "CR 500.8 whole card: Full Throttle adds two combat phases and NO main phase" $ do
-    -- The one two-element payload in the pool, and the one that adds a
-    -- combat phase directly after a combat phase. CR 500.8 fixes neither the
-    -- number nor the kind, which is why the opcode carries a list.
-    mountain <- S.printingOf s registry "Mountain"
-    throttle <- S.printingOf s registry "Full Throttle"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, spell, _) = throttleBoard mountain throttle piker
-        after = castAndResolve spell gs
-    Spec.assertEqWith
-      s
-      "two whole combat phases, back to back, then the ordinary rest of the turn"
-      (GameState.remaining after)
-      ( Turn.expandExtraPhase ExtraPhase.ExtraCombat
-          <> Turn.expandExtraPhase ExtraPhase.ExtraCombat
-          <> afterPrecombatMain
-      )
-    Spec.assertEqWith s "one delayed ability armed" (Seq.length (GameState.delayedTriggers after)) 1
   Spec.it s "CR 603.7b whole card: Full Throttle's delayed trigger fires at EVERY combat this turn" $ do
     -- The falsifier for CR 603.7b's one shot. "At the beginning of each
     -- combat this turn" is a STATED duration, so the ability stays armed and
@@ -840,23 +635,6 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
     Spec.assertEqWith s "bob took 2 in each of the three combats" (S.lifeOf S.bob played) (Just 14)
     -- CR 514.2 ends the stated duration, so nothing is left armed.
     Spec.assertEqWith s "and the store is empty by the end of the turn" (Seq.length (GameState.delayedTriggers played)) 0
-  Spec.it s "CR 511.3 Relentless Assault still finds an attacker after clearCombat" $ do
-    -- The reason the atom reads the turn-scoped event log rather than the
-    -- live combat record. By the postcombat main phase the end of combat
-    -- step has ended, so CR 511.3 has removed every creature from combat and
-    -- Combat.Type.attackers is empty -- an IsAttacking-shaped implementation would
-    -- untap nothing here and this test would fail.
-    mountain <- S.printingOf s registry "Mountain"
-    assault <- S.printingOf s registry "Relentless Assault"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, spell, attacker, _) = relentlessBoard mountain assault piker
-        fought = S.runCombat (S.attackTo S.bob) gs
-    Spec.assertEqWith s "combat really was cleared" (Map.keys (Combat.Type.attackers (GameState.combat fought))) []
-    Spec.assertEqWith
-      s
-      "and the attacker untapped anyway"
-      (fmap Object.tapped (Game.lookupObject attacker (castAndResolve spell fought)))
-      (Just TapState.Untapped)
 
 -- Aim every target slot at one player. Time Warp's slot is Pool.Players, so a
 -- recipient tagged for any other pool is not in its legal set at all.
@@ -992,91 +770,6 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
         after = S.runPure S.identityAnswer gs (S.cast S.bob held >> Stack.resolveTop)
     Spec.assertEqWith s "added in APNAP order, so taken in reverse" (takersOf after) [S.alice, S.bob]
 
--- alice in her precombat main phase with priority, three Islands and a Mountain
--- (exactly Ral Zarek's {2}{U}{R}), Ral cast through the ordinary path so his
--- four loyalty counters come from CR 306.5b, and three more put on by fixture
--- so the -7 is payable. Both libraries stocked, for warpBoard's reason.
-ralBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, GameState.GameState)
-ralBoard island mountain ral piker =
-  let lands = S.landsFor mountain S.alice 1 (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers))
-      stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
-      (withHand, handId) = S.handOne ral (stock (stock lands S.alice) S.bob)
-      positioned =
-        withHand
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      after = S.runPure S.identityAnswer positioned (do S.cast S.alice handId; Stack.resolveTop)
-      named oid = fmap Face.name (Game.faceOf oid after) == Just (CardName.MkCardName (Text.pack "Ral Zarek"))
-      ralId = case filter named (Set.toList (GameState.battlefield after)) of
-        oid : _ -> oid
-        [] -> S.noSource
-   in (ralId, S.addCounter CounterKind.Loyalty 3 ralId after)
-
--- Pins every coin of the -7 BY INDEX, which a pure answerer cannot do -- five
--- faces are five structurally identical prompts -- and counts the flips. The
--- fallback past the end is tails, so a run that flipped more coins than the
--- case pinned cannot inflate the tally. No Prompt.CallCoin arm: the -7 reads
--- the face (CR 705.2's first sentence), so none is asked.
-pinnedFaces :: [CoinFace.CoinFace] -> Prompt.Prompt r -> State.State Int r
-pinnedFaces faces p = case p of
-  Prompt.FlipCoin -> do
-    i <- State.get
-    State.put (i + 1)
-    pure (Maybe.fromMaybe CoinFace.Tails (Maybe.listToMaybe (drop i faces)))
-  _ -> pure (S.identityAnswer p)
-
--- Activate Ral's -7 (his third printed ability) and let it resolve, returning
--- the board and how many coins the engine flipped.
-useMinusSeven :: [CoinFace.CoinFace] -> Printing.Printing -> ObjectId -> GameState.GameState -> (GameState.GameState, Int)
-useMinusSeven faces ral oid gs = case drop 2 (Face.activatedAbilities (S.combinedFace ral)) of
-  ability : _ ->
-    let ((_, after), flips) = State.runState (Engine.runGame (pinnedFaces faces) gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)) 0
-     in (after, flips)
-  [] -> (gs, 0)
-
--- CR 500.7's "multiple extra turns" from ONE effect whose count is bound
--- earlier in the same ability: Ral Zarek ({2}{U}{R} Legendary Planeswalker --
--- Ral, loyalty 4; -7: "Flip five coins. Take an extra turn after this one for
--- each coin that comes up heads." Oracle text read at api.scryfall.com
--- 2026-09-02).
-repeatedExtraTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-repeatedExtraTurnSpec s registry = Spec.describe s "RepeatedExtraTurn" $ do
-  let boardOf = do
-        island <- S.printingOf s registry "Island"
-        mountain <- S.printingOf s registry "Mountain"
-        ral <- S.printingOf s registry "Ral Zarek"
-        piker <- S.printingOf s registry "Goblin Piker"
-        pure (ral, ralBoard island mountain ral piker)
-  Spec.it s "CR 500.7 whole card: Ral Zarek's -7 gives one extra turn per coin that came up heads" $ do
-    (ral, (oid, gs)) <- boardOf
-    Spec.assertEqWith s "the fixture left Ral at seven loyalty" (S.counterOf CounterKind.Loyalty oid gs) 7
-    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
-    -- mutation. Heads, tails, heads, heads, tails: THREE is a reading no other
-    -- implementation produces -- one turn regardless gives [alice, bob, ...],
-    -- the coin COUNT gives five of alice's turns. A tally of flips WON would
-    -- agree here, since Replay.defaultAnswer calls heads; that the -7 asks no
-    -- call at all is Pawl.CoinSpec's "Odds asks no call" case's business.
-    -- Read by running the turns, since CR 500.7 is about who takes them.
-    let (after, flips) = useMinusSeven [CoinFace.Heads, CoinFace.Tails, CoinFace.Heads, CoinFace.Heads, CoinFace.Tails] ral oid gs
-    Spec.assertEqWith
-      s
-      "CR 500.7: three heads, so alice takes three extra turns before bob's ordinary one"
-      (turnTakers 5 after)
-      [S.alice, S.alice, S.alice, S.bob, S.alice]
-    -- Supporting, and after the assertion they could otherwise absorb.
-    Spec.assertEqWith s "three turns pending, all alice's" (takersOf after) [S.alice, S.alice, S.alice]
-    Spec.assertEqWith s "CR 705.1: the -7 flipped five coins" flips 5
-  Spec.it s "CR 500.7 the pair: five tails give no extra turn at all" $ do
-    (ral, (oid, gs)) <- boardOf
-    -- The same board and the same ability with every coin the other way up: a
-    -- count of zero adds nothing, and the seating order hands off to bob.
-    let (after, flips) = useMinusSeven [CoinFace.Tails, CoinFace.Tails, CoinFace.Tails, CoinFace.Tails, CoinFace.Tails] ral oid gs
-    Spec.assertEqWith s "CR 500.7: no heads, so bob's turn follows as usual" (turnTakers 2 after) [S.bob, S.alice]
-    Spec.assertEqWith s "nothing pending" (takersOf after) []
-    Spec.assertEqWith s "CR 705.1: the -7 still flipped five coins" flips 5
-
 -- alice in her precombat main phase with priority, eight untapped Islands
 -- (Savor the Moment's {1}{U}{U} plus Time Warp's {3}{U}{U}, so both can be cast
 -- in the one main phase), one TAPPED creature of hers, and both spells in hand.
@@ -1129,7 +822,7 @@ tapStateOf oid = fmap Object.tapped . Game.lookupObject oid
 -- created after this one and taken BEFORE it, and the printed card skips the
 -- untap step of the turn IT made, not of whichever turn comes next. Two cards
 -- already in the pool reach that divergence.
-turnScopedSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnScopedSkipSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
   let boardOf = do
         island <- S.printingOf s registry "Island"
@@ -1139,40 +832,6 @@ turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
         pure (savorBoard island savor warp piker)
       tapped = Just TapState.Tapped
       untapped = Just TapState.Untapped
-  -- The control that keeps the two below from passing vacuously: an extra
-  -- turn carrying NO skip runs its untap step like any other turn.
-  Spec.it s "CR 502.3 the control: an extra turn with no skip untaps" $ do
-    (gs, _, warp, piker) <- boardOf
-    let resolved = castAndResolveWith (aimPlayer S.alice) warp gs
-        atExtra = runTurns 1 resolved
-        afterExtra = runTurns 1 atExtra
-    Spec.assertEqWith s "the extra turn is alice's" (GameState.activePlayer atExtra) S.alice
-    Spec.assertEqWith s "still tapped going into it" (tapStateOf piker atExtra) tapped
-    Spec.assertEqWith s "and Time Warp's extra turn untaps it" (tapStateOf piker afterExtra) untapped
-  Spec.it s "CR 500.11 whole card: Savor the Moment's extra turn skips its untap step" $ do
-    (gs, savor, _, piker) <- boardOf
-    let resolved = castAndResolve savor gs
-        atExtra = runTurns 1 resolved
-        -- CR 500.11: "to skip a step, phase, or turn is to proceed past
-        -- it as though it didn't exist", and CR 614.1b replaces it with
-        -- nothing -- so CR 502.3's turn-based action never happens.
-        afterExtra = runTurns 1 atExtra
-    Spec.assertEqWith
-      s
-      "one turn was created, alice's, carrying the untap skip"
-      (fmap (\e -> (ExtraTurn.taker e, ExtraTurn.skipped e)) (GameState.extraTurns resolved))
-      [(S.alice, Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))]
-    Spec.assertEqWith s "the extra turn is alice's" (GameState.activePlayer atExtra) S.alice
-    Spec.assertEqWith s "and it untapped nothing" (tapStateOf piker afterExtra) tapped
-    -- The skip named ONE turn (CR 500.11's "skip a step ... of that
-    -- turn", as Savor the Moment prints it) and is gone with it -- NOT CR
-    -- 614.10a's "next", which is the reading these cases exist to rule
-    -- out. bob's turn untaps BOB's permanents (CR 502.3 is about the
-    -- ACTIVE player's), so it is alice's own next turn that has to put
-    -- this right.
-    Spec.assertEqWith s "the turn after it is bob's" (GameState.activePlayer afterExtra) S.bob
-    Spec.assertEqWith s "which is not alice's untap step" (tapStateOf piker (runTurns 1 afterExtra)) tapped
-    Spec.assertEqWith s "alice's next ordinary turn untaps it" (tapStateOf piker (runTurns 2 afterExtra)) untapped
   -- THE PROVING CASE. Savor the Moment creates extra turn A; Time Warp,
   -- cast after it in the same turn, creates extra turn B. CR 500.7: "the
   -- most recently created turn will be taken first", so B is taken first
@@ -1263,25 +922,6 @@ thatTurnSpec s registry = Spec.describe s "ThatExtraTurn" $ do
     Spec.assertBool s (S.alice `elem` Game.stillPlaying atFortuneTurn) "alice survives Time Warp's turn, end step and all"
     Spec.assertEqWith s "Final Fortune's is turn 3, and alice's" (GameState.turnNumber atFortuneTurn, GameState.activePlayer atFortuneTurn) (3, S.alice)
     Spec.assertEqWith s "and alice loses at its end step" (Game.stillPlaying afterFortuneTurn) [S.bob]
-  Spec.it s "CR 611.2a whole card: Chance for Glory's indestructible outlasts the turn" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    island <- S.printingOf s registry "Island"
-    glory <- S.printingOf s registry "Chance for Glory"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let lands = S.landsFor island S.alice 1 (S.landsFor plains S.alice 1 (S.landsInPlay mountain 1))
-        (pikerId, withPiker) = S.addPermanent piker S.alice lands
-        (bobPiker, withBob) = S.addPermanent piker S.bob withPiker
-        (gloryId, withGlory) = S.addHandCard glory S.alice withBob
-        stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
-        gs = (stock (stock withGlory S.alice) S.bob) {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-        resolved = castAndResolve gloryId gs
-        atExtra = runTurns 1 resolved
-        afterExtra = runTurns 1 atExtra
-    Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible pikerId atExtra) "alice's creature is still indestructible on the extra turn"
-    Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible bobPiker atExtra)) "bob's is not"
-    Spec.assertEqWith s "the extra turn is alice's" (GameState.activePlayer atExtra) S.alice
-    Spec.assertEqWith s "and alice loses at its end step" (Game.stillPlaying afterExtra) [S.bob]
 
 -- CR 611.2a / 500.7 / 615.12: a continuous effect lasting "during that turn",
 -- the extra turn the same spell created, through Alchemist's Gambit ({1}{R}{R}
@@ -1358,54 +998,6 @@ gambitSpec s registry = Spec.describe s "AlchemistsGambit" $ do
     Spec.assertEqWith s "the extra turn's 3 cannot be prevented" (struck atExtra) (Just 3)
     Spec.assertEqWith s "alice loses at its end step" (GameState.phase afterExtra, Game.stillPlaying afterExtra) (Phase.Ending EndingStep.EndStep, [S.bob])
 
--- CR 611.2a / 500.7 / 702.193a: Kang the Conqueror ({2}{U}{U}, "Power-up --
--- {5}{U}{U}{U}: Put a +1\/+1 counter on Kang. Take an extra turn after this one.
--- During that turn, power-up abilities can't be activated." -- Oracle verified on
--- Scryfall 2026-09-28), beside Hulk, Gamma Goliath as the other power-up ability
--- and a Prodigal Sorcerer as an ability the prohibition does not name.
---
--- Every reading asks one question off one helper: with eight fresh lands paying
--- Hulk's {6}{R}{G} and alice holding priority in a main phase, is his power-up
--- offered?
-kangSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-kangSpec s registry = Spec.describe s "KangTheConqueror" $ do
-  Spec.it s "CR 611.2a power-up abilities can't be activated during Kang's extra turn, and only then" $ do
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    mountain <- S.printingOf s registry "Mountain"
-    kang <- S.printingOf s registry "Kang the Conqueror"
-    hulk <- S.printingOf s registry "Hulk, Gamma Goliath"
-    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    piker <- S.printingOf s registry "Goblin Piker"
-    -- Kang did not enter this turn, and Hulk's "{3} less" is the only
-    -- reduction: {5}{U}{U}{U} less {3} is five Islands.
-    let (kangId, g1) = S.addPermanent kang S.alice (S.landsInPlay island 5)
-        (hulkId, g2) = S.addPermanent hulk S.alice g1
-        (sorcererId, g3) = S.addPermanent sorcerer S.alice g2
-        stock g pid = List.foldl' (\g4 _ -> snd (S.addLibraryCard piker pid g4)) g [1 .. (10 :: Int)]
-        gs =
-          (stock (stock g3 S.alice) S.bob)
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice,
-              GameState.remaining = S.phasesAfter Phase.PrecombatMain
-            }
-        powerUp = case Face.activatedAbilities (S.combinedFace kang) of
-          ability : _ -> Just ability
-          [] -> Nothing
-        activated = maybe gs (snd . Engine.runGamePure S.identityAnswer gs . Activate.activateAbility S.alice kangId) powerUp
-        resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
-        atExtra = runTurns 1 resolved
-        atBobsTurn = runTurns 1 atExtra
-        ready g = (S.landsFor mountain S.alice 1 (S.landsFor forest S.alice 7 g)) {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-        offered oid g = length (filter (\a -> case a of Action.Activate o _ -> o == oid; _ -> False) (Action.Engine.legalActions S.alice (ready g)))
-    Spec.assertEqWith s "during the extra turn Hulk's power-up is not offered" (offered hulkId atExtra) 0
-    Spec.assertEqWith s "on the turn Kang resolved, the window has not begun" (offered hulkId resolved) 1
-    Spec.assertEqWith s "and on bob's turn after it, the window has closed" (offered hulkId atBobsTurn) 1
-    Spec.assertEqWith s "the Sorcerer's {T}, no power-up ability, is offered during the extra turn" (offered sorcererId atExtra) 1
-    Spec.assertEqWith s "the extra turn is alice's turn 2, and bob's is turn 3" (fmap (\g -> (GameState.turnNumber g, GameState.activePlayer g)) [atExtra, atBobsTurn]) [(2, S.alice), (3, S.bob)]
-    Spec.assertEqWith s "Kang resolved: a +1/+1 counter, and the stack is empty" (S.powerToughnessOf kangId resolved, GameState.stack resolved) (Just (5, 6), [])
-
 -- Alchemist's Gambit's printed {1}{R}{R} and its cleave {4}{U}{U}{R}.
 gambitCost, gambitCleave :: [ManaSymbol.ManaSymbol]
 gambitCost = [ManaSymbol.Generic 1, theRed, theRed]
@@ -1426,45 +1018,6 @@ aimCreature :: ObjectId -> Prompt.Prompt r -> r
 aimCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
-
--- CR 603.7a / 603.7b / 118.12: "at the beginning of your next upkeep, pay ...
--- If you don't, you lose the game", through Pact of the Titan ({0} Instant,
--- "Create a 4/4 red Giant creature token." plus that clause). Onset.Immediately
--- is the whole of "next": the ability watches from its creation, fires once,
--- and only on its controller's upkeep.
-nextUpkeepSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-nextUpkeepSpec s registry = Spec.describe s "PactNextUpkeep" $ do
-  let boardOf = do
-        mountain <- S.printingOf s registry "Mountain"
-        pact <- S.printingOf s registry "Pact of the Titan"
-        piker <- S.printingOf s registry "Goblin Piker"
-        let (pactId, withPact) = S.addHandCard pact S.alice (S.landsInPlay mountain 5)
-            stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
-        pure
-          ( (stock (stock withPact S.alice) S.bob)
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice,
-                GameState.remaining = S.phasesAfter Phase.PrecombatMain
-              },
-            pactId
-          )
-      answering :: PaymentDecision.PaymentDecision -> Prompt.Prompt r -> r
-      answering decision p = case p of
-        Prompt.ChooseToPay {} -> decision
-        _ -> S.identityAnswer p
-      giant = CardName.MkCardName (Text.pack "Giant Token")
-      turnsWith decision n gs = if n <= (0 :: Int) then gs else turnsWith decision (n - 1) (fst (runTurn (answering decision) gs))
-  Spec.it s "CR 118.12 whole card: declining at alice's next upkeep loses her the game" $ do
-    (gs, pact) <- boardOf
-    let resolved = castAndResolve pact gs
-        atBobsTurn = turnsWith PaymentDecision.Declines 1 resolved
-        atAlicesTurn = turnsWith PaymentDecision.Declines 1 atBobsTurn
-        after = turnsWith PaymentDecision.Declines 1 atAlicesTurn
-    Spec.assertEqWith s "the Giant was made" (S.countOnBattlefieldByName giant S.alice resolved) 1
-    Spec.assertEqWith s "bob's upkeep is not alice's" (GameState.activePlayer atAlicesTurn, Game.stillPlaying atAlicesTurn) (S.alice, [S.alice, S.bob])
-    Spec.assertEqWith s "alice lost on her next turn" (Game.stillPlaying after) [S.bob]
-    Spec.assertEqWith s "in its upkeep" (GameState.phase after) (Phase.Beginning BeginningStep.Upkeep)
 
 -- Casts the first castable spell offered and passes otherwise, deferring every
 -- other prompt to S.identityAnswer. This is the CR 724.1f discriminator: under a
@@ -1561,17 +1114,6 @@ endTurnSpec s registry = Spec.describe s "EndTheTurn" $ do
     ((gs, _, _), _, _) <- board
     let phases = snd (runTurn castingFirst gs)
     Spec.assertEqWith s "the postcombat main phase and the end step never ran" phases [Phase.PrecombatMain, Phase.Ending EndingStep.Cleanup]
-  -- CR 724.1b against CR 608.2n: both spells are EXILED, and neither reaches a
-  -- graveyard. Asserting Time Stop's own destination is also what makes a card
-  -- that failed to parse unable to pass this group.
-  Spec.it s "CR 724.1b it exiles the whole stack, the resolving spell included" $ do
-    ((gs, _, _), stopName, burstName) <- board
-    let after = fst (runTurn castingFirst gs)
-    Spec.assertEqWith s "alice's exile holds Time Stop" (namesIn Zone.Exile S.alice after) [Just stopName]
-    Spec.assertEqWith s "bob's exile holds Burst Lightning" (namesIn Zone.Exile S.bob after) [Just burstName]
-    Spec.assertEqWith s "and neither graveyard has either" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([], [])
-    Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
-    Spec.assertEqWith s "and nothing on the stack resolved" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 20)
   -- CR 724.1f: no player gets priority during this process, and CR 724.1d has
   -- ended the step, so the window a sorcery would need never opens. The one
   -- assertion that separates a correct implementation from one that rewrites the
@@ -1680,25 +1222,6 @@ endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
         mandate <- S.printingOf s registry "Mandate of Peace"
         burst <- S.printingOf s registry "Burst Lightning"
         pure (mandateBoard plains mountain piker statue mandate burst, S.printingName mandate, (S.printingName burst, S.printingName piker))
-  -- THE CONTROL, and the same board differing in exactly one thing: whether alice
-  -- casts Mandate of Peace. Without it every negative below is satisfied by a
-  -- board where the combat phase never got this far.
-  Spec.it s "CR 506.1 the control combat phase runs the rest of its steps" $ do
-    ((gs, jade, _, _, _, his), _, (burstName, pikerName)) <- board
-    let phases = snd (runTurn S.aggressiveAnswer gs)
-        after = atPostcombatMain S.aggressiveAnswer gs
-    Spec.assertEqWith s "the rest of combat ran" phases [Phase.Combat CombatStep.DeclareBlockers, Phase.Combat CombatStep.CombatDamage, Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
-    -- CR 500.5a's ordinary sweep: the end of combat step ended, so the animation
-    -- is gone by the postcombat main phase here too. The two implementations
-    -- differ in WHEN, not in whether, which is why every expiry assertion below
-    -- is read at this moment and not at end of turn.
-    Spec.assertBool s (not (Projection.isCreatureOf jade after)) "Jade Statue is no longer a creature"
-    Spec.assertEqWith s "and has no power or toughness" (S.powerToughnessOf jade after) Nothing
-    -- The stack was NOT exiled and the combat damage step ran: bob's Burst
-    -- Lightning resolved for 2, and the blocked attacker traded with its blocker.
-    Spec.assertEqWith s "bob's Burst Lightning resolved" (S.lifeOf S.alice after) (Just 18)
-    Spec.assertEqWith s "the blocked attacker and its blocker traded" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([Just pikerName], [Just burstName, Just pikerName])
-    Spec.assertBool s (S.castable S.bob his after) "and bob may cast the one in his hand"
   -- CR 724.2d/724.2e: the schedule assertion, in its own case so no zone
   -- assertion can absorb a mutation to the jump. The combat damage and end of
   -- combat steps never run, which is the whole of CR 724.2e in pawl -- an "at end
@@ -1707,23 +1230,6 @@ endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
     ((gs, _, _, spell, _, _), _, _) <- board
     let phases = snd (runTurn (castingMandate spell) gs)
     Spec.assertEqWith s "the combat damage and end of combat steps never ran" phases [Phase.Combat CombatStep.DeclareBlockers, Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
-  -- CR 724.2d's removal from combat, in its OWN case: the expiry below could
-  -- otherwise absorb a mutation to it, an animation ending being one way a
-  -- creature stops being one.
-  Spec.it s "CR 724.2d it removes every creature from combat" $ do
-    ((gs, _, attacker, spell, _, _), _, _) <- board
-    let after = GameState.combat (atPostcombatMain (castingMandate spell) gs)
-    Spec.assertEqWith s "the fixture really did attack" (Map.keys (Combat.Type.attackers (GameState.combat gs))) [attacker]
-    Spec.assertEqWith s "no creature is attacking in the postcombat main phase" (Map.keys (Combat.Type.attackers after)) []
-    Spec.assertEqWith s "and none is blocking" (Map.keys (Combat.Type.blockers after)) []
-  -- CR 724.2d's expiry clause, which CR 500.5a scopes to the PHASE: the end of
-  -- combat step never ran, so Engine.runStepThatBegan's own sweep never asked.
-  -- The load-bearing case of the group.
-  Spec.it s "CR 724.2d an until-end-of-combat effect expires though the end of combat step never ran" $ do
-    ((gs, jade, _, spell, _, _), _, _) <- board
-    let after = atPostcombatMain (castingMandate spell) gs
-    Spec.assertBool s (not (Projection.isCreatureOf jade after)) "Jade Statue is no longer a creature"
-    Spec.assertEqWith s "and has no power or toughness" (S.powerToughnessOf jade after) Nothing
   -- CR 724.1d's half of the same clause, on the same board: ending the TURN
   -- during combat ends that combat phase too, so its expiries expire. Read as the
   -- cleanup step begins, since CR 514.2's own sweep does not reach an
@@ -1737,17 +1243,6 @@ endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
     Spec.assertEqWith s "the turn jumped to the cleanup step" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
     Spec.assertBool s (not (Projection.isCreatureOf jade after)) "and Jade Statue is no longer a creature"
     Spec.assertEqWith s "with no power or toughness" (S.powerToughnessOf jade after) Nothing
-  -- CR 724.2b against CR 608.2n: both spells are EXILED, and neither reaches a
-  -- graveyard. Asserting Mandate of Peace's own destination is also what makes a
-  -- card that failed to parse unable to pass this group.
-  Spec.it s "CR 724.2b it exiles the whole stack, the resolving spell included" $ do
-    ((gs, _, _, spell, _, _), mandateName, (burstName, _)) <- board
-    let after = atPostcombatMain (castingMandate spell) gs
-    Spec.assertEqWith s "nothing on the stack resolved" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 20)
-    Spec.assertEqWith s "alice's exile holds Mandate of Peace" (namesIn Zone.Exile S.alice after) [Just mandateName]
-    Spec.assertEqWith s "bob's exile holds Burst Lightning" (namesIn Zone.Exile S.bob after) [Just burstName]
-    Spec.assertEqWith s "and neither graveyard has either" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([], [])
-    Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
   -- CR 724.2f: no player gets priority during the process. The seats that were
   -- offered an action in the declare blockers step, in order -- alice casts,
   -- alice passes, bob passes, and the process runs with the round closed. An
@@ -1763,15 +1258,6 @@ endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
           _ -> pure (castingMandate spell p)
         seats = State.execState (Engine.runGame recording gs Engine.runStep) []
     Spec.assertEqWith s "alice cast, alice passed, bob passed, and nobody else was asked" seats [S.alice, S.alice, S.bob]
-  -- The positive assertion about what the procedure did NOT destroy: CR 724.2d
-  -- expires the effects scoped to the COMBAT PHASE, and Expiry.dropAtEndOf
-  -- compares selectors by equality, so the "this turn" prohibition Mandate of
-  -- Peace installed in the same clause outlives it (CR 514.2).
-  Spec.it s "CR 611.1 the until-end-of-turn prohibition outlives the phase it ended" $ do
-    ((gs, _, _, spell, hers, his), _, _) <- board
-    let after = atPostcombatMain (castingMandate spell) gs
-    Spec.assertBool s (not (S.castable S.bob his after)) "bob may not cast his Burst Lightning"
-    Spec.assertBool s (S.castable S.alice hers after) "and alice, who is not her own opponent, may cast hers"
   -- CR 724.2g: outside a combat phase nothing happens at all -- not the exile,
   -- not the schedule rewrite. Reached by applying the effect directly, since the
   -- card's own rider correctly refuses the cast.
@@ -1783,17 +1269,6 @@ endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
     Spec.assertEqWith s "the stack is untouched" (GameState.stack after) (GameState.stack staged)
     Spec.assertEqWith s "the schedule is untouched" (GameState.remaining after) afterPrecombatMain
     Spec.assertEqWith s "and nobody lost life" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 20)
-  -- CR 601.3 / CR 500.1: the card's own rider, both directions on one board with
-  -- the same mana available in each -- presence alone is satisfied by a
-  -- restriction nothing reads. The third reading pins CR 109.5's scope: "during
-  -- combat" names no turn, so bob's combat phase admits it too.
-  Spec.it s "CR 601.3 Mandate of Peace is castable only during a combat phase" $ do
-    ((gs, _, _, spell, _, _), _, _) <- board
-    let inMain = gs {GameState.phase = Phase.PrecombatMain}
-        onBobsTurn = gs {GameState.activePlayer = S.bob}
-    Spec.assertBool s (S.castable S.alice spell gs) "castable in alice's declare blockers step"
-    Spec.assertBool s (not (S.castable S.alice spell inMain)) "and not in her precombat main phase"
-    Spec.assertBool s (S.castable S.alice spell onBobsTurn) "and castable in bob's combat phase too"
 
 -- alice, active and at her DECLARE BLOCKERS step with a Goblin Piker already
 -- attacking, holding Synthetic Truncate the Fray; bob has a Wall of Stone to
@@ -1933,12 +1408,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   skipSpec s registry
   extraPhaseSpec s registry
   extraTurnSpec s registry
-  repeatedExtraTurnSpec s registry
   turnScopedSkipSpec s registry
   thatTurnSpec s registry
   gambitSpec s registry
-  kangSpec s registry
-  nextUpkeepSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry
   skippedEndOfCombatSpec s registry

@@ -1,0 +1,100 @@
+{
+  "description": "CR 903.10a only the commander's combat damage is tallied",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "life": 40,
+        "battlefield": [
+          {
+            "card": "Kalakscion, Hunger Tyrant",
+            "label": "kalakscion",
+            "ready": true,
+            "commander": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 40,
+        "command": [
+          {
+            "card": "Jedit Ojanen",
+            "label": "jedit",
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion",
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 31
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "CommanderDamage",
+          "player": "bob",
+          "is": [
+            [
+              "Kalakscion, Hunger Tyrant",
+              7
+            ]
+          ]
+        }
+      }
+    }
+  ]
+}

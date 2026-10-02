@@ -65,7 +65,6 @@
 module Pawl.TransformSpec where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -128,7 +127,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
@@ -299,7 +297,6 @@ spec s registry = Spec.describe s "Transform" $ do
   bystanderTransformSpec s registry
   equippedTransformSpec s registry
   convertSpec s registry
-  gainLifeConvertSpec s registry
   moreThanMeetsTheEyeSpec s registry
   disturbSpec s registry
   spellsCastLastTurnSpec s registry
@@ -916,25 +913,6 @@ zoneNames zone gs =
 -- that road rather than fencing it.
 transformTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
-  -- CR 701.27e's own case: the permanent turns over, and the ability printed on
-  -- the face it turned INTO triggers.
-  --
-  -- Four Forests pay {3}{G/P} with mana rather than life, and the board is
-  -- alice's own precombat main phase because of the sorcery-speed rider.
-  Spec.it s "CR 701.27e the Thallid's own ability turns it over and the back face's trigger fires" $ do
-    thallid <- S.printingOf s registry "Blightreaper Thallid"
-    forest <- S.printingOf s registry "Forest"
-    let (oid, gs) = thallidBoard thallid forest 4
-    case activateThallid oid gs of
-      Left n -> Spec.assertFailure s ("expected one activated ability, got " <> show n)
-      Right activated -> do
-        let turned = resolveTop activated
-            settled = gather turned
-            after = resolveStack settled
-        Spec.assertEqWith s "the trigger resolved into one Saproling" (S.countOnBattlefieldByName saprolingToken S.alice after) 1
-        Spec.assertEqWith s "no Saproling exists before the trigger resolves" (S.countOnBattlefieldByName saprolingToken S.alice turned) 0
-        Spec.assertEqWith s "the settle put exactly one ability on the stack" (length (GameState.stack settled)) 1
-        Spec.assertEqWith s "and the permanent really did turn over" (faceNameOf oid turned) (Just thallidBack)
   -- CR 701.27f from the event's side: the second resolution is IGNORED, so it is
   -- not an event and nothing triggers on it. Eight Forests put both activations
   -- on the stack before either resolves, TransformSpec's own CR 701.27f board.
@@ -1262,20 +1240,6 @@ destroyEveryFungus =
         Destroy.permanents = Nothing
       }
 
--- The two faces Daybreak Ranger prints, for the CR 603.4 group below.
-rangerFront, rangerBack :: CardName.CardName
-rangerFront = CardName.MkCardName (Text.pack "Daybreak Ranger")
-rangerBack = CardName.MkCardName (Text.pack "Nightfall Predator")
-
--- The face this permanent shows and its power/toughness, as one tuple, so a case
--- names a FACE rather than two independent facts. 2/2 and 4/4 do not coincide, so
--- a partial fix cannot reach the name by one road and the size by another.
-faceAndSize ::
-  ObjectId.ObjectId ->
-  GameState.GameState ->
-  (Maybe CardName.CardName, Maybe (Integer, Integer))
-faceAndSize oid gs = (faceNameOf oid gs, S.powerToughnessOf oid gs)
-
 -- `pid` casts that spell and it resolves. CR 601.2i files the SpellWasCast the
 -- last-turn tally is folded from; resolving keeps the stack empty so the upkeep
 -- step below has only the trigger on it.
@@ -1283,25 +1247,6 @@ castAndResolve :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState 
 castAndResolve pid oid gs =
   let cast = S.runPure S.castAnswer gs (S.cast pid oid)
    in S.runPure S.castAnswer cast Stack.resolveTop
-
--- The turn handoff, then the new active player's upkeep step run to completion.
--- Pawl.DaytimeSpec's `upkeep` with the seat read off the board rather than fixed:
--- Engine.beginTurnOf has already set it, and the schedule loses its head so
--- runStep advances OUT of the upkeep rather than back into it.
---
--- The untap step is skipped rather than run, which changes nothing here: CR 502.2
--- is inert on a board with no daybound or nightbound permanent (asserted below),
--- and skipping it leaves every land as the cast that tapped it left it.
-handOffThenUpkeep :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-handOffThenUpkeep pid gs =
-  let handed = Engine.beginTurnOf pid gs
-      atUpkeep =
-        handed
-          { GameState.phase = Phase.Beginning BeginningStep.Upkeep,
-            GameState.priority = Just pid,
-            GameState.remaining = Seq.drop 1 (GameState.remaining handed)
-          }
-   in S.runPure S.identityAnswer atUpkeep Engine.runStep
 
 -- CR 603.2b / 603.4: Daybreak Ranger // Nightfall Predator's two upkeep triggers,
 -- whose intervening "if" reads how many spells each player cast LAST turn.
@@ -1316,55 +1261,8 @@ handOffThenUpkeep pid gs =
 -- Fog is the spell cast throughout: {G}, an instant, targetless, and its only
 -- effect is a combat-damage replacement on a board that never reaches combat. So
 -- "bob cast a spell" is the only thing a cast contributes.
-spellsCastLastTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spellsCastLastTurnSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 spellsCastLastTurnSpec s registry = Spec.describe s "SpellsCastLastTurn" $ do
-  -- The whole unit in one board, read four times. Each read is the falsifier for
-  -- a different wrong implementation, and none of the four can be dropped:
-  --
-  --   A. bob casts during ALICE's turn. "No spells were cast last turn" is false,
-  --      so the front face does NOT flip. An implementation reading the previous
-  --      turn's ACTIVE PLAYER alone (GameState.spellsCastLastTurn, CR 502.2's
-  --      scalar) sees 0 and flips.
-  --   B. a turn passes with nobody casting, and it flips. Without this, A is
-  --      satisfied by a trigger that never fires at all.
-  --   C. alice and bob cast ONE EACH. "A player cast two or more spells" is an
-  --      existential, so the back face does NOT flip back. An implementation
-  --      SUMMING the seats sees 2 and flips.
-  --   D. bob casts TWO in one turn, and it flips back. Without this, C is
-  --      satisfied by a back-face trigger that never fires.
-  Spec.it s "CR 603.4 the upkeep triggers read what each player cast last turn" $ do
-    ranger <- S.printingOf s registry "Daybreak Ranger"
-    forest <- S.printingOf s registry "Forest"
-    fog <- S.printingOf s registry "Fog"
-    let (rangerId, withRanger) = S.addPermanent ranger S.alice emptyBoard
-        withLands = S.landsFor forest S.bob 4 (S.landsFor forest S.alice 1 withRanger)
-        (aliceFog, withAliceFog) = S.addHandCard fog S.alice withLands
-        (bobFogA, withA) = S.addHandCard fog S.bob withAliceFog
-        (bobFogB, withB) = S.addHandCard fog S.bob withA
-        (bobFogC, withC) = S.addHandCard fog S.bob withB
-        (bobFogD, board) = S.addHandCard fog S.bob withC
-        -- Turn 1 is alice's; bob casts one Fog during it.
-        turn1 = castAndResolve S.bob bobFogA board
-        -- Turn 2 is bob's. Read A.
-        turn2 = handOffThenUpkeep S.bob turn1
-        -- Nobody casts during turn 2. Turn 3 is alice's. Read B.
-        turn3 = handOffThenUpkeep S.alice turn2
-        -- alice and bob cast one each during turn 3. Turn 4 is bob's. Read C.
-        turn3Cast = castAndResolve S.bob bobFogB (castAndResolve S.alice aliceFog turn3)
-        turn4 = handOffThenUpkeep S.bob turn3Cast
-        -- bob casts two during turn 4. Turn 5 is alice's. Read D.
-        turn4Cast = castAndResolve S.bob bobFogD (castAndResolve S.bob bobFogC turn4)
-        turn5 = handOffThenUpkeep S.alice turn4Cast
-    Spec.assertEqWith s "the board is neither day nor night, so CR 502.2 reaches nothing" (GameState.daytime turn2) Nothing
-    Spec.assertEqWith s "A: bob cast during alice's turn, so the front face stays up" (faceAndSize rangerId turn2) (Just rangerFront, Just (2, 2))
-    Spec.assertEqWith s "B: a turn with no spell at all transforms it" (faceAndSize rangerId turn3) (Just rangerBack, Just (4, 4))
-    Spec.assertEqWith s "C: one spell each is not a player casting two, so it stays transformed" (faceAndSize rangerId turn4) (Just rangerBack, Just (4, 4))
-    Spec.assertEqWith s "D: one player casting two transforms it back" (faceAndSize rangerId turn5) (Just rangerFront, Just (2, 2))
-    -- The preconditions the four reads rest on, asserted AFTER them so a failure
-    -- names the behaviour first: bob really cast (his hand shrank by four), and
-    -- alice really cast (hers emptied).
-    Spec.assertEqWith s "bob cast all four Fogs" (S.handSize S.bob turn5) 0
-    Spec.assertEqWith s "and alice cast hers" (S.handSize S.alice turn5) 0
   -- The snapshot the four reads above rest on, asserted at the state level: the
   -- handoff records a count PER SEAT, and CR 502.2's one-player scalar keeps
   -- answering about the outgoing active player alone. A unit-level fence, not the
@@ -1408,7 +1306,7 @@ ratchetReadings oid gs =
 -- "converted", which moreThanMeetsTheEyeSpec below plays out of a hand -- and
 -- routing the fixture through it would make every case here also a case about
 -- casting. The other road, the front face's own optional convert, is played out
--- in gainLifeConvertSpec below, and routing this fixture through THAT one would
+-- in data/scenarios/transform/, and routing this fixture through THAT one would
 -- make every case here a case about gaining life as well.
 --
 -- Object.turnedOverAt is deliberately left unset. CR 701.27f -- which CR 701.28e
@@ -1433,7 +1331,7 @@ racerBoard ratchet gs =
 -- Ratchet. When you do, return target artifact card with mana value less than or
 -- equal to the amount of life you gained this turn from your graveyard to the
 -- battlefield tapped" -- IS transcribed, so the card is now whole: nothing on
--- either face is elided. gainLifeConvertSpec below is what proves it. More than
+-- either face is elided. data/scenarios/transform/ is what proves it. More than
 -- meets the eye {1}{W} is transcribed too; see moreThanMeetsTheEyeSpec.
 convertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 convertSpec s registry = Spec.describe s "Convert" $ do
@@ -1716,179 +1614,6 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
     Spec.assertEqWith s "a free offer reaches the front face, though the back was asked for" (readingsIn (resolvedUnder free)) [ratchetFrontReadings]
     Spec.assertEqWith s "rule 702.162a's {1}{W} was paid for the converted cast" (S.tappedCount S.alice (under offered)) 2
     Spec.assertEqWith s "and the free cast paid nothing" (S.tappedCount S.alice (under free)) 0
-
--- alice's copies of a printing in one zone, each as its CR 110.5b tap status.
---
--- BY THE CARD rather than by an object id, because CR 400.7 makes a card that
--- changes zones a NEW object: the id `medicBoard` handed back for a graveyard
--- card names nothing once that card has been returned to the battlefield.
-inZoneAs :: Printing.Printing -> Zone.Zone -> GameState.GameState -> [TapState.TapState]
-inZoneAs printing zone gs = do
-  oid <- Game.zoneMembers zone S.alice gs
-  Monad.guard (fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing))
-  o <- Maybe.maybeToList (Game.lookupObject oid gs)
-  pure (Object.tapped o)
-
--- Both zones at once, so "returned" and "tapped" are one assertion rather than
--- two that could each pass while the other fails: a card returned to the wrong
--- zone, or the right zone untapped, differs from `returnedTapped` here.
-battlefieldAndGraveyard :: Printing.Printing -> GameState.GameState -> ([TapState.TapState], [TapState.TapState])
-battlefieldAndGraveyard printing gs = (inZoneAs printing Zone.Battlefield gs, inZoneAs printing Zone.Graveyard gs)
-
-stillInGraveyard, returnedTapped :: ([TapState.TapState], [TapState.TapState])
-stillInGraveyard = ([], [TapState.Untapped])
-returnedTapped = ([TapState.Tapped], [])
-
--- alice's board for the front face's own trigger: Ratchet face up among three
--- Plains, one instant in hand, and a graveyard holding Arcum's Weathervane (mana
--- value 2), Jade Statue (mana value 4) and Lightning Bolt (mana value 1).
---
--- THREE distinct mana values, and the Bolt is the one UNDER every bound these
--- cases use: it is kept out by the And's artifact conjunct alone, so a filter
--- that had stopped narrowing by card type would show up here rather than pass.
--- The two artifacts print no entry trigger and no replacement effect, so what
--- arrives on the battlefield does nothing of its own.
---
--- THREE Plains, so the {W} and the {2}{W} instants the cases below choose
--- between are both payable: mana is never the difference between two boards
--- here.
-medicBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-medicBoard ratchet plains weathervane statue bolt spell =
-  let (ratchetId, g0) = S.addPermanent ratchet S.alice (S.landsInPlay plains 3)
-      (weathervaneId, g1) = S.addGraveyardCard weathervane S.alice g0
-      (statueId, g2) = S.addGraveyardCard statue S.alice g1
-      (boltId, g3) = S.addGraveyardCard bolt S.alice g2
-      (spellId, g4) = S.addHandCard spell S.alice g3
-   in ( ratchetId,
-        weathervaneId,
-        statueId,
-        boltId,
-        spellId,
-        g4 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-      )
-
--- Casts the instant in alice's hand and plays the whole printed chain out: the
--- spell resolves and its controller gains the life (CR 119.3), CR 603.2 gathers
--- the front face's "whenever you gain life" trigger, `decision` answers its CR
--- 603.5 "may", taking it converts Ratchet (CR 701.28a) and creates the CR 603.12
--- reflexive, and that reflexive is gathered, targeted (CR 603.3d) and resolved.
---
--- Six settle-and-resolve passes rather than a hand-counted sequence: CR 117.5's
--- boundary is where each of those steps happens, resolveTop is a no-op on an
--- empty stack, and a chain that needed fewer would leave the extra passes idle.
---
--- What it RECORDS is the pair the cases assert on: every target set the engine
--- OFFERED, and how many CR 603.5 questions it asked. The offer is the reading
--- that answers "is this a legal target", so a case reads it rather than reading
--- back what the answerer happened to pick; and the answerer FILTERS that offer
--- for `wanted` rather than building a recipient of its own, since CR 608.2b
--- drops one that never came from the offer.
---
--- `wanted` is pinned at the card the bound is being asked about, so the engine's
--- refusal is what keeps that card out -- an answerer picking the first candidate
--- would take the in-range one on both boards and prove nothing.
-playMedic ::
-  OptionalDecision.OptionalDecision ->
-  ObjectId.ObjectId ->
-  ObjectId.ObjectId ->
-  GameState.GameState ->
-  (GameState.GameState, ([Set.Set Recipient.Recipient], Int))
-playMedic decision wanted spellId gs =
-  let answerer :: Prompt.Prompt r -> State.State ([Set.Set Recipient.Recipient], Int) r
-      answerer p = case p of
-        Prompt.ChooseOptional {} -> do
-          State.modify' (\(offers, asked) -> (offers, asked + 1))
-          pure decision
-        Prompt.ChooseTargets _ _ _ sets -> do
-          State.modify' (\(offers, asked) -> (offers <> fmap snd (Map.elems sets), asked))
-          pure (S.preferring ((== Just wanted) . Recipient.objectOf) sets)
-        _ -> pure (S.castAnswer p)
-      chain = S.cast S.alice spellId *> Monad.replicateM_ 6 (Engine.settleForPriority *> Stack.resolveTop)
-      ((_, after), recorded) = State.runState (Engine.runGame answerer gs chain) ([], 0)
-   in (after, recorded)
-
--- CR 603.12's reflexive triggered ability and CR 202.3's computed bound on the
--- one printed card that puts them together: Ratchet, Field Medic's front face,
--- "Whenever you gain life, you may convert Ratchet. When you do, return target
--- artifact card with mana value less than or equal to the amount of life you
--- gained this turn from your graveyard to the battlefield tapped" (Oracle text
--- re-fetched from Scryfall).
---
--- Five limbs, and each case says which it is about: the "may" is offered and
--- declining it does nothing; taking it turns the permanent over; the reflexive's
--- slot admits an artifact card within the life gained THIS TURN and not one
--- above it; what comes back arrives tapped; and a convert CR 701.28e ignores arms
--- no reflexive at all.
---
--- Celestine, the Living Saint proves the bound off a slot the engine matches at
--- CR 601.2c; this group proves it off one CR 603.3d fills, which is a different
--- door into Pawl.Engine.Target.slotContext.
---
--- CR 701.28e's ignore is the fifth limb, and Ratchet is its own producer: two
--- instances of the trigger reach the stack together off two lifelink sources, and
--- the second's convert is ignored. "CR 701.28e / 603.12 an ignored convert arms no
--- reflexive" is what proves the arm hangs on the act rather than on the CR 603.5
--- answer (Pawl.Engine.Resolve.Effect.applyClauseEffects).
-gainLifeConvertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
-  -- THE proving case: the first four limbs on one board. alice casts Blossoming Calm
-  -- ({W} instant, "you can't be the target of spells or abilities your opponents
-  -- control until your next turn. You gain 2 life"), gains 2, takes the "may",
-  -- and the reflexive returns the mana value 2 artifact tapped.
-  --
-  -- The answerer is pinned at the JADE STATUE, whose mana value is 4: it is out
-  -- of range here, so what comes back is the Weathervane, and it comes back
-  -- because the engine never offered the Statue rather than because the test
-  -- asked for the Weathervane.
-  Spec.it s "CR 603.12 / 202.3 taking the may converts Ratchet and returns an in-range artifact tapped" $ do
-    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
-    plains <- S.printingOf s registry "Plains"
-    weathervane <- S.printingOf s registry "Arcum's Weathervane"
-    statue <- S.printingOf s registry "Jade Statue"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    calm <- S.printingOf s registry "Blossoming Calm"
-    let (ratchetId, weathervaneId, statueId, _, spellId, board) = medicBoard ratchet plains weathervane statue bolt calm
-        (after, (offers, asked)) = playMedic OptionalDecision.Exercises statueId spellId board
-    Spec.assertEqWith s "the mana value 2 artifact came back to the battlefield TAPPED" (battlefieldAndGraveyard weathervane after) returnedTapped
-    Spec.assertEqWith s "the mana value 4 artifact stayed in the graveyard" (battlefieldAndGraveyard statue after) stillInGraveyard
-    Spec.assertEqWith s "and the reflexive offered the in-range artifact and nothing else" offers [Set.singleton (Recipient.ToObject weathervaneId)]
-    Spec.assertEqWith s "so did the instant card under every bound" (battlefieldAndGraveyard bolt after) stillInGraveyard
-    Spec.assertEqWith s "Ratchet turned over, so the BACK face is the permanent" (ratchetReadings ratchetId after) ratchetBackReadings
-    Spec.assertEqWith s "alice really gained the 2 life" (Game.lifeGainedThisTurn after S.alice) 2
-    Spec.assertEqWith s "and the CR 603.5 may was one real question" asked 1
-  -- THE MOVING-BOUND control, a board differing in exactly one thing: the instant
-  -- in alice's hand is Renewed Faith ({2}{W}, "you gain 6 life") instead, so the
-  -- life gained this turn is 6 rather than 2. Same graveyard, same Ratchet, same
-  -- three Plains, same pinned answer -- and the Jade Statue the case above could
-  -- not touch is now both offered and returned.
-  --
-  -- Without this leg the bound could be a printed 2 and every assertion above
-  -- would still hold.
-  Spec.it s "CR 202.3 the bound moves with the life gained, not with the card" $ do
-    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
-    plains <- S.printingOf s registry "Plains"
-    weathervane <- S.printingOf s registry "Arcum's Weathervane"
-    statue <- S.printingOf s registry "Jade Statue"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    faith <- S.printingOf s registry "Renewed Faith"
-    let (_, weathervaneId, statueId, _, spellId, board) = medicBoard ratchet plains weathervane statue bolt faith
-        (after, (offers, _)) = playMedic OptionalDecision.Exercises statueId spellId board
-    Spec.assertEqWith s "alice gained 6 this turn" (Game.lifeGainedThisTurn after S.alice) 6
-    Spec.assertEqWith s "the mana value 4 artifact came back tapped -- the bound moved" (battlefieldAndGraveyard statue after) returnedTapped
-    Spec.assertEqWith
-      s
-      "and the reflexive offered BOTH artifact cards"
-      offers
-      [Set.fromList [Recipient.ToObject weathervaneId, Recipient.ToObject statueId]]
-    Spec.assertEqWith s "the one target the slot takes left the other artifact where it was" (battlefieldAndGraveyard weathervane after) stillInGraveyard
-    Spec.assertEqWith s "the instant card is still out at a bound of 6" (battlefieldAndGraveyard bolt after) stillInGraveyard
 
 -- CR 613.7g: "a double-faced permanent receives a new timestamp each time it
 -- transforms or converts". Rule 712.18 says the permanent is not a new object,

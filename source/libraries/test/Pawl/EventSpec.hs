@@ -6,7 +6,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -17,7 +16,6 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -71,15 +69,6 @@ settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority
 settleAndResolve :: GameState.GameState -> GameState.GameState
 settleAndResolve gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
 
--- Answer Shimatsu the Bloodcloaked's CR 614.1c offer with exactly the two
--- permanents named, FILTERED out of what was offered rather than built: an offer
--- that never held them sacrifices nothing rather than quietly sacrificing them.
--- Every other prompt keeps Pawl.Support's answer.
-sacrificingExactly :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-sacrificingExactly first second prompt = case prompt of
-  Prompt.ChooseAnyNumberToSacrifice _ _ _ offered -> Set.fromList (filter (\oid -> oid == first || oid == second) offered)
-  _ -> S.identityAnswer prompt
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614: with Rest in Peace out, a creature sent to the graveyard is exiled" $ do
@@ -102,119 +91,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     case S.zoneChangesOf after of
       zc : _ -> Spec.assertEqWith s "event says exile" (ZoneChange.to zc) Zone.Exile
       [] -> Spec.assertFailure s "expected an emitted zone change"
-
-  -- CR 608.2f / 701.21a: All Is Dust's "each player sacrifices all permanents
-  -- they control that are one or more colors" is ONE action on several objects,
-  -- so every member's CR 616.1 loop reads the board the batch began on. Rest in
-  -- Peace is coloured, so the sweep names it too; it is added FIRST, so under a
-  -- per-victim fold it leaves the battlefield before bob's creature is asked
-  -- about and bob's creature reaches a graveyard the batch rule says is closed.
-  --
-  -- Bob's seat holds the second permanent rather than alice's, because All Is
-  -- Dust itself goes to ALICE's graveyard when it finishes resolving -- by then
-  -- Rest in Peace has gone, so that move is not replaced and a graveyard count
-  -- taken on alice would read 1 either way.
-  Spec.it s "CR 608.2f All Is Dust sacrifices as one event, so Rest in Peace still exiles the permanent that goes second" $ do
-    restInPeace <- S.printingOf s registry "Rest in Peace"
-    piker <- S.printingOf s registry "Goblin Piker"
-    allIsDust <- S.printingOf s registry "All Is Dust"
-    forest <- S.printingOf s registry "Forest"
-    let (_, g0) = S.addPermanent restInPeace S.alice (S.landsInPlay forest 7)
-        (_, g1) = S.addPermanent piker S.bob g0
-        (g2, spellId) = S.handOne allIsDust g1
-        cast = snd (Engine.runGamePure S.identityAnswer g2 (S.cast S.alice spellId))
-        after = settleAndResolve cast
-        -- CR 400.7 mints a new object for the arrival, so the exiled card is a
-        -- different id from the permanent; ownership is what names it.
-        exiledOwnedBy pid = length (filter (\oid -> fmap Object.owner (Game.lookupObject oid after) == Just pid) (Set.toList (GameState.exile after)))
-    Spec.assertEqWith s "bob's creature was exiled, not buried" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
-    Spec.assertEqWith s "and bob's card is the one in exile" (exiledOwnedBy S.bob) 1
-    -- Rest in Peace's own move is replaced by its own effect, which is what makes
-    -- the board discriminating: it is gone from the battlefield by the time bob's
-    -- creature would be asked about under a fold.
-    Spec.assertEqWith s "Rest in Peace was sacrificed too" (exiledOwnedBy S.alice) 1
-    Spec.assertEqWith s "both coloured permanents left the battlefield" (length (Game.zoneMembers Zone.Battlefield S.bob after), length (Game.zoneMembers Zone.Battlefield S.alice after)) (0, 7)
-
-  -- CR 614.1c / 608.2f: Shimatsu the Bloodcloaked's as-enters "sacrifice any
-  -- number of permanents" is ONE action on the set chosen, so every member's CR
-  -- 616.1 loop reads the board the batch began on. Rest in Peace is added before
-  -- the Piker and so comes first in the ascending order the funnel is handed;
-  -- under a per-victim fold it has already left when the Piker's move is
-  -- replaced, and the Piker reaches a graveyard the batch rule says is closed.
-  --
-  -- The Mountains that pay for Shimatsu are offered too and are deliberately NOT
-  -- chosen, which is what leaves alice's graveyard about these two alone.
-  Spec.it s "CR 608.2f Shimatsu's as-enters sacrifice is one event, so Rest in Peace exiles the permanent chosen after it" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    restInPeace <- S.printingOf s registry "Rest in Peace"
-    piker <- S.printingOf s registry "Goblin Piker"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let (rip, g0) = S.addPermanent restInPeace S.alice (S.landsInPlay mountain 4)
-        (thePiker, g1) = S.addPermanent piker S.alice g0
-        (g2, spellId) = S.handOne shimatsu g1
-        -- Inlined at both call sites rather than let-bound: GADTs implies
-        -- MonoLocalBinds, so a local answerer would not generalise.
-        cast = snd (Engine.runGamePure (sacrificingExactly rip thePiker) g2 (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure (sacrificingExactly rip thePiker) cast Engine.priorityLoop)
-    Spec.assertEqWith s "alice's graveyard is empty, both sacrifices having been exiled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-    -- The anti-vacuity half: an answer that chose nothing would leave the
-    -- graveyard empty too. Two cards in exile is the pair actually sacrificed.
-    Spec.assertEqWith s "and both are in exile" (Set.size (GameState.exile after)) 2
-    Spec.assertEqWith s "leaving four Mountains and Shimatsu on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 5
-
-  -- CR 101.4 / 608.2f: an edict's picks are taken from every seat first and only
-  -- then sacrificed, as one action. Rishadan Cutpurse's "each opponent sacrifices
-  -- a permanent of their choice unless they pay {1}" is the multi-seat producer,
-  -- and THREE seats are what make it one: at two seats the batch has a single
-  -- member and nothing can go second.
-  --
-  -- Bob's only permanent is Rest in Peace and carol's only permanent is a Piker,
-  -- so CR 609.3 elides both picks and the batch is exactly those two, in APNAP
-  -- order. Under a per-victim fold Rest in Peace has already left when carol's
-  -- Piker moves, and the Piker reaches a graveyard the batch rule says is closed.
-  -- Neither opponent has a land, so neither can take CR 118.12a's "unless".
-  Spec.it s "CR 101.4 an edict's picks are sacrificed as one event, so Rest in Peace exiles the seat that goes second" $ do
-    island <- S.printingOf s registry "Island"
-    restInPeace <- S.printingOf s registry "Rest in Peace"
-    piker <- S.printingOf s registry "Goblin Piker"
-    cutpurse <- S.printingOf s registry "Rishadan Cutpurse"
-    let (_, g0) = S.addPermanent restInPeace S.bob (S.landsFor island S.alice 3 (Setup.emptyGame S.threePlayers))
-        (_, g1) = S.addPermanent piker S.carol g0
-        (g2, spellId) = S.handOne cutpurse g1
-        cast = snd (Engine.runGamePure S.identityAnswer g2 (S.cast S.alice spellId))
-        after = settleAndResolve cast
-    Spec.assertEqWith s "carol's Piker was exiled, not buried" (length (Game.zoneMembers Zone.Graveyard S.carol after)) 0
-    -- The anti-vacuity half: an edict that sacrificed nothing would leave that
-    -- graveyard empty too. Two cards in exile is the pair actually sacrificed.
-    Spec.assertEqWith s "and both sacrifices are in exile" (Set.size (GameState.exile after)) 2
-    Spec.assertEqWith s "neither opponent kept their permanent" (length (Game.zoneMembers Zone.Battlefield S.bob after) + length (Game.zoneMembers Zone.Battlefield S.carol after)) 0
-
-  -- CR 101.4 / 701.21a: Tithing Blade's "each opponent sacrifices a creature of
-  -- their choice", with no slot to name the opponents. Three seats, so "each
-  -- opponent" is two players, and each opponent holds two creatures, so each is
-  -- asked (CR 609.3 elides nothing). Each answer is the creature the elision's
-  -- ascending-order filler would NOT take, so an ignored answer is visible.
-  Spec.it s "CR 101.4 Tithing Blade makes each opponent sacrifice the creature they chose" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    giant <- S.printingOf s registry "Hill Giant"
-    blade <- S.printingOf s registry "Tithing Blade"
-    let (alicePiker, g0) = S.addPermanent piker S.alice (S.landsFor swamp S.alice 2 (Setup.emptyGame S.threePlayers))
-        (bobPiker, g1) = S.addPermanent piker S.bob g0
-        (bobGiant, g2) = S.addPermanent giant S.bob g1
-        (carolGiant, g3) = S.addPermanent giant S.carol g2
-        (carolPiker, g4) = S.addPermanent piker S.carol g3
-        (g5, bladeId) = S.handOne blade g4
-        chosen = Set.fromList [bobGiant, carolPiker]
-        answer :: Prompt.Prompt r -> r
-        answer p = case p of
-          Prompt.ChooseSacrifices _ _ _ candidates _ _ -> Set.fromList (filter (`Set.member` chosen) candidates)
-          _ -> S.identityAnswer p
-        cast = snd (Engine.runGamePure answer g5 (S.cast S.alice bladeId))
-        after = snd (Engine.runGamePure answer cast Engine.priorityLoop)
-    Spec.assertEqWith s "bob sacrificed the Hill Giant he chose and kept his Piker" (Game.zoneMembers Zone.Battlefield S.bob after) [bobPiker]
-    Spec.assertEqWith s "carol sacrificed the Piker she chose and kept her Hill Giant" (Game.zoneMembers Zone.Battlefield S.carol after) [carolGiant]
-    Spec.assertBool s (elem alicePiker (Game.zoneMembers Zone.Battlefield S.alice after)) "alice, no opponent of her own, kept her creature"
 
   -- CR 101.4b: Fleshbag Marauder's "each player sacrifices a creature of their
   -- choice", on a pair of boards differing only in alice's pick. bob sacrifices
@@ -305,22 +181,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
         after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
     Spec.assertEqWith s "not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
     Spec.assertEqWith s "exiled instead" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
-
-  Spec.it s "CR 603/614 whole card: cast Rest in Peace, ETB exiles graveyards, then deaths are exiled" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    restInPeace <- S.printingOf s registry "Rest in Peace"
-    let base = S.landsInPlay plains 2
-        (deadId, withDead) = S.addLibraryCard piker S.alice base
-        g0 = S.runPure S.identityAnswer withDead (Event.changeZone deadId Zone.Graveyard) -- a card already in the graveyard
-        (g1, ripId) = S.handOne restInPeace g0
-        afterCast = snd (Engine.runGamePure S.identityAnswer g1 (S.cast S.alice ripId))
-        -- run priority: both players pass, RiP resolves and enters, its ETB is
-        -- placed (CR 117.5) and resolves, exiling the graveyard.
-        settled = snd (Engine.runGamePure S.identityAnswer afterCast Engine.priorityLoop)
-    Spec.assertEqWith s "alice's graveyard exiled by the ETB" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 0
-    Spec.assertEqWith s "Rest in Peace is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Rest in Peace") S.alice settled) 1
-    Spec.assertEqWith s "stack empty" (GameState.stack settled) []
 
   -- CR 800.4b, sentence 2: "If a token would be created under the control of
   -- a player who has left the game, no token is created." NOT "is created and
@@ -567,13 +427,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
         once = S.runPure S.identityAnswer (S.addRegenShield oid gs0) (Event.destroy Regenerability.Regenerable [oid]) -- regenerated
         twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [oid]) -- no shield -> dies
     Spec.assertEqWith s "gone from the battlefield" (Set.member oid (GameState.battlefield twice)) False
-
-  Spec.it s "CR 700.4 Event.destroy no-ops on an indestructible permanent" $ do
-    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-    let base = Setup.emptyGame S.bothPlayers
-        (oid, gs0) = S.addPermanent darksteelMyr S.alice base
-        after = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [oid])
-    Spec.assertEqWith s "indestructible survives" (Set.member oid (GameState.battlefield after)) True
 
   Spec.it s "CR 122.2 counters cease to exist when an object changes zones" $ do
     swamp <- S.printingOf s registry "Swamp"

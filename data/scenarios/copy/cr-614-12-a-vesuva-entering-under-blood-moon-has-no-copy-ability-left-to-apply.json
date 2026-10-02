@@ -1,0 +1,115 @@
+{
+  "description": "CR 614.12 a Vesuva entering under Blood Moon has no copy ability left to apply",
+  "note": "Mana.manaTypesOf being red is read as two checks: the Offered view gives the untapped Vesuva a mana ability, and its only subtype is Mountain (CR 305.6); the exact colour is not readable.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Mutavault",
+            "ready": true
+          },
+          {
+            "card": "Blood Moon",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Vesuva",
+            "label": "vesuva",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "PlayLand": "$vesuva"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mutavault",
+            "ActivateManaAbility Vesuva"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Vesuva",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Vesuva",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Vesuva",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Vesuva",
+        "tapped": false
+      }
+    },
+    {
+      "Names": {
+        "object": "Vesuva",
+        "names": [
+          "Vesuva"
+        ]
+      }
+    },
+    {
+      "Subtypes": {
+        "object": "Vesuva",
+        "subtypes": [
+          "Mountain"
+        ]
+      }
+    }
+  ]
+}

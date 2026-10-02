@@ -1,0 +1,128 @@
+{
+  "description": "CR 601.3 the same Ornithopter is cast when no land play spent the use",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Serra Paragon",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Swamp"
+          },
+          {
+            "card": "Ornithopter",
+            "label": "ornithopter"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ornithopter",
+          "mana": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Ornithopter",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Ornithopter",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Ornithopter",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Ornithopter",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Ornithopter",
+        "power": 0,
+        "toughness": 2
+      }
+    }
+  ]
+}

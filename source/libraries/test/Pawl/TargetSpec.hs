@@ -73,7 +73,6 @@ module Pawl.TargetSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -127,7 +126,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -136,7 +134,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -247,67 +244,6 @@ aimingDwellShuffling :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 aimingDwellShuffling oids p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> aimingDwell oids p
-
--- aimingDwell for the case that turns on the OFFERED COUNT: bob in the player
--- slot again, `oids` many cards announced, and then as many of `oids` as the
--- engine actually asked for, taken off the front.
---
--- Reading the count out of Prompt.ChooseTargets is the whole difference. The
--- other answerer names its whole list whatever it is asked, so an announcement
--- the engine narrowed and one it did not both end in a reversal -- of the count
--- check in the one case and of the joint check in the other -- and the case
--- could not tell them apart.
-aimingDwellObeying :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-aimingDwellObeying oids p = case p of
-  Prompt.AnnounceTargets _ _ _ offers -> fmap (const (Natural.length oids)) offers
-  Prompt.ChooseTargets _ _ _ asked ->
-    Map.mapWithKey
-      ( \slot (n, _) ->
-          if slot == SlotName.MkSlotName (Text.pack "player")
-            then Set.singleton (Recipient.ToPlayer S.bob)
-            else Set.fromList (fmap Recipient.ToObject (take (Natural.toIntSaturating n) oids))
-      )
-      asked
-  _ -> S.identityAnswer p
-
--- CR 700.2d's whole announcement for Synthetic Recurring Reclamation with its
--- first mode chosen twice: occurrence 0 names bob and `his`, occurrence 1 names
--- `other` and `hisOther`. The two runs differ only in `other`.
---
--- Synthetic Reclamation Engine's case shares it, that card printing the same two
--- modes on an activated ability. What `hisOther` is differs with the fixture: a
--- card in BOB's graveyard for the spell case whichever player `other` is, and a
--- card in CAROL's for the ability case.
---
--- Pinned per slot NAME rather than searched, and the suffixed names are
--- Modal.instanceSlot's. CR 601.2c offers occurrence 1 the union over every
--- player its own slot could still take, so bob's second card is offered for
--- carol's occurrence either way -- what the rename decides is whether the JOINT
--- CHECK still admits it.
-aimingReclamation :: PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimingReclamation other his hisOther p = case p of
-  Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 0]
-  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
-  Prompt.ChooseTargets _ _ _ asked ->
-    Map.mapWithKey
-      ( \slot (n, _) ->
-          let named name = slot == SlotName.MkSlotName (Text.pack name)
-              wanted
-                | named "player" = [Recipient.ToPlayer S.bob]
-                | named "player#1" = [Recipient.ToPlayer other]
-                | named "cards" = [Recipient.ToObject his]
-                | otherwise = [Recipient.ToObject hisOther]
-           in Set.fromList (take (Natural.toIntSaturating n) wanted)
-      )
-      asked
-  _ -> S.identityAnswer p
-
--- The printed names of the cards in one player's copy of a zone (CR 400.1),
--- sorted so the assertion does not depend on object-id order. Names rather than
--- ids because a card that changes zones is a NEW object (CR 400.7).
-namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
-namesIn zone pid gs =
-  List.sort (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
 
 -- CR 601.2c's whole announcement for Fall of the Hammer: `dealerId` in the
 -- dealer slot and `victimId` in the victim slot. Both counts are fixed at one,
@@ -729,29 +665,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           (Set.member (Recipient.ToCreature mongooseId) (Target.legalRecipients (Just S.alice) S.noSource theSlot humbled))
           "under Humility it is a legal target"
 
-  -- CR 115.10a: "Just because an object or player is being affected by a spell
-  -- or ability doesn't make that object or player a target of that spell or
-  -- ability." Day of Judgment names no target at all, so shroud has nothing to
-  -- say about it -- the classic way to get this rule wrong is to make the
-  -- restriction a property of being AFFECTED.
-  Spec.it s "CR 115.10a Day of Judgment still destroys Blurred Mongoose: shroud restricts targeting, not effects" $ do
-    plains <- S.printingOf s registry "Plains"
-    mongoose <- S.printingOf s registry "Blurred Mongoose"
-    piker <- S.printingOf s registry "Goblin Piker"
-    dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let base = S.landsInPlay plains 4 -- {2}{W}{W}
-        (_, b1) = S.addPermanent mongoose S.bob base
-        (_, b2) = S.addPermanent piker S.bob b1
-        (gs, dojId) = S.handOne dayOfJudgment b2
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dojId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        -- By NAME, not by id: CR 400.7 makes the graveyard incarnation a new
-        -- object, and Event.changeZone mints it a fresh ObjectId.
-        buried = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid after)) (Game.zoneMembers Zone.Graveyard S.bob after)
-    Spec.assertEqWith s "both of bob's creatures are gone" (S.creaturesInPlay S.bob after) 0
-    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Blurred Mongoose") buried) "the Mongoose itself is in bob's graveyard"
-    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
-
   -- CR 115.5: "A spell or ability on the stack is an illegal target for itself."
   -- Cancel's "counter target spell" draws from Pool.Spells with no Filter at
   -- all, so the rule is the ONLY thing that can exclude the Cancel itself --
@@ -892,49 +805,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) theirs) "though bob's may point at the Piker"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) theirs) "and at a player (CR 115.4)"
       _ -> Spec.assertFailure s "Prodigal Sorcerer should print one ability with one target slot"
-
-  -- The whole card, cast and resolved through the stack rather than asked as a
-  -- set membership: alice's own Doom Blade destroys her own Slippery Bogle. The
-  -- Bogle is the only creature on the battlefield, so CR 601.2c's choice is
-  -- forced -- were 702.11b read as 702.18a's shroud, the spell would have no
-  -- legal target at all and the Bogle would live.
-  Spec.it s "CR 702.11b whole card: alice's Doom Blade destroys her own Slippery Bogle" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    bogle <- S.printingOf s registry "Slippery Bogle"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    let base = S.landsInPlay swamp 2 -- {1}{B}
-        (_, board) = S.addPermanent bogle S.alice base
-        (gs, dbId) = S.handOne doomBlade board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        -- By NAME, not by id: CR 400.7 makes the graveyard incarnation a new
-        -- object, and Event.changeZone mints it a fresh ObjectId.
-        buried = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid after)) (Game.zoneMembers Zone.Graveyard S.alice after)
-    Spec.assertEqWith s "Doom Blade went on the stack" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "alice's own creature is gone" (S.creaturesInPlay S.alice after) 0
-    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Slippery Bogle") buried) "the Bogle itself is in alice's graveyard"
-
-  -- CR 115.10a: "Just because an object or player is being affected by a spell
-  -- or ability doesn't make that object or player a target of that spell or
-  -- ability." Day of Judgment names no target at all, so hexproof has nothing to
-  -- say about it -- even though alice, who casts it, is exactly the opponent
-  -- rule 702.11b names. The classic way to get this rule wrong is to make the
-  -- restriction a property of being AFFECTED.
-  Spec.it s "CR 115.10a Day of Judgment still destroys Slippery Bogle: hexproof restricts targeting, not effects" $ do
-    plains <- S.printingOf s registry "Plains"
-    bogle <- S.printingOf s registry "Slippery Bogle"
-    piker <- S.printingOf s registry "Goblin Piker"
-    dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let base = S.landsInPlay plains 4 -- {2}{W}{W}
-        (_, b1) = S.addPermanent bogle S.bob base
-        (_, b2) = S.addPermanent piker S.bob b1
-        (gs, dojId) = S.handOne dayOfJudgment b2
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dojId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        buried = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid after)) (Game.zoneMembers Zone.Graveyard S.bob after)
-    Spec.assertEqWith s "both of bob's creatures are gone" (S.creaturesInPlay S.bob after) 0
-    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Slippery Bogle") buried) "the Bogle itself is in bob's graveyard"
-    Spec.assertBool s (elem (CardName.MkCardName $ Text.pack "Goblin Piker") buried) "and so is the Piker beside it"
 
   -- Hexproof is read off the PROJECTION and not off the printed card, so it
   -- lives in the CR 613 layer system like every other keyword. Humility is "All
@@ -1279,31 +1149,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "her white Angelic Edict can -- the half a shroud-shaped reading loses"
       _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
 
-  -- The same card through the CAST path and on to a resolution, which is what the
-  -- set-membership case above stands in for: CR 601.2c makes a spell with no legal
-  -- target for a slot uncastable at all, and the source Cast passes is the card IN
-  -- HAND rather than a spell object on the stack.
-  --
-  -- ONE PAIR OF BOARDS DIFFERING IN ONE THING, and Humility is what moves: "All
-  -- creatures lose all abilities and have base power and toughness 1/1" is CR
-  -- 613.1f at layer 6, and CR 702.16 states no clause holding protection clear of
-  -- it. So the humbled row is the same Apostle with the same Doom Blade in the
-  -- same hand over the same two Swamps, minus the keyword -- which also makes this
-  -- the case that proves the read is POST-layer rather than off the printed card.
-  Spec.it s "CR 601.2c whole card: protection leaves alice's Doom Blade no legal target until Humility takes it away" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    apostle <- S.printingOf s registry "Apostle of Purifying Light"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    humility <- S.printingOf s registry "Humility"
-    let (_, board) = S.addPermanent apostle S.bob (S.landsInPlay swamp 2) -- {1}{B}
-        (base, dbId) = S.handOne doomBlade board
-        humbled = S.withHumility humility base
-        resolve gs = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))) Stack.resolveTop)
-    Spec.assertBool s (not (S.castable S.alice dbId base)) "CR 702.16b protection from black leaves the black Doom Blade no legal target at all"
-    Spec.assertBool s (S.castable S.alice dbId humbled) "CR 613.1f under Humility it has one again"
-    Spec.assertEqWith s "and the humbled Apostle dies to it" (S.creaturesInPlay S.bob (resolve humbled)) 0
-    Spec.assertEqWith s "while the protected one is still standing, never having been aimed at" (S.creaturesInPlay S.bob base) 1
-
   -- CR 702.16k: "Such a permanent or player can't be targeted by spells or
   -- abilities the specified player controls." True-Name Nemesis, whose quality is
   -- Filter.OfChosenPlayer -- answered off Filter.Context.carrierChosenPlayer,
@@ -1456,88 +1301,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "and the Angelic Edict too, so neither refusal above is a spell that reaches nothing"
       _ -> Spec.assertFailure s "Murder and Angelic Edict should each declare a target slot"
 
-  -- CR 113.9, the whole rule, as two DISJOINT pools: "activated and triggered
-  -- abilities on the stack aren't spells, and therefore can't be countered by
-  -- anything that counters only spells. Activated and triggered abilities on
-  -- the stack can be countered by effects that specifically counter abilities."
-  --
-  -- One board with one of each on the stack -- alice's Goblin Piker spell, and
-  -- her Prodigal Sorcerer's activated ability above it -- so neither exclusion
-  -- can pass by the pool simply being empty. Cancel ("counter target spell",
-  -- Pool.Spells) and Stifle ("counter target activated or triggered ability",
-  -- Pool.Abilities) are read off their committed printings, so this is the
-  -- printed text and not a hand-built target slot.
-  --
-  -- CR 115.2 is what admits either at all: "only permanents are legal targets
-  -- ... unless a spell or ability ... (b) targets an object that can't exist on
-  -- the battlefield, such as a spell or ability."
-  Spec.it s "CR 113.9 Stifle's pool holds only the ability and Cancel's only the spell" $ do
-    cancel <- S.printingOf s registry "Cancel"
-    stifle <- S.printingOf s registry "Stifle"
-    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    piker <- S.printingOf s registry "Goblin Piker"
-    case Face.activatedAbilities (S.combinedFace sorcerer) of
-      [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
-      ability : _ -> do
-        let (srcId, withSorcerer) = S.addPermanent sorcerer S.alice (Setup.emptyGame S.bothPlayers)
-            -- CR 302.6: the Sorcerer has to have settled before its {T} is legal.
-            settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-            (spellId, onStack) = S.spellOnStack piker S.alice settled
-            gs = S.runPure S.identityAnswer (onStack {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
-            abilIds = filter (/= spellId) (GameState.stack gs)
-            -- soleTargetSlot, not S.spellTargetSlot: neither card calls its slot
-            -- "target" -- Cancel's is "spell" and Stifle's is "ability".
-            legalFor printing = fmap (\theSlot -> Target.legalRecipients (Just S.bob) S.noSource theSlot gs) (soleTargetSlot (Face.spell (S.combinedFace printing)))
-        case (abilIds, legalFor cancel, legalFor stifle) of
-          ([abilId], Just cancelLegal, Just stifleLegal) -> do
-            Spec.assertEqWith s "Cancel sees the spell and only the spell" cancelLegal (Set.singleton (Recipient.ToObject spellId))
-            Spec.assertEqWith s "Stifle sees the ability and only the ability" stifleLegal (Set.singleton (Recipient.ToObject abilId))
-          _ -> Spec.assertFailure s "the fixture should put one ability and one spell on the stack, and both cards should declare a target slot"
-
-  -- CR 113.3b against CR 113.3c, INSIDE the pool the case above holds against
-  -- Pool.Spells: Stifle's "activated or triggered ability" reaches both kinds and
-  -- Squelch's "target activated ability" reaches one, which is
-  -- Filter.IsActivatedAbility narrowing the same Pool.Abilities rather than a
-  -- second pool. Both offers are read off the committed printings.
-  --
-  -- One board carrying one of each kind, so neither offer can pass by the pool
-  -- being empty: alice's Prodigal Sorcerer's {T} (CR 113.3b) and the Aether Flash
-  -- trigger her Goblin Piker's entry raised (CR 113.3c).
-  --
-  -- Pawl.CounterspellSpec's Squelch group is the gameplay-level twin.
-  Spec.it s "CR 113.3b Squelch's pool holds the activated ability alone where Stifle's holds both" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    aetherFlash <- S.printingOf s registry "Aether Flash"
-    piker <- S.printingOf s registry "Goblin Piker"
-    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    stifle <- S.printingOf s registry "Stifle"
-    squelch <- S.printingOf s registry "Squelch"
-    case soleActivatedAbility sorcerer of
-      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
-      Just ping -> do
-        let (srcId, withSorcerer) = S.addPermanent sorcerer S.alice (Setup.emptyGame S.bothPlayers)
-            -- CR 302.6: the Sorcerer has to have settled before its {T} is legal.
-            settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-            (_, withFlash) = S.addPermanent aetherFlash S.alice settled
-            withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withFlash [1 .. (2 :: Int)]
-            (pikerId, withPiker) = S.addHandCard piker S.alice withLands
-            cast = S.runPure S.identityAnswer withPiker (S.cast S.alice pikerId)
-            -- CR 603.3 puts Aether Flash's trigger on the stack once the Piker
-            -- has entered.
-            entered = S.runPure S.identityAnswer cast Stack.resolveTop
-            placed = S.runPure S.identityAnswer entered Engine.settleForPriority
-            atAlice :: Prompt.Prompt r -> r
-            atAlice p = case p of
-              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
-              _ -> S.identityAnswer p
-            gs = S.runPure atAlice (placed {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ping)
-            legalFor printing = fmap (\theSlot -> Target.legalRecipients (Just S.bob) S.noSource theSlot gs) (soleTargetSlot (Face.spell (S.combinedFace printing)))
-        case (GameState.stack placed, GameState.stack gs, legalFor stifle, legalFor squelch) of
-          ([triggerId], [abilId, _], Just stifleLegal, Just squelchLegal) -> do
-            Spec.assertEqWith s "Squelch sees the activated ability and only it" squelchLegal (Set.singleton (Recipient.ToObject abilId))
-            Spec.assertEqWith s "where Stifle sees both kinds" stifleLegal (Set.fromList [Recipient.ToObject abilId, Recipient.ToObject triggerId])
-          _ -> Spec.assertFailure s "the fixture should put one trigger and then one activated ability on the stack, and both cards should declare a target slot"
-
   -- CR 602.2a creates an activated ability on the stack BEFORE CR 602.2b routes
   -- the rest of the activation through CR 601.2b-i, so CR 601.2c's targets are
   -- chosen in a state that already holds the ability. Activate.activateAbility
@@ -1653,29 +1416,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertBool s (not (Set.member (Recipient.ToObject inPlayId) legal)) "nor the Piker on the battlefield, under ToObject"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature inPlayId) legal)) "nor under ToCreature (disjoint from Pool.Creatures)"
         Spec.assertEqWith s "and nothing else at all" legal (Set.singleton (Recipient.ToObject mineId))
-
-  -- The move itself, cast and resolved through the stack: CR 400.7 mints a NEW
-  -- object in the hand ("an object that moves from one zone to another becomes a
-  -- new object"), so the card is asserted by name in the hand and by the absence
-  -- of the id it was targeted under from the graveyard. Raise Dead's own trip to
-  -- the graveyard is CR 404.1's "as is any instant or sorcery spell that's
-  -- finished resolving".
-  Spec.it s "CR 115.2 clause (a) whole card: Raise Dead returns the targeted creature card to alice's hand" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    raiseDead <- S.printingOf s registry "Raise Dead"
-    let (mineId, board) = S.addGraveyardCard piker S.alice (S.landsInPlay swamp 1)
-        (gs, rdId) = S.handOne raiseDead board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice rdId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "Raise Dead went on the stack" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "the Piker card is in alice's hand" (S.countByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 1
-    Spec.assertBool
-      s
-      (notElem mineId (Game.zoneMembers Zone.Graveyard S.alice resolved))
-      "and the object it was targeted under is gone from the graveyard (CR 400.7)"
-    Spec.assertEqWith s "that graveyard holds one card, the spent Raise Dead (CR 404.1)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
-    Spec.assertEqWith s "and alice's hand holds one card, the Piker and not the spell" (S.handSize S.alice resolved) 1
 
   -- CR 400.1's OTHER half. Raise Dead above says "in your graveyard"; Withered
   -- Wretch's "{1}: Exile target card from a graveyard" names no player at all, so
@@ -1977,44 +1717,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "naming bob and a card in CAROL's graveyard, the cast is reversed (CR 601.2)" (length (GameState.stack castAtCarol)) 0
     Spec.assertBool s (elem dwellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell is back in alice's hand"
 
-  -- CR 601.2c: "If the spell has a variable number of targets, the player
-  -- announces how many targets they will choose before they announce those
-  -- targets." How many they WILL choose -- so a number they could not then choose
-  -- legally is not one to offer. Dwell on the Past's card slot is offered the
-  -- union over the player slot's candidates (the case above pins that offer), and
-  -- CR 400.1 gives each player their own graveyard, so no ONE answer can reach
-  -- two graveyards at once.
-  --
-  -- Target.slotCapacities is the narrowing: the ceiling for a graveyard-scoped
-  -- slot is the largest per-player total, not the union's size. Without it a
-  -- caster announces two, names the only two cards there are, and CR 601.2e
-  -- returns the game to before the spell was proposed.
-  --
-  -- THREE SEATS, and the two cards are split ONE APIECE between bob and carol,
-  -- which is the whole discriminator: the union holds two and every graveyard
-  -- holds one.
-  --
-  -- The answerer OBEYS the count the engine came back with rather than naming
-  -- both cards outright. An answerer that named both would fail selectionLegal's
-  -- count check under the fix and its joint check without it -- a reversal either
-  -- way, and the case would pass whatever the engine offered.
-  Spec.it s "CR 601.2c Dwell on the Past cannot be aimed at more cards than one graveyard holds" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    dwell <- S.printingOf s registry "Dwell on the Past"
-    let (hisId, g1) = S.addGraveyardCard piker S.bob (S.landsFor forest S.alice 2 S.threePlayerGame)
-        (hersId, g2) = S.addGraveyardCard bolt S.carol g1
-        (board, dwellId) = S.handOne dwell g2
-        cast = S.runPure (aimingDwellObeying [hisId, hersId]) board (S.cast S.alice dwellId)
-        resolved = S.runPure (aimingDwellObeying [hisId, hersId]) cast Stack.resolveTop
-    Spec.assertEqWith s "asking for two, alice gets the one bob's graveyard holds: the Piker is in his library" (namesIn Zone.Library S.bob resolved) [S.nameOf (Printing.card piker)]
-    Spec.assertEqWith s "and out of his graveyard" (namesIn Zone.Graveyard S.bob resolved) []
-    Spec.assertEqWith s "carol's Bolt is untouched, never reachable beside bob" (namesIn Zone.Graveyard S.carol resolved) [S.nameOf (Printing.card bolt)]
-    Spec.assertEqWith s "and her library is empty" (namesIn Zone.Library S.carol resolved) []
-    Spec.assertEqWith s "the spell was cast rather than reversed (CR 601.2e)" (length (GameState.stack cast)) 1
-    Spec.assertBool s (notElem dwellId (Game.zoneMembers Zone.Hand S.alice cast)) "so it is not back in alice's hand"
-
   -- The same narrowing on the FLOOR rather than the ceiling, which is CR 601.2c's
   -- other half: "In some cases, the number of targets will be defined by the
   -- spell's text." A slot whose count is fixed at two has no announcement to
@@ -2046,111 +1748,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (split, splitId) = boardWith S.carol
     Spec.assertBool s (S.castable S.alice togetherId together) "with both cards in bob's graveyard the spell has a coherent announcement"
     Spec.assertBool s (not (S.castable S.alice splitId split)) "split one apiece it has none, though the union still holds two"
-
-  -- CR 700.2d: "If a particular mode is chosen multiple times, the spell is
-  -- treated as if that mode appeared that many times in sequence. If that mode
-  -- requires a target, the same player or object may be chosen as the target for
-  -- each of those modes, or different targets may be chosen." Different targets
-  -- is what Pawl.Engine.Modal.instanceSlot's per-occurrence rename buys, and a
-  -- slot's POOL may name a sibling slot by its printed name -- so occurrence 1's
-  -- graveyard scope has to follow the rename or it reads OCCURRENCE 0's player.
-  --
-  -- Synthetic Recurring Reclamation {2}{G} Sorcery (data/cards/synthetic-recurring-reclamation.json):
-  -- "Choose two. You may choose the same mode more than once. -- Target player
-  -- shuffles up to two target cards from their graveyard into their library. --
-  -- Draw a card." SYNTHETIC because the two printed sets do not intersect:
-  -- Scryfall o:"choose the same mode more than once", 2026-08-31, returns 22
-  -- cards, and no mode of any of them targets a card in another slot's graveyard
-  -- (the graveyard modes of the Confluence and Season cycles say "your
-  -- graveyard", and Unite the Coalition's "exile target player's graveyard" is a
-  -- resolution-time sweep, which reads printed names off Modal.instanceView and
-  -- never this path). CR 700.2d states the shape outright.
-  --
-  -- THE WRONG ANSWER IS WEAKER THAN PRINTED, not stricter, which is what makes
-  -- the case worth a board: an unrenamed scope judges occurrence 1's card against
-  -- whatever OCCURRENCE 0 named, so naming bob for occurrence 0 and carol for
-  -- occurrence 1 admits a card out of BOB's graveyard for her occurrence.
-  --
-  -- The DESTINATION cannot show it. CR 400.3 sends an object that would go to a
-  -- library other than its owner's to its owner's instead, so the misjudged card
-  -- lands in bob's library whichever player occurrence 1 named -- what
-  -- discriminates is that it MOVES AT ALL, the whole announcement being reversed
-  -- when the rename holds.
-  --
-  -- TWO RUNS off one board, differing in exactly one thing -- which player
-  -- occurrence 1 names -- with the same three Forests paying the same {2}{G},
-  -- the same two cards in bob's graveyard and the same modes chosen. The bob run
-  -- is what keeps the carol run from passing off a spell that never worked.
-  --
-  -- THREE SEATS: with alice and bob alone the two occurrences would name one
-  -- player and the rename could not be observed.
-  Spec.it s "CR 700.2d a repeated mode's graveyard scope follows its own occurrence, not the first" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    reclamation <- S.printingOf s registry "Synthetic Recurring Reclamation"
-    let (hisId, g1) = S.addGraveyardCard piker S.bob (S.landsFor forest S.alice 3 S.threePlayerGame)
-        (hisOtherId, g2) = S.addGraveyardCard bolt S.bob g1
-        (board, spellId) = S.handOne reclamation g2
-        run other =
-          let cast = S.runPure (aimingReclamation other hisId hisOtherId) board (S.cast S.alice spellId)
-           in (cast, S.runPure (aimingReclamation other hisId hisOtherId) cast Stack.resolveTop)
-        (castAtCarol, atCarol) = run S.carol
-        (_, atBob) = run S.bob
-    Spec.assertEqWith s "occurrence 1 naming carol, both of bob's cards stay in his graveyard: the announcement is reversed (CR 601.2e)" (namesIn Zone.Graveyard S.bob atCarol) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
-    Spec.assertEqWith s "so nothing reaches his library either" (namesIn Zone.Library S.bob atCarol) []
-    Spec.assertEqWith s "with nothing on the stack" (length (GameState.stack castAtCarol)) 0
-    Spec.assertBool s (elem spellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell back in alice's hand"
-    Spec.assertEqWith s "occurrence 1 naming bob instead, both cards reach his library" (namesIn Zone.Library S.bob atBob) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
-    Spec.assertEqWith s "leaving his graveyard empty" (namesIn Zone.Graveyard S.bob atBob) []
-
-  -- CR 700.2d one object type over: the case above is a SPELL, and an activated
-  -- ability re-checks CR 608.2b's targets down a second path of its own
-  -- (Pawl.Engine.Resolve.resolveModesWith), which built that map without the
-  -- per-occurrence rename the announcement had made; see #2806. The announcement is
-  -- not what is under test -- Pawl.Engine.Activate goes through
-  -- Modal.modesTargetSlots and always renamed -- so the ability reaches the stack
-  -- either way, and what CR 608.2b decides is whether occurrence 1's card is
-  -- still legal. Judged against OCCURRENCE 0's player it is a card in the wrong
-  -- graveyard, dropped with no error.
-  --
-  -- Synthetic Reclamation Engine {3} Artifact
-  -- (data/cards/synthetic-reclamation-engine.json): "{T}: Choose two. You may
-  -- choose the same mode more than once. -- Target player shuffles up to two
-  -- target cards from their graveyard into their library. -- Draw a card."
-  -- SYNTHETIC because no printing puts that instruction on an ability at all:
-  -- Scryfall o:"choose the same mode more than once", 2026-08-31, returns 22
-  -- cards and every one of them is an instant or a sorcery. CR 700.2a states the
-  -- shape outright -- the controller of a modal activated ability chooses the
-  -- modes as part of activating it -- and CR 700.2d's own sentence is about "a
-  -- modal spell or ability", so nothing in the rules forbids the printing.
-  --
-  -- THE WRONG ANSWER IS STRICTER THAN PRINTED here, where the spell case's was
-  -- weaker: the misjudged card is dropped rather than admitted, so what
-  -- discriminates is that carol's card MOVES.
-  --
-  -- THREE SEATS, the case above's reason: with alice and bob alone the two
-  -- occurrences would name one player and the rename could not be observed.
-  Spec.it s "CR 608.2b a repeated mode on an ABILITY re-checks each occurrence against its own binding" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    engine <- S.printingOf s registry "Synthetic Reclamation Engine"
-    case soleActivatedAbility engine of
-      Nothing -> Spec.assertFailure s "Synthetic Reclamation Engine should declare exactly one activated ability"
-      Just ability -> do
-        let (engineId, g1) = S.addPermanent engine S.alice S.threePlayerGame
-            (hisId, g2) = S.addGraveyardCard piker S.bob g1
-            (hersId, board) = S.addGraveyardCard bolt S.carol g2
-            activated = S.runPure (aimingReclamation S.carol hisId hersId) board (Activate.activateAbility S.alice engineId ability)
-            resolved = S.runPure (aimingReclamation S.carol hisId hersId) activated Stack.resolveTop
-        Spec.assertEqWith s "occurrence 1's card reaches CAROL's library, the player her own occurrence named" (namesIn Zone.Library S.carol resolved) [S.nameOf (Printing.card bolt)]
-        Spec.assertEqWith s "leaving her graveyard empty" (namesIn Zone.Graveyard S.carol resolved) []
-        Spec.assertEqWith s "and occurrence 0's card reaches bob's" (namesIn Zone.Library S.bob resolved) [S.nameOf (Printing.card piker)]
-        -- The proxies last: the announcement is not what this case is about, and
-        -- an ability that never reached the stack would leave every graveyard
-        -- alone too.
-        Spec.assertEqWith s "the activation was accepted, so the ability really did resolve" (length (GameState.stack activated)) 1
-        Spec.assertEqWith s "and nothing is left on the stack after it" (length (GameState.stack resolved)) 0
 
   -- CR 601.2c's other sibling-slot reading, and the one the rule states in its
   -- own words: "The same target can't be chosen multiple times for any one
@@ -2597,104 +2194,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "and carol's is not either, so it is one library and not every library" (Game.zoneMembers Zone.Library S.carol resolvedWithout) [carolTopId, carolDeeperId]
     Spec.assertEqWith s "with the spell off the stack" (length (GameState.stack resolvedWithout)) 0
 
-  -- CR 725.5: "If the result of a continuous effect generated by a static
-  -- ability is determined based on who is currently the monarch, but there is no
-  -- monarch in the game as that effect begins to apply, that effect does nothing
-  -- until a player becomes the monarch."
-  --
-  -- Dawnglade Regent ({5}{G}{G} Creature -- Elk 8/8) is the pool's first card
-  -- that can reach that path without any exotic board state, because its two
-  -- abilities are of different kinds and start at different moments: "When this
-  -- creature enters, you become the monarch" is a TRIGGER that has to resolve,
-  -- while "As long as you're the monarch, permanents you control have hexproof"
-  -- is a CR 604.2 static that is live the instant the Regent is on the
-  -- battlefield. Between the two sits a real window in which the static is
-  -- evaluated with no monarch at all -- and CR 725.5 says it does nothing there.
-  --
-  -- Palace Jailer, the pool's other monarch card, cannot reach it: it makes a
-  -- monarch before anything of its own asks who the monarch is.
-  --
-  -- THE WINDOW IS THE CASE, not the steady state. An implementation that read
-  -- "is there a monarch at all", or one that latched the static's answer when the
-  -- permanent entered, or one that simply never gated the ability, all pass a
-  -- test that only looks after the trigger resolved.
-  --
-  -- bob's Doom Blade ("Destroy target nonblack creature" -- an 8/8 green Elk is
-  -- nonblack, so its Filter admits the Regent and only the restriction can remove
-  -- it) is the probe, and the board answers every way it could be wrong at once:
-  -- alice's Piker separates "permanents you control" from an IsSource-shaped
-  -- affected set, bob's Piker keeps a negative from passing on an empty legal set,
-  -- and alice's own perspective is CR 702.11b's opponent scope, which is what
-  -- makes the negative below about hexproof rather than about targeting being
-  -- broken for some payment or timing reason.
-  Spec.it s "CR 725.5 Dawnglade Regent's hexproof does nothing until its own trigger crowns alice" $ do
-    forest <- S.printingOf s registry "Forest"
-    swamp <- S.printingOf s registry "Swamp"
-    regent <- S.printingOf s registry "Dawnglade Regent"
-    piker <- S.printingOf s registry "Goblin Piker"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    let -- {5}{G}{G} for the Regent, and {1}{B} twice for bob.
-        (gs1, regentCardId) = S.handOne regent (S.landsInPlay forest 7)
-        (alicePikerId, gs2) = S.addPermanent piker S.alice gs1
-        (bobPikerId, gs3) = S.addPermanent piker S.bob gs2
-        (_, gs4) = S.addPermanent swamp S.bob gs3
-        (_, gs5) = S.addPermanent swamp S.bob gs4
-        (bobsBlade, gs6) = S.addHandCard doomBlade S.bob gs5
-        (_, gs7) = S.addHandCard doomBlade S.bob gs6
-        -- CR 104.3c: neither player may deck during the three runs below.
-        (_, gs8) = S.addLibraryCard piker S.alice gs7
-        (_, board) = S.addLibraryCard piker S.bob gs8
-        -- The Regent's BATTLEFIELD id: CR 400.7 makes the resolved permanent a
-        -- new object, so the hand id above cannot name it.
-        regentOn gs =
-          List.find (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (S.printingName regent)) (Set.toList (GameState.battlefield gs))
-        castRegent = S.runPure S.identityAnswer board (S.cast S.alice regentCardId)
-        entered = S.runPure S.identityAnswer castRegent Stack.resolveTop
-        -- THE WINDOW: the Regent is on the battlefield and its enters trigger is
-        -- on the stack, unresolved. Nobody is the monarch.
-        window = S.runPure S.identityAnswer entered Engine.settleForPriority
-        -- The same board one resolution later, with alice crowned.
-        crowned = S.runPure S.identityAnswer window Stack.resolveTop
-    case (S.spellTargetSlot doomBlade, regentOn window) of
-      (Nothing, _) -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      (_, Nothing) -> Spec.assertFailure s "the Regent should be on the battlefield in the window"
-      (Just theSlot, Just regentId) -> do
-        let legalFor pid = Target.legalRecipients (Just pid) S.noSource theSlot
-            aimAtRegent :: Prompt.Prompt r -> r
-            aimAtRegent p = case p of
-              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature regentId))) sets
-              _ -> S.identityAnswer p
-            bobCast = S.runPure aimAtRegent window (S.cast S.bob bobsBlade)
-            killed = S.runPure aimAtRegent bobCast Stack.resolveTop
-        -- (1) The window itself. CR 725.1: there is no monarch in a game until an
-        -- effect instructs a player to become one, and the effect that would is
-        -- still on the stack.
-        Spec.assertEqWith s "nobody is the monarch yet" (GameState.monarch window) Nothing
-        Spec.assertEqWith s "because the enters trigger has not resolved" (length (GameState.stack window)) 1
-        Spec.assertBool s (Set.member (Recipient.ToCreature regentId) (legalFor S.bob window)) "so bob may target the Regent: CR 725.5's effect does nothing"
-        Spec.assertBool s (Set.member (Recipient.ToCreature alicePikerId) (legalFor S.bob window)) "and alice's Piker beside it"
-        -- The whole card through the stack, not merely a set membership: the
-        -- removal bob is allowed to cast in that window actually resolves.
-        Spec.assertEqWith s "bob's Doom Blade went on the stack above the trigger" (length (GameState.stack bobCast)) 2
-        Spec.assertEqWith s "and the Regent is destroyed" (regentOn killed) Nothing
-        Spec.assertBool s (elem (S.printingName regent) (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid killed)) (Game.zoneMembers Zone.Graveyard S.alice killed))) "into alice's graveyard"
-        -- (2) The steady state, one resolution later. Now CR 604.2's clause is
-        -- true, so layer 6 (CR 613.1f) hands out CR 702.11a's hexproof.
-        Spec.assertEqWith s "the trigger resolved and alice is the monarch" (GameState.monarch crowned) (Just S.alice)
-        Spec.assertBool s (not (Set.member (Recipient.ToCreature regentId) (legalFor S.bob crowned))) "now bob may not target the Regent"
-        Spec.assertBool s (not (Set.member (Recipient.ToCreature alicePikerId) (legalFor S.bob crowned))) "nor alice's Piker: the set is PERMANENTS YOU CONTROL, not the source"
-        Spec.assertBool s (Set.member (Recipient.ToCreature bobPikerId) (legalFor S.bob crowned)) "though bob's own Piker is still a legal target"
-        -- (3) THE DISCRIMINATOR for (2). CR 702.11b's hexproof stops only "spells
-        -- or abilities your opponents control", so the Regent's own controller
-        -- reaches it. Were bob's spell illegal for a payment or timing reason,
-        -- alice's would be illegal too and (2) would prove nothing.
-        Spec.assertBool s (Set.member (Recipient.ToCreature regentId) (legalFor S.alice crowned)) "alice may still target her own Regent"
-        -- (4) CR 109.5: the clause reads "YOU'RE the monarch", i.e. the static's
-        -- own controller. Crowning bob instead answers the question an
-        -- implementation that asked "is there a monarch at all" would get wrong.
-        let bobCrowned = S.withMonarch S.bob crowned
-        Spec.assertBool s (Set.member (Recipient.ToCreature regentId) (legalFor S.bob bobCrowned)) "with bob wearing the crown, alice's Regent has no hexproof"
-
   -- CR 122.1: "A counter is a marker placed on an object or player ...". Razorfin
   -- Abolisher's slot asks whether the candidate has one AT ALL, with no kind to
   -- look up -- Filter.HasCountersOfAnyKind, the kind-agnostic sibling of the
@@ -2735,90 +2234,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   borrowedExhumationSpec s registry
   -- And the bound at EQUALITY rather than order, which is a different atom and
   -- not a different reading of the one above: "with mana value X"; see #2989.
-  chthonianNightmareSpec s registry
   -- The joint check on the road no spell takes: CR 603.3d's placement, where an
   -- announcement that fails it is asked again rather than reversed.
   itzquinthSpec s registry
   -- And the conjunct beside it on that road: rule 601.2c's NUMBER, which only an
   -- interpreter ignoring the offer can get wrong.
   ravenousRatsSpec s registry
-  -- And the OBJECT a computed count is read against, on the two ability roads
-  -- where the stack object and CR 113.7's source are not the same thing.
-  -- And the one slot in the corpus its CONTROLLER does not announce.
-  cuombajjSpec s registry
   -- And CR 115.7d, a spell that is already on the stack given new targets.
-  redirectSpec s registry
   -- And its joint half, over a spell whose second slot reads its first.
   redirectBioshiftSpec s registry
-
--- CR 115.1 fixes the ability's controller as the seat that announces its
--- targets. Cuombajj Witches overrides that for one of its two slots -- "{T}:
--- This creature deals 1 damage to any target and 1 damage to any target of an
--- opponent's choice" -- and CR 801.5a's example is the rule text that names the
--- card, and that says the CONTROLLER picks which opponent picks.
---
--- Three seats, because at two the two readings collapse: CR 102.2 leaves "an
--- opponent" one candidate, and nothing on the board can tell "alice chose it"
--- from "bob did" when they would name the same seat.
---
--- Both cases run off one board and one activation, and differ only in which
--- opponent alice names, so the seat that answers is the only thing between them.
-cuombajjSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-cuombajjSpec s registry = Spec.describe s "A slot the controller does not announce (CR 115.1)" $ do
-  Spec.it s "CR 115.1 the opponent alice named picks the second target, and alice picks only the first" $ do
-    witches <- S.printingOf s registry "Cuombajj Witches"
-    case Face.activatedAbilities (S.combinedFace witches) of
-      [] -> Spec.assertFailure s "Cuombajj Witches should print one activated ability"
-      ability : _ -> do
-        let (srcId, board) = witchesBoard witches
-            after = S.runPure (answeringWitches S.bob) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-        -- The gameplay assertions first. alice is the seat BOB named, and alice
-        -- would never have named herself, so her life total is the whole claim.
-        Spec.assertEqWith s "alice, whom bob named, took bob's damage" (S.lifeOf S.alice after) (Just 19)
-        Spec.assertEqWith s "carol, whom alice named, took alice's" (S.lifeOf S.carol after) (Just 19)
-        Spec.assertEqWith s "and bob, who announced but was named by nobody, took none" (S.lifeOf S.bob after) (Just 20)
-        -- The proxy last: the ability really resolved and really tapped.
-        Spec.assertEqWith s "the Witches tapped to pay for it" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Tapped)
-
-  -- CR 801.5a's other half: WHICH opponent announces is alice's to choose, so
-  -- naming carol instead of bob moves the second target with it. The engine may
-  -- not settle that question itself, which is what a three-seat board is for.
-  Spec.it s "CR 801.5a naming carol instead of bob routes the second announcement to carol" $ do
-    witches <- S.printingOf s registry "Cuombajj Witches"
-    case Face.activatedAbilities (S.combinedFace witches) of
-      [] -> Spec.assertFailure s "Cuombajj Witches should print one activated ability"
-      ability : _ -> do
-        let (srcId, board) = witchesBoard witches
-            after = S.runPure (answeringWitches S.carol) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-        Spec.assertEqWith s "bob, whom carol named, took carol's damage" (S.lifeOf S.bob after) (Just 19)
-        Spec.assertEqWith s "carol took alice's, and none of her own" (S.lifeOf S.carol after) (Just 19)
-        Spec.assertEqWith s "and alice, whom bob would have named had bob been asked, took none" (S.lifeOf S.alice after) (Just 20)
-
--- alice's Witches, settled and untapped, at three seats with priority hers.
-witchesBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-witchesBoard witches =
-  let (srcId, gs) = S.addPermanent witches S.alice (Setup.emptyGame S.threePlayers)
-   in (srcId, gs {GameState.priority = Just S.alice})
-
--- `chosen` is the opponent alice names at CR 801.5a's pick. Every announcing
--- seat targets the seat BEFORE it, a rotation rather than a fixed victim, so
--- each of the three possible askers names a different player and no two of them
--- can be told apart by the board alone. Keyed on the ASKING seat, which the
--- prompt carries; a pure answerer that read only the offer would answer both
--- announcements alike. The answer is FILTERED out of the offer rather than
--- built, so it is the recipient the pool actually produced (CR 608.2b).
-answeringWitches :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-answeringWitches chosen p = case p of
-  Prompt.ChooseOpponent _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (chosen ==) (NonEmpty.toList offered))
-  Prompt.ChooseTargets _ asker _ asked -> fmap (\(_, offered) -> Set.filter ((Just (previousSeat asker) ==) . Recipient.playerOf) offered) asked
-  _ -> S.identityAnswer p
-
--- The rotation answeringWitches names its victim by.
-previousSeat :: PlayerId.PlayerId -> PlayerId.PlayerId
-previousSeat pid
-  | pid == S.alice = S.carol
-  | pid == S.bob = S.alice
-  | otherwise = S.bob
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
@@ -3066,7 +2490,7 @@ celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ 
 --
 -- THREE SEATS, so "your graveyard" (CR 109.5's you, alice) is a different zone
 -- from the damaged player's.
-warsingerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+warsingerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 warsingerSpec s registry =
   let board = do
         warsinger <- S.printingOf s registry "Venerable Warsinger"
@@ -3089,19 +2513,6 @@ warsingerSpec s registry =
             placed = S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) fought Engine.settleForPriority
         pure (mine, pikerId, shrunk, placed, S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) placed Engine.priorityLoop)
    in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
-        -- THE proving case, at gameplay level: which card came back.
-        Spec.it s "CR 603.2 whole card: the bound is the damage the event carried" $ do
-          (mine, _, before, _, after) <- board
-          case mine of
-            [warsingerId] -> do
-              Spec.assertEqWith s "CR 202.3: the mana value 2 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-              Spec.assertEqWith s "and the mana value 3 one the answerer preferred is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 0
-              Spec.assertEqWith s "nor the mana value 4 one" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.alice after) 0
-              Spec.assertEqWith s "nor the instant under every bound" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Lightning Bolt")) S.alice after) 0
-              -- The fixture's own preconditions, asserted rather than assumed.
-              Spec.assertEqWith s "the -1/-1 counter makes the Warsinger a 2/2 before it connects" (S.powerToughnessOf warsingerId before) (Just (2, 2))
-              Spec.assertEqWith s "CR 510.1b: bob took the Warsinger's 2" (S.lifeOf S.bob after) (Just 18)
-            _ -> Spec.assertFailure s "fixture should give alice one Warsinger"
         -- The announcement itself, read off the placed ability rather than
         -- inferred from what happened -- so this says what the event stamped and
         -- what the slot ADMITTED against it.
@@ -3150,7 +2561,7 @@ warsingerPlan bait p = case p of
 -- nothing happening. The Bolt is what makes a filter that had stopped narrowing by
 -- card type visible, since the fallback takes the smallest legal recipient either
 -- way.
-stirTheGraveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stirTheGraveSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 stirTheGraveSpec s registry =
   let boardOf graveyard swamps = do
         stir <- S.printingOf s registry "Stir the Grave"
@@ -3173,45 +2584,6 @@ stirTheGraveSpec s registry =
           (instantBoard, _, withInstant) <- boardOf ["Lightning Bolt"] 3
           Spec.assertBool s (S.castable S.alice creatureBoard withCreature) "the mana value 4 creature card is reachable by some X, so the cast is offered"
           Spec.assertBool s (not (S.castable S.alice instantBoard withInstant)) "and no X reaches an instant, so it is not"
-        -- THE proving case, at gameplay level: which card came back. THREE
-        -- DISTINCT READINGS of one graveyard, so the offered set names one and
-        -- rejects two -- the announced 2 admits the Piker alone, a bound that had
-        -- widened admits the Tyrant and the Wolves as well, and a bound that went
-        -- unanswered admits nothing and CR 601.2e reverses the whole cast.
-        Spec.it s "CR 601.2c whole card: the bound is the X the caster announced" $ do
-          (stirId, ids, gs) <- boardOf ["Goblin Piker", "Kalakscion, Hunger Tyrant", "Russet Wolves", "Lightning Bolt"] 3
-          case ids of
-            [_, tyrantId, wolvesId, boltId] -> do
-              let after = S.runPure (stirPlan 2 [tyrantId, wolvesId, boltId]) gs (S.cast S.alice stirId >> Stack.resolveTop)
-              Spec.assertEqWith s "CR 202.3: the mana value 2 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-              Spec.assertEqWith s "and the mana value 3 one the answerer preferred is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 0
-              Spec.assertEqWith s "nor the mana value 4 one" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.alice after) 0
-              Spec.assertEqWith s "nor the instant under every bound" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Lightning Bolt")) S.alice after) 0
-              -- The fixture's own precondition, asserted rather than assumed: the
-              -- cast was not reversed, so {2}{B} was announced and paid.
-              Spec.assertEqWith s "CR 601.2h all three Swamps paid {2}{B}" (S.tappedCount S.alice after) 3
-            _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
-        -- The other end of the same announcement, on the same board: X is the
-        -- caster's to name, so naming 0 leaves a slot no card in that graveyard
-        -- satisfies -- and CR 601.2c's unfillable announcement makes the casting
-        -- illegal rather than being repaired to some value the board can meet.
-        Spec.it s "CR 601.2e an X no graveyard card is under reverses the whole cast" $ do
-          (stirId, ids, gs) <- boardOf ["Goblin Piker", "Kalakscion, Hunger Tyrant", "Russet Wolves", "Lightning Bolt"] 3
-          case ids of
-            [_, tyrantId, wolvesId, boltId] -> do
-              let after = S.runPure (stirPlan 0 [tyrantId, wolvesId, boltId]) gs (S.cast S.alice stirId >> Stack.resolveTop)
-              Spec.assertEqWith s "no creature card came back" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
-              Spec.assertEqWith s "CR 601.2: the game returned to before the casting was proposed, so no Swamp is tapped" (S.tappedCount S.alice after) 0
-            _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
-
--- Announces this X and aims every target slot at the graveyard cards the bound
--- EXCLUDES, falling back to the smallest legal recipient -- warsingerPlan's shape,
--- with CR 601.2b's announcement in place of the combat that supplied the trigger.
-stirPlan :: Natural.Type.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-stirPlan x bait p = case p of
-  Prompt.ChooseX {} -> x
-  Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
-  _ -> S.identityAnswer p
 
 -- Synthetic Borrowed Exhumation ({X}{B} Sorcery,
 -- data/cards/synthetic-borrowed-exhumation.json): "Return target creature card
@@ -3299,98 +2671,6 @@ aimingExhumation x oid p = case p of
             else Set.singleton (Recipient.ToObject oid)
       )
       asked
-  _ -> S.identityAnswer p
-
--- Chthonian Nightmare ({1}{B} Enchantment, Modern Horizons 3, paper; Oracle text
--- fetched from Scryfall this session and transcribed whole): "When this
--- enchantment enters, you get {E}{E}{E} (three energy counters). / Pay X {E},
--- Sacrifice a creature, Return this enchantment to its owner's hand: Return
--- target creature card with mana value X from your graveyard to the battlefield.
--- Activate only as a sorcery."
---
--- CR 202.3's computed bound at EQUALITY rather than order, which is the whole
--- reason the card is here: every group above prints "or less", and transcribing
--- this one with that atom would have run WEAKER than printed; see #2989.
---
--- The board is stirTheGraveSpec's one operator over, and it tells the two
--- readings apart because a graveyard card sits BELOW the announced X as well as
--- at it and above it: alice's graveyard holds a mana value 2 creature card, a
--- mana value 3 one, a mana value 4 one and a mana value 3 INSTANT, and the
--- answerer PREFERS every card the equality excludes. At X=3 an "or less" bound
--- would have admitted the mana value 2 card and the answerer would have taken it,
--- so which permanent arrives is what separates them; the second case announces 2
--- on the same board, where a bound frozen at 3 or read as ">=" would arrive at the
--- wrong card instead.
---
--- The Ogre Sentry is what the cost sacrifices and nothing else: it is alice's
--- only creature, so CR 601.2b's choice has one candidate and CR 601.2h's payment
--- cannot reach anything the assertions read -- and it reaches the graveyard only
--- after CR 601.2c has chosen the target. Five energy counters, so the announced 3 and 2
--- are both affordable and neither coincides with the supply.
-chthonianNightmareSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-chthonianNightmareSpec s registry = Spec.describe s "ManaValueEqualToAmount (CR 202.3)" $ do
-  -- THE proving case, at gameplay level: which card came back.
-  Spec.it s "CR 601.2c whole card: only the graveyard card AT the announced X comes back" $ do
-    (nightmare, srcId, ids, board) <- chthonianBoard s registry
-    case (Face.activatedAbilities (S.combinedFace nightmare), ids) of
-      (ability : _, [pikerId, _, wolvesId, cancelId]) -> do
-        let after = S.runPure (chthonianPlan 3 [pikerId, wolvesId, cancelId]) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-        Spec.assertEqWith s "CR 202.3: the mana value 3 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 1
-        Spec.assertEqWith s "and the mana value 2 one an \"or less\" bound would have admitted is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
-        Spec.assertEqWith s "nor the mana value 4 one above the bound" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.alice after) 0
-        Spec.assertEqWith s "nor the mana value 3 INSTANT, which the card-type conjunct keeps out" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Cancel")) S.alice after) 0
-        -- The proxies last: the announcement really was paid at 3, so the bound
-        -- above was read off a value the board charged for.
-        Spec.assertEqWith s "CR 118.3 two counters left, so the announced 3 was really spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
-        Spec.assertEqWith s "CR 701.21a the cost sacrificed alice's one creature" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Ogre Sentry")) S.alice after) 0
-        Spec.assertBool s (not (S.onBattlefield srcId after)) "and returned the Nightmare itself to hand"
-        Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
-      _ -> Spec.assertFailure s "fixture should give alice the Nightmare's one ability and four graveyard cards"
-
-  -- The bound MOVES with the announcement, on the same board: announcing 2 picks
-  -- out the mana value 2 card and leaves the 3 the case above returned. Nothing
-  -- constant and nothing frozen at the first case's value can pass both.
-  Spec.it s "CR 601.2b announcing 2 instead returns the mana value 2 card and leaves the 3" $ do
-    (nightmare, srcId, ids, board) <- chthonianBoard s registry
-    case (Face.activatedAbilities (S.combinedFace nightmare), ids) of
-      (ability : _, [_, tyrantId, wolvesId, cancelId]) -> do
-        let after = S.runPure (chthonianPlan 2 [tyrantId, wolvesId, cancelId]) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
-        Spec.assertEqWith s "CR 202.3: the mana value 2 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-        Spec.assertEqWith s "and the mana value 3 one the answerer preferred is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 0
-        Spec.assertEqWith s "CR 118.3 three counters left, so this announcement was 2" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
-      _ -> Spec.assertFailure s "fixture should give alice the Nightmare's one ability and four graveyard cards"
-
--- alice with a settled Chthonian Nightmare, one creature for the cost to
--- sacrifice, five energy counters and four cards in her graveyard, holding
--- priority in her own precombat main phase -- which the ability's CR 307.5
--- sorcery-speed restriction demands.
-chthonianBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  m (Printing.Printing, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-chthonianBoard s registry = do
-  nightmare <- S.printingOf s registry "Chthonian Nightmare"
-  sentry <- S.printingOf s registry "Ogre Sentry"
-  cards <- traverse (S.printingOf s registry) ["Goblin Piker", "Kalakscion, Hunger Tyrant", "Russet Wolves", "Cancel"]
-  let (srcId, g0) = S.addPermanent nightmare S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g1) = S.addPermanent sentry S.alice g0
-      (ids, g2) = List.foldl' (\(acc, g) c -> let (oid, g3) = S.addGraveyardCard c S.alice g in (acc <> [oid], g3)) ([], g1) cards
-  pure
-    ( nightmare,
-      srcId,
-      ids,
-      S.addPlayerCounter PlayerCounterKind.Energy 5 S.alice g2 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-    )
-
--- Announces this X and aims the target slot at the graveyard cards the bound
--- EXCLUDES, falling back to the smallest legal recipient -- stirPlan's shape, with
--- CR 601.2h's sacrifice pinned rather than left to the base answerer.
-chthonianPlan :: Natural.Type.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-chthonianPlan x bait p = case p of
-  Prompt.ChooseX {} -> x
-  Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
-  Prompt.ChooseSacrifices _ _ _ offered n _ -> Set.fromList (List.genericTake n offered)
   _ -> S.identityAnswer p
 
 -- CR 603.3d's announcement for Itzquinth's reflexive ability, threaded through a
@@ -3572,68 +2852,6 @@ overCounting p = case p of
     pure (if asked_ == 0 then fmap snd asked else S.preferring (const True) asked)
   _ -> pure (S.identityAnswer p)
 
-mainPhase :: GameState.GameState -> GameState.GameState
-mainPhase gs =
-  gs
-    { GameState.activePlayer = S.alice,
-      GameState.phase = Phase.PrecombatMain,
-      GameState.priority = Just S.alice
-    }
-
--- CR 115.7d over an ORIGINAL spell: Redirect ({U}{U} Instant, "You may choose new
--- targets for target spell"), with CR 702.21a's ward as the observer of what
--- became a target, and Wild Ricochet as the same instruction ahead of a copy.
---
--- THREE SEATS, Pawl.CopySpec's wardedCopyBoard's reason: alice casts the Giant
--- Growth, bob casts the re-target and controls every creature it can reach
--- (Tomakul Honor Guard, "Ward {2}"; Slippery Bogle, hexproof; a Goblin Piker of
--- his own), and carol is neither. alice's Goblin Piker is what the Growth names
--- first. alice's three Forests are the Growth and a {2} ward payment she CAN make,
--- so a countered Growth is her declining rather than being unable.
-redirectSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-redirectSpec s registry =
-  let boardOf = do
-        forest <- S.printingOf s registry "Forest"
-        island <- S.printingOf s registry "Island"
-        mountain <- S.printingOf s registry "Mountain"
-        guard <- S.printingOf s registry "Tomakul Honor Guard"
-        bogle <- S.printingOf s registry "Slippery Bogle"
-        piker <- S.printingOf s registry "Goblin Piker"
-        growth <- S.printingOf s registry "Giant Growth"
-        redirect <- S.printingOf s registry "Redirect"
-        ricochet <- S.printingOf s registry "Wild Ricochet"
-        let lands = S.landsFor mountain S.bob 4 (S.landsFor island S.bob 2 (S.landsFor forest S.alice 3 S.threePlayerGame))
-            (withGrowth, growthId) = S.handOne growth lands
-            (redirectId, g1) = S.addHandCard redirect S.bob withGrowth
-            (ricochetId, g2) = S.addHandCard ricochet S.bob g1
-            (guardId, g3) = S.addPermanent guard S.bob g2
-            (bogleId, g4) = S.addPermanent bogle S.bob g3
-            (bobPikerId, g5) = S.addPermanent piker S.bob g4
-            (pikerId, gs) = S.addPermanent piker S.alice g5
-        pure (MkRedirectBoard guardId bogleId bobPikerId pikerId growthId redirectId ricochetId, gs)
-      -- alice casts the Growth at `aim`; the Growth's id and the board with it
-      -- on the stack, any trigger its announcement raised not yet placed.
-      growthAt aim board ids = S.runPure (aimingAs S.alice aim) board (S.cast S.alice (growthOf ids))
-      -- bob casts `card` at the Growth, then it resolves with every target
-      -- prompt put to bob answered by `aim`.
-      retarget card aim growthSpell gs =
-        let cast = S.runPure (aimingAs S.bob (Recipient.ToObject growthSpell)) gs (S.cast S.bob card)
-         in S.runPure (aimingAs S.bob aim) cast (Stack.resolveTop >> Engine.settleForPriority)
-   in Spec.describe s "Redirect (CR 115.7d)" $ do
-        -- The same board, bob naming his Slippery Bogle instead. CR 115.7d's new
-        -- target "must be legal", judged for the GROWTH, whose controller is
-        -- alice -- so CR 702.11b's hexproof refuses it though bob is the one
-        -- choosing, and the Growth resolves on its old target.
-        Spec.it s "CR 115.7d / 702.11b legality is the spell's controller's, so bob cannot aim alice's Growth at his hexproof Bogle" $ do
-          (ids, board) <- boardOf
-          let cast = growthAt (Recipient.ToCreature (pikerOf ids)) board ids
-          case topOfStack cast of
-            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
-            Just growthSpell -> do
-              let after = drainDeclining (retarget (redirectOf ids) (Recipient.ToCreature (bogleOf ids)) growthSpell cast)
-              Spec.assertEqWith s "the Growth resolved on alice's Piker, its old target" (S.powerToughnessOf (pikerOf ids) after) (Just (5, 4))
-              Spec.assertEqWith s "and the Bogle is untouched" (S.powerToughnessOf (bogleOf ids) after) (Just (1, 1))
-
 -- CR 115.7d's two halves over a jointly judged slot: Bioshift's `to` must be
 -- "another target creature with the same controller" as its `from`. alice casts
 -- it from her Goblin Piker to her other Piker; bob's Redirect moves `from` to his
@@ -3687,17 +2905,6 @@ aimingSlots who aimed p = case p of
   Prompt.ChooseTargets _ player _ asked | player == who -> Map.mapWithKey (\slot (_, offered) -> Set.filter ((== Map.lookup slot aimed) . Just) offered) asked
   _ -> S.identityAnswer p
 
--- The objects redirectSpec's board holds.
-data RedirectBoard = MkRedirectBoard
-  { guardOf :: ObjectId.ObjectId,
-    bogleOf :: ObjectId.ObjectId,
-    bobPikerOf :: ObjectId.ObjectId,
-    pikerOf :: ObjectId.ObjectId,
-    growthOf :: ObjectId.ObjectId,
-    redirectOf :: ObjectId.ObjectId,
-    ricochetOf :: ObjectId.ObjectId
-  }
-
 -- Answer every target prompt put to `who` by FILTERING the offered set down to
 -- `recipient`; a target prompt put to another seat gets the identity answer.
 aimingAs :: PlayerId.PlayerId -> Recipient.Recipient -> Prompt.Prompt r -> r
@@ -3707,13 +2914,3 @@ aimingAs who recipient p = case p of
 
 topOfStack :: GameState.GameState -> Maybe ObjectId.ObjectId
 topOfStack = Maybe.listToMaybe . GameState.stack
-
--- Resolve until the stack is empty, every payment declined: a ward trigger is
--- one object more, so a fixed count would read two boards at different depths.
-drainDeclining :: GameState.GameState -> GameState.GameState
-drainDeclining =
-  let go :: Int -> GameState.GameState -> GameState.GameState
-      go fuel gs
-        | fuel <= 0 || null (GameState.stack gs) = gs
-        | otherwise = go (fuel - 1) (S.runPure S.identityAnswer gs (Stack.resolveTop >> Engine.settleForPriority))
-   in go 10

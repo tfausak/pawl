@@ -1,0 +1,111 @@
+{
+  "description": "CR 704.5g the control: an Ogre Sentry survives the same 2 damage, marked",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Aether Flash",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ogre Sentry",
+            "label": "ogre-sentry",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ogre-sentry",
+          "mana": [
+            "$mountain",
+            "$mountain-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Ogre Sentry",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Ogre Sentry",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$mountain-2",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Ogre Sentry",
+        "damage": 2
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Ogre Sentry",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Ogre Sentry",
+        "power": 3,
+        "toughness": 3
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Graveyard",
+        "is": []
+      }
+    }
+  ]
+}

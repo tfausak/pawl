@@ -1,0 +1,99 @@
+{
+  "description": "CR 118.7 whole card: Bureau Headmaster equips a Bonesplitter off no mana at all",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Bonesplitter",
+            "label": "bonesplitter",
+            "ready": true
+          },
+          {
+            "card": "Withered Wretch",
+            "ready": true
+          },
+          {
+            "card": "Bureau Headmaster",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$goblin-piker",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $bonesplitter"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$bonesplitter",
+          "ability": 0,
+          "targets": [
+            "$goblin-piker"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "PowerToughness": {
+        "object": "$goblin-piker",
+        "power": 4,
+        "toughness": 1
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "$bonesplitter",
+        "is": "$goblin-piker"
+      }
+    }
+  ]
+}

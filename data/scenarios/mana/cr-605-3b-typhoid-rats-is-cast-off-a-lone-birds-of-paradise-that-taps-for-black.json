@@ -1,0 +1,106 @@
+{
+  "description": "CR 605.3b Typhoid Rats is cast off a lone Birds of Paradise that taps for black",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Birds of Paradise",
+            "label": "birds-of-paradise",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Typhoid Rats",
+            "label": "typhoid-rats",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$typhoid-rats",
+          "mana": [
+            "$birds-of-paradise"
+          ],
+          "yields": [
+            [
+              {
+                "manaType": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Black"
+                  }
+                },
+                "tags": [],
+                "retention": {
+                  "type": "Ordinary"
+                },
+                "restriction": null,
+                "rider": null,
+                "sourceChosenSubtype": null
+              }
+            ]
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Typhoid Rats",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Typhoid Rats",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$birds-of-paradise",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Typhoid Rats",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Typhoid Rats",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Typhoid Rats",
+        "power": 1,
+        "toughness": 1
+      }
+    }
+  ]
+}

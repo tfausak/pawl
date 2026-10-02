@@ -1,0 +1,98 @@
+{
+  "description": "CR 605.3a whole cards: the Ogre Deadlock Trap named is no longer a mana source, and its twin is",
+  "note": "The Offered view names mana abilities by object id: 1 is bob's Mountain, 2 the first Treasonous Ogre, 3 the second.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [
+          {
+            "key": {
+              "type": "Energy"
+            },
+            "value": 2
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Deadlock Trap",
+            "label": "deadlock-trap",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Treasonous Ogre",
+            "label": "treasonous-ogre",
+            "ready": true
+          },
+          {
+            "card": "Treasonous Ogre",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$deadlock-trap",
+          "ability": 0,
+          "targets": [
+            "$treasonous-ogre"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "ActivateManaAbility Mountain",
+            "ActivateManaAbility Treasonous Ogre#2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$treasonous-ogre",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$deadlock-trap",
+        "tapped": true
+      }
+    }
+  ]
+}

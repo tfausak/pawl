@@ -1,0 +1,83 @@
+{
+  "description": "CR 702.105a a tie for most life still triggers",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 15,
+        "battlefield": [
+          {
+            "card": "Enraged Revolutionary",
+            "label": "enraged-revolutionary",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$enraged-revolutionary"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$enraged-revolutionary",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$enraged-revolutionary",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$enraged-revolutionary",
+        "power": 3,
+        "toughness": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$enraged-revolutionary",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    }
+  ]
+}

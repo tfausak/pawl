@@ -1,0 +1,286 @@
+{
+  "description": "CR 601.2a an OPPONENT's earlier Approach is not one you've cast",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p3"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p4"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p5"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p6"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p7"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p8"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p9"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p10"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p11"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p12"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p13"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p14"
+          },
+          {
+            "card": "Future Sight",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Approach of the Second Sun",
+            "label": "hers"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b1"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b2"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b3"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b4"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b5"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b6"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b7"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Approach of the Second Sun",
+            "label": "his"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$his",
+          "mana": [
+            "$b1",
+            "$b2",
+            "$b3",
+            "$b4",
+            "$b5",
+            "$b6",
+            "$b7"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 27
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$hers",
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$p4",
+            "$p5",
+            "$p6",
+            "$p7",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Result",
+        "is": null
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 27
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "alice",
+        "zone": "Library",
+        "is": [
+          "Plains#15",
+          "Plains#16",
+          "Plains#17",
+          "Plains#18",
+          "Plains#19",
+          "Plains#20",
+          "Approach of the Second Sun#2",
+          "Plains#21"
+        ]
+      }
+    }
+  ]
+}

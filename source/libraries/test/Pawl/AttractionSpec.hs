@@ -112,13 +112,6 @@ openSpec s registry = Spec.describe s "Open an Attraction" $ do
     Spec.assertEqWith s "under alice's control" (S.countOnBattlefieldByName bumperCars S.alice after) 1
     Spec.assertEqWith s "and 202f is left in the deck" (fmap (`Game.lightsOf` after) (Attraction.deckOf S.alice after)) [Set.fromList [4, 5, 6]]
     Spec.assertEqWith s "which was two cards before" (length (Attraction.deckOf S.alice gs)) 2
-  Spec.it s "CR 609.3 an empty Attraction deck opens nothing" $ do
-    attendant <- S.printingOf s registry "Deadbeat Attendant"
-    swamp <- S.printingOf s registry "Swamp"
-    let (gs, spellId) = S.handOne attendant (S.landsInPlay swamp 2)
-        after = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice spellId)) Engine.priorityLoop
-    Spec.assertEqWith s "the Attendant resolved" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Deadbeat Attendant")) S.alice after) 1
-    Spec.assertEqWith s "and no Attraction entered" (S.countOnBattlefieldByName bumperCars S.alice after) 0
   Spec.it s "CR 717.2 / 103.3a the Attraction deck is shuffled before the game begins" $ do
     swamp <- S.printingOf s registry "Swamp"
     cars <- S.printingOf s registry "Bumper Cars"

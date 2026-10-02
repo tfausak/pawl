@@ -1,0 +1,204 @@
+{
+  "description": "CR 601.2c any number of targets: four announced on a five-candidate board",
+  "note": "Soulfire Eruption prints no maximum, so all four players are announced with bob's Ogre Sentry a fifth candidate left unchosen. The four exiled cards' mana values 1, 2, 4 and 8 land one on each player in APNAP order.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain2"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain3"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain4"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain5"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain6"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain7"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain8"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain9"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Soulfire Eruption",
+            "label": "eruption"
+          }
+        ],
+        "library": [
+          {
+            "card": "Benalish Hero"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Hill Giant"
+          },
+          {
+            "card": "Excruciator"
+          },
+          {
+            "card": "Bird Maiden"
+          },
+          {
+            "card": "Sabretooth Tiger"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ogre Sentry"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      },
+      {
+        "name": "dave"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$eruption",
+          "targets": [
+            "$alice",
+            "$bob",
+            "$carol",
+            "$dave"
+          ],
+          "mana": [
+            "$mountain1",
+            "$mountain2",
+            "$mountain3",
+            "$mountain4",
+            "$mountain5",
+            "$mountain6",
+            "$mountain7",
+            "$mountain8",
+            "$mountain9"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": [
+            "Benalish Hero",
+            "Goblin Piker",
+            "Hill Giant",
+            "Excruciator"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Library",
+          "is": [
+            "Bird Maiden",
+            "Sabretooth Tiger"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 19
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 18
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "carol",
+          "life": 16
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "dave",
+          "life": 12
+        }
+      }
+    }
+  ]
+}

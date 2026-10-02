@@ -77,8 +77,8 @@
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
--- counterpart, and the pair is the point: one board, one Cancel, and the filter
--- alone deciding whether the victim spell survives.
+-- counterpart, in data/scenarios/cast-permission: one board, one Cancel, and the
+-- filter alone deciding whether the victim spell survives.
 --
 -- Oppressive Rays is CR 601.2f's ACTIVATION side, on a criterion no other group
 -- here has: CR 303.4b's "enchanted", answered off the source the row carries.
@@ -99,7 +99,6 @@
 -- same per-player question of a filtered count of the turn's casts.
 module Pawl.PlayerEffectSpec where
 
-import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
@@ -142,7 +141,6 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
-import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -186,13 +184,6 @@ ruleOfLawBoard plains ruleOfLaw =
           }
       )
 
--- Cast Rule of Law itself, and let it resolve onto the battlefield.
-ruleOfLawAfterFirst :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-ruleOfLawAfterFirst plains ruleOfLaw =
-  let resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
-      (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
-   in (a, b, resolveAll (S.runPure S.identityAnswer board (S.cast S.alice a)))
-
 -- The object every assertion below about a QUALITY-FREE prohibition passes to
 -- prohibitsCasting, and a made-up one: CR 601.3's "can't cast spells" (Silence)
 -- and "can't cast more than one spell" (Rule of Law) do not depend on WHICH
@@ -215,50 +206,6 @@ ruleOfLawSpec s registry =
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced board)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "a offered"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "b offered"
-
-    -- Ruling: "Rule of Law looks at the entire turn to see if a player has
-    -- cast a spell, even if Rule of Law wasn't on the battlefield when that
-    -- spell was cast. Notably, you can't cast Rule of Law and then cast
-    -- another spell during the same turn." THE FALSIFIER: the spell that
-    -- used up the allowance is Rule of Law itself, cast BEFORE the effect
-    -- existed. Any per-effect watermark or counter fails here.
-    Spec.it s "CR 601.3 casting Rule of Law itself uses up the turn's one spell" $ do
-      plains <- S.printingOf s registry "Plains"
-      ruleOfLaw <- S.printingOf s registry "Rule of Law"
-      let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced afterFirst) "alice is now prohibited"
-      Spec.assertEqWith
-        s
-        "no cast is offered at all"
-        (filter isCast (Action.legalActions S.alice afterFirst))
-        []
-
-    -- The limit is counted PER PLAYER: bob has cast nothing this turn, so
-    -- EachPlayer does not prohibit him.
-    Spec.it s "CR 109.5 the EachPlayer scope still counts each player's own casts" $ do
-      plains <- S.printingOf s registry "Plains"
-      ruleOfLaw <- S.printingOf s registry "Rule of Law"
-      let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced afterFirst)) "bob is not prohibited"
-
-    -- Engine.handoffTurn clears the event log at the turn handoff, so
-    -- "this turn" (castsThisTurn's fold over the log) is exactly the
-    -- log's own extent -- CR 608.2i is the "look back in time" rule and
-    -- says nothing about the log being cleared, so this is an
-    -- implementation fact rather than a rules citation.
-    Spec.it s "the restriction lifts on the next turn" $ do
-      plains <- S.printingOf s registry "Plains"
-      ruleOfLaw <- S.printingOf s registry "Rule of Law"
-      let (_, b, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-          handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
-          nextOwnTurn =
-            (handoff (handoff afterFirst))
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.priority = Just S.alice
-              }
-      Spec.assertEqWith s "alice is active again" (GameState.activePlayer nextOwnTurn) S.alice
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced nextOwnTurn)) "not prohibited"
-      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
 
     -- Ruling: "If you cast a spell that was countered, you can't cast
     -- another spell during the same turn." The counted event is the CAST.
@@ -1116,22 +1063,6 @@ humilitySpec s registry =
         (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) humbled)
         (Just (ManaCost.MkManaCost [red]))
 
-    -- The same statement at the two gameplay sites the Thalia group tests,
-    -- with ONE Mountain -- the amount that tells the taxed and untaxed costs
-    -- apart.
-    Spec.it s "CR 601.2f castability and payment both drop the stripped tax" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      piker <- S.printingOf s registry "Goblin Piker"
-      humility <- S.printingOf s registry "Humility"
-      let (bolt, _, oneLand) = thaliaBoard mountain thalia lightningBolt piker 1
-          humbled = S.withHumility humility oneLand
-          paid = S.runPure S.identityAnswer humbled (S.cast S.alice bolt)
-      Spec.assertBool s (not (S.castable S.alice bolt oneLand)) "control: one Mountain cannot pay the taxed Bolt"
-      Spec.assertBool s (S.castable S.alice bolt humbled) "under Humility one Mountain is enough"
-      Spec.assertEqWith s "and paying it taps exactly that one" (S.tappedCount S.alice paid) 1
-
     -- THE DISCRIMINATOR against "Humility silences every player ability".
     -- Humility's affected set is "each creature", and Sapphire Medallion is an
     -- artifact -- nothing animates it here, so its discount is untouched.
@@ -1605,19 +1536,6 @@ takesHalf half p = case p of
     if elem half offers then half else NonEmpty.head offers
   _ -> S.identityAnswer p
 
--- Records each CR 601.2b monocolored hybrid offer as its symbol's type and the
--- routes offered, in the order asked, answering `way` where it is on offer. Taps
--- `first` before any other source, so a {R}{B} is not paid Swamp-first into a
--- floating {B}; every other prompt goes to `takesHalf half`.
-recordsHybridOffers :: HybridPayment.HybridPayment -> ManaSymbol.ManaSymbol -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [(ManaType.ManaType, [HybridPayment.HybridPayment])] r
-recordsHybridOffers way half first p = case p of
-  Prompt.AnnounceHybridPayment _ _ _ manaType offers -> do
-    State.modify' (<> [(manaType, NonEmpty.toList offers)])
-    pure (if elem way offers then way else NonEmpty.head offers)
-  Prompt.ChooseManaSource _ _ candidates ->
-    pure (Just (if elem first candidates then first else NonEmpty.head candidates))
-  _ -> pure (takesHalf half p)
-
 -- alice controls `copies` reducers and `n` untapped lands of one printing; her
 -- hand holds one `spell` and one Sol Ring ({1} colourless Artifact). Shared by
 -- the two hybrid-reduction groups below, which differ in which hybrid symbol
@@ -1667,32 +1585,6 @@ hybridDiscountBoard land discount spell solRing copies n =
 monocoloredHybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monocoloredHybridDiscountSpec s registry =
   Spec.describe s "SyntheticMonocoloredHybridDiscount" $ do
-    -- THE HEADLINE FALSIFIER, and it is a GAMEPLAY-level one because CR 118.7e's
-    -- choice is only made on the path that pays: taking the {2} half leaves
-    -- {2}{B} as {B}, one Swamp. Reading the symbol as nothing at all -- what the
-    -- arm did before -- leaves all three tapped.
-    Spec.it s "CR 118.7e a {2/B} reduction taken as {2} takes two generic mana off the cost" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
-      ghoul <- S.printingOf s registry "Khabál Ghoul"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
-          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
-      Spec.assertEqWith s "one Swamp tapped, not three" (S.tappedCount S.alice paid) 1
-
-    -- THE OTHER HALF of the same symbol, on the same board, and the pair is what
-    -- proves the ANSWER is what decides: CR 118.7e's coloured half takes one
-    -- black mana, so {2}{B} becomes {2} and two Swamps pay it. An engine that
-    -- picked a half for the player could not make both cases pass.
-    Spec.it s "CR 118.7e the same reduction taken as {B} takes one black mana instead" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
-      ghoul <- S.printingOf s registry "Khabál Ghoul"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
-          paid = S.runPure (takesHalf black) gs (S.cast S.alice ghoulId)
-      Spec.assertEqWith s "two Swamps tapped, not one and not three" (S.tappedCount S.alice paid) 2
-
     -- The control both cases above need: without the artifact the same spell is
     -- full price whatever the interpreter would have answered, so the mana
     -- really did leave because of the reduction.
@@ -1704,19 +1596,6 @@ monocoloredHybridDiscountSpec s registry =
       let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 0 3
           paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
       Spec.assertEqWith s "three Swamps tapped" (S.tappedCount S.alice paid) 3
-
-    -- The colour criterion, and it DISCRIMINATES here where the Phyrexian
-    -- group's could not: the {2} half is generic mana, which does not care what
-    -- the cost prints, so Sol Ring's {1} would go to {0} and tap nothing at all
-    -- if the Filter let the reduction reach a colourless spell.
-    Spec.it s "a colourless spell fails the effect's criterion, so it pays in full" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
-      ghoul <- S.printingOf s registry "Khabál Ghoul"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (_, ringId, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
-          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ringId)
-      Spec.assertEqWith s "one Swamp tapped, not none" (S.tappedCount S.alice paid) 1
 
     -- CR 118.7e AT THE GATE. Two Swamps cannot pay Khabál Ghoul's printed
     -- {2}{B}, and either half of the reduction brings it into range: the {B}
@@ -1772,50 +1651,6 @@ monocoloredHybridDiscountSpec s registry =
       let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 0
       Spec.assertBool s (not (S.castable S.alice ghoulId gs)) "no mana pays either half"
 
-    -- THE GATE AND THE PAYMENT AGREE, which is the pair that matters: on the
-    -- board the gate now says yes to, both of CR 118.7e's answers complete, and
-    -- they tap different numbers of Swamps. A gate more permissive than the
-    -- payment would leave one of these two casts unpaid.
-    Spec.it s "CR 118.7e a cast the gate allows is one both halves can pay" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
-      ghoul <- S.printingOf s registry "Khabál Ghoul"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 2
-          takenAsGeneric = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
-          takenAsBlack = S.runPure (takesHalf black) gs (S.cast S.alice ghoulId)
-      Spec.assertBool s (S.castable S.alice ghoulId gs) "the gate allows the cast"
-      Spec.assertEqWith s "the {2} half taps one Swamp" (S.tappedCount S.alice takenAsGeneric) 1
-      Spec.assertEqWith s "the {B} half taps both" (S.tappedCount S.alice takenAsBlack) 2
-
-    -- CR 601.2b's announcement measured through CR 601.2f's reduction, and
-    -- through SOME CR 118.7e half of it. Defibrillating Current
-    -- ({2/R}{2/W}{2/B}, black) off two Swamps and a Mountain: its {2/R}'s {2}
-    -- route is payable only as {2}{2}{B} less the {2} half, and its {2/B}'s
-    -- {2} route (after {R}{2}) only as {R}{2}{2} less the same half. The {B}
-    -- half comes first, so an offer measured through one resolution drops
-    -- both {2} routes and asks nothing.
-    Spec.it s "CR 601.2b a hybrid reduction's {2} half keeps a {2/X}'s generic route on offer" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
-      current <- S.printingOf s registry "Defibrillating Current"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (currentId, _, board) = hybridDiscountBoard swamp discount current solRing 1 2
-          (mountainId, withMountain) = S.addPermanent mountain S.alice board
-          (pikerId, gs) = S.addPermanent piker S.bob withMountain
-          play way = State.runState (Engine.runGame (recordsHybridOffers way (ManaSymbol.Generic 2) mountainId) gs (S.cast S.alice currentId >> Stack.resolveTop)) []
-          ((_, offGeneric), genericOffers) = play HybridPayment.PaysGeneric
-          ((_, offTyped), typedOffers) = play HybridPayment.PaysTyped
-          both = [HybridPayment.PaysTyped, HybridPayment.PaysGeneric]
-      Spec.assertEqWith s "the {2/R} offers both routes" genericOffers [(ManaType.Colored Color.Red, both)]
-      Spec.assertEqWith s "after {R}, the {2/B} offers both routes too" typedOffers [(ManaType.Colored Color.Red, both), (ManaType.Colored Color.Black, both)]
-      Spec.assertEqWith s "{2}{2}{B} less {2} taps all three lands" (S.tappedCount S.alice offGeneric) 3
-      Spec.assertEqWith s "{R}{2}{B} less {2} taps two" (S.tappedCount S.alice offTyped) 2
-      Spec.assertEqWith s "the Current resolved: 2 life gained" (S.lifeOf S.alice offGeneric, S.lifeOf S.alice offTyped) (Just 22, Just 22)
-      Spec.assertEqWith s "and 4 damage to the Piker" (S.damageOf pikerId offGeneric, S.damageOf pikerId offTyped) (Just 4, Just 4)
-
 -- Synthetic Hybrid Discount {2} Artifact: "Black spells you cast cost {W/B}
 -- less to cast."
 --
@@ -1840,36 +1675,9 @@ monocoloredHybridDiscountSpec s registry =
 -- The SPILL itself is the last case below, on Khabál Ghoul's {2}{B} instead --
 -- the same reduction and the same white half, aimed at a cost that does have a
 -- generic component for CR 118.7b to reach.
-hybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hybridDiscountSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hybridDiscountSpec s registry =
   Spec.describe s "SyntheticHybridDiscount" $ do
-    -- THE HEADLINE FALSIFIER for CR 107.4e's colour/colour half: the black half
-    -- of {W/B} takes one black mana, so {B}{B} becomes {B} and one Swamp pays
-    -- it. Reading the symbol as nothing -- what the arm did before -- taps both.
-    Spec.it s "CR 118.7e a {W/B} reduction taken as {B} takes one black mana off the cost" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
-      wretch <- S.printingOf s registry "Withered Wretch"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 1 2
-          paid = S.runPure (takesHalf black) gs (S.cast S.alice wretchId)
-      Spec.assertEqWith s "one Swamp tapped, not two" (S.tappedCount S.alice paid) 1
-
-    -- THE ENGINE DOES NOT PICK THE BETTER HALF. CR 118.7e gives the choice to
-    -- the player paying with no condition attached, so a payer who names the
-    -- white half of {W/B} against a cost printing no {W} gets a reduction that
-    -- takes nothing -- and pays both Swamps. This case fails if the engine
-    -- silently takes the half the cost can use, which is exactly what a
-    -- payability filter on the offers would have made it do.
-    Spec.it s "CR 118.7e the same reduction taken as {W} finds no white mana to take" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
-      wretch <- S.printingOf s registry "Withered Wretch"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 1 2
-          paid = S.runPure (takesHalf white) gs (S.cast S.alice wretchId)
-      Spec.assertEqWith s "two Swamps tapped" (S.tappedCount S.alice paid) 2
-
     -- The control the headline needs: with no reducer out, two Swamps is what
     -- the spell costs whatever the interpreter would have answered.
     Spec.it s "without the reducer the same spell is full price" $ do
@@ -1880,35 +1688,6 @@ hybridDiscountSpec s registry =
       let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 0 2
           paid = S.runPure (takesHalf black) gs (S.cast S.alice wretchId)
       Spec.assertEqWith s "two Swamps tapped" (S.tappedCount S.alice paid) 2
-
-    -- CR 118.7b AT THE BOARD, and the file's proof of the spill. Khabál Ghoul
-    -- ({2}{B} Creature -- Zombie, "At the beginning of each end step, put a
-    -- +1/+1 counter on this creature for each creature that died this turn." --
-    -- checked against Scryfall, 2026-08-20) is black, so the same artifact
-    -- discounts it, and its {2} is the generic component Withered Wretch above
-    -- deliberately lacks. Taking the WHITE half leaves a reduction of one white
-    -- mana against a cost requiring none, which CR 118.7b turns into one generic
-    -- mana: {2}{B} becomes {1}{B} and two Swamps pay it. Dropping the stranded
-    -- half instead leaves {2}{B} and taps all three.
-    Spec.it s "CR 118.7b a stranded {W} half comes off the generic component" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
-      ghoul <- S.printingOf s registry "Khabál Ghoul"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
-          paid = S.runPure (takesHalf white) gs (S.cast S.alice ghoulId)
-      Spec.assertEqWith s "two Swamps tapped, not three" (S.tappedCount S.alice paid) 2
-
-    -- The control that case needs, the two boards differing only in whether the
-    -- reducer is out: the full {2}{B} taps all three Swamps.
-    Spec.it s "without the reducer the same Ghoul is full price" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
-      ghoul <- S.printingOf s registry "Khabál Ghoul"
-      solRing <- S.printingOf s registry "Sol Ring"
-      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 0 3
-          paid = S.runPure (takesHalf white) gs (S.cast S.alice ghoulId)
-      Spec.assertEqWith s "three Swamps tapped" (S.tappedCount S.alice paid) 3
 
 -- Aims the text changer's one target slot at `oid` -- the SpellsAndPermanents
 -- pool's recipient shape, which both changers below print -- and answers whichever
@@ -1971,81 +1750,6 @@ textChangedEdgewalkerBoard s registry changerName swap = do
             S.cast S.alice changerId
             Stack.resolveTop
   pure (after, walkerId, clericSpell, zombieSpell)
-
--- Answers CR 118.7e's half with `half` and CR 601.2f's order with the total
--- `cost`, deferring everything else to S.identityAnswer. TWO prompts in one
--- cast, and both have to be answered for the pair below to be about the order
--- rather than about the half.
-takesHalfAndCost :: ManaSymbol.ManaSymbol -> ManaCost.ManaCost -> Prompt.Prompt r -> r
-takesHalfAndCost half cost p = case p of
-  Prompt.ChooseReducedCost _ _ _ offers ->
-    if elem cost offers then cost else NonEmpty.head offers
-  _ -> takesHalf half p
-
--- alice controls one Edgewalker, one Synthetic Monocolored Hybrid Discount and
--- two untapped Swamps; her hand holds a Cabal Evangel ({1}{B} Creature -- Human
--- Cleric 2/2, vanilla -- checked against Scryfall, 2026-08-20). Loaded fresh
--- inside each case that needs it -- equivalent because loading is deterministic
--- and cached (batch-recipe.md).
-mixedReductionBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-mixedReductionBoard swamp edgewalker discount evangel =
-  let base = S.landsInPlay swamp 2
-      (_, g1) = S.addPermanent edgewalker S.alice base
-      (_, g2) = S.addPermanent discount S.alice g1
-      (evangelId, g3) = S.addHandCard evangel S.alice g2
-   in ( evangelId,
-        g3
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      )
-
--- CR 601.2f's "if multiple cost reductions apply, the player may apply them in
--- any order", where the order is observable BECAUSE the two reducers disagree
--- about CR 101.1's coloured-mana confinement.
---
--- Cabal Evangel is a black Cleric with a generic component, so both reducers
--- match it: Edgewalker's {W}{B} confined to the coloured mana paid, and the
--- Synthetic Monocolored Hybrid Discount's {2/B} taken as {B}, which is not.
--- Against {1}{B} the two orders part company -- Edgewalker first takes the black
--- symbol, leaving the unconfined {B} nothing to take and CR 118.7b to spill it
--- onto the {1}, for {0}; the unconfined one first takes the black symbol, and
--- Edgewalker's own sentence then strands both its halves, for {1}.
---
--- That is the whole reason `reductionOrders` prunes on the confinement as well
--- as on the floor. Two reducers agreeing on both commute, and pruning them costs
--- the payer nothing; these two do not, and pruning them would be pawl choosing.
-mixedReductionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-mixedReductionSpec s registry =
-  Spec.describe s "MixedConfinementReductions" $ do
-    -- THE HEADLINE FALSIFIER: the payer names {0} and pays no mana at all. An
-    -- engine that pruned the order away would fold in the gathered order and
-    -- never ask, so one of this pair would come out with the other's count.
-    Spec.it s "CR 601.2f the payer may apply the confined reduction first, for {0}" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      edgewalker <- S.printingOf s registry "Edgewalker"
-      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
-      evangel <- S.printingOf s registry "Cabal Evangel"
-      let (evangelId, gs) = mixedReductionBoard swamp edgewalker discount evangel
-          paid = S.runPure (takesHalfAndCost black (ManaCost.MkManaCost [])) gs (S.cast S.alice evangelId)
-      Spec.assertEqWith s "no Swamp tapped" (S.tappedCount S.alice paid) 0
-      -- The anti-vacuity check: an untapped board also describes a cast that
-      -- never happened.
-      Spec.assertEqWith s "and the Evangel left the hand" (S.handSize S.alice paid) 0
-
-    -- THE OTHER ORDER, same board and same half, and the pair is what proves the
-    -- ANSWER decides: applying the unconfined {B} first leaves Edgewalker's
-    -- {W}{B} with nothing to take and nothing to spill onto, so the {1} stands.
-    Spec.it s "CR 601.2f or the unconfined one first, for {1}" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      edgewalker <- S.printingOf s registry "Edgewalker"
-      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
-      evangel <- S.printingOf s registry "Cabal Evangel"
-      let (evangelId, gs) = mixedReductionBoard swamp edgewalker discount evangel
-          paid = S.runPure (takesHalfAndCost black (ManaCost.MkManaCost [ManaSymbol.Generic 1])) gs (S.cast S.alice evangelId)
-      Spec.assertEqWith s "one Swamp tapped" (S.tappedCount S.alice paid) 1
-      Spec.assertEqWith s "and the Evangel left the hand" (S.handSize S.alice paid) 0
 
 -- CR 612.1 reaching the FILTER a player static ability's effect carries.
 --
@@ -2319,13 +2023,6 @@ reliquaryTowerSpec s registry =
         (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [reliquaryTower]))
         Nothing
 
-    Spec.it s "CR 514.1 with Reliquary Tower nothing is discarded and nothing is asked" $ do
-      plains <- S.printingOf s registry "Plains"
-      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
-      let after = reliquaryCleanup (reliquaryHandOfNine plains [reliquaryTower])
-      Spec.assertEqWith s "hand keeps nine" (S.handSize S.alice after) 9
-      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-
     -- CR 109.5: the You scope. bob does not share alice's Tower.
     Spec.it s "CR 109.5 the opponent still has a maximum hand size" $ do
       plains <- S.printingOf s registry "Plains"
@@ -2447,15 +2144,6 @@ theTenRingsSpec s registry =
       plains <- S.printingOf s registry "Plains"
       tenRings <- S.printingOf s registry "The Ten Rings"
       Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [tenRings])) (Just 10)
-
-    -- CR 514.1: nine cards is under the ten it allows, so the cleanup discard
-    -- that trims a default hand of nine to seven trims nothing here.
-    Spec.it s "CR 514.1 nine cards at cleanup discards nothing" $ do
-      plains <- S.printingOf s registry "Plains"
-      tenRings <- S.printingOf s registry "The Ten Rings"
-      let after = reliquaryCleanup (reliquaryHandOfNine plains [tenRings])
-      Spec.assertEqWith s "hand keeps nine" (S.handSize S.alice after) 9
-      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
 
     -- CR 109.5: the You scope, as for the Tower. bob's hand is still CR 402.2's
     -- seven.
@@ -2841,24 +2529,6 @@ silenceAfter plains silence mountain prodigalSorcerer piker =
       after = resolveAll (S.runPure S.identityAnswer before (S.cast S.alice silenceId))
    in (silenceId, silence2Id, pikerId, landId, before, after)
 
-isSilenceActivate :: Action.Type.Action -> Bool
-isSilenceActivate action = case action of
-  Action.Type.Activate _ _ -> True
-  Action.Type.Cast {} -> False
-  Action.Type.Play {} -> False
-  Action.Type.TurnFaceUp {} -> False
-  Action.Type.Unlock _ _ -> False
-  Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot {} -> False
-  Action.Type.Foretell _ -> False
-  Action.Type.Suspend _ -> False
-  Action.Type.PutCompanionIntoHand -> False
-  Action.Type.RollPlanarDie -> False
-  Action.Type.Ignore _ _ -> False
-  Action.Type.EndEffect _ -> False
-  Action.Type.ActivateManaAbility _ -> False
-  Action.Type.Pass -> False
-
 -- Takes the first mana source offered, and otherwise S.identityAnswer -- which
 -- DECLINES a Prompt.ChooseManaSource, leaving a cast unpaid.
 payingAnswer :: Prompt.Prompt r -> r
@@ -2983,72 +2653,6 @@ emperionSpec s registry =
         (fmap (\ev -> (DamageEvent.target ev, DamageEvent.amount ev)) (S.damageEventsOf after))
         [(Recipient.ToPlayer S.alice, 3)]
 
--- Greed ({3}{B} Enchantment, "{B}, Pay 2 life: Draw a card") and one Swamp under
--- alice, with a card in her library to draw and `emperionSeats` naming who
--- controls a Platinum Emperion.
-greedBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId] -> GameState.GameState
-greedBoard swamp greed emperion emperionSeats =
-  let (_, withGreed) = S.addPermanent greed S.alice (S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers))
-      (_, stocked) = S.addLibraryCard swamp S.alice withGreed
-      withEmperions = List.foldl' (\gs pid -> snd (S.addPermanent emperion pid gs)) stocked emperionSeats
-   in withEmperions
-        { GameState.phase = Phase.PrecombatMain,
-          GameState.activePlayer = S.alice,
-          GameState.priority = Just S.alice
-        }
-
--- Takes any Activate offered and passes otherwise, so an activation the engine
--- never OFFERS is the only way the draw fails to happen.
-activatingAnswer :: Prompt.Prompt r -> r
-activatingAnswer p = case p of
-  Prompt.ChooseAction _ _ actions -> case filter isActivate actions of
-    a : _ -> a
-    [] -> Action.Type.Pass
-  _ -> payingAnswer p
-
-isActivate :: Action.Type.Action -> Bool
-isActivate a = case a of
-  Action.Type.Activate {} -> True
-  Action.Type.Pass -> False
-  Action.Type.Play {} -> False
-  Action.Type.Cast {} -> False
-  Action.Type.TurnFaceUp {} -> False
-  Action.Type.Unlock {} -> False
-  Action.Type.DiscardFromHand {} -> False
-  Action.Type.Plot {} -> False
-  Action.Type.Foretell {} -> False
-  Action.Type.Suspend {} -> False
-  Action.Type.PutCompanionIntoHand -> False
-  Action.Type.RollPlanarDie -> False
-  Action.Type.ActivateManaAbility {} -> False
-  Action.Type.Ignore {} -> False
-  Action.Type.EndEffect {} -> False
-
-greedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-greedSpec s registry =
-  Spec.describe s "GreedUnderEmperion" $ do
-    -- The paired control: CR 119.4's payment is affordable at 20, so Greed's
-    -- ability is offered, activated and paid.
-    Spec.it s "CR 119.4 with no restriction Greed's 2 life buys a card" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      greed <- S.printingOf s registry "Greed"
-      emperion <- S.printingOf s registry "Platinum Emperion"
-      let after = S.runPure activatingAnswer (greedBoard swamp greed emperion []) Engine.priorityLoop
-      Spec.assertEqWith s "alice drew the card" (S.handSize S.alice after) 1
-      Spec.assertEqWith s "and paid 2 life for it" (S.lifeOf S.alice after) (Just 18)
-
-    -- CR 119.8's last sentence: a cost that involves having a player who can't
-    -- lose life pay life can't be paid, so the activation is never offered at
-    -- all. Platinum Emperion's own reminder text is that reading.
-    Spec.it s "CR 119.8 alice's Platinum Emperion makes Greed's cost unpayable" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      greed <- S.printingOf s registry "Greed"
-      emperion <- S.printingOf s registry "Platinum Emperion"
-      let after = S.runPure activatingAnswer (greedBoard swamp greed emperion [S.alice]) Engine.priorityLoop
-      Spec.assertEqWith s "alice drew nothing" (S.handSize S.alice after) 0
-      Spec.assertEqWith s "and is still at 20" (S.lifeOf S.alice after) (Just 20)
-      Spec.assertEqWith s "her Swamp was never tapped for the {B}" (S.tappedCount S.alice after) 0
-
 -- Angelic Arbiter {5}{W}{W}: "Each opponent who cast a spell this turn can't
 -- attack with creatures. Each opponent who attacked with a creature this turn
 -- can't cast spells." Three seats with bob active, so "each opponent who" has
@@ -3096,57 +2700,6 @@ angelicArbiterSpec s registry =
       Spec.assertBool s (bobPiker `notElem` Combat.legalAttackers S.bob afterCast) "bob, who cast a spell, can't attack with his Piker"
       Spec.assertBool s (quietPiker `elem` Combat.legalAttackers S.bob quiet) "and can on the same board had he cast nothing"
 
--- Ethersworn Canonist {1}{W}: "Each player who has cast a nonartifact spell
--- this turn can't cast additional nonartifact spells." Three seats with bob
--- active in his main phase: alice controls the Canonist, bob holds a Goblin
--- Piker, a Lightning Bolt and an Ornithopter beside three Mountains, and carol a
--- Lightning Bolt beside a Mountain. Bob's casts are real ones, resolved, so the
--- count reads the turn's own log; neither targets, so nothing touches the
--- Canonist.
-etherswornCanonistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-etherswornCanonistSpec s registry =
-  Spec.describe s "EtherswornCanonist" $ do
-    let board = do
-          canonist <- S.printingOf s registry "Ethersworn Canonist"
-          mountain <- S.printingOf s registry "Mountain"
-          bolt <- S.printingOf s registry "Lightning Bolt"
-          ornithopter <- S.printingOf s registry "Ornithopter"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (_, gs1) = S.addPermanent canonist S.alice S.threePlayerGame
-              gs2 = S.landsFor mountain S.carol 1 (S.landsFor mountain S.bob 3 gs1)
-              (bobPiker, gs3) = S.addHandCard piker S.bob gs2
-              (bobBolt, gs4) = S.addHandCard bolt S.bob gs3
-              (thopter, gs5) = S.addHandCard ornithopter S.bob gs4
-              (carolBolt, gs6) = S.addHandCard bolt S.carol gs5
-          pure
-            ( bobPiker,
-              bobBolt,
-              thopter,
-              carolBolt,
-              gs6
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.bob,
-                  GameState.priority = Just S.bob
-                }
-            )
-        castAndResolve oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.bob oid)) Engine.priorityLoop
-
-    -- Bob's Piker uses up his one nonartifact spell; carol, who has cast
-    -- nothing, is asked about herself and not about bob.
-    Spec.it s "CR 601.3 a player who has cast a nonartifact spell can't cast another" $ do
-      (bobPiker, bobBolt, thopter, carolBolt, gs) <- board
-      let afterPiker = castAndResolve bobPiker gs
-      Spec.assertBool s (not (S.castable S.bob bobBolt afterPiker)) "bob, who cast a Goblin Piker, can't cast Lightning Bolt"
-      Spec.assertBool s (S.castable S.carol carolBolt afterPiker {GameState.priority = Just S.carol}) "carol, who cast nothing, can still cast hers"
-      Spec.assertBool s (S.castable S.bob thopter afterPiker) "and bob can still cast an artifact spell"
-
-    -- The count is of NONARTIFACT spells: an Ornithopter cast first leaves the
-    -- allowance untouched.
-    Spec.it s "CR 601.3 an artifact spell cast this turn does not use up the one nonartifact spell" $ do
-      (_, bobBolt, thopter, _, gs) <- board
-      let afterThopter = castAndResolve thopter gs
-      Spec.assertBool s (S.castable S.bob bobBolt afterThopter) "bob, who cast only an Ornithopter, can still cast a Bolt"
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -3161,7 +2714,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   snowDiscountSpec s registry
   monocoloredHybridDiscountSpec s registry
   hybridDiscountSpec s registry
-  mixedReductionSpec s registry
   textChangedEdgewalkerSpec s registry
   nerdRageSpec s registry
   reliquaryTowerSpec s registry
@@ -3171,6 +2723,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   storedSpec s registry
   cindermawSpec s registry
   emperionSpec s registry
-  greedSpec s registry
   angelicArbiterSpec s registry
-  etherswornCanonistSpec s registry

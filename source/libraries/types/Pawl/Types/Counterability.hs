@@ -45,8 +45,8 @@ module Pawl.Types.Counterability where
 -- the clearest demonstration that they are two carriers rather than one written
 -- two ways: "This spell can't be countered" is this field, and "Creature spells
 -- you control can't be countered" is the player-axis constructor. The proof is
--- in Pawl.PlayerEffectSpec's ProwlingSerpopard group, where a Serpopard SPELL
--- survives a Cancel with no Serpopard on the battlefield at all.
+-- in data/scenarios/cast-permission, where a Serpopard SPELL survives a Cancel
+-- with no Serpopard on the battlefield at all.
 data Counterability
   = Counterable
   | CantBeCountered

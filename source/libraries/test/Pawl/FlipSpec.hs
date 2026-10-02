@@ -346,18 +346,6 @@ spec s registry = Spec.describe s "Flip" $ do
     Spec.assertEqWith s "and the status was never set" (fmap Object.flipped (Game.lookupObject oid after)) (Just False)
     Spec.assertEqWith s "alice took the 1 and bob took none" (S.lifeOf S.bob after, S.lifeOf S.alice after) (Just 20, Just 19)
     Spec.assertEqWith s "the same dealer and the same kind" (fmap DamageEvent.source (S.damageEventsOf after), fmap DamageEvent.kind (S.damageEventsOf after)) ([oid], [DamageKind.Noncombat])
-  -- CR 707.2 / 110.5: status is not copied, so a Clone entering as a copy of a
-  -- FLIPPED Akki copies the flip card and arrives unflipped (CR 110.5b) -- a 1/1
-  -- Akki Lavarunner, not a legendary Tok-Tok. The control is the same Akki read
-  -- after the same combat, so the copy is of a permanent that really flipped.
-  Spec.it s "CR 707.2 a Clone of a flipped Tok-Tok is an unflipped Akki Lavarunner" $ do
-    (akkiId, base, clone) <- cloneBoard s registry
-    let flipped = S.runCombat (S.attackTo S.bob) base
-    Spec.assertEqWith s "control: the copied permanent is Tok-Tok" (halfReadings akkiId flipped) alternativeHalf
-    case enterCopyOf akkiId clone flipped of
-      Nothing -> Spec.assertFailure s "the Clone did not enter"
-      Just (cloneId, copied) ->
-        Spec.assertEqWith s "CR 707.2: the Clone is Akki Lavarunner, the status left behind" (halfReadings cloneId copied) normalHalf
   -- CR 707.3 / 110.5c: the copy's copiable values are the flip card's, "as
   -- modified by the copy's status", so a Clone of an unflipped Akki carries the
   -- trigger AND the alternative half it reaches -- CR 110.5c's Example flips a
@@ -379,29 +367,6 @@ spec s registry = Spec.describe s "Flip" $ do
           Nothing -> Spec.assertFailure s "the second Clone did not enter"
           Just (secondId, recopied) ->
             Spec.assertEqWith s "CR 707.2: a Clone of the flipped Clone is Akki Lavarunner" (halfReadings secondId recopied) normalHalf
-  -- CR 707.9b / 110.5c: Sakashima's exceptions are copiable values of the copy
-  -- whichever half its status picks, so once its copied trigger flips it, it is
-  -- Tok-Tok's 2/2 Goblin Shaman still named Sakashima. Tok-Tok is legendary
-  -- anyway, so the NAME is what an exception dropped from the flipped reading
-  -- would change.
-  Spec.it s "CR 707.9b a Sakashima that copied Akki flips into Tok-Tok named Sakashima" $ do
-    (akkiId, base, _) <- cloneBoard s registry
-    sakashima <- S.printingOf s registry "Sakashima the Impostor"
-    let sakashimaName = CardName.MkCardName (Text.pack "Sakashima the Impostor")
-    case enterCopyOf akkiId sakashima base of
-      Nothing -> Spec.assertFailure s "Sakashima did not enter"
-      Just (sakashimaId, copied) -> do
-        let fought = S.runCombat (attackWithOnly sakashimaId) copied
-        Spec.assertEqWith
-          s
-          "CR 707.9b: the flipped copy is Tok-Tok except its name and legendary"
-          (halfReadings sakashimaId fought)
-          (Set.singleton sakashimaName, Just (2, 2), Set.fromList [Subtype.Goblin, Subtype.Shaman], Set.singleton Supertype.Legendary, True)
-        Spec.assertEqWith
-          s
-          "control: unflipped, it was Akki except its name and legendary"
-          (halfReadings sakashimaId copied)
-          (Set.singleton sakashimaName, Just (1, 1), Set.fromList [Subtype.Goblin, Subtype.Warrior], Set.singleton Supertype.Legendary, False)
   -- CR 707.3 / 110.5c over CR 709.5: a flipped Tok-Tok that Mirrorweave makes a
   -- copy of an Opalescence-animated Roaring Furnace // Steaming Sauna has the
   -- Room's halves against its OWN doors, both shut -- a nameless 0/0 Room its

@@ -1,0 +1,148 @@
+{
+  "description": "Molten Disaster deals X to each creature without flying and each player",
+  "note": "X is 1. The Haskell test reads the Goblin Piker's 1 damage before CR 704.5g; no priority moment comes between, so the Piker in bob's graveyard is the witness that it was dealt damage, and both players at 19 that X was 1.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "a1"
+          },
+          {
+            "card": "Mountain",
+            "label": "a2"
+          },
+          {
+            "card": "Mountain",
+            "label": "a3"
+          },
+          {
+            "card": "Mountain",
+            "label": "a4"
+          },
+          {
+            "card": "Mountain",
+            "label": "a5"
+          },
+          {
+            "card": "Mountain",
+            "label": "a6"
+          },
+          {
+            "card": "Mountain",
+            "label": "a7"
+          },
+          {
+            "card": "Mountain",
+            "label": "a8"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Molten Disaster",
+            "label": "disaster"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          },
+          {
+            "card": "Bird Maiden",
+            "label": "maiden"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$disaster",
+          "x": 1,
+          "mana": [
+            "$a1",
+            "$a2",
+            "$a3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseKicker",
+          "with": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$maiden",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 19
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 19
+        }
+      }
+    }
+  ]
+}

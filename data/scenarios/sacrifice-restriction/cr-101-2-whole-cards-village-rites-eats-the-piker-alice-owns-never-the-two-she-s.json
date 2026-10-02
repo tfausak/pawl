@@ -1,0 +1,60 @@
+{
+  "description": "CR 101.2 whole cards: Village Rites eats the Piker alice owns, never the two she stole",
+  "note": "bob owns Garland, Royal Kidnapper and a Goblin Piker, both placed under alice's control; alice owns the other Piker. Garland's 'creatures you control but don't own can't be sacrificed' leaves alice's own Piker the only legal victim, so Village Rites' additional cost is paid with no prompt (an unscheduled one fails the run): her Piker is in her graveyard, both stolen creatures are still hers, and she drew two.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "hers"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Village Rites",
+            "label": "rites"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          },
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Garland, Royal Kidnapper",
+            "label": "garland",
+            "controller": "alice"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "stolen-piker",
+            "controller": "alice"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$rites", "mana": ["$swamp"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Controller", "object": "$stolen-piker", "is": "alice"}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Controller", "object": "$garland", "is": "alice"}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Swamp", "count": 2}}}
+  ]
+}

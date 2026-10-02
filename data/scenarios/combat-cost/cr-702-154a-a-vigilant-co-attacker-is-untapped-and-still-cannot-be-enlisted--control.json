@@ -1,0 +1,74 @@
+{
+  "description": "CR 702.154a a vigilant co-attacker is untapped and still cannot be enlisted",
+  "note": "Control: the same Legion left at home is offered by ChooseEnlist, tapped by the cost, and pumps the Steelcrusher to 6/2.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Yavimaya Steelcrusher",
+            "label": "crusher",
+            "ready": true
+          },
+          {
+            "card": "Kemba's Legion",
+            "label": "legion",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$crusher"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseEnlist",
+          "with": "$legion"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$crusher",
+          "power": 6,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$legion",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

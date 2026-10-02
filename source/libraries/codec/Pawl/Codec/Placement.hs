@@ -5,6 +5,7 @@ module Pawl.Codec.Placement where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.FaceDownReason as FaceDownReason
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Label as Label
 import qualified Pawl.Codec.Readiness as Readiness
@@ -27,6 +28,10 @@ codec = Fields.object $ do
   token <- Fields.defaulted "token" False Common.boolean Placement.token
   controller <- Fields.defaulted "controller" Nothing (Common.maybe Label.codec) Placement.controller
   attached <- Fields.defaulted "attached" Nothing (Common.maybe Label.codec) Placement.attached
+  commander <- Fields.defaulted "commander" False Common.boolean Placement.commander
+  face <- Fields.defaulted "face" Nothing (Common.maybe CardName.codec) Placement.face
+  faceDown <- Fields.defaulted "faceDown" Nothing (Common.maybe FaceDownReason.codec) Placement.faceDown
+  protector <- Fields.defaulted "protector" Nothing (Common.maybe Label.codec) Placement.protector
   pure
     Placement.MkPlacement
       { Placement.card = card,
@@ -37,5 +42,9 @@ codec = Fields.object $ do
         Placement.counters = counters,
         Placement.token = token,
         Placement.controller = controller,
-        Placement.attached = attached
+        Placement.attached = attached,
+        Placement.commander = commander,
+        Placement.face = face,
+        Placement.faceDown = faceDown,
+        Placement.protector = protector
       }

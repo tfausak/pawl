@@ -7,10 +7,8 @@ module Pawl.DepartureSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -33,9 +31,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -63,11 +59,9 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
-import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
-import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import Pawl.ZoneTriggerSpec (paysFor)
@@ -81,17 +75,6 @@ isPayDecision :: Response.Response -> Bool
 isPayDecision response = case response of
   Response.ChoseToPay _ -> True
   _ -> False
-
--- Takes the LAST permanent offered when `who` is the seat asked, and answers
--- everything else as S.identityAnswer does -- which takes the first. The pair is
--- what lets the permanent that ends up exiled name the seat the engine put the
--- question to. The Decider is checked alongside the player for paysFor's reason.
-takesLast :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-takesLast who p = case p of
-  Prompt.ChoosePermanent (Decider.MkDecider d) player _ offered
-    | d == who && player == who ->
-        NonEmpty.last offered
-  _ -> S.identityAnswer p
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
@@ -196,12 +179,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
     Spec.assertEq s (statusOf S.alice after) . Just $ Status.Departed Departure.Type.Conceded
 
-  Spec.it s "CR 104.2a the last player standing wins, without waiting for a state-based action check" $ do
-    -- leaveGame settles the outcome itself. Nothing runs an SBA pass here.
-    let gs = Setup.emptyGame S.bothPlayers
-        after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
-    Spec.assertEq s (GameState.result after) . Just $ Result.Won S.bob
-
   Spec.it s "an already-decided result is not overwritten" $ do
     let gs = (Setup.emptyGame S.bothPlayers) {GameState.result = Just Result.Drawn}
         after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
@@ -237,12 +214,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     let after = S.runPure S.identityAnswer S.threePlayerGame (Departure.leaveGame Departure.Type.Conceded S.bob)
     Spec.assertEqWith s "bob keeps his seat" (GameState.turnOrder after) [S.alice, S.bob, S.carol]
     Spec.assertEqWith s "but is no longer playing" (Game.stillPlaying after) [S.alice, S.carol]
-
-  Spec.it s "CR 104.2a one departure does not decide a three-player game" $ do
-    let after = S.runPure S.identityAnswer S.threePlayerGame (Departure.leaveGame Departure.Type.Conceded S.bob)
-        andAnother = S.runPure S.identityAnswer after (Departure.leaveGame Departure.Type.Conceded S.carol)
-    Spec.assertEqWith s "two survivors, no result" (GameState.result after) Nothing
-    Spec.assertEqWith s "one survivor, alice wins" (GameState.result andAnother) (Just (Result.Won S.alice))
 
   -- CR 725.4: "If the monarch leaves the game, the active player becomes the
   -- monarch at the same time as that player leaves the game."
@@ -662,79 +633,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "CR 104.2a: bob and carol are still playing, so the game continues" (GameState.result after) Nothing
     Spec.assertEqWith s "and alice controls nothing" (Projection.controls S.alice after) []
 
-  -- CR 800.4c, the other side of the clause above and the same fixture: the
-  -- permanent is LENT to a player still in the game before its default
-  -- controller leaves, so clause 4 passes it over and the loan's end is what
-  -- orphans it.
-  --
-  -- The fixture leaves alice controlling bob's Towershell by CR 110.2a alone --
-  -- the case above proves that much. Carol then casts Ray of Command on it, so
-  -- CR 800.4a's fourth clause finds nothing of alice's when she concedes and the
-  -- permanent survives her departure under carol. The loan says "until end of
-  -- turn", so CR 514.2's cleanup sweep ends it, and CR 110.2 then has nobody in
-  -- the game to hand it back to.
-  --
-  -- The cleanup step is also where no player ordinarily receives priority, so
-  -- this pins the placement as well as the rule: CR 514.3a's own settle is what
-  -- reaches the check, and the exile it performs is what then schedules the
-  -- extra cleanup step.
-  Spec.it s "CR 800.4c a permanent lent to a surviving player is exiled when the loan ends and its default controller has left" $ do
-    towershell <- S.printingOf s registry "Meandering Towershell"
-    controlMagic <- S.printingOf s registry "Control Magic"
-    island <- S.printingOf s registry "Island"
-    ray <- S.printingOf s registry "Ray of Command"
-    let board = stolenTowershellBoard S.threePlayerGame towershell controlMagic island
-        returned = runToTurnStep 4 (Phase.Combat CombatStep.DeclareBlockers) board
-        (rayId, withRay) = S.addHandCard ray S.carol (S.landsFor island S.carol 4 returned)
-        lent = S.runPure S.identityAnswer withRay (S.cast S.carol rayId >> Stack.resolveTop)
-        conceded = S.runPure S.identityAnswer lent (Departure.leaveGame Departure.Type.Conceded S.alice)
-        ended = runToTurnStep 5 (Phase.Beginning BeginningStep.Upkeep) conceded
-        turtleIn = soleObjectOf towershell
-    -- The setup, in the order the rule needs it: carol holds the loan, so clause
-    -- 4 has nothing of alice's to take and the permanent really does survive the
-    -- departure.
-    Spec.assertEqWith s "carol's Ray of Command took bob's Towershell from alice" (fmap (\(oid, _) -> Projection.controllerOf oid lent) (turtleIn lent)) (Just (Just S.carol))
-    Spec.assertEqWith s "so alice leaving does NOT exile it -- clause 4 finds nothing she controls" (fmap (Object.zone . snd) (turtleIn conceded)) (Just Zone.Battlefield)
-    Spec.assertEqWith s "and carol still holds it across the departure" (fmap (\(oid, _) -> Projection.controllerOf oid conceded) (turtleIn conceded)) (Just (Just S.carol))
-    -- The rule under test.
-    Spec.assertEqWith s "the loan ending EXILES it (CR 800.4c)" (fmap (Object.zone . snd) (turtleIn ended)) (Just Zone.Exile)
-    Spec.assertEqWith s "and exile really holds it, under its owner" (fmap (\(oid, _) -> List.elem oid (Game.zoneMembers Zone.Exile S.bob ended)) (turtleIn ended)) (Just True)
-    Spec.assertEqWith s "so it did NOT revert to the player who has left" (Projection.controls S.alice ended) []
-    Spec.assertEqWith s "CR 104.2a: bob and carol are still playing, so the game continues" (GameState.result ended) Nothing
-
-  -- The same clause, the same fixture, and the one thing a direct write to the
-  -- zone maps cannot do: CR 800.4a's exile is a permanent moving from the
-  -- battlefield to exile, so CR 603.6c's leaves-the-battlefield abilities
-  -- trigger on it.
-  --
-  -- The WATCHER is carol's, and it has to be somebody's other than alice's: by
-  -- CR 603.3a the Towershell's own leaves-the-battlefield trigger would be
-  -- controlled by the player who controlled it as it left -- alice -- and CR
-  -- 800.4d then keeps that trigger off the stack entirely. So the departing
-  -- player's own triggers are unobservable by construction, and a bystander is
-  -- the only shape this rule can be proved in.
-  --
-  -- Super Shredder is added to the finished board rather than to the fixture so
-  -- that the count discriminates: the line of play up to here contains the
-  -- Towershell's own attack-trigger exile and CR 704.5m's burial of the Control
-  -- Magic, both of which are departures this watcher would have seen.
-  Spec.it s "CR 800.4a/603.6c the exile is a zone change, so a bystander's leaves-the-battlefield trigger fires" $ do
-    towershell <- S.printingOf s registry "Meandering Towershell"
-    controlMagic <- S.printingOf s registry "Control Magic"
-    island <- S.printingOf s registry "Island"
-    shredder <- S.printingOf s registry "Super Shredder"
-    let board = stolenTowershellBoard S.threePlayerGame towershell controlMagic island
-        returned = runToTurnStep 4 (Phase.Combat CombatStep.DeclareBlockers) board
-        (shredderId, watching) = S.addPermanent shredder S.carol returned
-        after = S.runPure S.identityAnswer watching (Departure.leaveGame Departure.Type.Conceded S.alice)
-        settled = resolveTriggers after
-    Spec.assertEqWith s "carol's Shredder is a 1/1 with no counters before alice leaves" (Projection.powerOf shredderId watching, fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId watching)) (Just 1, Just Nothing)
-    Spec.assertEqWith s "alice really did control bob's Towershell at that moment" (fmap (\(oid, _) -> Projection.controllerOf oid watching) (soleObjectOf towershell watching)) (Just (Just S.alice))
-    -- The rule under test: the exile fired carol's trigger, and it resolved.
-    Spec.assertEqWith s "carol's Super Shredder saw the departing player's permanent leave (CR 603.6c)" (Projection.powerOf shredderId settled, Projection.toughnessOf shredderId settled) (Just 2, Just 2)
-    Spec.assertEqWith s "exactly one counter -- one permanent left the battlefield" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId settled)) (Just (Just 1))
-    Spec.assertEqWith s "and the Towershell is in exile, which is what it saw" (fmap (Object.zone . snd) (soleObjectOf towershell settled)) (Just Zone.Exile)
-
   -- CR 800.4a's fourth clause with its SECOND producer, and the case that says
   -- why the rule cannot be proved through the exiled permanent's own trigger.
   --
@@ -930,58 +828,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
       (fmap LastKnown.counters (Map.lookup tusk (GameState.lastKnown gone)))
       (Just (Map.singleton CounterKind.PlusOnePlusOne 1))
 
-  -- CR 603.3a / CR 113.8: a triggered ability belongs to whoever controlled its
-  -- source AT THE TIME IT TRIGGERED, and CR 800.4d's second sentence then keeps
-  -- it off the stack if that player has left. The pair below is the board that
-  -- tells that reading from the one that asks who controls the source at the CR
-  -- 117.5 scan instead -- by which time CR 800.4a has already handed the source
-  -- back and the ability would be placed under a player it was never controlled
-  -- by.
-  --
-  -- Three seats, because CR 800.1/104.2a end a two-player game at the departure
-  -- rather than running CR 800.4a at all -- stolenTowershellBoard's reason.
-  --
-  -- Bitterblossom is what makes one resolution do both halves at once: it takes
-  -- its controller to 0 life AND records an entry event, and the Faerie enters
-  -- while bob is at 0 but still in the game (CR 704.5a waits for the settle), so
-  -- the Soul Warden really does trigger before its controller is decided.
-  -- The Warden is CAROL's, lent to bob by a layer-2 effect: clause 1 of CR 800.4a
-  -- passes it over (she owns it) and clause 2 ends the loan, so it is hers again
-  -- before the scan -- which is exactly what the two readings disagree about.
-  --
-  -- The upkeep is stamped with Event.recordEvent rather than S.withEvents on
-  -- purpose: rewriting the log clears GameState.battlefieldWhenTriggered, which
-  -- sends Event.eventTriggers to its live reading and collapses the distinction
-  -- this pair exists to draw.
-  --
-  -- The Bitterblossom trigger is resolved by hand rather than through the
-  -- priority loop so that `settled` is the CR 117.5 boundary the departure
-  -- happens at, which is where CR 800.4d's second sentence is observable: run to
-  -- the end of the step the stack is empty under both readings.
-  --
-  -- TWO gameplay-level readings are asserted, because the two wrong answers
-  -- differ. Reading the controller live at the scan hands the ability to CAROL,
-  -- who gains the life; keeping a departed controller's abilities in
-  -- Engine.apnapPlayers hands it to BOB, who gains it instead. Neither number
-  -- moves under the other's mutation.
-  Spec.it s "CR 603.3a/800.4d a borrowed permanent's trigger is the departing player's, so it is never put on the stack" $ do
-    (wardenId, board) <- blossomDepartureBoard s registry True
-    let onStack = S.runPure S.identityAnswer board Engine.settleForPriority
-        resolved = S.runPure S.identityAnswer onStack Stack.resolveTop
-        settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
-        after = S.runPure S.identityAnswer settled Engine.priorityLoop
-    Spec.assertEqWith s "carol owns the Soul Warden and bob controls it as the upkeep begins" (fmap Object.owner (Game.lookupObject wardenId board), Projection.controllerOf wardenId board) (Just S.carol, Just S.bob)
-    Spec.assertEqWith s "the Faerie entered while bob was at 0 and still in the game, so the Warden really did trigger" (S.lifeOf S.bob resolved, length (S.tokensOf resolved)) (Just 0, 1)
-    -- The rule under test: the Warden's trigger was bob's when it triggered, so
-    -- carol -- who has it back by the time the scan runs -- gains nothing.
-    Spec.assertEqWith s "carol gains no life: the trigger was bob's (CR 603.3a), not hers" (S.lifeOf S.carol after) (Just 20)
-    Spec.assertEqWith s "and neither does bob, because it never went on the stack to resolve (CR 800.4d)" (S.lifeOf S.bob after) (Just 0)
-    Spec.assertEqWith s "read at the CR 117.5 boundary itself: the settle put nothing on the stack" (GameState.stack settled) []
-    Spec.assertEqWith s "bob's own life loss took him out of the game" (statusOf S.bob settled) (Just (Status.Departed Departure.Type.Lost))
-    Spec.assertEqWith s "and the loan ended with him, so the Warden is carol's again (CR 800.4a)" (Projection.controllerOf wardenId settled) (Just S.carol)
-    Spec.assertEqWith s "the game goes on -- three seats, so CR 800.4a runs rather than CR 104.2a ending it" (GameState.result after) Nothing
-    Spec.assertEqWith s "the Faerie left with its owner, so nothing is left on the battlefield to have triggered anything else" (S.tokensOf after) []
-
   -- The control for the case above, differing from it in exactly one line: carol
   -- keeps her own Soul Warden, so CR 603.3a makes the trigger HERS and CR 800.4d
   -- has nothing to say. Without this the 20 above is unfalsifiable -- an entrant
@@ -1000,29 +846,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "carol both owns and controls the Soul Warden" (fmap Object.owner (Game.lookupObject wardenId board), Projection.controllerOf wardenId board) (Just S.carol, Just S.carol)
     Spec.assertEqWith s "carol gains 1 life: the trigger was hers all along" (S.lifeOf S.carol after) (Just 21)
     Spec.assertEqWith s "the same settle that took bob out of the game put her trigger on the stack" (length (GameState.stack settled), statusOf S.bob settled) (1, Just (Status.Departed Departure.Type.Lost))
-
-  -- CR 104.3e's own door, at gameplay level: "an effect may state that a player
-  -- loses the game". Scryfall o:/target player loses the game/ -is:digital,
-  -- 2026-09-16, one hit: Door to Nothingness, so it is where the targeted form is
-  -- proved.
-  --
-  -- The loss is NOT a state-based action -- CR 104.3b-d wait for the next
-  -- priority, this happens as the ability applies -- and lands in the same
-  -- departure the other four ways take (CR 104.3, CR 104.5).
-  Spec.it s "CR 104.3e/104.2a Door to Nothingness loses its target the game, and the survivor wins" $ do
-    after <- S.play s registry (doorBoard [S.battlefield S.bob []]) doorScript S.priorityGame
-    Spec.assertEqWith s "alice's opponents have all left, so she wins" (GameState.result after) (Just (Result.Won S.alice))
-    Spec.assertEqWith s "and bob left because he LOST, not because he conceded" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
-
-  -- The same ability at three seats, which is the only place CR 800.4a's road is
-  -- observable: at two, CR 104.2a ends the game before anything can read it.
-  -- bob's Child of Night is what shows the first clause running -- "all objects
-  -- owned by that player leave the game".
-  Spec.it s "CR 800.4a with a third seat the game continues and the loser's permanents leave with him" $ do
-    after <- S.play s registry (doorBoard [S.battlefield S.bob [S.settled "child" "Child of Night"], S.battlefield S.carol []]) doorScript S.priorityGame
-    Spec.assertEqWith s "bob lost the game" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
-    Spec.assertEqWith s "alice and carol play on, with nothing decided" (Game.stillPlaying after, GameState.result after) ([S.alice, S.carol], Nothing)
-    Spec.assertEqWith s "and his Child of Night left the game with him" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Child of Night")) S.bob after) 0
 
   -- CR 102.1: carol has conceded a four-seat game, and alice's Fanatic of
   -- Mogis ("When this creature enters, it deals damage to each opponent equal to
@@ -1095,76 +918,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "a bob who stayed pays the ward cost, going 37 -> 34" (S.lifeOf S.bob staying) (Just 34)
     Spec.assertEqWith s "and he was asked exactly once" (payDecisions stayingTranscript) [Response.ChoseToPay PaymentDecision.Pays]
 
-  -- CR 800.4g: "if an object requires a player who has left the game to make a
-  -- choice other than whether to pay a cost, the controller of the object
-  -- chooses another player to make that choice. If the original choice was to be
-  -- made by an opponent of the controller of the object, that player chooses
-  -- another opponent if possible."
-  --
-  -- Synthetic Arbiter of Forfeits ({2}{U} Creature -- Advisor 2/3, "Whenever a
-  -- player casts a spell, that player chooses a permanent you control other than
-  -- this creature and exiles it") is the producer, and it is SYNTHETIC because
-  -- the rule needs two things at once that no printing puts together: a chooser
-  -- named by a slot filled BEFORE the departure, and candidates that outlive the
-  -- chooser. Every printed "an opponent chooses" -- Murmurs from Beyond, Wormfang
-  -- Crab, Animal Magnetism -- names its opponent inside the same resolution that
-  -- then asks them, a window no player can leave the game in here. Scryfall
-  -- o:"that player chooses", 2026-09-18, enumerates the trigger-bound shape, and
-  -- every hit either has the bound player choose among their OWN objects, which
-  -- leave with them (CR 800.4a), or fires on a turn a departed player never gets
-  -- (CR 800.4k). A printing joining a cast or damage trigger to a choice over the
-  -- ability controller's permanents would replace this card.
-  --
-  -- Binding.triggerPlayer is what survives the departure: a CR 601.2i cast
-  -- trigger stamps the caster's PlayerId, and PlayerRef.InSlot reads it back at
-  -- resolution with no survival filter of its own -- where PlayerRef.Relative
-  -- Opponent is answered off Game.stillPlaying and so can never name a seat that
-  -- has gone.
-  --
-  -- THREE SEATS, the CR 800.4f case's reason and this one: alice's remaining
-  -- opponent once bob leaves is carol alone, so "another opponent if possible"
-  -- elides to her, where the first sentence's unnarrowed "another player" would
-  -- have offered alice herself and the prompt would have been a real one.
-  Spec.it s "CR 800.4g a departed player's choice is made by another opponent" $ do
-    forest <- S.printingOf s registry "Forest"
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    arbiter <- S.printingOf s registry "Synthetic Arbiter of Forfeits"
-    growth <- S.printingOf s registry "Giant Growth"
-    let withLands = S.landsFor forest S.bob 3 S.threePlayerGame
-        (_, withArbiter) = S.addPermanent arbiter S.alice withLands
-        -- TWO candidates, so the choice is a real one, and differently named, so
-        -- which of them went says who picked.
-        (_, withIsland) = S.addPermanent island S.alice withArbiter
-        (_, withMountain) = S.addPermanent mountain S.alice withIsland
-        (growthId, withGrowth) = S.addHandCard growth S.bob withMountain
-        board =
-          withGrowth
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        -- The Arbiter is the board's only creature, so identityAnswer's targeting
-        -- of the Growth has one option and nothing here searches for the one that
-        -- makes the assertion pass.
-        onStack = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.bob growthId)) Engine.settleForPriority
-        gone = S.runPure S.identityAnswer onStack (Departure.leaveGame Departure.Type.Conceded S.bob)
-        after = S.runPure (takesLast S.carol) gone Stack.resolveTop
-        staying = S.runPure (takesLast S.carol) onStack Stack.resolveTop
-        held name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
-    -- The setup: the cast trigger really fired, and bob's departure really took
-    -- his Growth with him, leaving the trigger to resolve alone.
-    Spec.assertEqWith s "the Growth and the Arbiter's trigger are both on the stack" (length (GameState.stack onStack)) 2
-    Spec.assertEqWith s "bob leaving takes his Growth with it, leaving the trigger" (length (GameState.stack gone)) 1
-    Spec.assertEqWith s "and bob is out of the game" (statusOf S.bob gone) (Just (Status.Departed Departure.Type.Conceded))
-    -- The rule: carol answered in bob's place, and her answer is the one the
-    -- board carries out.
-    Spec.assertEqWith s "CR 800.4g carol chose in bob's place, exiling the Mountain and leaving the Island" (held "Mountain" after, held "Island" after) (0, 1)
-    -- The PAIR, differing from the board above in bob's departure and nothing
-    -- else: a bob who stayed is the one asked, and takes the other land. Without
-    -- it the assertion above would pass on a board that never reached the choice.
-    Spec.assertEqWith s "a bob who stayed answers for himself, exiling the Island instead" (held "Mountain" staying, held "Island" staying) (1, 0)
-
   -- CR 800.4h inside CR 800.4a's own exile: the fourth clause happens after the
   -- player has left, so a CR 616.1 race over a permanent they control goes to
   -- the next player in turn order.
@@ -1233,49 +986,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         landing holder = fmap (Object.zone . snd) (soleObjectOf island (S.runPure S.identityAnswer (boardWith holder) (Departure.leaveGame Departure.Type.Conceded S.alice)))
     Spec.assertEqWith s "bob, in alice's range as the turn began, diverts the Island to carol's graveyard" (landing S.bob) (Just Zone.Graveyard)
     Spec.assertEqWith s "carol, two seats from alice, does not reach it, so it is exiled" (landing S.carol) (Just Zone.Exile)
-
--- alice with Door to Nothingness and one land per colored symbol of its
--- activation cost, plus whatever other seats the case wants.
-doorBoard :: [Seat.Seat] -> Board.Board
-doorBoard others =
-  S.board
-    (S.battlefield S.alice (S.settled "door" "Door to Nothingness" : fmap (uncurry S.settled) doorLands) NonEmpty.:| others)
-    S.alice
-    S.precombatMain
-
--- "{W}{W}{U}{U}{B}{B}{R}{R}{G}{G}", in the cost's own order, which is the order
--- the harness hands the sources back in.
-doorLands :: [(String, String)]
-doorLands =
-  [ ("w1", "Plains"),
-    ("w2", "Plains"),
-    ("u1", "Island"),
-    ("u2", "Island"),
-    ("b1", "Swamp"),
-    ("b2", "Swamp"),
-    ("r1", "Mountain"),
-    ("r2", "Mountain"),
-    ("g1", "Forest"),
-    ("g2", "Forest")
-  ]
-
--- alice activates the Door targeting bob. Every board it runs on offers at least
--- two players in the target pool, so the target is a real choice rather than the
--- one option a prompt would short-circuit.
-doorScript :: Seq.Seq Timed.Timed
-doorScript =
-  S.turn
-    1
-    [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "door") $
-        Choices.none
-          { Choices.targets = Just [S.seatRef S.bob],
-            -- CR 601.2h: tap first, then sacrifice. The other order is a real
-            -- choice -- a sacrificed artifact is no longer there to tap -- which
-            -- is why Pawl.Engine.Cost asks.
-            Choices.costOrder = Just [0, 1],
-            Choices.manaSources = Seq.fromList (fmap (Just . S.aliasRef . fst) doorLands)
-          }
-    ]
 
 -- bob at 1 life, active, with a Bitterblossom of his own and carol's Soul Warden
 -- either lent to him or not. Returns the Warden's id and the board with bob's

@@ -72,29 +72,23 @@
 module Pawl.CoinSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Scenario.Prompt as Scenario.Prompt
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
@@ -103,11 +97,8 @@ import qualified Pawl.Types.Recipient as Recipient
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Coin" $ do
   flipCoinSpec s registry
-  multiCoinSpec s registry
   faceReadingSpec s registry
   missesSpec s registry
-  statedFlipSpec s registry
-  krarkSpec s registry
 
 -- Set a seat's life directly, so the two seats start on different numbers and
 -- neither can be read for the other.
@@ -147,12 +138,6 @@ coinBoard s registry = do
       (_, gs9) = S.addHandCard mountain S.alice gs8
   pure (skyId, atLife S.bob 17 gs9)
 
--- Cast Winter Sky and resolve it under a pinned (face, call), then settle CR
--- 704.5g so the damage reads as a board count.
-after :: CoinFace.CoinFace -> CoinFace.CoinFace -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
-after face called (skyId, board) =
-  S.settleSba (S.runPure (flipAnswer face called) board (S.cast S.alice skyId >> Stack.resolveTop))
-
 -- What resolution ASKED, in order: Nothing for CR 705.1's flip, which names no
 -- seat, and Just the seat for CR 705.2's call. Not readable off the resulting
 -- board, so it takes a State-logging answerer.
@@ -170,62 +155,8 @@ asked (skyId, board) =
       run = Engine.runGame logging board (S.cast S.alice skyId >> Stack.resolveTop)
    in reverse (State.execState run [])
 
--- Every gameplay-level column of one leg, in the order the header lists them.
-reading :: GameState.GameState -> (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
-reading gs =
-  ( S.lifeOf S.alice gs,
-    S.lifeOf S.bob gs,
-    S.creaturesInPlay S.alice gs,
-    S.creaturesInPlay S.bob gs,
-    S.handSize S.alice gs,
-    S.handSize S.bob gs,
-    length (GameState.stack gs)
-  )
-
--- A won flip: 1 damage to each player and each creature, so both Pikers die and
--- bob's Bird Maiden survives, and neither player draws.
-won :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
-won = (Just 19, Just 16, 0, 1, 1, 0, 0)
-
--- A lost flip: nothing is damaged and each player draws one, which is the only
--- reading in which the hand columns move.
-lost :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
-lost = (Just 20, Just 17, 1, 2, 2, 1, 0)
-
-flipCoinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flipCoinSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 flipCoinSpec s registry = Spec.describe s "FlipCoin" $ do
-  Spec.it s "CR 705.2 a call the coin does not match loses the flip" $ do
-    board <- coinBoard s registry
-    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
-    -- mutation, and on the one leg Replay.defaultAnswer cannot reach: the coin
-    -- came up heads, the player called tails, so the call does not match and the
-    -- flip is lost.
-    Spec.assertEqWith
-      s
-      "CR 705.2: heads flipped against a call of tails is a lost flip"
-      (reading (after CoinFace.Heads CoinFace.Tails board))
-      lost
-    -- The mirror, one thing different: the same mismatch the other way round.
-    -- Falsifies an implementation that reads only the call.
-    Spec.assertEqWith
-      s
-      "CR 705.2: tails flipped against a call of heads is a lost flip too"
-      (reading (after CoinFace.Tails CoinFace.Heads board))
-      lost
-  Spec.it s "CR 705.2 a call the coin matches wins the flip" $ do
-    board <- coinBoard s registry
-    Spec.assertEqWith
-      s
-      "CR 705.2: heads flipped against a call of heads is a won flip"
-      (reading (after CoinFace.Heads CoinFace.Heads board))
-      won
-    -- The other matching pair. Falsifies an implementation that reads only the
-    -- face -- "heads wins" agrees with the line above and disagrees here.
-    Spec.assertEqWith
-      s
-      "CR 705.2: tails flipped against a call of tails is a won flip too"
-      (reading (after CoinFace.Tails CoinFace.Tails board))
-      won
   Spec.it s "CR 705.2 only the flipping player calls, and calls before the coin comes up" $ do
     board <- coinBoard s registry
     -- Supporting, and in its own case so it cannot stand in for the four legs
@@ -235,295 +166,11 @@ flipCoinSpec s registry = Spec.describe s "FlipCoin" $ do
     -- game. Bob is never asked.
     Spec.assertEqWith s "the call, of alice, then the flip" (asked board) [Just S.alice, Nothing]
 
--- CR 705.3's producer is Edgar, King of Figaro ({4}{U}{U} Legendary Creature --
--- Human Artificer Noble 4/5, "Two-Headed Coin -- The first time you flip one or
--- more coins each turn, those coins come up heads and you win those flips";
--- name, cost, type line and Oracle text checked against api.scryfall.com
--- 2026-09-01). It states BOTH halves of the rule at once, which is why one card
--- can prove them together.
---
--- THE FIXTURE is the Winter Sky board above with one creature added under alice.
--- `withEdgar` decides WHICH creature, and that is the only difference between
--- the two boards: Edgar, or a Bird Maiden (1/2), which is the same shape for
--- every column `reading` looks at -- one more creature under alice that survives
--- 1 damage. A negative built by leaving the seat empty instead would differ in
--- two things.
---
--- `skies` is how many Winter Skys sit in alice's hand, which is what the "first
--- time each turn" narrowing needs: one flip cannot tell "the first" from "every".
-statedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> Int -> m ([ObjectId.ObjectId], GameState.GameState)
-statedBoard s registry withEdgar skies = do
-  sky <- S.printingOf s registry "Winter Sky"
-  piker <- S.printingOf s registry "Goblin Piker"
-  maiden <- S.printingOf s registry "Bird Maiden"
-  mountain <- S.printingOf s registry "Mountain"
-  edgar <- S.printingOf s registry "Edgar, King of Figaro"
-  let (_, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addPermanent piker S.bob g1
-      (_, g3) = S.addPermanent maiden S.bob g2
-      (_, g4) = S.addPermanent (if withEdgar then edgar else maiden) S.alice g3
-      -- Three cards apiece so a lost flip's draw never decks a seat (CR 104.3c)
-      -- and replaces a hand size with a loss.
-      stocked = repeatedly (snd . S.addLibraryCard mountain S.alice) 3 (repeatedly (snd . S.addLibraryCard mountain S.bob) 3 g4)
-      landed = S.landsFor mountain S.alice (2 * skies + 2) stocked
-      addSky (ids, g) = let (i, g5) = S.addHandCard sky S.alice g in (i : ids, g5)
-      (skyIds, handed) = repeatedly addSky skies ([], landed)
-   in pure (skyIds, atLife S.bob 17 handed)
-
--- Apply `f` `n` times.
-repeatedly :: (a -> a) -> Int -> a -> a
-repeatedly f n x = if n <= 0 then x else repeatedly f (n - 1) (f x)
-
--- Cast each Winter Sky in turn and resolve it, with the COIN pinned to tails and
--- alice's call pinned to `called`. The coin never comes up heads in this group,
--- so a heads face below is one rule 705.3 stated and never one the coin
--- produced.
---
--- The call is the parameter because Edgar states BOTH halves at once, and the
--- two halves are told apart by nothing else. A call of HEADS matches the face
--- Edgar states, so that leg wins whether or not the stated WIN is read; a call
--- of TAILS does not match it, so that leg wins only through rule 705.3's second
--- clause.
-afterSkies :: CoinFace.CoinFace -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
-afterSkies called skyIds board =
-  S.settleSba (List.foldl' (\g i -> S.runPure (flipAnswer CoinFace.Tails called) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
-
--- One Winter Sky won: 1 damage to each player and each creature, so both Pikers
--- die, alice's extra creature and bob's Bird Maiden survive, and nobody draws.
-wonWithHelper :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
-wonWithHelper = (Just 19, Just 16, 1, 1, 0, 0, 0)
-
--- The same Winter Sky lost: nothing damaged, each player draws one.
-lostWithHelper :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
-lostWithHelper = (Just 20, Just 17, 2, 2, 1, 1, 0)
-
--- Two Winter Skys under Edgar: the FIRST flip is won and the second is not, so
--- the damage sentence runs once and the draw sentence runs once. An
--- implementation that ignored "the first time ... each turn" would win both,
--- which is 18 and 15 with bob's Bird Maiden dead to the second point of damage
--- and no draws at all -- no column of this reading survives that.
-firstOnly :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
-firstOnly = (Just 19, Just 16, 1, 1, 1, 1, 0)
-
--- alice's Molten Sentry ({3}{R} Creature -- Elemental */*, "As this creature
--- enters, flip a coin. If the coin comes up heads, this creature enters as a 5/2
--- creature with haste. If it comes up tails, this creature enters as a 2/5
--- creature with defender") in hand, over a Tavern Scoundrel ("Whenever you win a
--- coin flip, create two Treasure tokens") and one more creature under alice --
--- Edgar or the same Bird Maiden stand-in the Winter Sky boards use.
-sentryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
-sentryBoard s registry withEdgar = do
-  mountain <- S.printingOf s registry "Mountain"
-  scoundrel <- S.printingOf s registry "Tavern Scoundrel"
-  sentry <- S.printingOf s registry "Molten Sentry"
-  maiden <- S.printingOf s registry "Bird Maiden"
-  edgar <- S.printingOf s registry "Edgar, King of Figaro"
-  let (_, g1) = S.addPermanent scoundrel S.alice (S.landsInPlay mountain 6)
-      (_, g2) = S.addPermanent (if withEdgar then edgar else maiden) S.alice g1
-      (spellId, g3) = S.addHandCard sentry S.alice g2
-   in pure
-        ( spellId,
-          g3
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        )
-
--- Cast the Sentry, resolve it, then run the place/resolve cycle twice so a flip
--- the Scoundrel watches has room to pay out -- CR 603.3 puts the trigger on the
--- stack at the next priority, and the flip happens inside the entry replacement.
--- The coin is pinned to TAILS, so a heads face below is one rule 705.3 stated.
-runSentry :: GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-runSentry board spellId =
-  let answer :: Prompt.Prompt r -> r
-      answer = flipAnswer CoinFace.Tails CoinFace.Tails
-      drain n g =
-        if n <= (0 :: Int) || null (GameState.stack g)
-          then g
-          else drain (n - 1) (S.runPure answer g Stack.resolveTop)
-      cycleOnce g = drain 8 (S.runPure answer g Engine.placePendingTriggers)
-      resolved = S.runPure answer board (S.cast S.alice spellId >> Stack.resolveTop)
-   in cycleOnce (cycleOnce resolved)
-
--- The newest battlefield object whose printed card has this name.
-newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
-newestNamed wanted gs =
-  let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
-   in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
-
-statedFlipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-statedFlipSpec s registry = Spec.describe s "StateCoinFlip (CR 705.3)" $ do
-  Spec.it s "CR 705.3 a stated win beats a call the coin did not match" $ do
-    (withEdgar, edgarBoard) <- statedBoard s registry True 1
-    (withHelper, plainBoard) <- statedBoard s registry False 1
-    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
-    -- mutation: alice calls TAILS and Edgar states the face is HEADS, so CR
-    -- 705.2's comparison says she LOST -- and rule 705.3's second clause says
-    -- she won anyway, which is the sentence "this can cause a player to win a
-    -- flip that couldn't otherwise be won". Nothing else in this module reaches
-    -- that clause: on every other leg the stated face already matches the call.
-    Spec.assertEqWith
-      s
-      "CR 705.3: the stated win beats a call the stated face does not match"
-      (reading (afterSkies CoinFace.Tails withEdgar edgarBoard))
-      wonWithHelper
-    -- The same board with the call the coin ACTUALLY came up. Loses without a
-    -- statement and wins with one, which is what the pair below reads.
-    Spec.assertEqWith
-      s
-      "CR 705.3: a call of heads against a tails coin wins under Edgar"
-      (reading (afterSkies CoinFace.Heads withEdgar edgarBoard))
-      wonWithHelper
-    -- The pair, one thing different: the same board and the same answers with a
-    -- vanilla creature in Edgar's seat, so every column starts where the line
-    -- above started.
-    Spec.assertEqWith
-      s
-      "CR 705.2: with nobody stating a result that same flip is lost"
-      (reading (afterSkies CoinFace.Heads withHelper plainBoard))
-      lostWithHelper
-  Spec.it s "CR 705.3 Edgar's statement is spent on the turn's first flip" $ do
-    (skyIds, board) <- statedBoard s registry True 2
-    Spec.assertEqWith
-      s
-      "the first flip is won and the second is not"
-      (reading (afterSkies CoinFace.Heads skyIds board))
-      firstOnly
-  Spec.it s "CR 705.3 reaches the flip CR 705.2 leaves winnerless" $ do
-    (edgarSpell, edgarBoard) <- sentryBoard s registry True
-    (plainSpell, plainBoard) <- sentryBoard s registry False
-    let underEdgar = runSentry edgarBoard edgarSpell
-        underHelper = runSentry plainBoard plainSpell
-    -- Edgar's own ruling: its ability "can cause you to win coin flips that
-    -- would ordinarily have no winner". The Scoundrel is the discrimination --
-    -- two Treasures against none -- and it is asserted FIRST, because the P/T
-    -- below would also move if only the stated FACE had landed.
-    Spec.assertEqWith
-      s
-      "CR 705.3: Molten Sentry's winnerless flip is won, so the Scoundrel mints two Treasures"
-      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Treasure Token")) S.alice underEdgar)
-      2
-    Spec.assertEqWith
-      s
-      "CR 705.2: with nobody stating a result that same flip has no winner"
-      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Treasure Token")) S.alice underHelper)
-      0
-    -- The other half of the same statement, on the same two boards: the coin was
-    -- pinned to TAILS, so a 5/2 with haste is the stated FACE and a 2/5 with
-    -- defender is the one the coin actually came up.
-    case (newestNamed (CardName.MkCardName (Text.pack "Molten Sentry")) underEdgar, newestNamed (CardName.MkCardName (Text.pack "Molten Sentry")) underHelper) of
-      (Just stated, Just actual) -> do
-        Spec.assertEqWith s "CR 705.3: the stated heads picks the 5/2" (S.powerToughnessOf stated underEdgar) (Just (5, 2))
-        Spec.assertEqWith s "CR 705.1: the actual tails picks the 2/5" (S.powerToughnessOf actual underHelper) (Just (2, 5))
-      _ -> Spec.assertFailure s "Molten Sentry did not reach the battlefield"
-
--- CR 705.1's OTHER producer, and the one that makes an instruction's coins more
--- than one: Flock of Rabid Sheep ({X}{G}{G} Sorcery, "Flip X coins. For each
--- flip you win, create a 2/2 green Sheep creature token named Rabid Sheep";
--- name, cost, type line and Oracle text checked against api.scryfall.com
--- 2026-09-01). Its tally is the token count, so a board reads how many of the
--- flips were won rather than merely that one was.
---
--- FIVE Forests, which is exactly {3}{G}{G}: X=3 is payable and X=4 is not, so an
--- announcement that ignored the pinned answer could not quietly flip more.
---
--- `helper` is the creature planted under alice, and is the only difference
--- between the two boards the CR 705.3 case below compares: Edgar, King of
--- Figaro, or a Bird Maiden that states nothing.
-flockBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe String -> m (ObjectId.ObjectId, GameState.GameState)
-flockBoard s registry helper = do
-  flock <- S.printingOf s registry "Flock of Rabid Sheep"
-  forest <- S.printingOf s registry "Forest"
-  let lands = S.landsFor forest S.alice 5 (Setup.emptyGame S.bothPlayers)
-  planted <- case helper of
-    Nothing -> pure lands
-    Just name -> do
-      creature <- S.printingOf s registry name
-      pure (snd (S.addPermanent creature S.alice lands))
-  let (gs, oid) = S.handOne flock planted
-  pure (oid, gs)
-
 -- The `i`th element, or a fallback past the end. The fallbacks are the answers
 -- that LOSE a flip -- a tails coin against a call of heads -- so a run that
 -- flipped more coins than the case pinned cannot inflate the tally.
 atIndex :: [CoinFace.CoinFace] -> CoinFace.CoinFace -> Int -> CoinFace.CoinFace
 atIndex xs fallback i = Maybe.fromMaybe fallback (Maybe.listToMaybe (drop i xs))
-
--- Pins every coin of the instruction BY INDEX, which a pure @Prompt r -> r@
--- answerer cannot do: the calls and the faces of three coins are three pairs of
--- structurally identical prompts, and one answer for all of them cannot tell a
--- three-coin instruction from a one-coin one. The counter advances on the FLIP,
--- so the call CR 705.2 asks first reads the same index the coin that follows it
--- does.
-flockAnswer :: [CoinFace.CoinFace] -> [CoinFace.CoinFace] -> Prompt.Prompt r -> State.State Int r
-flockAnswer faces calls p = case p of
-  Prompt.ChooseX {} -> pure 3
-  Prompt.CallCoin {} -> do
-    i <- State.get
-    pure (atIndex calls CoinFace.Heads i)
-  Prompt.FlipCoin -> do
-    i <- State.get
-    State.put (i + 1)
-    pure (atIndex faces CoinFace.Tails i)
-  _ -> pure (S.identityAnswer p)
-
--- Cast the Flock for X=3 and resolve it, returning the settled board and how
--- many coins the engine actually flipped.
-castFlock :: [CoinFace.CoinFace] -> [CoinFace.CoinFace] -> (ObjectId.ObjectId, GameState.GameState) -> (GameState.GameState, Int)
-castFlock faces calls (oid, board) =
-  let ((_, gs), flips) = State.runState (Engine.runGame (flockAnswer faces calls) board (S.cast S.alice oid >> Stack.resolveTop)) 0
-   in (S.settleSba gs, flips)
-
--- How many Rabid Sheep the Flock left on the battlefield, which is its tally of
--- won flips.
-sheep :: GameState.GameState -> Int
-sheep = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Rabid Sheep")) S.alice
-
-multiCoinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-multiCoinSpec s registry = Spec.describe s "FlipCoin over several coins (CR 705.1)" $ do
-  Spec.it s "CR 705.2 one instruction flips every coin it names and tallies the flips won" $ do
-    board <- flockBoard s registry Nothing
-    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
-    -- mutation. Three coins, each called separately: heads called heads (won),
-    -- tails called heads (lost), tails called tails (won). TWO is a reading no
-    -- other implementation of this instruction produces -- one coin gives 1
-    -- (the first flip was won), the coin COUNT gives 3, and the number of coins
-    -- that came up heads gives 1.
-    Spec.assertEqWith
-      s
-      "CR 705.2: two of the three flips were won, so two Sheep"
-      (sheep (fst (castFlock [CoinFace.Heads, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Tails] board)))
-      2
-    -- Supporting, and after the assertion it could otherwise absorb: the engine
-    -- flipped three coins and not one.
-    Spec.assertEqWith
-      s
-      "CR 705.1: the instruction flipped three coins"
-      (snd (castFlock [CoinFace.Heads, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Tails] board))
-      3
-  Spec.it s "CR 705.3 a statement spent on an instruction reaches every coin of it" $ do
-    edgarBoard <- flockBoard s registry (Just "Edgar, King of Figaro")
-    plainBoard <- flockBoard s registry (Just "Bird Maiden")
-    -- Edgar's ruling on exactly this shape: "if an effect tells you to flip
-    -- multiple coins at once ... Edgar's last ability modifies that set of
-    -- flips". His "the FIRST time you flip one or more coins each turn" is spent
-    -- on the INSTRUCTION, so all three coins come up heads and all three are
-    -- won. Spending it on the first FLIP instead would leave 1, and the two
-    -- calls of heads against real tails coins would lose.
-    Spec.assertEqWith
-      s
-      "CR 705.3: all three coins of the one instruction are stated, so three Sheep"
-      (sheep (fst (castFlock [CoinFace.Tails, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Heads] edgarBoard)))
-      3
-    -- The pair, one thing different: the same board and the same answers with a
-    -- vanilla creature in Edgar's seat, where every call of heads meets a tails
-    -- coin and every flip is lost.
-    Spec.assertEqWith
-      s
-      "CR 705.2: with nobody stating a result all three flips are lost"
-      (sheep (fst (castFlock [CoinFace.Tails, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Heads] plainBoard)))
-      0
 
 -- CR 705.2's FIRST sentence as an effect rather than an entry replacement: Odds
 -- (the left half of Odds // Ends, {U}{R} Instant, "Flip a coin. If it comes up
@@ -719,104 +366,3 @@ missesSpec s registry = Spec.describe s "FlipCoin tallies the flips lost (CR 705
       "CR 705.2: no flip lost, so no damage and two cards drawn"
       (let settled = afterMutalith [CoinFace.Heads, CoinFace.Heads] board in (S.lifeOf S.bob settled, S.lifeOf S.carol settled, S.handSize S.alice settled))
       (Just 20, Just 16, 2)
-
--- CR 614.1a over CR 705.1: Krark's Thumb's "if you would flip a coin, instead
--- flip two coins and ignore one", on the Winter Sky fixture at the top -- so the
--- flip's outcome is read through the same seven gameplay columns the rest of this
--- module reads, and the Thumb is the only thing that differs between the legs.
---
--- Winter Sky rather than a face-only flip because the kept coin has to MATTER: a
--- flip alice calls tails wins on a kept tails and loses on a kept heads, and
--- `won` and `lost` are two boards apart.
---
--- ONE Thumb and never two. The card is LEGENDARY, so CR 704.5j leaves no board on
--- which one player controls a second, and rule 705.2's last sentence keeps an
--- opponent's Thumb off this flip -- so the four-coin reading of CR 614.5 has no
--- producer. What a single Thumb does prove of rule 614.5 is that the row is spent
--- once: the flip is settled with TWO coins rather than doubling again off its own
--- modified event.
---
--- A STATE-THREADED answerer, since the two coins of one flip are structurally
--- identical Prompt.FlipCoin questions that must come up differently; a pure
--- Prompt -> r answerer cannot tell them apart and would make the case green
--- whatever the engine did.
-krarkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-krarkSpec s registry = Spec.describe s "CoinFlipR" $ do
-  Spec.it s "CR 614.1a Krark's Thumb settles the flip with two coins and the flipper keeps one" $ do
-    board <- thumbBoard s registry
-    let (settled, prompts) = thumbRun [CoinFace.Heads, CoinFace.Tails] CoinFace.Tails CoinFace.Tails board
-    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
-    -- mutation: the coins disagreed, alice called tails and kept the tails, so
-    -- the call matches and Winter Sky's winning branch is what the board shows.
-    Spec.assertEqWith s "CR 705.2: the kept coin matches the call, so the flip is won" (reading settled) won
-    -- Supporting: CR 614.5 spends the Thumb once, so two coins and not four.
-    Spec.assertEqWith s "CR 614.5: two coins" (length (filter isFlip prompts)) 2
-    -- Supporting: the flipper was actually asked which coin to ignore.
-    Spec.assertEqWith s "CR 614.1a: one choice offered" (length (filter isKeep prompts)) 1
-  Spec.it s "CR 705.1 without the Thumb the one coin flipped settles the flip" $ do
-    -- The pair, one thing different: the same board, the same pinned answers,
-    -- and no Thumb -- so the second face is never reached and the first coin
-    -- loses the call.
-    board <- coinBoard s registry
-    let (settled, prompts) = thumbRun [CoinFace.Heads, CoinFace.Tails] CoinFace.Tails CoinFace.Tails board
-    Spec.assertEqWith s "CR 705.2: heads against a call of tails loses" (reading settled) lost
-    Spec.assertEqWith s "CR 705.1: one coin" (length (filter isFlip prompts)) 1
-    Spec.assertEqWith s "CR 705.1: nothing to keep" (length (filter isKeep prompts)) 0
-  Spec.it s "CR 705.1 two coins that came up the same leave nothing to choose" $ do
-    board <- thumbBoard s registry
-    let (settled, prompts) = thumbRun [CoinFace.Heads, CoinFace.Heads] CoinFace.Tails CoinFace.Tails board
-    -- Both coins are heads, so which one is ignored is indistinguishable and the
-    -- prompt is elided -- and the flip loses against a call of tails however the
-    -- answerer would have answered it.
-    Spec.assertEqWith s "CR 705.2: the agreed face loses the call" (reading settled) lost
-    Spec.assertEqWith s "CR 614.5: two coins" (length (filter isFlip prompts)) 2
-    Spec.assertEqWith s "CR 705.1: no choice offered" (length (filter isKeep prompts)) 0
-
-isFlip :: Text.Text -> Bool
-isFlip = (==) (Text.pack "FlipCoin")
-
-isKeep :: Text.Text -> Bool
-isKeep = (==) (Text.pack "ChooseCoinResult")
-
--- The Winter Sky board with a Krark's Thumb under alice. Added as a permanent
--- rather than cast, the fixture's own posture for everything but the spell under
--- test: the Thumb's whole text is a static ability, which functions from the
--- battlefield with nothing to announce.
-thumbBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
-thumbBoard s registry = do
-  (skyId, gs) <- coinBoard s registry
-  thumb <- S.printingOf s registry "Krark's Thumb"
-  let (_, next) = S.addPermanent thumb S.alice gs
-  pure (skyId, next)
-
--- Cast Winter Sky and resolve it, handing out the given faces IN ORDER to CR
--- 705.1's flips and pinning CR 705.2's call and the kept coin by CONSTANT, so
--- the engine cannot repair either after a mutation. Answers with the settled
--- board and the prompts the run asked, in order.
-thumbRun ::
-  [CoinFace.CoinFace] ->
-  CoinFace.CoinFace ->
-  CoinFace.CoinFace ->
-  (ObjectId.ObjectId, GameState.GameState) ->
-  (GameState.GameState, [Text.Text])
-thumbRun faces called kept (skyId, board) =
-  let answering :: Prompt.Prompt r -> State.State ([CoinFace.CoinFace], [Text.Text]) r
-      answering p = do
-        (pending0, log0) <- State.get
-        State.put (pending0, Scenario.Prompt.kindOf p : log0)
-        case p of
-          Prompt.FlipCoin -> do
-            (pending, log_) <- State.get
-            case pending of
-              -- Running out means the engine flipped more coins than the leg
-              -- pinned, which the FlipCoin tally beside every assertion reports.
-              [] -> pure CoinFace.Heads
-              face : rest -> do
-                State.put (rest, log_)
-                pure face
-          Prompt.CallCoin {} -> pure called
-          Prompt.ChooseCoinResult {} -> pure kept
-          _ -> pure (S.identityAnswer p)
-      run = Engine.runGame answering board (S.cast S.alice skyId >> Stack.resolveTop)
-      ((_, settled), (_, prompts)) = State.runState run (faces, [])
-   in (S.settleSba settled, reverse prompts)

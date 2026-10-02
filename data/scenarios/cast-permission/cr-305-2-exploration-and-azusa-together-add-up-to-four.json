@@ -1,0 +1,169 @@
+{
+  "description": "CR 305.2 Exploration and Azusa together add up to four",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Exploration",
+            "ready": true
+          },
+          {
+            "card": "Azusa, Lost but Seeking",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "PlayLand": "$mountain"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "PlayLand": "$mountain-2"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "PlayLand": "$mountain-3"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "PlayLand": "$mountain-4"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility Mountain#2",
+            "ActivateManaAbility Mountain#3",
+            "ActivateManaAbility Mountain#4",
+            "ActivateManaAbility Mountain#5"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Mountain",
+        "count": 4
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Mountain",
+        "count": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Mountain#2",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Mountain#2",
+        "tapped": false
+      }
+    },
+    {
+      "Damage": {
+        "object": "Mountain#3",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Mountain#3",
+        "tapped": false
+      }
+    },
+    {
+      "Damage": {
+        "object": "Mountain#4",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Mountain#4",
+        "tapped": false
+      }
+    },
+    {
+      "Damage": {
+        "object": "Mountain#5",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Mountain#5",
+        "tapped": false
+      }
+    }
+  ]
+}

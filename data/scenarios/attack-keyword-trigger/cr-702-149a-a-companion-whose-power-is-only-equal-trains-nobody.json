@@ -1,0 +1,86 @@
+{
+  "description": "CR 702.149a a companion whose power is only equal trains nobody",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Apprentice Sharpshooter",
+            "label": "apprentice-sharpshooter",
+            "ready": true
+          },
+          {
+            "card": "Apprentice Sharpshooter",
+            "label": "apprentice-sharpshooter-2",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$apprentice-sharpshooter",
+          "$apprentice-sharpshooter-2"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$apprentice-sharpshooter",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$apprentice-sharpshooter-2",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$apprentice-sharpshooter",
+          "power": 1,
+          "toughness": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$apprentice-sharpshooter-2",
+          "power": 1,
+          "toughness": 4
+        }
+      }
+    }
+  ]
+}

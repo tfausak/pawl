@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- Covers: CR 801's limited range of influence option -- Pawl.Types.RangeOfInfluence,
 -- the Pawl.Types.GameSettings field that carries it, Pawl.Engine.Game.inRangeOf,
@@ -37,7 +36,6 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -55,17 +53,14 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
-import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
@@ -105,38 +100,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (not (declares S.carol (S.withRange 1 board))) "CR 801.3 at range 1 alice's creature may not attack carol, two seats away"
     Spec.assertBool s (declares S.carol board) "at an unlimited range it may"
     Spec.assertBool s (declares S.dave (S.withRange 1 board)) "CR 801.2 and at range 1 it may attack dave, one seat away the other way round"
-
-  -- CR 801.4 through a target slot's offer. Ravenous Rats, {1}{B} Rat: "When this
-  -- creature enters, target opponent discards a card." The offer is the engine's
-  -- own output, read as Pawl.TeamSpec's teammate case reads it.
-  Spec.it s "CR 801.4 a target opponent slot does not offer an opponent outside the controller's range" $ do
-    rats <- S.printingOf s registry "Ravenous Rats"
-    swamp <- S.printingOf s registry "Swamp"
-    let lands = S.landsFor swamp S.alice 2 S.fourPlayerGame
-        (held, staged) = S.addHandCard rats S.alice lands
-        board =
-          staged
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        recording :: Prompt.Prompt r -> State.State [[Recipient.Recipient]] r
-        recording p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> do
-            State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
-            pure (S.preferring (const True) sets)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer gs (S.cast S.alice held)) Engine.priorityLoop) []
-    Spec.assertEqWith
-      s
-      "CR 801.4 at range 1 only bob and dave are offered"
-      (offered (S.withRange 1 board))
-      [[Recipient.ToPlayer S.bob, Recipient.ToPlayer S.dave]]
-    Spec.assertEqWith
-      s
-      "and at an unlimited range carol is too"
-      (offered board)
-      [[Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol, Recipient.ToPlayer S.dave]]
 
   -- CR 801.2d for objects under CR 801.4: Lightning Bolt's "any target" over a
   -- Goblin Piker and Invasion of Dominaria, both controlled by carol. The Piker is
@@ -284,47 +247,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (not (S.onBattlefield plane (pass carols))) "at an unlimited range it is put into the graveyard"
     Spec.assertBool s (not (S.onBattlefield plane (pass (S.withRange 1 bobs)))) "and at range 1 bob's newer Crossroads, in range, buries it"
 
-  -- CR 801.2c and its example: bob concedes during alice's turn, and carol,
-  -- two seats from alice across bob's emptied seat, stays out of alice's range
-  -- for the rest of that turn, then comes into it as the next turn begins. The
-  -- Ravenous Rats offer is read as the CR 801.4 case above reads it: alice's on
-  -- her own turn, then carol's on hers, which the handoff reaches past bob.
-  Spec.it s "CR 801.2c a seat emptied mid-turn closes up only when the next turn begins" $ do
-    rats <- S.printingOf s registry "Ravenous Rats"
-    swamp <- S.printingOf s registry "Swamp"
-    let lands = S.landsFor swamp S.carol 2 (S.landsFor swamp S.alice 2 S.fourPlayerGame)
-        (alices, g0) = S.addHandCard rats S.alice lands
-        (carols, g1) = S.addHandCard rats S.carol g0
-        board =
-          S.withRange
-            1
-            g1
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-        conceded = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob)
-        carolsTurn = S.runPure S.identityAnswer conceded Engine.handoffTurn
-        carolsMain = carolsTurn {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.carol}
-        recording :: Prompt.Prompt r -> State.State [[Recipient.Recipient]] r
-        recording p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> do
-            State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
-            pure (S.preferring (const True) sets)
-          _ -> pure (S.identityAnswer p)
-        offered pid held gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer gs (S.cast pid held)) Engine.priorityLoop) []
-    Spec.assertEqWith
-      s
-      "CR 801.2c for the rest of alice's turn carol is still two seats away, so only dave is offered"
-      (offered S.alice alices conceded)
-      [[Recipient.ToPlayer S.dave]]
-    Spec.assertEqWith
-      s
-      "CR 801.2c from carol's turn on bob's seat has closed up, so alice is offered beside dave"
-      (offered S.carol carols carolsMain)
-      [[Recipient.ToPlayer S.alice, Recipient.ToPlayer S.dave]]
-    Spec.assertEqWith s "the handoff skipped bob's seat" (GameState.activePlayer carolsTurn) S.carol
-
   -- CR 801.7 for an object the event involves: alice's Soul Warden ("Whenever
   -- another creature enters, you gain 1 life.") sees a Goblin Piker enter under
   -- carol, two seats away, and one under bob, one seat away.
@@ -441,35 +363,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 801.11 at range 1 Malignus reads only bob's and dave's 20" (S.powerToughnessOf creature (S.withRange 1 board)) (Just (10, 10))
     Spec.assertEqWith s "at an unlimited range it reads carol's 40" (S.powerToughnessOf creature board) (Just (20, 20))
 
-  -- CR 801.5a for a player: alice casts True-Name Nemesis ("As this creature
-  -- enters, choose a player."), and the choice offers only the players in her
-  -- range.
-  Spec.it s "CR 801.5a a choice of player offers only players within the chooser's range" $ do
-    nemesis <- S.printingOf s registry "True-Name Nemesis"
-    island <- S.printingOf s registry "Island"
-    let (spellId, board) = S.addHandCard nemesis S.alice (S.landsFor island S.alice 3 S.fourPlayerGame)
-        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
-        recording p = case p of
-          Prompt.ChoosePlayer _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
-    Spec.assertEqWith s "CR 801.5a at range 1 carol is not offered" (offered (S.withRange 1 board)) [[S.alice, S.bob, S.dave]]
-    Spec.assertEqWith s "at an unlimited range she is" (offered board) [[S.alice, S.bob, S.carol, S.dave]]
-
-  -- CR 801.5a for an opponent: alice's Pulling Teeth ("Clash with an opponent.
-  -- ...") offers only the opponents in her range.
-  Spec.it s "CR 801.5a a choice of opponent offers only opponents within the chooser's range" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    teeth <- S.printingOf s registry "Pulling Teeth"
-    let (spellId, board) = S.addHandCard teeth S.alice (S.landsFor swamp S.alice 2 S.fourPlayerGame)
-        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
-        recording p = case p of
-          Prompt.ChooseOpponent _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
-    Spec.assertEqWith s "CR 801.5a at range 1 carol is not offered" (offered (S.withRange 1 board)) [[S.bob, S.dave]]
-    Spec.assertEqWith s "at an unlimited range she is" (offered board) [[S.bob, S.carol, S.dave]]
-
   -- CR 801.5a for a resolving "choose a player": alice's Stadium Vendors ("When
   -- this creature enters, choose a player. That player adds two mana ...").
   Spec.it s "CR 801.5a a resolving choice of player offers only players within the controller's range" $ do
@@ -502,24 +395,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 801.5a at range 1 tribute does not offer carol, and does at an unlimited range" (offeredFor snake forest 5) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
     Spec.assertEqWith s "CR 801.5a at range 1 Null Chamber does not offer carol, and does at an unlimited range" (offeredFor chamber plains 4) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
 
-  -- CR 801.10 for proliferate: alice's Steady Progress ("Proliferate. Draw a
-  -- card.") while bob, one seat away, and carol, two seats away, each have a
-  -- poison counter.
-  Spec.it s "CR 801.10 proliferate offers only players within its controller's range" $ do
-    island <- S.printingOf s registry "Island"
-    progress <- S.printingOf s registry "Steady Progress"
-    let (spellId, g0) = S.addHandCard progress S.alice (S.landsFor island S.alice 3 S.fourPlayerGame)
-        (_, g1) = S.addLibraryCard island S.alice g0
-        poisoned = Set.fromList [S.bob, S.carol]
-        board = g1 {GameState.players = Map.mapWithKey (\pid p -> if Set.member pid poisoned then p {Player.counters = Map.singleton PlayerCounterKind.Poison 1} else p) (GameState.players g1)}
-        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
-        recording p = case p of
-          Prompt.ChooseProliferate _ _ _ players -> State.modify' (<> [players]) >> pure (Set.empty, Set.fromList players)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
-    Spec.assertEqWith s "CR 801.10 at range 1 only bob is offered" (offered (S.withRange 1 board)) [[S.bob]]
-    Spec.assertEqWith s "at an unlimited range carol is too" (offered board) [[S.bob, S.carol]]
-
   -- CR 104.2b / 801.14: alice's Felidar Sovereign ("At the beginning of your
   -- upkeep, if you have 40 or more life, you win the game.") at 40 life. At range
   -- 1 only bob and dave, her opponents in range, lose; carol plays on.
@@ -532,23 +407,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "and the game goes on" (GameState.result limited) Nothing
     Spec.assertEqWith s "CR 104.2b at an unlimited range alice wins" (GameState.result (upkeepOf S.alice (atLife 40))) (Just (Result.Won S.alice))
     Spec.assertEqWith s "CR 603.4 at 39 life nothing happens" (Game.stillPlaying (upkeepOf S.alice (atLife 39))) [S.alice, S.bob, S.carol, S.dave]
-
-  -- CR 104.4c / 801.15: alice casts Divine Intervention ("This enchantment enters
-  -- with two intervention counters on it. At the beginning of your upkeep, remove
-  -- an intervention counter from this enchantment. When you remove the last
-  -- intervention counter from this enchantment, the game is a draw.") and two of
-  -- her upkeeps pass. At range 1 the draw takes alice, bob and dave out; carol,
-  -- the last one playing, wins by CR 104.2a.
-  Spec.it s "CR 801.15 a draw is a draw for its controller and the players within their range" $ do
-    plains <- S.printingOf s registry "Plains"
-    intervention <- S.printingOf s registry "Divine Intervention"
-    let (spellId, g0) = S.addHandCard intervention S.alice (S.landsFor plains S.alice 8 S.fourPlayerGame)
-        played ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g0))
-        twice gs = upkeepOf S.alice (upkeepOf S.alice gs)
-        limited = twice (played (S.withRange 1))
-    Spec.assertEqWith s "one upkeep leaves the game running" (GameState.result (upkeepOf S.alice (played id))) Nothing
-    Spec.assertEqWith s "CR 801.15 at range 1 only carol is still playing" (Game.stillPlaying limited) [S.carol]
-    Spec.assertEqWith s "CR 104.4c at an unlimited range the game is a draw" (GameState.result (twice (played id))) (Just Result.Drawn)
 
   -- CR 801.16: Pawl.GameSpec's CR 104.4b loop -- alice's Sporemound mints a
   -- Saproling, a Life and Limb makes it a Forest land, and another player's
@@ -654,8 +512,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
        in resolveAll (snd (Engine.runGamePure S.identityAnswer staged Engine.settleForPriority))
     -- A main phase with alice holding priority, for an instant she casts.
     onMain gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-    castResolved :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-    castResolved answer pid spellId gs = snd (Engine.runGamePure answer (S.runPure answer gs (S.cast pid spellId)) Engine.priorityLoop)
     -- CR 510.2: these creatures, attacking `defender` on `active`'s turn, deal
     -- their combat damage.
     strike active attackers defender gs =

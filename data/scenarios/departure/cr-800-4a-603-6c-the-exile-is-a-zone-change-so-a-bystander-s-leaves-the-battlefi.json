@@ -1,0 +1,355 @@
+{
+  "description": "CR 800.4a/603.6c the exile is a zone change, so a bystander's leaves-the-battlefield trigger fires",
+  "note": "Alice controls bob's Meandering Towershell through Control Magic (the placement's controller and ready stand for the fixture's settled control), attacks with it on turn 1 so it is exiled and the Aura goes to the graveyard, and carol casts Super Shredder on turn 3, after both departures. On turn 4 the Towershell returns under alice tapped and attacking carol; alice concedes in the declare blockers step, CR 800.4a exiles the Towershell she controls, and carol's Shredder triggers once: a 2/2 with one counter, the Towershell in bob's exile.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Control Magic",
+            "label": "magic",
+            "attached": "towershell"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Meandering Towershell",
+            "label": "towershell",
+            "ready": true,
+            "controller": "alice"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "s1"
+          },
+          {
+            "card": "Swamp",
+            "label": "s2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Super Shredder",
+            "label": "shredder"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$towershell",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$towershell"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Exile",
+          "card": "Meandering Towershell",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Control Magic",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$shredder",
+          "mana": [
+            "$s1",
+            "$s2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "PowerToughness": {
+          "object": "Super Shredder",
+          "power": 1,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "Counters": {
+          "object": "Super Shredder",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $towershell"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "Meandering Towershell",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {}
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Concede"
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Super Shredder"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "PowerToughness": {
+          "object": "Super Shredder",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "Counters": {
+          "object": "Super Shredder",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Exile",
+          "card": "Meandering Towershell",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 0
+        }
+      }
+    }
+  ]
+}

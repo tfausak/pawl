@@ -1,0 +1,53 @@
+{
+  "description": "CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers",
+  "note": "The same board on alice's own turn: the window offers no mana activation (and the Wretch, which only Lavinia could pay for, is not offered either).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Lavinia, Foil to Conspiracy",
+            "label": "lavinia",
+            "ready": true
+          },
+          {
+            "card": "Withered Wretch",
+            "label": "wretch",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass"
+          ]
+        }
+      }
+    }
+  ]
+}

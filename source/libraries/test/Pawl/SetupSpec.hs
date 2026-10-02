@@ -396,33 +396,6 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     Spec.assertEqWith s "the battlefield is empty after the rebuild" (Set.null (GameState.battlefield after)) True
     Spec.assertEqWith s "every rebuilt object is owned by alice or bob (ownership preserved)" (all (\o -> Object.owner o == S.alice || Object.owner o == S.bob) (Map.elems (GameState.objects after))) True
 
-  -- CR 727.2 carries CARDS into the restarted game, and CR 108.2 makes each half
-  -- of a melded permanent one: "one object represented by two cards" (CR
-  -- 701.42a). So the permanent itself must not come back and both of its cards
-  -- must, which is CR 712.21's split read at a funnel that is not a zone change.
-  --
-  -- alice's five Mountains ride along as the discriminator on the other side: a
-  -- rebuild that dropped every object would satisfy the "no melded permanent
-  -- survives" assertion on its own.
-  Spec.it s "CR 727.2/712.21 a restart carries both cards of a melded permanent into the new game" $ do
-    battlements <- S.printingOf s registry "Hanweir Battlements"
-    garrison <- S.printingOf s registry "Hanweir Garrison"
-    mountain <- S.printingOf s registry "Mountain"
-    let (meldedId, board) = meldedBoard (Setup.emptyGame S.bothPlayers) battlements garrison mountain
-        components = componentsOn meldedId board
-        after = snd (Engine.runGamePure S.identityAnswer board (Setup.restartGame S.performer Set.empty S.alice))
-        -- CR 103.5's opening draw runs inside the restart, so a card that came
-        -- back is in the library or the hand and which one is the shuffle's
-        -- business rather than this rule's.
-        hers = Game.zoneMembers Zone.Library S.alice after <> Game.zoneMembers Zone.Hand S.alice after
-        sources = sourcesOf hers after
-    -- Setup, read off the board going IN, so nothing here can absorb a mutation
-    -- of the funnel under test.
-    Spec.assertEqWith s "setup: the pair really melded into one permanent representing two cards" (length components) 2
-    Spec.assertEqWith s "CR 727.2/712.21 both cards representing the melded permanent are in alice's rebuilt game" (filter (\p -> elem (Source.OfCard p) sources) components) components
-    Spec.assertEqWith s "and no object left in the new game is represented by two cards: the permanent is no card at all (CR 108.2)" (all (null . Game.componentsOf . Object.source) (Map.elems (GameState.objects after))) True
-    Spec.assertEqWith s "alice's five Mountains came back beside them" (length hers) 7
-
   Spec.it s "CR 400.7: startGameFromCards puts each card into the library as a NEW object, with no per-incarnation state" $ do
     -- Every one of alice's and bob's 8 owned cards carries the full set of
     -- per-incarnation state -- a chosen colour, a chosen land type, a chosen

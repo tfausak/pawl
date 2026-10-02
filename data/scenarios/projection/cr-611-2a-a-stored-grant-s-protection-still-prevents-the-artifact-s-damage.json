@@ -1,0 +1,132 @@
+{
+  "description": "CR 611.2a a stored grant's protection still prevents the artifact's damage",
+  "board": {
+    "seats": [
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Icehide Golem",
+            "label": "golem",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "red",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Cabal Evangel",
+            "label": "mine"
+          },
+          {
+            "card": "Tower of the Magistrate",
+            "label": "tower",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$golem",
+          "$red"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$tower",
+          "ability": 1,
+          "targets": [
+            "$mine"
+          ],
+          "mana": [
+            "$p1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": {
+        "Block": {
+          "$mine": [
+            "$golem"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Cabal Evangel",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Damage": {
+          "object": "$mine",
+          "damage": 0
+        }
+      }
+    }
+  ],
+  "note": "bob attacks with Icehide Golem (an artifact 2/2) and Goblin Piker; alice activates Tower of the Magistrate at her Cabal Evangel in the declare attackers step (a stored grant, on no object's rules text) and blocks the Golem: its 2 is prevented and nothing is marked. The --control file blocks the Piker instead on the same warded board, and its 2 kills the Evangel, so 2 is lethal."
+}

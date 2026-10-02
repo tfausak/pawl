@@ -1,0 +1,235 @@
+{
+  "description": "CR 602.5b the per-turn rider resets at the handoff and the per-game one does not",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f1"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f2"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f3"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f4"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f5"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f6"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f7"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f8"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f9"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f10"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f11"
+          },
+          {
+            "card": "Forest",
+            "ready": true,
+            "label": "f12"
+          },
+          {
+            "card": "Locust Swarm",
+            "label": "swarm",
+            "tapped": true,
+            "ready": true
+          },
+          {
+            "card": "Greenbelt Guardian",
+            "label": "guardian",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Lightning Bolt"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Lightning Bolt"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $swarm",
+            "Activate $swarm",
+            "Activate $guardian",
+            "Activate $guardian",
+            "ActivateManaAbility $f1",
+            "ActivateManaAbility $f2",
+            "ActivateManaAbility $f3",
+            "ActivateManaAbility $f4",
+            "ActivateManaAbility $f5",
+            "ActivateManaAbility $f6",
+            "ActivateManaAbility $f7",
+            "ActivateManaAbility $f8",
+            "ActivateManaAbility $f9",
+            "ActivateManaAbility $f10",
+            "ActivateManaAbility $f11",
+            "ActivateManaAbility $f12"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$swarm",
+          "ability": 1,
+          "mana": [
+            "$f1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$guardian",
+          "ability": 1,
+          "mana": [
+            "$f2",
+            "$f3",
+            "$f4",
+            "$f5",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $swarm",
+            "Activate $guardian",
+            "ActivateManaAbility $f6",
+            "ActivateManaAbility $f7",
+            "ActivateManaAbility $f8",
+            "ActivateManaAbility $f9",
+            "ActivateManaAbility $f10",
+            "ActivateManaAbility $f11",
+            "ActivateManaAbility $f12"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $swarm",
+            "Activate $swarm",
+            "Activate $guardian",
+            "ActivateManaAbility $f1",
+            "ActivateManaAbility $f2",
+            "ActivateManaAbility $f3",
+            "ActivateManaAbility $f4",
+            "ActivateManaAbility $f5",
+            "ActivateManaAbility $f6",
+            "ActivateManaAbility $f7",
+            "ActivateManaAbility $f8",
+            "ActivateManaAbility $f9",
+            "ActivateManaAbility $f10",
+            "ActivateManaAbility $f11",
+            "ActivateManaAbility $f12"
+          ]
+        }
+      }
+    }
+  ]
+}

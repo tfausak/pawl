@@ -1,0 +1,80 @@
+{
+  "description": "CR 702.170d the plotted card is castable only by its owner, and only later",
+  "note": "The plotted control: the same card placed in alice's exile unplotted is offered to nobody; her cast on turn 3 is refused.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "exile": [
+          {
+            "card": "Djinn of Fool's Fall",
+            "label": "djinn"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "PlayLand Island#8"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "Djinn of Fool's Fall",
+          "mana": [
+            null
+          ]
+        }
+      }
+    }
+  ]
+}

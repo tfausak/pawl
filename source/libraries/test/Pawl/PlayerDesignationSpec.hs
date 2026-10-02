@@ -101,18 +101,6 @@ ascendSpec s registry = Spec.describe s "Ascend" $ do
     Spec.assertEqWith s "CR 702.131a alice drew three cards, not two" (S.handSize S.alice after) 3
     Spec.assertEqWith s "and holds the city's blessing once the sorcery is gone" (marksOf S.alice (settle after)) (Just (Set.singleton PlayerDesignation.CitysBlessing))
     Spec.assertEqWith s "bob, who cast nothing, has nothing" (marksOf S.bob after) (Just Set.empty)
-  -- The board above with one Island taken away: nine permanents, so CR 702.131a's
-  -- "ten or more" is not met, the mark is not granted, and the card's own
-  -- unblessed clause draws two. Three Islands still pay {1}{U}{U}, so the
-  -- negative cannot pass for want of mana.
-  Spec.it s "CR 702.131a nine permanents leave Secrets of the Golden City drawing two" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    secrets <- S.printingOf s registry "Secrets of the Golden City"
-    let (gs, spellId) = S.handOne secrets (stocked piker (S.landsInPlay island 9))
-        after = resolveOne gs spellId
-    Spec.assertEqWith s "alice drew two cards" (S.handSize S.alice after) 2
-    Spec.assertEqWith s "and has nothing" (marksOf S.alice (settle after)) (Just Set.empty)
 
 storiedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 storiedSpec s registry = Spec.describe s "Storied" $ do

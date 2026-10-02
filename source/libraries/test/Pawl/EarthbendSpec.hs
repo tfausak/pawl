@@ -39,7 +39,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as View
@@ -118,13 +117,6 @@ earthbent forest lesson =
   let (target, twin, spell, _, gs) = lessonBoard forest lesson [] []
    in (target, twin, castAt target spell gs)
 
--- Lethal damage on the 0/0 with four +1/+1 counters, then CR 704.5g, then the
--- delayed ability onto the stack and off it.
-killed :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-killed oid gs =
-  let dead = S.settleSba (S.markDamage oid 4 gs)
-   in S.runPure S.identityAnswer dead (Engine.placePendingTriggers *> Stack.resolveTop)
-
 -- The delayed ability placed and resolved without anything having killed
 -- anything: what a zone change the condition does not admit leaves behind.
 settled :: GameState.GameState -> GameState.GameState
@@ -168,21 +160,8 @@ spec s registry = Spec.describe s "Earthbend" $ do
   producerSpec s registry
 
 -- CR 701.66a's first two sentences.
-animationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+animationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 animationSpec s registry = Spec.describe s "Animation" $ do
-  -- CR 611.2a: rule 701.66a states no duration, so the animation is not "until end
-  -- of turn". Nothing but the CR 514.2 sweep can tell the two apart, and the sweep
-  -- is what a card printing the shorter duration would be caught by.
-  Spec.it s "CR 611.2a the animation does not end at cleanup" $ do
-    forest <- S.printingOf s registry "Forest"
-    lesson <- S.printingOf s registry "Earthbending Lesson"
-    let (target, _, after) = earthbent forest lesson
-        swept = Expiry.dropAtCleanup after
-    Spec.assertEqWith s "CR 611.2a the earthbent land is still a 4/4 after cleanup" (S.powerToughnessOf target swept) (Just (4, 4))
-    Spec.assertBool s (Projection.hasKeyword Keyword.Haste target swept) "and still has haste"
-    -- CR 514.2 really did run on this board: the animation surviving it is the
-    -- duration and not a sweep that reached nothing.
-    Spec.assertEqWith s "CR 514.2 the sweep did run" (length (GameState.continuousEffects swept)) (length (GameState.continuousEffects after))
   -- CR 302.6 read against CR 702.10b: the land was played this turn, so haste is
   -- the only thing that lets it attack. The Piker is the control -- equally sick,
   -- equally alice's, and without haste.
@@ -206,23 +185,6 @@ animationSpec s registry = Spec.describe s "Animation" $ do
 -- CR 701.66a's third sentence, and CR 603.7's delayed ability behind it.
 returnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 returnSpec s registry = Spec.describe s "Return" $ do
-  Spec.it s "CR 701.66a the land that dies comes back tapped under its controller's control" $ do
-    forest <- S.printingOf s registry "Forest"
-    lesson <- S.printingOf s registry "Earthbending Lesson"
-    let (target, twin, after) = earthbent forest lesson
-        returned = killed target after
-    case arrivals after returned of
-      [back] -> do
-        Spec.assertEqWith s "CR 701.66a it returns tapped" (fmap Object.tapped (Game.lookupObject back returned)) (Just TapState.Tapped)
-        Spec.assertEqWith s "CR 701.66a under alice's control" (View.controllerOf back returned) (Just S.alice)
-        Spec.assertBool s (Set.member Subtype.Forest (Projection.subtypesOf back returned)) "and it is the Forest that died"
-        -- CR 400.7: a new object, so rule 701.66a's animation is gone with the old
-        -- one rather than following the card back.
-        Spec.assertBool s (not (Set.member CardType.Creature (Projection.cardTypesOf back returned))) "CR 400.7 and it is a land again, not a creature"
-      other -> Spec.assertEqWith s "CR 701.66a exactly one permanent returned to the battlefield" (length other) 1
-    -- The twin dying on the same board returns nothing, so the arrival above is
-    -- the earthbend rather than a rule about Forests.
-    Spec.assertEqWith s "CR 701.66a the land nobody earthbent stays dead" (arrivals after (killed twin after)) []
   Spec.it s "CR 701.66a the land that is exiled comes back too" $ do
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
@@ -238,31 +200,6 @@ returnSpec s registry = Spec.describe s "Return" $ do
         Spec.assertEqWith s "CR 701.66a the exiled land returns tapped" (fmap Object.tapped (Game.lookupObject back exiled)) (Just TapState.Tapped)
         Spec.assertEqWith s "under alice's control" (View.controllerOf back exiled) (Just S.alice)
       other -> Spec.assertEqWith s "CR 701.66a exactly one permanent returned to the battlefield" (length other) 1
-  -- CR 110.2a's "unless the effect states otherwise", which rule 701.66a does:
-  -- "under YOUR control". alice earthbends a Forest bob OWNS and she controls, so
-  -- the owner reading and the earthbender reading name different seats -- the one
-  -- board on which that rider is observable at all. Without it this case would
-  -- pass under either reading, alice owning everything else she controls.
-  Spec.it s "CR 110.2a the land returns under the earthbender's control, not its owner's" $ do
-    forest <- S.printingOf s registry "Forest"
-    lesson <- S.printingOf s registry "Earthbending Lesson"
-    let (_, _, spell, _, base) = lessonBoard forest lesson [] []
-        lent = S.landsFor forest S.bob 1 base
-        borrowed = case List.sort (Game.zoneMembers Zone.Battlefield S.bob lent) of
-          oid : _ -> oid
-          [] -> S.noSource
-        gs = S.giveControl borrowed S.alice lent
-        after = castAt borrowed spell gs
-        returned = killed borrowed after
-        back = List.sort (Game.zoneMembers Zone.Battlefield S.bob returned)
-    -- The precondition the rider turns on, asserted rather than assumed.
-    Spec.assertEqWith s "alice controls the Forest bob owns" (View.controllerOf borrowed after) (Just S.alice)
-    Spec.assertEqWith s "CR 400.7 the card came back as one new permanent bob owns" (length back) 1
-    case back of
-      [oid] -> do
-        Spec.assertEqWith s "CR 701.66a it is alice who controls it, not bob who owns it" (View.controllerOf oid returned) (Just S.alice)
-        Spec.assertEqWith s "CR 701.66a and it is tapped" (fmap Object.tapped (Game.lookupObject oid returned)) (Just TapState.Tapped)
-      _ -> pure ()
   -- CR 701.66a names two destinations and no third. A bounce is the reading that
   -- would be wrong if the condition were "leaves the battlefield".
   Spec.it s "CR 701.66a a land returned to hand is not returned to the battlefield" $ do

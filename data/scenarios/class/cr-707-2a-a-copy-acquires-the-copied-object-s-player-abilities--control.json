@@ -1,0 +1,191 @@
+{
+  "description": "CR 707.2a a copy acquires the copied object's player abilities",
+  "note": "Control: the same board with Copy Enchantment never cast; the original Class alone taxes the Bolt to {1}{R}, so one of bob's three R is left.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "pl1",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl5",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl6",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl7",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl8",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl9",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl10",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl11",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl12",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Paladin Class",
+            "label": "class",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Copy Enchantment",
+            "label": "copyench"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "manaPool": "RRR",
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$class",
+          "ability": 0,
+          "mana": [
+            "$pl1",
+            "$pl2",
+            "$pl3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "$alice"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "ManaPool",
+          "player": "bob",
+          "is": [
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Lightning Bolt"
+          ]
+        }
+      }
+    }
+  ]
+}

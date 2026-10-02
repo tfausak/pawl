@@ -1,0 +1,151 @@
+{
+  "description": "CR 609.7a the redirection moves the chosen source's damage and no other source's",
+  "note": "Bob's two Prodigal Sorcerers stand in for the test's two hand-built noncombat damage events from bob's Goblin Pikers (no Piker deals noncombat damage). Alice taps the Attendants at her Piker and names $omega as the source; that Sorcerer's 1 then lands on the Attendants and none on the Piker, and the other Sorcerer's 1 stays on the Piker, killing it, while the Attendants keeps its 1.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Oracle's Attendants",
+            "label": "attendants",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "victim"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Prodigal Sorcerer",
+            "label": "alpha",
+            "ready": true
+          },
+          {
+            "card": "Prodigal Sorcerer",
+            "label": "omega",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$attendants",
+          "ability": 0,
+          "targets": [
+            "$victim"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDamageSource",
+          "with": "$omega"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$omega",
+          "ability": 0,
+          "targets": [
+            "$victim"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$victim",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$attendants",
+          "damage": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$alpha",
+          "ability": 0,
+          "targets": [
+            "$victim"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$attendants",
+          "damage": 1
+        }
+      }
+    }
+  ]
+}

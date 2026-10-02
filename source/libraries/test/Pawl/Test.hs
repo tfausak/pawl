@@ -59,6 +59,7 @@ import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
 import qualified Pawl.Codec.AlternativeActivationCostSpec
 import qualified Pawl.Codec.AlternativeCostSpec
+import qualified Pawl.Codec.AnswerSpec
 import qualified Pawl.Codec.AnyNumberDiscardSpec
 import qualified Pawl.Codec.AnyNumberMatchingSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
@@ -565,6 +566,7 @@ import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.SuspendCountersSpec
 import qualified Pawl.Codec.SuspendSpec
 import qualified Pawl.Codec.TakeExtraTurnSpec
+import qualified Pawl.Codec.TakingSpec
 import qualified Pawl.Codec.TapForTotalPowerSpec
 import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
@@ -606,6 +608,7 @@ import qualified Pawl.Codec.UntapRewriteSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
+import qualified Pawl.Codec.ViewIsSpec
 import qualified Pawl.Codec.VillainousChoiceRSpec
 import qualified Pawl.Codec.VillainousChoiceRewriteSpec
 import qualified Pawl.Codec.VoteSpec
@@ -760,7 +763,6 @@ import qualified Pawl.StationSpec
 import qualified Pawl.TargetPerPlayerSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
-import qualified Pawl.TimeTravelSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
@@ -1267,6 +1269,7 @@ spec s registry = do
   Pawl.Codec.ChoicesSpec.spec s
   Pawl.Codec.CheckSpec.spec s
   Pawl.Codec.CastingSpec.spec s
+  Pawl.Codec.TakingSpec.spec s
   Pawl.Codec.BoardSpec.spec s
   Pawl.Codec.ActivationSpec.spec s
   Pawl.Codec.PhasedOutSpec.spec s
@@ -1378,6 +1381,8 @@ spec s registry = do
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SubtypesAreSpec.spec s
+  Pawl.Codec.AnswerSpec.spec s
+  Pawl.Codec.ViewIsSpec.spec s
   Pawl.Codec.NamesAreSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.SuspendCountersSpec.spec s
@@ -1446,25 +1451,17 @@ spec s registry = do
   Pawl.ConspiracySpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CopySpec.copySpellSpec s registry
-  Pawl.CopySpec.copyTargetSpec s registry
   Pawl.CopySpec.stirCopySpec s registry
   Pawl.CopySpec.copiedAbilitySpec s registry
   Pawl.CopySpec.faceDownCopySpec s registry
   Pawl.CopySpec.permanentCopySpec s registry
   Pawl.CopySpec.copyAbilityOnStackSpec s registry
-  Pawl.CopySpec.copiedTriggerTargetSpec s registry
   Pawl.CopySpec.ivySpec s registry
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.zadaSpec s registry
-  Pawl.CopySpec.radiateSpec s registry
-  Pawl.CopySpec.radiatePerspectiveSpec s registry
-  Pawl.CopySpec.precursorGolemSpec s registry
-  Pawl.CopySpec.precursorGolemSeatSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry
   Pawl.CopySpec.flamerushRiderSpec s registry
-  Pawl.CopySpec.castCopySpec s registry
   Pawl.CopySpec.garthSpec s registry
-  Pawl.CopySpec.cipherSpec s registry
   Pawl.CopySpec.magarSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
@@ -1549,7 +1546,6 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlaneswalkerSpec.combinedLoyaltyCostSpec s registry
   Pawl.PlaneswalkerSpec.countersRemovedSpec s registry
-  Pawl.PlaneswalkerSpec.loyaltyAbilityOnlySpec s registry
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry
@@ -1560,7 +1556,6 @@ spec s registry = do
   Pawl.CastProhibitionSpec.spec s registry
   Pawl.CastPermissionSpec.spec s registry
   Pawl.PopulateSpec.spec s registry
-  Pawl.TimeTravelSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.PreparationSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry

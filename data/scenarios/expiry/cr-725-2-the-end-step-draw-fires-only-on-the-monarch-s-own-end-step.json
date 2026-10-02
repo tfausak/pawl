@@ -1,0 +1,45 @@
+{
+  "description": "CR 725.2 the end-step draw fires only on the monarch's own end step",
+  "note": "bob is the monarch and alice's end step passes; bob's hand is read in his own upkeep, before his draw step. The control is the board: with bob active on turn 1, his end step draws him the Piker.",
+  "board": {
+    "active": "alice",
+    "step": "PostcombatMain",
+    "monarch": "bob",
+    "seats": [
+      {
+        "name": "alice",
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Goblin Piker",
+          "count": 0
+        }
+      }
+    }
+  ]
+}

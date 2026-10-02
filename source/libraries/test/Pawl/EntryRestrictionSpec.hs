@@ -44,7 +44,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -56,9 +55,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   Spec.describe s "Grafdigger's Cage" $ do
     exhumeCase s registry
-    hardcastCase s registry
-    manifestCase s registry
-  Spec.describe s "Synthetic Sealed Horizon" (permanentSpellCase s registry)
   Spec.describe s "Worms of the Earth" (tokenCase s registry)
 
 -- The names of the permanents `after` has that `before` did not, sorted. CR 400.7
@@ -155,123 +151,6 @@ exhumeCase s registry = do
       "CR 400.4a each card remains in its previous zone, as the same object"
       (fmap (`whereIs` after) graves)
       (fmap (\(printing, _) -> (Just Zone.Graveyard, Just (S.printingName printing))) buried)
-
--- THE CONTROL LEG for EntryRestriction.origins. A hardcast Goblin Piker is a
--- creature card that is NOT in a graveyard or a library -- it is a spell on the
--- stack -- so the Cage says nothing about it and the permanent enters. An
--- implementation that spelled the Cage as Affected.MatchingOffBattlefield with no
--- origin zones refuses this, because the stack is off the battlefield too.
-hardcastCase :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-hardcastCase s registry =
-  Spec.it s "CR 101.2 a hardcast creature spell is not in a graveyard or a library, so it still enters" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    mountain <- S.printingOf s registry "Mountain"
-    cage <- S.printingOf s registry "Grafdigger's Cage"
-    let g1 = snd (S.addPermanent cage S.alice (S.landsInPlay mountain 4))
-        (before, spell) = S.handOne piker g1
-        after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
-    Spec.assertEqWith s "the Piker is on the battlefield" (arrivals before after) [Just (S.printingName piker)]
-
--- CR 701.40f, and WotC's own Grafdigger's Cage ruling: "manifesting a card from a
--- graveyard or library is an impossible action while Grafdigger's Cage is on the
--- battlefield". Soul Summons manifests the top card of alice's library; with a
--- CREATURE on top the Cage forbids the face-down object's entry, so the card
--- isn't manifested, stays in the library, and stays face up.
-manifestCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-manifestCase s registry = do
-  let -- alice has two Plains for Soul Summons' {1}{W}, the Cage where `cage`
-      -- names it, Soul Summons in hand, and a library holding a Goblin Piker
-      -- under a Bog Wraith. The Piker keeps CR 104.3c off the board and leaves
-      -- "the library is the same length" a delta rather than an emptying; the
-      -- Wraith on top is a CREATURE card, which is what the Cage's filter reads.
-      board summons plains piker wraith cage =
-        let g1 = foldr (\c g -> snd (S.addPermanent c S.alice g)) (S.landsInPlay plains 2) cage
-            (g2, spell) = S.handOne summons g1
-            g3 = snd (S.addLibraryCard piker S.alice g2)
-            (top, g4) = S.addLibraryCard wraith S.alice g3
-         in (spell, top, g4)
-      fixtures = do
-        summons <- S.printingOf s registry "Soul Summons"
-        plains <- S.printingOf s registry "Plains"
-        piker <- S.printingOf s registry "Goblin Piker"
-        wraith <- S.printingOf s registry "Bog Wraith"
-        cage <- S.printingOf s registry "Grafdigger's Cage"
-        pure (summons, plains, piker, wraith, cage)
-  -- THE PAIRED CONTROL: the same board with no Cage manifests the Wraith, so the
-  -- absences asserted below are absences of something this board can do.
-  Spec.it s "CR 701.40a without the Cage the top card is manifested" $ do
-    (summons, plains, piker, wraith, _) <- fixtures
-    let (spell, top, before) = board summons plains piker wraith []
-        after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
-    Spec.assertEqWith s "one permanent entered" (length (Set.difference (GameState.battlefield after) (GameState.battlefield before))) 1
-    Spec.assertEqWith s "and it is no longer the library card it was (CR 400.7)" (whereIs top after) (Nothing, Nothing)
-  Spec.it s "CR 701.40f the Cage makes manifesting a library card an impossible action" $ do
-    (summons, plains, piker, wraith, cage) <- fixtures
-    let (spell, top, before) = board summons plains piker wraith [cage]
-        after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
-    Spec.assertEqWith s "the sorcery resolved into alice's graveyard (CR 608.2n)" (elem (S.printingName summons) (namesIn Zone.Graveyard S.alice after)) True
-    Spec.assertEqWith s "CR 101.2 nothing entered the battlefield" (arrivals before after) []
-    Spec.assertEqWith
-      s
-      "CR 701.40f the library is the same length"
-      (length (Game.zoneMembers Zone.Library S.alice after))
-      (length (Game.zoneMembers Zone.Library S.alice before))
-    -- CR 701.40f's own last two sentences. The facing assertion is the one no
-    -- implementation that wrote the face-down status before refusing can pass:
-    -- CR 708.3 turns a manifested object face down BEFORE it enters, so a gate
-    -- placed after that write would leave a face-down card in the library.
-    Spec.assertEqWith
-      s
-      "CR 701.40f the card remains in its previous zone, as the same object"
-      (whereIs top after)
-      (Just Zone.Library, Just (S.printingName wraith))
-    Spec.assertEqWith
-      s
-      "CR 701.40f and it remains face up"
-      (fmap Object.facing (Game.lookupObject top after))
-      (Just Facing.FaceUp)
-
--- CR 608.3e, the one origin CR 400.4a does not answer for: "if a permanent spell
--- resolves but its controller can't put it onto the battlefield, that player puts
--- it into its owner's graveyard." Synthetic Sealed Horizon ({2}{W} enchantment,
--- "green creatures can't enter the battlefield") is what reaches it. No printing
--- can: Scryfall @o:/can't enter the battlefield/@, 2026-09-01, returns five cards,
--- and four of them name the graveyard or the library, which a spell has already
--- left by the time it resolves. The fifth is Worms of the Earth below, whose
--- lands are played rather than cast.
---
--- Llanowar Elves is the spell: a GREEN creature, so the Horizon's filter reads it,
--- and {G} so two Forests pay for it twice over.
-permanentSpellCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-permanentSpellCase s registry = do
-  let board forest elves horizon =
-        let g1 = foldr (\c g -> snd (S.addPermanent c S.alice g)) (S.landsInPlay forest 2) horizon
-            (g2, spell) = S.handOne elves g1
-         in (spell, g2)
-      fixtures = do
-        forest <- S.printingOf s registry "Forest"
-        elves <- S.printingOf s registry "Llanowar Elves"
-        horizon <- S.printingOf s registry "Synthetic Sealed Horizon"
-        pure (forest, elves, horizon)
-  -- THE PAIRED CONTROL, differing in that one permanent: without the Horizon the
-  -- same cast puts the Elves onto the battlefield and leaves the graveyard empty,
-  -- so neither absence below is an absence this board has for free.
-  Spec.it s "CR 608.3a without the Horizon the creature spell becomes a permanent" $ do
-    (forest, elves, _) <- fixtures
-    let (spell, before) = board forest elves []
-        after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
-    Spec.assertEqWith s "the Elves are on the battlefield" (arrivals before after) [Just (S.printingName elves)]
-    Spec.assertEqWith s "and nothing is in alice's graveyard" (namesIn Zone.Graveyard S.alice after) []
-  Spec.it s "CR 608.3e a permanent spell refused entry goes to its owner's graveyard" $ do
-    (forest, elves, horizon) <- fixtures
-    let (spell, before) = board forest elves [horizon]
-        after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
-    -- THE HEADLINE, and first so that no proxy below can absorb a mutation: CR
-    -- 400.4a's "remains in its previous zone" would leave the card on the stack,
-    -- which is the behaviour this case exists to rule out.
-    Spec.assertEqWith s "CR 608.3e the card is in its owner's graveyard" (namesIn Zone.Graveyard S.alice after) [S.printingName elves]
-    Spec.assertEqWith s "CR 101.2 nothing entered the battlefield" (arrivals before after) []
-    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
 
 -- CR 111.5: "if a spell or ability would create a token, but a rule or effect
 -- states that a permanent with one or more of that token's characteristics can't

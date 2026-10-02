@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName.Type
 import qualified Pawl.Types.CounterKind as CounterKind.Type
+import qualified Pawl.Types.FaceDownReason as FaceDownReason.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.Placement as Placement.Type
 import qualified Pawl.Types.Readiness as Readiness.Type
@@ -28,9 +29,13 @@ spec s = Spec.describe s "Pawl.Codec.Placement" $ do
           Placement.Type.counters = Map.singleton CounterKind.Type.PlusOnePlusOne 2,
           Placement.Type.token = True,
           Placement.Type.controller = Just (Label.Type.MkLabel (Text.pack "bob")),
-          Placement.Type.attached = Just (Label.Type.MkLabel (Text.pack "bear"))
+          Placement.Type.attached = Just (Label.Type.MkLabel (Text.pack "bear")),
+          Placement.Type.commander = True,
+          Placement.Type.face = Just (CardName.Type.MkCardName (Text.pack "Nightfall Predator")),
+          Placement.Type.faceDown = Just FaceDownReason.Type.Manifested,
+          Placement.Type.protector = Just (Label.Type.MkLabel (Text.pack "carol"))
         }
-      " {\"card\":\"Goblin Piker\",\"label\":\"piker\",\"tapped\":true,\"ready\":true,\"damage\":1,\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":2}],\"token\":true,\"controller\":\"bob\",\"attached\":\"bear\"} "
+      " {\"card\":\"Goblin Piker\",\"label\":\"piker\",\"tapped\":true,\"ready\":true,\"damage\":1,\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":2}],\"token\":true,\"controller\":\"bob\",\"attached\":\"bear\",\"commander\":true,\"face\":\"Nightfall Predator\",\"faceDown\":{\"type\":\"Manifested\"},\"protector\":\"carol\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Placement.codec
 
@@ -45,5 +50,9 @@ plain name =
       Placement.Type.counters = Map.empty,
       Placement.Type.token = False,
       Placement.Type.controller = Nothing,
-      Placement.Type.attached = Nothing
+      Placement.Type.attached = Nothing,
+      Placement.Type.commander = False,
+      Placement.Type.face = Nothing,
+      Placement.Type.faceDown = Nothing,
+      Placement.Type.protector = Nothing
     }

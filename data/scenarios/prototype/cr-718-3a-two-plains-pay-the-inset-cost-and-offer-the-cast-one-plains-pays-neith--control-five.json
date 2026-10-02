@@ -1,0 +1,71 @@
+{
+  "description": "CR 718.3a two Plains pay the inset cost and offer the cast; one Plains pays neither (control: five Plains)",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Autonomous Assembler",
+            "label": "autonomous-assembler",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $autonomous-assembler",
+            "ActivateManaAbility $plains",
+            "ActivateManaAbility $plains-2",
+            "ActivateManaAbility $plains-3",
+            "ActivateManaAbility $plains-4",
+            "ActivateManaAbility $plains-5"
+          ]
+        }
+      }
+    }
+  ]
+}

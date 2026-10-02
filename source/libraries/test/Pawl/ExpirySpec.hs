@@ -22,9 +22,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Damage as Damage
@@ -38,7 +36,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -50,7 +47,6 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -77,7 +73,6 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
-import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
@@ -98,7 +93,6 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
@@ -651,27 +645,6 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "alice drew (one card now in hand)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
-  Spec.it s "CR 725.2 the end-step draw fires only on the monarch's own end step" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_, gs0) = S.addLibraryCard piker S.bob (S.withMonarch S.bob (Setup.emptyGame S.bothPlayers))
-        -- alice is the active player; her end step is not bob's (the monarch).
-        began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
-        after = monarchResolveAll (monarchSettle began)
-    Spec.assertEqWith s "bob did not draw on alice's end step" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
-  Spec.it s "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat
-        began = S.withEvents [GameEvent.DamageDealt dmg] gs0
-        after = monarchResolveAll (monarchSettle began)
-    Spec.assertEqWith s "bob took the crown" (GameState.monarch after) (Just S.bob)
-  Spec.it s "CR 725.2 noncombat damage to the monarch does not hand over the crown" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
-        began = S.withEvents [GameEvent.DamageDealt dmg] gs0
-        after = monarchResolveAll (monarchSettle began)
-    Spec.assertEqWith s "alice keeps the crown" (GameState.monarch after) (Just S.alice)
   Spec.it s "CR 725 Palace Jailer: ETB makes the caster monarch and exiles an opponent's creature until an opponent takes the crown" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     palaceJailer <- S.printingOf s registry "Palace Jailer"
@@ -838,16 +811,6 @@ garlandSpec s registry = Spec.describe s "GarlandRoyalKidnapper" $ do
     Spec.assertEqWith s "control goes back to bob" (Projection.controllerOf bobs crowned) (Just S.bob)
     -- CR 611.2b's one continuous period: the effect is deleted, not masked.
     Spec.assertEqWith s "and the stored effect is gone" (filter (S.continuousEffectAffects bobs) (GameState.continuousEffects crowned)) []
-  -- The same ending with the crown going to Garland's OWN controller, which is
-  -- the reading that would survive if the condition had been baked to CR 109.5's
-  -- "you" instead of to the slot.
-  Spec.it s "CR 611.2b it ends when the crown moves to the ability's controller" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
-    let (bobs, _, entering) = garlandBoard piker garland
-        stolen = S.runPure garlandPlan (monarchSettle entering) Engine.priorityLoop
-        crowned = monarchSettle (S.withMonarch S.alice stolen)
-    Spec.assertEqWith s "control goes back to bob" (Projection.controllerOf bobs crowned) (Just S.bob)
 
 hagUpkeep :: Phase.Phase
 hagUpkeep = Phase.Beginning BeginningStep.Upkeep
@@ -1216,17 +1179,6 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     let unpinged = S.runCombat aliceOnlyAnswer jade
     Spec.assertEqWith s "bob still took 3 from the same attacker" (S.lifeOf S.bob unpinged) (Just 17)
     Spec.assertEqWith s "and the Statue took nothing when bob declined" (S.damageOf statueId unpinged) (Just 0)
-  -- The control for the two whole-card tests above: the same board, an
-  -- interpreter that never activates. The Statue stays a noncreature artifact,
-  -- so what animated it was the ability and nothing about the fixture.
-  Spec.it s "CR 500.5a whole card: an unactivated Jade Statue never becomes a creature" $ do
-    statue <- S.printingOf s registry "Jade Statue"
-    mountain <- S.printingOf s registry "Mountain"
-    let (statueId, _, jade) = jadeBoard statue mountain []
-        after = S.runCombat S.aggressiveAnswer jade
-    Spec.assertEqWith s "the whole combat phase ran" (GameState.phase after) Phase.PostcombatMain
-    Spec.assertBool s (not (Projection.isCreatureOf statueId after)) "never a creature"
-    Spec.assertEqWith s "so it never attacked" (S.lifeOf S.bob after) (Just 20)
 
 -- Aims every target slot at one object, so a spell with two legal targets on
 -- the board is pointed at the one the test means. S.identityAnswer would take
@@ -1540,16 +1492,6 @@ cannonadeSpec s registry = Spec.describe s "BrazenCannonade" $ do
     let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         armed = effectWith (Expiry.Type.AtEndOfCombatOn (AfterTurn.MkAfterTurn S.bob 1)) gone
     Spec.assertEqWith s "it ended at bob's seat" (GameState.continuousEffects (handoff armed)) []
-  Spec.it s "CR 500.5a / 611.2a whole card: the permission outlives bob's combat, and the card is played on alice's next turn" $ do
-    (pikerId, armed) <- cannonadeBoard s registry
-    let alicesNext = runToTurn S.identityAnswer 3 armed
-        played = runToTurn (castingFromExile pikerId) 4 alicesNext
-    Spec.assertEqWith s "the raid trigger exiled the Piker" (fmap S.nameOf (Game.cardOf pikerId armed)) (Just (CardName.MkCardName (Text.pack "Goblin Piker")))
-    Spec.assertEqWith s "alice may play it" (permissionOn pikerId armed) (Just S.alice)
-    Spec.assertEqWith s "alice's next turn began" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
-    Spec.assertEqWith s "the permission survived the end of bob's combat phase" (permissionOn pikerId alicesNext) (Just S.alice)
-    Spec.assertEqWith s "alice played the exiled card during that turn" (S.creaturesInPlay S.alice played) 2
-    Spec.assertEqWith s "so it is no longer in exile" (Game.zoneMembers Zone.Exile S.alice played) []
   Spec.it s "CR 500.5a whole card: the permission ends as alice's next combat phase ends" $ do
     (pikerId, armed) <- cannonadeBoard s registry
     let atTurn n phase gs = GameState.turnNumber gs == n && GameState.phase gs == phase
@@ -1704,13 +1646,6 @@ aimedAtObject oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just oid) candidates) sets
   _ -> S.identityAnswer p
 
--- The same, for a recipient known outright -- Lightning Bolt's CR 115.4 slot in
--- the tax cases below, where the pool offers players and permanents alike.
-aimedAtRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
-aimedAtRecipient recipient p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== recipient) candidates) sets
-  _ -> S.identityAnswer p
-
 -- alice casts Dovin off three Plains and activates the -1 at bob's Goblin Piker.
 -- Returns the shielded permanent, bob's War Mammoth, alice's own Piker, and the
 -- board.
@@ -1746,26 +1681,6 @@ dovinBoardAimedAt pick plains piker warMammoth dovin =
         ability : _ -> S.runPure (aimedAtObject (pick shielded attacker)) cast (do Activate.activateAbility S.alice dovinId ability; Stack.resolveTop)
         [] -> cast
    in (shielded, control, attacker, activated)
-
--- CR 601.2f's total, read as WHETHER one Mountain was enough for a Lightning
--- Bolt: taxed it is not, untaxed it is. `caster` is who holds the Bolt and that
--- Mountain, and is what tells PlayerScope.Opponents from EachPlayer.
---
--- The Mountain is added AFTER Dovin is cast, which is load-bearing in both
--- directions: it keeps {2}{W/U} from being paid with it (leaving a Plains
--- untapped and the Bolt payable whatever the tax), and it leaves alice's three
--- Plains tapped, so in her own leg the Mountain is the only mana she has and a
--- tax she does not pay is the only reason her Bolt gets cast.
-taxLeg :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> PlayerId.PlayerId -> Int
-taxLeg plains mountain bolt dovin withDovin caster =
-  let (withCard, dovinId) = S.handOne dovin (S.landsInPlay plains 3)
-      staged =
-        if withDovin
-          then S.runPure S.identityAnswer withCard (do S.cast S.alice dovinId; Stack.resolveTop)
-          else withCard
-      (boltId, gs) = S.addHandCard bolt caster (S.landsFor mountain caster 1 staged)
-      after = S.runPure (aimedAtRecipient (Recipient.ToPlayer S.alice)) gs (S.cast caster boltId)
-   in length (GameState.stack after)
 
 dovinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
@@ -1845,18 +1760,6 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
     let (_, _, attacker, gs) = dovinBoardAimedAt (\_ hers -> hers) plains piker warMammoth dovin
     Spec.assertEqWith s "no shield was installed" (fmap ActiveReplacement.expiry (GameState.replacements gs)) []
     Spec.assertEqWith s "and alice's own creature takes damage as usual" (S.damageOf attacker (settleDamage gs [hit attacker (Recipient.ToCreature attacker) 4])) (Just 4)
-  -- The static clause, so the card is not half-dead data. CR 601.2f's increase,
-  -- scoped to the OPPONENTS: alice's own instant is untaxed, which is the only
-  -- thing that tells PlayerScope.Opponents from Thalia's EachPlayer.
-  Spec.it s "CR 601.2f an opponent's instant costs {1} more, and alice's does not" $ do
-    plains <- S.printingOf s registry "Plains"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    dovin <- S.printingOf s registry "Dovin, Hand of Control"
-    let leg = taxLeg plains mountain bolt dovin
-    Spec.assertEqWith s "with no Dovin, bob's one Mountain casts the Bolt" (leg False S.bob) 1
-    Spec.assertEqWith s "under Dovin, the same Mountain does not" (leg True S.bob) 0
-    Spec.assertEqWith s "and alice's own Bolt is untaxed off hers" (leg True S.alice) 1
 
 -- Old Fat Spider Can't See Me {2}{U} Enchantment -- Saga (The Hobbit; name,
 -- cost, type line and Oracle text checked against api.scryfall.com): "I --
@@ -2018,7 +1921,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   dovinSpec s registry
   oldFatSpiderSpec s registry
   lingeringSpec s registry
-  skippedEndingPhaseSpec s registry
 
 -- CR 116.2c's duration, which no sweep of this module ends: the unit-level half
 -- of Pawl.AuraSpec's Gliding Licid pair. The offer that DOES end it is
@@ -2131,44 +2033,6 @@ perpetualSpec s registry = Spec.describe s "Perpetual" $ do
         Spec.assertBool s (mineAgain /= mineId && controlAgain /= controlId) "CR 400.7: both round trips minted new objects"
         Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink mineId granted && Projection.hasKeyword Keyword.Lifelink controlId granted) "and both grants applied before either creature moved"
         Spec.assertEqWith s "the ability stored exactly one effect, under the perpetual arm" (fmap ContinuousEffect.expiry (filter ((== collectorId) . ContinuousEffect.source) (GameState.continuousEffects granted))) [Expiry.Type.Perpetual]
-  -- CR 613.1 / 611.2c: a perpetual pump on CARDS IN A GRAVEYARD. Blighted
-  -- Nightmare's "creature cards in your graveyard perpetually get +1/+1" locks
-  -- the Goblin Piker (2/1) and Llanowar Elves (1/1) as they lie, and Graceful
-  -- Restoration's "up to two target creature cards with power 2 or less from
-  -- your graveyard" is the reader: the Piker is 3 power there now and is not
-  -- offered, and the Elves come back still pumped. The control board differs in
-  -- the Nightmare's trigger alone.
-  Spec.it s "Blighted Nightmare's perpetual +1/+1 applies in the graveyard and follows the card out" $ do
-    let restored withNightmare = do
-          nightmare <- S.printingOf s registry "Blighted Nightmare"
-          graceful <- S.printingOf s registry "Graceful Restoration"
-          plains <- S.printingOf s registry "Plains"
-          swamp <- S.printingOf s registry "Swamp"
-          piker <- S.printingOf s registry "Goblin Piker"
-          elves <- S.printingOf s registry "Llanowar Elves"
-          let (g0, spellId) = S.handOne graceful (S.landsFor swamp S.alice 1 (S.landsInPlay plains 4))
-              (_, g1) = S.addGraveyardCard piker S.alice g0
-              (_, g2) = S.addGraveyardCard elves S.alice g1
-              pumped =
-                if withNightmare
-                  then S.runPure S.identityAnswer (snd (S.entersWithTrigger nightmare S.alice g2)) (do _ <- Engine.placePendingTriggers; Stack.resolveTop)
-                  else g2
-              cast = S.runPure restoresBoth pumped (S.cast S.alice spellId)
-          pure (S.runPure restoresBoth cast Stack.resolveTop, S.printingName piker, S.printingName elves)
-    (after, pikerName, elvesName) <- restored True
-    (control, _, _) <- restored False
-    let powerOnBattlefield name gs = [Projection.powerOf oid gs | oid <- Game.zoneMembers Zone.Battlefield S.alice gs, fmap S.nameOf (Game.cardOf oid gs) == Just name]
-    Spec.assertEqWith s "the Piker, 3 power in the graveyard, was not returned" (powerOnBattlefield pikerName after) []
-    Spec.assertEqWith s "the Elves came back, and still 2/2" (powerOnBattlefield elvesName after) [Just 2]
-    Spec.assertEqWith s "without the Nightmare the 2-power Piker is returned too" (powerOnBattlefield pikerName control) [Just 2]
-
--- Graceful Restoration's second mode, aimed at every card its slot offers.
-restoresBoth :: Prompt.Prompt r -> r
-restoresBoth p = case p of
-  Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex 1)
-  Prompt.AnnounceTargets _ _ _ slots -> fmap (\(count, offered) -> TargetCount.ceilingOn (Natural.length offered) count) slots
-  Prompt.ChooseTargets _ _ _ sets -> fmap snd sets
-  _ -> S.identityAnswer p
 
 -- The control grant, and the perpetual one's twin in every respect but its
 -- expiry: same stand-in source, same layer-6 modification, same CR 611.2c
@@ -2210,259 +2074,3 @@ pingsBob :: Prompt.Prompt r -> r
 pingsBob p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
   _ -> S.identityAnswer p
-
--- CR 500.11 / 611.2a: an ENDING PHASE skipped whole. The cleanup step is where
--- CR 514.2 ends every "until end of turn" duration, and skipping the phase takes
--- that step with it -- but the turn still ends, and CR 611.2a is what the
--- duration was stated in terms of. Engine.cleanupSecondAction is the sweep on
--- that road, and it runs CR 514.2's action WHOLE -- marked damage with the
--- durations -- because that rule makes the two simultaneous. CR 724.2d states the
--- same call one phase over, for a combat phase whose end of combat step is
--- skipped.
---
--- Synthetic Curfew Bell ({2}{U} Instant, "Target player skips their next ending
--- phase") is the producer, and it is synthetic because no printing reaches this:
--- Scryfall o:skips (o:"ending phase" or o:"end step" or o:cleanup), 2026-09-06,
--- returns only Possessed Portal, whose "skips that draw" is not a step skip.
---
--- HARRIED DRONESMITH is on every board here and is what keeps these cases from
--- being vacuous. Its "at the beginning of combat on your turn" Thopter is created
--- during alice's combat phase, and its delayed "sacrifice it at the beginning of
--- your next end step" is what the skipped phase DEFERS -- CR 614.10a's second
--- sentence, anything scheduled for the "next" occurrence waiting for the first
--- occurrence that isn't skipped. So alice's creature count on bob's turn says
--- whether the ending phase happened at all, on the same board that reads the
--- expiry -- without it a fixed engine and a Bell that silently never installed
--- would look alike -- and the deferral case below pins where the sacrifice went
--- instead.
-skippedEndingPhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-skippedEndingPhaseSpec s registry = Spec.describe s "SkippedEndingPhase" $ do
-  -- THE PROVING CASE for CR 514.2's stored-effect half. Giant Growth's +3/+3 is
-  -- an Expiry.AtCleanup continuous effect, and the cleanup step that would sweep
-  -- it never runs.
-  Spec.it s "CR 611.2a a pump ends with the turn though the ending phase was skipped" $ do
-    (pikerId, _, gs) <- pumpBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = curfewAnswer pikerId S.alice
-        alicesMain = throughPostcombatMain answer gs
-        bobsTurn = throughPostcombatMain answer (intoNextTurn answer alicesMain)
-        carolsTurn = throughPostcombatMain answer (intoNextTurn answer bobsTurn)
-    Spec.assertEqWith s "CR 611.2a back to its printed power on bob's turn, though no cleanup step ran" (Projection.powerOf pikerId bobsTurn) (Just 2)
-    Spec.assertEqWith s "and still on carol's, so nothing merely deferred it" (Projection.powerOf pikerId carolsTurn) (Just 2)
-    Spec.assertEqWith s "CR 614.10a the end step was skipped, so the Thopter was not sacrificed there" (S.creaturesInPlay S.alice bobsTurn) 3
-    Spec.assertEqWith s "the pump was live while alice's turn still ran" (Projection.powerOf pikerId alicesMain) (Just 5)
-  -- THE PROVING CASE for CR 514.2's SIMULTANEITY. The removal of marked damage
-  -- and the end of the durations are one turn-based action, so a pump that ends
-  -- must never meet the damage it was covering: alice's Piker comes out of the
-  -- skipped phase a 2/1 with nothing marked on it, not a 2/1 carrying 3 damage
-  -- that CR 704.5g destroys at the next check.
-  --
-  -- The damage is marked at alice's postcombat main rather than on the starting
-  -- board because a 2/1 with 3 marked is already dead to CR 704.5g at the first
-  -- check, before Giant Growth could be cast. By then the pump has resolved and
-  -- the Bell is installed, and 3 is under the pumped toughness of 4, so the
-  -- Piker is alive on both readings up to the skipped phase.
-  Spec.it s "CR 514.2 a pumped creature with damage marked on it neither dies to its own shrinking nor keeps the pump" $ do
-    (pikerId, _, gs) <- pumpBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = curfewAnswer pikerId S.alice
-        alicesMain = S.markDamage pikerId 3 (throughPostcombatMain answer gs)
-        bobsTurn = throughPostcombatMain answer (intoNextTurn answer alicesMain)
-    Spec.assertEqWith s "CR 704.5g the Piker is still on the battlefield on bob's turn" (S.creaturesInPlay S.alice bobsTurn) 3
-    Spec.assertEqWith s "back to its printed 2/1, so the duration half ran" (S.powerToughnessOf pikerId bobsTurn) (Just (2, 1))
-    Spec.assertEqWith s "CR 514.2 and the damage went in the same action" (S.damageOf pikerId bobsTurn) (Just 0)
-    Spec.assertEqWith s "it was a 5/4 with 3 marked while alice's turn ran" (S.powerToughnessOf pikerId alicesMain) (Just (5, 4))
-  -- CR 614.10a's second sentence, which the count on bob's turn cannot see: the
-  -- skipped ending phase DEFERS the Dronesmith's delayed sacrifice rather than
-  -- removing it, so the Thopter waits for alice's first end step that isn't
-  -- skipped. Read on bob's SECOND turn, past the end step of alice's second turn,
-  -- where the deferred Thopter and the one that turn's combat made both go and
-  -- leave her Piker and her Dronesmith.
-  Spec.it s "CR 614.10a the skipped end step defers the sacrifice to alice's next one" $ do
-    (pikerId, _, gs) <- pumpBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = curfewAnswer pikerId S.alice
-        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
-        carolsTurn = throughPostcombatMain answer (intoNextTurn answer bobsTurn)
-        alicesNextTurn = throughPostcombatMain answer (intoNextTurn answer carolsTurn)
-        bobsSecondTurn = throughPostcombatMain answer (intoNextTurn answer alicesNextTurn)
-    Spec.assertEqWith s "the deferred Thopter and the new one both went at alice's next end step" (S.creaturesInPlay S.alice bobsSecondTurn) 2
-    Spec.assertEqWith s "it was still there through carol's turn" (S.creaturesInPlay S.alice carolsTurn) 3
-    Spec.assertEqWith s "and alice's second combat made a second one beside it" (S.creaturesInPlay S.alice alicesNextTurn) 4
-  -- The paired control, differing in ONE decision: the Bell is never cast. Same
-  -- board, same seats, same answers everywhere else -- so alice's ending phase
-  -- runs, and both the sacrifice and the CR 514.2 sweep happen the ordinary way.
-  Spec.it s "CR 514.2 without the Bell the ending phase runs and does the same work" $ do
-    (pikerId, bellId, gs) <- pumpBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = declinesBellAnswer bellId pikerId S.alice
-        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
-    Spec.assertEqWith s "the Thopter was sacrificed at alice's end step" (S.creaturesInPlay S.alice bobsTurn) 2
-    Spec.assertEqWith s "and the pump ended at her cleanup step" (Projection.powerOf pikerId bobsTurn) (Just 2)
-  -- The "whose" dimension, and the reason the board carries three seats: a Bell
-  -- aimed at carol must leave ALICE's ending phase alone, which a skip that
-  -- ignored PhasePattern.whosePhase would not.
-  Spec.it s "CR 614.1b a Bell aimed at carol leaves alice's own ending phase alone" $ do
-    (pikerId, _, gs) <- pumpBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = curfewAnswer pikerId S.carol
-        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
-    Spec.assertEqWith s "alice's end step ran, so her Thopter went" (S.creaturesInPlay S.alice bobsTurn) 2
-    Spec.assertEqWith s "and her cleanup step ended the pump" (Projection.powerOf pikerId bobsTurn) (Just 2)
-  -- THE PROVING CASE for CR 514.2's mana half, which is the one with no
-  -- counterweight: Mana.endManaRetention is the only place a
-  -- ManaRetention.UntilEndOfTurn reverts, and Mana.emptiedManaPools keeps anything
-  -- that is not Ordinary -- so a retention the skip strands is stranded for the
-  -- rest of the game, not merely for a turn.
-  --
-  -- Read at GAMEPLAY level, as whether alice can cast Giant Growth off the
-  -- floating green: she can while her own turn runs, and cannot on bob's, where
-  -- her only other mana is three Islands. The pool assertion beside it is the
-  -- same claim said directly.
-  Spec.it s "CR 514.2 retained mana is not spendable once the skipped turn is over" $ do
-    (bellId, growthId, gs) <- manaBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = castsOnlyAnswer bellId S.alice
-        alicesMain = throughPostcombatMain answer gs
-        bobsTurn = throughPostcombatMain answer (intoNextTurn answer alicesMain)
-        carolsTurn = throughPostcombatMain answer (intoNextTurn answer bobsTurn)
-        castsGrowth held = Maybe.isJust (List.find (S.isCastOf growthId) (Action.legalActions S.alice (withPriority S.alice held)))
-    Spec.assertBool s (not (castsGrowth bobsTurn)) "CR 611.2a alice cannot cast a {G} spell off the retained green on bob's turn"
-    Spec.assertEqWith s "and her pool is empty there" (poolSize S.alice bobsTurn) 0
-    Spec.assertEqWith s "still empty on carol's, so nothing merely deferred it" (poolSize S.alice carolsTurn) 0
-    Spec.assertEqWith s "CR 614.10a the end step was skipped, so the Thopter was not sacrificed there" (S.creaturesInPlay S.alice bobsTurn) 3
-    Spec.assertBool s (castsGrowth alicesMain) "the retention was live while alice's own turn ran"
-  -- manaBoard's paired control, differing in the one decision again.
-  Spec.it s "CR 514.2 without the Bell the cleanup step ends the retention" $ do
-    (bellId, _, gs) <- manaBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = declinesOnlyAnswer bellId S.alice
-        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
-    Spec.assertEqWith s "the Thopter was sacrificed at alice's end step" (S.creaturesInPlay S.alice bobsTurn) 2
-    Spec.assertEqWith s "and her pool emptied at her cleanup step" (poolSize S.alice bobsTurn) 0
-
--- alice active on turn 2 at her own upkeep, with three seats so the Bell's
--- "target player" is a real choice, and every library stocked so no fixture
--- player decks (CR 704.5b) over the turns these cases run. Turn 2, so no case
--- here sits on a game's first turn.
-curfewSeats :: Printing.Printing -> GameState.GameState -> GameState.GameState
-curfewSeats land gs =
-  let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard land pid h)) g [1 .. (8 :: Int)]
-      stocked = List.foldl' stock gs [S.alice, S.bob, S.carol]
-   in stocked
-        { GameState.activePlayer = S.alice,
-          GameState.phase = Phase.Beginning BeginningStep.Upkeep,
-          GameState.remaining = S.phasesAfter (Phase.Beginning BeginningStep.Upkeep),
-          GameState.turnNumber = 2
-        }
-
--- alice's Goblin Piker (2/1) to pump, her Harried Dronesmith, three Islands for
--- the Bell's {2}{U} and one Forest for Giant Growth's {G}. NO green in the pool
--- on this board, so the Forest is the only way to pay the pump and the mana
--- board below is where a retention is read.
-pumpBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-pumpBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  forest <- S.printingOf s registry "Forest"
-  piker <- S.printingOf s registry "Goblin Piker"
-  dronesmith <- S.printingOf s registry "Harried Dronesmith"
-  bell <- S.printingOf s registry "Synthetic Curfew Bell"
-  growth <- S.printingOf s registry "Giant Growth"
-  let (pikerId, gs1) = S.addPermanent piker S.alice S.threePlayerGame
-      (_, gs2) = S.addPermanent dronesmith S.alice gs1
-      gs3 = S.landsFor forest S.alice 1 (S.landsFor island S.alice 3 gs2)
-      (bellId, gs4) = S.addHandCard bell S.alice gs3
-      (_, gs5) = S.addHandCard growth S.alice gs4
-  pure (pikerId, bellId, curfewSeats island gs5)
-
--- alice's Shizuko, Caller of Autumn ({1}{G}{G}, "At the beginning of each
--- player's upkeep, that player adds {G}{G}{G}. Until end of turn, they don't
--- lose this mana as steps and phases end"), her Harried Dronesmith and three
--- Islands. Giant Growth stays IN HAND and is never cast: it is the {G} spell the
--- assertions ask about, and no Forest anywhere is what makes the floating green
--- the only way to pay it.
---
--- The Bell's {2}{U} may take up to two of the three green for its generic half,
--- which is why nothing here counts the pool while alice's turn runs: what matters
--- is that a step end would have taken any ORDINARY mana, so whatever is still
--- floating at her postcombat main is floating because of the retention.
-manaBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-manaBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
-  dronesmith <- S.printingOf s registry "Harried Dronesmith"
-  bell <- S.printingOf s registry "Synthetic Curfew Bell"
-  growth <- S.printingOf s registry "Giant Growth"
-  let (_, gs1) = S.addPermanent shizuko S.alice S.threePlayerGame
-      (_, gs2) = S.addPermanent dronesmith S.alice gs1
-      gs3 = S.landsFor island S.alice 3 gs2
-      (bellId, gs4) = S.addHandCard bell S.alice gs3
-      (growthId, gs5) = S.addHandCard growth S.alice gs4
-  pure (bellId, growthId, curfewSeats island gs5)
-
--- CR 117.1a: a player needs priority to cast an instant, and these boards are
--- read between steps rather than inside a priority round. The one field that
--- differs, applied to every board a cast is asked of, so the pair below differs
--- in the pool and in nothing else.
-withPriority :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-withPriority pid gs = gs {GameState.priority = Just pid}
-
--- Run whole steps until `done` holds, the game ends, or the bound runs out. The
--- bound is three three-player turns' worth of steps, so a skip that dropped more
--- of the schedule than it should fails an assertion rather than hanging.
-runSteps :: (GameState.GameState -> Bool) -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-runSteps done answer gs0 =
-  let go n g =
-        if n <= (0 :: Int) || done g || Maybe.isJust (GameState.result g)
-          then g
-          else go (n - 1) (S.runPure answer g Engine.runStep)
-   in go 60 gs0
-
--- Top-level rather than `where` bindings because the answerer is rank-2 and GHC
--- will not infer it.
-throughPostcombatMain :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-throughPostcombatMain = runSteps ((== Phase.PostcombatMain) . GameState.phase)
-
-intoNextTurn :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-intoNextTurn answer gs = runSteps ((/= GameState.turnNumber gs) . GameState.turnNumber) answer gs
-
--- Casts whatever is castable, aiming Giant Growth at `pumped` and the Bell at
--- `skipper`. Both are answered by FILTERING the offered set (S.preferring): a
--- ChooseTargets over creatures never offers a player and one over players never
--- offers a creature, so exactly one of the two survives each filter, and no
--- hand-built recipient can miss CR 608.2b's re-read at resolution.
-curfewAnswer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
-curfewAnswer pumped skipper p = case p of
-  Prompt.ChooseAction _ _ actions -> firstCast actions
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> r == Recipient.ToCreature pumped || r == Recipient.ToPlayer skipper) sets
-  _ -> S.identityAnswer p
-
--- curfewAnswer's paired control, differing in ONE decision: the Bell is never
--- cast. The board, the seats and every other answer are shared.
-declinesBellAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
-declinesBellAnswer bell pumped skipper p = case p of
-  Prompt.ChooseAction _ _ actions -> firstCast (filter (not . S.isCastOf bell) actions)
-  _ -> curfewAnswer pumped skipper p
-
--- Casts the Bell and NOTHING else, so the Giant Growth in hand stays there as the
--- {G} spell the mana assertions ask about.
-castsOnlyAnswer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
-castsOnlyAnswer bell skipper p = case p of
-  Prompt.ChooseAction _ _ actions -> firstCast (filter (S.isCastOf bell) actions)
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer skipper) sets
-  _ -> S.identityAnswer p
-
--- castsOnlyAnswer's paired control: casts nothing at all.
-declinesOnlyAnswer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
-declinesOnlyAnswer bell skipper p = case p of
-  Prompt.ChooseAction {} -> A.Pass
-  _ -> castsOnlyAnswer bell skipper p
-
-firstCast :: [A.Action] -> A.Action
-firstCast actions =
-  let isCast a = case a of
-        A.Cast {} -> True
-        _ -> False
-   in case filter isCast actions of
-        h : _ -> h
-        [] -> A.Pass

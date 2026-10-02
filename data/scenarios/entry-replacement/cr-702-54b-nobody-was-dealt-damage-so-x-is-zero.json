@@ -1,0 +1,177 @@
+{
+  "description": "CR 702.54b nobody was dealt damage, so X is zero",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-5",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-6",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-7",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Petrified Wood-Kin",
+            "label": "petrified-wood-kin",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ogre Sentry",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$petrified-wood-kin",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            "$forest-5",
+            "$forest-6",
+            "$forest-7"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Petrified Wood-Kin",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Petrified Wood-Kin",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$forest-7",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Petrified Wood-Kin",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Petrified Wood-Kin",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Petrified Wood-Kin",
+        "power": 3,
+        "toughness": 3
+      }
+    },
+    {
+      "Counters": {
+        "object": "Petrified Wood-Kin",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

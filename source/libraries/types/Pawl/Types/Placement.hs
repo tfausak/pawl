@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import Numeric.Natural (Natural)
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Readiness as Readiness
@@ -23,6 +24,14 @@ data Placement = MkPlacement
     -- | The seat controlling it, when not its owner.
     controller :: Maybe Label.Label,
     -- | CR 301.5 / 303.4: the labelled object or seat it is attached to.
-    attached :: Maybe Label.Label
+    attached :: Maybe Label.Label,
+    -- | CR 903.3: its owner's commander.
+    commander :: Bool,
+    -- | CR 712.8e / 712.8f: the face it shows, when not the one the layout decides.
+    face :: Maybe CardName.CardName,
+    -- | CR 708.2a: face down, by the rules that allowed it (CR 708.6).
+    faceDown :: Maybe FaceDownReason.FaceDownReason,
+    -- | CR 310.9: the seat protecting it, a battle.
+    protector :: Maybe Label.Label
   }
   deriving (Eq, Ord, Show)

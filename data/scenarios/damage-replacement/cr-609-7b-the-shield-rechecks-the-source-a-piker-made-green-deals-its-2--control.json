@@ -1,0 +1,106 @@
+{
+  "description": "CR 609.7b the shield rechecks the source: a Piker made green deals its 2 (control: the Piker stays red)",
+  "note": "Alice casts Luminesce in bob's upkeep, then Moonlace on bob's attacking Goblin Piker once the shield exists; the Piker's 2 lands. Moonlace (the card setting the colour to colourless) stands in for the test's hand-built SetColor Green: no card in the pool makes a creature exactly green, and colourless matches neither disjunct just as green does. The --control file casts no Moonlace and the red Piker's 2 is prevented.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Luminesce",
+            "label": "luminesce"
+          },
+          {
+            "card": "Moonlace",
+            "label": "moonlace"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$luminesce",
+          "mana": [
+            "$plains",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Colors",
+          "object": "$piker",
+          "is": [
+            "Red"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    }
+  ]
+}

@@ -15,6 +15,7 @@ import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.SubtypesAre as SubtypesAre
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TypesAre as TypesAre
+import qualified Pawl.Types.ViewIs as ViewIs
 
 -- | One fact a scenario asserts about the game, in the nouns a client would
 -- display.
@@ -33,5 +34,6 @@ data Check
   | PlayerCounters PlayerCountersAre.PlayerCountersAre
   | Subtypes SubtypesAre.SubtypesAre
   | Names NamesAre.NamesAre
+  | View ViewIs.ViewIs
   | Keywords KeywordsAre.KeywordsAre
   deriving (Eq, Ord, Show)

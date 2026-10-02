@@ -7257,9 +7257,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- copy's printed "this ability" is the copy. Re-stamped for the
                 -- same reason `you` is -- Pawl.Engine.Activate wrote the
                 -- original's id there as it went on the stack -- and not a
-                -- decision CR 707.10 copies. Pawl.CopySpec's Forsworn Paladin case
-                -- proves the aim moved, and its Stifle case that it answers once
-                -- the original has left the stack. A triggered ability's copy is
+                -- decision CR 707.10 copies. data/scenarios/copy's Forsworn Paladin
+                -- case proves the aim moved, and Pawl.CopySpec's Stifle case that
+                -- it answers once the original has left the stack. A triggered ability's copy is
                 -- re-stamped the same way, Pawl.Engine.Engine.placeBorne having
                 -- written the original's id there.
                 stampSelf = case kind of
@@ -7301,8 +7301,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- its own example says a copy of Dawnglow Infusion gains no
                       -- life "because mana isn't an object". Forsworn Paladin's "if
                       -- mana from a Treasure was spent to activate this ability" is
-                      -- the reader, and Pawl.CopySpec's Forsworn Paladin case the
-                      -- proof.
+                      -- the reader, and data/scenarios/copy's Forsworn Paladin
+                      -- case the proof.
                       Object.manaSpent = Mana.Type.MkMana [],
                       -- CR 601.2b's record of how many Phyrexian symbols were
                       -- announced for life, dropped for a reason of its own rather

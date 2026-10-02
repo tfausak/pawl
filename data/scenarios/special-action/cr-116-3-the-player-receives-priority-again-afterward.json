@@ -1,0 +1,58 @@
+{
+  "description": "CR 116.3 the player receives priority again afterward",
+  "note": "bob's turn: bob passes, alice discards Circling Vultures as a special action. The check right after it sees an empty stack, so alice was asked again before bob, who would otherwise have cast his Lightning Bolt first; bob is then asked after alice's pass and casts it, which a pass count left standing (bob's pass plus alice's making a full round) would never allow, failing the run on an unreached entry. The final life total shows the Bolt was cast.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "hand": [
+          {
+            "card": "Circling Vultures",
+            "label": "vultures"
+          },
+          {
+            "card": "Doomed Traveler",
+            "label": "traveler"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "b-mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "final": [
+    {
+      "Life": {
+        "player": "alice",
+        "life": 17
+      }
+    }
+  ],
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Take": {"action": "DiscardFromHand $vultures"}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Stack", "is": []}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Circling Vultures", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$bolt", "targets": ["$alice"], "mana": ["$b-mountain"]}}}
+  ]
+}

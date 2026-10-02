@@ -1,0 +1,64 @@
+{
+  "description": "CR 804.1 control: without the deploy option the Piker has nothing to activate",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 0,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 0
+      },
+      {
+        "name": "carol",
+        "team": 0
+      },
+      {
+        "name": "dave",
+        "team": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "deployCreatures": false
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Activate": {
+          "object": "$goblin-piker",
+          "ability": 0,
+          "targets": [
+            "$carol"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Controller",
+        "object": "$goblin-piker",
+        "is": "alice"
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$goblin-piker",
+        "tapped": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "description": "a permanent entering from exile puts a counter on each creature you control",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Fire Lord Zuko",
+            "label": "fire-lord-zuko",
+            "ready": true
+          },
+          {
+            "card": "Doomed Traveler",
+            "label": "doomed-traveler",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Flicker of Fate",
+            "label": "flicker-of-fate",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$flicker-of-fate",
+          "targets": [
+            "$doomed-traveler"
+          ],
+          "mana": [
+            "$plains",
+            "$plains-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Flicker of Fate",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Flicker of Fate",
+        "count": 1
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$fire-lord-zuko",
+        "power": 3,
+        "toughness": 5
+      }
+    },
+    {
+      "Counters": {
+        "object": "$fire-lord-zuko",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Damage": {
+        "object": "Doomed Traveler",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Doomed Traveler",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Doomed Traveler",
+        "power": 2,
+        "toughness": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "Doomed Traveler",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Doomed Traveler",
+        "count": 1
+      }
+    }
+  ]
+}

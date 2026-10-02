@@ -1,0 +1,224 @@
+{
+  "description": "CR 614.12 the same two already on the battlefield do count, so it enters with two counters",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-5",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-6",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-7",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-8",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-9",
+            "ready": true
+          },
+          {
+            "card": "Jedit Ojanen",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rise of the Dark Realms",
+            "label": "rise-of-the-dark-realms",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Squad Captain"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$rise-of-the-dark-realms",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$swamp-4",
+            "$swamp-5",
+            "$swamp-6",
+            "$swamp-7",
+            "$swamp-8",
+            "$swamp-9"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Squad Captain",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Rise of the Dark Realms",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Rise of the Dark Realms",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Squad Captain",
+        "count": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-7",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-8",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-9",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Squad Captain",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Squad Captain",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Squad Captain",
+        "power": 4,
+        "toughness": 4
+      }
+    },
+    {
+      "Counters": {
+        "object": "Squad Captain",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 2
+      }
+    }
+  ]
+}

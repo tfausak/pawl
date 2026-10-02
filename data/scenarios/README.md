@@ -10,13 +10,19 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
 - **Board.** `seats` in turn order, each with a `name`, `life` (default 20),
   player `counters` (`[{ "key": { "type": "Energy" }, "value": 3 }]`), a
   `team` number (CR 808.1), a `range` of influence (CR 801.2a, default
-  unlimited), `emperor` (CR 809.2) and
-  `battlefield`, `hand`, `graveyard`, `library` and `exile` placements (a
+  unlimited), `emperor` (CR 809.2), a `manaPool` of unrestricted mana one
+  letter per unit (`"RRC"`, CR 106.4) and
+  `battlefield`, `hand`, `graveyard`, `library`, `exile` and `command` (CR
+  408.1) placements (a
   library top card first; an exiled card face up and linked to nothing). A
   placement names its `card` and may give a `label`, `tapped`, `ready` (CR
   302.6), `damage`, `counters`, `token` (CR 111.1, battlefield only), a
-  `controller` and the label of the object or seat it is `attached` to. `active` names a seat;
-  `step` is where turn 1 starts; `monarch` optionally names a seat;
+  `controller`, the label of the object or seat it is `attached` to, and
+  `commander` (CR 903.3: its owner's commander), the name of the `face` it
+  shows (CR 712.8e, `"Nightfall Predator"`), `faceDown` with the reason it is
+  (CR 708.2a / 708.6, `{ "type": "Manifested" }`) and a battle's `protector`
+  seat (CR 310.9). `active` names a seat;
+  `turn` (default 1) and `step` are where the game starts; `monarch` optionally names a seat;
   `attackOption` (CR 806.2b) is `MultiplePlayers` unless given, and `null` is
   CR 507.1's choice among every opponent; `brawl` (CR 903.12a),
   `sharedTeamTurns` (CR 805.1) and `deployCreatures` (CR 804.2) are off unless
@@ -28,7 +34,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
 - **References.** `"$name"` is a seat or a labelled card; the sigil is not `@`,
   so a label quoted in a PR or issue mentions no GitHub user. `"Goblin Piker"`
   is the first live object with that name, `"Goblin Piker#2"` the second, in
-  creation order across every zone.
+  creation order across every zone. `"trigger of $x"` and `"ability of $x"`
+  name the topmost triggered or activated ability on the stack from that
+  source, which may have left the game (CR 113.7a).
 - **Timeline.** Each entry is keyed by `turn`, `step` and the `player` who
   decides, and carries `do` (a move) or `check`. Entries sharing a key are
   taken in order. An unscheduled priority prompt passes; any other
@@ -49,7 +57,13 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   `{ "from": { "type": "Island" }, "to": { "type": "Swamp" } }`, keyed
   the same way. `ChooseCopyTarget` names what an object entering as a copy
   copies (CR 707.5), `"$bear"`, or `null` to decline its "may", keyed by
-  the entering object. `ChooseTargets` names each slot's
+  the entering object. `Answer` answers any prompt no move above covers, by
+  its kind, `{ "prompt": "ChooseDiscard", "with": ["$card"] }`: an object is
+  a reference, a player a seat label, a map an array of `[key, value]` pairs,
+  and a recipient or attack target `["Player", "$bob"]`. It is keyed by the
+  prompt's decider, or the active player for a prompt nobody decides (a
+  shuffle, a die), and answers a prompt raised in the middle of a cast without
+  ending it. `ChooseTargets` names each slot's
   targets, `{ "target": ["$moon"] }`, for a target prompt no cast or activation
   of the scenario's own raises (a triggered ability's), keyed the same way; it
   also answers that prompt's announcement of how many. A cast's own `targets`
@@ -57,6 +71,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   spell or ability with more than one target slot names them with
   `targetsBySlot`, `{ "victim": ["$bear"], "gauge": ["$wall"] }`, in place
   of `targets`.
+  `Take` takes any other action offered at priority (CR 116.2, 605.3a), named
+  as the `Offered` view renders it, with a cast's choices such as `mana`:
+  `{ "action": "TurnFaceUp $piker Manifest", "mana": ["$mountain"] }`.
   `OrderTriggers` lists one player's simultaneous triggers by source, `null`
   for a sourceless one such as the monarch's draw, in the order they go on the
   stack, so the last named resolves first (CR 603.3b).
@@ -65,7 +82,20 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   block declaration; the move standing fails the scenario, and the prompt
   asked again takes the next entry at that key. An illegal `do` is asked
   again too, so turning a `refuse` into `do` proves nothing: a `refuse` is
-  proven by changing the board until the move is legal.
+  proven by changing the board until the move is legal. At priority, a refused
+  `Cast`, `PlayLand` or `Activate` the engine does not offer is refused
+  already; one it offers is taken, its targets and `x` sent to the engine whether
+  offered or not, and must leave the stack and the player's hand and
+  battlefield as they were. At any other prompt, a refused move naming
+  something the prompt did not offer (a summoning-sick attacker, a target no
+  slot admits) is refused already, and the prompt takes the next entry. The
+  runner judges a chosen card name (CR 201.4): it must be a real card's that
+  the prompt's restriction admits, so a `refuse` can carry one. A refused
+  `Answer` to a prompt offering a list (players, cards, permanents to
+  sacrifice, cards a search finds, spellbook names) or a range (an X, a die,
+  counters a permanent carries) is refused already when it names something
+  the list lacks or leaves the range; a `do` naming one goes to the engine. The engine's card lookups are answered from the card data, for every
+  name the board, timeline or final checks mention.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones,
   `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),
@@ -75,8 +105,19 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   projected `power` and `toughness`) and `PlayerCounters` (how many of one
   `kind` a `player` has), `Subtypes` (an object's projected subtypes, all of
   them, as bare names) and `Keywords` (how many instances of one `keyword` an
-  object has, 0 when it has none). Assert combat at `EndOfCombat` or
-  earlier: it is cleared as that step ends.
+  object has, 0 when it has none), `Names` (an object's projected names) and
+  `View`, which renders part of the state as JSON and compares it whole:
+  `{ "of": "Stack", "is": ["$bolt"] }`. Its views are `Stack` (top first),
+  `Step`, `Offered` (a `player`'s actions at priority, as `"Cast $bolt"`),
+  `AttachedTo` and `Controller` (of an `object`), `Result`, `ActivePlayer`,
+  `Priority`, `Zone` (a `player`'s `zone`, in order), `Colors`, `ManaPool`
+  (a `player`'s), `Daytime` (`null` before either), and `Protector`,
+  `Designations`, `RingBearer` and `Supertypes` (of an `object`),
+  `CommanderDamage` (a `player`'s, as `[name, amount]` pairs); an object is named as the
+  runner's messages name it, by label while it keeps one, and an ability on
+  the stack as `"trigger of $source"` or `"ability of $source"`. A seat is
+  named bare: `"player": "alice"`.
+  Assert combat at `EndOfCombat` or earlier: it is cleared as that step ends.
 - **Final.** The run plays whole steps until the timeline is spent, the game
   ends, or the turn passes the last one named; `final` checks that state.
 

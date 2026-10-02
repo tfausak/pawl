@@ -1,0 +1,83 @@
+{
+  "description": "CR 614.1c Hickory Woodlot enters tapped with two depletion counters",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "hand": [
+          {
+            "card": "Hickory Woodlot",
+            "label": "hickory-woodlot",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "PlayLand": "$hickory-woodlot"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseReplacement",
+          "with": 0
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "Hickory Woodlot",
+        "kind": {
+          "type": "Named",
+          "value": "depletion"
+        },
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Hickory Woodlot",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Hickory Woodlot",
+        "count": 0
+      }
+    },
+    {
+      "Damage": {
+        "object": "Hickory Woodlot",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Hickory Woodlot",
+        "tapped": true
+      }
+    }
+  ]
+}

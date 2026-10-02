@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
 import qualified Pawl.Types.Label as Label
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.TeamId as TeamId
@@ -21,12 +22,17 @@ data Seat = MkSeat
     range :: Maybe Natural,
     -- | CR 809.2: whether the player is their team's emperor.
     emperor :: Bool,
+    -- | CR 106.4: the unrestricted mana already in the player's pool, one type
+    -- per unit.
+    manaPool :: [ManaType.ManaType],
     battlefield :: Seq.Seq Placement.Placement,
     hand :: Seq.Seq Placement.Placement,
     graveyard :: Seq.Seq Placement.Placement,
     -- | Top card first (CR 401.1).
     library :: Seq.Seq Placement.Placement,
     -- | Face up (CR 406.3), owned by this seat.
-    exile :: Seq.Seq Placement.Placement
+    exile :: Seq.Seq Placement.Placement,
+    -- | CR 408.1: the command zone, owned by this seat.
+    command :: Seq.Seq Placement.Placement
   }
   deriving (Eq, Ord, Show)

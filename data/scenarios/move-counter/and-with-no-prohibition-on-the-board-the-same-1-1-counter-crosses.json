@@ -1,0 +1,163 @@
+{
+  "description": "and with no prohibition on the board the same -1/-1 counter crosses",
+  "note": "The control for the Melira case: the same two shield counters and one -1/-1 counter on bob's Wall of Stone, with no Melira, so every kind crosses.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Swamp",
+            "label": "s"
+          },
+          {
+            "card": "Wall of Stone",
+            "label": "taker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fate Transfer",
+            "label": "ft"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Wall of Stone",
+            "label": "giver",
+            "counters": [
+              {
+                "key": {
+                  "type": "Shield"
+                },
+                "value": 2
+              },
+              {
+                "key": {
+                  "type": "MinusOneMinusOne"
+                },
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ft",
+          "targetsBySlot": {
+            "from": [
+              "$giver"
+            ],
+            "to": [
+              "$taker"
+            ]
+          },
+          "mana": [
+            "$i1",
+            "$i2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "AnnounceHybridHalf",
+          "with": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "Counters": {
+        "object": "$taker",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "$taker",
+        "kind": {
+          "type": "Shield"
+        },
+        "count": 2
+      }
+    },
+    {
+      "Counters": {
+        "object": "$taker",
+        "kind": {
+          "type": "MinusOneMinusOne"
+        },
+        "count": 1
+      }
+    },
+    {
+      "Counters": {
+        "object": "$giver",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "$giver",
+        "kind": {
+          "type": "Shield"
+        },
+        "count": 0
+      }
+    },
+    {
+      "Counters": {
+        "object": "$giver",
+        "kind": {
+          "type": "MinusOneMinusOne"
+        },
+        "count": 0
+      }
+    }
+  ]
+}

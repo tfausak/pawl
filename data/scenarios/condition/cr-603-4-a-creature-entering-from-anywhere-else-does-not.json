@@ -1,0 +1,94 @@
+{
+  "description": "CR 603.4 a creature entering from anywhere else does not",
+  "note": "The test also kills the Skeleton with marked damage before reading the Knight; with nothing on the stack there is nothing for the kill to change, so the scenario reads the Knight once the cast Skeleton has entered.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp-1"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2"
+          },
+          {
+            "card": "Breathless Knight",
+            "label": "knight"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Reassembling Skeleton",
+            "label": "skeleton"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$skeleton",
+          "mana": [
+            "$swamp-1",
+            "$swamp-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Reassembling Skeleton",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$knight",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    }
+  ]
+}

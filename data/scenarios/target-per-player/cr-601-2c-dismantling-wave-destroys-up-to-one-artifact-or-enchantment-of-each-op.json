@@ -1,0 +1,218 @@
+{
+  "description": "CR 601.2c Dismantling Wave destroys up to one artifact or enchantment of each opponent's",
+  "note": "One slot per opponent, bob's first. Each refused cast aims one slot at something that slot does not offer, the other slot at its own player's permanent: alice's own Ornithopter in either slot, and each opponent's permanent in the other opponent's slot.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "Ornithopter",
+            "label": "mine"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Dismantling Wave",
+            "label": "wave"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Ornithopter",
+            "label": "bobs"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Glorious Anthem",
+            "label": "anthem"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$wave",
+          "targetsBySlot": {
+            "target#player1": [
+              "$mine"
+            ],
+            "target#player2": [
+              "$anthem"
+            ]
+          },
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$wave",
+          "targetsBySlot": {
+            "target#player1": [
+              "$anthem"
+            ],
+            "target#player2": []
+          },
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$wave",
+          "targetsBySlot": {
+            "target#player1": [
+              "$bobs"
+            ],
+            "target#player2": [
+              "$mine"
+            ]
+          },
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$wave",
+          "targetsBySlot": {
+            "target#player1": [],
+            "target#player2": [
+              "$bobs"
+            ]
+          },
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$wave",
+          "targetsBySlot": {
+            "target#player1": [
+              "$bobs"
+            ],
+            "target#player2": [
+              "$anthem"
+            ]
+          },
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Graveyard",
+          "card": "Ornithopter",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Graveyard",
+          "card": "Glorious Anthem",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Battlefield",
+          "is": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$mine"
+          ]
+        }
+      }
+    }
+  ]
+}

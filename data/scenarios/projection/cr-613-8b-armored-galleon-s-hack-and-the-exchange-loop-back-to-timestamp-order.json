@@ -1,0 +1,73 @@
+{
+  "description": "CR 613.8b Armored Galleon's Hack and the exchange loop back to timestamp order",
+  "note": "The Haskell board's resolved Hack and pending exchange are reached by casting both. A Magical Hack (Island to Swamp) on Armored Galleon and Exchange of Words with Merfolk Spy depend on each other, so CR 613.8b falls back to timestamp order: the Hack runs first and the Galleon keeps the Spy's islandwalk. The Haskell test's check that the Hack landed on the Galleon is witnessed by the Spy, which now holds the hacked restriction: bob controls only an Island, so the Spy may not attack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Armored Galleon",
+            "label": "galleon",
+            "ready": true
+          },
+          {
+            "card": "Merfolk Spy",
+            "label": "spy",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island1"
+          },
+          {
+            "card": "Island",
+            "label": "island2"
+          },
+          {
+            "card": "Island",
+            "label": "island3"
+          },
+          {
+            "card": "Island",
+            "label": "island4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Magical Hack",
+            "label": "hack"
+          },
+          {
+            "card": "Exchange of Words",
+            "label": "exchange"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$hack", "targets": ["$galleon"], "mana": ["$island1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": {"ChooseTypeSwap": {"from": {"type": "Island"}, "to": {"type": "Swamp"}}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$exchange", "mana": ["$island2", "$island3", "$island4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Exchange of Words", "do": {"ChooseTargets": {"creatures": ["$galleon", "$spy"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$galleon", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Island"}}}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$galleon", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Swamp"}}}, "count": 0}}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "refuse": {"Attack": ["$spy"]}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": ["$galleon"]}},
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "check": {"Attackers": {"attackers": {"$galleon": "$bob"}}}}
+  ]
+}

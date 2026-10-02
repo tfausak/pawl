@@ -1,0 +1,278 @@
+{
+  "description": "CR 604.2 a copy's own as-long-as clause is still gated once the original is exiled",
+  "note": "The Haskell test puts Copy Enchantment straight onto the stack; here it is cast, so alice has an Island and a thirteenth Plains beside the twelve, the last three paying the copy's level-2 bar afterwards: that bar being offered is what shows the copy was still at level 1.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "pl1",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl4",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl5",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl6",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl7",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl8",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl9",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl10",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl11",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl12",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "pl13",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Paladin Class",
+            "label": "class",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Copy Enchantment",
+            "label": "copyench"
+          },
+          {
+            "card": "Angelic Edict",
+            "label": "edict"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$class",
+          "ability": 0,
+          "mana": [
+            "$pl1",
+            "$pl2",
+            "$pl3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$copyench",
+          "mana": [
+            "$island",
+            "$pl4",
+            "$pl5",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "source": "Copy Enchantment",
+      "do": {
+        "ChooseCopyTarget": "$class"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$edict",
+          "targets": [
+            "$class"
+          ],
+          "mana": [
+            "$pl6",
+            "$pl7",
+            "$pl8",
+            "$pl9",
+            "$pl10",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": [
+            "Paladin Class"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Types": {
+          "object": "Copy Enchantment",
+          "types": [
+            "Enchantment"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Subtypes": {
+          "object": "Copy Enchantment",
+          "subtypes": [
+            "Class"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "Copy Enchantment",
+          "ability": 0,
+          "mana": [
+            "$pl11",
+            "$pl12",
+            "$pl13"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker",
+          "power": 3,
+          "toughness": 2
+        }
+      }
+    }
+  ]
+}

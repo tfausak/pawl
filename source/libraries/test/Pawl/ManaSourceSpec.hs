@@ -30,7 +30,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import Pawl.ManaSpec (alicePermanents, atLife, castFrom, isActivationOf, optionOfTypes, paysColors, poolSize, poolTypes, poolUnits, prefersSource, recordingManaSources, tapEverything, theAbility)
+import Pawl.ManaSpec (alicePermanents, atLife, castFrom, isActivationOf, optionOfTypes, paysColors, poolSize, poolUnits, prefersSource, recordingManaSources, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -38,12 +38,10 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -66,7 +64,6 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -75,7 +72,6 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.StepBegan as StepBegan
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
@@ -477,23 +473,6 @@ chromaticSpec s registry = Spec.describe s "Chromatic Sphere and Chromatic Star"
     Spec.assertBool s (any (isActivateOf sphereId) sphereActions) "the Sphere is menued as an ordinary activation"
     Spec.assertBool s (not (any (isActivateOf starId) starActions)) "which a mana ability never is"
 
-  -- End to end. tapEverything takes ONLY mana activations, so what it reaches is
-  -- exactly CR 605.3a's window: the Star is sacrificed to its own cost and its
-  -- death trigger draws, while the Sphere is never touched at all and its draw
-  -- never happens.
-  Spec.it s "CR 605.3a the mana window reaches the Star and never the Sphere" $ do
-    star <- S.printingOf s registry "Chromatic Star"
-    sphere <- S.printingOf s registry "Chromatic Sphere"
-    forest <- S.printingOf s registry "Forest"
-    let (_, starBoard) = chromaticBoard star forest
-        (_, sphereBoard) = chromaticBoard sphere forest
-        starAfter = S.runPure tapEverything starBoard Engine.priorityLoop
-        sphereAfter = S.runPure tapEverything sphereBoard Engine.priorityLoop
-    Spec.assertEqWith s "the Star paid its own sacrifice" (length (Game.zoneMembers Zone.Graveyard S.alice starAfter)) 1
-    Spec.assertEqWith s "the Sphere was never activated" (length (Game.zoneMembers Zone.Graveyard S.alice sphereAfter)) 0
-    Spec.assertEqWith s "the Star's death trigger drew one card" (length (Game.zoneMembers Zone.Hand S.alice starAfter)) 1
-    Spec.assertEqWith s "and nothing drew on the Sphere's board" (length (Game.zoneMembers Zone.Hand S.alice sphereAfter)) 0
-
 -- alice, active, in her precombat main phase: one of the two artifacts, a Forest
 -- to pay the {1} activation cost with, and a stocked library so a draw has a card
 -- to take and CR 104.3c decides nothing first. Identical for both artifacts, so
@@ -576,37 +555,6 @@ millikinSpec s registry = Spec.describe s "Millikin" $ do
     Spec.assertBool s (any (isActivateOf millikinId) actions) "Millikin is menued as an ordinary activation"
     Spec.assertBool s (not (any (isActivateOf solRingId) actions)) "which a mana ability never is"
 
-  -- End to end, and the gameplay-level proof (design.md section 4).
-  -- tapEverything takes ONLY mana activations, so what it reaches is exactly CR
-  -- 605.3a's window: the Sol Ring is tapped for {C}{C} and Millikin is never
-  -- touched, so no card is milled and it stays untapped. Under the other reading
-  -- of rule 605.1a the window takes Millikin too, and the graveyard says so.
-  Spec.it s "CR 605.3a the mana window reaches the Sol Ring and never Millikin" $ do
-    millikin <- S.printingOf s registry "Millikin"
-    solRing <- S.printingOf s registry "Sol Ring"
-    let (millikinId, solRingId, board) = millikinBoard millikin solRing
-        after = S.runPure tapEverything board Engine.priorityLoop
-    Spec.assertEqWith s "CR 701.17a nothing was milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-    Spec.assertEqWith s "and Millikin's library is whole" (length (Game.zoneMembers Zone.Library S.alice after)) 3
-    Spec.assertEqWith s "Millikin is untapped, never having paid its cost" (fmap Object.tapped (Game.lookupObject millikinId after)) (Just TapState.Untapped)
-    Spec.assertEqWith s "the Sol Ring did pay its own" (fmap Object.tapped (Game.lookupObject solRingId after)) (Just TapState.Tapped)
-    Spec.assertEqWith s "so the window ran and floated {C}{C}" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless]
-
-  -- The card in its own right: CR 605.3b puts it on the stack, CR 602.2b pays
-  -- its cost as it is activated, and the mana arrives only on resolution.
-  Spec.it s "CR 602.2b activating Millikin pays the mill up front and adds {C} on resolution" $ do
-    millikin <- S.printingOf s registry "Millikin"
-    solRing <- S.printingOf s registry "Sol Ring"
-    let (millikinId, _, board) = millikinBoard millikin solRing
-        activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice millikinId (theAbility millikin))
-        resolved = S.runPure S.identityAnswer activated Stack.resolveTop
-    Spec.assertEqWith s "CR 605.3b the ability is on the stack" (length (GameState.stack activated)) 1
-    Spec.assertEqWith s "CR 601.2h nothing is in the pool yet" (poolTypes S.alice activated) []
-    Spec.assertEqWith s "CR 701.17a the top card of the library is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice activated)) 1
-    Spec.assertEqWith s "which is one card off the library" (length (Game.zoneMembers Zone.Library S.alice activated)) 2
-    Spec.assertEqWith s "CR 107.5 and Millikin is tapped" (fmap Object.tapped (Game.lookupObject millikinId activated)) (Just TapState.Tapped)
-    Spec.assertEqWith s "the resolution adds {C}" (poolTypes S.alice resolved) [ManaType.Colorless]
-
 -- alice, active, in her precombat main phase, with Millikin and a Sol Ring on
 -- the battlefield -- both settled and untapped -- and three cards in her library
 -- for a mill to take. Nothing else makes mana, so every mana on this board comes
@@ -654,21 +602,6 @@ burningTreeSpec s registry = Spec.describe s "Burning-Tree Emissary" $ do
     Spec.assertEqWith s "alice's Emissary pays alice" (poolSize S.alice alices, poolSize S.bob alices) (2, 0)
     Spec.assertEqWith s "bob's Emissary pays bob" (poolSize S.alice bobs, poolSize S.bob bobs) (0, 2)
 
-  -- Gameplay level: the floating {R}{G} is ordinary mana, so it pays for a second
-  -- Emissary ({R/G}{R/G}) off a board holding no land and no other mana source.
-  -- The negative board differs in ONE thing -- the Emissary was arranged onto the
-  -- battlefield rather than entering -- so no trigger fired, nothing was added,
-  -- and the cast is not offered.
-  Spec.it s "CR 106.4 the added mana pays for a second Emissary, and without it the cast is not offered" $ do
-    bte <- S.printingOf s registry "Burning-Tree Emissary"
-    let (handId, after) = burningTreeResolved bte S.alice
-        (noTriggerHandId, noTrigger) = burningTreeArranged bte S.alice
-        cast = snd (Engine.runGamePure S.identityAnswer after (S.cast S.alice handId))
-    Spec.assertBool s (any (S.isCastOf handId) (Action.legalActions S.alice after)) "the second Emissary is castable off the trigger's mana"
-    Spec.assertBool s (not (any (S.isCastOf noTriggerHandId) (Action.legalActions S.alice noTrigger))) "and is not castable when no trigger added any"
-    Spec.assertEqWith s "the cast spent the whole pool" (poolSize S.alice cast) 0
-    Spec.assertEqWith s "and the second Emissary is on the stack" (length (GameState.stack cast)) 1
-
 -- One Burning-Tree Emissary entering under `pid` with its CR 603.6a enters event,
 -- that trigger placed and resolved, plus a second copy in alice's hand -- alice
 -- being active with priority in her precombat main phase (S.handOne). No land and
@@ -680,15 +613,6 @@ burningTreeResolved bte pid =
       (_, entered) = S.entersWithTrigger bte pid base
       placed = snd (Engine.runGamePure S.identityAnswer entered Engine.placePendingTriggers)
    in (handId, snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop))
-
--- The same board with the Emissary ARRANGED onto the battlefield instead of
--- entering (S.addPermanent emits no event), so nothing triggers and no mana is
--- added. Everything else -- seats, phase, priority, the copy in hand, the empty
--- stack -- is burningTreeResolved's.
-burningTreeArranged :: Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
-burningTreeArranged bte pid =
-  let (base, handId) = S.handOne bte (Setup.emptyGame S.bothPlayers)
-   in (handId, snd (S.addPermanent bte pid base))
 
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
@@ -829,49 +753,6 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
     Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.carol hers)) "carol casts a second Shizuko off her own upkeep's mana"
     Spec.assertBool s (not (any (S.isCastOf otherOid) (Action.legalActions S.carol his))) "and cannot when the mana went to alice"
 
-  -- CR 500.5 / 106.4, driven through Engine.runStep so the WHOLE upkeep step
-  -- runs
-  -- -- CR 603.2b's event, the trigger, the priority round and the step's own
-  -- end-of-step mana emptying -- rather than by calling Mana.emptiedManaPools.
-  --
-  -- carol's pool is seeded with one ORDINARY green before the step, so the pool
-  -- the sweep sees holds four units identical but for their retention. The two
-  -- casts read that difference at gameplay level on one board: Shizuko is
-  -- {1}{G}{G} and Giant Spider is {3}{G}, so three green pays the first and not
-  -- the second. Keeping nothing fails the first assertion; keeping all four --
-  -- which is what a player-axis retention would do -- fails the second.
-  Spec.it s "CR 500.5 the three retained green survive the upkeep step's end and the ordinary fourth does not" $ do
-    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
-    giantSpider <- S.printingOf s registry "Giant Spider"
-    let seeded = Mana.addMana S.carol [plainGreen] (shizukoStep shizuko S.carol (Phase.Beginning BeginningStep.Upkeep))
-        after = carolMain (S.runPure S.identityAnswer seeded Engine.runStep)
-        (shizukoId, withShizuko) = S.addHandCard shizuko S.carol after
-        (spiderId, withSpider) = S.addHandCard giantSpider S.carol after
-    Spec.assertBool s (any (S.isCastOf shizukoId) (Action.legalActions S.carol withShizuko)) "carol casts a {1}{G}{G} spell in a later phase, off mana the step's end did not take"
-    Spec.assertBool s (not (any (S.isCastOf spiderId) (Action.legalActions S.carol withSpider))) "but not a {3}{G} one, because the ordinary fourth green WAS taken"
-    Spec.assertEqWith s "exactly the three the trigger added" (poolOf S.carol after) [retainedGreen, retainedGreen, retainedGreen]
-
-  -- CR 514.2 ends the retention, and CR 500.5 then takes the mana. A pair of
-  -- boards differing in EXACTLY one thing -- which step Engine.runStep runs --
-  -- both starting from the same resolved upkeep trigger.
-  --
-  -- The end step is the last one the retention outlives: its end runs CR 500.5's
-  -- sweep with the retention still standing. The cleanup step's turn-based
-  -- actions run CR 514.2 at that step's START (Mana.endManaRetention), so the
-  -- same sweep at that step's END finds ordinary mana and takes it. Swapping the
-  -- two moments in Engine.hs is what this pair refuses.
-  Spec.it s "CR 514.2 the retention outlives the end step and not the cleanup step" $ do
-    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
-    let floated = shizukoUpkeep shizuko S.carol
-        ran phase = carolMain (S.runPure S.identityAnswer (atStep phase floated) Engine.runStep)
-        afterEnd = ran (Phase.Ending EndingStep.EndStep)
-        afterCleanup = ran (Phase.Ending EndingStep.Cleanup)
-        (endId, castableAfterEnd) = S.addHandCard shizuko S.carol afterEnd
-        (cleanupId, castableAfterCleanup) = S.addHandCard shizuko S.carol afterCleanup
-    Spec.assertBool s (any (S.isCastOf endId) (Action.legalActions S.carol castableAfterEnd)) "carol still has the mana once the end step has ended"
-    Spec.assertBool s (not (any (S.isCastOf cleanupId) (Action.legalActions S.carol castableAfterCleanup))) "and no longer does once the cleanup step has ended"
-    Spec.assertEqWith s "the pools say the same thing" (poolOf S.carol afterEnd, poolOf S.carol afterCleanup) ([retainedGreen, retainedGreen, retainedGreen], [])
-
 -- One Shizuko on the battlefield under ALICE's control, with @upkeep@'s upkeep
 -- beginning (CR 500.1: a step belongs to exactly one turn, so the event names one
 -- seat and GameState.activePlayer agrees with it), that trigger placed and
@@ -886,28 +767,6 @@ shizukoUpkeep shizuko upkeep =
           board {GameState.activePlayer = upkeep, GameState.phase = Phase.Beginning BeginningStep.Upkeep}
       placed = snd (Engine.runGamePure S.identityAnswer began Engine.placePendingTriggers)
    in snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop)
-
--- @shizukoUpkeep@'s twin for a runStep-driven case: the same board with NOTHING
--- yet done to it, since Engine.runStep records CR 603.2b's event, places the
--- trigger and runs the priority round that resolves it. The schedule loses its
--- head for Pawl.ActivateSpec's augurUpkeep reason -- Setup.emptyGame's
--- `remaining` still begins with the upkeep step, so a runStep-driven board would
--- otherwise advance back into the step it just ran.
-shizukoStep :: Printing.Printing -> PlayerId.PlayerId -> Phase.Phase -> GameState.GameState
-shizukoStep shizuko active phase =
-  let (_, board) = S.addPermanent shizuko S.alice S.threePlayerGame
-   in board
-        { GameState.activePlayer = active,
-          GameState.phase = phase,
-          GameState.priority = Just active,
-          GameState.remaining = Seq.drop 1 (GameState.remaining board)
-        }
-
--- An already-floated board moved to another step of the SAME turn, so the pair
--- above differs in one field and nothing else. The active player keeps priority,
--- which is what makes Engine.runStep grant a priority round rather than settle.
-atStep :: Phase.Phase -> GameState.GameState -> GameState.GameState
-atStep phase gs = gs {GameState.phase = phase, GameState.priority = Just (GameState.activePlayer gs)}
 
 -- CR 307.1 / 117.1a: carol active with priority in her own precombat main phase,
 -- which is what a sorcery-speed cast of hers needs. Applied to BOTH boards of the
@@ -937,25 +796,7 @@ poolOf pid gs = case Game.poolOf pid gs of
 -- The retention rides the UNIT and not CR 613.11's player axis, for Shizuko's
 -- reason above: "this mana" is the six units this ability added, and a seventh
 -- red in the same pool is lost at the first step end.
---
--- THREE MOMENTS, because a shorter board admits two wrong implementations:
---
---   * the declare blockers step separates the arm from ManaRetention.Ordinary,
---     which is what this card carried while the arm did not exist -- CR 500.5
---     takes the pool as the declare attackers step ends.
---   * the end of combat step separates it from a retention ended at a combat
---     STEP's end. CR 500.5a's own sentence is that the effect lasts through that
---     step, and Pawl.ExpirySpec's "the end of combat STEP ending does not expire
---     it; the PHASE ending does" is the stored-effect twin.
---   * the postcombat main phase separates it from ManaRetention.UntilEndOfTurn,
---     and nothing earlier can. Without it the board proves only "longer than one
---     step".
---
--- Read as a LEGALITY (design.md section 4) with the pool's exact contents
--- alongside, and then SPENT in the second case, because presence is not
--- spendability. alice holds no land and bob no mana source at all, so the
--- trigger's six {R} is the only mana in the game.
-avatarRokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+avatarRokuSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 avatarRokuSpec s registry =
   let withPriority gs = gs {GameState.priority = Just S.alice}
       -- Declares attackers and blockers and PASSES on every action (identityAnswer
@@ -970,84 +811,7 @@ avatarRokuSpec s registry =
           (gs, [rokuId], [pikerId]) -> pure (Just (rokuId, pikerId, gs))
           _ -> pure Nothing
    in Spec.describe s "Avatar Roku, Firebender" $ do
-        Spec.it s "CR 500.5a the retained {R} outlive every step of the combat phase, and the phase's end takes them" $ do
-          built <- fixture
-          case built of
-            Just (rokuId, _, gs) -> do
-              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs
-                  endOfCombat = S.runToStep (Phase.Combat CombatStep.EndOfCombat) passing blockers
-                  postcombat = S.runPure passing endOfCombat Engine.runStep
-                  offered g = any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority g))
-              -- S.runToStep stops silently once combat is left, so each moment
-              -- says which step it is before anything is read off it. None of the
-              -- three depends on the retention, so none can absorb a mutation to it.
-              Spec.assertEqWith s "the first moment is the declare blockers step" (GameState.phase blockers) (Phase.Combat CombatStep.DeclareBlockers)
-              Spec.assertEqWith s "the second is the end of combat step" (GameState.phase endOfCombat) (Phase.Combat CombatStep.EndOfCombat)
-              Spec.assertEqWith s "and the third is the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
-              Spec.assertBool s (offered blockers) "alice may activate Roku once the declare attackers step has ended"
-              Spec.assertBool s (offered endOfCombat) "and still may once the combat damage step has ended"
-              Spec.assertBool s (not (offered postcombat)) "and no longer may in the postcombat main phase"
-              Spec.assertEqWith s "exactly the six the trigger added, retained" (poolOf S.alice blockers) (replicate 6 retainedRed)
-              Spec.assertEqWith s "all six still there as the end of combat step begins" (poolOf S.alice endOfCombat) (replicate 6 retainedRed)
-              Spec.assertEqWith s "and none once the combat phase has ended" (poolOf S.alice postcombat) []
-            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
-
-        -- Presence is not spendability, and only spending reaches CR 106.4's
-        -- "used to pay costs". alice takes every activation offered in the
-        -- DECLARE BLOCKERS step -- a step whose start is already past the end
-        -- that CR 500.5 would have emptied the pool at -- and six {R} pays for
-        -- exactly two, so Roku is a 12/6. Ordinary retention leaves it its
-        -- printed 6/6.
-        Spec.it s "CR 106.4 the retained mana pays for two activations in a LATER step" $ do
-          built <- fixture
-          case built of
-            Just (rokuId, _, gs) -> do
-              let activating :: Prompt.Prompt r -> r
-                  activating p = case p of
-                    Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature rokuId) . snd) sets
-                    Prompt.ChooseAction _ _ options -> case filter (isActivationOf rokuId) options of
-                      a : _ -> a
-                      [] -> Action.Type.Pass
-                    _ -> S.aggressiveAnswer p
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs)
-                  after = S.runPure activating blockers Engine.runStep
-              Spec.assertEqWith s "Roku is its printed 6/6 as the step begins" (S.powerToughnessOf rokuId blockers) (Just (6, 6))
-              Spec.assertEqWith s "and a 12/6 once the step has run, off two activations" (S.powerToughnessOf rokuId after) (Just (12, 6))
-              Spec.assertEqWith s "which is the whole pool spent" (poolOf S.alice after) []
-            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
-
-        -- CR 724.2d/e: Mandate of Peace ({1}{W} Instant, "Cast this spell only
-        -- during combat. Your opponents can't cast spells this turn. End the
-        -- combat phase.") ends the combat phase with its last step never running,
-        -- so Turn.phaseEndingAt never reports that end and the CR 500.5 sweep at
-        -- the step's own end sees no phase. Pawl.Engine.Resolve's CR 724.2 arm has
-        -- to end the retention itself, or the mana outlives the phase it was
-        -- scoped to.
-        --
-        -- Read as the postcombat main phase begins -- one step after the cast,
-        -- which is the first moment the two readings differ. Pawl.TurnSpec's
-        -- endCombatPhaseSpec covers the same arm on the STORED-effect axis (a Jade
-        -- Statue's animation); this is its unit-axis twin.
-        --
-        -- BOB casts it, and holds the only lands. Every red in the game is the
-        -- trigger's, so the cast cannot spend any of it and the "may no longer
-        -- activate" read cannot pass because alice ran short.
-        Spec.it s "CR 724.2d a combat phase ended part-way through takes the retained mana" $ do
-          built <- fixture
-          case built of
-            Just (rokuId, _, gs) -> do
-              plains <- S.printingOf s registry "Plains"
-              mandate <- S.printingOf s registry "Mandate of Peace"
-              let (spell, staged) = S.addHandCard mandate S.bob (S.landsFor plains S.bob 2 gs)
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
-                  after = S.runPure (castingOnly spell) blockers Engine.runStep
-              Spec.assertEqWith s "the six retained {R} are there when the step begins" (poolOf S.alice blockers) (replicate 6 retainedRed)
-              Spec.assertEqWith s "the combat phase is over" (GameState.phase after) Phase.PostcombatMain
-              Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "and alice may no longer activate Roku off it"
-              Spec.assertEqWith s "the pool says the same thing" (poolOf S.alice after) []
-            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
-
-        -- CR 724.1d's half of the same claim: Time Stop ({4}{U}{U} Instant, "End
+        -- CR 724.1d: Time Stop ({4}{U}{U} Instant, "End
         -- the turn.") ends the current phase as well as the step, and the game
         -- skips straight to the cleanup step. The retention is scoped to the
         -- combat phase, which has just ended, so the mana goes at that step's own
@@ -1058,9 +822,8 @@ avatarRokuSpec s registry =
         -- standing at that step's start, so a board read after the cleanup step
         -- had run would find an empty pool under both readings.
         --
-        -- BOB casts it, the case above's reason and sharper here: {4}{U}{U} is
-        -- six mana, and alice paying any of it out of the retained {R} would
-        -- leave her under {R}{R}{R} whatever the sweep did.
+        -- BOB casts it: {4}{U}{U} is six mana, and alice paying any of it out of
+        -- the retained {R} would leave her under {R}{R}{R} whatever the sweep did.
         Spec.it s "CR 724.1d ending the turn during combat takes the retained mana before cleanup" $ do
           built <- fixture
           case built of
@@ -1074,44 +837,6 @@ avatarRokuSpec s registry =
               Spec.assertEqWith s "the game jumped to the cleanup step" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
               Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "and alice may no longer activate Roku off it"
               Spec.assertEqWith s "the pool says the same thing" (poolOf S.alice after) []
-            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
-
-        -- CR 500.5 / CR 614.1b: the same phase end reached by a SKIP of the
-        -- phase's last step rather than by an effect ending the phase. CR 724.2e
-        -- is the CR contemplating exactly that pairing -- the combat phase ends
-        -- while its end of combat step does not happen -- and Engine.skipStep is
-        -- where the phase-grain sweep this retention needs now lives.
-        --
-        -- Synthetic Truncate the Fray ({1}{U} Instant, "Target player skips their
-        -- next end of combat step"), synthetic because nothing printed names that
-        -- step: Scryfall o:/skips?.*end of combat/ and o:"end of combat step"
-        -- o:skip, 2026-08-27, no hit. Pawl.TurnSpec's SkippedEndOfCombat group is
-        -- the stored-effect and combat-record twin of this case.
-        --
-        -- The skip must be aimed at the ACTIVE player, whose combat phase it is
-        -- (Event.beginsPhase asks of GameState.activePlayer), so bob casts it at
-        -- alice. BOB casts it for the case above's reason as well: he holds the
-        -- only lands, so no part of {1}{U} can come out of the retained {R}.
-        --
-        -- "The end of combat step never began" is what keeps this from passing
-        -- vacuously: a cast that silently did nothing would leave the step to run
-        -- normally, and the pool would be empty at the same moment under both
-        -- readings.
-        Spec.it s "CR 500.5 a skipped end of combat step still takes the retained mana" $ do
-          built <- fixture
-          case built of
-            Just (rokuId, _, gs) -> do
-              island <- S.printingOf s registry "Island"
-              fray <- S.printingOf s registry "Synthetic Truncate the Fray"
-              let (spell, staged) = S.addHandCard fray S.bob (S.landsFor island S.bob 2 gs)
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
-                  after = S.runToStep Phase.PostcombatMain (castingOnly spell) blockers
-                  began = filter (== GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.EndOfCombat) S.alice)) (S.eventsOf after)
-              Spec.assertEqWith s "the six retained {R} are there when the step begins" (poolOf S.alice blockers) (replicate 6 retainedRed)
-              Spec.assertEqWith s "CR 614.6 the end of combat step never began" began []
-              Spec.assertEqWith s "CR 511.3 the combat phase is over regardless" (GameState.phase after) Phase.PostcombatMain
-              Spec.assertEqWith s "and the retained mana went with the phase" (poolOf S.alice after) []
-              Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "so alice may no longer activate Roku off it"
             Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
 
 -- Casts that one object the first time it is offered and passes otherwise,
@@ -1130,142 +855,6 @@ castingOnly spell p = case p of
 retainedRed :: ManaUnit.ManaUnit
 retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
 
--- CR 702.189a's firebending, the keyword that reaches the retention Avatar Roku
--- writes out longhand: "'Firebending N' means 'Whenever this creature attacks,
--- add N {R}. Until end of combat, you don't lose this mana as steps and phases
--- end.'"
---
--- Zhao, Ruthless Admiral {2}{B/R}{B/R} Legendary Creature -- Human Soldier 3/4
--- is the producer. Its other sentence, "Whenever you sacrifice another
--- permanent, creatures you control get +1/+0 until end of turn", never fires
--- here: nothing on this board sacrifices anything. Nothing is omitted from
--- pawl's transcription, so it is neither stricter nor weaker than printed.
---
--- THE PIKER attacks beside Zhao with no firebending of its own, so a pool of
--- exactly two says the count came off the keyword's payload and off one
--- instance of it -- neither a per-attacker addition nor a fixed one.
---
--- TWO MOMENTS, Roku's first and third: the declare blockers step separates the
--- retention from ManaRetention.Ordinary, which CR 500.5 would have emptied as
--- the declare attackers step ended, and the postcombat main phase separates it
--- from UntilEndOfTurn. Roku's group above proves the machinery at all three;
--- what this group adds is that rule 702.189a's keyword mints it.
-zhaoSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-zhaoSpec s registry =
-  let passing :: Prompt.Prompt r -> r
-      passing = S.aggressiveAnswer
-   in Spec.describe s "Zhao, Ruthless Admiral" $ do
-        Spec.it s "CR 702.189a firebending 2 adds two retained {R} as Zhao attacks" $ do
-          zhao <- S.printingOf s registry "Zhao, Ruthless Admiral"
-          piker <- S.printingOf s registry "Goblin Piker"
-          case S.combatBoardOf [zhao, piker] [] of
-            (gs, [_, _], _) -> do
-              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs
-                  postcombat = S.runPure passing (S.runToStep (Phase.Combat CombatStep.EndOfCombat) passing blockers) Engine.runStep
-              Spec.assertEqWith s "the first moment is the declare blockers step" (GameState.phase blockers) (Phase.Combat CombatStep.DeclareBlockers)
-              Spec.assertEqWith s "and the second is the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
-              -- THE gameplay assertion, ahead of the expiry one: it says how many
-              -- units the keyword added and that each carries rule 702.189a's
-              -- retention, so a payload read as anything but Zhao's 2 reddens
-              -- here rather than at the sweep.
-              Spec.assertEqWith s "CR 702.189a exactly the two the keyword added, retained" (poolOf S.alice blockers) (replicate 2 retainedRed)
-              Spec.assertEqWith s "CR 500.5a and none once the combat phase has ended" (poolOf S.alice postcombat) []
-            _ -> Spec.assertFailure s "fixture should give alice a Zhao and a Piker"
-
--- CR 702.189a's N restated as the creature's power: Firebending Student {1}{R}
--- Creature -- Human Monk 1/2, "Prowess / Firebending X, where X is this
--- creature's power". Prowess never triggers here, as nothing is cast. Nothing is
--- omitted, so pawl's Student is neither stricter nor weaker than printed.
---
--- TWO +1/+1 COUNTERS make its power three, distinct from the printed one and
--- from the Piker's two beside it, so X read off the printed card or off the
--- wrong attacker reddens.
-firebendingStudentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-firebendingStudentSpec s registry =
-  let passing :: Prompt.Prompt r -> r
-      passing = S.aggressiveAnswer
-   in Spec.describe s "Firebending Student" $ do
-        Spec.it s "CR 702.189a firebending X adds the Student's projected power in retained {R}" $ do
-          student <- S.printingOf s registry "Firebending Student"
-          piker <- S.printingOf s registry "Goblin Piker"
-          case S.combatBoardOf [student, piker] [] of
-            (gs, [studentId, _], _) -> do
-              let pumped = S.addCounter CounterKind.PlusOnePlusOne 2 studentId gs
-                  blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing pumped
-              -- THE gameplay assertion, ahead of the proxy.
-              Spec.assertEqWith s "CR 702.189a three retained {R}, one per point of the Student's power" (poolOf S.alice blockers) (replicate 3 retainedRed)
-              Spec.assertEqWith s "CR 613.4c the counters made the Student a 3/4" (S.powerToughnessOf studentId blockers) (Just (3, 4))
-            _ -> Spec.assertFailure s "fixture should give alice a Student and a Piker"
-
--- CR 702.189a's N restated as a player's counters, and a cast trigger narrowed
--- to CR 506's combat phase: Zuko, Firebending Master {1}{R} Legendary Creature
--- -- Ally Human Noble 2/2, "First strike / Firebending X, where X is the number
--- of experience counters you have. / Whenever you cast a spell during combat,
--- you get an experience counter." Nothing is omitted, so pawl's Zuko is neither
--- stricter nor weaker than printed.
---
--- alice starts with THREE experience counters, distinct from Zuko's power of
--- two. Two Blessed Reversals ({1}{W} Instant, no target, so nothing can hit
--- Zuko) are the pair of casts: one in the declare blockers step, one in the
--- postcombat main phase, on one timeline, off four Plains.
-zukoFirebendingMasterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-zukoFirebendingMasterSpec s registry =
-  let passing :: Prompt.Prompt r -> r
-      passing = S.aggressiveAnswer
-      withPriority gs = gs {GameState.priority = Just S.alice}
-      experience = S.playerCounterOf PlayerCounterKind.Experience S.alice
-      spent = length . Game.zoneMembers Zone.Graveyard S.alice
-   in Spec.describe s "Zuko, Firebending Master" $ do
-        Spec.it s "CR 702.189a firebending X adds one retained {R} per experience counter" $ do
-          zuko <- S.printingOf s registry "Zuko, Firebending Master"
-          case S.combatBoardOf [zuko] [] of
-            (gs, [_], _) -> do
-              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing (S.addPlayerCounter PlayerCounterKind.Experience 3 S.alice gs)
-              Spec.assertEqWith s "CR 702.189a three retained {R}, one per experience counter" (poolOf S.alice blockers) (replicate 3 retainedRed)
-            _ -> Spec.assertFailure s "fixture should give alice a Zuko"
-        Spec.it s "CR 603.2 a spell cast during combat gives an experience counter, one cast after combat none" $ do
-          zuko <- S.printingOf s registry "Zuko, Firebending Master"
-          plains <- S.printingOf s registry "Plains"
-          reversal <- S.printingOf s registry "Blessed Reversal"
-          case S.combatBoardOf [zuko] [] of
-            (gs, [zukoId], _) -> do
-              let (inCombat, withOne) = S.addHandCard reversal S.alice (S.landsFor plains S.alice 4 (S.addPlayerCounter PlayerCounterKind.Experience 3 S.alice gs))
-                  (afterCombat, staged) = S.addHandCard reversal S.alice withOne
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
-                  castInCombat = S.runPure (castingOnly inCombat) blockers Engine.runStep
-                  postcombat = withPriority (S.runToStep Phase.PostcombatMain passing castInCombat)
-                  castAfter = S.runPure (castingOnly afterCombat) postcombat Engine.runStep
-              -- THE gameplay assertion: four after the combat cast, and still
-              -- four after the postcombat one.
-              Spec.assertEqWith s "CR 603.2 the combat cast adds one, the postcombat cast none" (experience castInCombat, experience castAfter) (4, 4)
-              Spec.assertEqWith s "and each Reversal was cast and resolved" (spent castInCombat, spent castAfter) (1, 2)
-              Spec.assertBool s (S.onBattlefield zukoId castAfter) "while Zuko is still there to see the second cast"
-              Spec.assertEqWith s "the second cast was in the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
-            _ -> Spec.assertFailure s "fixture should give alice a Zuko"
-
--- CR 702.189a's N restated as a count of the battlefield: Sun Warriors {2}{R}{W}
--- Creature -- Ally Human Warrior 3/5, "Firebending X, where X is the number of
--- creatures you control. / {5}: Create a 1/1 white Ally creature token."
--- Nothing is omitted, so pawl's Sun Warriors is neither stricter nor weaker
--- than printed.
---
--- alice controls FOUR creatures, distinct from the Warriors' power of three and
--- from the five a count reaching bob's Piker would make.
-sunWarriorsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-sunWarriorsSpec s registry =
-  let passing :: Prompt.Prompt r -> r
-      passing = S.aggressiveAnswer
-   in Spec.describe s "Sun Warriors" $ do
-        Spec.it s "CR 702.189a firebending X adds one retained {R} per creature its controller controls" $ do
-          sun <- S.printingOf s registry "Sun Warriors"
-          piker <- S.printingOf s registry "Goblin Piker"
-          traveler <- S.printingOf s registry "Doomed Traveler"
-          case S.combatBoardOf [sun, piker, traveler, traveler] [piker] of
-            (gs, [_, _, _, _], [_]) -> do
-              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs
-              Spec.assertEqWith s "CR 702.189a four retained {R}, one per creature alice controls" (poolOf S.alice blockers) (replicate 4 retainedRed)
-            _ -> Spec.assertFailure s "fixture should give alice four creatures and bob one"
-
 -- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
 -- artifact or creature spells") is the printing, and the whole card is that one
@@ -1276,59 +865,8 @@ sunWarriorsSpec s registry =
 --
 -- Nothing is omitted from the card, so pawl's Geosurge is neither stricter nor
 -- weaker than printed.
-geosurgeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+geosurgeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 geosurgeSpec s registry = Spec.describe s "Geosurge" $ do
-  -- The discriminating pair, and it is a pair of SPELLS rather than of boards:
-  -- one pool of seven red pays for the artifact spell and not for the instant,
-  -- which is the only difference between the two casts. The BEFORE board is the
-  -- control that keeps the refusal from passing for an unrelated reason -- with
-  -- four untapped Mountains instead of the restricted seven, the very same
-  -- Lightning Bolt in the very same hand, at the same phase and with the same
-  -- targets available, is castable.
-  Spec.it s "CR 106.6 the seven red pay for an artifact spell and not for an instant" $ do
-    geosurge <- S.printingOf s registry "Geosurge"
-    mountain <- S.printingOf s registry "Mountain"
-    solRing <- S.printingOf s registry "Sol Ring"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (before, after) = geosurgeBoards geosurge mountain
-        castables gs =
-          let (ringId, withRing) = S.addHandCard solRing S.alice gs
-              (boltId, withBolt) = S.addHandCard bolt S.alice gs
-           in (S.castable S.alice ringId withRing, S.castable S.alice boltId withBolt)
-    Spec.assertEqWith s "before Geosurge, four untapped Mountains cast either one" (castables before) (True, True)
-    Spec.assertEqWith s "after it, the same seven mana cast the artifact spell and refuse the instant" (castables after) (True, False)
-    Spec.assertEqWith s "and the pool is seven red, every one of them restricted" (poolOf S.alice after) (replicate 7 restrictedRed)
-
-  -- The other half: the mana the restriction ADMITS is spent like any other, so
-  -- the cast it allows really is paid out of these units and not out of some
-  -- other supply. Six restricted red are left, not seven and not zero.
-  Spec.it s "CR 106.4 the artifact cast spends one of the seven and leaves six" $ do
-    geosurge <- S.printingOf s registry "Geosurge"
-    mountain <- S.printingOf s registry "Mountain"
-    solRing <- S.printingOf s registry "Sol Ring"
-    let after = snd (geosurgeBoards geosurge mountain)
-        (ringId, withRing) = S.addHandCard solRing S.alice after
-        paid = S.runPure S.identityAnswer withRing (S.cast S.alice ringId)
-    Spec.assertEqWith s "Sol Ring is on the stack" (length (GameState.stack paid)) 1
-    Spec.assertEqWith s "six restricted red are left" (poolOf S.alice paid) (replicate 6 restrictedRed)
-
-  -- CR 106.4's other half, and the one that keeps the restriction from being a
-  -- way to LOSE mana: a cost the seven cannot pay is paid out of something else,
-  -- and the seven are still in the pool afterwards. One Mountain added AFTER
-  -- Geosurge resolved is the only difference from the board above, so the {R}
-  -- Lightning Bolt now has a legal payment that does not touch the restricted
-  -- mana -- and pawl must both offer that cast and pay it the way the rule says.
-  Spec.it s "CR 106.4 an instant paid from a Mountain leaves all seven restricted red floating" $ do
-    geosurge <- S.printingOf s registry "Geosurge"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let spare = S.landsFor mountain S.alice 1 (snd (geosurgeBoards geosurge mountain))
-        (boltId, withBolt) = S.addHandCard bolt S.alice spare
-        after = S.runPure S.identityAnswer withBolt (S.cast S.alice boltId)
-    Spec.assertBool s (S.castable S.alice boltId withBolt) "the spare Mountain makes the instant castable"
-    Spec.assertEqWith s "Lightning Bolt is on the stack" (length (GameState.stack after)) 1
-    Spec.assertEqWith s "and the seven restricted red are untouched" (poolOf S.alice after) (replicate 7 restrictedRed)
-
   -- CR 106.6 asked of a payment that is NO cast. Chromatic Star ("{1}, {T},
   -- Sacrifice this artifact: Add one mana of any color") is a mana ability whose
   -- own cost holds mana, and paying it is an activation cost (CR 602.2b) -- so
@@ -1362,20 +900,6 @@ geosurgeBoards geosurge mountain =
       cast_ = S.runPure S.identityAnswer before (S.cast S.alice geoId)
    in (before, S.runPure S.identityAnswer cast_ Stack.resolveTop)
 
--- One of Geosurge's seven: red, from a source that is not snow, lost as the
--- phase ends, and spendable only on an artifact or creature spell.
-restrictedRed :: ManaUnit.ManaUnit
-restrictedRed =
-  ManaUnit.MkManaUnit
-    { ManaUnit.manaType = ManaType.Colored Color.Red,
-      ManaUnit.tags = Set.empty,
-      ManaUnit.retention = ManaRetention.Ordinary,
-      ManaUnit.restriction =
-        Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])),
-      ManaUnit.rider = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing
-    }
-
 -- CR 106.6 on the OTHER road: a mana ability's restricted mana, added inline at
 -- payment (CR 605.3b) rather than by a spell resolving off the stack. Mishra's
 -- Workshop (Land, "{T}: Add {C}{C}{C}. Spend this mana only to cast artifact
@@ -1388,7 +912,7 @@ restrictedRed =
 -- Geosurge above is the same rule on the stack road, and the pair is what proves
 -- the two roads agree: the restriction rides Pawl.Types.ManaAddition, and
 -- Mana.manaOptionsOfGiven is what stamps it onto the units this road adds.
-workshopSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+workshopSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 workshopSpec s registry = Spec.describe s "Mishra's Workshop" $ do
   -- The discriminating pair, twice over. Two SPELLS: Sol Ring ({1} Artifact) is
   -- what the restriction admits and Goblin Piker ({1}{R} Creature) is what it
@@ -1413,89 +937,6 @@ workshopSpec s registry = Spec.describe s "Mishra's Workshop" $ do
            in (S.castable S.alice ringId withBoth, S.castable S.alice pikerId withBoth)
     Spec.assertEqWith s "three unrestricted colourless and a Mountain cast either one" (castables (S.landsFor tower S.alice 3 (S.landsInPlay mountain 1))) (True, True)
     Spec.assertEqWith s "the Workshop's three cast the artifact spell and not the creature spell" (castables (S.landsFor workshop S.alice 1 (S.landsInPlay mountain 1))) (True, False)
-
-  -- The stamp itself, read off the pool the payment left. One Workshop and
-  -- nothing else, so the {1} has one payment and the two unspent mana are
-  -- CR 106.4's floating remainder -- restricted, which is what says the inline
-  -- path carried the instruction's clause and not just its type.
-  Spec.it s "CR 106.4 the artifact cast spends one of the three and leaves two restricted" $ do
-    workshop <- S.printingOf s registry "Mishra's Workshop"
-    solRing <- S.printingOf s registry "Sol Ring"
-    let (before, ringId) = S.handOne solRing (S.landsInPlay workshop 1)
-        paid = S.runPure S.identityAnswer before (S.cast S.alice ringId)
-    Spec.assertEqWith s "two restricted colourless are left floating" (poolOf S.alice paid) (replicate 2 restrictedColorless)
-    Spec.assertEqWith s "Sol Ring is on the stack" (length (GameState.stack paid)) 1
-    Spec.assertEqWith s "and the Workshop is the permanent that paid" (S.tappedCount S.alice paid) 1
-
--- One of the Workshop's three: colourless, from a source that is not snow, lost
--- as the phase ends, and spendable only on an artifact spell.
-restrictedColorless :: ManaUnit.ManaUnit
-restrictedColorless =
-  ManaUnit.MkManaUnit
-    { ManaUnit.manaType = ManaType.Colorless,
-      ManaUnit.tags = Set.empty,
-      ManaUnit.retention = ManaRetention.Ordinary,
-      ManaUnit.restriction = Just (ManaRestriction.onlyCasts (Filter.HasCardType CardType.Artifact)),
-      ManaUnit.rider = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing
-    }
-
--- CR 106.6 with CR 607.2d: a restriction whose predicate reads a CHOICE the
--- SOURCE made rather than a word printed on the card. Pillar of Origins ({2}
--- Artifact, "As this artifact enters, choose a creature type. {T}: Add one mana of
--- any color. Spend this mana only to cast a creature spell of the chosen type")
--- is the printing, and the whole card is those two sentences -- the cheapest
--- member of the Cavern of Souls family.
---
--- Nothing is omitted from the card, so pawl's Pillar is neither stricter nor
--- weaker than printed.
---
--- The choice cannot be looked up at payment: Pawl.Types.ManaUnit carries no source
--- id, so Mana.sourceChosenSubtypeOf bakes the answer onto every unit the Pillar
--- adds and Mana.admitsUnder hands it to Filter.HasChosenSubtype.
-pillarSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-pillarSpec s registry = Spec.describe s "Pillar of Origins" $ do
-  -- The gameplay-level proof docs/design.md section 4 asks for: cast the Pillar,
-  -- answer its as-enters prompt for real, let it resolve, and ask what its one
-  -- mana can pay for.
-  --
-  -- Run TWICE with different answers on ONE board, Pawl.AuraSpec's Convincing
-  -- Mirage arrangement and for its reason: one half alone would pass for an
-  -- implementation that conjured a fixed type, and two halves that disagree can
-  -- only be told apart by reading the choice.
-  --
-  -- The two spells are Goblin Grappler ({R} Goblin) and Llanowar Elves ({G} Elf
-  -- Druid): one mana each, different colours, different creature types. The
-  -- Pillar's mana is of ANY colour, so neither refusal can be a colour the board
-  -- cannot make, and the two runs are each other's control -- the boards are
-  -- identical and only the answer differs. Each run casts ONE of the two, so
-  -- neither pair can be two refusals.
-  --
-  -- The two lands are Reliquary Towers, which the Pillar's {2} taps: nothing
-  -- untapped is left once it has resolved, and a Tower's colourless could not pay
-  -- either coloured pip in any case.
-  Spec.it s "CR 607.2d whole card: the Pillar's mana casts a creature of the chosen type and no other" $ do
-    pillar <- S.printingOf s registry "Pillar of Origins"
-    tower <- S.printingOf s registry "Reliquary Tower"
-    grappler <- S.printingOf s registry "Goblin Grappler"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    let (withPillar, pillarSpell) = S.handOne pillar (S.landsInPlay tower 2)
-        run pick =
-          let cast_ = S.runPure (pillarChoosing pick) withPillar (S.cast S.alice pillarSpell)
-           in S.runPure (pillarChoosing pick) cast_ Stack.resolveTop
-        castables gs =
-          let (grapplerId, withGoblin) = S.addHandCard grappler S.alice gs
-              (elvesId, withBoth) = S.addHandCard elves S.alice withGoblin
-           in (S.castable S.alice grapplerId withBoth, S.castable S.alice elvesId withBoth)
-    Spec.assertEqWith s "CR 106.6 choosing Goblin, the Pillar's mana casts the Goblin and refuses the Elf" (castables (run Subtype.Goblin)) (True, False)
-    Spec.assertEqWith s "CR 106.6 choosing Elf, the same board and the pair flips" (castables (run Subtype.Elf)) (False, True)
-
--- Pillar of Origins' CR 614.1c as-enters creature type, and nothing else: the
--- card raises no other prompt this case has to steer.
-pillarChoosing :: Subtype.Subtype -> Prompt.Prompt r -> r
-pillarChoosing subtype p = case p of
-  Prompt.ChooseCreatureType {} -> subtype
-  _ -> S.identityAnswer p
 
 -- CR 106.4's retention on the INLINE road (CR 605.3b), the third clause a mana
 -- ability's ManaAddition carries onto the units it adds -- the restriction above
@@ -1540,9 +981,9 @@ lastingSpringSpec s registry = Spec.describe s "Synthetic Lasting Spring" $ do
     Spec.assertEqWith s "the pools say the same thing" (poolOf S.alice (ran spring), poolOf S.alice (ran powder)) ([retainedColorless], [])
 
 -- `printing`'s one mana ability activated inline during alice's upkeep. The
--- schedule loses its head for shizukoStep's reason: Setup.emptyGame's
--- `remaining` still begins with the upkeep step, so a runStep-driven board would
--- otherwise advance back into the step it just ran.
+-- schedule loses its head because Setup.emptyGame's `remaining` still begins
+-- with the upkeep step, so a runStep-driven board would otherwise advance back
+-- into the step it just ran.
 tappedAtUpkeep :: Printing.Printing -> GameState.GameState
 tappedAtUpkeep printing =
   let (oid, board) = S.addPermanent printing S.alice (Setup.emptyGame S.bothPlayers)
@@ -1640,31 +1081,6 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
         -- have overwritten it, which is what this pins.
         Spec.assertEqWith s "CR 400.7d the equip records no mana spent on the Bonesplitter" (fmap Object.manaSpent (Game.lookupObject equipId equipped)) (Just (Mana.Type.MkMana []))
 
-  -- The CONTROL, one Island apart. Everything the assertions above rest on that
-  -- is not CR 106.6 -- the Hawker being unsick enough to tap (CR 302.6), the
-  -- equip's sorcery-speed rider (CR 702.6a), a legal equip target, the phase --
-  -- is unchanged here, and both the equip and the cast go through. So the
-  -- refusal above is the restriction and not the board.
-  Spec.it s "CR 106.6 one Island casts the same spell, so the refusal above is the restriction" $ do
-    hawker <- S.printingOf s registry "Omen Hawker"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    recall <- S.printingOf s registry "Ancestral Recall"
-    solRing <- S.printingOf s registry "Sol Ring"
-    island <- S.printingOf s registry "Island"
-    let (hawkerId, g1) = S.addPermanent hawker S.alice (S.landsInPlay island 1)
-        (equipId, g2) = S.addPermanent bonesplitter S.alice g1
-    case Projection.abilitiesOf equipId g2 of
-      [] -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
-      equipAbility : _ -> do
-        let (g3, recallId) = S.handOne recall g2
-            (ringId, board) = S.addHandCard solRing S.alice g3
-            equipped =
-              let activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice equipId equipAbility)
-               in S.runPure S.identityAnswer activated Stack.resolveTop
-        Spec.assertEqWith s "the equip still resolves" (S.powerToughnessOf hawkerId equipped) (Just (3, 1))
-        Spec.assertBool s (S.castable S.alice recallId board) "and the Island casts the instant"
-        Spec.assertBool s (S.castable S.alice ringId board) "and the artifact spell too, so neither demand is what refused above"
-
   -- CR 602.2b's own reading, one level in: paying a mana ability's activation
   -- cost is an activation, so mana restricted to activations may pay it. Omen
   -- Hawker taps for {C}{U}, one of those buys Chromatic Star's "{1}, {T},
@@ -1748,7 +1164,7 @@ hawkerMana manaType =
 -- rider's predicate cannot come out right here by luck; and its rider carries a
 -- real predicate -- "an instant or sorcery spell" -- where the Halfling's
 -- narrows nothing, so the condition field is proven rather than merely present.
-boseijuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boseijuSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 boseijuSpec s registry = Spec.describe s "Boseiju, Who Shelters All" $ do
   -- The pair, one mana source apart. Divination ({2}{U} Sorcery, "Draw two
   -- cards") is the victim, and alice's three lands are exactly its three mana --
@@ -1777,23 +1193,6 @@ boseijuSpec s registry = Spec.describe s "Boseiju, Who Shelters All" $ do
     -- Only now the proxies, both of them behind the assertion above.
     Spec.assertBool s (not (any isSpellCountered (S.eventsOf withBoseiju))) "CR 701.6a nothing was countered"
     Spec.assertBool s (any isSpellCountered (S.eventsOf allIslands)) "and on the control board something was"
-
-  -- The rider's CONDITION, which the case above cannot reach: its board would
-  -- pass with the predicate widened to Pawl.Types.Filter's trivial @And []@.
-  -- Erudite Wizard ({2}{U} Creature) costs what Divination costs and is paid the
-  -- same way off the same three lands, so the boards differ in the victim's card
-  -- type and in nothing else -- and CR 106.6's clause names instants and
-  -- sorceries, so this one IS counterable.
-  Spec.it s "CR 106.6 the same mana leaves a creature spell counterable" $ do
-    boseiju <- S.printingOf s registry "Boseiju, Who Shelters All"
-    island <- S.printingOf s registry "Island"
-    wizard <- S.printingOf s registry "Erudite Wizard"
-    cancel <- S.printingOf s registry "Cancel"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let alicesLands = S.landsFor boseiju S.alice 1 (S.landsInPlay island 2)
-        (_, after) = counteredAfter piker cancel island alicesLands wizard
-    Spec.assertEqWith s "CR 701.6a the creature spell was countered, so no creature reached the battlefield" (S.creaturesInPlay S.alice after) 0
-    Spec.assertEqWith s "and it is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
 -- alice casts `victim` off the lands `alicesLands` already gives her, bob
 -- answers with Cancel, and the stack is then walked all the way down. bob's three
@@ -2461,13 +1860,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   stadiumVendorsSpec s registry
   shizukoSpec s registry
   avatarRokuSpec s registry
-  zhaoSpec s registry
-  firebendingStudentSpec s registry
-  zukoFirebendingMasterSpec s registry
-  sunWarriorsSpec s registry
   geosurgeSpec s registry
   workshopSpec s registry
-  pillarSpec s registry
   lastingSpringSpec s registry
   omenHawkerSpec s registry
   boseijuSpec s registry

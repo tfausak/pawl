@@ -440,51 +440,6 @@ spec s registry = Spec.describe s "Meld" $ do
         -- 701.42a's opcode reads (CR 400.7j).
         Spec.assertEqWith s "and the pair still melds into Hanweir, the Writhing Township" (S.countOnBattlefieldByName townshipName S.alice after) 1
       abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
-  -- CR 608.2d: "a creature named Hanweir Garrison" is a choice announced while
-  -- the effect is applied, and with two of them it is a real one. The two boards
-  -- are identical and differ only in the ANSWER, so a run that ignored the
-  -- decider would give them the same outcome.
-  Spec.it s "CR 608.2d with two Hanweir Garrisons the resolving controller says which one melds" $ do
-    battlements <- S.printingOf s registry "Hanweir Battlements"
-    garrison <- S.printingOf s registry "Hanweir Garrison"
-    mountain <- S.printingOf s registry "Mountain"
-    let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
-        (firstG, g2) = S.addPermanent garrison S.alice g1
-        (secondG, g3) = S.addPermanent garrison S.alice g2
-        board = readyFor mountain g3
-    case Projection.abilitiesOf bId board of
-      [_, _, melding] -> do
-        let melding_ chosen = S.runPure (sparing bId (choosing chosen)) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
-            survivor picked kept = fmap Object.zone (Game.lookupObject kept (melding_ picked))
-            taken picked = fmap Object.zone (Game.lookupObject picked (melding_ picked))
-        Spec.assertEqWith s "naming the first Garrison leaves the second on the battlefield" (survivor firstG secondG) (Just Zone.Battlefield)
-        Spec.assertEqWith s "and naming the second leaves the first there instead" (survivor secondG firstG) (Just Zone.Battlefield)
-        Spec.assertEqWith s "the Garrison that was named is gone" (taken firstG) Nothing
-        Spec.assertEqWith s "in either run" (taken secondG) Nothing
-        Spec.assertEqWith s "and either way exactly one melded permanent arrived" (fmap (S.countOnBattlefieldByName townshipName S.alice . melding_) [firstG, secondG]) [1, 1]
-      abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
-  -- The printed condition, which is a gate on the whole clause: "If you both own
-  -- AND control this land and a creature named Hanweir Garrison". Two boards,
-  -- each differing from the melding board above in ONE thing -- no Garrison at
-  -- all, and a Garrison alice controls but bob owns -- and on neither does the
-  -- land exile itself for nothing. The second board is what the word "own" buys:
-  -- a control-only reading would meld bob's card away.
-  Spec.it s "CR 608.2c the ability does nothing without a Hanweir Garrison you both own and control" $ do
-    battlements <- S.printingOf s registry "Hanweir Battlements"
-    garrison <- S.printingOf s registry "Hanweir Garrison"
-    mountain <- S.printingOf s registry "Mountain"
-    let resolvedOn extra =
-          let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
-              board = readyFor mountain (extra g1)
-           in case Projection.abilitiesOf bId board of
-                [_, _, melding] -> (Just bId, S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop))
-                _ -> (Nothing, board)
-        borrowed g1 =
-          let (theirs, g2) = S.addPermanent garrison S.bob g1
-           in S.giveControl theirs S.alice g2
-        stayed (mBId, after) = (fmap (\bId -> fmap Object.zone (Game.lookupObject bId after)) mBId, S.countOnBattlefieldByName townshipName S.alice after)
-    Spec.assertEqWith s "with no Garrison anywhere the land is untouched and nothing melded" (stayed (resolvedOn id)) (Just (Just Zone.Battlefield), 0)
-    Spec.assertEqWith s "and a Garrison alice controls but does not own is not one the ability may name" (stayed (resolvedOn borrowed)) (Just (Just Zone.Battlefield), 0)
   -- CR 701.42c's own example, with Hanweir in place of Midnight Scavengers: the
   -- counterpart is a TOKEN copy of Hanweir Garrison, which CR 701.42b bars from
   -- melding (CR 108.2 makes a token no card at all). The card's own "exile them"
@@ -1412,16 +1367,6 @@ readyFor mountain gs =
       GameState.activePlayer = S.alice,
       GameState.priority = Just S.alice
     }
-
--- CR 608.2d's answer pinned by IDENTITY rather than by index: the named permanent
--- if the engine offered it, and every other prompt left to the identity answerer.
--- Filtering the offer is what makes a run that never asked distinguishable from
--- one that did -- an answerer building its own id could not tell them apart.
-choosing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-choosing wanted p = case p of
-  Prompt.ChoosePermanent _ _ _ candidates
-    | List.elem wanted (NonEmpty.toList candidates) -> wanted
-  _ -> S.identityAnswer p
 
 -- CR 712.21a's arrangement pinned by INDEX, over a board whose Griptide aims at
 -- the melded permanent by identity. The permutation is the one thing a caller

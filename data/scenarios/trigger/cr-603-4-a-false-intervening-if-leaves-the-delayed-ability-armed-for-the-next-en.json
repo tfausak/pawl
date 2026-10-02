@@ -1,0 +1,74 @@
+{
+  "description": "CR 603.4 a false intervening \"if\" leaves the delayed ability armed for the next end step",
+  "note": "alice casts Synthetic Deferred Rally ('at the beginning of the next end step, if you control a creature, you gain 2 life') in bob's turn with no creature: that end step it does not trigger. On her own turn she casts a Goblin Piker, and that end step it triggers and she gains 2: it was still armed. At the end step after, it triggers no more, which is the one shot spent. The Haskell test's added Piker is reached by casting it.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Deferred Rally",
+            "label": "rally"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$rally", "mana": ["$plains", null]}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"View": {"of": "Stack", "is": []}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "alice", "life": 20}}},
+    {"turn": 2, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$piker", "mana": ["$mountain-1", "$mountain-2", null]}}},
+    {"turn": 2, "step": "EndStep", "player": "alice", "check": {"View": {"of": "Stack", "is": ["trigger of Synthetic Deferred Rally"]}}},
+    {"turn": 2, "step": "EndStep", "player": "alice", "do": "Pass"},
+    {"turn": 2, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "alice", "life": 22}}},
+    {"turn": 3, "step": "EndStep", "player": "alice", "check": {"View": {"of": "Stack", "is": []}}},
+    {"turn": 3, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "alice", "life": 22}}}
+  ]
+}

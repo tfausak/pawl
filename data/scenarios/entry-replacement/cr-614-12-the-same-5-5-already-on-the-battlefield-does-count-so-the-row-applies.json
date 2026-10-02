@@ -1,0 +1,220 @@
+{
+  "description": "CR 614.12 the same 5/5 already on the battlefield does count, so the row applies",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-5",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-6",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-7",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-8",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-9",
+            "ready": true
+          },
+          {
+            "card": "Jedit Ojanen",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rise of the Dark Realms",
+            "label": "rise-of-the-dark-realms",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Frontier Mastodon"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$rise-of-the-dark-realms",
+          "mana": [
+            "$swamp",
+            "$swamp-2",
+            "$swamp-3",
+            "$swamp-4",
+            "$swamp-5",
+            "$swamp-6",
+            "$swamp-7",
+            "$swamp-8",
+            "$swamp-9"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Frontier Mastodon",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Rise of the Dark Realms",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Frontier Mastodon",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Rise of the Dark Realms",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-3",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-4",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-5",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-6",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-7",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-8",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$swamp-9",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Frontier Mastodon",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Frontier Mastodon",
+        "tapped": false
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "Frontier Mastodon",
+        "power": 4,
+        "toughness": 3
+      }
+    },
+    {
+      "Counters": {
+        "object": "Frontier Mastodon",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    }
+  ]
+}

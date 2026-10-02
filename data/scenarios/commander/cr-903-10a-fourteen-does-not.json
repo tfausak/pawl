@@ -1,0 +1,116 @@
+{
+  "description": "CR 903.10a fourteen does not",
+  "note": "Two of alice's turns, each a 7-point swing by her commander; the Haskell test skips the steps between combats, so here each player's library holds Islands for the draws.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "life": 40,
+        "battlefield": [
+          {
+            "card": "Kalakscion, Hunger Tyrant",
+            "label": "kalakscion",
+            "ready": true,
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 40,
+        "command": [
+          {
+            "card": "Jedit Ojanen",
+            "label": "jedit",
+            "commander": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$kalakscion"
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "CommanderDamage",
+          "player": "bob",
+          "is": [
+            [
+              "Kalakscion, Hunger Tyrant",
+              14
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 26
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Result",
+          "is": null
+        }
+      }
+    }
+  ]
+}

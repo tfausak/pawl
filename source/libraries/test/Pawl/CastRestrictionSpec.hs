@@ -16,7 +16,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import Pawl.CastSpec (aliceOnTurn, isPlaneswalkerTarget, rallyBoard, tapStateOf)
+import Pawl.CastSpec (aliceOnTurn, rallyBoard, tapStateOf)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
@@ -60,7 +60,6 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
-import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -73,47 +72,6 @@ import qualified Pawl.Types.Zone as Zone
 
 printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
-  -- Both clauses satisfied: bob is the defending player (CR 506.2), attackers
-  -- have joined (CR 508.8), and the game is in the declare attackers step.
-  Spec.it s "CR 601.3 castable once bob has been attacked in the declare attackers step" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    plains <- S.printingOf s registry "Plains"
-    rally <- S.printingOf s registry "Rally the Troops"
-    let (bobsRally, _, _, board) = rallyBoard piker plains rally
-        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertBool s (S.castable S.bob bobsRally attacked) "castable"
-    Spec.assertBool s (elem (A.Cast bobsRally (S.printingName rally) Facing.FaceUp) (Action.legalActions S.bob attacked)) "and offered as a legal action"
-  -- CR 306.6 / CR 508.1b: the same board, with the attack aimed at bob's
-  -- planeswalker instead of at bob. Eightfold Maze's ruling is the reading being
-  -- pinned -- "If all the attacking creatures attack your planeswalkers, you
-  -- can't cast Eightfold Maze. To cast it, a creature needs to have attacked
-  -- _you_" -- so this is the case that says "you've been attacked" is a question
-  -- about the ATTACK TARGET and not about whether a declaration happened.
-  --
-  -- Its own control is the test above: one Piker, one step, one declaration; the
-  -- only difference is what it was announced as attacking.
-  Spec.it s "CR 601.3 not castable when the only attacker attacked bob's planeswalker instead" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    plains <- S.printingOf s registry "Plains"
-    rally <- S.printingOf s registry "Rally the Troops"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (bobsRally, _, _, board) = rallyBoard piker plains rally
-        (jaceId, withJace) = S.addPermanent jace S.bob board
-        loyal = S.addCounter CounterKind.Loyalty 3 jaceId withJace
-        atPlaneswalker :: Prompt.Prompt r -> r
-        atPlaneswalker p = case p of
-          Prompt.ChooseAttackTarget _ _ _ options -> case filter isPlaneswalkerTarget (NonEmpty.toList options) of
-            target : _ -> target
-            [] -> NonEmpty.head options
-          _ -> S.aggressiveAnswer p
-        attacked = S.runPure atPlaneswalker loyal (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith
-      s
-      "the Piker really was declared, attacking the planeswalker"
-      (Map.elems (Combat.Type.attackers (GameState.combat attacked)))
-      [AttackTarget.OfPlaneswalker jaceId]
-    Spec.assertBool s (not (S.castable S.bob bobsRally attacked)) "not castable"
-    Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob attacked))) "and not offered"
   -- The "only if you've been attacked this step" clause, isolated: the step is
   -- right and nobody has attacked yet.
   Spec.it s "CR 601.3 not castable in the declare attackers step before attackers are declared" $ do
@@ -123,41 +81,6 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
     Spec.assertBool s (not (S.castable S.bob bobsRally board)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob board))) "and not offered"
-  -- The same clause from the other side, and the reason the check cannot be a
-  -- question about the step alone: Eightfold Maze's ruling is "To cast it, a
-  -- creature needs to have attacked _you_", and nothing attacked alice.
-  Spec.it s "CR 601.3 the ATTACKING player is not offered it in the same step" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    plains <- S.printingOf s registry "Plains"
-    rally <- S.printingOf s registry "Rally the Troops"
-    let (_, alicesRally, _, board) = rallyBoard piker plains rally
-        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertBool s (not (S.castable S.alice alicesRally attacked)) "not castable"
-    Spec.assertBool s (not (any (S.isCastOf alicesRally) (Action.legalActions S.alice attacked))) "and not offered"
-  -- Both of Rally's clauses fail in the declare blockers step, and this case
-  -- pins the wider one: CR 511.3 keeps the PHASE-scoped record live until the
-  -- end of combat step ends, so bob is still on it, and the window has passed.
-  -- (The step-scoped record is already empty by then -- the case below is what
-  -- proves that -- so this is a conjunction failing rather than one clause
-  -- isolated.)
-  --
-  -- Carries its own control, in the same step and for the same player: bob's
-  -- Bolt is still offered, so what stops the Rally is the clauses and not the
-  -- step being closed to bob altogether.
-  Spec.it s "CR 601.3 not castable in the declare blockers step, though bob was attacked" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    plains <- S.printingOf s registry "Plains"
-    rally <- S.printingOf s registry "Rally the Troops"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (bobsRally, _, _, board) = rallyBoard piker plains rally
-        (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addPermanent mountain S.bob board))
-        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.manaPerformer S.alice)
-        later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
-    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
-    Spec.assertBool s (not (S.castable S.bob bobsRally later)) "not castable"
-    Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob later))) "and not offered"
-    Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt) Facing.FaceUp) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
   -- CR 508.6 on CR 500.1's span: "you've been attacked this step" asks about ONE
   -- STEP, and no printed card tells that from "this combat phase" -- Scryfall
   -- `o:"been attacked this step"`, 2026-08-21, returns fifteen cards and every
@@ -247,24 +170,6 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
         (boltId, withBolt) = S.addHandCard bolt S.alice (snd (S.addPermanent mountain S.alice board))
     Spec.assertBool s (S.castable S.alice boltId withBolt) "castable"
     Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt) Facing.FaceUp) (Action.legalActions S.alice withBolt)) "and offered as a legal action"
-  -- Gameplay level, through the stack: the permitted cast resolves and its
-  -- effect lands, so the gate is a gate and not a silent no-op.
-  Spec.it s "CR 601.3 the permitted cast resolves and untaps bob's creatures" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    plains <- S.printingOf s registry "Plains"
-    rally <- S.printingOf s registry "Rally the Troops"
-    let (bobsRally, _, bobsPiker, board) = rallyBoard piker plains rally
-        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-        cast = S.runPure S.identityAnswer attacked (S.cast S.bob bobsRally)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "tapped before" (tapStateOf bobsPiker attacked) (Just TapState.Tapped)
-    Spec.assertEqWith s "untapped after" (tapStateOf bobsPiker resolved) (Just TapState.Untapped)
-    -- "creatures YOU control" is the CASTER's, not everyone's. CR 508.1f taps
-    -- alice's attacker as it is declared, and alice's only other permanent is
-    -- an untapped Plains, so her tapped count is exactly her attacker -- before
-    -- the spell and after it.
-    Spec.assertEqWith s "alice's attacker was tapped to attack" (S.tappedCount S.alice attacked) 1
-    Spec.assertEqWith s "and Rally did not untap it" (S.tappedCount S.alice resolved) 1
 
   necrologiaSpec s registry
 
@@ -286,14 +191,6 @@ necrologiaBoard swamp mountain necrologia bolt ph =
       (boltId, withBolt) = S.addHandCard bolt S.alice (snd (S.addPermanent mountain S.alice base))
       stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard swamp S.alice gs)) withBolt [1 :: Int, 2, 3]
    in (necrologiaId, boltId, stocked)
-
--- Announces this X for Necrologia; every other prompt takes the identity
--- fallback. CostSpec's answerHatredXOf, for the other card whose only X is a
--- CostComponent.PayLifeX.
-answerNecrologiaXOf :: Natural -> Prompt.Prompt r -> r
-answerNecrologiaXOf n p = case p of
-  Prompt.ChooseX {} -> n
-  _ -> S.identityAnswer p
 
 necrologiaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 necrologiaSpec s registry = Spec.describe s "Necrologia" $ do
@@ -341,22 +238,6 @@ necrologiaSpec s registry = Spec.describe s "Necrologia" $ do
     let (oid, boltId, board) = necrologiaBoard swamp mountain necrologia bolt (Phase.Ending EndingStep.Cleanup)
     Spec.assertBool s (not (S.castable S.alice oid board)) "a Step window names one step"
     Spec.assertBool s (S.castable S.alice boltId board) "though the control instant is castable"
-  -- Gameplay level, through the stack: the permitted cast resolves, CR 119.4
-  -- takes the announced life and CR 121.3 draws that many, so the gate admits a
-  -- card that then plays. Falsifiers: an X read as 0 leaves 20 life and one card
-  -- drawn short of nothing; an X paid but not read back leaves 18 life and no
-  -- draw.
-  Spec.it s "CR 601.2b/107.3a the permitted cast pays 2 life and draws 2" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    mountain <- S.printingOf s registry "Mountain"
-    necrologia <- S.printingOf s registry "Necrologia"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (oid, _, board) = necrologiaBoard swamp mountain necrologia bolt (Phase.Ending EndingStep.EndStep)
-        after = S.runPure (answerNecrologiaXOf 2) board (do S.cast S.alice oid; Stack.resolveTop)
-    Spec.assertEqWith s "CR 119.4 subtracted the announced 2" (S.lifeOf S.alice after) (Just 18)
-    -- One Bolt left in hand plus the two drawn; Necrologia itself has left it.
-    Spec.assertEqWith s "two cards drawn" (S.handSize S.alice after) 3
-    Spec.assertEqWith s "and the library is two shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 1
 
 -- alice holds one Pouncing Cheetah and one War Mammoth, with four untapped
 -- Forests -- enough for either one alone ({2}{G} and {3}{G}), so nothing below
@@ -441,30 +322,6 @@ flashSpec s registry = Spec.describe s "Flash" $ do
         buried = S.runPure S.identityAnswer gs (Event.changeZone cheetahId Zone.Graveyard)
     Spec.assertBool s (S.castable S.alice cheetahId gs) "castable from the hand"
     Spec.assertEqWith s "and nothing castable once it is in the graveyard" (Cast.castableSpells S.alice buried) []
-  -- Flash moves the window the cast is PROPOSED in and nothing else. Two rules
-  -- say what is left untouched, and they are two:
-  --
-  --   * CR 601.2a, the stack half: "To propose the casting of a spell, a player
-  --     first moves that card ... from where it is to the stack. It becomes the
-  --     topmost object on the stack." So the Cheetah is a spell before it is a
-  --     permanent, exactly as a sorcery-speed creature spell is.
-  --   * CR 117.3c, the response half: "If a player has priority when they cast a
-  --     spell ... that player receives priority afterward" -- and then CR 117.1a
-  --     lets the opponent cast an instant when priority reaches them.
-  Spec.it s "CR 601.2a / 117.3c an instant-speed creature spell still uses the stack and can be responded to" $ do
-    forest <- S.printingOf s registry "Forest"
-    mountain <- S.printingOf s registry "Mountain"
-    pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (gs0, cheetahId) = S.handOne pouncingCheetah (S.landsInPlay forest 4)
-        (boltId, gs1) = S.addHandCard lightningBolt S.bob (snd (S.addPermanent mountain S.bob gs0))
-        bobsTurn = gs1 {GameState.activePlayer = S.bob}
-        cast = S.runPure S.identityAnswer bobsTurn (S.cast S.alice cheetahId)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "one object on the stack" (length (GameState.stack cast)) 1
-    Spec.assertEqWith s "and not on the battlefield yet" (S.creaturesInPlay S.alice cast) 0
-    Spec.assertBool s (S.castable S.bob boltId cast) "bob may respond to it"
-    Spec.assertEqWith s "it resolves into a creature like any other" (S.creaturesInPlay S.alice resolved) 1
   -- Cast.instantSpeed reads the CR 613 projection, and this is the case that says
   -- the printed keyword still reaches it: a card whose flash is printed rather
   -- than granted is castable on the same board.
@@ -1582,130 +1439,6 @@ hostageTakerSpec s registry = Spec.describe s "HostageTaker" $ do
           other -> Spec.assertFailure s ("expected exactly one Goblin Piker on the battlefield, got " <> show (length other))
       other -> Spec.assertFailure s ("expected exactly one exiled Piker, got " <> show (length other))
 
--- alice with `n` untapped Swamps and one spell in hand, a Goblin Piker under BOB
--- for the spells that target a creature, and Drought under bob when one is
--- passed. The positive and the negative differ in that Maybe and in nothing
--- else: same seats, same permanents, same Swamps.
---
--- Drought sits with BOB however the cast goes, because its sentence is symmetric
--- ("Spells cost an additional ...", no possessive, PlayerScope.EachPlayer) --
--- the board that proves that is the one where the caster does not control it.
-droughtBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Maybe Printing.Printing ->
-  Int ->
-  (GameState.GameState, ObjectId.ObjectId)
-droughtBoard swamp piker spell mDrought n =
-  let withPiker = snd (S.addPermanent piker S.bob (S.landsInPlay swamp n))
-      board = maybe withPiker (\drought -> snd (S.addPermanent drought S.bob withPiker)) mDrought
-   in S.handOne spell board
-
--- Drought {2}{W}{W} Enchantment (ICE), Oracle text checked against Scryfall:
--- "At the beginning of your upkeep, sacrifice this enchantment unless you pay
--- {W}{W}. / Spells cost an additional \"Sacrifice a Swamp\" to cast for each
--- black mana symbol in their mana costs. / Activated abilities cost an
--- additional \"Sacrifice a Swamp\" to activate for each black mana symbol in
--- their activation costs."
---
--- The SPELL sentence, which is CR 118.8's "or applied to a spell or ability from
--- another effect" -- the half a spell's own card text cannot state -- reaching CR
--- 601.2f's total. The activation sentence is Pawl.ActivateSpec's droughtSpec;
--- line one is droughtUpkeepSpec below.
---
--- STRICTLY MORE Swamps than any case consumes on every board, so a cast that
--- succeeded for lack of anything to sacrifice cannot pass: the assertion is the
--- SURVIVOR count and never zero.
---
--- NO SINGLE CASE HERE DISCRIMINATES. An implementation that adds the component
--- unconditionally passes the one-symbol case and fails the zero-symbol one; one
--- that adds it exactly once for a black spell passes both and fails the
--- two-symbol case; one that saturates at two fails only Stalker Hag's three. The
--- ladder 0, 1, 2, 3 is the proof, and the counting RULE is what Dismember and
--- the Hag add on top of it.
-droughtSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-droughtSpec s registry = Spec.describe s "Drought" $ do
-  -- ONE black mana symbol, so one Swamp. Doom Blade is {1}{B}, and the generic
-  -- half is what shows the count is over SYMBOLS OF A COLOUR and not over the
-  -- cost's size.
-  Spec.it s "CR 601.2f a spell with one black symbol costs a Swamp to cast" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    drought <- S.printingOf s registry "Drought"
-    blade <- S.printingOf s registry "Doom Blade"
-    let (taxed, taxedId) = droughtBoard swamp piker blade (Just drought) 5
-        (free, freeId) = droughtBoard swamp piker blade Nothing 5
-        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
-        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
-    Spec.assertEqWith s "one of the five Swamps was sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 4
-    Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
-    Spec.assertEqWith s "and the Blade is on the stack, not refused" (length (GameState.stack after)) 1
-  -- ZERO black mana symbols, so nothing at all -- not a Sacrifice component of
-  -- count zero. Bonesplitter is {1}, and the board is carried far enough that a
-  -- component added regardless of the count would have taken a Swamp.
-  Spec.it s "CR 601.2f a spell with no black symbol sacrifices nothing" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    drought <- S.printingOf s registry "Drought"
-    splitter <- S.printingOf s registry "Bonesplitter"
-    let (taxed, taxedId) = droughtBoard swamp piker splitter (Just drought) 5
-        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
-    Spec.assertEqWith s "all five Swamps survive" (S.countOnBattlefieldByName swampName S.alice after) 5
-    Spec.assertEqWith s "and the Bonesplitter is on the stack" (length (GameState.stack after)) 1
-  -- TWO black mana symbols, so two Swamps: the multiplier, which the one-symbol
-  -- case above cannot tell from "add it once". Sign in Blood is {B}{B}.
-  Spec.it s "CR 601.2f two black symbols cost two Swamps" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    drought <- S.printingOf s registry "Drought"
-    sign <- S.printingOf s registry "Sign in Blood"
-    let (taxed, taxedId) = droughtBoard swamp piker sign (Just drought) 5
-        (free, freeId) = droughtBoard swamp piker sign Nothing 5
-        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
-        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
-    Spec.assertEqWith s "two of the five Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
-    Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
-    Spec.assertEqWith s "and Sign in Blood is on the stack" (length (GameState.stack after)) 1
-  -- CR 107.4f: "Phyrexian mana symbols are colored mana symbols ... {B/P} is
-  -- black", so Dismember's {1}{B/P}{B/P} holds two BLACK mana symbols and
-  -- demands two Swamps -- where an implementation counting only CR 107.4a's
-  -- five primary symbols reads it as zero.
-  Spec.it s "CR 107.4f two Phyrexian black symbols cost two Swamps too" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    drought <- S.printingOf s registry "Drought"
-    dismember <- S.printingOf s registry "Dismember"
-    let (taxed, taxedId) = droughtBoard swamp piker dismember (Just drought) 5
-        (free, freeId) = droughtBoard swamp piker dismember Nothing 5
-        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
-        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
-    Spec.assertEqWith s "two of the five Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
-    Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
-    Spec.assertEqWith s "and Dismember is on the stack" (length (GameState.stack after)) 1
-  -- Drought's own 2008-08-01 ruling, on the symbols it was written about: "A
-  -- hybrid symbol that is both black and another type is a black mana symbol,
-  -- regardless of what cost is paid for it." Stalker Hag is {B/G}{B/G}{B/G}, so
-  -- it is THREE black mana symbols -- and the ruling's last clause is what the
-  -- board pins: every one of them is paid with black mana here (alice has only
-  -- Swamps), and the count would be the same off Forests, because CR 107.4e
-  -- makes a hybrid symbol all of its component colours whatever pays it.
-  --
-  -- THREE, so this is also the multiplier past two: a scale that saturated at
-  -- one or two would leave a Swamp standing.
-  Spec.it s "CR 107.4e three black hybrid symbols cost three Swamps" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    drought <- S.printingOf s registry "Drought"
-    hag <- S.printingOf s registry "Stalker Hag"
-    let (taxed, taxedId) = droughtBoard swamp piker hag (Just drought) 6
-        (free, freeId) = droughtBoard swamp piker hag Nothing 6
-        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
-        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
-    Spec.assertEqWith s "three of the six Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
-    Spec.assertEqWith s "where the same cast without Drought keeps all six" (S.countOnBattlefieldByName swampName S.alice control) 6
-    Spec.assertEqWith s "and the Hag is on the stack" (length (GameState.stack after)) 1
-
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
 -- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
 -- Rat creature token ...", and Dismember is the falsifier: {1}{B/P}{B/P} "Target
@@ -1875,7 +1608,7 @@ answerSoulImmolation guardId n p = case p of
   Prompt.ChooseBlight {} -> guardId
   _ -> S.identityAnswer p
 
-soulImmolationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulImmolationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulImmolationSpec s registry = Spec.describe s "Soul Immolation" $ do
   -- The PROVING case. Five is one more than the greatest toughness among
   -- alice's creatures, so CR 101.1 refuses the announcement and CR 601.2
@@ -1895,47 +1628,6 @@ soulImmolationSpec s registry = Spec.describe s "Soul Immolation" $ do
     -- CR 601.2e's rewind reaches the additional cost as well as the damage.
     Spec.assertEqWith s "no blight counters were paid" (S.counterOf CounterKind.MinusOneMinusOne guardId after) 0
     Spec.assertEqWith s "and the card is still in alice's hand" (S.handSize S.alice after) 1
-  -- The CONTROL, and the same board with one thing changed: the answer. Four IS
-  -- the greatest toughness among alice's creatures, so CR 101.1 permits it and
-  -- everything the case above found missing happens.
-  Spec.it s "CR 101.1 an X equal to the stated maximum is announced and paid" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    guard <- S.printingOf s registry "Palace Guard"
-    wolves <- S.printingOf s registry "Russet Wolves"
-    immolation <- S.printingOf s registry "Soul Immolation"
-    let (spellId, _, guardId, wolvesId, board) = soulImmolationBoard mountain piker guard wolves immolation
-        after = S.runPure (answerSoulImmolation guardId 4) board (do S.cast S.alice spellId; Stack.resolveTop)
-    Spec.assertEqWith s "bob took four" (S.lifeOf S.bob after) (Just 16)
-    Spec.assertEqWith s "carol took four" (S.lifeOf S.carol after) (Just 16)
-    Spec.assertEqWith s "and bob's Wolves took four" (S.damageOf wolvesId after) (Just 4)
-    Spec.assertEqWith s "the blight put four counters on the Palace Guard" (S.counterOf CounterKind.MinusOneMinusOne guardId after) 4
-    Spec.assertEqWith s "and the card left alice's hand" (S.handSize S.alice after) 0
-  -- Gameplay level, under the ceiling on both sides, so nothing here is about
-  -- the ceiling: what it proves is that CR 601.2b's announced X is the number
-  -- the blight charges and the number the damage deals, and that "each opponent
-  -- and each creature they control" reaches neither alice nor her creatures.
-  Spec.it s "CR 107.3a the announced X is blighted, dealt to each opponent, and dealt to their creatures" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    guard <- S.printingOf s registry "Palace Guard"
-    wolves <- S.printingOf s registry "Russet Wolves"
-    immolation <- S.printingOf s registry "Soul Immolation"
-    let (spellId, pikerId, guardId, wolvesId, board) = soulImmolationBoard mountain piker guard wolves immolation
-        after = S.runPure (answerSoulImmolation guardId 2) board (do S.cast S.alice spellId; Stack.resolveTop)
-    Spec.assertEqWith s "bob took two" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertEqWith s "carol took two" (S.lifeOf S.carol after) (Just 18)
-    -- CR 109.5: alice is not her own opponent, and neither of her creatures is
-    -- one an opponent controls. An ObjectRef.EachPlayer in either instruction's
-    -- place would have taken two from her and two from each of them.
-    Spec.assertEqWith s "alice took nothing" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith s "her Palace Guard took no damage" (S.damageOf guardId after) (Just 0)
-    Spec.assertEqWith s "her Goblin Piker took no damage" (S.damageOf pikerId after) (Just 0)
-    Spec.assertEqWith s "bob's Wolves took two" (S.damageOf wolvesId after) (Just 2)
-    -- CR 601.2f/601.2h: the additional cost was paid with the same X, on the
-    -- creature the prompt was answered with rather than on the first candidate.
-    Spec.assertEqWith s "two -1/-1 counters on the Palace Guard" (S.counterOf CounterKind.MinusOneMinusOne guardId after) 2
-    Spec.assertEqWith s "and none on the Goblin Piker" (S.counterOf CounterKind.MinusOneMinusOne pikerId after) 0
 
 -- Drannith Magistrate {1}{W} Creature -- Human Wizard 1/3 (IKO 12): "Your
 -- opponents can't cast spells from anywhere other than their hands." CR 601.3's
@@ -2487,14 +2179,6 @@ avenAnswer victimId prompt = case prompt of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just victimId) . Recipient.objectOf) sets
   _ -> S.identityAnswer prompt
 
--- avenAnswer, plus CR 603.5's "may" taken: Baral's trigger draws only if its
--- optional is exercised, and Pawl.Support's default answerer declines every one.
--- The Bird's own trigger is mandatory, so this changes nothing on its board.
-baralAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-baralAnswer victimId prompt = case prompt of
-  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  _ -> avenAnswer victimId prompt
-
 -- The cards of one name a player owns in one zone, by name rather than by id:
 -- CR 400.7 mints a new incarnation on every move, so the id the spell had on the
 -- stack names nothing in exile.
@@ -2596,72 +2280,6 @@ avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
           (fmap Object.plotted (Game.lookupObject exiledId after))
           (Just (Just (GameState.turnNumber after)))
       other -> Spec.assertFailure s ("expected one exiled Piker, got " <> show (length other))
-  -- CR 701.6a's negative, as a PAIR that differs in one thing: the same
-  -- Prowling Serpopard spell, on the same seats with the same mana, removed once
-  -- by Cancel and once by the Bird. Cancel is the control that says CR 113.6g is
-  -- live on this board at all -- without it, "the Serpopard was exiled" would
-  -- pass on an engine that had never heard of Counterability.
-  --
-  -- Prowling Serpopard {1}{G}{G} rather than Blurred Mongoose, which prints the
-  -- same "this spell can't be countered" beside a shroud that would give a
-  -- refusal to TARGET it a second reading (CR 702.18a).
-  --
-  -- What refuses the countering here is the Serpopard's own FACE. Its other
-  -- sentence, "creature spells you control can't be countered", is a static
-  -- ability of the permanent and does not reach its own spell on the stack:
-  -- disabling Pawl.Engine.Event.protectedFromCountering leaves this case green,
-  -- and only forcing Face.counterability to Counterable reddens it.
-  Spec.it s "CR 701.6a exiling a spell is not countering it, so a spell that can't be countered is exiled anyway" $ do
-    plains <- S.printingOf s registry "Plains"
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    aven <- S.printingOf s registry "Aven Interrupter"
-    cancel <- S.printingOf s registry "Cancel"
-    serpopard <- S.printingOf s registry "Prowling Serpopard"
-    let (avenId, victimA, boardA) = avenBoard plains forest aven serpopard
-        (cancelId, victimB, boardB) = avenBoard island forest cancel serpopard
-        exiled = S.runPure (avenAnswer victimA) boardA (S.cast S.bob victimA >> S.cast S.alice avenId >> Engine.priorityLoop)
-        countered = S.runPure (avenAnswer victimB) boardB (S.cast S.bob victimB >> S.cast S.alice cancelId >> Engine.priorityLoop)
-    Spec.assertEqWith s "the exile took the Serpopard off the stack, so it never resolved" (S.countOnBattlefieldByName (S.printingName serpopard) S.bob exiled) 0
-    Spec.assertEqWith s "CR 701.6a and put it in exile, CR 113.6g notwithstanding: this was never a countering" (avenNamed serpopard Zone.Exile S.bob exiled) 1
-    Spec.assertEqWith s "CR 113.6g the control: Cancel does not counter the same spell, so it resolves" (S.countOnBattlefieldByName (S.printingName serpopard) S.bob countered) 1
-    Spec.assertEqWith s "and nothing of it is in exile there" (avenNamed serpopard Zone.Exile S.bob countered) 0
-  -- CR 701.6a's other negative, the same way: nothing counters a spell that is
-  -- exiled off the stack, so a "whenever a spell you control counters a spell"
-  -- trigger must stay silent. Baral, Chief of Compliance is the observer, and
-  -- alice's LIBRARY is where his trigger shows: he draws, so a fired trigger
-  -- costs her a card off the top and a silent one does not.
-  --
-  -- The pair again: the same Goblin Piker, removed by Cancel on one board and by
-  -- the Bird on the other. The Cancel half is what says Baral is watching -- an
-  -- engine that never recorded the event at all would leave alice's library
-  -- untouched on BOTH boards and the negative would be vacuous.
-  Spec.it s "CR 701.6a a spell exiled off the stack was not countered, so a counter trigger stays silent" $ do
-    plains <- S.printingOf s registry "Plains"
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    aven <- S.printingOf s registry "Aven Interrupter"
-    cancel <- S.printingOf s registry "Cancel"
-    baral <- S.printingOf s registry "Baral, Chief of Compliance"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let watched land answer =
-          let (answerId, victimId, gs0) = avenBoard land mountain answer piker
-              (_, gs1) = S.addPermanent baral S.alice gs0
-              (_, gs2) = S.addLibraryCard mountain S.alice gs1
-              (_, gs3) = S.addLibraryCard mountain S.alice gs2
-           in (answerId, victimId, gs3)
-        (avenId, victimA, boardA) = watched plains aven
-        (cancelId, victimB, boardB) = watched island cancel
-        exiled = S.runPure (baralAnswer victimA) boardA (S.cast S.bob victimA >> S.cast S.alice avenId >> Engine.priorityLoop)
-        countered = S.runPure (baralAnswer victimB) boardB (S.cast S.bob victimB >> S.cast S.alice cancelId >> Engine.priorityLoop)
-        librarySize gs = length (Game.zoneMembers Zone.Library S.alice gs)
-        wasCountered gs = any (\e -> case e of GameEvent.SpellCountered _ -> True; _ -> False) (S.eventsOf gs)
-    Spec.assertEqWith s "both boards start alice on two library cards" (librarySize boardA, librarySize boardB) (2, 2)
-    Spec.assertEqWith s "CR 701.6a the control: Cancel counters the Piker, Baral's trigger draws, and alice's library is one shorter" (librarySize countered) 1
-    Spec.assertEqWith s "CR 701.6a the Bird exiled the same spell instead, so Baral never triggered and alice drew nothing" (librarySize exiled) 2
-    Spec.assertEqWith s "the Piker is in bob's exile rather than his graveyard" (avenNamed piker Zone.Exile S.bob exiled, avenNamed piker Zone.Graveyard S.bob exiled) (1, 0)
-    Spec.assertEqWith s "where the countered one went to his graveyard rather than exile" (avenNamed piker Zone.Exile S.bob countered, avenNamed piker Zone.Graveyard S.bob countered) (0, 1)
-    Spec.assertEqWith s "and the record agrees: a countering happened on the one board and not on the other" (wasCountered countered, wasCountered exiled) (True, False)
   -- The third sentence, on the zone the Bird itself never puts anything in: CR
   -- 702.34a's flashback cast out of a GRAVEYARD. Think Twice ({1}{U} Instant,
   -- "Draw a card." / "Flashback {2}{U}") is the spell, and the two zones it can
@@ -2727,11 +2345,6 @@ aimAtPlayer pid prompt = case prompt of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
   _ -> S.identityAnswer prompt
 
--- A player's life total set by hand, for the case that asks what CR 601.2h does
--- when the life is not there to pay.
-withLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameState
-withLife pid life gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = life}) pid (GameState.players gs)}
-
 terrorOfThePeaksSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
   -- The headline pair. bob's Bolt at the Dragon costs him 3 life on top of the
@@ -2765,25 +2378,6 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
         after = S.runPure (avenAnswer terrorId) board (S.cast S.alice boltId)
     Spec.assertEqWith s "alice's own Bolt at her own Dragon cost her no life" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "and is on the stack" (length (GameState.stack after)) 1
-  -- CR 601.2h: the tax is priced after CR 601.2c's targets are fixed, which is
-  -- after the castability gate ran -- so the gate offers the Bolt to a player
-  -- who cannot pay 3 life, and it is the PAYMENT that fails and CR 601.2's
-  -- rewind that answers. The pair again: at 2 life bob's Bolt at the Dragon
-  -- never leaves his hand, where the same Bolt at the Piker is cast.
-  Spec.it s "CR 601.2h a caster without the life to pay has the cast rewound, and the same caster aims the Bolt elsewhere" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    terror <- S.printingOf s registry "Terror of the Peaks"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (terrorId, pikerId, boltId, board) = terrorBoard mountain terror piker bolt S.bob
-        poor = withLife S.bob 2 board
-        atDragon = S.runPure (avenAnswer terrorId) poor (S.cast S.bob boltId)
-        atPiker = S.runPure (avenAnswer pikerId) poor (S.cast S.bob boltId)
-    Spec.assertEqWith s "CR 601.2h the Bolt at the Dragon was rewound: nothing is on the stack" (GameState.stack atDragon) []
-    Spec.assertEqWith s "bob still holds it" (S.handSize S.bob atDragon) 1
-    Spec.assertEqWith s "and paid nothing -- neither the life nor the Mountain" (S.lifeOf S.bob atDragon, S.tappedCount S.bob atDragon) (Just 2, 0)
-    Spec.assertEqWith s "where the same Bolt at the Piker is on the stack" (length (GameState.stack atPiker)) 1
-    Spec.assertBool s (S.castable S.bob boltId poor) "the gate offered the Bolt: CR 601.2c's choice is what decides whether the tax applies, and the gate runs before it"
   -- The third sentence, on its own: a Goblin Piker (2/1) entering under alice
   -- has the Dragon deal 2 -- the PIKER's power, not the Dragon's 5 -- to the
   -- target alice names. The Dragon entering with the Piker already out deals
@@ -2979,7 +2573,6 @@ shellOfTheLastKappaSpec s registry = Spec.describe s "Shell of the Last Kappa" $
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
-  droughtSpec s registry
   waxWaneSpec s registry
   wearTearSpec s registry
   boundedFuseXSpec s registry

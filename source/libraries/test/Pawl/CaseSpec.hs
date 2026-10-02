@@ -9,13 +9,14 @@
 -- Pawl.Engine.Quantity's HasDesignation arm reads it, and
 -- Pawl.Types.TriggeredAbility's intervening "if" gates on it.
 --
--- Case of the Ransacked Lab, MKM 45, carries the first three groups. Its three
--- clauses are all expressible: a cost reduction Baral, Chief of Compliance
--- already prints word for word, a to-solve condition that is a count over the CR
--- 608.2i log, and a Solved clause that is a triggered ability rather than a
--- cast-from-graveyard permission (#670) or a swept set of damage dealers.
+-- Case of the Ransacked Lab, MKM 45, carries the first group here and its
+-- to-solve and Solved cases in data/scenarios/case. Its three clauses are all
+-- expressible: a cost reduction Baral, Chief of Compliance already prints word
+-- for word, a to-solve condition that is a count over the CR 608.2i log, and a
+-- Solved clause that is a triggered ability rather than a cast-from-graveyard
+-- permission (#670) or a swept set of damage dealers.
 --
--- Case of the Pilfered Proof, MKM 9, carries the fourth, and is here for its
+-- Case of the Pilfered Proof, MKM 9, carries the second, and is here for its
 -- FIRST clause rather than for rule 719: a CR 603.1b two-condition trigger whose
 -- branches name one subject. Its Solved clause is CR 702.169b's static reading
 -- and a CR 614.1a token replacement, so the two Cases cover both shapes rule
@@ -29,8 +30,8 @@
 --
 -- What is NOT proven here is CR 719.3a's "and this Case is not solved". The card
 -- carries the limb because the rule prints it, but deleting it leaves every case
--- below green: Object.designations is a Set and Pawl.Engine.Resolve's Designate
--- arm writes only on a transition, so a to-solve trigger that fired again at a
+-- green: Object.designations is a Set and Pawl.Engine.Resolve's Designate arm
+-- writes only on a transition, so a to-solve trigger that fired again at a
 -- later end step would change nothing and emit nothing. The limb is still
 -- observable through the trigger's own existence -- CR 601.2c gives Lithoform
 -- Engine's "copy target activated or triggered ability you control" no legal
@@ -49,7 +50,6 @@ module Pawl.CaseSpec where
 import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -66,7 +66,6 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
@@ -74,56 +73,20 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
-import qualified Pawl.Types.Zone as Zone
-import qualified Pawl.Types.ZoneChange as ZoneChange
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Case" $ do
-  solveSpec s registry
-  solvedAbilitySpec s registry
   reductionSpec s registry
   pilferedProofSpec s registry
   gorgonsKissSpec s registry
-
--- alice's board: the Case on the battlefield, Forests enough for every cast the
--- caller makes, `fogs` Fogs in hand and a stocked library, in a main phase with
--- priority. Fog is the instant throughout because its resolution touches nothing
--- these assertions read -- a combat-damage prevention effect in a main phase --
--- so a hand or library count moves only when the Case's own ability moves it.
---
--- The Case is placed rather than cast: CR 719 says nothing about how a Case
--- arrives, and its abilities are not entry triggers.
-board :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-board ransackedLab forest fog fogs =
-  let (caseId, withCase) = S.addPermanent ransackedLab S.alice (S.landsInPlay forest 12)
-      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard fog S.alice g)) withCase [1 .. 10 :: Int]
-      (fogIds, filled) = List.foldl' (\(ids, g) _ -> let (i, g2) = S.addHandCard fog S.alice g in (ids <> [i], g2)) ([], stocked) [1 .. fogs]
-   in ( caseId,
-        fogIds,
-        filled
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      )
-
--- One cast, resolved along with anything it triggered.
-castOne :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-castOne oid gs = resolveAll (settle (S.runPure S.identityAnswer gs (S.cast S.alice oid)))
-
-castEach :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
-castEach oids gs = List.foldl' (flip castOne) gs oids
 
 settle :: GameState.GameState -> GameState.GameState
 settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
@@ -146,90 +109,9 @@ throughEndStep gs =
 solvedness :: ObjectId.ObjectId -> GameState.GameState -> Bool
 solvedness oid gs = maybe False (Set.member Designation.Solved . Object.designations) (Game.lookupObject oid gs)
 
-librarySize :: GameState.GameState -> Int
-librarySize gs = length (Game.zoneMembers Zone.Library S.alice gs)
-
--- CR 719.3a: "At the beginning of your end step, if [condition] and this Case is
--- not solved, this Case becomes solved."
-solveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-solveSpec s registry = Spec.describe s "To solve" $ do
-  -- The two boards differ in ONE thing: whether the fourth Fog was cast. Three
-  -- casts is the falsifier for a to-solve trigger that ignores its condition and
-  -- solves at the first end step it sees.
-  Spec.it s "CR 719.3a the condition gates the solve" $ do
-    ransackedLab <- S.printingOf s registry "Case of the Ransacked Lab"
-    forest <- S.printingOf s registry "Forest"
-    fog <- S.printingOf s registry "Fog"
-    let solvedAfter n =
-          let (caseId, fogIds, gs) = board ransackedLab forest fog n
-           in solvedness caseId (throughEndStep (castEach fogIds gs))
-    Spec.assertEqWith s "three instants: still unsolved" (solvedAfter 3) False
-    Spec.assertEqWith s "four instants: solved" (solvedAfter 4) True
-  -- The other half of rule 719.3a's sentence: the solve happens AT THE BEGINNING
-  -- OF THE END STEP, not on the cast that satisfies the condition. Without this
-  -- the case above passes for an implementation that solves as soon as the
-  -- fourth spell is cast.
-  Spec.it s "CR 719.3a the fourth cast does not solve it by itself" $ do
-    ransackedLab <- S.printingOf s registry "Case of the Ransacked Lab"
-    forest <- S.printingOf s registry "Forest"
-    fog <- S.printingOf s registry "Fog"
-    let (caseId, fogIds, gs) = board ransackedLab forest fog 4
-        cast = castEach fogIds gs
-    Spec.assertEqWith s "four casts, no end step yet" (solvedness caseId cast) False
-    Spec.assertEqWith s "and the end step is what solves it" (solvedness caseId (throughEndStep cast)) True
-
--- CR 719.3c / CR 702.169c: "Solved -- [Ability text]" for a triggered ability
--- means the ability triggers only if the Case is solved.
-solvedAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-solvedAbilitySpec s registry = Spec.describe s "Solved" $ do
-  -- Both directions on ONE board, which is what keeps the negative from passing
-  -- because the Case never entered or the Fog never resolved: the same Case, the
-  -- same instant and the same seat draw nothing before the solve and one card
-  -- after it.
-  Spec.it s "CR 719.3c the solved ability functions only once the Case is solved" $ do
-    ransackedLab <- S.printingOf s registry "Case of the Ransacked Lab"
-    forest <- S.printingOf s registry "Forest"
-    fog <- S.printingOf s registry "Fog"
-    let (caseId, fogIds, gs) = board ransackedLab forest fog 5
-        (unsolvedCasts, lastFog) = splitAt 4 fogIds
-        cast = castEach unsolvedCasts gs
-        solved = throughEndStep cast
-        after = castEach lastFog solved
-    Spec.assertEqWith s "the library is untouched by four casts while unsolved" (librarySize cast) (librarySize gs)
-    Spec.assertEqWith s "and those four casts are what solved it" (solvedness caseId solved) True
-    Spec.assertEqWith s "the fifth cast, now solved, draws one" (librarySize after) (librarySize gs - 1)
-    -- The draw's other end: the hand spent a Fog and took a card back, so it is
-    -- the same size it was. Named as literals so the two sides cannot coincide
-    -- silently.
-    Spec.assertEqWith s "one Fog left in hand before the fifth cast" (S.handSize S.alice cast) 1
-    Spec.assertEqWith s "and one card in hand after it, the one drawn" (S.handSize S.alice after) 1
-  -- CR 719.3b: "Once a permanent becomes solved, it stays solved until it leaves
-  -- the battlefield." THE assertion that proves the designation is stored state
-  -- rather than a re-read of the to-solve condition: the next turn's log is
-  -- empty (Engine.beginTurnOf clears it), so a Case whose Solved ability were
-  -- gated on the four-spell count directly would go quiet here.
-  Spec.it s "CR 719.3b the Case stays solved into a turn that casts nothing" $ do
-    ransackedLab <- S.printingOf s registry "Case of the Ransacked Lab"
-    forest <- S.printingOf s registry "Forest"
-    fog <- S.printingOf s registry "Fog"
-    let (caseId, fogIds, gs) = board ransackedLab forest fog 5
-        (thisTurn, nextTurnFog) = splitAt 4 fogIds
-        solved = throughEndStep (castEach thisTurn gs)
-        handed =
-          (Engine.beginTurnOf S.alice solved)
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.priority = Just S.alice
-            }
-        after = castEach nextTurnFog handed
-    Spec.assertEqWith s "no spell has been cast this turn" (length (S.eventsOf handed)) 0
-    Spec.assertEqWith s "the Case is still solved" (solvedness caseId handed) True
-    Spec.assertEqWith s "and its ability still draws" (librarySize after) (librarySize handed - 1)
-
 -- The Case's first clause, which is not a CR 719 rule at all -- ordinary printed
 -- text, and the same PlayerEffect.ReduceSpellCost Baral, Chief of Compliance
--- prints. Here to prove the transcription rather than the capability: a card
--- whose reduction decoded wrong would still pass every case above, since Fog's
--- {G} has no generic symbol to reduce.
+-- prints. Here to prove the transcription rather than the capability.
 reductionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 reductionSpec s registry = Spec.describe s "The cost reduction" $ do
   -- Two boards differing in exactly one thing: whether the Case is on the
@@ -351,28 +233,8 @@ enteredOne before after =
 -- Case of the Gorgon's Kiss, MKM 79: its entry trigger and CR 702.169b's static
 -- reading of "Solved --" as a type-changing effect. Its to-solve count is proven
 -- against a melded permanent in Pawl.MeldSpec.
-gorgonsKissSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gorgonsKissSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 gorgonsKissSpec s registry = Spec.describe s "Case of the Gorgon's Kiss" $ do
-  -- Prodigal Sorcerer pings one of two Hill Giants, so the damaged one is the
-  -- only creature the trigger's slot admits.
-  Spec.it s "CR 120.1 the entry trigger destroys the creature that was dealt damage this turn" $ do
-    gorgonsKiss <- S.printingOf s registry "Case of the Gorgon's Kiss"
-    island <- S.printingOf s registry "Island"
-    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    case Face.activatedAbilities (S.combinedFace sorcerer) of
-      ping : _ -> do
-        let (sorcererId, gs1) = S.addPermanent sorcerer S.alice (S.landsInPlay island 1)
-            (hurtId, gs2) = S.addPermanent hillGiant S.bob gs1
-            (wholeId, gs3) = S.addPermanent hillGiant S.bob gs2
-            ready = gs3 {GameState.priority = Just S.alice}
-            pinged = S.settleSba (S.runPure (aimedAt hurtId) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop))
-            (caseId, withCase) = S.addPermanent gorgonsKiss S.alice pinged
-            entered = Event.recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange caseId caseId Zone.Stack Zone.Battlefield) (Projection.project caseId withCase))) withCase
-            after = S.runPure (aimedAt wholeId) entered (Engine.settleForPriority >> Engine.priorityLoop)
-        Spec.assertBool s (not (Set.member hurtId (GameState.battlefield after))) "the damaged Giant was destroyed"
-        Spec.assertBool s (Set.member wholeId (GameState.battlefield after)) "and its undamaged twin, though aimed at, is not a legal target"
-      [] -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability"
   -- CR 719.3a's three creature cards, then CR 702.169b's "as long as this Case
   -- is solved": a 4/4 Gorgon creature with deathtouch and lifelink, still an
   -- enchantment. Two cards leave it the enchantment it was.
@@ -392,9 +254,3 @@ gorgonsKissSpec s registry = Spec.describe s "Case of the Gorgon's Kiss" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch solvedId solved) "with deathtouch"
     Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink solvedId solved) "and lifelink"
     Spec.assertEqWith s "CR 719.3a two creature cards leave it unsolved and no creature" (Projection.cardTypesOf unsolvedId unsolved) (Set.fromList [CardType.Enchantment])
-
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt oid p = case p of
-  Prompt.AnnounceTargets _ _ _ slots -> fmap (const 1) slots
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
-  _ -> S.identityAnswer p

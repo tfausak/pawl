@@ -1,0 +1,85 @@
+{
+  "description": "CR 509.3e blocking TWO black creatures is +2/+0 once",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "bog-wraith",
+            "ready": true
+          },
+          {
+            "card": "Bog Wraith",
+            "label": "bog-wraith-2",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Serra Inquisitors",
+            "label": "serra-inquisitors",
+            "ready": true
+          },
+          {
+            "card": "High Ground",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$bog-wraith",
+          "$bog-wraith-2"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$serra-inquisitors": [
+            "$bog-wraith",
+            "$bog-wraith-2"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Tapped": {
+        "object": "$bog-wraith",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$bog-wraith-2",
+        "tapped": true
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$serra-inquisitors",
+        "power": 5,
+        "toughness": 3
+      }
+    }
+  ]
+}

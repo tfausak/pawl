@@ -23,6 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
       Board.Type.MkBoard
         { Board.Type.seats = seat "alice" NonEmpty.:| [seat "bob"],
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
+          Board.Type.turn = 1,
           Board.Type.phase = Phase.Type.Combat CombatStep.Type.DeclareAttackers,
           Board.Type.monarch = Nothing,
           Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
@@ -38,6 +39,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
       Board.Type.MkBoard
         { Board.Type.seats = seat "alice" NonEmpty.:| [seat "bob"],
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
+          Board.Type.turn = 1,
           Board.Type.phase = Phase.Type.PrecombatMain,
           Board.Type.monarch = Just (Label.Type.MkLabel (Text.pack "bob")),
           Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
@@ -53,6 +55,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
       Board.Type.MkBoard
         { Board.Type.seats = seat "alice" NonEmpty.:| [seat "bob"],
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
+          Board.Type.turn = 1,
           Board.Type.phase = Phase.Type.PrecombatMain,
           Board.Type.monarch = Nothing,
           Board.Type.attackOption = Just AttackOption.Type.Leftward,
@@ -67,6 +70,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
       Board.Type.MkBoard
         { Board.Type.seats = seat "alice" NonEmpty.:| [seat "bob"],
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
+          Board.Type.turn = 1,
           Board.Type.phase = Phase.Type.PrecombatMain,
           Board.Type.monarch = Nothing,
           Board.Type.attackOption = Nothing,
@@ -82,6 +86,7 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
       Board.Type.MkBoard
         { Board.Type.seats = seat "alice" NonEmpty.:| [seat "bob"],
           Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
+          Board.Type.turn = 1,
           Board.Type.phase = Phase.Type.PrecombatMain,
           Board.Type.monarch = Nothing,
           Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
@@ -90,6 +95,22 @@ spec s = Spec.describe s "Pawl.Codec.Board" $ do
           Board.Type.deployCreatures = True
         }
       " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"PrecombatMain\",\"brawl\":true,\"sharedTeamTurns\":true,\"deployCreatures\":true} "
+  Spec.it s "a later turn" $
+    Common.assertCodec
+      s
+      Board.codec
+      Board.Type.MkBoard
+        { Board.Type.seats = seat "alice" NonEmpty.:| [seat "bob"],
+          Board.Type.active = Label.Type.MkLabel (Text.pack "bob"),
+          Board.Type.turn = 2,
+          Board.Type.phase = Phase.Type.PrecombatMain,
+          Board.Type.monarch = Nothing,
+          Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers,
+          Board.Type.brawl = False,
+          Board.Type.sharedTeamTurns = False,
+          Board.Type.deployCreatures = False
+        }
+      " {\"seats\":[{\"name\":\"alice\"},{\"name\":\"bob\"}],\"active\":\"bob\",\"turn\":2,\"step\":\"PrecombatMain\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Board.codec
 
@@ -102,9 +123,11 @@ seat name =
       Seat.Type.team = Nothing,
       Seat.Type.range = Nothing,
       Seat.Type.emperor = False,
+      Seat.Type.manaPool = [],
       Seat.Type.battlefield = Seq.empty,
       Seat.Type.hand = Seq.empty,
       Seat.Type.graveyard = Seq.empty,
       Seat.Type.library = Seq.empty,
-      Seat.Type.exile = Seq.empty
+      Seat.Type.exile = Seq.empty,
+      Seat.Type.command = Seq.empty
     }

@@ -1,0 +1,84 @@
+{
+  "description": "CR 613.1d control: without Blood Moon, Evolving Wilds is not a Mountain and one Mountain is not two, so Fireblast is neither offered nor castable",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "ready": true
+          },
+          {
+            "card": "Evolving Wilds",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fireblast",
+            "label": "fireblast",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate Evolving Wilds",
+            "ActivateManaAbility Mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$fireblast",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Fireblast",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Evolving Wilds",
+        "count": 1
+      }
+    }
+  ]
+}

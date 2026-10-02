@@ -1,0 +1,77 @@
+{
+  "description": "CR 107.3b a free cast fixes X at 0, so the {X} spell is refused as even",
+  "note": "Three boards, as the test has: under alice's Winnower bob, with only Omniscience to pay, is offered no cast; the first control drops the Winnower and the free Disaster resolves at X = 0 with nobody hurt; the second gives bob nine Mountains under the Winnower, where no ChooseCost is raised (only the printed cost is a candidate) and X = 3 deals 3 to each player.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Void Winnower",
+            "label": "winnower"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Omniscience",
+            "label": "omni"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Molten Disaster",
+            "label": "disaster"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass"
+          ]
+        }
+      }
+    }
+  ]
+}

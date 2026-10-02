@@ -17,19 +17,15 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural.Type
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection as Projection.Engine
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -37,7 +33,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -102,70 +97,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" . Spec.describe s "PerPla
     Spec.assertBool s (elem (named "Goblin Piker") (namesIn Zone.Hand S.bob after)) "the Piker is in bob's hand"
     Spec.assertBool s (elem (named "Glorious Anthem") (namesIn Zone.Hand S.carol after)) "the Anthem is in carol's hand"
     Spec.assertEqWith s "alice's Ornithopter stayed" (onBattlefield "Ornithopter" S.alice after) 1
-  -- The spell's road: CR 601.2c's announcement as the spell is cast, and CR
-  -- 608.2b's re-check as it resolves.
-  Spec.it s "CR 601.2c Dismantling Wave destroys up to one artifact or enchantment of each opponent's" $ do
-    plains <- S.printingOf s registry "Plains"
-    ornithopter <- S.printingOf s registry "Ornithopter"
-    anthem <- S.printingOf s registry "Glorious Anthem"
-    wave <- S.printingOf s registry "Dismantling Wave"
-    let (bobsId, g1) = S.addPermanent ornithopter S.bob (S.landsFor plains S.alice 3 S.threePlayerGame)
-        (carolsId, g2) = S.addPermanent anthem S.carol g1
-        (_, g3) = S.addPermanent ornithopter S.alice g2
-        (gs, waveId) = S.handOne wave g3
-        (after, offers) = State.runState (fmap snd (Engine.runGame (aiming (Set.fromList [bobsId, carolsId])) gs (S.cast S.alice waveId >> Stack.resolveTop))) []
-    Spec.assertEqWith s "bob's Ornithopter was destroyed" (onBattlefield "Ornithopter" S.bob after) 0
-    Spec.assertEqWith s "carol's Anthem was destroyed" (onBattlefield "Glorious Anthem" S.carol after) 0
-    Spec.assertEqWith s "alice's own Ornithopter stayed" (onBattlefield "Ornithopter" S.alice after) 1
-    Spec.assertEqWith s "one slot per opponent, each its own player's" offers [[Set.singleton bobsId, Set.singleton carolsId]]
-
-  -- Exactly one target per opponent. alice holds seven Islands; bob controls a
-  -- Goblin Piker and a Forest, carol an Ornithopter unless `carolEmpty`.
-  let thievery carolEmpty = do
-        island <- S.printingOf s registry "Island"
-        forest <- S.printingOf s registry "Forest"
-        piker <- S.printingOf s registry "Goblin Piker"
-        ornithopter <- S.printingOf s registry "Ornithopter"
-        card <- S.printingOf s registry "Blatant Thievery"
-        let (pikerId, g1) = S.addPermanent piker S.bob (S.landsFor island S.alice 7 S.threePlayerGame)
-            (_, g2) = S.addPermanent forest S.bob g1
-            (thopterId, g3) = if carolEmpty then (pikerId, g2) else S.addPermanent ornithopter S.carol g2
-            (gs, spellId) = S.handOne card g3
-        pure (gs, spellId, pikerId, thopterId)
-      steal picks gs spellId = State.evalState (fmap snd (Engine.runGame (aiming picks) gs (S.cast S.alice spellId))) []
-  -- Sylvan Primordial's ruling for the same template: a player with nothing to
-  -- target gets no target, so carol controlling nothing does not stop the cast.
-  -- The pair's other half: with NO opponent controlling anything the slot
-  -- cannot be filled at all.
-  Spec.it s "CR 601.2c Blatant Thievery with carol controlling nothing still takes bob's Piker" $ do
-    (gs, spellId, pikerId, _) <- thievery True
-    Spec.assertBool s (S.castable S.alice spellId gs) "castable with carol controlling nothing"
-    Spec.assertEqWith s "alice controls bob's Piker" (Projection.controllerOf pikerId (resolve (steal (Set.singleton pikerId) gs spellId))) (Just S.alice)
-    island <- S.printingOf s registry "Island"
-    card <- S.printingOf s registry "Blatant Thievery"
-    let (bare, bareSpellId) = S.handOne card (S.landsFor island S.alice 7 S.threePlayerGame)
-    Spec.assertBool s (not (S.castable S.alice bareSpellId bare)) "and not castable with no opponent controlling anything"
-  -- The activation's road (CR 602.2b's announcement), on a loyalty ability.
-  Spec.it s "CR 602.2b The Theorist, Jace Beleren's -2 returns each opponent's chosen artifact or creature" $ do
-    jace <- S.printingOf s registry "The Theorist, Jace Beleren"
-    piker <- S.printingOf s registry "Goblin Piker"
-    ornithopter <- S.printingOf s registry "Ornithopter"
-    anthem <- S.printingOf s registry "Glorious Anthem"
-    case Face.activatedAbilities (S.combinedFace jace) of
-      [_, minusTwo, _] -> do
-        let (jaceId, g1) = S.addPermanent jace S.alice S.threePlayerGame
-            (pikerId, g2) = S.addPermanent piker S.bob (S.addCounter CounterKind.Loyalty 3 jaceId g1)
-            (thopterId, g3) = S.addPermanent ornithopter S.carol g2
-            -- carol's Anthem is neither an artifact nor a creature: not offered.
-            (_, g4) = S.addPermanent anthem S.carol g3
-            (_, gs) = S.addPermanent piker S.alice g4
-            (after, offers) = State.runState (fmap snd (Engine.runGame (aiming (Set.fromList [pikerId, thopterId])) gs (Activate.activateAbility S.alice jaceId minusTwo >> Stack.resolveTop))) []
-        Spec.assertBool s (elem (named "Goblin Piker") (namesIn Zone.Hand S.bob after)) "bob's Piker is in his hand"
-        Spec.assertBool s (elem (named "Ornithopter") (namesIn Zone.Hand S.carol after)) "carol's Ornithopter is in her hand"
-        Spec.assertEqWith s "carol's Anthem stayed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Glorious Anthem")) S.carol after) 1
-        Spec.assertEqWith s "alice's own Piker stayed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-        Spec.assertEqWith s "one slot per opponent, each its own player's" offers [[Set.singleton pikerId, Set.singleton thopterId]]
-      _ -> Spec.assertFailure s "The Theorist has three loyalty abilities"
 
   -- "that player's graveyard": each copy's POOL is its own player's graveyard
   -- (ZoneScope.BoundPlayer). bob's graveyard holds a Goblin Piker, an Ornithopter
@@ -265,18 +196,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" . Spec.describe s "PerPla
     (faceDown, returned) <- primordialSweep S.carol S.bob
     Spec.assertEqWith s "CR 614.12 the sweep turned over the Giant and the Primordial, not the Warden entering beside Ixidron" faceDown swept
     Spec.assertEqWith s "both creature cards entered under alice" returned 2
-  -- "For each player": alice's own graveyard gets a copy too, and every returned
-  -- card is a Zombie under alice's control.
-  Spec.it s "CR 601.2c Afterlife from the Loam takes one creature card from each player's graveyard as Zombies" $ do
-    (gs, spellId, (pikerId, bobThopterId, elvesId, aliceThopterId)) <- graveyards "Afterlife from the Loam"
-    let picks = Set.fromList [pikerId, elvesId, aliceThopterId]
-        (after, offers) = State.runState (fmap snd (Engine.runGame (taking Set.empty picks) gs (S.cast S.alice spellId >> Stack.resolveTop))) []
-        entered = [o | o <- Set.toList (GameState.battlefield after), Projection.controllerOf o after == Just S.alice, fmap S.nameOf (Game.cardOf o after) /= named "Swamp"]
-    Spec.assertEqWith s "alice controls bob's Piker" (controls "Goblin Piker" S.alice after) 1
-    Spec.assertEqWith s "alice controls carol's Elves" (controls "Llanowar Elves" S.alice after) 1
-    Spec.assertEqWith s "alice controls her own Ornithopter" (controls "Ornithopter" S.alice after) 1
-    Spec.assertEqWith s "each is a Zombie" (fmap (\o -> Set.member Subtype.Zombie (Projection.Engine.subtypesOf o after)) entered) [True, True, True]
-    Spec.assertEqWith s "one slot per player, each offering that player's creature cards" offers [[Set.singleton aliceThopterId, Set.fromList [pikerId, bobThopterId], Set.singleton elvesId]]
 
 -- Announce one target for every slot offering one of `picks`, none elsewhere,
 -- and take `picks` out of each offer -- FILTERED from the offer, so the
