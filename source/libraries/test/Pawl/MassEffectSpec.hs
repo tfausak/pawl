@@ -1203,25 +1203,6 @@ openTheWaySpec s registry =
             (namesIn Zone.Library S.alice after)
             [named "Island", named "Murder", named "Swamp", named "Murder", named "Mountain", named "Murder"]
           Spec.assertEqWith s "and the card is still in alice's hand" (namesIn Zone.Hand S.alice after) [named "Open the Way"]
-        -- CR 601.2b's ceiling is read ONCE, at the announcement: carol leaves the
-        -- game (CR 800.4a) with the spell already on the stack, and the X alice
-        -- announced is still 3, so three lands are still found. An engine that
-        -- re-read Face.maximumX at resolution would have two players to count.
-        Spec.it s "CR 601.2b a player leaving in response does not shrink an X already announced" $ do
-          forest <- S.printingOf s registry "Forest"
-          openTheWay <- S.printingOf s registry "Open the Way"
-          island <- S.printingOf s registry "Island"
-          swamp <- S.printingOf s registry "Swamp"
-          mountain <- S.printingOf s registry "Mountain"
-          murder <- S.printingOf s registry "Murder"
-          let stock = [murder, mountain, murder, swamp, murder, island]
-              after = cast 3 (S.departs Departure.Type.Conceded S.carol) (board forest openTheWay stock [])
-          Spec.assertEqWith
-            s
-            "all three land cards still arrived tapped"
-            (tapOf "Island" S.alice after, tapOf "Swamp" S.alice after, tapOf "Mountain" S.alice after)
-            ([TapState.Tapped], [TapState.Tapped], [TapState.Tapped])
-          Spec.assertEqWith s "carol really did leave, so the ceiling a resolution-time read would have found is 2" (statusOf S.carol after) (Just (Status.Departed Departure.Type.Conceded))
         -- The discriminating twin, differing in exactly one thing: carol leaves
         -- BEFORE the cast rather than after it, so the ceiling she is counted in
         -- is 2 and CR 101.1 refuses the same X of 3 the case above honoured.

@@ -34,7 +34,6 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -343,128 +342,44 @@ controllerAtTriggerSpec s registry =
 -- part of an instant or sorcery spell's resolution, the spell is put into its
 -- owner's graveyard" -- so the stack-to-graveyard zone change a countering
 -- records is indistinguishable from the one an ordinary resolution records. The
--- first three cases below are that distinction, from three sides: the countering
--- fires, a countering that CR 113.6g stopped does not, and a resolution into the
--- very same graveyard does not. The fourth is the PlayerRelation axis -- whose
--- spell did the countering -- and the fifth is Baral's other half, its CR 601.2f
--- cost reduction.
+-- case below is the resolution side of that distinction; the countering, the
+-- CR 113.6g, CR 113.9 and CR 601.2f cases live in data/scenarios/event-trigger.
 --
 -- bob controls the Baral throughout, so CR 109.5 fixes its "you" as bob (CR
 -- 603.3a).
 --
 -- Baral's reflexive "if you do" is one Optional mode over both instructions
 -- (#487), so `Exercises` below draws AND discards.
-counterTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+counterTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 counterTriggerSpec s registry =
-  let -- Targets the spell already on the stack, and takes rule 603.5's "may".
-      answerWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-      answerWith victimId p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets
-        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-        _ -> S.identityAnswer p
-   in Spec.describe s "CounterTrigger" $ do
-        -- The negative that keeps
-        -- cr-701-6a-whole-cards-bob-s-cancel-counters-alice-s-spell.json from
-        -- passing vacuously. CR
-        -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
-        -- zone change rule 701.6a's countering makes -- so an implementation
-        -- that matched the zone pair rather than the recorded countering would
-        -- fire here too.
-        Spec.it s "CR 608.2n bob's own Bolt resolving into that same graveyard fires nothing" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          bolt <- S.printingOf s registry "Lightning Bolt"
-          let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
-              withLand = snd (S.addPermanent mountain S.bob withBaral)
-              (_, withLibrary) = S.addLibraryCard mountain S.bob withLand
-              (boltId, gs) = S.addHandCard bolt S.bob withLibrary
-              answer :: Prompt.Prompt r -> r
-              answer p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
-                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-                _ -> S.identityAnswer p
-              cast = S.runPure answer gs (S.cast S.bob boltId)
-              resolved = S.runPure answer cast Stack.resolveTop
-              placed = S.runPure answer resolved Engine.settleForPriority
-          Spec.assertEqWith s "the Bolt really did resolve into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
-          Spec.assertEqWith s "alice took 3, so it resolved rather than fizzling" (S.lifeOf S.alice resolved) (fmap (subtract 3) (S.lifeOf S.alice gs))
-          Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
-          Spec.assertEqWith s "bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
-        -- THE discriminating case for rule 701.6a's OTHER subject. That rule is
-        -- about "a spell or ability", and Stifle ({U} Instant, "Counter target
-        -- activated or triggered ability") counters the second -- but Baral's
-        -- printed object is "counters A SPELL", so Baral must stay silent. CR
-        -- 113.9 is the rule that keeps the two apart: "activated and triggered
-        -- abilities on the stack aren't spells."
-        --
-        -- ONE board, run two ways, because either half alone proves nothing: a
-        -- silent Baral could be a Baral that never worked, and a firing one
-        -- could be a condition that ignores what was countered. The Cancel run
-        -- fires it and the Stifle run does not, from the same starting state,
-        -- with the same interpreter answering `Exercises` to CR 603.5's "may" --
-        -- so the silence is not a declined option either.
-        --
-        -- bob's LIBRARY is the readout, not his hand: Baral draws then discards,
-        -- which leaves the hand the size it was.
-        Spec.it s "CR 113.9 the same Baral: a countered SPELL fires it, a countered ABILITY does not" $ do
-          island <- S.printingOf s registry "Island"
-          cancel <- S.printingOf s registry "Cancel"
-          stifle <- S.printingOf s registry "Stifle"
-          baral <- S.printingOf s registry "Baral, Chief of Compliance"
-          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-          piker <- S.printingOf s registry "Goblin Piker"
-          mountain <- S.printingOf s registry "Mountain"
-          case Face.activatedAbilities (S.combinedFace sorcerer) of
-            [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
-            ability : _ -> do
-              -- bob: Baral, three Islands, one library card, and both a Cancel
-              -- and a Stifle in hand. alice: a settled Prodigal Sorcerer (CR
-              -- 302.6, so its {T} may be activated) and a Goblin Piker spell on
-              -- the stack -- one victim of each kind, standing side by side.
-              let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
-                  withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withBaral [1 .. (3 :: Int)]
-                  (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
-                  (srcId, withSorcerer) = S.addPermanent sorcerer S.alice withLibrary
-                  settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-                  (victimId, onStack) = S.spellOnStack piker S.alice settled
-                  (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
-                  (stifleId, gs) = S.addHandCard stifle S.bob withCancel
-                  -- The SPELL run: bob's Cancel at alice's Piker spell.
-                  spellRun = S.runPure (answerWith victimId) gs (S.cast S.bob cancelId)
-                  spellCountered = S.runPure (answerWith victimId) spellRun Stack.resolveTop
-                  spellPlaced = S.runPure (answerWith victimId) spellCountered Engine.settleForPriority
-                  spellAfter = S.runPure (answerWith victimId) spellPlaced Stack.resolveTop
-                  -- The ABILITY run: alice activates her Sorcerer at herself,
-                  -- and bob's Stifle counters the ability. Aimed at alice so the
-                  -- effect that must NOT occur is her own life total.
-                  atAlice :: Prompt.Prompt r -> r
-                  atAlice p = case p of
-                    Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
-                    Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-                    _ -> S.identityAnswer p
-                  -- Stifle's only legal target is the ability -- the Pool.Abilities
-                  -- set holds nothing else -- so the default interpreter picks it,
-                  -- and its `Exercises` is what would take Baral's "may".
-                  atAbility :: Prompt.Prompt r -> r
-                  atAbility p = case p of
-                    Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-                    _ -> S.identityAnswer p
-                  activated = S.runPure atAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
-                  abilityRun = S.runPure atAbility activated (S.cast S.bob stifleId)
-                  abilityCountered = S.runPure atAbility abilityRun Stack.resolveTop
-                  abilityPlaced = S.runPure atAbility abilityCountered Engine.settleForPriority
-              -- Half one: a countered SPELL. Baral fires, and lands.
-              Spec.assertEqWith s "the Piker spell was countered into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice spellCountered)) 1
-              Spec.assertEqWith s "Baral's trigger is the only thing on the stack" (length (GameState.stack spellPlaced)) 1
-              Spec.assertEqWith s "and bob drew his only library card" (length (Game.zoneMembers Zone.Library S.bob spellAfter)) 0
-              -- Half two: a countered ABILITY. The countering really happened --
-              -- the ability is off the stack and alice took no damage -- and
-              -- Baral saw nothing.
-              Spec.assertEqWith s "the ability is gone, leaving only the untouched Piker spell" (GameState.stack abilityPlaced) [victimId]
-              Spec.assertEqWith s "alice took no damage, so the ability never resolved" (S.lifeOf S.alice abilityPlaced) (Just 20)
-              Spec.assertEqWith s "no ability went to a graveyard: alice's is empty" (length (Game.zoneMembers Zone.Graveyard S.alice abilityPlaced)) 0
-              Spec.assertEqWith s "bob's holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob abilityPlaced)) 1
-              Spec.assertEqWith s "and Baral never fired: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob abilityPlaced)) 1
+  Spec.describe s "CounterTrigger" $ do
+    -- The negative that keeps
+    -- cr-701-6a-whole-cards-bob-s-cancel-counters-alice-s-spell.json from
+    -- passing vacuously. CR
+    -- 608.2n puts a RESOLVED instant into its owner's graveyard -- the same
+    -- zone change rule 701.6a's countering makes -- so an implementation
+    -- that matched the zone pair rather than the recorded countering would
+    -- fire here too.
+    Spec.it s "CR 608.2n bob's own Bolt resolving into that same graveyard fires nothing" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      baral <- S.printingOf s registry "Baral, Chief of Compliance"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
+          withLand = snd (S.addPermanent mountain S.bob withBaral)
+          (_, withLibrary) = S.addLibraryCard mountain S.bob withLand
+          (boltId, gs) = S.addHandCard bolt S.bob withLibrary
+          answer :: Prompt.Prompt r -> r
+          answer p = case p of
+            Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+            Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+            _ -> S.identityAnswer p
+          cast = S.runPure answer gs (S.cast S.bob boltId)
+          resolved = S.runPure answer cast Stack.resolveTop
+          placed = S.runPure answer resolved Engine.settleForPriority
+      Spec.assertEqWith s "the Bolt really did resolve into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+      Spec.assertEqWith s "alice took 3, so it resolved rather than fizzling" (S.lifeOf S.alice resolved) (fmap (subtract 3) (S.lifeOf S.alice gs))
+      Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
+      Spec.assertEqWith s "bob drew nothing" (length (Game.zoneMembers Zone.Library S.bob placed)) 1
 
 -- CR 603.2's binding half of a per-permanent counter trigger: the ability names
 -- the permanent the counters went on, and that permanent is neither the bearer

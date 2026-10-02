@@ -1,0 +1,189 @@
+{
+  "description": "CR 707.10c a copied trigger's slot is baked, so the offer is a real choice",
+  "note": "Questing Beast's \"target planeswalker that player controls\" names a bound player; the Lithoform Engine copy carries the binding, so carol's other planeswalker is a legal new target. Karn on 9 loyalty and Jace on 6 read 5 / 2 when the copy is re-aimed, against 1 / 6 when it is not.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "f1",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "f2",
+            "ready": true
+          },
+          {
+            "card": "Questing Beast",
+            "label": "beast"
+          },
+          {
+            "card": "Lithoform Engine",
+            "label": "engine",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Karn Liberated",
+            "label": "karn",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 9
+              }
+            ]
+          },
+          {
+            "card": "Jace Beleren",
+            "label": "jace",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 6
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$beast"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$beast",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$karn"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$engine",
+          "ability": 0,
+          "targets": [
+            "trigger of $beast"
+          ],
+          "mana": [
+            "$f1",
+            "$f2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$jace"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $beast",
+            "trigger of $beast"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$karn",
+          "kind": {
+            "type": "Loyalty"
+          },
+          "count": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$jace",
+          "kind": {
+            "type": "Loyalty"
+          },
+          "count": 2
+        }
+      }
+    }
+  ]
+}

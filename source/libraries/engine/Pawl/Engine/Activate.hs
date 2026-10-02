@@ -485,8 +485,8 @@ activateAbility pid srcId ability = do
                   -- CR 702.122b / 702.171c: the creatures this crew or saddle
                   -- cost tapped crewed the Vehicle or saddled the Mount as they
                   -- were tapped, so the relation is recorded at the payment and
-                  -- an ability that never resolves still leaves it (CrewSpec's
-                  -- "a countered crew ability"). A case on the rule-702 keyword
+                  -- an ability that never resolves still leaves it
+                  -- (data/scenarios/crew). A case on the rule-702 keyword
                   -- stamp, never on an effect.
                   let tappers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedForTotalPower (Binding.targetsOf bound))))
                   case Keyword.familyOf =<< stamp of

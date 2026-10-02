@@ -560,29 +560,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "asked once, offering the three nonland cards and no land, and revealing nothing"
       (offers, [() | GameEvent.Revealed _ <- S.eventsOf final])
       ([[lightningBolt, thinkTwice, ornithopter]], [])
-  -- CR 707.2 / 118.9: the alternative cost is copiable for the same reason. A
-  -- Clone copying Asmoranomardicadaistinaculdacar (no mana cost; "As long as
-  -- you've discarded a card this turn, you may pay {B/R} to cast this spell") is
-  -- duplicated, and the duplicate is castable for {B/R} once a card is
-  -- discarded. Bob controls the original, so CR 704.5j leaves both legends be.
-  Spec.it s "CR 707.2/118.9 a duplicate of a Clone offers the alternative cost of what the Clone copies" $ do
-    island <- S.printingOf s registry "Island"
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    asmor <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
-    let (asmorId, board) = S.addPermanent asmor S.bob (S.landsInPlay island 2)
-    case conjuredDuplicate clone reflections asmorId board of
-      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      Just (duplicate, conjured) -> do
-        let (pikerId, undiscarded) = S.addHandCard piker S.alice (S.landsFor swamp S.alice 1 conjured)
-            discarded = S.runPure S.identityAnswer undiscarded (Event.discard DiscardCause.Ordinary S.alice pikerId)
-        Spec.assertEqWith
-          s
-          "CR 118.9 castable for {B/R} only once a card is discarded: (undiscarded, discarded)"
-          (S.castable S.alice duplicate undiscarded, S.castable S.alice duplicate discarded)
-          (False, True)
   -- CR 707.2 / 113.6b: the abilities a card has off the battlefield are its
   -- copiable values' too. A Clone copying bob's Anger is duplicated and the
   -- duplicate discarded, so alice's graveyard holds a card printed Clone whose

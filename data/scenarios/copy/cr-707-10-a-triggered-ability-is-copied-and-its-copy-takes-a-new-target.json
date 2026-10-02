@@ -1,0 +1,258 @@
+{
+  "description": "CR 707.10 a triggered ability is copied, and its copy takes a new target",
+  "note": "Three seats, so CR 707.10c's new target is a real choice: the Rats' trigger targets bob and its Lithoform Engine copy carol. Each holds two cards, so one discard each is told apart from two by one seat. The Rats alice cast are \"Ravenous Rats#5\" on the battlefield, the four in bob's and carol's hands being older objects.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "s1",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s4",
+            "ready": true
+          },
+          {
+            "card": "Lithoform Engine",
+            "label": "engine",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ravenous Rats",
+            "label": "rats"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "hand": [
+          {
+            "card": "Ravenous Rats",
+            "label": "b1"
+          },
+          {
+            "card": "Ravenous Rats",
+            "label": "b2"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "hand": [
+          {
+            "card": "Ravenous Rats",
+            "label": "c1"
+          },
+          {
+            "card": "Ravenous Rats",
+            "label": "c2"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$rats",
+          "mana": [
+            "$s1",
+            "$s2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$bob"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$engine",
+          "ability": 0,
+          "targets": [
+            "trigger of Ravenous Rats#5"
+          ],
+          "mana": [
+            "$s3",
+            "$s4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$carol"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Ravenous Rats",
+            "trigger of Ravenous Rats"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDiscard",
+          "with": [
+            "$c1"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Ravenous Rats",
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Hand",
+          "card": "Ravenous Rats",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDiscard",
+          "with": [
+            "$b1"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Hand",
+          "card": "Ravenous Rats",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Hand",
+          "card": "Ravenous Rats",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    }
+  ]
+}

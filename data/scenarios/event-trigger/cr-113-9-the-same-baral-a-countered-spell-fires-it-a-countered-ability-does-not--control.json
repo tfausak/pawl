@@ -1,0 +1,194 @@
+{
+  "description": "CR 113.9 the same Baral: a countered SPELL fires it, a countered ABILITY does not",
+  "note": "The ABILITY half of the same board as the main file: alice holds priority over her Goblin Piker spell to aim Prodigal Sorcerer at herself, and bob's Stifle counters that ability. alice takes nothing and Baral does not fire: bob's library is untouched and only the Piker spell remains on the stack.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Prodigal Sorcerer",
+            "label": "sorcerer",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Baral, Chief of Compliance",
+            "label": "baral"
+          },
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Island",
+            "label": "i3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Cancel",
+            "label": "cancel"
+          },
+          {
+            "card": "Stifle",
+            "label": "stifle"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$piker",
+          "mana": [
+            "$m1",
+            "$m2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$sorcerer",
+          "ability": 0,
+          "targets": [
+            "$alice"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$stifle",
+          "targets": [
+            "ability of $sorcerer"
+          ],
+          "mana": [
+            "$i1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Goblin Piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Graveyard",
+          "is": [
+            "Stifle"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Library",
+          "card": "Mountain",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

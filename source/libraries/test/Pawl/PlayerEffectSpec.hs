@@ -77,8 +77,8 @@
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
--- counterpart, and the pair is the point: one board, one Cancel, and the filter
--- alone deciding whether the victim spell survives.
+-- counterpart, in data/scenarios/cast-permission: one board, one Cancel, and the
+-- filter alone deciding whether the victim spell survives.
 --
 -- Oppressive Rays is CR 601.2f's ACTIVATION side, on a criterion no other group
 -- here has: CR 303.4b's "enchanted", answered off the source the row carries.

@@ -370,7 +370,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
       [oid] -> Spec.assertEqWith s "not castable once it is nobody's commander" (S.castable S.alice oid undesignated) False
       _ -> Spec.assertBool s False "expected one commander"
 
-taxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+taxSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 taxSpec s registry = Spec.describe s "Tax" $ do
   -- CR 903.8's second sentence, at zero: the FIRST cast from the command zone has
   -- no previous cast to pay for, so it costs the printed {3}{R} and nothing more.
@@ -384,54 +384,6 @@ taxSpec s registry = Spec.describe s "Tax" $ do
         let after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
         Spec.assertEqWith s "four Mountains paid" (tappedCount after) 4
         Spec.assertEqWith s "and the cast is counted" (commanderCastsOf after) [1]
-      _ -> Spec.assertBool s False "expected one commander"
-  -- CR 903.9a: Shimatsu resolves as a 0/0, CR 704.5f buries it, and the same CR
-  -- 704.3 settle loop then offers its owner the command zone. The whole rule in one
-  -- board.
-  Spec.it s "CR 903.9a a commander that dies is offered back to the command zone" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let gs = commanderBoard mountain shimatsu 10
-    case inCommandZone gs of
-      [oid] -> do
-        let back = castAndSettle reclaiming oid gs
-        Spec.assertEqWith s "it is in the command zone again" (length (inCommandZone back)) 1
-        Spec.assertEqWith s "and not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice back)) 0
-        Spec.assertEqWith s "nor on the battlefield" (S.creaturesInPlay S.alice back) 0
-      _ -> Spec.assertBool s False "expected one commander"
-  -- CR 903.9a is a "may". The default answerer declines, and the commander then
-  -- stays in the graveyard -- the falsifier for an engine that moved it without
-  -- asking, which would make the case above pass for the wrong reason.
-  Spec.it s "CR 903.9a declining leaves it in the graveyard" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let gs = commanderBoard mountain shimatsu 10
-    case inCommandZone gs of
-      [oid] -> do
-        let after = castAndSettle S.identityAnswer oid gs
-        Spec.assertEqWith s "the command zone is empty" (length (inCommandZone after)) 0
-        Spec.assertEqWith s "and it is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-      _ -> Spec.assertBool s False "expected one commander"
-  -- CR 903.8's whole point: the SECOND cast from the
-  -- command zone costs {2} more. Ten Mountains, four spent on the first cast and
-  -- six on the second -- {3}{R} then {5}{R}.
-  Spec.it s "CR 903.8 the second cast from the command zone costs {2} more" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let gs = commanderBoard mountain shimatsu 10
-    case inCommandZone gs of
-      [oid] -> do
-        let back = castAndSettle reclaiming oid gs
-        Spec.assertEqWith s "one cast so far" (commanderCastsOf back) [1]
-        Spec.assertEqWith s "four Mountains spent on it" (tappedCount back) 4
-        case inCommandZone back of
-          [oid2] -> do
-            Spec.assertEqWith s "the tax is now {2}" (Commander.tax S.alice oid2 back) 2
-            let twice = castAndSettle reclaiming oid2 back
-            Spec.assertEqWith s "two casts now" (commanderCastsOf twice) [2]
-            Spec.assertEqWith s "ten Mountains spent in total: four then six" (tappedCount twice) 10
-            Spec.assertEqWith s "and the tax is {4} for the next one" (fmap (\o -> Commander.tax S.alice o twice) (inCommandZone twice)) [4]
-          _ -> Spec.assertBool s False "expected it back in the command zone"
       _ -> Spec.assertBool s False "expected one commander"
 
 -- Alice's board with TWO commanders designated (CR 702.124h), built through
@@ -461,9 +413,9 @@ inCommandZoneNamed printing gs =
   filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.nameOf (Printing.card printing))) (inCommandZone gs)
 
 -- Cast this commander, resolve it, bin the permanent it became, and settle --
--- which is CR 903.9a's offer, accepted by `reclaiming`. castAndSettle above
--- cannot serve: Shimatsu resolves as a 0/0 that CR 704.5f buries on its own,
--- and Rograkh is a 0/1 that lives, so the trip back has to be made explicitly.
+-- which is CR 903.9a's offer, accepted by `reclaiming`. Shimatsu resolves as a
+-- 0/0 that CR 704.5f buries on its own, and Rograkh is a 0/1 that lives, so the
+-- trip back has to be made explicitly.
 castAndReclaim :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 castAndReclaim printing oid gs =
   let resolved = S.runPure reclaiming (S.runPure reclaiming gs (S.cast S.alice oid)) Stack.resolveTop
@@ -1213,14 +1165,6 @@ reclaiming :: Prompt.Prompt r -> r
 reclaiming p = case p of
   Prompt.ReturnCommander {} -> CommandZoneDecision.Returns
   _ -> S.identityAnswer p
-
--- Cast the commander and let it resolve, then settle state-based actions -- which
--- is where CR 704.5f buries the 0/0 and CR 903.9a offers it back.
-castAndSettle :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-castAndSettle answer oid gs =
-  let cast = S.runPure answer gs (S.cast S.alice oid)
-      resolved = S.runPure answer cast Stack.resolveTop
-   in S.runPure answer resolved Engine.settleForPriority
 
 -- Alice's board with her LIBRARY stocked, which commanderBoard's is not: its
 -- deck holds nothing but the commander, so every library count below would

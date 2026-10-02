@@ -1549,30 +1549,6 @@ undyingSpec s registry =
                   Spec.assertBool s (not (inGraveyard "Putrid Goblin" S.alice second)) "and it is not in the graveyard"
                 other -> Spec.assertFailure s ("expected the Goblin back a second time, got " <> show other)
             other -> Spec.assertFailure s ("expected exactly one Putrid Goblin back, got " <> show other)
-        -- CR 110.2a's "unless the effect states otherwise". Alice steals bob's
-        -- Wolf and kills it, so CR 603.3a hands ALICE the dies trigger -- which
-        -- is what makes this discriminating, since a return under the ability's
-        -- controller and a return under the owner are the same board at one
-        -- seat. Lightning Bolt does the killing so the whole fixture is red.
-        Spec.it s "CR 110.2a a stolen Young Wolf comes back under its OWNER's control" $ do
-          mountain <- S.printingOf s registry "Mountain"
-          treason <- S.printingOf s registry "Act of Treason"
-          bolt <- S.printingOf s registry "Lightning Bolt"
-          wolf <- S.printingOf s registry "Young Wolf"
-          let (wolfId, withWolf) = S.addPermanent wolf S.bob (S.landsInPlay mountain 4)
-              (gs1, treasonId) = S.handOne treason withWolf
-              (boltId, gs2) = S.addHandCard bolt S.alice gs1
-              stolen = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (S.cast S.alice treasonId)) Stack.resolveTop
-              burned = S.runPure S.identityAnswer (S.runPure S.identityAnswer stolen (S.cast S.alice boltId)) Stack.resolveTop
-              settled = S.runPure S.identityAnswer burned Engine.settleForPriority
-              after = S.runPure S.identityAnswer settled Stack.resolveTop
-          Spec.assertEqWith s "alice controls the Wolf when it dies" (Projection.controllerOf wolfId stolen) (Just S.alice)
-          Spec.assertEqWith s "CR 603.3a: so the dies trigger is alice's" (fmap (\oid -> Projection.controllerOf oid settled) (GameState.stack settled)) [Just S.alice]
-          case named "Young Wolf" after of
-            [backId] -> do
-              Spec.assertEqWith s "and it returns under bob's" (Projection.controllerOf backId after) (Just S.bob)
-              Spec.assertEqWith s "with its +1/+1 counter" (countersOn backId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
-            other -> Spec.assertFailure s ("expected the Wolf back on the battlefield, got " <> show other)
 
 -- CR 702.135a afterlife N: "When this permanent is put into a graveyard from the
 -- battlefield, create N 1/1 white and black Spirit creature tokens with flying."

@@ -1,0 +1,227 @@
+{
+  "description": "CR 113.7 the trigger reaches the artifact's ability and not the creature's, and the artifact is destroyed",
+  "note": "bob's Prodigal Sorcerer pings alice and his Crystal Ball's scry goes on top; alice flashes in Green Slime, whose trigger counters an ability from an artifact or enchantment source and destroys that permanent. Aimed at the creature's ping it is refused; aimed at the Ball's ability it counters it, the Ball is destroyed, and the ping still lands.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "f1",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "f2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "f3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Green Slime",
+            "label": "slime"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Prodigal Sorcerer",
+            "label": "sorcerer",
+            "ready": true
+          },
+          {
+            "card": "Crystal Ball",
+            "label": "ball",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$sorcerer",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$ball",
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$slime",
+          "mana": [
+            "$f1",
+            "$f2",
+            "$f3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Green Slime",
+            "ability of $ball",
+            "ability of $sorcerer"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "ChooseTargets": {
+          "ability": [
+            "ability of $sorcerer"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "ability": [
+            "ability of $ball"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Green Slime",
+            "ability of $ball",
+            "ability of $sorcerer"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Crystal Ball",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Graveyard",
+        "card": "Crystal Ball",
+        "count": 1
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Graveyard",
+        "is": [
+          "Crystal Ball"
+        ]
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 19
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Prodigal Sorcerer",
+        "count": 1
+      }
+    },
+    {
+      "View": {
+        "of": "Stack",
+        "is": []
+      }
+    }
+  ]
+}

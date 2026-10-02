@@ -1349,7 +1349,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- being empty: alice's Prodigal Sorcerer's {T} (CR 113.3b) and the Aether Flash
   -- trigger her Goblin Piker's entry raised (CR 113.3c).
   --
-  -- Pawl.CounterspellSpec's Squelch group is the gameplay-level twin.
+  -- data/scenarios/counterspell holds the gameplay-level twin.
   Spec.it s "CR 113.3b Squelch's pool holds the activated ability alone where Stifle's holds both" $ do
     mountain <- S.printingOf s registry "Mountain"
     aetherFlash <- S.printingOf s registry "Aether Flash"

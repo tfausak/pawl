@@ -35,11 +35,9 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -55,12 +53,10 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -376,70 +372,6 @@ searchIsUntimedSpec s registry =
           gs <- board "Mountain" "Nyxborn Rollicker" "Sigarda's Aid"
           Spec.assertEqWith s "the Rollicker is on the stack" (length (GameState.stack (castThere 0 gs))) 1
 
--- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
--- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
--- whose {T} ABILITY can join it, and bob holds a Cancel for the first and a
--- Stifle for the second. `permanents` is the only difference between a run that
--- counters and a run that does not.
---
--- Shared by the Spider-Punk and Prowling Serpopard groups below, which is why
--- both the protecting permanents and the victim spell are parameters: the
--- unfiltered arm and the filtered one differ only in which victim survives.
---
--- bob's three Islands pay for whichever of the two he casts; the runs branch
--- from this state and never share mana.
-counteringBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  [(PlayerId.PlayerId, Printing.Printing)] ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-counteringBoard island cancel stifle sorcerer victim permanents =
-  let withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) (Setup.emptyGame S.bothPlayers) [1 .. (3 :: Int)]
-      (srcId, withSorcerer) = S.addPermanent sorcerer S.alice withLands
-      -- CR 302.6: settled, so the Sorcerer's {T} may be activated at all.
-      settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-      addPermanent (ids, g) (who, p) = let (oid, g2) = S.addPermanent p who g in (oid : ids, g2)
-      (permanentIds, withPermanents) = List.foldl' addPermanent ([], settled) permanents
-      (victimId, onStack) = S.spellOnStack victim S.alice withPermanents
-      (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
-      (stifleId, gs) = S.addHandCard stifle S.bob withCancel
-   in (victimId, srcId, cancelId, stifleId, permanentIds, gs)
-
--- Prodigal Sorcerer's "any target" is aimed at ALICE, so the effect that must
--- not occur when the ability is countered is her own life total; Stifle's only
--- legal target is the ability, which the default interpreter picks.
-counteringAtAlice :: Prompt.Prompt r -> r
-counteringAtAlice p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
-  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  _ -> S.identityAnswer p
-
-counteringAtAbility :: Prompt.Prompt r -> r
-counteringAtAbility p = case p of
-  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  _ -> S.identityAnswer p
-
--- alice activates her Sorcerer at herself, bob casts his Stifle at the ability,
--- and the stack is emptied down to the spell underneath. The first component is
--- the state once the Stifle has resolved, the second once the ability under it
--- has had its chance to resolve too.
-abilityRun ::
-  ObjectId.ObjectId ->
-  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
-  ObjectId.ObjectId ->
-  GameState.GameState ->
-  (GameState.GameState, GameState.GameState)
-abilityRun srcId ability stifleId gs =
-  let activated = S.runPure counteringAtAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
-      cast = S.runPure counteringAtAbility activated (S.cast S.bob stifleId)
-      stifleResolved = S.runPure counteringAtAbility cast Stack.resolveTop
-      placed = S.runPure counteringAtAbility stifleResolved Engine.settleForPriority
-   in (placed, S.runPure counteringAtAlice placed Stack.resolveTop)
-
--- Spider-Punk {1}{R} Legendary Creature -- Spider Human Hero 2/1 (Marvel's
 -- ONE board for Yawgmoth's Will, built once and branched. alice has six untapped
 -- Swamps -- three for the Will's {2}{B} and three left over, so no assertion
 -- below can turn on mana -- the Will in hand, and a Sign in Blood ({B}{B}, no
@@ -1058,8 +990,9 @@ johannSpec s registry =
           Spec.assertBool s (not (any (S.isCastOf top) (Action.legalActions S.alice bare))) "the top card is not offered"
           Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Library top bare)) "and the typed question says no"
 
--- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
--- counteringBoard above, with a Goblin Piker as the victim spell.
+-- Spider-Punk {1}{R} Legendary Creature -- Spider Human Hero 2/1 (Marvel's
+-- Spider-Man, 92), "Spells and abilities can't be countered". Its counter runs
+-- are in data/scenarios/cast-permission.
 --
 -- All four of the card's printed clauses are in its file now, and only this one
 -- is read here: nothing on this board prevents damage, no other Spider enters,
@@ -1068,100 +1001,15 @@ johannSpec s registry =
 -- replacement to be. CR 615.12's clause is proved in Pawl.ReplacementSpec's
 -- "Spider-Punk (CR 615.12)" group instead, where a Mending Hands shield gives it
 -- something to defeat.
-spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spiderPunkSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 spiderPunkSpec s registry =
-  let withAbility act = do
-        island <- S.printingOf s registry "Island"
-        cancel <- S.printingOf s registry "Cancel"
-        stifle <- S.printingOf s registry "Stifle"
-        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-        piker <- S.printingOf s registry "Goblin Piker"
-        punk <- S.printingOf s registry "Spider-Punk"
-        case Face.activatedAbilities (S.combinedFace sorcerer) of
-          [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
-          ability : _ -> act (counteringBoard island cancel stifle sorcerer piker) punk piker ability
-   in Spec.describe s "SpiderPunk" $ do
-        -- The CONTROL for the ability half, and CR 113.9's reason it needs its
-        -- own: an ability on the stack is not a spell, so nothing the spell
-        -- case proves carries over.
-        Spec.it s "CR 113.9 without Spider-Punk bob's Stifle counters alice's ability"
-          . withAbility
-          $ \board _ _ ability -> do
-            let (victimId, srcId, _, stifleId, _, gs) = board []
-                (placed, after) = abilityRun srcId ability stifleId gs
-            Spec.assertEqWith s "the ability is gone, leaving only the Piker spell" (GameState.stack placed) [victimId]
-            Spec.assertEqWith s "alice took no damage, so it never resolved" (S.lifeOf S.alice after) (Just 20)
-            Spec.assertEqWith s "and bob's graveyard holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
-
-        -- THE case Spider-Punk is in the pool for, and the half no card could
-        -- reach before:
-        -- Spider-Punk's clause is an ability of a BATTLEFIELD PERMANENT about
-        -- other objects, where Pawl.Types.Counterability is CR 113.6g's
-        -- self-referential ability of the spell itself and can say nothing
-        -- about an ability at all. The ability survives the Stifle and
-        -- resolves, so alice takes the 1 damage she aimed at herself.
-        Spec.it s "CR 701.6a / 113.9 with Spider-Punk the ability survives the Stifle and resolves"
-          . withAbility
-          $ \board punk _ ability -> do
-            let (victimId, srcId, _, stifleId, _, gs) = board [(S.alice, punk)]
-                (placed, after) = abilityRun srcId ability stifleId gs
-            Spec.assertEqWith s "the ability is still on the stack, above the Piker spell" (length (GameState.stack placed)) 2
-            Spec.assertEqWith s "the spent Stifle is bob's only graveyard card" (length (Game.zoneMembers Zone.Graveyard S.bob placed)) 1
-            Spec.assertEqWith s "and resolving it deals alice the 1 damage" (S.lifeOf S.alice after) (Just 19)
-            Spec.assertEqWith s "leaving the Piker spell alone on the stack" (GameState.stack after) [victimId]
-
-        -- CR 113.6g's carrier is untouched, which is what keeps the two apart:
-        -- Spider-Punk's OWN card says nothing about being countered, and the
-        -- protection it hands out comes from the CR 613.11 axis alone.
-        Spec.it s "CR 113.6g Spider-Punk's own card field is Counterable" $ do
-          punk <- S.printingOf s registry "Spider-Punk"
-          Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace punk)) Counterability.Counterable
-
--- Prowling Serpopard {1}{G}{G} Creature -- Cat Snake 4/3 (Amonkhet, 180),
--- "This spell can't be countered. Creature spells you control can't be
--- countered." BOTH of the card's sentences, on the two different carriers the
--- rules give them:
---
---   * "This spell can't be countered" is CR 113.6g's self-referential ability,
---     which functions on the stack and rides the card as
---     Pawl.Types.Counterability.
---   * "Creature spells you control can't be countered" is an ability of a
---     BATTLEFIELD PERMANENT about OTHER objects, so CR 611.1's third clause
---     makes it a rules-modifying continuous effect on the CR 613.11 player
---     axis.
---
--- The second sentence is why the card is in THIS file and not only among the CR
--- 113.6g cards: it NARROWS by the victim spell's own qualities, which
--- Spider-Punk's unfiltered "Spells and abilities can't be countered" does not.
--- The whole group therefore turns on the same Cancel counting differently for a
--- CREATURE spell and a NONCREATURE one on one board -- an assertion no
--- unfiltered arm can pass.
-prowlingSerpopardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-prowlingSerpopardSpec s registry =
-  let withVictim name act = do
-        island <- S.printingOf s registry "Island"
-        cancel <- S.printingOf s registry "Cancel"
-        stifle <- S.printingOf s registry "Stifle"
-        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-        victim <- S.printingOf s registry name
-        cat <- S.printingOf s registry "Prowling Serpopard"
-        case Face.activatedAbilities (S.combinedFace sorcerer) of
-          [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
-          ability : _ -> act (counteringBoard island cancel stifle sorcerer victim) cat ability
-   in Spec.describe s "ProwlingSerpopard" $ do
-        -- CR 113.9 / 701.6a's OTHER subject. An ability on the stack has no
-        -- card behind it -- Game.faceOf answers Nothing for one -- so a Filter
-        -- naming a CARD TYPE can never match it, and alice's Prodigal Sorcerer
-        -- ability is Stifled with the Serpopard standing. That is the whole of
-        -- the answer to the wrinkle a filtered arm has and the unfiltered one
-        -- does not: this card's protection reaches spells only.
-        Spec.it s "CR 113.9 with Prowling Serpopard alice's activated ability is still counterable"
-          . withVictim "Goblin Piker"
-          $ \board cat ability -> do
-            let (victimId, srcId, _, stifleId, _, gs) = board [(S.alice, cat)]
-                (placed, after) = abilityRun srcId ability stifleId gs
-            Spec.assertEqWith s "the ability is gone, leaving only the creature spell" (GameState.stack placed) [victimId]
-            Spec.assertEqWith s "alice took no damage, so it never resolved" (S.lifeOf S.alice after) (Just 20)
+  Spec.describe s "SpiderPunk" $ do
+    -- CR 113.6g's carrier is untouched, which is what keeps the two apart:
+    -- Spider-Punk's OWN card says nothing about being countered, and the
+    -- protection it hands out comes from the CR 613.11 axis alone.
+    Spec.it s "CR 113.6g Spider-Punk's own card field is Counterable" $ do
+      punk <- S.printingOf s registry "Spider-Punk"
+      Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace punk)) Counterability.Counterable
 
 -- Jared Carthalion, True Heir {R}{G}{W} Legendary Creature -- Human Warrior 3/3
 -- (Commander Legends, 281): "When Jared Carthalion enters, target opponent
@@ -1976,7 +1824,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   thundermaneSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry
-  prowlingSerpopardSpec s registry
   jaredSpec s registry
   oppressiveRaysSpec s registry
   scoutsWarningSpec s registry

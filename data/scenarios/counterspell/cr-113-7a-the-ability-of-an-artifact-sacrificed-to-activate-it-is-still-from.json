@@ -1,0 +1,189 @@
+{
+  "description": "CR 113.7a the ability of an artifact sacrificed to activate it is still from an artifact source, and nothing is destroyed",
+  "note": "bob sacrifices Golden Egg to activate its gain-3 ability, so the ability's source is known only by last known information (CR 113.7a). Green Slime's trigger still finds it from an artifact source and counters it, and the Egg, no longer a permanent, is not destroyed again.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "f1",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "f2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "f3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Green Slime",
+            "label": "slime"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m2",
+            "ready": true
+          },
+          {
+            "card": "Golden Egg",
+            "label": "egg",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Activate": {
+          "object": "$egg",
+          "ability": 1,
+          "mana": [
+            "$m1",
+            "$m2",
+            null
+          ],
+          "costOrder": [
+            0,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Golden Egg",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "ability of $egg"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$slime",
+          "mana": [
+            "$f1",
+            "$f2",
+            "$f3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "ability": [
+            "ability of $egg"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of Green Slime",
+            "ability of $egg"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "bob",
+        "life": 20
+      }
+    },
+    {
+      "View": {
+        "of": "Zone",
+        "player": "bob",
+        "zone": "Graveyard",
+        "is": [
+          "Golden Egg"
+        ]
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Battlefield",
+        "card": "Mountain",
+        "count": 2
+      }
+    },
+    {
+      "View": {
+        "of": "Stack",
+        "is": []
+      }
+    }
+  ]
+}

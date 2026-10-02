@@ -1,0 +1,255 @@
+{
+  "description": "CR 707.10 a copied activated ability was not activated, so no mana was spent to activate it",
+  "note": "Forsworn Paladin's pump is activated with a Treasure's mana and aimed at piker-1; Lithoform Engine copies it and the copy is aimed at piker-2. Both Pikers get +2/+0, and only piker-1, the target of the activation the Treasure paid for, gains deathtouch.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "s1",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s2",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s3",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s4",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s5",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "s6",
+            "ready": true
+          },
+          {
+            "card": "Lithoform Engine",
+            "label": "engine",
+            "ready": true
+          },
+          {
+            "card": "Forsworn Paladin",
+            "label": "paladin",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker-1"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker-2"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$paladin",
+          "ability": 0,
+          "mana": [
+            "$s1",
+            "$s2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$paladin",
+          "ability": 1,
+          "targets": [
+            "$piker-1"
+          ],
+          "mana": [
+            "Treasure Token",
+            "$s3",
+            "$s4",
+            null
+          ],
+          "costOrder": [
+            0,
+            1
+          ],
+          "yields": [
+            [
+              {
+                "manaType": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Black"
+                  }
+                },
+                "tags": [
+                  {
+                    "type": "Treasure"
+                  },
+                  {
+                    "type": "Artifact"
+                  }
+                ],
+                "retention": {
+                  "type": "Ordinary"
+                },
+                "restriction": null,
+                "rider": null,
+                "sourceChosenSubtype": null
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Treasure Token",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$engine",
+          "ability": 0,
+          "targets": [
+            "ability of $paladin"
+          ],
+          "mana": [
+            "$s5",
+            "$s6"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$piker-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$piker-2",
+          "keyword": {
+            "type": "Deathtouch"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$piker-1",
+          "keyword": {
+            "type": "Deathtouch"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker-2",
+          "power": 4,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker-1",
+          "power": 4,
+          "toughness": 1
+        }
+      }
+    }
+  ]
+}

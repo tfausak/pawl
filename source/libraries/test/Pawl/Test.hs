@@ -1449,7 +1449,6 @@ spec s registry = do
   Pawl.CopySpec.faceDownCopySpec s registry
   Pawl.CopySpec.permanentCopySpec s registry
   Pawl.CopySpec.copyAbilityOnStackSpec s registry
-  Pawl.CopySpec.copiedTriggerTargetSpec s registry
   Pawl.CopySpec.ivySpec s registry
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry

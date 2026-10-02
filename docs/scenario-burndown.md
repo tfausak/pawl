@@ -345,8 +345,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 109.5 one player's Exploration does not raise another's allowance | `check:other-PlayerEffect.landPlaysAllowed`
 - CR 109.5 the You scope does not reach bob's graveyard | `check:other-PlayerEffect.mayCastFrom`
-- CR 113.9 with Prowling Serpopard alice's activated ability is still counterable | `ready`
-- CR 113.9 without Spider-Punk bob's Stifle counters alice's ability | `ready`
 - CR 305.1 / 614.1a a graveyard land turned away by its own sacrifice still spends the use | `check:helper-arrivedBetween` `check:helper-namesIn` `check:helper-pbBuried`
 - CR 305.1 beside Crucible of Worlds the player chooses whether a graveyard land is played under Serra Paragon | `board:continuous-effect`
 - CR 400.1 the grant does not reach the copy in bob's graveyard | `check:other-PlayerEffect.mayCastFrom`
@@ -356,12 +354,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2e a rejected cast leaves the grant standing | `board:player-effect`
 - CR 601.2e an announced X that leaves the spell even takes the cast back | `move:expect-rejected`
 - CR 601.3 / 118.8 the linked creature is cast by removing three counters | `board:exile-linked`
-- CR 601.3 a cast made while searching spends the grant | `ready`
 - CR 601.3 the budget comes back at the turn handoff | `board:replacement`
 - CR 601.3 the use comes back on her next turn | `board:continuous-effect`
 - CR 611.2 resolving stores one MayPlayAsThoughItHadFlash grant expiring on use | `check:other-GameState.playerEffects` `check:other-ActivePlayerEffect.effect` `check:other-ActivePlayerEffect.expiry`
 - CR 613.1f The Eighth Doctor's quoted replacement exiles the permanent it was granted to | `board:continuous-effect`
-- CR 701.6a / 113.9 with Spider-Punk the ability survives the Stifle and resolves | `ready`
 - CR 708.2a a face-down cast spends the grant off the face the gate read | `board:player-effect`
 
 ### `CastProhibitionSpec`
@@ -549,9 +545,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 903.10a only the commander's combat damage is tallied | `check:commander-damage`
 - CR 903.10a twenty-one combat damage from one commander loses the game | `check:commander-damage`
 - CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game | `check:commander-damage`
-- CR 903.8 the second cast from the command zone costs {2} more | `ready`
-- CR 903.9a a commander that dies is offered back to the command zone | `ready`
-- CR 903.9a declining leaves it in the graveyard | `ready`
 - CR 903.9b a commander bounced to its owner's hand may go to the command zone | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
 - CR 903.9b a commander put on top of its owner's library may go to the command zone | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
 - CR 903.9b an ordinary creature is not offered the command zone | `board:object-bindings` `board:player-commandercasts` `board:player-startingdeck`
@@ -568,7 +561,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.140e a duplicate of a mutated Headless Skaab owes the Skaab's additional cost | `board:source-ofmerge`
 - CR 702.178a at max speed the Smasher returns the duplicate with haste, and the end step sacrifices it | `board:exile-linked` `board:player-speed`
 - CR 702.178a one short of max speed, the duplicate stays in exile | `board:exile-linked` `board:player-speed`
-- CR 707.2/118.9 a duplicate of a Clone offers the alternative cost of what the Clone copies | `ready`
 - CR 707.2/702.37e a duplicate of a Clone of Ainok Tracker is cast face down and turned up for its morph cost | `check:tapped-count`
 - CR 707.2/709.5b a duplicate of a copied Room is cast as a door | `move:cast-face` `move:action-UnlockDoor`
 - CR 707.2/715.2b a duplicate of a Clone of Flaxen Intruder is cast as Welcome Home | `move:cast-face` `check:tapped-count`
@@ -589,14 +581,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.128a embalm exiles the card for a white Zombie token copy with no mana cost, and a Clone of it keeps all three | `check:mana-value`
 - CR 702.129a eternalize makes a black 4/4 Zombie token copy, and neither it nor a Clone of it is a Doom Blade target | `check:mana-value`
 - CR 702.99c a flickered Piker is no longer encoded and offers nothing | `board:sickness`
-- CR 707.10 a copied activated ability was not activated, so no mana was spent to activate it | `ready`
-- CR 707.10 a triggered ability is copied, and its copy takes a new target | `ready`
-- CR 707.10b a copied activated ability keeps its source, and the copy is not activated | `ready`
-- CR 707.10b a copy of a triggered ability still counts once the original has been countered | `ready`
-- CR 707.10b a copy of an activated ability still counts once the original has been countered | `ready`
+- CR 707.10b a copy of a triggered ability still counts once the original has been countered | `ref:stack-ability-occurrence`
+- CR 707.10b a copy of an activated ability still counts once the original has been countered | `ref:stack-ability-occurrence`
 - CR 707.10c a card the copied X does not reach is not offered | `check:legal-targets` `move:out-of-range-answer`
-- CR 707.10c a copied trigger's slot is baked, so the offer is a real choice | `ready`
-- CR 707.10c new targets are chosen for a copied activated ability | `ready`
 - CR 707.10e no copy is created where Ivy is not a legal target | `board:continuous-effect`
 - CR 707.13 Garth One-Eye's cast copy of Black Lotus has Black Lotus's characteristics and resolves as a token | `check:other-Object.castFrom,` `check:other-GameState.outsideCopies`
 - CR 707.13 a declined copy leaves nothing behind, and a name the reference does not know makes no copy | `check:other-GameState.outsideCopies,` `check:other-GameState.namedCopyChoices,` `board:card-reference`
@@ -695,9 +682,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `CounterspellSpec`
 
 - CR 107.3a the announced X is what the targeted spell's controller pays | `check:mana-pool`
-- CR 113.3b Squelch counters the activated ability and leaves the trigger, which still kills the Piker | `ready`
-- CR 113.7 the trigger reaches the artifact's ability and not the creature's, and the artifact is destroyed | `ready`
-- CR 113.7a the ability of an artifact sacrificed to activate it is still from an artifact source, and nothing is destroyed | `ready`
 - CR 118.12 a graveyard one card smaller demands one mana less | `check:mana-pool`
 - CR 118.12 the offer is {1} for each card in the RESOLVING controller's graveyard | `check:mana-pool`
 - CR 118.12 whole card: an unhacked Lithophage's gate demands the Mountain | `check:helper-namesIn` `check:helper-payResponses`
@@ -724,14 +708,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `CrewSpec`
 
 - CR 514.2 the Vehicle stops being a creature at cleanup | `check:power-toughness-none`
-- CR 702.122b a countered crew ability still crewed the Vehicle | `ready`
-- CR 702.122c a creature whose crew ability was countered still crewed it | `ready`
 - CR 702.122d a creature Revoke Privileges enchants is not offered to pay | `check:prompt-offers`
 - CR 702.122e crewed by exactly two creatures grants the ability | `check:abilities` `check:intermediate-state`
 
 ### `DamageReplacementSpec`
 
-- CR 120.4 a redirect onto the recipient it was already aimed at deals one event, not two | `check:events` `check:helper-countedRedirectRows`
 - CR 120.4 one sentence naming alice twice deals her ONE event, of 6 | `check:events`
 - CR 608.2f an ability's two halves are one batch | `board:replacement`
 - CR 608.2f creatures and players in a won flip are one batch | `board:replacement`
@@ -739,25 +720,19 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2f one sentence's differing amounts are one batch | `board:replacement`
 - CR 609.7a the redirection moves the chosen source's damage and no other source's | `board:replacement`
 - CR 609.7a the same board answering the OTHER source moves that one's damage instead | `board:replacement`
-- CR 609.7a the unchosen source's damage to alice stays where it was aimed | `check:helper-countedRedirectRows`
 - CR 609.7b the recheck reads the RECORD, not the print: a Fire-Eater made green before it left deals its 2 | `board:continuous-effect` `board:replacement`
 - CR 609.7b the shield rechecks the source: a Piker made a Wolf deals its 2 | `board:continuous-effect` `board:replacement`
 - CR 609.7b the shield rechecks the source: a Piker made green deals its 2 | `board:continuous-effect` `board:replacement`
-- CR 611.2c a permanent alice controls is covered by the same countdown | `ready`
-- CR 611.2c the chosen source's damage to bob's own creature is not covered | `ready`
 - CR 614.3 the row covers the next damage event and no later one | `board:objects-ids`
-- CR 614.9 Lava Burst's damage to a creature is not redirected, and another source's still is | `check:helper-redirectSources`
 - CR 614.9 a 1-damage event moves whole, and the row is spent by it | `check:events` `check:other-Damage.applyDamage` `check:other-GameState.replacements`
 - CR 614.9 guard: a destination that left the battlefield makes the effect do nothing | `check:helper-redirectRows`
 - CR 614.9 the redirection covers the creature the spell named and not the other | `check:other-Damage.applyDamage` `check:other-GameState.replacements`
-- CR 615.10 the emblem floors damage to alice and to her other planeswalker at 1, and reaches nothing else | `ready`
 - CR 615.12 the same shield still prevents Lava Burst's 3 dealt to a player | `board:objects-ids`
 - CR 615.12 the shield prevents none of Lava Burst's 3 and is not reduced by it | `board:objects-ids`
 - CR 615.12 the unreduced shield still covers the next 2 once Spider-Punk is gone | `board:replacement`
 - CR 615.12 unpreventable damage is still moved, and still contended for | `board:replacement`
 - CR 615.13 a trigger scoped to one recipient reads its own share of the application | `board:replacement`
 - CR 615.13 another card's prevention of the same 4, on the same creature, is not 'this way' | `board:replacement`
-- CR 615.13 the other disjunct: a red source gains the life too | `ready`
 - CR 615.5 the prevented three come off as three +1/+1 counters | `check:helper-aimCreature` `check:helper-countersOn`
 - CR 615.7 NONcombat damage from that same creature is prevented | `check:helper-amounts` `check:helper-shieldsLeft`
 - CR 615.7 a simultaneous batch contends for the 2, and alice divides it | `board:replacement`
@@ -765,13 +740,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 615.7 combat damage from a creature the Beast's controller does NOT control is prevented | `check:helper-amounts` `check:helper-shieldsLeft`
 - CR 615.7 once spent, the next event stays whole | `check:other-Damage.applyDamage`
 - CR 615.7 one shield over you AND your permanents is a single shared pool | `board:replacement`
-- CR 615.7 the chosen source's 5 to alice: 2 is dealt to bob and 3 to alice | `check:events` `check:continuous-effects`
 - CR 615.7 the next 1 of a 3-damage event moves and the other 2 stay where they were aimed | `check:events` `check:other-Damage.applyDamage` `check:other-GameState.replacements`
 - CR 615.7 the shield still prevents the Goblin Piker's 3 whole | `check:helper-amounts` `check:helper-shieldsLeft`
 - CR 615.7 without Spider-Punk the shield prevents the whole 3 | `check:helper-amounts` `check:helper-shieldsLeft`
 - CR 615.7's allocation lands on the events it was asked about, after the sort | `board:replacement`
 - CR 615.7's order sits INSIDE one chooser's APNAP turn, not across choosers | `board:objects-ids`
-- CR 615.8 / 609.7a the shield eats one whole instance from the source it named, and the reflection hits that source's controller | `check:continuous-effects`
 - CR 615.9 / 615.13 samite ministration gains life from a black source it named, and none from a green one | `board:delayed-trigger` `board:replacement`
 - CR 616.1 the shielded creature's controller picks which of two simultaneous events the row replaces | `board:replacement`
 - CR 616.1 two players choosing for one batch are asked in APNAP order | `board:objects-ids`
@@ -837,7 +810,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 800.4a/603.6c the exile is a zone change, so a bystander's leaves-the-battlefield trigger fires | `board:combat` `board:entered-with`
 - CR 800.4a/800.4m turnOrder is the SEATING roster: a departure does not shorten it | `check:other-GameState.turnOrder`
 - CR 800.4c a permanent lent to a surviving player is exiled when the loan ends and its default controller has left | `board:combat` `board:entered-with`
-- stillPlaying omits a departed player | `ready`
 
 ### `DetainSpec`
 
@@ -915,7 +887,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 112.2 Kambal's 'that player' is the opponent who cast it | `check:helper-lives`
 - CR 113.6k Desolation Twin's cast trigger fires from the stack | `check:helper-eldraziOf`
-- CR 113.9 the same Baral: a countered SPELL fires it, a countered ABILITY does not | `ready`
 - CR 505.1b an extra main phase makes the postcombat main the third, and it does not trigger | `check:other-GameState.triggeredThisGame`
 - CR 601.2i Brineborn Cutthroat counts only the casts on another player's turn | `board:replacement`
 - CR 601.2i casting an instant fires Young Pyromancer | `check:helper-elementalsOf`
@@ -1038,10 +1009,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - a priority round whose only action is Pass leaves it alone | `check:other-GameState.lastChoice`
 - land play conserves cards | `board:matchup` `check:object-count`
 - no player receives priority after the restart resolves | `board:stack`
-- one event short of the limit is not a draw | `ready`
 - playing lands fills the battlefield | `board:matchup`
 - the conceding player departs as Conceded, not Lost | `check:other-GameState.players` `check:other-Player.status`
-- the limit is a draw | `ready`
 - the next step runs the rebuilt turn 1's untap step | `board:stack`
 - the seat walk terminates when every seat has departed | `check:other-GameState.turnNumber`
 - the step the restart fired in does not advance past turn 1's untap step | `board:stack`
@@ -1099,7 +1068,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `LeavesTriggerSpec`
 
 - CR 109.5 an opponent's spell naming ANOTHER player fires nothing | `check:helper-payResponses`
-- CR 110.2a a stolen Young Wolf comes back under its OWNER's control | `ready`
 - CR 113.3c a TRIGGERED ability naming the same creature draws nothing | `check:designations`
 - CR 113.6k the same ability does not fire from a graveyard | `board:exiledwith` `board:haunting`
 - CR 113.6m an ability whose delayed trigger returns it from the graveyard functions there | `board:delayed-trigger` `board:entered-with`
@@ -1116,7 +1084,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2h a second Aether Flash resolves with the entrant already dead, and deals nothing | `check:events`
 - CR 614.1 Vizier of Remedies takes persist's counter to zero, so the Goblin returns bare and persists again | `check:helper-countersOn` `check:helper-inGraveyard` `check:helper-named`
 - CR 702.55b/702.55c the haunted creature dying fires the card's rider | `board:haunting`
-- CR 730.3 a merged token put into a library still puts its Cubwarden card there, and the Seeker grows | `ready`
 - Professor Hojo sacrificed to the cost still triggers | `board:object-designations`
 - Professor Hojo sees a target its own cost sacrificed | `board:object-designations`
 - a card moved from a library into a library is not put into one | `check:other-Event.changeZone`
@@ -1215,7 +1182,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `MassEffectSpec`
 
-- CR 601.2b a player leaving in response does not shrink an X already announced | `ready`
 - CR 608.2d Carth the Lion's reveal is not offered without a planeswalker among them | `check:helper-namesIn` `check:helper-revealed`
 - CR 608.2d the second choice is made among the cards the first left | `check:prompt-candidates`
 - CR 608.2d two cards are taken from among the seven, both of them chosen | `check:prompt-candidates`
@@ -1233,11 +1199,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.42a a one-or-more-cards-leave-exile trigger counts both melded cards | `check:events` `check:other-Binding.eventAmount` `check:other-Binding.toAmount` `check:other-Event.eventBindings` `check:other-LoggedEvent.event` `check:other-Moved.change` `check:other-Moved.departures` `check:other-ZoneChange.from` `check:other-ZoneChange.object` `check:other-ZoneChange.to`
 - CR 701.42a the melding ability exiles the pair and puts one permanent onto the battlefield | `check:helper-componentPrintings` `check:helper-townshipName` `check:other-Game.printingOf` `check:other-Object.owner` `check:other-Object.source` `check:other-Printing.card`
 - CR 701.42b/701.42c a token counterpart melds nothing, and the land stays exiled | `check:intermediate-state`
-- CR 712.21 a melded permanent dies as one permanent and arrives as two cards | `ready`
-- CR 712.21 a melded permanent's death fires a dies trigger once and a card-arrival trigger twice | `ready`
 - CR 712.21a the owner arranges the two cards her melded permanent becomes on top of her library | `board:source-ofmeld`
 - CR 712.21c a perpetual grant on a melded permanent follows both cards it becomes | `board:source-ofmeld`
-- CR 712.21c a trigger that exiles what the melded permanent became exiles both cards | `ready`
 - CR 712.21e a melded permanent's death is two cards put into a graveyard and one object that moved | `board:source-ofmeld`
 - CR 712.21e each card of a melded permanent is counted as its own card type | `board:source-ofmeld`
 - CR 712.4c/712.9 the melded permanent ignores an instruction to transform | `check:helper-townshipName` `check:other-PC.subtypes` `check:other-Projection.namesOf` `check:other-Projection.project`
@@ -1444,7 +1407,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 615.5 the counters are on before CR 704.5g asks whether the attacker died | `board:replacement`
 - CR 615.7 a shield naming NO source watches every source, and asks nothing | `check:helper-answersFor` `check:helper-chosenSourcesIn` `check:other-Stack.resolveTop`
 - CR 615.7 a shield that covers the whole batch asks nothing | `check:helper-amounts` `check:helper-answersFor` `check:helper-wasAskedToAllocateDamage` `check:other-Damage.applyDamage` `check:other-GameState.replacements`
-- CR 615.7 bob splits the shield between the two events, which no order can do | `ready`
 - CR 615.7 the shielded PLAYER chooses which of two simultaneous damages the shield prevents | `board:replacement`
 - CR 615.9 only a source with the printed properties can be chosen | `board:replacement`
 - CR 700.4 the same creature exiled from the battlefield instead fires nothing | `board:delayed-trigger` `board:player-effect` `board:unregeneratables`
@@ -1454,7 +1416,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ProjectionSpec`
 
 - CR 113.6b a graveyard grant's protection still bars the artifact blocker | `check:other-GameState.continuousEffects` `check:other-GameState.command` `move:expect-rejected`
-- CR 113.6p an emblem's own replacement row floors the life total from the command zone | `ready`
 - CR 208.1/208.2b Imperial Recruiter's search offers the */* card and the 2-power creature, not the 3-power one | `check:prompt-offers` `check:shuffled-set`
 - CR 208.2a Tarmogoyf is a power-0 search candidate with every graveyard empty | `check:prompt-offers`
 - CR 208.2a Tarmogoyf is a search candidate at power 2, off a land and an instant in a graveyard | `check:prompt-offers`
@@ -1483,7 +1444,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.8b a text change waits for the exchange that gives it a word | `board:continuous-effect`
 - CR 613.8b an earlier text change waits for the later one it depends on | `board:objects-ids`
 - CR 701.23a without the Nexus, Goblin Matron's search offers the printed Goblin alone | `check:prompt-offers`
-- CR 702.16e an emblem's granted protection still prevents the damage | `ready`
 - CR 702.73a changeling granted by a RESOLUTION makes the creature every creature type | `check:subtype-member`
 
 ### `PrototypeSpec`
@@ -1601,7 +1561,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ShieldCounterSpec`
 
 - CR 122.1c a rule's destruction is not replaced, though a counter is still there | `check:intermediate-state`
-- CR 122.1c the counter does not save the bird from a rule's destruction | `ready`
 - CR 514.2 the prohibition lasts exactly the turn, and the same shield saves the same creature next turn | `board:replacement`
 - CR 701.19c / 704.5g the prohibited creature's shield does not save it from lethal damage | `board:replacement`
 
@@ -1819,7 +1778,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 121.2c Vision Skeins draws for the active player first, then in turn order | `check:helper-drawersOf`
 - CR 121.3 drawing from an empty library records the failed draw | `check:other-GameState.drewFromEmpty`
 - CR 202.3b a Clone copying a TRANSFORMED Stonewing Antagonizer has mana value 0, not the front face's 1 | `check:mana-value` `board:face`
-- CR 303.4b / 614.1a Wheel of Sun and Moon reroutes only the enchanted player's cards | `check:helper-revealsOf` `check:events`
 - CR 401.2 each attacking creature's OWNER picks the end, not the resolving controller | `board:sickness`
 - CR 401.7 Oust into a one-card library puts the creature on the bottom | `board:sickness`
 - CR 401.7 Oust: second from the top, and its CONTROLLER gains 3 life | `board:sickness`

@@ -1,0 +1,202 @@
+{
+  "description": "CR 702.122b a countered crew ability still crewed the Vehicle",
+  "note": "Gearshift Ace and Blind-Spot Giant crew the Dreadnought, tapping as the cost, so the Ace has crewed it before bob's Stifle counters the crew ability. The Ace's trigger still gives the Vehicle first strike, and the countered ability never makes it a creature.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Gearshift Ace",
+            "label": "ace",
+            "ready": true
+          },
+          {
+            "card": "Consulate Dreadnought",
+            "label": "d1",
+            "ready": true
+          },
+          {
+            "card": "Blind-Spot Giant",
+            "label": "blind",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Stifle",
+            "label": "stifle"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTapsForTotalPower",
+          "with": [
+            "$ace",
+            "$blind"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$d1",
+          "ability": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $ace",
+            "ability of $d1"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$stifle",
+          "targets": [
+            "ability of $d1"
+          ],
+          "mana": [
+            "$island"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $ace"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "bob",
+          "zone": "Graveyard",
+          "is": [
+            "Stifle"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Types": {
+          "object": "$d1",
+          "types": [
+            "Artifact"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$d1",
+          "keyword": {
+            "type": "FirstStrike"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Types": {
+          "object": "$d1",
+          "types": [
+            "Artifact"
+          ]
+        }
+      }
+    }
+  ]
+}
