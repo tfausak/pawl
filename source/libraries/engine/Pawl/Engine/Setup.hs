@@ -496,8 +496,8 @@ createDeck pid deck = do
   Monad.forM_ designatedIds $ \printingId -> do
     Monad.void (createInCommandZone pid printingId)
     State.modify' (Commander.designate pid printingId)
-  -- CR 103.2a / CR 702.139b: the starting deck, recorded once and never rewritten
-  -- -- rule 103.2a names a moment before the game begins, and by the time a
+  -- CR 103.2a / CR 702.139b: the starting deck, recorded once for this game --
+  -- rule 103.2a names a moment before the game begins, and by the time a
   -- companion's condition could be asked again the opening hands have been drawn.
   --
   -- Deck.cards PLUS every commander, which is rule 702.139b's second sentence: "in a
@@ -754,9 +754,24 @@ startGameFromCards perform exemptions = do
       -- archenemy whose scheme deck moved into a subgame empty is still one
       -- (Archenemy.isArchenemy).
       decksOf old pool = Map.fromList [(pid, ownedIn pool pid) | pid <- owners, Map.member pid old || not (Seq.null (ownedIn pool pid))]
+      -- CR 103.2a / 702.139b: the new game's starting deck is the deck it is
+      -- built from -- every card headed for the library plus the commander
+      -- held back from it. That is CR 727.2's every involved card, a wished-in
+      -- one included, less CR 727.5's exemptions, or CR 729.2's main-game
+      -- library plus CR 729.2c's commander. What stayed outside the game is
+      -- not in it, nor is a supplementary deck, a vanguard or a conspiracy.
+      deckCards = Map.union cards (Map.restrictKeys commandZoneCards commanderIds)
+      printingOf obj = case Object.source obj of
+        Source.OfCard printingId -> Just printingId
+        _ -> Nothing
+      startingDeckOf pid =
+        Map.fromListWith (+) [(printingId, 1) | obj <- Map.elems deckCards, Object.owner obj == pid, Just printingId <- [printingOf obj]]
+      withStartingDeck pid player =
+        if List.elem pid owners then player {Player.startingDeck = startingDeckOf pid} else player
   State.put
     gs
-      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards, planarCards, schemeCards],
+      { GameState.players = Map.mapWithKey withStartingDeck (GameState.players gs),
+        GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards, planarCards, schemeCards],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) owners)),
         GameState.planarDecks = decksOf (GameState.planarDecks gs) planarCards,
@@ -777,7 +792,11 @@ startGameFromCards perform exemptions = do
   -- CR 103.1c after CR 727.1a's determination: a conspiracy stays in the
   -- command zone through a restart (CR 315.3), so it claims again.
   claimStartingPlayer
-  Mulligan.openingHands perform =<< State.gets Game.stillPlayingInOrder
+  seated <- State.gets Game.stillPlayingInOrder
+  -- CR 103.2b, newGame's reveal round: CR 727.1 and CR 729.2 each start a new
+  -- game following rule 103, so the reveal is put to every player again.
+  Monad.forM_ seated Companion.reveal
+  Mulligan.openingHands perform seated
   -- CR 103.7, newGame's step: the new game's starting player sets a starting
   -- plane after the opening hands.
   starting <- State.gets GameState.activePlayer
@@ -888,19 +907,12 @@ resetPlayers settings seats lifeModifier players =
               Player.completedDungeonNames = Set.empty,
               -- CR 116.2g counts "this game", and CR 727.1 / CR 729.2 make both of
               -- this function's callers' games a new one, so the once-per-game
-              -- action is available again. Pawl.Engine.Companion.canTake still asks
-              -- whether the card is out there, which is what keeps a companion
-              -- already brought in from being taken twice.
-              --
-              -- Player.startingDeck and Player.companion are deliberately NOT
-              -- reset beside it, for Player.commander's reason: CR 727.2 reuses
-              -- the same cards and the designation was made from the deck before
-              -- the restarted game began.
-              --
-              -- Not implemented: CR 727.1's own re-run of rule 103, which would
-              -- put CR 103.2b's reveal round to the players again -- this reader
-              -- keeps the designation the first game made instead (#3260).
-              Player.companionTaken = False
+              -- action is available again.
+              Player.companionTaken = False,
+              -- CR 103.2b: nobody has revealed a companion in the new game yet.
+              -- startGameFromCards records its starting deck and puts the reveal
+              -- round again.
+              Player.companion = Nothing
             }
         Status.Departed _ -> player
    in Map.mapWithKey reset players

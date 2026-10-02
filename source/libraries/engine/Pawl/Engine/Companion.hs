@@ -114,6 +114,10 @@ fulfilled predicate pid gs =
 -- Player.outsideTheGame and not the sideboard field on the deck, because rule
 -- 103.2b runs AFTER rule 103.2a has set the sideboard aside; Pawl.Engine.Setup.createDeck
 -- is what interns it into the pool this reads.
+--
+-- Not implemented: in a subgame, CR 729.4's main-game objects
+-- (GameState.outsideObjects) are outside the game too, and none is offered
+-- (#4645).
 revealable :: PlayerId -> GameState -> [PrintingId]
 revealable pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
@@ -160,9 +164,8 @@ reveal pid = do
 -- window too), and the {3} is payable.
 --
 -- A FIFTH that rule 116.2g leaves implicit: the card is still outside the game.
--- It can only fail where Pawl.Engine.Setup.resetPlayers has given the action back
--- -- CR 727.1's restart and CR 729.2's subgame, each a new game -- while the pool
--- it would spend was already spent in the game before.
+-- It fails where something else brought the revealed card in first -- a wish
+-- whose filter admits it (CR 400.11b) spends the same pool entry.
 --
 -- The payability check is Cost.canPay and NOT Cost.total's CR 601.2f
 -- adjustments, Pawl.Engine.Foretell.canForetell's reason: that rule totals the

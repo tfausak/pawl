@@ -219,9 +219,11 @@ data Player = MkPlayer
     -- A SNAPSHOT and not a live read of the library, which is the whole reason the
     -- field exists: CR 702.139b fixes the set at one moment before the game begins,
     -- and by the time a companion's condition could be asked again the opening hands
-    -- have been drawn and the library no longer holds the deck. Pawl.Engine.Setup.createDeck
-    -- is the sole writer, and nothing rewrites it -- CR 103.2a names a moment, not a
-    -- state that tracks.
+    -- have been drawn and the library no longer holds the deck. Written once per
+    -- game -- by Pawl.Engine.Setup.createDeck, and again by
+    -- Pawl.Engine.Setup.startGameFromCards for CR 727.1's restart and CR 729.2's
+    -- subgame, each a new game -- and never in between: CR 103.2a names a moment,
+    -- not a state that tracks.
     --
     -- The COMMANDER is counted in, which is CR 702.139b's second sentence: "in a
     -- Commander game, this is also before you've set aside your commander". So this
