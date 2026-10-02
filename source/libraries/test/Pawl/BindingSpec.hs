@@ -60,6 +60,7 @@ sampleSnapshot =
       PC.grantedCostReductions = [],
       PC.halves = Nothing,
       PC.exceptions = [],
+      PC.mergedDonors = [],
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
       PC.spell = Face.defaultSpell,

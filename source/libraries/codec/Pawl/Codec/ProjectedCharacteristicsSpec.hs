@@ -111,6 +111,8 @@ testCharacteristics =
       PC.halves = Just CardSpec.mountainCard,
       -- CR 707.9b, synthetic for halves' reason.
       PC.exceptions = [CopyException.NoManaCost],
+      -- CR 702.140e, synthetic for halves' reason.
+      PC.mergedDonors = [minimalCharacteristics],
       -- Synthetic for halves' reason: a Mountain has no inset frame, and what
       -- the case is about is that the field carries a whole FACE through the
       -- wire (CR 722.2b).
@@ -159,6 +161,7 @@ testCharacteristicsJson =
     <> "\"grantedCostReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]},"
     <> "\"exceptions\":[{\"type\":\"NoManaCost\"}],"
+    <> "\"mergedDonors\":[{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}],"
     <> "\"prepare\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
     <> "\"alternativeSpell\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
     <> "\"spell\":{\"modes\":[{},{}]},"
@@ -206,6 +209,7 @@ minimalCharacteristics =
       PC.grantedCostReductions = [],
       PC.halves = Nothing,
       PC.exceptions = [],
+      PC.mergedDonors = [],
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
       PC.spell = Face.Type.defaultSpell,

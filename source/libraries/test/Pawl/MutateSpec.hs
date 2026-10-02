@@ -102,6 +102,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
@@ -505,6 +506,23 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: under Mirrorweave the Falcon Abomination was the Hill Giant" (Projection.namesOf host board, S.powerToughnessOf host board) (named "Hill Giant", Just (3, 3))
     Spec.assertEqWith s "setup: both merges happened" (componentNames host over, componentNames host under) ([CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Falcon Abomination")], [CardName.MkCardName (Text.pack "Falcon Abomination"), CardName.MkCardName (Text.pack "Cubwarden")])
     Spec.assertEqWith s "setup: the cleanup step ran" (GameState.phase (ending over)) (Phase.Ending EndingStep.Cleanup)
+  -- CR 702.140e over a Room on top: Opalescence makes the Room with its red
+  -- door open a 2/2 non-Human creature, and Cubwarden mutates under it. The
+  -- merged permanent shows the Room (CR 730.2a), whose characteristics are
+  -- rebuilt from its halves against its own doors (CR 709.5), and the rebuild
+  -- still carries the lifelink only the component under it prints.
+  Spec.it s "CR 702.140e mutating under an animated Room keeps the abilities from under it" $ do
+    plains <- S.printingOf s registry "Plains"
+    opalescence <- S.printingOf s registry "Opalescence"
+    room <- S.printingOf s registry "Roaring Furnace"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+        (_, withOpalescence) = S.addPermanent opalescence S.alice base
+        (host, withRoom) = S.addPermanent room S.alice withOpalescence
+        opened = withRoom {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = Set.singleton RoomHalf.LeftHalf}) host (GameState.objects withRoom)}
+        (board, spellId) = S.handOne cubwarden opened
+        after = merging MutateSide.Under host board spellId
+    Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink host after) "the merged Room has Cubwarden's lifelink"
   -- CR 702.140e read by the gatherer rather than by the projection: a static
   -- ability under the topmost component has to reach Projection.permanentParts,
   -- which walks Projection.View.staticAbilitiesOf and not the seed record. Lord

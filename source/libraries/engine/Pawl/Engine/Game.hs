@@ -1133,7 +1133,7 @@ alternativeSpellCardOf obj card = case copyStampOf obj of
 -- ProjectedCharacteristics.alternativeSpell from. FACE UP only, halvesOf's fork.
 alternativeSpellOf :: ObjectId -> GameState -> Maybe (Face Card)
 alternativeSpellOf oid gs = do
-  obj <- lookupObject oid gs
+  obj <- lookupLayerOne oid gs
   case Object.facing obj of
     Facing.FaceDown _ -> Nothing
     Facing.FaceUp -> do
@@ -1146,12 +1146,17 @@ alternativeSpellOf oid gs = do
 -- mana cost. Pawl.ConjureSpec's "CR 707.2/702.37e a duplicate of a Clone of
 -- Ainok Tracker is cast face down and turned up for its morph cost" proves the
 -- morph read.
+--
+-- Off `lookupLayerOne`'s object, so a STORED copy (Mirrorweave) lays its values
+-- over the face as a stamp does (CR 708.8, 707.2). faceUpFaceOf itself stays on
+-- the printed object, since CR 708.12 and 730.2g read the card. A regression
+-- fence: no test turns a face-down creature under Mirrorweave face up.
 faceUpCastingFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceUpCastingFaceOf oid gs = do
-  obj <- lookupObject oid gs
+  obj <- lookupLayerOne oid gs
   card <- cardOf oid gs
-  face <- faceUpFaceOf oid gs
-  pure (castingFaceOf obj card face)
+  printing <- printingOfObject oid gs
+  pure (castingFaceOf obj card (resolveFaceFor (Just obj) (Printing.card printing)))
 
 -- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
 -- when the object is copying something, and its own printed card's otherwise.
@@ -1191,7 +1196,7 @@ prepareCardOf obj card = case copyStampOf obj of
 -- existence without naming a zone.
 prepareSpellOf :: ObjectId -> GameState -> Maybe (Face Card)
 prepareSpellOf oid gs = do
-  obj <- lookupObject oid gs
+  obj <- lookupLayerOne oid gs
   case Object.facing obj of
     Facing.FaceDown _ -> Nothing
     Facing.FaceUp -> do
@@ -1213,7 +1218,7 @@ prepareSpellOf oid gs = do
 -- 709.5c's designations belong to a permanent on the battlefield alone.
 halvesOf :: ObjectId -> GameState -> Maybe Card
 halvesOf oid gs = do
-  obj <- lookupObject oid gs
+  obj <- lookupLayerOne oid gs
   case Object.facing obj of
     Facing.FaceDown _ -> Nothing
     Facing.FaceUp -> do
@@ -1237,7 +1242,7 @@ halvesOf oid gs = do
 -- that goes looking, so CR 708.5's "you can't look at face-down permanents
 -- controlled by another player" is unimplemented (#1412).
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
-faceOf oid gs = faceOfObject gs =<< lookupObject oid gs
+faceOf oid gs = faceOfObject gs =<< lookupLayerOne oid gs
 
 -- `faceOf` for a caller that already holds the object, and the function `faceOf`
 -- itself is written in terms of -- ONE lookup where the chain through
@@ -1265,7 +1270,7 @@ faceOfObject gs obj = case Object.facing obj of
 namesOf :: ObjectId -> GameState -> Set.Set CardName.CardName
 namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just (Facing.FaceDown _) -> Set.empty
-  _ -> maybe Set.empty (namesFor (lookupObject oid gs) . Printing.card) (printingOfObject oid gs)
+  _ -> maybe Set.empty (namesFor (lookupLayerOne oid gs) . Printing.card) (printingOfObject oid gs)
 
 -- `faceOf` IGNORING CR 708.2's substitution: what the object's own card shows,
 -- whichever way up the object is -- CR 709.3b's chosen half, CR 709.4's combined
@@ -1325,7 +1330,7 @@ manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
     _ -> Seq.fromList . Maybe.maybeToList $ do
       printing <- printingOfObject oid gs
       let card = Printing.card printing
-      Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
+      Just (Card.manaCostFace card (resolveFaceFor (lookupLayerOne oid gs) card))
 
 -- `componentsOf` NARROWED to CR 730.2's own subject, which is a merged permanent
 -- and nothing else, TOP TO BOTTOM. meldComponentsOf below is the same narrowing
@@ -1469,7 +1474,7 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just (Facing.FaceDown state) -> Just (Card.faceDownFace (FaceDownState.listed state))
   _ -> do
     card <- cardOfWithLastKnown oid gs
-    Just (resolveFaceFor (lookupObject oid gs) card)
+    Just (resolveFaceFor (lookupLayerOne oid gs) card)
 
 -- CR 603.7: the delayed triggered abilities declared on the face `oid` is
 -- showing, empty for an id with no face to read. The lookup CR 113.6m's final
@@ -1686,20 +1691,30 @@ flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipHalf oid 
 --
 -- HERE rather than beside its main caller
 -- (Pawl.Engine.Projection.View.stampedSnapshotOf) so that `hasFlipHalf` below
--- answers the same question the projection does. The two readers of
--- Binding.copyOf that CANNOT ask it are halvesCardOf and prepareCardOf above,
--- which hold an Object and no GameState: a permanent under a stored row answers
--- its own stamp for CR 709.5's halves and CR 722.2b's prepare spell. No board in
--- data/cards/ reaches that -- the one card that stores a row copies a CREATURE
--- (Mirrorweave), a Room is an enchantment (CR 709.5), and no card in the pool
--- prints a prepare spell. A creature printed with a prepare spell is what would
--- refute it.
+-- answers the same question the projection does. The readers of Binding.copyOf
+-- that hold an Object and no GameState -- halvesCardOf, prepareCardOf,
+-- alternativeSpellCardOf and resolveFaceFor's arms -- reach it through
+-- `lookupLayerOne` below.
 storedCopyOf :: ObjectId -> GameState -> Maybe PC.ProjectedCharacteristics
 storedCopyOf oid gs =
   fmap ActiveCopy.snapshot
     . Maybe.listToMaybe
     . List.sortOn (Ord.Down . ActiveCopy.timestamp)
     $ filter (Set.member oid . ActiveCopy.objects) (GameState.copyEffects gs)
+
+-- CR 613.1a: the object as layer 1a leaves it -- `storedCopyOf`'s row laid into
+-- its copy binding, and the object itself where no row covers it. For the
+-- readers that hold an Object and no GameState, so a creature Mirrorweave made a
+-- copy of a Room has that Room's halves (CR 709.5b) rather than its own card's.
+-- A read only, never written back: Pawl.Engine.Expiry ends the copy by sweeping
+-- the row. Pawl.RoomSpec's "CR 709.5b a creature Mirrorweave makes a copy of an
+-- animated Room has its halves" proves it.
+lookupLayerOne :: ObjectId -> GameState -> Maybe Object.Object
+lookupLayerOne oid gs = withStoredCopy <$> lookupObject oid gs
+  where
+    withStoredCopy obj = case storedCopyOf oid gs of
+      Nothing -> obj
+      Just stored -> obj {Object.bindings = Binding.setCopy stored (Object.bindings obj)}
 
 -- CR 613.7: a copy effect stamped now is later than every stored row covering
 -- these objects, and a copy effect replaces copiable values rather than adding
