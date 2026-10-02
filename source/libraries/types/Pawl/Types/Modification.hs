@@ -14,6 +14,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -430,4 +431,7 @@ data Modification ability
     -- its power (Tapestry Warden). Self-only, like DestructionR: a fact about the
     -- controller, not a set of affected permanents.
     GrantsStationToughness
+  | -- | Alchemy's "intensifies by N" (Static Discharge): add N to the object's
+    -- intensity, which no CR rule names.
+    Intensify Quantity.Quantity
   deriving (Eq, Ord, Show)

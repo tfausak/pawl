@@ -38,6 +38,7 @@ bareFace n =
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.startingIntensity = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,

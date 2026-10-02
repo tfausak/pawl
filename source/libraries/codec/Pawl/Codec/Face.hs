@@ -104,6 +104,7 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   toughness <- Fields.defaulted "toughness" Nothing (Common.maybe Toughness.codec) Face.toughness
   loyalty <- Fields.defaulted "loyalty" Nothing (Common.maybe Loyalty.codec) Face.loyalty
   defense <- Fields.defaulted "defense" Nothing (Common.maybe Defense.codec) Face.defense
+  startingIntensity <- Fields.defaulted "startingIntensity" Nothing (Common.maybe Common.natural) Face.startingIntensity
   -- CR 313.6 / 313.7: absent on every card but a vanguard.
   vanguard <- Fields.defaulted "vanguard" Nothing (Common.maybe Vanguard.codec) Face.vanguard
   -- ONE quantity on the wire, where Face.characteristicPT holds a slot per box:
@@ -189,6 +190,7 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
         Face.toughness = toughness,
         Face.loyalty = loyalty,
         Face.defense = defense,
+        Face.startingIntensity = startingIntensity,
         Face.vanguard = vanguard,
         Face.characteristicPT = fmap (\q -> CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = q, CharacteristicPT.toughness = q}) characteristicPT,
         Face.enchant = enchant,

@@ -431,6 +431,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ManaValue -> False
   Quantity.Type.Power -> False
   Quantity.Type.Toughness -> False
+  Quantity.Type.Intensity -> False
   Quantity.Type.InSlot _ -> False
   Quantity.Type.WasBound _ -> False
   Quantity.Type.BoundCount _ -> False
@@ -1232,6 +1233,7 @@ chooserRef ref = case ref of
   ObjectRef.EachCardInYourHand -> False
   ObjectRef.EachCardInHand {} -> False
   ObjectRef.EachCardInYourLibrary {} -> False
+  ObjectRef.EachCardYouOwn _ -> False
   ObjectRef.EachCardExiledWithSource {} -> False
   ObjectRef.EachCardExiledWithAbility _ -> False
   ObjectRef.EachCardEncodedOnSource {} -> False
@@ -1840,6 +1842,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachCardInYourHand -> False
           ObjectRef.EachCardInHand {} -> False
           ObjectRef.EachCardInYourLibrary {} -> False
+          ObjectRef.EachCardYouOwn _ -> False
           -- CR 607.3 is what makes this one plural even where the card's own
           -- words are singular: an ability referring to "the exiled card" whose
           -- linked ability exiled several performs its action on each of them.

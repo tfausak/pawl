@@ -1082,6 +1082,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInHand {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInYourLibrary _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardYouOwn _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithAbility _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardEncodedOnSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -5026,6 +5027,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- A resolving spell is on the stack (CR 608.1), not in the library,
               -- so Paradigm Shift does not sweep itself.
               ObjectRef.EachCardInYourLibrary _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f).
+              ObjectRef.EachCardYouOwn _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
               -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR
