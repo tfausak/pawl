@@ -9352,31 +9352,39 @@ triggeredSources gs =
 -- The printed riders "This ability triggers only once each turn" and "This
 -- ability triggers only once" (Pawl.Types.TriggerLimit), applied to one gathered
 -- batch: drop every entry whose ability carries a rider and has already triggered
--- inside that rider's window. The per-TURN window needs no stored flag -- the
--- record is CR 603.3b's own log, and GameState.events is cleared at the turn
--- handoff, which makes "in the log" mean "this turn". The per-GAME window reads
--- GameState.triggeredThisGame, which survives that handoff and which Engine.reactions
--- writes. The two are read as ONE spent set: the ability VALUE is part of the key
--- and carries its own limit, so a per-turn key and a per-game key can never be
--- equal. CR 702.179d's inherent twin is limited here like any other, the log
--- recording a sourceless trigger too. Keyed on the SOURCE and the ABILITY, so two
--- permanents with the same printed ability spend separate limits (CR 113.7), one
--- that leaves and returns re-arms (CR 400.7), and two DISTINCT abilities of one
--- source spend separate limits; a change of CONTROL spends nothing. Spent on
--- TRIGGERING.
+-- inside that rider's window as often as its source bears it. The per-TURN
+-- window needs no stored flag -- the record is CR 603.3b's own log, and
+-- GameState.events is cleared at the turn handoff, which makes "in the log" mean
+-- "this turn". The per-GAME window reads GameState.triggeredThisGame, which
+-- survives that handoff and which Engine.reactions writes. The two are read as
+-- ONE spent tally: the ability VALUE is part of the key and carries its own
+-- limit, so a per-turn key and a per-game key can never be equal. CR 702.179d's
+-- inherent twin is limited here like any other, the log recording a sourceless
+-- trigger too. Keyed on the SOURCE and the ABILITY, so two permanents with the
+-- same printed ability spend separate limits (CR 113.7), one that leaves and
+-- returns re-arms (CR 400.7), and two DISTINCT abilities of one source spend
+-- separate limits; a change of CONTROL spends nothing. Spent on TRIGGERING.
+--
+-- COUNTED against PendingTrigger.copies, as stateTriggers counts CR 603.8's
+-- suppression: CR 113.2c makes two value-identical instances on one source two
+-- abilities, each with its own allowance. Pawl.EventTriggerSpec's "CR 113.2c two
+-- Well Rested on one creature each trigger once that turn" proves it.
 withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
 withinTriggerLimit gs =
   let spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
+      tally :: [LimitKey] -> Map LimitKey Natural
+      tally = List.foldl' (\m key -> Map.insertWith (+) key 1 m) Map.empty
       go _ [] = []
       go spent (pending : rest) = case limitedKey pending of
         Nothing -> pending : go spent rest
         Just key
-          | Set.member key spent -> go spent rest
-          | otherwise -> pending : go (Set.insert key spent) rest
+          | Map.findWithDefault 0 key spent >= PendingTrigger.copies pending -> go spent rest
+          | otherwise -> pending : go (Map.insertWith (+) key 1 spent) rest
    in go
-        ( Set.union
-            (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
-            (Set.map spentKey (GameState.triggeredThisGame gs))
+        ( tally
+            ( fmap spentKey (Maybe.mapMaybe (abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+                <> fmap spentKey (Foldable.toList (GameState.triggeredThisGame gs))
+            )
         )
 
 -- What ONE INSTANCE of a triggered ability is, for the rider's purposes: what it
@@ -9391,8 +9399,10 @@ withinTriggerLimit gs =
 -- active teammate's speed rises once": under the shared team turns option two
 -- active players each spend their own instance of rule 702.179d's ability.
 --
--- Not implemented: two VALUE-IDENTICAL limited abilities on one source are one
--- instance here, so one spends the other's turn (#3198).
+-- Not implemented: value-identical instances on one source share a key and are
+-- COUNTED rather than told apart, so when the instance that triggered goes and
+-- an identical one that has not stays, the one that stays reads as spent
+-- (#4627).
 type LimitKey = (TriggerSource.TriggerSource, Maybe PlayerId, TriggeredAbility.TriggeredAbility Card (GrantedAbility.Type.GrantedAbility Card))
 
 limitKey :: TriggerSource.TriggerSource -> PlayerId -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.Type.GrantedAbility Card) -> LimitKey

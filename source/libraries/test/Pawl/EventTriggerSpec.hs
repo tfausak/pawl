@@ -1445,7 +1445,7 @@ secondMainPhaseSpec s registry =
           Spec.assertEqWith s "no flying counter: the third main phase is not the second" (flyingOn oid after) Nothing
           Spec.assertEqWith s "the extra main phase really ran, with the Cheerleader untapped" (GameState.phase secondMain, tapState oid secondMain) (Phase.PostcombatMain, Just TapState.Untapped)
           Spec.assertEqWith s "and the third main phase really ran, with it tapped" (GameState.phase thirdMain, tapState oid thirdMain) (Phase.PostcombatMain, Just TapState.Tapped)
-          Spec.assertEqWith s "the rider is unspent, so nothing but the ordinal held the trigger back" (Set.size (GameState.triggeredThisGame after)) 0
+          Spec.assertEqWith s "the rider is unspent, so nothing but the ordinal held the trigger back" (length (GameState.triggeredThisGame after)) 0
         Spec.it s "CR 505.1b and the same attack does trigger at a second main phase the Assault did not move" $ do
           (oid, _, gs) <- boardOf
           let secondMain = stepUntil S.aggressiveAnswer (atPhase Phase.PostcombatMain) gs
@@ -1964,6 +1964,36 @@ oreskosSunGuideSpec s registry =
           Spec.assertEqWith s "untapping the Guide gains alice 2" (S.lifeOf S.alice (resolveOne (untapOne guideId))) (Just 22)
           Spec.assertEqWith s "untapping the Piker instead gains nothing" (S.lifeOf S.alice (resolveOne (untapOne pikerId))) (Just 20)
 
+-- CR 113.2c: two instances of one ability function independently, so each
+-- spends its own "This ability triggers only once each turn"
+-- (Pawl.Engine.Event.withinTriggerLimit). Well Rested, {1}{G} Enchantment --
+-- Aura: "Enchant creature / Enchanted creature has 'Whenever this creature
+-- becomes untapped, put two +1/+1 counters on it, then you gain 2 life and draw
+-- a card. This ability triggers only once each turn.'" Nothing omitted.
+--
+-- Two on one Goblin Piker grant it two value-identical instances. The untap
+-- step fires both; a second untap that turn, through Event.untap, fires
+-- neither.
+wellRestedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+wellRestedSpec s registry =
+  Spec.describe s "Well Rested" $ do
+    Spec.it s "CR 113.2c two Well Rested on one creature each trigger once that turn" $ do
+      rested <- S.printingOf s registry "Well Rested"
+      piker <- S.printingOf s registry "Goblin Piker"
+      island <- S.printingOf s registry "Island"
+      let (pikerId, g0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+          (first, g1) = S.addPermanent rested S.alice g0
+          (second, g2) = S.addPermanent rested S.alice g1
+          stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (S.attach second pikerId (S.attach first pikerId g2)) [1 .. (5 :: Int)]
+          resolveOne gs = S.runPure S.identityAnswer gs Stack.resolveTop
+          settle gs = resolveOne (resolveOne (S.runPure S.identityAnswer gs Engine.settleForPriority))
+          rested1 = settle (S.runPure S.identityAnswer (S.tapObject pikerId stocked) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)))
+          rested2 = S.runPure S.identityAnswer (S.runPure S.identityAnswer (S.tapObject pikerId rested1) (Event.untap pikerId)) Engine.settleForPriority
+          countersOn gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject pikerId gs)
+      Spec.assertEqWith s "both instances resolved: four +1/+1 counters" (countersOn rested1) (Just 4)
+      Spec.assertEqWith s "and 4 life and two cards" (S.lifeOf S.alice rested1, S.handSize S.alice rested1) (Just 24, 2)
+      Spec.assertEqWith s "a second untap that turn triggers neither" (length (GameState.stack rested2)) 0
+
 -- CR 701.68d's blight as a TRIGGER EVENT, which nothing could watch: the whole
 -- printed pool blights, and not one card triggers on a player doing it
 -- (Scryfall oracle:blight, every "whenever" clause read, 2026-09-05). So the
@@ -2306,6 +2336,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   kambalSpec s registry
   brinebornCutthroatSpec s registry
   oreskosSunGuideSpec s registry
+  wellRestedSpec s registry
   blightChroniclerSpec s registry
   bendTriggerSpec s registry
   avatarAangSpec s registry
