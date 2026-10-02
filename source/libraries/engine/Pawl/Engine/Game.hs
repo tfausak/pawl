@@ -934,13 +934,20 @@ resolveFace mName card = case mName of
 -- characteristics the spell has.
 resolveFaceFor :: Maybe Object.Object -> Card -> Face Card
 resolveFaceFor mObj card = case mObj of
+  -- CR 707.3 / 110.5c: ahead of the flip arm below, because a flipped permanent
+  -- that became a copy of a Room has the copied halves, and its status has no
+  -- effect on them. Pawl.FlipSpec's "CR 110.5c a flipped Tok-Tok Mirrorweave
+  -- makes a copy of an animated Room is that Room" proves the order.
+  Just obj
+    | Just halves <- halvesCardOf obj card,
+      Object.zone obj == Zone.Battlefield ->
+        Card.roomFace (Object.unlockedHalves obj) halves
   -- CR 710.2: a FLIPPED permanent's normal name, text box, type line, power and
   -- toughness "don't apply and the alternative versions of those characteristics
-  -- apply instead". Ahead of the Room arm and of CR 709.3b's chosen half, and
-  -- neither can arise beside it: Card.flippedFace answers only for a Flip card,
-  -- which has no shared type line and offers only its normal half to a cast.
+  -- apply instead". Ahead of CR 709.3b's chosen half, which cannot arise beside
+  -- it: a Flip card offers only its normal half to a cast.
   --
-  -- No battlefield gate of its own, where the Room arm below needs one: CR 110.5d
+  -- No battlefield gate of its own, where the Room arm above needs one: CR 110.5d
   -- gives only permanents status, and Object.flipped is written only by
   -- `flipPermanent` below (which gates on the battlefield) and cleared by CR
   -- 400.7's new incarnation, so no object outside the battlefield carries it --
@@ -950,10 +957,6 @@ resolveFaceFor mObj card = case mObj of
     | Object.flipped obj,
       Just flipped <- Card.flippedFace card ->
         flipped
-  Just obj
-    | Just halves <- halvesCardOf obj card,
-      Object.zone obj == Zone.Battlefield ->
-        Card.roomFace (Object.unlockedHalves obj) halves
   -- CR 707.2 / 709.3b / 715.3b: a half its copiable values have and its printed
   -- card lacks, which is the only place the chosen name then resolves.
   Just obj
@@ -972,6 +975,10 @@ resolveFaceFor mObj card = case mObj of
 -- object has. The set is what CR 709.4a's "one of its names" asks about.
 namesFor :: Maybe Object.Object -> Card -> Set.Set CardName.CardName
 namesFor mObj card = case mObj of
+  Just obj
+    | Just halves <- halvesCardOf obj card,
+      Object.zone obj == Zone.Battlefield ->
+        Card.roomNames (Object.unlockedHalves obj) halves
   -- CR 710.2's list names the NAME first, so a flipped permanent has the
   -- alternative half's name and not the normal one -- which is what makes CR
   -- 710.2's own Example true from this side, a "search your library for a
@@ -984,10 +991,6 @@ namesFor mObj card = case mObj of
     | Object.flipped obj,
       Just flipped <- Card.flippedFace card ->
         Set.singleton (Face.name flipped)
-  Just obj
-    | Just halves <- halvesCardOf obj card,
-      Object.zone obj == Zone.Battlefield ->
-        Card.roomNames (Object.unlockedHalves obj) halves
   Just obj
     | Just half <- copiedHalfOf obj ->
         Set.singleton (Face.name half)

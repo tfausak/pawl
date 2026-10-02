@@ -30,6 +30,7 @@
 --
 -- CR 707.2 / 707.3's copies of it are the Clone cases at the end, and CR
 -- 707.9b's exceptions on a copy that flips are the Sakashima case after them.
+-- CR 110.5c's flipped permanent that copies a Room is the Mirrorweave case last.
 --
 -- CR 730.2h's merged permanent containing a flip card is Pawl.MutateSpec's, this
 -- card being the pool's only flip printing and Cubwarden what merges with it.
@@ -56,6 +57,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Filter as Filter.Type
@@ -70,6 +72,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -399,6 +402,42 @@ spec s registry = Spec.describe s "Flip" $ do
           "control: unflipped, it was Akki except its name and legendary"
           (halfReadings sakashimaId copied)
           (Set.singleton sakashimaName, Just (1, 1), Set.fromList [Subtype.Goblin, Subtype.Warrior], Set.singleton Supertype.Legendary, False)
+  -- CR 707.3 / 110.5c over CR 709.5: a flipped Tok-Tok that Mirrorweave makes a
+  -- copy of an Opalescence-animated Roaring Furnace // Steaming Sauna has the
+  -- Room's halves against its OWN doors, both shut -- a nameless 0/0 Room its
+  -- +1/+1 counter keeps alive as a 1/1. Its flipped status has no effect: the
+  -- printed flip face would leave it a legendary 3/3 Tok-Tok.
+  Spec.it s "CR 110.5c a flipped Tok-Tok Mirrorweave makes a copy of an animated Room is that Room" $ do
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    room <- S.printingOf s registry "Roaring Furnace"
+    opalescence <- S.printingOf s registry "Opalescence"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    island <- S.printingOf s registry "Island"
+    let (_, withOpalescence) = S.addPermanent opalescence S.alice (S.landsInPlay island 4)
+        (akkiId, withAkki) = S.addPermanent akki S.alice withOpalescence
+        flipped = S.addCounter CounterKind.PlusOnePlusOne 1 akkiId (Game.withFlipped True akkiId withAkki)
+        (roomId, withRoom) = S.addPermanent room S.alice flipped
+        opened = withRoom {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = Set.singleton RoomHalf.LeftHalf}) roomId (GameState.objects withRoom)}
+        (staged, weaveId) = S.handOne mirrorweave opened
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just roomId) . Recipient.objectOf) . snd) sets
+          _ -> S.identityAnswer p
+        woven = S.runPure answer staged (S.cast S.alice weaveId >> Stack.resolveTop >> Engine.settleForPriority)
+    -- THE gameplay assertion: the Room's characteristics, not Tok-Tok's.
+    Spec.assertEqWith
+      s
+      "CR 709.5: the flipped Akki is a nameless, nonlegendary 1/1 Room"
+      (Projection.namesOf akkiId woven, S.powerToughnessOf akkiId woven, isLegendary akkiId woven)
+      (Set.empty, Just (1, 1), False)
+    -- The proxies, after it: the status survived, and the copied Room is the
+    -- 2/2 Roaring Furnace its open door makes it.
+    Spec.assertEqWith s "CR 110.5c: the status is kept" (fmap Object.flipped (Game.lookupObject akkiId woven)) (Just True)
+    Spec.assertEqWith
+      s
+      "control: before Mirrorweave it was a 3/3 Tok-Tok, and the Room a 2/2 Roaring Furnace"
+      (Projection.namesOf akkiId opened, S.powerToughnessOf akkiId opened, Projection.namesOf roomId woven, S.powerToughnessOf roomId woven)
+      (Set.singleton tokTokName, Just (3, 3), Set.singleton (CardName.MkCardName (Text.pack "Roaring Furnace")), Just (2, 2))
 
 -- S.attackTo bob, declaring `attacker` and nothing else.
 attackWithOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
