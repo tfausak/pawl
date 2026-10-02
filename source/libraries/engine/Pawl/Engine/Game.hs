@@ -1146,12 +1146,17 @@ alternativeSpellOf oid gs = do
 -- mana cost. Pawl.ConjureSpec's "CR 707.2/702.37e a duplicate of a Clone of
 -- Ainok Tracker is cast face down and turned up for its morph cost" proves the
 -- morph read.
+--
+-- Off `lookupLayerOne`'s object, so a STORED copy (Mirrorweave) lays its values
+-- over the face as a stamp does (CR 708.8, 707.2). faceUpFaceOf itself stays on
+-- the printed object, since CR 708.12 and 730.2g read the card. A regression
+-- fence: no test turns a face-down creature under Mirrorweave face up.
 faceUpCastingFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceUpCastingFaceOf oid gs = do
-  obj <- lookupObject oid gs
+  obj <- lookupLayerOne oid gs
   card <- cardOf oid gs
-  face <- faceUpFaceOf oid gs
-  pure (castingFaceOf obj card face)
+  printing <- printingOfObject oid gs
+  pure (castingFaceOf obj card (resolveFaceFor (Just obj) (Printing.card printing)))
 
 -- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
 -- when the object is copying something, and its own printed card's otherwise.
