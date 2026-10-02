@@ -122,6 +122,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.SubtypesAre as SubtypesAre
+import qualified Pawl.Types.Taking as Taking
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Teams as Teams
@@ -858,6 +859,8 @@ answerActionPrompt gs pid actions = do
         Entry.Refuse Move.Cast {} -> True
         Entry.Refuse Move.PlayLand {} -> True
         Entry.Refuse Move.Activate {} -> True
+        Entry.Do Move.Take {} -> True
+        Entry.Refuse Move.Take {} -> True
         _ -> False
   case List.find (takesPriority . snd) (zip [0 ..] (Foldable.toList entries)) of
     Nothing -> pure Action.Pass
@@ -909,6 +912,7 @@ choicesOf :: Move.Move -> Choices.Choices
 choicesOf verb = case verb of
   Move.Cast casting -> Casting.choices casting
   Move.Activate activation -> Activation.choices activation
+  Move.Take taking -> Taking.choices taking
   _ -> Choices.none
 
 actionsMatching :: GameState.GameState -> Move.Move -> [Action.Action] -> Run [Action.Action]
@@ -923,6 +927,7 @@ actionsMatching gs verb actions = case verb of
     oid <- resolveObject (Activation.object activation) gs
     let selected = fmap (\index -> List.genericDrop index (Projection.abilitiesOf oid gs)) (Activation.ability activation)
     pure (filter (matchesActivation oid selected) actions)
+  Move.Take taking -> fmap (fmap fst . filter ((== Taking.action taking) . snd) . zip actions) (mapM (describeAction gs) actions)
   _ -> pure []
 
 matchesActivation :: ObjectId.ObjectId -> Maybe [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)] -> Action.Action -> Bool

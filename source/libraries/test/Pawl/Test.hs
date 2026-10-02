@@ -563,6 +563,7 @@ import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.SuspendCountersSpec
 import qualified Pawl.Codec.SuspendSpec
 import qualified Pawl.Codec.TakeExtraTurnSpec
+import qualified Pawl.Codec.TakingSpec
 import qualified Pawl.Codec.TapForTotalPowerSpec
 import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
@@ -1263,6 +1264,7 @@ spec s registry = do
   Pawl.Codec.ChoicesSpec.spec s
   Pawl.Codec.CheckSpec.spec s
   Pawl.Codec.CastingSpec.spec s
+  Pawl.Codec.TakingSpec.spec s
   Pawl.Codec.BoardSpec.spec s
   Pawl.Codec.ActivationSpec.spec s
   Pawl.Codec.PhasedOutSpec.spec s

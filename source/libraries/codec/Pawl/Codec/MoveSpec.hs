@@ -9,7 +9,6 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Activation as Activation.Type
 import qualified Pawl.Types.Answer as Answer.Type
-import qualified Pawl.Types.Reply as Reply.Type
 import qualified Pawl.Types.Casting as Casting.Type
 import qualified Pawl.Types.Choices as Choices.Type
 import qualified Pawl.Types.Label as Label.Type
@@ -18,8 +17,10 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision.Type
 import qualified Pawl.Types.Paying as Paying.Type
 import qualified Pawl.Types.PaymentDecision as PaymentDecision.Type
 import qualified Pawl.Types.Reference as Reference.Type
+import qualified Pawl.Types.Reply as Reply.Type
 import qualified Pawl.Types.SlotName as SlotName.Type
 import qualified Pawl.Types.Subtype as Subtype.Type
+import qualified Pawl.Types.Taking as Taking.Type
 import qualified Pawl.Types.TypeSwap as TypeSwap.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -58,6 +59,9 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.Answer (Answer.Type.MkAnswer (Text.pack "ChooseDiscard") (Reply.Type.Array [Reply.Type.Text (Text.pack "@card")]))) " {\"Answer\":{\"prompt\":\"ChooseDiscard\",\"with\":[\"@card\"]}} "
   Spec.it s "ChooseTypeSwap" $
     Common.assertCodec s Move.codec (Move.Type.ChooseTypeSwap (TypeSwap.Type.MkTypeSwap Subtype.Type.Goblin Subtype.Type.Elf)) " {\"ChooseTypeSwap\":{\"from\":{\"type\":\"Goblin\"},\"to\":{\"type\":\"Elf\"}}} "
+  Spec.it s "Take" $
+    Common.assertCodec s Move.codec (Move.Type.Take (Taking.Type.MkTaking (Text.pack "TurnFaceUp $piker Manifest") Choices.Type.none)) " {\"Take\":{\"action\":\"TurnFaceUp $piker Manifest\"}} "
+
   Spec.it s "Concede" $
     Common.assertCodec s Move.codec Move.Type.Concede " \"Concede\" "
   Spec.it s "Pass" $

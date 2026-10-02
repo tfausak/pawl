@@ -71,6 +71,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   spell or ability with more than one target slot names them with
   `targetsBySlot`, `{ "victim": ["$bear"], "gauge": ["$wall"] }`, in place
   of `targets`.
+  `Take` takes any other action offered at priority (CR 116.2, 605.3a), named
+  as the `Offered` view renders it, with a cast's choices such as `mana`:
+  `{ "action": "TurnFaceUp $piker Manifest", "mana": ["$mountain"] }`.
   `OrderTriggers` lists one player's simultaneous triggers by source, `null`
   for a sourceless one such as the monarch's draw, in the order they go on the
   stack, so the last named resolves first (CR 603.3b).

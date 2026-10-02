@@ -12,6 +12,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Paying as Paying
 import qualified Pawl.Types.Reference as Reference
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Taking as Taking
 import qualified Pawl.Types.TypeSwap as TypeSwap
 
 -- | One decision a scenario makes for a player.
@@ -52,6 +53,9 @@ data Move
     OrderTriggers (Seq.Seq (Maybe Reference.Reference))
   | -- | Any prompt no dedicated move covers, answered by its name.
     Answer Answer.Answer
+  | -- | CR 116.2 / 605.3a: any other action a player takes at priority, named
+    -- as the Offered view renders it.
+    Take Taking.Taking
   | -- | CR 104.3a.
     Concede
   | -- | CR 117.3d.

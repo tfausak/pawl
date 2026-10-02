@@ -62,7 +62,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `check:tapped-count`: how many permanents a player has tapped
 - `board:object-attachedto`
 - `board:player-effect`: a player effect already in force
-- `move:action-ActivateManaAbility`: the `action-ActivateManaAbility` prompt
 - `check:face-down`: whether an exiled card is face down
 - `check:castable`: whether a card in hand can be cast at all
 - `board:graveyard`
@@ -94,8 +93,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:object-turnedoverat`
 - `board:object-doesnotuntapfor`
 - `board:object-chosennames`
-- `move:action-Foretell`: the `action-Foretell` prompt
-- `move:action-Plot`: the plot special action
 - `move:pile-target`: a target naming a face-down pile
 - `check:prompt-count`: how many times a prompt is asked
 - `check:continuous-effects`: the continuous effects stored
@@ -104,9 +101,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:zone-phasedout`
 - `board:unregeneratables`
 - `board:object-unlockedhalves`
-- `move:action-Suspend`: the `action-Suspend` prompt
 - `board:schemedecks`
-- `move:action-TurnFaceUp`: the turn-face-up special action
 - `check:mana-types`: the mana types a permanent can produce
 - `check:subtype-member`: whether an object has one subtype, among many
 - `check:prompt-order`: the order prompts were asked in
@@ -120,7 +115,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `check:lands-played`: how many lands a player has played this turn
 - `check:power-toughness-absent`: that an object has no power and toughness
 - `check:card-types`: an object's card types
-- `move:action-UnlockDoor`: the Room unlock special action
 - `move:ChooseManaYield`: the `ChooseManaYield` prompt
 - `board:last-known`: last-known information edited by hand
 - `board:attraction-deck`: an Attraction deck
@@ -229,7 +223,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.1b/704.5m Control Magic keeps a crewed Vehicle and loses it the instant the crew wears off | `board:stage-a-placement-cannot-be-attached-to-o0`
 - CR 613.8a/613.8b a permanent already stolen from the enchanted player is not handed over again | `check:other-Combat.canAttack`
 - CR 613.8b two Confiscates enchanting each other apply in timestamp order | `board:object-attachedto`
-- CR 614.1c whole card: Convincing Mirage makes a Mountain the chosen basic land type | `move:action-ActivateManaAbility`
+- CR 614.1c whole card: Convincing Mirage makes a Mountain the chosen basic land type | `ready`
 - CR 701.3a equipping again moves the Equipment off the first creature | `check:helper-attachedTo`
 - CR 701.3a whole card: Sovereigns of Lost Alara finds the Aura that could enchant the creature its trigger bound | `move:out-of-range-answer` `check:other-Attach.attachableWithLastKnown`
 - CR 701.3b with only its own host available the Aura does not move and is not restamped | `check:helper-attachedTo` `check:other-Object.timestamp`
@@ -326,7 +320,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 603.4 raid: an attack aimed at a planeswalker by a creature that then died still discards | `check:combat`
 - CR 603.4 the clause fails when the declaration went at a third player | `check:events`
 - CR 603.7 Ray of Command whole card: the borrowed creature is TAPPED when control reverts at cleanup, and Act of Treason's is not | `board:continuous-effect` `board:delayed-trigger`
-- CR 702.170a plotting another card does not fire an exiled Aloe Alchemist | `check:events` `move:action-Plot`
+- CR 702.170a plotting another card does not fire an exiled Aloe Alchemist | `check:events`
 - CR 725.2/109.5 a crown stolen by carol does not fire alice's trigger | `check:creature-count` `check:events` `check:helper-combatDamageTo` `check:helper-targetsPlayer` `check:other-S.soleFaceName`
 - CR 725.3 a player who is ALREADY the monarch does not become the monarch, so the Lich's edict stays silent | `check:creature-count` `check:events` `check:helper-targetsPlayer`
 
@@ -538,7 +532,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.178a at max speed the Smasher returns the duplicate with haste, and the end step sacrifices it | `board:exile-linked` `board:player-speed`
 - CR 702.178a one short of max speed, the duplicate stays in exile | `board:exile-linked` `board:player-speed`
 - CR 707.2/702.37e a duplicate of a Clone of Ainok Tracker is cast face down and turned up for its morph cost | `check:tapped-count`
-- CR 707.2/709.5b a duplicate of a copied Room is cast as a door | `move:cast-face` `move:action-UnlockDoor`
+- CR 707.2/709.5b a duplicate of a copied Room is cast as a door | `move:cast-face`
 - CR 707.2/715.2b a duplicate of a Clone of Flaxen Intruder is cast as Welcome Home | `move:cast-face` `check:tapped-count`
 - CR 715.3a a duplicate of Flaxen Intruder cast as Welcome Home costs Welcome Home's cost | `move:expect-rejected`
 - CR 730.2/730.3 a duplicate of a Clone that merged as the spell is the Cubwarden again | `board:source-ofmerge`
@@ -592,7 +586,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2f one opponent's two spells take {U} off; two opponents' one each do not | `board:replacement`
 - CR 601.2f the perpetually discounted Sliver is cast off four Islands and enters a 5/5 | `board:continuous-effect`
 - CR 601.2g the mana window opens before the payer says how much of a Siege Wurm's cost is convoked | `check:prompt-order`
-- CR 601.2h an answer of the wrong size pays nothing at all | `move:action-ActivateManaAbility` `move:Answer-ChooseManaYield`
+- CR 601.2h an answer of the wrong size pays nothing at all | `move:Answer-ChooseManaYield`
 - CR 601.2h the payer chooses how many counters come off, and the token is that big | `check:prompt-payload`
 - CR 601.2h the payer chooses which creature the +1/+1 counter comes off, and the ability then draws | `check:events` `check:prompt-payload`
 - CR 601.2h the payer divides the two counters among creatures, one off each of two | `check:prompt-payload`
@@ -884,8 +878,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 109.5 alice's own face-down creature is not a legal target | `board:face-down`
 - CR 110.5 Break Open turns the opponent's face-down creature face up | `board:face-down`
 - CR 110.5 a face-up creature the opponent controls is not a legal target | `board:face-down`
-- CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once | `check:face-down` `move:action-TurnFaceUp` `move:cast-face`
-- CR 601.2c the offer is every OTHER morph creature, and all three turn over | `check:face-down` `check:prompt-offers` `move:action-TurnFaceUp` `move:cast-face`
+- CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once | `check:face-down` `move:cast-face`
+- CR 601.2c the offer is every OTHER morph creature, and all three turn over | `check:face-down` `check:prompt-offers` `move:cast-face`
 - CR 613.4c turning one face up drops the Whisperer by two | `board:face-down`
 - CR 613.7f turning face down restamps the permanent after a removal that had wiped its grant | `board:object-designations`
 - CR 613.7f turning face up restamps the permanent after a removal that had wiped its grant | `board:object-designations`
@@ -900,7 +894,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 708.12 the printed card is read, not the continuous effect on the permanent | `board:face-down`
 - CR 708.12 with the continuous effect elsewhere the same card turns face up | `board:face-down`
 - CR 708.2a Yedora returns the dead creature as the Forest land it listed | `check:creature-count` `check:face-down` `check:mana-types`
-- CR 708.3 / 708.7 entering face down and turning face up draw nothing | `move:cast-face` `move:action-TurnFaceUp`
+- CR 708.3 / 708.7 entering face down and turning face up draw nothing | `move:cast-face`
 - CR 708.7 Pine Walker does not untap a creature cast face up | `move:cast-face`
 - CR 708.7 Pine Walker does not untap an Aura turned face up | `board:face-down`
 - CR 708.7 Pine Walker untaps the permanent that turned face up, not itself | `board:face-down`
@@ -915,7 +909,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `ForageSpec`
 
-- CR 601.2h / 602.1a a forage paid as an activation cost exiles the three cards the forager chose | `move:action-ActivateManaAbility`
+- CR 601.2h / 602.1a a forage paid as an activation cost exiles the three cards the forager chose | `ready`
 - CR 608.2d a forager who can do neither half is not offered the forage | `check:helper-names` `check:helper-namesIn`
 
 ### `GameSpec`
@@ -1091,8 +1085,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 500.5 a skipped end of combat step still takes the retained mana | `board:combat`
 - CR 603.2b on the controller's own upkeep the same trigger pays the controller | `check:helper-poolOf` `check:helper-retainedGreen`
 - CR 605.1b the enters trigger resolves off the stack and adds {R}{G} | `check:helper-plainGreen` `check:helper-plainRed` `check:helper-poolUnits`
-- CR 605.3a the mana window reaches the Sol Ring and never Millikin | `move:action-ActivateManaAbility`
-- CR 605.3a the mana window reaches the Star and never the Sphere | `move:action-ActivateManaAbility`
+- CR 605.3a the mana window reaches the Sol Ring and never Millikin | `ready`
+- CR 605.3a the mana window reaches the Star and never the Sphere | `ready`
 - CR 724.1d ending the turn during combat takes the retained mana before cleanup | `board:combat`
 - CR 724.2d a combat phase ended part-way through takes the retained mana | `board:combat`
 
@@ -1101,17 +1095,17 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 106.12a a basic land tapped for the CHOSEN colour adds the Gauntlet's additional mana | `board:object-chosencolor`
 - CR 106.13 the pool crosses whole, and its production tags with it | `move:Answer-ChooseManaYield`
 - CR 106.13 the targeted player loses life for the mana Drain Power takes | `move:Answer-ChooseManaYield`
-- CR 117.3c the activator receives priority again afterward | `move:action-ActivateManaAbility`
-- CR 118.3 what the activation may yield is gated by its own cost | `move:action-ActivateManaAbility`
+- CR 117.3c the activator receives priority again afterward | `ready`
+- CR 118.3 what the activation may yield is gated by its own cost | `ready`
 - CR 302.6 a stolen Llanowar Elves is not a mana source for the thief | `check:other-Cost.manaActivations` `check:other-Mana.manaSources` `check:other-Projection.controls`
-- CR 500.1 the priority window offers the source only inside the rider's step | `move:action-ActivateManaAbility`
+- CR 500.1 the priority window offers the source only inside the rider's step | `ready`
 - CR 500.5/613.4c whole card: the green Omnath keeps is the green that keeps it big | `check:helper-poolSize`
-- CR 601.2a no cast is offered off the sorcery-speed source, the proposal itself closing CR 307.5's window | `move:action-ActivateManaAbility`
+- CR 601.2a no cast is offered off the sorcery-speed source, the proposal itself closing CR 307.5's window | `ready`
 - CR 605.1b a land's ability adding the chosen colour with no tap adds Caged Sun's additional mana | `board:object-chosencolor`
-- CR 605.3a a mana ability whose cost holds mana may be activated inside the window | `move:action-ActivateManaAbility`
-- CR 605.3a a player with priority may fill their pool with nothing to pay for | `move:action-ActivateManaAbility`
+- CR 605.3a a mana ability whose cost holds mana may be activated inside the window | `ready`
+- CR 605.3a a player with priority may fill their pool with nothing to pay for | `ready`
 - CR 605.3a the order the batch is activated in is the targeted player's | `check:mana-pool` `move:ChooseManaYield`
-- CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers | `move:action-ActivateManaAbility`
+- CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers | `ready`
 - CR 605.5a mana a land's ability adds as it RESOLVES fires Caged Sun, whose trigger then uses the stack | `board:object-chosencolor`
 - CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing | `check:helper-tappedFor` `check:other-Cost.manaActivations` `check:other-Mana.canPay` `check:other-Mana.manaTypesOf` `check:other-Object.chosenColor`
 - CR 607.2d a Coldsteel Heart that chose blue offers blue and nothing else | `board:object-chosencolor`
@@ -1472,27 +1466,27 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `SpecialActionSpec`
 
-- CR 107.3d the announced X is both the time counters and the mana | `move:action-Suspend`
+- CR 107.3d the announced X is both the time counters and the mana | `ready`
 - CR 116.2d paying the cost lets that player, and only that player, search | `move:action-Ignore`
 - CR 116.3 the player receives priority again afterward | `board:objects-ids`
 - CR 514.2 the ignore ends at cleanup | `move:action-Ignore`
-- CR 603.4 the free play is removed if the card has left exile by the time it resolves | `move:action-Suspend`
+- CR 603.4 the free play is removed if the card has left exile by the time it resolves | `ready`
 - CR 701.9a taking it discards the card without using the stack | `board:objects-ids`
 - CR 702.143a casting it costs the foretell cost | `board:foretold`
-- CR 702.143a the foretold card is cast for its own mana cost reduced by {2}, the Devourer gone | `move:action-Foretell`
-- CR 702.143a the foretold card is castable only by its owner, only later, and only for the foretell cost | `move:action-Foretell`
-- CR 702.143b taking it exiles the card face down without using the stack | `move:action-Foretell`
+- CR 702.143a the foretold card is cast for its own mana cost reduced by {2}, the Devourer gone | `ready`
+- CR 702.143a the foretold card is castable only by its owner, only later, and only for the foretell cost | `ready`
+- CR 702.143b taking it exiles the card face down without using the stack | `ready`
 - CR 702.143c a spell cast from a foretold card was foretold, and one cast from hand was not | `board:foretold`
-- CR 702.143c foretelling a card triggers its controller's Devourer and no one else's | `move:action-Foretell`
+- CR 702.143c foretelling a card triggers its controller's Devourer and no one else's | `ready`
 - CR 702.143d a card an effect makes foretold was not foretold by anyone | `check:foretold`
 - CR 702.143d an effect makes an exiled card foretold and gives it a foretell cost | `board:hypothetical` `check:foretold` `check:face-down`
 - CR 702.143d casting it costs the foretell cost the effect gave it | `board:face-down` `board:foretold`
 - CR 702.143d the granted cost is the mana cost of the face being cast | `board:hypothetical` `check:castable`
-- CR 702.170b taking it exiles the card without using the stack | `move:action-Plot`
+- CR 702.170b taking it exiles the card without using the stack | `ready`
 - CR 702.170d casting it costs nothing | `board:plotted`
-- CR 702.170d the plotted card is castable only by its owner, and only later | `move:action-Plot`
-- CR 702.170f plotting the top card exiles it from the library, and it is cast free later | `check:plotted` `check:tapped-count` `move:action-Plot`
-- CR 702.62 the card is exiled with a time counter, ticks down at the next upkeep, and is cast free | `move:action-Suspend`
+- CR 702.170d the plotted card is castable only by its owner, and only later | `ready`
+- CR 702.170f plotting the top card exiles it from the library, and it is cast free later | `check:plotted` `check:tapped-count`
+- CR 702.62 the card is exiled with a time counter, ticks down at the next upkeep, and is cast free | `ready`
 - CR 707.10 a copy of a foretold spell was not foretold | `board:face-down` `board:foretold`
 - CR 707.2a a copy of the Arbiter carries the offer with the ban | `board:object-bindings`
 - CR 712.11b casting the back face pays the back face's granted cost | `board:face-down` `board:foretold` `check:face` `move:cast-face`
@@ -1540,7 +1534,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 805.5 a teammate who passed is asked again before the team passes | `check:prompt-order`
 - CR 805.5b a departed active player's teammate receives priority | `board:player-status`
 - CR 805.8 controlling a player controls their team | `check:player-control`
-- CR 805.8 one effect skips a team's step once | `board:face-down` `move:action-TurnFaceUp`
+- CR 805.8 one effect skips a team's step once | `board:face-down`
 
 ### `TransformSpec`
 
