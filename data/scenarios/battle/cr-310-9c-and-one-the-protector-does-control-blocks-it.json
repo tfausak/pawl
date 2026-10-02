@@ -1,0 +1,113 @@
+{
+  "description": "CR 310.9c and one the protector does control blocks it",
+  "note": "The same board with the blocking Piker on carol's side: she protects the placed Siege, so she is asked and blocks.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "blocker",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": null
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "ChooseDefender": "carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {
+          "$blocker": [
+            "$piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$piker",
+          "blockers": [
+            "$blocker"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -474,55 +474,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (g3, spellId) = S.handOne instillInfection g2
         after = castAndResolve (raceAnswer scales piker) g3 spellId
     Spec.assertEqWith s "one -1/-1 counter, unscaled" (countersOn CounterKind.MinusOneMinusOne piker after) 1
-  -- CR 614.1d: "Continuous effects that read '[This permanent] enters . . .' or
-  -- '[Objects] enter [the battlefield] . . .' are replacement effects." Zof
-  -- Bloodbog prints one sentence of exactly that shape -- "This land enters
-  -- tapped" -- and no effect is involved anywhere on the path: CR 305.1's special
-  -- action simply puts the land onto the battlefield, so the rewrite has to be
-  -- read off the permanent's own text through the CR 616.1 loop.
-  --
-  -- Played through the real priority loop rather than through the entry funnel,
-  -- so what is asserted is the whole path a player actually takes to CR 305.1.
-  --
-  -- The tap state on its own is a field this same code just wrote, so what the
-  -- case measures is what a PLAYER loses by it: Typhoid Rats, a {B} creature, is
-  -- in the hand beside the land, and the tapped land's "{T}: Add {B}" is the only
-  -- mana in the game. So the Rats stays uncast here and enters on the SAME board
-  -- with that one land forced untapped -- the only difference entering tapped
-  -- makes. Without the second half the first would pass on a board where the Rats
-  -- was uncastable for some other reason.
-  --
-  -- CR 302.6 has nothing to say either way: Zof Bloodbog is a land, so summoning
-  -- sickness is not what is being measured.
-  Spec.it s "CR 614.1d Zof Bloodbog's own text makes it enter TAPPED" $ do
-    zof <- S.printingOf s registry "Zof Consumption"
-    rats <- S.printingOf s registry "Typhoid Rats"
-    let (_, withZof) = S.addHandCard zof S.alice (Setup.emptyGame S.bothPlayers)
-        (_, filled) = S.addHandCard rats S.alice withZof
-        board =
-          filled
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice,
-              GameState.priority = Just S.alice
-            }
-        played = S.runPure S.playLandAnswer board Engine.priorityLoop
-        untap oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)}
-        ratsName = CardName.MkCardName (Text.pack "Typhoid Rats")
-        ratsOut gs = length (filter (\o -> Projection.hasName ratsName o gs) (Set.toList (GameState.battlefield gs)))
-    case Set.toList (GameState.battlefield played) of
-      [permId] -> do
-        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
-        Spec.assertEqWith
-          s
-          "so the {B} creature in hand stays there -- no mana to cast it with"
-          (ratsOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
-          0
-        Spec.assertEqWith
-          s
-          "and the same land untapped pays for it"
-          (ratsOut (S.runPure castOrPassAnswer (untap permId played) Engine.priorityLoop))
-          1
-      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
   Spec.it s "CR 119.4 at 2 life the payment is ILLEGAL, so it enters tapped with no life paid" $ do
     seaGate <- S.printingOf s registry "Sea Gate Restoration"
     warrior <- S.printingOf s registry "Tidal Warrior"

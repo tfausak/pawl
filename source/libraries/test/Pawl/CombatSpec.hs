@@ -2112,8 +2112,7 @@ renewBoard rakshasa swamp piker =
 
 -- Announces X and answers CR 601.2c's targets out of `oids`, by FILTERING the
 -- offered set: the pool decides which flavour of Recipient a candidate arrives
--- as, and a hand-built one of another flavour is dropped by CR 608.2b's re-read
--- (Pawl.ActivateSpec's answerXTargeting says the same).
+-- as, and a hand-built one of another flavour is dropped by CR 608.2b's re-read.
 --
 -- As many of them as the slot was OFFERED, rather than all of them: an offer of
 -- the wrong size then lands counters on the wrong creatures instead of failing

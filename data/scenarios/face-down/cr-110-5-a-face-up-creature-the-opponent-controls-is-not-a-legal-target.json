@@ -1,0 +1,166 @@
+{
+  "description": "CR 110.5 a face-up creature the opponent controls is not a legal target",
+  "note": "Break Open aimed at bob's face-up Hill Giant is refused; aimed at his manifested Thragtusk it turns that over, and the Giant and alice's own manifested Ainok Tracker are as they were. Names read which way each faces (CR 708.2a).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m2",
+            "ready": true
+          },
+          {
+            "card": "Ainok Tracker",
+            "label": "mine",
+            "faceDown": {
+              "type": "Manifested"
+            }
+          }
+        ],
+        "hand": [
+          {
+            "card": "Break Open",
+            "label": "break"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "giant"
+          },
+          {
+            "card": "Thragtusk",
+            "label": "victim",
+            "faceDown": {
+              "type": "Manifested"
+            }
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$break",
+          "targets": [
+            "$giant"
+          ],
+          "mana": [
+            "$m1",
+            "$m2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$break",
+          "targets": [
+            "$victim"
+          ],
+          "mana": [
+            "$m1",
+            "$m2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$victim",
+          "names": [
+            "Thragtusk"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$mine",
+          "names": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$mine",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$giant",
+          "names": [
+            "Hill Giant"
+          ]
+        }
+      }
+    }
+  ]
+}

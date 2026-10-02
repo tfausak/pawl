@@ -1,0 +1,121 @@
+{
+  "description": "CR 310.9d the battle's CONTROLLER's lands are not the ones read",
+  "note": "alice controls the placed Siege and the Swamp; carol protects it and holds an Island, so carol's Piker blocks the swampwalking Wraith. With carol's Island made a Swamp the block is refused and the run fails.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Bog Wraith",
+            "label": "wraith",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "blocker",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": null
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "ChooseDefender": "carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$wraith"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$wraith",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$wraith": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {
+          "$blocker": [
+            "$wraith"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$wraith",
+          "blockers": [
+            "$blocker"
+          ]
+        }
+      }
+    }
+  ]
+}

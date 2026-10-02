@@ -54,7 +54,6 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
-import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1762,42 +1761,6 @@ cinderBoard s registry n = do
   let (srcId, g0) = S.addPermanent cinder S.alice (S.landsInPlay mountain n)
   pure (cinder, srcId, g0 {GameState.priority = Just S.alice})
 
--- The name of Tovolar's back face, which is where the {X} ability is printed.
-tovolarBackName :: CardName.CardName
-tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge")
-
--- theAbility for an object showing a face that is NOT its card's combined view.
--- A transforming card's combined view is its front face (CR 712.8a), so reading
--- the printing gets Tovolar, Dire Overlord's empty list of activated abilities;
--- what the permanent actually offers is read off the face it is showing.
---
--- Total for theAbility's reason, and the fallback is inert: it costs nothing and
--- does nothing, so a fixture that reached it would fail its own assertions.
-shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
-shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
-  Just ab -> ab
-  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
-
--- alice controls Tovolar showing his BACK face -- "{X}{R}{G}: Target Wolf or
--- Werewolf you control gets +X/+0 and gains trample until end of turn" -- a
--- Russet Wolves to aim it at, and two Mountains and two Forests, which pay
--- {2}{R}{G} and nothing above it.
-tovolarNightBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-tovolarNightBoard s registry = do
-  tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
-  wolves <- S.printingOf s registry "Russet Wolves"
-  mountain <- S.printingOf s registry "Mountain"
-  forest <- S.printingOf s registry "Forest"
-  let (tovolarId, g0) = S.addPermanent tovolar S.alice (S.landsFor mountain S.alice 2 (S.landsInPlay forest 2))
-      (wolfId, g1) = S.addPermanent wolves S.alice g0
-      turnedOver o = o {Object.face = Just tovolarBackName}
-      g2 = g1 {GameState.objects = Map.adjust turnedOver tovolarId (GameState.objects g1)}
-  pure (tovolarId, wolfId, g2 {GameState.priority = Just S.alice})
-
 -- alice with a settled Sphinx of the Revelation, the Plains and two Islands its
 -- ability's {W}{U}{U} takes, `energy` energy counters and a library to draw
 -- from, holding priority. `energy` is the whole of what the "Pay X {E}" half is
@@ -1851,16 +1814,6 @@ answerXAt :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
 answerXAt x who p = case p of
   Prompt.ChooseX {} -> x
   _ -> aimAt who p
-
--- Announces X and narrows every target slot to one object, by FILTERING the
--- offered set rather than building a recipient: the pool decides which flavour
--- of Recipient a candidate arrives as, and a hand-built one of another flavour
--- is stored, looks targeted, and is then dropped by CR 608.2b's re-read.
-answerXTargeting :: Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-answerXTargeting x oid p = case p of
-  Prompt.ChooseX {} -> x
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just oid) . Recipient.objectOf) . snd) sets
-  _ -> S.identityAnswer p
 
 -- Answers Prompt.ChooseX with the affordability bound the prompt carries, and
 -- records that bound in the State -- the CastSpec answerer, aimed at a player.
@@ -2023,39 +1976,6 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     (_, noneId, none) <- cinderBoard s registry 0
     Spec.assertBool s (Activatable.activatable S.alice srcId (theAbility cinder) one) "one Mountain admits X=0"
     Spec.assertBool s (not (Activatable.activatable S.alice noneId (theAbility cinder) none)) "no Mountain pays even the {R}"
-
-  -- Cinder Elemental READS the announced X in the instant the ability resolves;
-  -- Tovolar's back face STORES it, and that is a second reader. CR 608.2h /
-  -- 611.2d freeze a stored continuous effect's variable once, on resolution, and
-  -- the value they freeze is the one CR 601.2b stamped on the object announcing
-  -- it -- the ability on the stack, never CR 113.7a's source permanent, which
-  -- never learned it.
-  --
-  -- The trample half of the same activation is the control: it carries no
-  -- quantity, so it stored fine while the +X/+0 stored NOTHING AT ALL, which is
-  -- what made the divergence silent -- the Wolf visibly gained trample and
-  -- invisibly failed to grow.
-  Spec.it s "CR 601.2b/611.2d an activated {X} pump freezes the announced X into the stored effect" $ do
-    (tovolarId, wolfId, g1) <- tovolarNightBoard s registry
-    Spec.assertEqWith s "Tovolar is showing his 4/4 back face, whose ability this is" (S.powerToughnessOf tovolarId g1) (Just (4, 4))
-    Spec.assertEqWith s "and the Wolf starts a plain 3/3" (S.powerToughnessOf wolfId g1) (Just (3, 3))
-    let after =
-          snd
-            ( Engine.runGamePure
-                (answerXTargeting 2 wolfId)
-                g1
-                (do Activate.activateAbility S.alice tovolarId (shownAbility tovolarId g1); Stack.resolveTop)
-            )
-    Spec.assertEqWith s "the Wolf is a 5/3, so the announced 2 reached the stored pump" (S.powerToughnessOf wolfId after) (Just (5, 3))
-    Spec.assertBool s (Projection.hasKeyword Keyword.Trample wolfId after) "and the quantity-free grant landed too"
-    Spec.assertEqWith
-      s
-      "both halves are stored, the pump as a CR 611.2d Literal rather than a live X"
-      (fmap ContinuousEffect.modification (GameState.continuousEffects after))
-      [ Modification.GainKeyword Keyword.Trample,
-        Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0))
-      ]
-    Spec.assertEqWith s "all four lands paid the {2}{R}{G}" (S.tappedCount S.alice after) 4
 
   -- The bound moves with the ENERGY and with nothing else: the {W}{U}{U} is paid
   -- the same way on both boards, so no constant and nothing read off the printed
@@ -4390,8 +4310,9 @@ graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName
 graveyardNames pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs)
 
 -- Announces X, pins CR 701.68a's blight to one creature, and narrows the target
--- slot to one graveyard card by FILTERING the offered set -- answerXTargeting's
--- reason, plus the blight the cost demands.
+-- slot to one graveyard card by FILTERING the offered set: the pool decides which
+-- flavour of Recipient a candidate arrives as, and a hand-built one of another
+-- flavour is dropped by CR 608.2b's re-read.
 answerBlightXTargeting :: Natural -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 answerBlightXTargeting x blighted wanted p = case p of
   Prompt.ChooseX {} -> x

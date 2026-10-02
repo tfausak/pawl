@@ -1,0 +1,131 @@
+{
+  "description": "CR 704.5x a battle that IS being attacked keeps a protector who has left",
+  "note": "carol concedes in the declare attackers step with alice's Piker attacking the Siege she protects; the designation stands while the Piker attacks it, the Piker's 2 combat damage still removes two defense counters, and once combat is over the repair names bob, the one opponent left.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": null
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "ChooseDefender": "carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": "Concede"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Protector",
+          "object": "$invasion",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$invasion",
+          "kind": {
+            "type": "Defense"
+          },
+          "count": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Protector",
+          "object": "$invasion",
+          "is": "bob"
+        }
+      }
+    }
+  ]
+}

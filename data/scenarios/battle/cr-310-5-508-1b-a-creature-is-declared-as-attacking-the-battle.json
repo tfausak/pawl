@@ -1,0 +1,92 @@
+{
+  "description": "CR 310.5 / 508.1b a creature is declared as attacking the battle",
+  "note": "Three seats; carol protects alice's Siege (placed) and is CR 507.1's chosen defender, as the Haskell fixture designates her. Removing the protector leaves nothing to announce the Piker at.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": null
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "ChooseDefender": "carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$piker",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$piker",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

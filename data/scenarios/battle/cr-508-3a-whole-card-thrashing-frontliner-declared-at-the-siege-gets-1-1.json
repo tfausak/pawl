@@ -1,0 +1,93 @@
+{
+  "description": "CR 508.3a whole card: Thrashing Frontliner declared at the Siege gets +1/+1",
+  "note": "carol protects the placed Siege and is the chosen defender; the Frontliner's attack trigger resolves in the declare attackers step.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Thrashing Frontliner",
+            "label": "frontliner",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": null
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "ChooseDefender": "carol"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$frontliner"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$frontliner",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$frontliner": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$frontliner",
+          "power": 3,
+          "toughness": 3
+        }
+      }
+    }
+  ]
+}

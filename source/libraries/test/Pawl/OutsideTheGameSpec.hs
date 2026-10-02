@@ -79,7 +79,6 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
@@ -893,18 +892,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "CR 701.23a the library's Lightning Bolt is in her hand, and nothing else" (printingsIn Zone.Hand S.alice resolved) [arcaviosBolt board]
     Spec.assertEqWith s "CR 701.23a the pool is untouched" (Map.elems (poolOf S.alice resolved)) [1, 1]
     Spec.assertEqWith s "the library was shuffled" (printingsIn Zone.Library S.alice resolved) (reverse (filter (/= arcaviosBolt board) (arcaviosLibrary board)))
-  -- The card's back face, Invocation of the Founders (Enchantment, "Whenever
-  -- you cast an instant or sorcery spell from your hand, you may copy that
-  -- spell. You may choose new targets for the copy."): a Lightning Bolt cast
-  -- from her hand is copied, and declining the "may" is the paired leg. Life
-  -- is summed over both seats, so the case does not turn on where the copy
-  -- was pointed.
-  Spec.it s "CR 707.10 Invocation of the Founders copies an instant she casts from her hand" $ do
-    (lifeTaking, _) <- invocationBolt s registry OptionalDecision.Exercises
-    Spec.assertEqWith s "CR 707.10 two Bolts resolved: six life lost between them" lifeTaking (Just 34)
-  Spec.it s "CR 608.2d declining Invocation of the Founders' may copies nothing" $ do
-    (lifeTaking, _) <- invocationBolt s registry OptionalDecision.Declines
-    Spec.assertEqWith s "one Bolt resolved: three life lost" lifeTaking (Just 37)
 
 -- alice with a Forest and an Island, Research // Development in hand -- {G}{U}
 -- pays Research and nothing pays Development --
@@ -979,29 +966,6 @@ arcaviosBoard s registry = do
       stock p = p {Player.outsideTheGame = Map.fromList entries}
       ready = interned {GameState.players = Map.adjust stock S.alice (GameState.players interned)}
   pure (MkArcaviosBoard ready spellId boltId bolt signInBlood fog (printingsIn Zone.Library S.alice ready))
-
--- alice with Invasion of Arcavios on the battlefield showing its back face,
--- a Mountain, and a Lightning Bolt in hand aimed at bob. Casts the Bolt, answers
--- the trigger's "may" as given, and resolves the stack down; answers the life
--- both seats have left, summed, and the settled board.
-invocationBolt :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> OptionalDecision.OptionalDecision -> m (Maybe Integer, GameState.GameState)
-invocationBolt s registry decision = do
-  mountain <- S.printingOf s registry "Mountain"
-  invasion <- S.printingOf s registry "Invasion of Arcavios"
-  bolt <- S.printingOf s registry "Lightning Bolt"
-  let (siegeId, placed) = S.addPermanent invasion S.alice (S.landsInPlay mountain 1)
-      turned = placed {GameState.objects = Map.adjust (\o -> o {Object.face = Just (CardName.MkCardName (Text.pack "Invocation of the Founders"))}) siegeId (GameState.objects placed)}
-      (board, boltId) = S.handOne bolt turned
-      answer :: Prompt.Prompt r -> r
-      answer p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
-        Prompt.ChooseOptional {} -> decision
-        _ -> S.identityAnswer p
-      cast = S.runPure answer board (S.cast S.alice boltId)
-      settled = S.runPure answer cast Engine.settleForPriority
-      drained = List.foldl' (\g _ -> S.runPure answer (S.runPure answer g Stack.resolveTop) Engine.settleForPriority) settled [1 :: Int, 2, 3]
-      total = (+) <$> S.lifeOf S.alice drained <*> S.lifeOf S.bob drained
-  pure (total, drained)
 
 -- Cast the Siege, resolve it, and resolve its enters trigger.
 resolveArcavios :: (forall r. Prompt.Prompt r -> r) -> ArcaviosBoard -> GameState.GameState

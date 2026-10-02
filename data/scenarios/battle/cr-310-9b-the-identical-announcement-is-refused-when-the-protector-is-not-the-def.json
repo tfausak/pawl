@@ -1,0 +1,72 @@
+{
+  "description": "CR 310.9b the identical announcement is refused when the protector is not the defending player",
+  "note": "carol protects the placed Siege; alice chooses bob as CR 507.1's defender. No ChooseAttackTarget prompt is scheduled, so a Siege offered beside bob would fail the run as an unscheduled prompt; the Attackers check records bob. With the protector moved to bob the Siege is offered and the run fails.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": null
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "ChooseDefender": "bob"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$piker": "$bob"
+          }
+        }
+      }
+    }
+  ]
+}

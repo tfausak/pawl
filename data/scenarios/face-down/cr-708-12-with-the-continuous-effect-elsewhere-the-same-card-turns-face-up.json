@@ -1,0 +1,145 @@
+{
+  "description": "CR 708.12 with the continuous effect elsewhere the same card turns face up",
+  "note": "The same board with Song of the Dryads on the Goblin Piker: the manifested Thragtusk is a 2/2 creature and the Shrieker's reveal turns it face up.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "f1",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "f2",
+            "ready": true
+          },
+          {
+            "card": "Hauntwoods Shrieker",
+            "label": "shrieker"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          },
+          {
+            "card": "Thragtusk",
+            "label": "manifest",
+            "faceDown": {
+              "type": "Manifested"
+            }
+          },
+          {
+            "card": "Song of the Dryads",
+            "label": "song",
+            "attached": "piker"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Types": {
+          "object": "$manifest",
+          "types": [
+            "Creature"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$manifest",
+          "names": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$shrieker",
+          "targets": [
+            "$manifest"
+          ],
+          "mana": [
+            "$f1",
+            "$f2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "ability of $shrieker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseOptional": {
+          "type": "Exercises"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$manifest",
+          "names": [
+            "Thragtusk"
+          ]
+        }
+      }
+    }
+  ]
+}

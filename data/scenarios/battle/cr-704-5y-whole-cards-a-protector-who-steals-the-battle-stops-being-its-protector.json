@@ -1,0 +1,185 @@
+{
+  "description": "CR 704.5y whole cards: a protector who steals the battle stops being its protector",
+  "note": "carol protects alice's Siege and takes it with Zealous Conscripts; she can't protect a battle she controls (CR 310.12a), so CR 704.5y asks her to re-choose between alice and bob, and she names bob. The --control file is the same board with the trigger aimed at alice's Plains.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Plains",
+            "label": "plains"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m2",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m3",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m4",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m5",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Zealous Conscripts",
+            "label": "conscripts"
+          }
+        ]
+      }
+    ],
+    "active": "carol",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$conscripts",
+          "mana": [
+            "$m1",
+            "$m2",
+            "$m3",
+            "$m4",
+            "$m5"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "ChooseTargets": {
+          "target": [
+            "$invasion"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseProtector",
+          "with": "bob"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Protector",
+          "object": "$invasion",
+          "is": "bob"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$invasion",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$plains",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Battlefield",
+          "card": "Invasion of Dominaria",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

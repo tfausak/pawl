@@ -150,7 +150,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 506.7b/g the rider opens at the declaration and runs to the end of the combat phase | `board:hypothetical` `check:other-Turn.afterBlockersDeclared`
 - CR 513.2 the encore tokens are sacrificed at the beginning of the next end step | `check:delayed-triggers`
 - CR 601.2b the ChooseX bound is the energy the player can spend | `check:prompt-payload`
-- CR 601.2b/611.2d an activated {X} pump freezes the announced X into the stored effect | `board:face`
 - CR 601.2f a matching activation before the Hojo arrived was the first | `board:continuous-effect`
 - CR 601.2f an unfloored reduction takes the mana a floored one may not | `board:continuous-effect`
 - CR 601.2f the next turn has a first activation again | `board:continuous-effect`
@@ -239,44 +238,14 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `BattleSpec`
 
-- CR 310.12b / 118.9 / 712.11a she may then cast it TRANSFORMED and FREE | `board:face` `board:protector`
-- CR 310.12b / 704.5v three plus two defeats it, and it is EXILED | `board:face` `board:protector`
-- CR 310.12b declining the offer leaves the card in exile | `board:face` `board:protector`
-- CR 310.5 / 508.1b a creature is declared as attacking the battle | `board:combat` `board:face` `board:protector`
-- CR 310.6 / 510.1b combat damage to a battle removes them too | `board:combat` `board:face` `board:protector`
-- CR 310.6 Lightning Bolt takes three defense counters off it | `board:face` `board:protector`
-- CR 310.6 the FIRST of those two spells defeats nothing | `board:face` `board:protector`
-- CR 310.9b the identical announcement is refused when the protector is not the defending player | `board:combat` `board:face` `board:protector`
-- CR 310.9c a creature the protector does not control can't block the battle's attacker | `board:combat` `board:face` `board:protector`
-- CR 310.9c and one the protector does control blocks it | `board:combat` `board:face` `board:protector`
-- CR 310.9d / 508.5 the defending player of a creature attacking a battle is the battle's protector | `board:combat` `board:face` `board:protector`
-- CR 310.9d the battle's CONTROLLER's lands are not the ones read | `board:combat` `board:face` `board:protector`
-- CR 310.9d whole card: Synthetic Bulwark Snare reaches a creature attacking a battle you PROTECT | `board:combat` `board:face` `board:protector`
-- CR 506.4 a battle that has left the battlefield is assigned no combat damage | `board:combat` `board:face` `board:protector`
-- CR 506.4 a battle that stops being a battle and becomes one again stays removed from combat, so the Snare still cannot name the attacker | `board:combat` `board:face` `board:protector`
-- CR 506.4 a battle that stops being a battle stops being attacked, so the Snare cannot name the attacker | `board:combat` `board:face` `board:protector`
-- CR 506.4 an attacker that leaves the battlefield stops attacking, so CR 704.5x repairs at once | `board:combat` `board:face` `board:protector`
-- CR 506.4 whole cards: a Ninja put onto the battlefield attacking the Siege is removed when bob steals it | `board:combat` `board:face` `board:protector`
-- CR 506.4 whole cards: a Word of Seizing on the attacked Siege stops it being attacked | `board:combat` `board:face` `board:protector`
-- CR 506.4c / 508.5 the same block stays illegal once the Siege has left the battlefield | `board:combat` `board:face` `board:protector`
-- CR 506.4c whole cards: a Ninja returning a Piker whose Siege was stolen attacks nothing | `board:combat` `board:face` `board:protector`
-- CR 508.3a the same creature declared at the battle's PROTECTOR is silent | `board:combat` `board:face` `board:protector`
-- CR 508.3a whole card: Thrashing Frontliner declared at the Siege gets +1/+1 | `board:combat` `board:face` `board:protector`
-- CR 508.4 the other road into combat records the same two seats | `board:combat` `board:face` `board:protector`
-- CR 508.5 the departed battle's CONTROLLER is not the seat that is read | `board:combat` `board:face` `board:protector`
-- CR 508.5 whole cards: a protector who steals the attacked Siege keeps the block | `board:face` `board:protector`
-- CR 702.14c and the same three-seat board with the lands swapped leaves the block legal | `board:face` `board:protector`
-- CR 702.14c the same attack is blocked normally when the protector's land is an Island | `board:combat` `board:face` `board:protector`
-- CR 702.14c the same removal with an ISLAND leaves the block legal | `board:combat` `board:face` `board:protector`
+- CR 506.4 a battle that has left the battlefield is assigned no combat damage | `check:event-log`
+- CR 508.4 the other road into combat records the same two seats | `check:combat-record`
 - CR 704.3 and the pass that buries it reports that an action was performed | `board:face` `board:protector`
 - CR 704.5v a battle at defense 0 with nothing pending is named by the state-based action | `board:counters` `check:other-Battle.defeated`
 - CR 704.5v and is NOT while its defeat ability is still owed a resolution | `board:counters` `check:intermediate-state` `check:other-Battle.defeated` `check:other-Battle.awaitingAbility`
 - CR 704.5w a NON-Siege battle at defense 0 is buried anyway | `board:counters` `check:intermediate-state` `check:other-Battle.defeated` `check:other-Battle.awaitingAbility`
-- CR 704.5x a battle that IS being attacked keeps a protector who has left | `board:combat` `board:face` `board:protector`
 - CR 704.5x the repair reports that an action was performed | `check:other-Sba.performStateBasedActions`
-- CR 704.5x the same concession on the same board DOES repair it when nothing attacks | `board:combat` `board:face` `board:protector`
-- CR 704.5y whole cards: a protector who steals the battle stops being its protector | `board:face` `board:protector`
-- CR 802.2a the departed battle's attacker reads its PROTECTOR, not the first defending player | `board:face` `board:protector`
+- CR 802.2a the departed battle's attacker reads its PROTECTOR, not the first defending player | `ref:departed-object`
 
 ### `BoardEffectSpec`
 
@@ -285,7 +254,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 109.5 no other player's library is touched | `check:helper-sortedNames`
 - CR 111.3 the Horror is an X/X where X is the number of creatures DESTROYED | `check:helper-horrorPrintedPower`
 - CR 113.6g removing the uncounterable spell leaves the count unchanged | `board:stack`
-- CR 113.9 an abilities-only sweep counters both opponents' abilities and lets their spell resolve | `board:face-down`
+- CR 113.9 an abilities-only sweep counters both opponents' abilities and lets their spell resolve | `ready`
 - CR 113.9 with only abilities countered, the Faeries still come and Baral stays silent | `board:stack`
 - CR 206.3c destroys the listed nontoken permanents, through a shield, and nothing else | `board:replacement`
 - CR 302.6 the newly gained enchantments are re-Sicked and the one alice already controlled is not | `check:other-Object.sickness`
@@ -874,13 +843,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `FaceDownSpec`
 
-- CR 109.5 a Pine Walker bob controls does not untap alice's permanent | `board:face-down`
-- CR 109.5 alice's own face-down creature is not a legal target | `board:face-down`
-- CR 110.5 Break Open turns the opponent's face-down creature face up | `board:face-down`
-- CR 110.5 a face-up creature the opponent controls is not a legal target | `board:face-down`
+- CR 109.5 a Pine Walker bob controls does not untap alice's permanent | `ready`
 - CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once | `check:face-down` `move:cast-face`
 - CR 601.2c the offer is every OTHER morph creature, and all three turn over | `check:face-down` `check:prompt-offers` `move:cast-face`
-- CR 613.4c turning one face up drops the Whisperer by two | `board:face-down`
 - CR 613.7f turning face down restamps the permanent after a removal that had wiped its grant | `board:object-designations`
 - CR 613.7f turning face up restamps the permanent after a removal that had wiped its grant | `board:object-designations`
 - CR 701.20b a face-down permanent revealed in place draws nothing | `board:objects-ids`
@@ -890,14 +855,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.40g a turn-face-up trigger does not fire for a manifested sorcery | `board:entered-with` `board:face-down`
 - CR 702.37b the manifest procedure pays no megamorph cost, so no counter lands | `board:entered-with` `board:face-down`
 - CR 708 a manifested CREATURE turns face up, and deals its printed damage | `board:entered-with` `board:face-down`
-- CR 708.12 a manifested land card is not a creature card, whatever CR 708.2a made the permanent | `board:face-down`
-- CR 708.12 the printed card is read, not the continuous effect on the permanent | `board:face-down`
-- CR 708.12 with the continuous effect elsewhere the same card turns face up | `board:face-down`
 - CR 708.2a Yedora returns the dead creature as the Forest land it listed | `check:creature-count` `check:face-down` `check:mana-types`
 - CR 708.3 / 708.7 entering face down and turning face up draw nothing | `move:cast-face`
 - CR 708.7 Pine Walker does not untap a creature cast face up | `move:cast-face`
-- CR 708.7 Pine Walker does not untap an Aura turned face up | `board:face-down`
-- CR 708.7 Pine Walker untaps the permanent that turned face up, not itself | `board:face-down`
+- CR 708.7 Pine Walker does not untap an Aura turned face up | `ready`
+- CR 708.7 Pine Walker untaps the permanent that turned face up, not itself | `ready`
 
 ### `FlipSpec`
 
@@ -1203,13 +1165,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 400.11c two eligible cards are a choice, and the answer decides which arrives | `board:outside-the-game`
 - CR 400.2 declining outside the game too, the graveyard's match is found | `board:outside-the-game`
 - CR 604.2/729.4a gameplay: Death Wish takes Titania's Song out of the main game and its effect goes on applying there | `move:nested`
-- CR 608.2d declining Invocation of the Founders' may copies nothing | `board:face`
 - CR 701.20a Death Wish brings the card in without revealing it, where Burning Wish reveals | `board:outside-the-game`
 - CR 701.23a/701.23j a library find fills the one count, and the library is shuffled | `board:outside-the-game`
 - CR 701.23j Invasion of Arcavios brings an instant in from outside the game, and a search that skipped her library shuffles nothing | `board:outside-the-game`
 - CR 701.23j a card taken from outside the game fills the count, sparing the graveyard's match | `board:outside-the-game`
 - CR 701.23j outside the game alone may find nothing | `board:outside-the-game`
-- CR 707.10 Invocation of the Founders copies an instant she casts from her hand | `board:face`
 - CR 708.2/729.4 a manifested main-game sorcery is offered to a subgame's wish as a creature and not as a sorcery | `board:objects-ids` `board:outsideobjects`
 - CR 729.4/729.4a/729.5 gameplay: Living Wish takes two main-game creatures out of a Shahrazad subgame, and the triggers wait for the main game | `move:nested`
 - CR 729.5 gameplay: a wish that takes the resolving Shahrazad itself still finishes resolving with the winner it bound | `move:nested`
@@ -1388,7 +1348,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 614.1c one +1/+1 counter per creature card in EVERY graveyard | `check:other-S.addGraveyardCard`
 - CR 614.1c the Blade enters attached to the creature its controller chose | `check:events`
 - CR 614.1c with NO Kithkin card in hand it enters tapped, unasked | `check:events` `check:helper-revealsOf`
-- CR 614.1d Zof Bloodbog's own text makes it enter TAPPED | `board:face`
 - CR 614.7 an Aura the same pass buries is never offered to a regeneration shield | `board:continuous-effect`
 - CR 615.10 Fog prevents both attackers' damage in one batch | `check:events`
 - CR 616.1b before CR 616.1c: the NEW controller chooses the copy | `board:replacement`

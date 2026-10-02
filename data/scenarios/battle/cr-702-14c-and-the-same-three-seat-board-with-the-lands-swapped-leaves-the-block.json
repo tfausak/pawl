@@ -1,0 +1,248 @@
+{
+  "description": "CR 702.14c and the same three-seat board with the lands swapped leaves the block legal",
+  "note": "Both opponents defend (CR 802.2), bob first; bob holds the Swamp and carol, who protects the Siege, an Island. Two Bolts exile the Siege inside the declare attackers step and carol's Piker may still block the Wraith.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Invasion of Dominaria",
+            "label": "invasion",
+            "protector": "carol",
+            "counters": [
+              {
+                "key": {
+                  "type": "Defense"
+                },
+                "value": 5
+              }
+            ]
+          },
+          {
+            "card": "Bog Wraith",
+            "label": "wraith",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m1",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "m2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt1"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt2"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$wraith"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "source": "$wraith",
+      "do": {
+        "ChooseAttackTarget": "$invasion"
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Defenders": {
+          "players": [
+            "bob",
+            "carol"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$wraith": "$invasion"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bolt1",
+          "targets": [
+            "$invasion"
+          ],
+          "mana": [
+            "$m1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bolt2",
+          "targets": [
+            "$invasion"
+          ],
+          "mana": [
+            "$m2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OfferedCast",
+          "with": {
+            "type": "Declines"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Invasion of Dominaria",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Exile",
+          "card": "Invasion of Dominaria",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {
+          "$piker": [
+            "$wraith"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$wraith",
+          "blockers": [
+            "$piker"
+          ]
+        }
+      }
+    }
+  ]
+}
