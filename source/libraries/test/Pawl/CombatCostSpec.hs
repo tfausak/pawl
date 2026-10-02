@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.PlaneswalkerCombatSpec (allTapped, allUntapped, announcesWay, atLife, jaceBoard, stillThere)
 import qualified Pawl.Registry as Registry
@@ -953,7 +952,7 @@ blockerEnteredBlocking e = case e of
 -- bob's life total: became blocked by the effect (blocked, nothing blocking it,
 -- both creatures alive), blocked by the declaration (blocked, the Piker in the
 -- set, both creatures dead), and never blocked (unblocked, bob down 1).
-becomesBlockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+becomesBlockedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
   Spec.it s "CR 509.1h whole card: Curtain of Light blocks an unblocked attacker, with nothing blocking it" $ do
     plains <- S.printingOf s registry "Plains"
@@ -996,24 +995,6 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
         Spec.assertBool s (not (S.onBattlefield attacker declared) && not (S.onBattlefield blocker declared)) "declaration leg: and the two creatures trade"
         Spec.assertBool s (any (blockerWasDeclared . LoggedEvent.event) (GameState.events declared)) "declaration leg: and CR 509.3d's event IS recorded there"
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
-  Spec.it s "CR 509.1h a creature already blocked is not a legal target" $ do
-    -- CR 509.1h again, read through the card's own committed target slot:
-    -- Pool.Creatures under `And [IsAttacking, Not IsBlocked]`. The pair differs
-    -- in exactly one thing -- both attackers are alice's, both are attacking,
-    -- and bob's one Piker blocks the first of them.
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    prey <- S.printingOf s registry "Sacred Prey"
-    curtain <- S.printingOf s registry "Curtain of Light"
-    case (curtainBoard plains piker curtain [prey, prey], S.spellTargetSlot curtain) of
-      ((gs, [first, second], _, _), Just slot) -> do
-        let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer gs
-            legal = Target.legalRecipients Nothing S.noSource slot atDamage
-        Spec.assertBool s (Combat.isBlocked first atDamage) "the declaration blocked the first attacker"
-        Spec.assertBool s (not (Combat.isBlocked second atDamage)) "and left the second unblocked"
-        Spec.assertBool s (not (Set.member (Recipient.ToCreature first) legal)) "Not IsBlocked refuses the blocked attacker"
-        Spec.assertBool s (Set.member (Recipient.ToCreature second) legal) "and admits the unblocked one"
-      _ -> Spec.assertFailure s "fixture should have two attackers and Curtain of Light a 'target' slot"
 
 -- alice attacks with a Spined Thopter and a Sacred Prey; bob defends with NO
 -- creature at all, holds Flash Foliage and the three Forests that pay its

@@ -532,80 +532,6 @@ villageRitesSpec s registry =
             _ -> False
       Spec.assertBool s (not (any isTargets asked)) "no ChooseTargets was raised"
 
--- Altar's Reap {1}{B} Instant: "As an additional cost to cast this spell,
--- sacrifice a creature. Draw two cards."
---
--- alice controls `lands` untapped Swamps and exactly one creature -- the leg's
--- only variable -- holds one Altar's Reap, and has three cards in her library so
--- the draw is never a CR 104.3c loss. The creature is the ONLY sacrifice
--- candidate, so CR 701.21a's choice is elided and no answerer can pick a
--- different victim. Loaded fresh inside each case that needs it -- equivalent
--- because loading is deterministic and cached (batch-recipe.md).
-altarsReapBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Int ->
-  (ObjectId.ObjectId, GameState.GameState)
-altarsReapBoard swamp creature altarsReap lands =
-  let base = S.landsInPlay swamp lands
-      (_, withCreature) = S.addPermanent creature S.alice base
-      (reap, gs1) = S.addHandCard altarsReap S.alice withCreature
-      stock gs _ = snd (S.addLibraryCard swamp S.alice gs)
-      gs2 = List.foldl' stock gs1 [1 .. (3 :: Int)]
-   in ( reap,
-        gs2
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      )
-
--- CR 601.2f's lock-in, in the shape of the rule's own example: the creature
--- paying the additional cost IS the cost reducer, so the total determined at CR
--- 601.2f and the total a recomputation would reach once CR 601.2h's sacrifice
--- has happened are different numbers. Baral, Chief of Compliance -- "Instant and
--- sorcery spells you cast cost {1} less to cast" -- is pawl's Thunderscape
--- Familiar, and Altar's Reap is an Instant: the locked total is {B}, a
--- recomputed one {1}{B}.
---
--- The two readings are told apart by MANA SPENT, not by a board that only one of
--- them reaches: one Swamp tapped against two.
---
--- What holds it is that Pawl.Engine.Cast.castProposed determines the total ONCE
--- -- `paidCost`, off the adjustments read before any payment -- and hands that
--- VALUE to Cost.pay, which never re-reads the game state for it. Mutating
--- castProposed to pay the components first and then re-total the announced cost
--- against the state that leaves (#94's own description of the defect: a total
--- recomputed on demand) fails the first two legs below, and only those: it taps
--- two Swamps where the first expects one, and loses the second's payment
--- outright.
-altarsReapSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-altarsReapSpec s registry =
-  Spec.describe s "Altar's Reap" $ do
-    -- The CONTROL on the two legs above, and not a third witness to the lock:
-    -- with no reducer on the board the two readings of CR 601.2f agree, so the
-    -- mutation that reddens them leaves this one green. What it establishes is
-    -- that one Swamp is genuinely short of an unreduced Altar's Reap -- so the
-    -- leg above succeeded on the locked total and not on mana it had spare.
-    --
-    -- The board is that leg with ONE thing changed, a Goblin Piker where Baral
-    -- stood: the same one Swamp, the same seats, the same phase, the same
-    -- library, the same single sacrifice candidate. The second pair pins the
-    -- refusal to the AMOUNT -- a second Swamp buys the very same Piker board the
-    -- cast.
-    Spec.it s "CR 601.2f with no reducer to lock in, the same one Swamp does not pay" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      piker <- S.printingOf s registry "Goblin Piker"
-      altarsReap <- S.printingOf s registry "Altar's Reap"
-      let (oneReap, one) = altarsReapBoard swamp piker altarsReap 1
-          (twoReap, two) = altarsReapBoard swamp piker altarsReap 2
-      Spec.assertBool s (not (S.castable S.alice oneReap one)) "one Swamp: refused"
-      Spec.assertEqWith s "and not offered" (filter (S.isCastOf oneReap) (Action.legalActions S.alice one)) []
-      Spec.assertBool s (S.castable S.alice twoReap two) "two Swamps: offered"
-      let resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer two (S.cast S.alice twoReap)) Stack.resolveTop
-      Spec.assertEqWith s "and both Swamps paid for it" (S.tappedCount S.alice resolved) 2
-
 -- Synthetic Spiteful Rite {B} Instant (data/cards/synthetic-spiteful-rite.json):
 -- "As an additional cost to cast this spell, sacrifice a creature other than the
 -- target. Destroy target creature." And its activation twin, Synthetic Spiteful
@@ -1322,35 +1248,9 @@ crossCheckWithPriority gs =
       GameState.priority = Just S.alice
     }
 
-crossCheckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+crossCheckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 crossCheckSpec s registry =
   Spec.describe s "CrossChecks" $ do
-    -- Blood Moon: "Nonbasic lands are Mountains." Evolving Wilds is a
-    -- nonbasic land, so layer 4 makes it a Mountain and it may be
-    -- sacrificed to Fireblast's alternative. The pair is what
-    -- discriminates: WITHOUT Blood Moon the same board has one Mountain
-    -- and the spell is not castable.
-    --
-    -- Blood Moon affects only NONBASIC lands, which is why the second
-    -- permanent is Evolving Wilds and not an Island.
-    Spec.it s "CR 613.1d PermanentOfSubtype reads the projection, not the printed type line" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      evolvingWilds <- S.printingOf s registry "Evolving Wilds"
-      fireblastPrinting <- S.printingOf s registry "Fireblast"
-      bloodMoon <- S.printingOf s registry "Blood Moon"
-      let base = S.landsInPlay mountain 1
-          (wilds, gs1) = S.addPermanent evolvingWilds S.alice base
-          (fireblast, gs2) = S.addHandCard fireblastPrinting S.alice gs1
-          withoutMoon = crossCheckWithPriority gs2
-          (_, gs3) = S.addPermanent bloodMoon S.alice gs2
-          withMoon = crossCheckWithPriority gs3
-          cast = S.runPure S.identityAnswer withMoon (S.cast S.alice fireblast)
-      Spec.assertBool
-        s
-        (not (S.castable S.alice fireblast withoutMoon))
-        "without Blood Moon, Evolving Wilds is not a Mountain and one Mountain is not two"
-      Spec.assertBool s (S.castable S.alice fireblast withMoon) "with Blood Moon it is castable"
-      Spec.assertBool s (not (Set.member wilds (GameState.battlefield cast))) "and Evolving Wilds was sacrificed as a Mountain"
     -- CR 118.9d: "If an alternative cost is being paid to cast a spell,
     -- any additional costs, cost increases, and cost reductions that
     -- affect that spell are applied to that alternative cost." Fireblast
@@ -2667,7 +2567,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   halfLifeSpec s registry
   hatredSpec s registry
   villageRitesSpec s registry
-  altarsReapSpec s registry
   spitefulSpec s registry
   headlessSkaabSpec s registry
   cadaverousBloomSpec s registry

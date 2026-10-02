@@ -186,13 +186,6 @@ ruleOfLawBoard plains ruleOfLaw =
           }
       )
 
--- Cast Rule of Law itself, and let it resolve onto the battlefield.
-ruleOfLawAfterFirst :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-ruleOfLawAfterFirst plains ruleOfLaw =
-  let resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
-      (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
-   in (a, b, resolveAll (S.runPure S.identityAnswer board (S.cast S.alice a)))
-
 -- The object every assertion below about a QUALITY-FREE prohibition passes to
 -- prohibitsCasting, and a made-up one: CR 601.3's "can't cast spells" (Silence)
 -- and "can't cast more than one spell" (Rule of Law) do not depend on WHICH
@@ -215,33 +208,6 @@ ruleOfLawSpec s registry =
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced board)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "a offered"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "b offered"
-
-    -- The limit is counted PER PLAYER: bob has cast nothing this turn, so
-    -- EachPlayer does not prohibit him.
-    Spec.it s "CR 109.5 the EachPlayer scope still counts each player's own casts" $ do
-      plains <- S.printingOf s registry "Plains"
-      ruleOfLaw <- S.printingOf s registry "Rule of Law"
-      let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced afterFirst)) "bob is not prohibited"
-
-    -- Engine.handoffTurn clears the event log at the turn handoff, so
-    -- "this turn" (castsThisTurn's fold over the log) is exactly the
-    -- log's own extent -- CR 608.2i is the "look back in time" rule and
-    -- says nothing about the log being cleared, so this is an
-    -- implementation fact rather than a rules citation.
-    Spec.it s "the restriction lifts on the next turn" $ do
-      plains <- S.printingOf s registry "Plains"
-      ruleOfLaw <- S.printingOf s registry "Rule of Law"
-      let (_, b, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-          handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
-          nextOwnTurn =
-            (handoff (handoff afterFirst))
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.priority = Just S.alice
-              }
-      Spec.assertEqWith s "alice is active again" (GameState.activePlayer nextOwnTurn) S.alice
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced nextOwnTurn)) "not prohibited"
-      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
 
     -- Ruling: "If you cast a spell that was countered, you can't cast
     -- another spell during the same turn." The counted event is the CAST.
@@ -1098,22 +1064,6 @@ humilitySpec s registry =
         "under Humility the printed {R} is the whole cost"
         (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) humbled)
         (Just (ManaCost.MkManaCost [red]))
-
-    -- The same statement at the two gameplay sites the Thalia group tests,
-    -- with ONE Mountain -- the amount that tells the taxed and untaxed costs
-    -- apart.
-    Spec.it s "CR 601.2f castability and payment both drop the stripped tax" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-      lightningBolt <- S.printingOf s registry "Lightning Bolt"
-      piker <- S.printingOf s registry "Goblin Piker"
-      humility <- S.printingOf s registry "Humility"
-      let (bolt, _, oneLand) = thaliaBoard mountain thalia lightningBolt piker 1
-          humbled = S.withHumility humility oneLand
-          paid = S.runPure S.identityAnswer humbled (S.cast S.alice bolt)
-      Spec.assertBool s (not (S.castable S.alice bolt oneLand)) "control: one Mountain cannot pay the taxed Bolt"
-      Spec.assertBool s (S.castable S.alice bolt humbled) "under Humility one Mountain is enough"
-      Spec.assertEqWith s "and paying it taps exactly that one" (S.tappedCount S.alice paid) 1
 
     -- THE DISCRIMINATOR against "Humility silences every player ability".
     -- Humility's affected set is "each creature", and Sapphire Medallion is an

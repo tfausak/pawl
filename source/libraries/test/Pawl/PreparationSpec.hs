@@ -162,29 +162,6 @@ aviatorDuel =
     ]
     []
 
--- The same board with Aurelia, the Warleader beside the Aviator: her CR 500.8
--- additional combat phase is what gives one turn two declare-attackers steps, and
--- her untap (she is the only source of one here) is what lets the Aviator attack
--- in the second one.
---
--- bob starts at 60 so that two combats do not kill him: the three attackers deal
--- 7 a combat, and a dead defending player would end the game (CR 104.3b) before
--- the second declaration this case is about.
-aureliaDuel :: Board.Board
-aureliaDuel =
-  S.board
-    ( S.battlefield
-        S.alice
-        [ S.settled "aviator" "Encouraging Aviator",
-          S.settled "aurelia" "Aurelia, the Warleader",
-          S.settled "piker" "Goblin Piker",
-          S.aliased "island" (S.permanent "Island")
-        ]
-        NonEmpty.:| [(S.battlefield S.bob []) {Seat.life = 60}]
-    )
-    S.alice
-    S.beginningOfCombat
-
 -- The Aviator attacks bob unblocked, and the whole combat phase runs -- so CR
 -- 508.1's declaration, CR 603.3's trigger placement and CR 608's resolution all
 -- happen inside the engine rather than being poked in.
@@ -355,23 +332,6 @@ spec s registry = Spec.describe s "Preparation" $ do
         swept = S.runPure S.identityAnswer bounced Sba.checkStateBasedActions
     Spec.assertEqWith s "CR 704.5e: the copy has ceased to exist" (prepareCopies swept) []
     Spec.assertEqWith s "and exile is empty" (Foldable.toList (GameState.exile swept)) []
-  -- CR 722.3a's second gate: "a permanent can't gain this designation if the
-  -- permanent already has it." Aurelia's CR 500.8 additional combat phase gives
-  -- the turn two declare-attackers steps and her untap lets the Aviator attack in
-  -- both, so its printed trigger resolves TWICE with the copy still in exile.
-  --
-  -- The control is the first attack: exactly one copy after it, so the one copy
-  -- after the second is a refused gain rather than a combat that never happened.
-  Spec.it s "CR 722.3a a second attack while already prepared mints no second copy" $ do
-    built <- S.buildBoardOrFail s registry aureliaDuel
-    aviatorId <- aliasOrFail s built "aviator"
-    let twice = S.runCombat (S.attackTo S.bob) (Staged.state built)
-    -- The CONTROL, and what keeps the count below from passing vacuously: two
-    -- combats of 7 took bob from 60 to 46, where one would have left him at 53.
-    -- So the Aviator really did attack a second time while prepared.
-    Spec.assertEqWith s "CR 500.8: two combat phases happened" (S.lifeOf S.bob twice) (Just 46)
-    Spec.assertBool s (isPrepared aviatorId twice) "the Aviator is still prepared"
-    Spec.assertEqWith s "CR 722.3a: still exactly one copy in exile" (length (prepareCopies twice)) 1
   -- CR 722.2b: "the existence and values of these alternative characteristics are
   -- part of the object's copiable values." So a permanent has a prepare spell
   -- because of what it COPIES, not because of the card printed underneath it --

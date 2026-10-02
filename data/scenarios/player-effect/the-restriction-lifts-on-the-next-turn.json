@@ -1,0 +1,223 @@
+{
+  "description": "the restriction lifts on the next turn",
+  "note": "One Plains in each library stands in for the Haskell's draw-free turn handoffs: the scenario plays the draw steps of turns 2 and 3, which an empty library would lose.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Rule of Law",
+            "ready": true
+          },
+          {
+            "card": "Rule of Law",
+            "ready": true
+          },
+          {
+            "card": "Rule of Law",
+            "label": "rule-of-law",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$rule-of-law",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "Rule of Law",
+          "mana": [
+            "Plains#4",
+            "Plains#5",
+            "Plains#6",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "PlayLand Plains#11",
+            "Cast Rule of Law",
+            "Cast Rule of Law#2",
+            "ActivateManaAbility $plains",
+            "ActivateManaAbility $plains-2",
+            "ActivateManaAbility $plains-3",
+            "ActivateManaAbility Plains#4",
+            "ActivateManaAbility Plains#5",
+            "ActivateManaAbility Plains#6",
+            "ActivateManaAbility Plains#7",
+            "ActivateManaAbility Plains#8",
+            "ActivateManaAbility Plains#9"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "Rule of Law",
+          "mana": [
+            "$plains",
+            "$plains-2",
+            "$plains-3",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Rule of Law",
+        "count": 2
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Rule of Law",
+        "count": 1
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-2",
+        "tapped": true
+      }
+    },
+    {
+      "Tapped": {
+        "object": "$plains-3",
+        "tapped": true
+      }
+    },
+    {
+      "Damage": {
+        "object": "Rule of Law#3",
+        "damage": 0
+      }
+    },
+    {
+      "Tapped": {
+        "object": "Rule of Law#3",
+        "tapped": false
+      }
+    }
+  ]
+}

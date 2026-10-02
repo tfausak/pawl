@@ -1,0 +1,111 @@
+{
+  "description": "CR 702.189a firebending X adds one retained {R} per experience counter",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "counters": [
+          {
+            "key": {
+              "type": "Experience"
+            },
+            "value": 3
+          }
+        ],
+        "battlefield": [
+          {
+            "card": "Zuko, Firebending Master",
+            "label": "zuko-firebending-master",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$zuko-firebending-master"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$zuko-firebending-master",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ManaPool",
+          "player": "alice",
+          "is": [
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "UntilEndOfCombat"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            },
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "UntilEndOfCombat"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            },
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Red"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "UntilEndOfCombat"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

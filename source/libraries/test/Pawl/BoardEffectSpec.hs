@@ -2997,25 +2997,6 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
             legal = Target.legalRecipients Nothing S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToCreature flierId) legal) "the flier is a legal target"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) legal)) "the creature without flying is not"
-  -- CR 613.1f: layer 6 is where abilities are added, so the read has to go
-  -- through the PROJECTION rather than the printed card. Spontaneous Flight
-  -- ({2}{W}, "+2/+2 and a flying counter") is the pool's grant, and the Piker it
-  -- lands on printed no flying at all.
-  Spec.it s "CR 613.1f a Piker that GAINS flying becomes a legal target" $ do
-    plummet <- S.printingOf s registry "Plummet"
-    piker <- S.printingOf s registry "Goblin Piker"
-    plains <- S.printingOf s registry "Plains"
-    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
-    case S.spellTargetSlot plummet of
-      Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
-      Just theSlot -> do
-        let (groundId, before) = S.addPermanent piker S.alice (S.landsInPlay plains 3)
-            (withSpell, spellId) = S.handOne spontaneousFlight before
-            cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
-            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) (Target.legalRecipients Nothing S.noSource theSlot before))) "no flying, no offer"
-        Spec.assertBool s (Projection.hasKeyword Keyword.Flying groundId after) "the grant landed"
-        Spec.assertBool s (Set.member (Recipient.ToCreature groundId) (Target.legalRecipients Nothing S.noSource theSlot after)) "and the grant makes it a legal target"
   -- The other direction, and the one that proves the read is not of the printed
   -- card: Humility (CR 613.1f, "all creatures lose all abilities") takes the
   -- flying off a creature that PRINTS it, and the offer goes with it.

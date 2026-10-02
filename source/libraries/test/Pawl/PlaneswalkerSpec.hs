@@ -80,7 +80,6 @@ import qualified Pawl.Engine.Mana as Mana.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
@@ -406,20 +405,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "loyalty 3 - 1" (S.counterOf CounterKind.Loyalty jaceId after) 2
     Spec.assertEqWith s "exactly one player drew exactly one card" (S.handSize S.alice after + S.handSize S.bob after) 1
 
-  Spec.it s "CR 606.6 the -10 is not offered at 3 loyalty, while the other two are" $ do
-    island <- S.printingOf s registry "Island"
-    jace <- S.printingOf s registry "Jace Beleren"
-    let (jaceId, board) = jaceOnBattlefield island jace
-        offered = Action.legalActions S.alice board
-        isOffered i = not (null (activation jaceId i jace)) && all (`elem` offered) (activation jaceId i jace)
-    Spec.assertBool s (isOffered plusTwo) "the +2 is offered"
-    Spec.assertBool s (isOffered minusOne) "the -1 is offered"
-    Spec.assertBool s (not (isOffered minusTen)) "the -10 is NOT offered"
-    Spec.assertBool
-      s
-      (not (any (\ab -> Activatable.activatable S.alice jaceId ab board) (abilityAt minusTen jace)))
-      "and it is not activatable either"
-
   Spec.it s "CR 606.3 a second loyalty ability is not offered in the same turn" $ do
     island <- S.printingOf s registry "Island"
     jace <- S.printingOf s registry "Jace Beleren"
@@ -470,49 +455,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
         after = useAbility plusTwo jace jaceId board
     Spec.assertEqWith s "six plus four, not six plus two" (S.counterOf CounterKind.Loyalty jaceId after) 10
     Spec.assertEqWith s "and the row was live on the way in: three doubled to six" (S.counterOf CounterKind.Loyalty jaceId board) 6
-
-  -- CR 115.4: "These targets may be creatures, players, planeswalkers, or
-  -- battles." Read off Lightning Bolt's OWN committed target slot rather than a
-  -- hand-built one, so what is under test is the pool the card data selects.
-  Spec.it s "CR 115.4 an 'any target' spell offers the planeswalker alongside the players" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    jace <- S.printingOf s registry "Jace Beleren"
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (jaceId, _, gs) = burnAtJace island mountain jace lightningBolt
-        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) S.noSource theSlot gs) (S.spellTargetSlot lightningBolt)
-    Spec.assertEqWith s "the planeswalker is a legal target" (fmap (Set.member (Recipient.ToPlaneswalker jaceId)) offered) (Just True)
-    Spec.assertEqWith s "and so are both players" (fmap (Set.isSubsetOf (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) offered) (Just True)
-    -- CR 115.4's other half: "Other game objects, such as noncreature artifacts
-    -- or spells, can't be chosen." The Mountain and the Islands are on the same
-    -- battlefield, so widening the pool to planeswalkers must not have widened
-    -- it to permanents.
-    Spec.assertEqWith s "and nothing else on the battlefield is" (fmap (Set.size . Set.filter (Maybe.isJust . Recipient.objectOf)) offered) (Just 1)
-
-  -- The OTHER pool that offers a planeswalker, and the pair is the point: CR
-  -- 115.2's default already admits a permanent, and its clause (a) adds "or a
-  -- player", so a card can name both in one slot without reaching rule 115.4's
-  -- four-way at all. Goblin War Strike {R} Sorcery
-  -- -- "Goblin War Strike deals damage to target player or planeswalker equal to
-  -- the number of Goblins you control" (checked against Scryfall) -- is that
-  -- card, and Pool.PlayersAndPlaneswalkers is its slot.
-  --
-  -- Read off the Strike's OWN committed slot, as the case above is, so what is
-  -- under test is the pool the card data selects.
-  Spec.it s "CR 115.2 a 'player or planeswalker' spell offers neither Goblin" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    jace <- S.printingOf s registry "Jace Beleren"
-    goblinWarStrike <- S.printingOf s registry "Goblin War Strike"
-    goblinPiker <- S.printingOf s registry "Goblin Piker"
-    let (jaceId, _, gs) = strikeAtJace island mountain jace goblinWarStrike goblinPiker
-        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) S.noSource theSlot gs) (S.spellTargetSlot goblinWarStrike)
-    -- FIRST, because it is the one assertion that tells this pool from either
-    -- neighbour: CR 115.4's pool would offer alice's two Goblins alongside Jace,
-    -- and a players-only pool would offer no object at all.
-    Spec.assertEqWith s "exactly one object is offered, so the two Goblins are not" (fmap (Set.size . Set.filter (Maybe.isJust . Recipient.objectOf)) offered) (Just 1)
-    Spec.assertEqWith s "and that object is the planeswalker" (fmap (Set.member (Recipient.ToPlaneswalker jaceId)) offered) (Just True)
-    Spec.assertEqWith s "and both players are offered too" (fmap (Set.isSubsetOf (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) offered) (Just True)
 
   -- And the pool is load-bearing all the way to the damage: the Strike is cast at
   -- the planeswalker and resolved, so CR 306.8 removes loyalty rather than a

@@ -1,0 +1,56 @@
+{
+  "description": "CR 725.2 combat damage to the monarch hands the crown to the damager's controller",
+  "board": {
+    "active": "bob",
+    "step": "BeginningOfCombat",
+    "monarch": "alice",
+    "seats": [
+      {
+        "name": "alice"
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 18
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Monarch": {
+          "player": "bob"
+        }
+      }
+    }
+  ]
+}

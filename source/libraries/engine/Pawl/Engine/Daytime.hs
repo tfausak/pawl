@@ -155,9 +155,8 @@ dueToTurn gs = case GameState.daytime gs of
 -- This is the ONE turn CR 702.145b's and CR 702.145e's transform restriction
 -- permits, and it reaches Game.turnFaceOver DIRECTLY for exactly that reason:
 -- `restrictsTransform` above gates Pawl.Engine.Resolve's instruction-level
--- `turnOver`, which this does not go through. Pawl.DaytimeSpec's
--- restrictionSpec proves the pair -- a spell's transform is refused, the sweep's
--- is not.
+-- `turnOver`, which this does not go through. data/scenarios/daytime proves the
+-- pair -- a spell's transform is refused, the sweep's is not.
 --
 -- CR 701.27a's event is recorded through the `record` argument rather than
 -- inline, and the argument is there because of the module graph rather than

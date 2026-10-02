@@ -1,0 +1,119 @@
+{
+  "description": "CR 707.2 a graveyard card offers the embalm of what it is a copy of, not its printed one",
+  "note": "Synthetic Mirror of the Fallen makes alice's graveyard Goblin Piker a copy of bob's Tah-Crop Skirmisher, so it offers embalm, as her own untouched Skirmisher still does. The control file aims the same Mirror at her Skirmisher and bob's Hill Giant instead, and her Skirmisher offers no embalm. Four Islands are left in both, exactly embalm's {3}{U}.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Tah-Crop Skirmisher",
+            "label": "own skirmisher"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "own piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Mirror of the Fallen",
+            "label": "mirror"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "graveyard": [
+          {
+            "card": "Tah-Crop Skirmisher",
+            "label": "their skirmisher"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "their giant"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$mirror",
+          "targetsBySlot": {
+            "mirrored": [
+              "$own piker"
+            ],
+            "archetype": [
+              "$their skirmisher"
+            ]
+          },
+          "mana": [
+            "Island",
+            "Island#2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $own skirmisher",
+            "Activate $own piker",
+            "ActivateManaAbility Island#3",
+            "ActivateManaAbility Island#4",
+            "ActivateManaAbility Island#5",
+            "ActivateManaAbility Island#6"
+          ]
+        }
+      }
+    }
+  ]
+}

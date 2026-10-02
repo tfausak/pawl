@@ -25,7 +25,6 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -925,77 +924,6 @@ m2bExitSpec s registry = Spec.describe s "M2bExit" $ do
     Spec.assertEqWith s "double striker deals 4" (S.lifeOf S.bob doubled) (Just 16)
     Spec.assertEqWith s "an attacker-less turn deals nothing" (S.lifeOf S.bob quiet) (Just 20)
 
--- alice is mid-combat with three Pikers; bob holds a Ray of Command and exactly
--- the four Islands that pay for it, and controls nothing else. The board sits at
--- the declare attackers step like every combatBoardOf board, so the ENGINE
--- declares the attack and carries it forward: no test here writes the combat
--- record. S.addPermanent is what puts the Islands out -- the "any printing, on the
--- battlefield, untapped and Settled" helper its haddock says it is.
-rayBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, [ObjectId.ObjectId])
-rayBoard island piker ray =
-  let (gs0, mine, _) = S.combatBoardOf [piker, piker, piker] []
-      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent island S.bob g))
-   in (snd (S.addHandCard ray S.bob (addLands 4 gs0)), mine)
-
--- Attack with everything except `homebody`, never block, cast whenever a cast is
--- offered, and aim every target at `victim`.
---
--- Blocks are DECLINED rather than routed, and that is what keeps the two legs
--- comparable: a stolen attacker arrives untapped (Ray of Command untaps it) and
--- hasty under its new controller, so an aggressive blocker answer would have bob
--- block with the very creature the case is about and hide the damage question
--- behind CR 509.1's routing.
-steal :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-steal homebody victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
-  Prompt.ChooseAction {} -> S.castAnswer p
-  Prompt.DeclareAttackers _ _ ids -> filter (/= homebody) ids
-  Prompt.DeclareBlockers {} -> Map.empty
-  _ -> S.aggressiveAnswer p
-
--- CR 506.4: "A permanent is removed from combat if it leaves the battlefield, if
--- its controller changes, ..." -- and a creature so removed "stops being an
--- attacking, blocking, blocked, and/or unblocked creature".
---
--- Ray of Command is this group's producer for the control-change clause: {3}{U},
--- INSTANT, "Untap target creature an opponent controls and gain control of it
--- until end of turn. That creature gains haste until end of turn." Act of Treason
--- has the same three effects and cannot reach this window at all, because it is a
--- sorcery -- which is why this clause was worked card-driven rather than built
--- speculatively. Ray of Command's third sentence, the delayed trigger that taps the
--- creature when its controller loses it, does not reach these legs: every one of
--- them stops at the end of combat step, well before the CR 514.2 sweep that ends
--- the control effect. Pawl.TriggerSpec's "RayOfCommand" group is what proves it.
---
--- Every leg runs whole steps through Engine.runStep, so the combat record under
--- test is the engine's own and the removal is observed where a player would see
--- it: at the CR 117.5 settle that follows the spell resolving. Each leg stops at
--- the end of combat step, where CR 511.3 says the record still reads live.
-controlChangeRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ do
-  Spec.it s "CR 506.4 whole card: Ray of Command on an attacker removes THAT attacker from combat, and it deals no combat damage" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    rayOfCommand <- S.printingOf s registry "Ray of Command"
-    killShot <- S.printingOf s registry "Kill Shot"
-    case (rayBoard island piker rayOfCommand, S.spellTargetSlot killShot) of
-      ((gs, [stolen, other, homebody]), Just attackingSlot) -> do
-        let atEnd = runToEndOfCombat (steal homebody stolen) gs
-            attackers = Combat.Type.attackers (GameState.combat atEnd)
-            legal = Target.legalRecipients Nothing S.noSource attackingSlot atEnd
-        Spec.assertEqWith s "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
-        Spec.assertEqWith s "bob really did gain control of it" (Projection.controllerOf stolen atEnd) (Just S.bob)
-        Spec.assertBool s (Map.notMember stolen attackers) "CR 506.4: so it is no longer an attacking creature"
-        Spec.assertBool s (Map.member other attackers) "the attacker bob left alone is untouched"
-        -- The discriminating assertion: the unfixed engine keeps the stolen
-        -- Piker in the record and deals its 2 alongside the other's.
-        Spec.assertEqWith s "CR 510.1: bob takes only the surviving attacker's 2" (S.lifeOf S.bob atEnd) (Just 18)
-        -- CR 508.1k through the door a card actually uses: Kill Shot's own
-        -- committed target slot is Pool.Creatures narrowed by IsAttacking.
-        Spec.assertBool s (not (Set.member (Recipient.ToCreature stolen) legal)) "Filter.IsAttacking no longer finds the stolen creature"
-        Spec.assertBool s (Set.member (Recipient.ToCreature other) legal) "and still finds the one that is attacking"
-      _ -> Spec.assertFailure s "fixture should have three Pikers and Kill Shot a 'target' slot"
-
 -- Labyrinth of Skophos' SECOND activated ability -- "{4}, {T}: Remove target
 -- attacking or blocking creature from combat" -- read off the JSON-loaded
 -- printing rather than hand-built, so every leg below exercises the codec's
@@ -1087,14 +1015,6 @@ runToEndOfCombatWith answer gs0 =
              in go (n - 1) g1 s1
    in go 8 gs0 False
 
--- Attack with everything except `homebody`, and otherwise behave aggressively --
--- so the board carries an attacking creature, a blocking creature and a creature
--- that is neither, which is what the target filter has to tell apart.
-stayHomeAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-stayHomeAnswer homebody p = case p of
-  Prompt.DeclareAttackers _ _ ids -> filter (/= homebody) ids
-  _ -> S.aggressiveAnswer p
-
 -- CR 506.4: "A permanent is removed from combat if ... an effect specifically
 -- removes it from combat." The rule's one clause a card ASKS for, rather than a
 -- condition the engine has to notice -- and Labyrinth of Skophos is the pool's
@@ -1111,7 +1031,7 @@ stayHomeAnswer homebody p = case p of
 -- Removal is removal only. Nothing here puts a creature back into combat, which
 -- is what the rules say too -- the glossary's "removed from combat" entry has
 -- the permanent take "no further involvement in that combat phase".
-effectRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+effectRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
   Spec.it s "CR 506.4 whole card: Labyrinth of Skophos removes target ATTACKING creature, and it deals no combat damage" $ do
     island <- S.printingOf s registry "Island"
@@ -1132,26 +1052,6 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
         Spec.assertBool s (Map.member attacker (Combat.Type.attackers (GameState.combat quiet))) "control leg: unactivated, the Piker is still attacking"
         Spec.assertEqWith s "and bob takes its 2" (S.lifeOf S.bob quiet) (Just 18)
       _ -> Spec.assertFailure s "fixture should give bob a Labyrinth with two abilities and alice one Piker"
-  Spec.it s "CR 601.2c the card's filter admits the attacker and the blocker and rejects the creature that stayed home" $ do
-    -- Or [IsAttacking, IsBlocking], and both halves are load-bearing: with
-    -- IsAttacking alone the blocker would be rejected, and with no filter at
-    -- all the homebody would be admitted.
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
-    case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker, piker] [piker]) of
-      (Just ability, (gs, [attacker, homebody], [blocker], _)) -> do
-        -- The combat damage step is the vantage point: blockers have been
-        -- declared and nothing has died yet.
-        let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) (stayHomeAnswer homebody) gs
-            legal = fmap (\theSlot -> Target.legalRecipients Nothing S.noSource theSlot atDamage) (removalTargetSlot ability)
-            admits oid = fmap (Set.member (Recipient.ToCreature oid)) legal
-        Spec.assertEqWith s "the fixture reached the combat damage step with blocks declared" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
-        Spec.assertBool s (Set.member blocker (Combat.blockersOf attacker atDamage)) "the blocker really is blocking the attacker"
-        Spec.assertEqWith s "IsAttacking admits the attacker" (admits attacker) (Just True)
-        Spec.assertEqWith s "IsBlocking admits the blocker" (admits blocker) (Just True)
-        Spec.assertEqWith s "and the creature in neither role is rejected" (admits homebody) (Just False)
-      _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Labyrinth, and bob a blocker"
 
 -- Save Point's only activated ability, read off the JSON-loaded printing for
 -- removalAbility's reason.
@@ -1224,28 +1124,6 @@ savePointSpec s registry = Spec.describe s "Save Point" $ do
         Spec.assertEqWith s "control leg: unactivated, the surviving attacker stays tapped" (tapStateOf unblocked idle) (Just TapState.Tapped)
         Spec.assertEqWith s "control leg: and the postcombat main phase follows" (nextPhase idle) Phase.PostcombatMain
       _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Save Point, and bob a blocker"
-
--- alice is mid-combat with Opalescence, Living Plane and a Goblin Piker, plus one
--- Forest that Living Plane has made a 1/1 creature; bob defends with nothing but
--- the two Swamps that pay for the Doom Blade in his hand. The board sits at the
--- declare attackers step like every combatBoardOf board, so the ENGINE declares
--- the attack: no test here writes the combat record.
---
--- Returns alice's three combatBoardOf permanents in printing order alongside the
--- Forest, which is added separately because it is not one of them.
-unmakeBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId)
-unmakeBoard opalescence livingPlane piker forest swamp doomBlade =
-  let (gs0, mine, _) = S.combatBoardOf [opalescence, livingPlane, piker] []
-      (land, gs1) = S.addPermanent forest S.alice gs0
-      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addPermanent swamp S.bob g))
-   in (snd (S.addHandCard doomBlade S.bob (addSwamps 2 gs1)), mine, land)
 
 -- alice attacks with one Goblin Piker and holds the Doom Blade and the two
 -- Swamps that pay for it; bob defends with Opalescence, Living Plane and the
@@ -1658,7 +1536,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   vigilanceSpec s registry
   attacksAloneSpec s registry
   boundedDeclarationSpec s registry
-  controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry
   effectRemovalSpec s registry
   savePointSpec s registry

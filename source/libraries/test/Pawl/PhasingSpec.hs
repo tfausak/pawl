@@ -74,7 +74,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -364,27 +363,6 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     -- CR 702.26d: no zone change, so Object.zone is untouched and the object still
     -- exists. Both are what CR 702.26i's host test later reads.
     Spec.assertEqWith s "its zone still says battlefield" (zoneOf victim after) (Just Zone.Battlefield)
-  -- CR 702.26b's "can't be affected by anything else in the game", at the one
-  -- reader a spell goes through: CR 601.2c's choice of targets, which admits only
-  -- legal candidates. A second Reality Ripple
-  -- cannot aim at the permanent the first one sent away, though it can still aim
-  -- at the one beside it.
-  Spec.it s "CR 702.26b a phased-out permanent is not a legal target" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    ripple <- S.printingOf s registry "Reality Ripple"
-    let ((victim, bystander), spell, board) =
-          rippleBoard island ripple $ \gs ->
-            let (a, g1) = S.addPermanent piker S.bob gs
-                (b, g2) = S.addPermanent piker S.bob g1
-             in ((a, b), g2)
-        after = rippleAt victim spell board
-        legalIn gs = case S.spellTargetSlot ripple of
-          Nothing -> Set.empty
-          Just slot -> Set.map Recipient.objectOf (Target.legalRecipients Nothing S.noSource slot gs)
-    Spec.assertEqWith s "setup: it was a legal target while phased in" (Set.member (Just victim) (legalIn board)) True
-    Spec.assertEqWith s "and is not once phased out" (Set.member (Just victim) (legalIn after)) False
-    Spec.assertEqWith s "while the Piker beside it still is" (Set.member (Just bystander) (legalIn after)) True
   -- CR 702.26a's phase-in half applied to a permanent with NO phasing, which is
   -- the reading Pawl.Engine.Phasing.phasingIn implements -- "the keyword decides
   -- who leaves, never who returns" -- and which no board could distinguish from

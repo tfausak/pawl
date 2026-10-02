@@ -1,0 +1,49 @@
+{
+  "description": "CR 704.5g a Mountain with damage marked is not destroyed",
+  "note": "The 5 is placed on the board rather than dealt: CR 704.5g reads marked damage, and the first priority runs the check. The control is the board: a Goblin Piker in the Mountain's place, with the same 5, is destroyed.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "damage": 5
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$mountain",
+          "damage": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Mountain",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

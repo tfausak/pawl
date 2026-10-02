@@ -570,17 +570,6 @@ yawgmothsWillSpec s registry =
           Spec.assertBool s (S.castable S.alice hers after) "though the identical copy in her own graveyard is castable"
           Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Graveyard his after)) "and the refusal is the permission's zone reference, not its filter"
 
-        -- The permission names a ZONE, not a TIME, which is the flashback ruling
-        -- one rule over ("you can cast a sorcery using flashback only when you
-        -- could normally cast a sorcery"). Read beside Cast.instantSpeed rather
-        -- than inside it, so the sorcery window still has to be open.
-        Spec.it s "CR 117.1a the grant does not lift the sorcery timing restriction" $ do
-          (willId, hers, _, gs) <- board
-          let after = willResolved willId gs
-              upkeep = after {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
-          Spec.assertBool s (S.castable S.alice hers after) "castable in her own main phase"
-          Spec.assertBool s (not (S.castable S.alice hers upkeep)) "not in her upkeep"
-
         -- CR 514.2: "until end of turn" is the stored CR 611.2c carrier's expiry,
         -- so the grant dies at cleanup and the same board refuses the same cast.
         Spec.it s "CR 514.2 the permission ends at cleanup" $ do
@@ -631,18 +620,6 @@ crucibleBoard swamp mountain sorcerer crucible present =
             GameState.priority = Just S.alice
           }
       )
-
--- Play ONE named object and pass at every other prompt. Pinned to an id rather
--- than to "whichever land play is offered" (S.playLandAnswer), because this
--- board offers a land in a hand as well: an answerer that took the first play
--- would put the Mountain onto the battlefield and the assertions would read the
--- wrong card.
-playOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-playOnly wanted p = case p of
-  Prompt.ChooseAction _ _ actions -> case filter (playing wanted) actions of
-    h : _ -> h
-    [] -> Action.Type.Pass
-  _ -> S.identityAnswer p
 
 -- Is this the offer to play THAT object as a land? Enumerated rather than
 -- wildcarded, so a new Action constructor is named by -Werror.
@@ -1683,27 +1660,6 @@ scoutsWarningSpec s registry =
       let (_, resolved) = scoutsWarningResolved plains warning mountain
           played = S.runPure S.playLandAnswer resolved Engine.priorityLoop
       Spec.assertEqWith s "the grant survives" (length (GameState.playerEffects played)) 1
-
-    -- CR 601.1a's other half: MayPlayAsThoughItHadFlash reaches a CAST too
-    -- (Pawl.Engine.PlayerEffect.mayCastAsThoughItHadFlash's own arm), not only
-    -- Action.landTimingOk -- an ordinary creature SPELL becomes castable
-    -- outside the sorcery-speed window as well.
-    Spec.it s "CR 601.1a the grant also widens a creature spell's cast window" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      plains <- S.printingOf s registry "Plains"
-      warning <- S.printingOf s registry "Scout's Warning"
-      let (pikerBase, pikerId) = S.pikerInHand mountain piker 9 Phase.PrecombatMain
-          withPlains = S.landsFor plains S.alice 1 pikerBase
-          -- CR 104.3c, scoutsWarningBoard's own trap: the second clause draws
-          -- a card, so the library must not be empty when it resolves.
-          (_, withLibrary) = S.addLibraryCard plains S.alice withPlains
-          (warningId, g1) = S.addHandCard warning S.alice withLibrary
-          before = g1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-          resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
-          resolved = resolveAll (S.runPure S.identityAnswer before (S.cast S.alice warningId))
-      Spec.assertBool s (not (S.castable S.alice pikerId (busyStack before))) "not castable before Scout's Warning resolves"
-      Spec.assertBool s (S.castable S.alice pikerId (busyStack resolved)) "castable once it has"
 
     -- CR 514.2 / 611.2a: the "or until the turn ends" half -- an UNUSED grant
     -- still ends at cleanup exactly as AtCleanup's does, so Scout's Warning

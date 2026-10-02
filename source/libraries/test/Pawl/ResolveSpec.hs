@@ -23,7 +23,6 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Engine as Engine
@@ -58,7 +57,6 @@ import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
@@ -479,24 +477,6 @@ targetSpec s registry = Spec.describe s "Target" $ do
             legalAfter = Target.legalRecipients Nothing S.noSource theSlot pumped
         Spec.assertBool s (not (Set.member (Recipient.ToCreature smallOid) legalBefore)) "power 2 is illegal (below the PowerAtLeast 4 floor)"
         Spec.assertBool s (Set.member (Recipient.ToCreature smallOid) legalAfter) "pumped to power 4 becomes legal"
-  -- CR 508.1k: Kill Shot's IsAttacking narrowing, read off the committed card
-  -- data. The defender is a creature in every other respect, so only combat
-  -- status can be what separates the two.
-  Spec.it s "Kill Shot: IsAttacking admits the attacker and rejects the untapped defender" $ do
-    killShot <- S.printingOf s registry "Kill Shot"
-    piker <- S.printingOf s registry "Goblin Piker"
-    case S.spellTargetSlot killShot of
-      Nothing -> Spec.assertFailure s "Kill Shot's printing carries no 'target' slot"
-      Just theSlot -> do
-        let (board, mine, theirs) = S.combatBoardOf [piker] [piker]
-            declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
-            legal = Target.legalRecipients Nothing S.noSource theSlot declared
-        case (mine, theirs) of
-          (attacker : _, defender : _) -> do
-            Spec.assertBool s (Map.member attacker (Combat.Type.attackers (GameState.combat declared))) "the fixture really did attack"
-            Spec.assertBool s (Set.member (Recipient.ToCreature attacker) legal) "the attacker is legal"
-            Spec.assertBool s (not (Set.member (Recipient.ToCreature defender) legal)) "the creature that stayed home is not"
-          _ -> Spec.assertFailure s "fixture should have one creature a side"
 
 resolveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 resolveSpec s registry = Spec.describe s "Resolve" $ do

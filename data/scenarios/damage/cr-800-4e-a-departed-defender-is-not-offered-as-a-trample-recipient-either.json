@@ -1,0 +1,116 @@
+{
+  "description": "CR 800.4e a departed defender is not offered as a trample recipient either",
+  "note": "The Haskell board has a non-defending player's creature block an attack on carol; CR 805.10d's shared team turns is the gameplay route to it, dave blocking for his teammate carol. Carol then concedes before damage, so the War Mammoth's 3 have only dave's Piker to go to: an assignment naming carol is refused. The control file is the same board without the concession, where that assignment stands.",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "sharedTeamTurns": true,
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "battlefield": [
+          {
+            "card": "War Mammoth",
+            "label": "mammoth",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 1
+      },
+      {
+        "name": "carol",
+        "team": 2
+      },
+      {
+        "name": "dave",
+        "team": 2,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$mammoth"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "ChooseAttackTarget": "$carol"
+      },
+      "source": "$mammoth"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Block": {
+          "$piker": [
+            "$mammoth"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": "Concede"
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "source": "$mammoth",
+      "refuse": {
+        "AssignDamage": {
+          "$piker": 1,
+          "$carol": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "source": "$mammoth",
+      "do": {
+        "AssignDamage": {
+          "$piker": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "dave",
+          "zone": "Graveyard",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

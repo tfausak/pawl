@@ -1,0 +1,334 @@
+{
+  "description": "CR 611.2a power-up abilities can't be activated during Kang's extra turn, and only then",
+  "note": "Seven Forests and a Mountain stand from the start, the eight fresh lands the test gives each board to pay Hulk's power-up.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-3",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-4",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "island-5",
+            "ready": true
+          },
+          {
+            "card": "Kang the Conqueror",
+            "label": "kang-the-conqueror",
+            "ready": true
+          },
+          {
+            "card": "Hulk, Gamma Goliath",
+            "ready": true,
+            "label": "hulk"
+          },
+          {
+            "card": "Prodigal Sorcerer",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-1"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-5"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-6"
+          },
+          {
+            "card": "Forest",
+            "label": "forest-7"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$kang-the-conqueror",
+          "ability": 0,
+          "mana": [
+            "$island",
+            "$island-2",
+            "$island-3",
+            "$island-4",
+            "$island-5",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $hulk",
+            "Activate Prodigal Sorcerer",
+            "ActivateManaAbility $forest-1",
+            "ActivateManaAbility $forest-2",
+            "ActivateManaAbility $forest-3",
+            "ActivateManaAbility $forest-4",
+            "ActivateManaAbility $forest-5",
+            "ActivateManaAbility $forest-6",
+            "ActivateManaAbility $forest-7",
+            "ActivateManaAbility $mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast Goblin Piker#20",
+            "Activate Prodigal Sorcerer",
+            "ActivateManaAbility $island",
+            "ActivateManaAbility $island-2",
+            "ActivateManaAbility $island-3",
+            "ActivateManaAbility $island-4",
+            "ActivateManaAbility $island-5",
+            "ActivateManaAbility $forest-1",
+            "ActivateManaAbility $forest-2",
+            "ActivateManaAbility $forest-3",
+            "ActivateManaAbility $forest-4",
+            "ActivateManaAbility $forest-5",
+            "ActivateManaAbility $forest-6",
+            "ActivateManaAbility $forest-7",
+            "ActivateManaAbility $mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "bob"
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Activate $hulk",
+            "Activate Prodigal Sorcerer",
+            "ActivateManaAbility $island",
+            "ActivateManaAbility $island-2",
+            "ActivateManaAbility $island-3",
+            "ActivateManaAbility $island-4",
+            "ActivateManaAbility $island-5",
+            "ActivateManaAbility $forest-1",
+            "ActivateManaAbility $forest-2",
+            "ActivateManaAbility $forest-3",
+            "ActivateManaAbility $forest-4",
+            "ActivateManaAbility $forest-5",
+            "ActivateManaAbility $forest-6",
+            "ActivateManaAbility $forest-7",
+            "ActivateManaAbility $mountain"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Library",
+        "card": "Goblin Piker",
+        "count": 9
+      }
+    },
+    {
+      "PowerToughness": {
+        "object": "$kang-the-conqueror",
+        "power": 5,
+        "toughness": 6
+      }
+    },
+    {
+      "Counters": {
+        "object": "$kang-the-conqueror",
+        "kind": {
+          "type": "PlusOnePlusOne"
+        },
+        "count": 1
+      }
+    }
+  ]
+}

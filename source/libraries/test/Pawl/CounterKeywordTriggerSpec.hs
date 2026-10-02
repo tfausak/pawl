@@ -88,41 +88,7 @@ renownSpec s registry =
       countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
       -- CR 702.112b's designation itself, which no characteristic reports.
       renownedness oid gs = fmap (Set.member Designation.Renowned . Object.designations) (Game.lookupObject oid gs)
-      -- CR 104.3c: a draw case needs a library to draw from, and more of one than
-      -- it draws, so an extra draw is visible rather than fatal.
-      stock printing n pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
-      -- CR 509.1: no blocks. S.aggressiveAnswer blocks with everything, which
-      -- would put the defender's own watcher in front of an attacker.
-      noBlocks :: Prompt.Prompt r -> r
-      noBlocks p = case p of
-        Prompt.DeclareBlockers {} -> Map.empty
-        _ -> S.aggressiveAnswer p
    in Spec.describe s "Renown" $ do
-        -- The proving test. CR 702.112a: two counters on the BEARER, and the
-        -- designation with them. The counter assertion is what separates rule
-        -- 702.112a's placement from a pump, and the 2 what separates N from 1.
-        Spec.it s "CR 702.112a whole card: Rhox Maulers connects and takes two +1/+1 counters" $ do
-          (gs, mine, _) <- board ["Rhox Maulers"] []
-          case mine of
-            [maulers] -> do
-              let after = S.runCombat S.aggressiveAnswer gs
-              Spec.assertEqWith s "bob took the printed four" (S.lifeOf S.bob after) (Just 16)
-              Spec.assertEqWith s "two counters, not one" (countersOn maulers after) (Map.singleton CounterKind.PlusOnePlusOne 2)
-              Spec.assertEqWith s "so it is a 6/6" (S.powerToughnessOf maulers after) (Just (6, 6))
-              Spec.assertEqWith s "and it is renowned" (renownedness maulers after) (Just True)
-            _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
-        -- CR 702.112a is scoped to combat damage dealt TO A PLAYER. The 1/4
-        -- absorbs all four (CR 702.19b leaves nothing to trample over), so the
-        -- event never happens and neither half of the ability runs.
-        Spec.it s "CR 702.112a a fully blocked Maulers is renowned by nobody" $ do
-          (gs, mine, _) <- board ["Rhox Maulers"] ["Apprentice Sharpshooter"]
-          case mine of
-            [maulers] -> do
-              let after = S.runCombat S.aggressiveAnswer gs
-              Spec.assertEqWith s "bob lost no life" (S.lifeOf S.bob after) (Just 20)
-              Spec.assertEqWith s "no counters" (countersOn maulers after) Map.empty
-              Spec.assertEqWith s "and no designation" (renownedness maulers after) (Just False)
-            _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
         -- What separates renown from a damage rider: it is a TRIGGERED ability, so
         -- the counters arrive when it resolves, not as the damage is dealt.
         -- S.fightWith deals combat damage without reaching a priority boundary,
@@ -154,59 +120,6 @@ renownSpec s registry =
                 Spec.assertEqWith s "the control: this incarnation is renowned" (Set.member Designation.Renowned (Object.designations obj)) True
                 Spec.assertEqWith s "the next one is not" (Set.member Designation.Renowned (Object.designations (Object.newIncarnation obj))) False
             _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
-        -- CR 702.112b's designation read by a WATCHER, which is what the rule
-        -- calls it a marker FOR: Valeron Wardens {2}{G} Creature -- Human Monk
-        -- 1/3, renown 2 and "whenever a creature you control becomes renowned,
-        -- draw a card". Both attackers connect, so the Wardens' trigger fires
-        -- TWICE -- once for the Maulers and once for itself, which is what "a
-        -- creature you control" says and a self-scoped reading would not.
-        --
-        -- The library is stocked past the two draws, so a third draw would show as
-        -- an extra card rather than as CR 104.3c losing alice the game before the
-        -- assertions run.
-        Spec.it s "CR 702.112b a watcher draws once per creature that becomes renowned" $ do
-          (gs, mine, _) <- board ["Valeron Wardens", "Rhox Maulers"] []
-          piker <- S.printingOf s registry "Goblin Piker"
-          case mine of
-            [wardens, maulers] -> do
-              let after = S.runCombat S.aggressiveAnswer (stock piker 3 S.alice gs)
-              Spec.assertEqWith s "both connected, for five" (S.lifeOf S.bob after) (Just 15)
-              Spec.assertEqWith s "the Wardens is renowned" (renownedness wardens after) (Just True)
-              Spec.assertEqWith s "and so is the Maulers" (renownedness maulers after) (Just True)
-              Spec.assertEqWith s "so two cards were drawn, not one" (length (Game.zoneMembers Zone.Hand S.alice after)) 2
-              Spec.assertEqWith s "leaving one in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
-            _ -> Spec.assertFailure s "fixture should give alice a Wardens and a Maulers"
-        -- What the condition is NOT: combat damage. Goblin Piker connects for two
-        -- and has no renown, so it never becomes renowned and contributes no draw
-        -- -- the one card is the Wardens' own designation.
-        Spec.it s "CR 702.112b a creature that connects without renown draws nothing" $ do
-          (gs, mine, _) <- board ["Valeron Wardens", "Goblin Piker"] []
-          piker <- S.printingOf s registry "Goblin Piker"
-          case mine of
-            [wardens, goblin] -> do
-              let after = S.runCombat S.aggressiveAnswer (stock piker 3 S.alice gs)
-              Spec.assertEqWith s "both connected, for three" (S.lifeOf S.bob after) (Just 17)
-              Spec.assertEqWith s "the Wardens is renowned" (renownedness wardens after) (Just True)
-              Spec.assertEqWith s "the Piker is not" (renownedness goblin after) (Just False)
-              Spec.assertEqWith s "so exactly one card was drawn" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
-            _ -> Spec.assertFailure s "fixture should give alice a Wardens and a Piker"
-        -- CR 109.5's "you control", and with it WHICH permanent the Filter reads:
-        -- bob has a Valeron Wardens of his own, watching from the defending side.
-        -- Nothing he controls becomes renowned, so he draws nothing -- an arm that
-        -- read the BEARER instead of the event's subject would have his Wardens
-        -- match itself and draw twice.
-        Spec.it s "CR 702.112b the defender's own Wardens sees no creature of his become renowned" $ do
-          (gs, mine, theirs) <- board ["Valeron Wardens", "Rhox Maulers"] ["Valeron Wardens"]
-          piker <- S.printingOf s registry "Goblin Piker"
-          case (mine, theirs) of
-            ([wardens, maulers], [hisWardens]) -> do
-              let after = S.runCombat noBlocks (stock piker 3 S.bob (stock piker 3 S.alice gs))
-              Spec.assertEqWith s "both of alice's connected, for five" (S.lifeOf S.bob after) (Just 15)
-              Spec.assertEqWith s "hers are renowned" (fmap (`renownedness` after) [wardens, maulers]) [Just True, Just True]
-              Spec.assertEqWith s "his is not" (renownedness hisWardens after) (Just False)
-              Spec.assertEqWith s "she drew two" (length (Game.zoneMembers Zone.Hand S.alice after)) 2
-              Spec.assertEqWith s "and he drew none" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
-            _ -> Spec.assertFailure s "fixture should give alice a Wardens and a Maulers, bob a Wardens"
         -- CR 702.112c: "if a creature has multiple instances of renown, each
         -- triggers separately". Asserted of the MINT, as poisonous' multiplicity
         -- is, no card in the pool printing renown twice. What rule 702.112c says
@@ -1260,7 +1173,7 @@ aetherjetIds gs =
 -- from printed renown 2 alone: with him out on the first swing the Maulers would
 -- hold renown 2 and a granted renown 1 at once, and CR 702.112c leaves which
 -- resolves first to its controller.
-aragornSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aragornSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 aragornSpec s registry =
   let board mine theirs = do
         ours <- mapM (S.printingOf s registry) mine
@@ -1304,22 +1217,6 @@ aragornSpec s registry =
               -- counters would be here instead.
               Spec.assertEqWith s "and Aragorn himself took none" (countersOn hero after) Map.empty
             _ -> Spec.assertFailure s "fixture should give alice a Maulers, an Aurelia and a Piker"
-        -- The other half of the same static ability, which the case above only
-        -- passes through: CR 702.7b's first strike, granted to an ATTACKING
-        -- creature. Two identical 2/1s meet, and only the attacker's controller
-        -- has an Aragorn -- so the blocker is dead before it assigns (CR 510.4),
-        -- where without the grant both would die.
-        Spec.it s "CR 702.7b the same static grants first strike to attackers" $ do
-          (gs, mine, theirs) <- board ["Aragorn, Hornburg Hero", "Goblin Piker"] ["Goblin Piker"]
-          case (mine, theirs) of
-            ([_, piker], [blocker]) -> do
-              let after = S.runCombat (plan [piker]) gs
-              Spec.assertEqWith s "the blocker is dead" (Game.lookupObject blocker after) Nothing
-              Spec.assertEqWith s "the attacker survived, unrenowned" (renownedness piker after) (Just False)
-              Spec.assertEqWith s "alice keeps both creatures" (S.creaturesInPlay S.alice after) 2
-              Spec.assertEqWith s "bob none" (S.creaturesInPlay S.bob after) 0
-              Spec.assertEqWith s "and nothing reached bob" (S.lifeOf S.bob after) (Just 20)
-            _ -> Spec.assertFailure s "fixture should give alice an Aragorn and a Piker, bob a Piker"
 
 -- CR 702.25a's flanking, which rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one

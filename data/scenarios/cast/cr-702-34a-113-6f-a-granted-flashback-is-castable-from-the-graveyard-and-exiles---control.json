@@ -1,0 +1,90 @@
+{
+  "description": "CR 702.34a/113.6f control: with bob at two poison counters there is no flashback, so the Spawning is neither offered nor castable",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Viral Spawning",
+            "label": "viral-spawning"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "counters": [
+          {
+            "key": {
+              "type": "Poison"
+            },
+            "value": 2
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility $forest",
+            "ActivateManaAbility $forest-2",
+            "ActivateManaAbility $forest-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$viral-spawning",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Viral Spawning",
+        "count": 1
+      }
+    }
+  ]
+}

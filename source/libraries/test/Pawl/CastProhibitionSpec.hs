@@ -92,47 +92,6 @@ silenceSpec s registry =
       Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced ended)) "bob may cast again"
 
-    -- CR 806.1: in a free-for-all the players compete as individuals, so the
-    -- card's your-opponents is EVERY other player, not the next seat. This is
-    -- the first Silence fixture that can tell those apart.
-    Spec.it s "CR 806.1 at three seats Silence stops BOTH opponents, and still spares the caster" $ do
-      plains <- S.printingOf s registry "Plains"
-      silence <- S.printingOf s registry "Silence"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (silenceId, bobsPiker, carolsPiker, before) = threeSeatSilenceBoard plains silence mountain piker
-          -- Goblin Piker is a creature, so CR 302.1's timing applies: it is
-          -- offered only to the ACTIVE player (Cast.sorcerySpeed). `before` is
-          -- alice's own main phase (she needs no such window: Silence is an
-          -- instant), so bob and carol's positive controls are checked against a
-          -- copy with the activePlayer field flipped to each of them in turn --
-          -- nothing else about the board changes. Directly poking activePlayer via
-          -- record update to stage a hypothetical turn already appears above
-          -- (thaliaBoard, ruleOfLawBoard's nextOwnTurn).
-          bobsTurn = before {GameState.activePlayer = S.bob}
-          carolsTurn = before {GameState.activePlayer = S.carol}
-          resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer before (S.cast S.alice silenceId)) Engine.priorityLoop
-          resolvedBobsTurn = resolved {GameState.activePlayer = S.bob}
-          resolvedCarolsTurn = resolved {GameState.activePlayer = S.carol}
-      -- The fixture really is three-seat and both opponents really could cast,
-      -- given their own main phase.
-      Spec.assertEqWith s "three seats" (length (GameState.turnOrder before)) 3
-      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (Action.legalActions S.bob bobsTurn)) "bob could cast before it resolved"
-      Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker) Facing.FaceUp) (Action.legalActions S.carol carolsTurn)) "carol could cast before it resolved"
-      Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects resolved)) 1
-      -- THE DISCRIMINATOR. carol is the far seat: an Opponents scope resolved as
-      -- "the next player in turn order" prohibits bob and leaves carol free, and
-      -- that is the reading the doc comments claimed was in here.
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced resolved) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId VariableChoice.Announced resolved) "carol is prohibited too"
-      Spec.assertEqWith
-        s
-        "and nothing is offered to either, even on their own main phase"
-        (filter isCast (Action.legalActions S.bob resolvedBobsTurn) <> filter isCast (Action.legalActions S.carol resolvedCarolsTurn))
-        []
-      -- CR 109.5: the scope is resolved off the effect's controller.
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced resolved)) "alice is not prohibited"
-
 -- CR 601.2c: the three-seat Cease-Fire board. alice has three Plains and the
 -- Cease-Fire; all three seats have two Mountains, a Goblin Piker in hand and two
 -- Plains in their library, and carol also holds a Lightning Bolt. The seats are
@@ -374,27 +333,6 @@ blossomingCalmSpec s registry =
       Spec.assertEqWith s "alice gained 2" (S.lifeOf S.alice resolved) (Just 22)
       Spec.assertEqWith s "and takes nothing from the Bolt" (S.lifeOf S.alice burned) (Just 22)
       Spec.assertEqWith s "which landed on bob, the lowest candidate left" (S.lifeOf S.bob burned) (Just 17)
-
-    -- HEXPROOF, NOT SHROUD, on the stored carrier: CR 702.11c names only
-    -- opponents, so alice remains a legal target for her own spells and carol
-    -- remains a legal target for everyone. An implementation that read the
-    -- payload as EachPlayer passes the case above and fails this one.
-    Spec.it s "CR 702.11c the stored effect stops alice's opponents and nobody else" $ do
-      plains <- S.printingOf s registry "Plains"
-      calm <- S.printingOf s registry "Blossoming Calm"
-      mountain <- S.printingOf s registry "Mountain"
-      bolt <- S.printingOf s registry "Lightning Bolt"
-      let (calmId, _, before) = blossomingCalmBoard plains calm mountain bolt
-          resolved = blossomingCalmAfter calmId before
-      case S.spellTargetSlot bolt of
-        Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
-        Just theSlot -> do
-          let legalFor who = Target.legalRecipients (Just who) S.noSource theSlot
-          Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob before)) "before the Calm, bob may bolt alice"
-          Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob resolved))) "after it, he may not"
-          Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.alice) (legalFor S.carol resolved))) "and neither may carol -- both opponents, not just the next seat"
-          Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.alice resolved)) "but alice may still target herself"
-          Spec.assertBool s (Set.member (Recipient.ToPlayer S.carol) (legalFor S.bob resolved)) "and carol is targetable as ever"
 
     -- CR 514.2 is the wrong sweep for this duration, and this is where an
     -- UntilEndOfTurn mis-arming would show: the effect has to outlive the
@@ -693,28 +631,6 @@ hackedSilenceSpec s registry =
       Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.carol after)) "and carol hers"
       Spec.assertEqWith s "the Silence really did resolve" (length (GameState.stack after)) 0
       Spec.assertEqWith s "and nothing is stored" (GameState.playerEffects after) []
-
-    -- THE UNIT'S POINT. The same Swamp-less board, with the word the duration
-    -- names swapped for one alice does control. The gameplay assertion leads: an
-    -- arm that dropped the rewrite would leave the clause counting Swamps, the
-    -- duration would never start, and both opponents would still be offered their
-    -- Pikers.
-    Spec.it s "CR 612.1 a Magical Hack on the Silence rewrites the duration's own word" $ do
-      island <- S.printingOf s registry "Island"
-      hush <- S.printingOf s registry "Synthetic Conditional Silence"
-      magicalHack <- S.printingOf s registry "Magical Hack"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (hushId, hackId, _, _, _, _, before) = hackedSilenceBoard island hush magicalHack mountain piker
-          after = hackedSilenceAfter True hushId hackId before
-      Spec.assertEqWith s "nothing is offered to either opponent" (conditionalSilenceCasts S.bob after <> conditionalSilenceCasts S.carol after) []
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced after) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId VariableChoice.Announced after) "carol is prohibited too"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId VariableChoice.Announced after)) "alice is not"
-      Spec.assertEqWith s "and both spells resolved" (length (GameState.stack after)) 0
-      case fmap ActivePlayerEffect.expiry (GameState.playerEffects after) of
-        [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
-        other -> Spec.assertFailure s ("expected one conditional player effect, got " <> show other)
 
     -- And the rewritten clause is still a CONDITION rather than an open-ended
     -- one: hand alice's two Islands to bob (CR 613.1b) and CR 611.2b's period is

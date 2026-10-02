@@ -233,7 +233,7 @@ gainLevel oid gs = case [ability | Action.Type.Activate o ability <- Action.lega
 
 -- CR 716.2a's static half: "As long as this Class is level N or greater, it has
 -- [abilities]."
-sectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 sectionSpec s registry = Spec.describe s "Level bar section" $ do
   -- The two readings this case must tell apart: a level-gated section that is off
   -- until the level is gained, and one that is simply always on. The Piker's
@@ -245,14 +245,6 @@ sectionSpec s registry = Spec.describe s "Level bar section" $ do
     let (classId, pikerId, gs) = board paladinClass plains piker
     Spec.assertEqWith s "the Piker is its printed 2/1" (S.powerToughnessOf pikerId gs) (Just (2, 1))
     Spec.assertEqWith s "CR 716.2b: no level designation has been written" (levelOf classId gs) Nothing
-  Spec.it s "CR 716.2a the level-2 section functions once the Class is level 2" $ do
-    paladinClass <- S.printingOf s registry "Paladin Class"
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (classId, pikerId, gs) = board paladinClass plains piker
-        levelled = gainLevel classId gs
-    Spec.assertEqWith s "the Piker is 3/2 while the Class is level 2" (S.powerToughnessOf pikerId levelled) (Just (3, 2))
-    Spec.assertEqWith s "CR 716.2a: the level BECAME 2" (levelOf classId levelled) (Just (ClassLevel.MkClassLevel 2))
 
 -- CR 716.2a's static half at the LAST section, which is where Paladin Class's
 -- ladder ends: "Whenever you attack, until end of turn, target attacking

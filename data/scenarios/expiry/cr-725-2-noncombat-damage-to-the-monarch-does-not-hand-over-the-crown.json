@@ -1,0 +1,74 @@
+{
+  "description": "CR 725.2 noncombat damage to the monarch does not hand over the crown",
+  "note": "The Haskell case's noncombat 2 comes from bob's Goblin Piker; here bob's Lightning Bolt deals 3. The control is the combat-damage scenario beside this one, where 2 from bob's Piker in combat takes the crown.",
+  "board": {
+    "active": "bob",
+    "step": "PrecombatMain",
+    "monarch": "alice",
+    "seats": [
+      {
+        "name": "alice"
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 17
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Monarch": {
+          "player": "alice"
+        }
+      }
+    }
+  ]
+}

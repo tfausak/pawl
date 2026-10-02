@@ -119,32 +119,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" . Spec.describe s "PerPla
     Spec.assertEqWith s "alice's own Ornithopter stayed" (onBattlefield "Ornithopter" S.alice after) 1
     Spec.assertEqWith s "one slot per opponent, each its own player's" offers [[Set.singleton bobsId, Set.singleton carolsId]]
 
-  -- Exactly one target per opponent. alice holds seven Islands; bob controls a
-  -- Goblin Piker and a Forest, carol an Ornithopter unless `carolEmpty`.
-  let thievery carolEmpty = do
-        island <- S.printingOf s registry "Island"
-        forest <- S.printingOf s registry "Forest"
-        piker <- S.printingOf s registry "Goblin Piker"
-        ornithopter <- S.printingOf s registry "Ornithopter"
-        card <- S.printingOf s registry "Blatant Thievery"
-        let (pikerId, g1) = S.addPermanent piker S.bob (S.landsFor island S.alice 7 S.threePlayerGame)
-            (_, g2) = S.addPermanent forest S.bob g1
-            (thopterId, g3) = if carolEmpty then (pikerId, g2) else S.addPermanent ornithopter S.carol g2
-            (gs, spellId) = S.handOne card g3
-        pure (gs, spellId, pikerId, thopterId)
-      steal picks gs spellId = State.evalState (fmap snd (Engine.runGame (aiming picks) gs (S.cast S.alice spellId))) []
-  -- Sylvan Primordial's ruling for the same template: a player with nothing to
-  -- target gets no target, so carol controlling nothing does not stop the cast.
-  -- The pair's other half: with NO opponent controlling anything the slot
-  -- cannot be filled at all.
-  Spec.it s "CR 601.2c Blatant Thievery with carol controlling nothing still takes bob's Piker" $ do
-    (gs, spellId, pikerId, _) <- thievery True
-    Spec.assertBool s (S.castable S.alice spellId gs) "castable with carol controlling nothing"
-    Spec.assertEqWith s "alice controls bob's Piker" (Projection.controllerOf pikerId (resolve (steal (Set.singleton pikerId) gs spellId))) (Just S.alice)
-    island <- S.printingOf s registry "Island"
-    card <- S.printingOf s registry "Blatant Thievery"
-    let (bare, bareSpellId) = S.handOne card (S.landsFor island S.alice 7 S.threePlayerGame)
-    Spec.assertBool s (not (S.castable S.alice bareSpellId bare)) "and not castable with no opponent controlling anything"
   -- The activation's road (CR 602.2b's announcement), on a loyalty ability.
   Spec.it s "CR 602.2b The Theorist, Jace Beleren's -2 returns each opponent's chosen artifact or creature" $ do
     jace <- S.printingOf s registry "The Theorist, Jace Beleren"

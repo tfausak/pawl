@@ -26,7 +26,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Stack as Stack
@@ -38,7 +37,6 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Designation as Designation
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Object as Object
@@ -95,9 +93,6 @@ saddleable mountId gs = case saddleAbility mountId gs of
 isSaddled :: ObjectId.ObjectId -> GameState.GameState -> Bool
 isSaddled oid gs = maybe False (Set.member Designation.Saddled . Object.designations) (Game.lookupObject oid gs)
 
-tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
-tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
-
 -- Tap one permanent in place, without paying anything for it.
 tap :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 tap oid gs =
@@ -115,7 +110,6 @@ attackingWith attacker p = case p of
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Saddle" $ do
   saddleCostSpec s registry
-  saddledDesignationSpec s registry
   attacksWhileSaddledSpec s registry
   saddledThisTurnSpec s registry
   returnSaddlersSpec s registry
@@ -143,38 +137,6 @@ saddleCostSpec s registry = Spec.describe s "SaddleCost" $ do
         inCombat = gs {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
     Spec.assertBool s (saddleable mountId gs) "alice's precombat main phase admits it"
     Spec.assertBool s (not (saddleable mountId inCombat)) "her declare attackers step does not"
-
--- CR 702.171b's designation: what the resolution writes, and when it ends.
-saddledDesignationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-saddledDesignationSpec s registry = Spec.describe s "Saddled" $ do
-  Spec.it s "CR 702.171b the saddle ability taps the creature named and marks the Mount saddled" $ do
-    bighorn <- S.printingOf s registry "Bridled Bighorn"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (mountId, otherIds, gs) = board bighorn [hillGiant, piker]
-    case otherIds of
-      [giantId, pikerId] -> do
-        let after = saddleWith (tappingFor [giantId]) mountId gs
-        Spec.assertBool s (isSaddled mountId after) "the Mount is saddled"
-        Spec.assertEqWith s "the creature named is tapped" (tapStateOf giantId after) (Just TapState.Tapped)
-        Spec.assertEqWith s "the creature not named is not" (tapStateOf pikerId after) (Just TapState.Untapped)
-        -- Rule 702.171a's cost carries no tap symbol, so the Mount itself never
-        -- taps -- the whole reason the threshold is paid by OTHER creatures.
-        Spec.assertEqWith s "and the Mount itself is untapped" (tapStateOf mountId after) (Just TapState.Untapped)
-      _ -> Spec.assertFailure s "fixture should have two other creatures"
-  -- Rule 702.171b's clock: "until the end of the turn". The other ending, a zone
-  -- change, is CR 400.7's new object and needs no sweep of its own.
-  Spec.it s "CR 702.171b the cleanup step ends the designation" $ do
-    bighorn <- S.printingOf s registry "Bridled Bighorn"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    let (mountId, otherIds, gs) = board bighorn [hillGiant]
-    case otherIds of
-      [giantId] -> do
-        let saddled = saddleWith (tappingFor [giantId]) mountId gs
-            after = snd (Engine.runGamePure S.identityAnswer saddled (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
-        Spec.assertBool s (isSaddled mountId saddled) "it was saddled before the step"
-        Spec.assertBool s (not (isSaddled mountId after)) "and is not after it"
-      _ -> Spec.assertFailure s "fixture should have one other creature"
 
 -- CR 702.171b read back by a card: "whenever this creature attacks while
 -- saddled". Two boards differing in the designation and in nothing else -- the

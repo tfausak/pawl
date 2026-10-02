@@ -1,0 +1,173 @@
+{
+  "description": "Crimson Wisps makes a black creature red, and it stops being black",
+  "note": "alice's library card keeps the Wisps' draw from decking her, and the Doom Blade and its two Swamps are the witness that the Rats became a legal nonblack target.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain",
+            "ready": true
+          },
+          {
+            "card": "Bad Moon",
+            "ready": true
+          },
+          {
+            "card": "Typhoid Rats",
+            "label": "typhoid-rats",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "blade-swamp"
+          },
+          {
+            "card": "Swamp",
+            "label": "blade-swamp-2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Crimson Wisps",
+            "label": "crimson-wisps",
+            "ready": true
+          },
+          {
+            "card": "Doom Blade",
+            "label": "blade"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$typhoid-rats",
+          "power": 2,
+          "toughness": 2
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$crimson-wisps",
+          "targets": [
+            "$typhoid-rats"
+          ],
+          "mana": [
+            "$mountain",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Colors",
+          "object": "$typhoid-rats",
+          "is": [
+            "Red"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$typhoid-rats",
+          "power": 1,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$blade",
+          "targets": [
+            "$typhoid-rats"
+          ],
+          "mana": [
+            "$blade-swamp",
+            "$blade-swamp-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Typhoid Rats",
+          "count": 1
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Hand",
+        "card": "Crimson Wisps",
+        "count": 0
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Crimson Wisps",
+        "count": 1
+      }
+    }
+  ]
+}

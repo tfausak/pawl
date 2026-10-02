@@ -348,17 +348,6 @@ actionSpec s registry = Spec.describe s "Action" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Flash arborId withTeferi) "the card in hand projects flash"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash arborId bare)) "and does not without Teferi"
 
-  -- CR 305.2a/305.2b: flash moves the WINDOW, not the count. The allowance is a
-  -- per-player gate the keyword never reaches, so an Arbor with flash is refused
-  -- once the turn's one land play is spent -- the same board as the pair above
-  -- with one thing changed, the tally.
-  Spec.it s "CR 305.2b flash moves the land-play window, not the allowance" $ do
-    dryadArbor <- S.printingOf s registry "Dryad Arbor"
-    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
-    let spent = (snd (arborBoard dryadArbor (Just teferi))) {GameState.landsPlayed = Map.singleton S.alice 1}
-        after = S.runPure S.playLandAnswer spent Engine.priorityLoop
-    Spec.assertEqWith s "the Arbor stayed in her hand" (S.countOnBattlefieldByName (S.printingName dryadArbor) S.alice after) 0
-
 -- Dryad Arbor in alice's hand during alice's UPKEEP with alice holding
 -- priority, and Teferi, Mage of Zhalfir on the battlefield or not. The Arbor has
 -- no mana cost, so affordability is identical either way and the only thing that

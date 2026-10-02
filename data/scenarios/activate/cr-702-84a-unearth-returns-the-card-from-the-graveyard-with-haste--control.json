@@ -1,0 +1,49 @@
+{
+  "description": "CR 602.5d control for CR 702.84a unearth: on the same board in the end step, the unearth activation is not offered",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          },
+          {
+            "card": "Dregscape Zombie",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Dregscape Zombie",
+            "label": "dregscape-zombie"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "EndStep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "ActivateManaAbility $swamp"
+          ]
+        }
+      }
+    }
+  ]
+}

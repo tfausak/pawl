@@ -1872,10 +1872,10 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
 -- from the Or" from "Wolf dropped from the Or", and would pass under either.
 --
 -- Tovolar's front face is a Human Werewolf, so Moonmist's OWN first sentence
--- names him -- and CR 702.145b's third static ability refuses it (Pawl.DaytimeSpec's
--- restrictionSpec is the proof). Nothing here rests on which way that goes: the
--- damage amounts are hand-built rather than read off power, and both of his faces
--- are Werewolves.
+-- names him -- and CR 702.145b's third static ability refuses it
+-- (data/scenarios/daytime is the proof). Nothing here rests on which way that
+-- goes: the damage amounts are hand-built rather than read off power, and both
+-- of his faces are Werewolves.
 --
 -- The DAMAGE BATCH is hand-built and the SPELL is not, for mendingHandsSpec's
 -- reason.

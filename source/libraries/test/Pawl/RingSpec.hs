@@ -545,21 +545,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
           (blocks bigger bearer gs, blocks equal bearer gs, blocks smaller bearer gs)
           (False, True, True)
       _ -> Spec.assertFailure s "fixture should have one attacker and three blockers"
-  Spec.it s "CR 701.54c without the emblem the same board admits the same blocker" $ do
-    -- THE FALSIFIER, and the reason the case above cannot pass on a fixture whose
-    -- blockers never block: the same board with Birthday Escape left in hand. One
-    -- difference, and it is the emblem.
-    island <- S.printingOf s registry "Island"
-    escape <- S.printingOf s registry "Birthday Escape"
-    piker <- S.printingOf s registry "Goblin Piker"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    let (_, mine, theirs, board) = ringCombatBoard island escape piker 1 [piker] [hillGiant]
-        gs = intoCombat board
-    case (mine, theirs) of
-      ([attacker], [bigger]) -> do
-        Spec.assertEqWith s "nobody is a Ring-bearer" (markedFor S.alice gs) []
-        Spec.assertBool s (blocks bigger attacker gs) "the 3/3 blocks the 2/1"
-      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
   Spec.it s "CR 701.54c the clause reaches the Ring-bearer alone" $ do
     -- CR 701.54c says "YOUR RING-BEARER", not "creatures you control": alice attacks
     -- with a 1/1 Llanowar Elves as well, and bob's 3/3 outpowers both. The Elves is

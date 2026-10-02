@@ -1,0 +1,65 @@
+{
+  "description": "CR 725.2 with no restriction standing, combat damage to the monarch hands alice the crown",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Jared Carthalion, True Heir",
+            "label": "jared",
+            "ready": true
+          },
+          {
+            "card": "Palace Jailer",
+            "label": "jailer",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "monarch": "bob"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Monarch": {
+          "player": "bob"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$piker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Monarch": {
+          "player": "alice"
+        }
+      }
+    }
+  ]
+}

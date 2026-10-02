@@ -1,0 +1,38 @@
+{
+  "description": "CR 704.5g damage below toughness is not lethal",
+  "note": "A Goblin Piker is 2/1, so 0 marked damage is survivable and 1 is not; the first priority runs the check. The control is the board: the same Piker with 1 marked is destroyed.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "damage": 0
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Goblin Piker",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

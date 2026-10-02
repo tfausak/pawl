@@ -49,7 +49,6 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
@@ -362,48 +361,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (droneId, gs) = S.addPermanent slaughterDrone S.alice gs0
         legal = Target.legalRecipients Nothing S.noSource nonblackCreature gs
     Spec.assertBool s (Set.member (Recipient.ToCreature droneId) legal) "colourless is nonblack"
-
-  Spec.it s "Crimson Wisps makes a black creature red, and it stops being black" $ do
-    -- THE SET-NOT-ADD FALSIFIER, end to end: under Bad Moon the Rats are 2/2
-    -- and no legal Doom Blade target; after Crimson Wisps they are a 1/1 red
-    -- creature that Doom Blade may target. An AddColor implementation fails
-    -- every one of these assertions.
-    mountain <- S.printingOf s registry "Mountain"
-    badMoon <- S.printingOf s registry "Bad Moon"
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    crimsonWisps <- S.printingOf s registry "Crimson Wisps"
-    let base = S.landsInPlay mountain 1
-        (_, withMoon) = S.addPermanent badMoon S.alice base
-        (ratsId, board) = S.addPermanent typhoidRats S.alice withMoon
-        (gs, cwId) = S.handOne crimsonWisps board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cwId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "before: the black Rats are 2/2 under Bad Moon" (Projection.powerOf ratsId board) $ Just 2
-    Spec.assertEqWith s "after: red only, not black and red" (Projection.colorsOf ratsId after) $ Set.singleton Color.Red
-    Spec.assertEqWith s "after: out of Bad Moon's set, back to 1 power" (Projection.powerOf ratsId after) $ Just 1
-    Spec.assertBool
-      s
-      (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients Nothing S.noSource nonblackCreature after))
-      "after: a legal Doom Blade target"
-
-  Spec.it s "Aphotic Wisps makes a creature black, the mirror of Crimson Wisps" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    badMoon <- S.printingOf s registry "Bad Moon"
-    piker <- S.printingOf s registry "Goblin Piker"
-    aphoticWisps <- S.printingOf s registry "Aphotic Wisps"
-    let base = S.landsInPlay swamp 1
-        (_, withMoon) = S.addPermanent badMoon S.alice base
-        (pikerId, board) = S.addPermanent piker S.alice withMoon
-        (gs, awId) = S.handOne aphoticWisps board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice awId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "black only, not red and black" (Projection.colorsOf pikerId after) $ Set.singleton Color.Black
-    Spec.assertEqWith s "INTO Bad Moon's set, now 3 power" (Projection.powerOf pikerId after) $ Just 3
-    Spec.assertBool s (Projection.hasKeyword Keyword.Fear pikerId after) "gained fear"
-    Spec.assertBool
-      s
-      (not (Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients Nothing S.noSource nonblackCreature after)))
-      "no longer a legal Doom Blade target"
 
   Spec.it s "CR 608.2b Doom Blade fizzles when its target becomes black in response" $ do
     -- The fizzle is only reachable through a colour change, and Aphotic Wisps

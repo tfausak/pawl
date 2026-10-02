@@ -32,16 +32,13 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.PreventionSpec (newestNamed)
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -61,7 +58,6 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
-import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -79,41 +75,12 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
-import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
-import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
-import qualified Pawl.Types.Timed as Timed
-import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
-
--- alice has 3 Islands and Cancel in hand; a `victim` spell (bob's) sits on the
--- stack. Returns (victimId, state after alice casts Cancel at it and it resolves).
-cancelVictim :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-cancelVictim island cancel victim =
-  let base = S.landsInPlay island 3
-      (victimId, onStack) = S.spellOnStack victim S.bob base
-      (gs, cancelId) = S.handOne cancel onStack
-      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
-      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-   in (victimId, resolved)
-
--- The board every Mana Leak case starts from, with only `bobLands` varying.
--- alice has two Islands (Mana Leak's {1}{U}) and a Mana Leak in hand; bob has
--- `bobLands` untapped Islands of his own and a Goblin Piker already on the
--- stack. Returns the Piker's id and the state after alice casts Mana Leak at it.
---
--- The Piker is on the stack BEFORE Mana Leak is cast, so it holds the lower
--- object id and identityAnswer's ChooseTargets -- Set.lookupMin over the legal
--- recipients -- aims the Leak at it. The cancelVictim route above, and the same
--- reason.
-manaLeakBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
-manaLeakBoard island manaLeak piker bobLands =
-  let (victimId, leakId, gs) = manaLeakHand island manaLeak piker bobLands
-   in (victimId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
 
 -- manaLeakBoard one step earlier, with the Leak still in alice's hand. Split out
 -- for the case that has to RECORD the cast as well as the resolution: an engine
@@ -1349,35 +1316,6 @@ recordingForbidden oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToObject oid))) sets)
   _ -> pure (S.identityAnswer p)
 
--- Cast Dragon Fodder; optionally cast Artificial Evolution at the Dragon Fodder
--- SPELL and resolve it, swapping the named creature type words; then resolve the
--- Fodder. Returns the tokens it minted and the final state.
---
--- Two Mountains and two Islands: the Fodder is {1}{R} and the Evolution {U}, and
--- the generic half may be paid from either colour without stranding the
--- Evolution.
-dragonFodderChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m ([ObjectId.ObjectId], GameState.GameState)
-dragonFodderChain s registry swap = do
-  mountain <- S.printingOf s registry "Mountain"
-  island <- S.printingOf s registry "Island"
-  dragonFodder <- S.printingOf s registry "Dragon Fodder"
-  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
-  let g1 = snd (S.addPermanent island S.alice (snd (S.addPermanent island S.alice (S.landsInPlay mountain 2))))
-      (fodderId, g2) = S.addHandCard dragonFodder S.alice g1
-      (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
-      onStack = S.runPure S.identityAnswer g3 (S.cast S.alice fodderId)
-      spellId = case GameState.stack onStack of
-        top : _ -> top
-        [] -> ObjectId.MkObjectId 999
-      evolved = case swap of
-        Nothing -> onStack
-        Just (from, to) ->
-          S.runPure (evolveAt spellId from to) onStack $ do
-            S.cast S.alice evolutionId
-            Stack.resolveTop
-      after = S.runPure S.identityAnswer evolved Stack.resolveTop
-  pure (S.tokensOf after, after)
-
 -- The same shape as dragonFodderChain for a synthetic token-minting sorcery
 -- named by `cardName`: cast it, optionally resolve an Artificial Evolution at it
 -- on the stack, then resolve it. Returns the tokens and the final state.
@@ -1674,7 +1612,7 @@ goblinWarStrikeChain s registry swap = do
 --
 -- Moonmist's OWN first sentence names Human, which the swap does not touch, and
 -- CR 702.145b's daybound refuses Tovolar the transform anyway
--- (Pawl.DaytimeSpec's restrictionSpec is the proof) -- and both of his faces are
+-- (data/scenarios/daytime is the proof) -- and both of his faces are
 -- Werewolves, so nothing here rests on which way that goes.
 --
 -- The DAMAGE BATCH is hand-built and the SPELL is not, moonmistSpec's reason.
@@ -2722,44 +2660,6 @@ greenSlimeSpec s registry = Spec.describe s "Green Slime" $ do
     Spec.assertEqWith s "both triggers went on the stack" (length (GameState.stack placed)) 2
     Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
 
--- Rebuff the Wicked (PLC 12) {W} Instant, Oracle text checked against Scryfall
--- 2026-09-25: "Counter target spell that targets a permanent you control."
---
--- One board, two runs differing only in which Goblin Piker bob's Lightning Bolt
--- is aimed at. "You" is the Rebuff's controller (CR 109.5), never the Bolt's:
--- read from bob's seat, the pair would come out the other way round.
-rebuffBoard :: Board.Board
-rebuffBoard =
-  let alice =
-        (S.battlefield S.alice [S.aliased "plains" (S.permanent "Plains"), S.aliased "alice's Piker" (S.permanent "Goblin Piker")])
-          { Seat.hand = Seq.singleton (S.aliased "rebuff" (S.cardSetup "Rebuff the Wicked"))
-          }
-      bob =
-        (S.battlefield S.bob [S.aliased "mountain" (S.permanent "Mountain"), S.aliased "bob's Piker" (S.permanent "Goblin Piker")])
-          { Seat.hand = Seq.singleton (S.aliased "bolt" (S.cardSetup "Lightning Bolt"))
-          }
-   in S.board (alice NonEmpty.:| [bob]) S.bob S.precombatMain
-
--- bob Bolts `victim`, then alice casts the Rebuff at the Bolt.
-rebuffScript :: String -> Seq.Seq Timed.Timed
-rebuffScript victim =
-  S.turn
-    1
-    [ S.on S.precombatMain S.bob (S.castAction (S.aliasRef "bolt") Choices.none {Choices.targets = Just [S.aliasRef victim], Choices.manaSources = Seq.singleton (Just (S.aliasRef "mountain"))}),
-      S.on S.precombatMain S.alice (S.castAction (S.aliasRef "rebuff") Choices.none {Choices.targets = Just [S.namedRef "Lightning Bolt" 1], Choices.manaSources = Seq.singleton (Just (S.aliasRef "plains"))})
-    ]
-
-rebuffTheWickedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-rebuffTheWickedSpec s registry = Spec.describe s "Rebuff the Wicked" $ do
-  Spec.it s "CR 115.9b it counters a Bolt at alice's creature and cannot target one at bob's" $ do
-    built <- S.buildBoardOrFail s registry rebuffBoard
-    case Scenario.rehearse (rebuffScript "bob's Piker") built S.priorityGame of
-      Left (ScenarioFailure.MkActionNotOffered (When.MkWhen _ _ who) (Move.Cast {}) _) | who == S.seatLabel S.alice -> pure ()
-      Left failure -> Spec.assertFailure s ("the Bolt at bob's Piker failed otherwise: " <> S.renderFailure failure)
-      Right _ -> Spec.assertFailure s "CR 115.9b a Bolt at bob's own Piker is no legal target, yet alice cast the Rebuff at it"
-    after <- S.play s registry rebuffBoard (rebuffScript "alice's Piker") S.priorityGame
-    Spec.assertEqWith s "CR 701.6a the Bolt at alice's Piker was countered, so the Piker lives" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-
 fizzleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
   -- CR 608.2b pins the `targeted` restriction Task 3 added (Resolve.hs's
@@ -2862,4 +2762,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   squelchSpec s registry
   weighTheTriggerSpec s registry
   greenSlimeSpec s registry
-  rebuffTheWickedSpec s registry

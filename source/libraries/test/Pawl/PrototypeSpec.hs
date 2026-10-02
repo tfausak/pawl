@@ -231,32 +231,6 @@ spec s registry = Spec.describe s "Prototype" $ do
               "and the counter is on it"
               (fmap (Map.lookup plusOnePlusOne . Object.counters) (Game.lookupObject oid counted))
               (Just (Just 1))
-  -- CR 718.3a: "while casting a prototyped spell, use only its alternative power,
-  -- toughness, and mana cost when evaluating those characteristics to see if it
-  -- can be cast." Read as a PAIR of boards differing in exactly one thing -- how
-  -- many Plains alice has -- since a board that could pay neither cost and a board
-  -- that could pay both would each pass for the wrong reason.
-  Spec.it s "CR 718.3a two Plains pay the inset cost and offer the cast; one Plains pays neither" $ do
-    assembler <- S.printingOf s registry "Autonomous Assembler"
-    plains <- S.printingOf s registry "Plains"
-    let (two, twoId) = S.handOne assembler (S.landsInPlay plains 2)
-        (one, oneId) = S.handOne assembler (S.landsInPlay plains 1)
-        (five, fiveId) = S.handOne assembler (S.landsInPlay plains 5)
-    Spec.assertBool s (S.castable S.alice twoId two) "CR 718.3a: two Plains pay the inset {1}{W}, so the cast is offered"
-    Spec.assertBool s (not (S.castable S.alice oneId one)) "one Plains pays neither cost, so it is not"
-    Spec.assertBool s (S.castable S.alice fiveId five) "five Plains pay both"
-    -- And the cast two Plains offer really is the prototyped one: an engine that
-    -- offered the cast off the printed {5} and then could not pay it would pass
-    -- the castability assertion above and fail here.
-    let cast = S.runPure prototyping two (S.cast S.alice twoId)
-    Spec.assertEqWith
-      s
-      "CR 718.3a: the spell two Plains put on the stack is the white 2/2"
-      ( (,)
-          <$> fmap (\oid -> Projection.colorsOf oid cast) (topOfStack cast)
-          <*> (topOfStack cast >>= \oid -> S.powerToughnessOf oid cast)
-      )
-      (Just (Set.singleton Color.White, (2, 2)))
   -- CR 718.4: "in every zone except the stack or the battlefield, and while on the
   -- stack or the battlefield when not cast as a prototyped spell, a prototype card
   -- has only its normal characteristics."

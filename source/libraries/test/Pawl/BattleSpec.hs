@@ -99,7 +99,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -182,7 +181,7 @@ entrySpec s registry = Spec.describe s "Entry" $ do
 -- CR 310.9a's choice, made observable. Three seats, because CR 102.2's two-player
 -- game leaves a Siege exactly one legal protector and a one-candidate ask decides
 -- nothing.
-protectorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+protectorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 protectorSpec s registry = Spec.describe s "Protector" $ do
   Spec.it s "CR 310.9a the controller chooses which opponent protects it" $ do
     (toBob, oidB) <- castInvasionThreeSeated s registry (protectTo S.bob)
@@ -192,12 +191,6 @@ protectorSpec s registry = Spec.describe s "Protector" $ do
     -- distinguish from an elision.
     Spec.assertEqWith s "bob when bob is named" (protectorOf oidB toBob) (Just S.bob)
     Spec.assertEqWith s "carol when carol is named" (protectorOf oidC toCarol) (Just S.carol)
-  Spec.it s "CR 310.12a the controller is never offered, even with three seats" $ do
-    -- An interpreter that names the controller anyway is filtered, not obeyed:
-    -- Battle.designateProtector falls back to the head of the candidate list.
-    (chosen, oid) <- castInvasionThreeSeated s registry (protectTo S.alice)
-    Spec.assertBool s (protectorOf oid chosen /= Just S.alice) "alice does not protect her own Siege"
-    Spec.assertBool s (protectorOf oid chosen `elem` [Just S.bob, Just S.carol]) "an opponent does"
 
 -- CR 310.9a's candidate rule at the level Pawl.Engine.Battle states it, which is
 -- the arithmetic the entry choice and the CR 704.5x re-choice SHARE -- so a drift
@@ -272,27 +265,6 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
 -- designated player is no longer in the game.
 repairSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 repairSpec s registry = Spec.describe s "Repair" $ do
-  Spec.it s "CR 704.5x a battle whose protector leaves the game gets a new one" $ do
-    (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    Spec.assertEqWith s "carol protects it to begin with" (protectorOf oid entered) (Just S.carol)
-    let gone = S.departs Departure.Type.Conceded S.carol entered
-        repaired = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
-    -- bob is the only opponent left, so the re-choice is elided and its answer is
-    -- forced -- which is what makes this assert the SBA firing rather than an
-    -- answerer's preference.
-    Spec.assertEqWith s "bob protects it now" (protectorOf oid repaired) (Just S.bob)
-    Spec.assertBool s (S.onBattlefield oid repaired) "and the battle is still on the battlefield"
-  Spec.it s "CR 704.5x a legal protector is not re-chosen" $ do
-    (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    -- Nobody has left, so CR 704.5x does not apply and the pass must not ask
-    -- again. Run under an answerer that would name BOB if it were asked: with all
-    -- three seats filled the re-choice would have two candidates and could not be
-    -- elided, so the designation still standing at carol is what says the
-    -- state-based action declined to fire. Asserting against S.identityAnswer
-    -- instead would pass whether or not it fired, since bob leaving leaves carol
-    -- the only candidate either way.
-    let checked = S.runPure (protectTo S.bob) entered Sba.checkStateBasedActions
-    Spec.assertEqWith s "carol still protects it" (protectorOf oid checked) (Just S.carol)
   Spec.it s "CR 704.5x the repair reports that an action was performed" $ do
     (entered, _) <- castInvasionThreeSeated s registry (protectTo S.carol)
     -- CR 704.3: the check repeats until no state-based action is performed, so a
@@ -343,39 +315,6 @@ repairSpec s registry = Spec.describe s "Repair" $ do
 -- is under attack.
 attackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackSpec s registry = Spec.describe s "Attacking" $ do
-  Spec.it s "CR 310.5 / 310.9b a Siege is offered as an attack target through its PROTECTOR" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
-    -- The three seats really are three here, which is what makes the pair of
-    -- assertions below distinguishable at all: alice controls the Siege, carol
-    -- protects it, bob is neither.
-    Spec.assertEqWith s "alice controls the Siege" (Projection.controllerOf battle gs) (Just S.alice)
-    Spec.assertEqWith s "carol protects it" (protectorOf battle gs) (Just S.carol)
-    -- CR 310.9b's "notably, a Siege battle can be attacked by its own controller":
-    -- alice is the attacking player AND the battle's controller, and the battle is
-    -- on her list anyway, because CR 310.12a put the protector among her
-    -- opponents. Exact rather than a membership test, so a list that grew a
-    -- spurious entry fails too.
-    Spec.assertEqWith
-      s
-      "carol herself and the Siege she protects"
-      (NonEmpty.toList (Combat.attackTargets S.carol gs))
-      [AttackTarget.OfPlayer S.carol, AttackTarget.OfBattle battle]
-  Spec.it s "CR 310.9b and NOT through an opponent who merely does not protect it" $ do
-    -- THE FALSIFIER for the case above, and the reason it cannot pass vacuously:
-    -- the same board read through the other opponent. bob is a legal defending
-    -- player (CR 506.2a) with a legal attack available, so this is not "nothing
-    -- can be attacked" -- it is the battle alone dropping off the list, which is
-    -- CR 310.9b's "any attacking player for whom its protector is a defending
-    -- player" and no wider a rule.
-    piker <- S.printingOf s registry "Goblin Piker"
-    (gs, battle, _, _, _) <- battleCombat s registry S.carol S.bob [piker] [] []
-    Spec.assertEqWith s "carol still protects it" (protectorOf battle gs) (Just S.carol)
-    Spec.assertEqWith
-      s
-      "bob alone"
-      (NonEmpty.toList (Combat.attackTargets S.bob gs))
-      [AttackTarget.OfPlayer S.bob]
   Spec.it s "CR 310.5 / 508.1b a creature is declared as attacking the battle" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
@@ -1185,27 +1124,6 @@ seizeAndProtect battle spell p = case p of
 -- counters, and CR 115.4 is what lets a damage spell name one.
 damageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageSpec s registry = Spec.describe s "Damage" $ do
-  Spec.it s "CR 115.4 an any-target spell offers the battle, and only what rule 115.4 names" $ do
-    (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt"]
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    case (spells, S.spellTargetSlot bolt) of
-      ([boltId], Just theSlot) ->
-        -- EXACT rather than a membership test, and that is what makes this read CR
-        -- 115.4 rather than "battles are permanents": alice's Plains and Mountain
-        -- are on the same battlefield, and rule 115.4's last sentence keeps them
-        -- off the list. Three seats, so all three players are on it.
-        Spec.assertEqWith
-          s
-          "the Siege and the three players"
-          (Target.legalRecipients (Just S.alice) boltId theSlot gs)
-          ( Set.fromList
-              [ Recipient.ToBattle battle,
-                Recipient.ToPlayer S.alice,
-                Recipient.ToPlayer S.bob,
-                Recipient.ToPlayer S.carol
-              ]
-          )
-      _ -> Spec.assertFailure s "fixture should have a Bolt with a target slot"
   Spec.it s "CR 310.6 Lightning Bolt takes three defense counters off it" $ do
     (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt"]
     case spells of

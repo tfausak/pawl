@@ -3257,30 +3257,6 @@ ownManaCostKeywordSpec s registry = Spec.describe s "Keyword priced at the card'
 -- the permanent the first one created.
 unearthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 unearthSpec s registry = Spec.describe s "Unearth (CR 702.84)" $ do
-  -- The offer and the first two sentences.
-  Spec.it s "CR 702.84a unearth returns the card from the graveyard with haste" $ do
-    zombie <- S.printingOf s registry "Dregscape Zombie"
-    swamp <- S.printingOf s registry "Swamp"
-    let (gyId, twinId, gs) = zombieBoard zombie swamp
-    Spec.assertBool s (any (isActivationOf gyId) (Action.legalActions S.alice gs)) "the unearth activation is offered from the graveyard"
-    -- CR 113.6m, which the twin on the SAME board is the control for: the ability
-    -- the projection now hands a battlefield creature with unearth (CR 702.84a's
-    -- ability exists in every zone, cycling's reading) is still offered to nobody
-    -- there, because rule 702.84a's return names the graveyard as its origin.
-    Spec.assertBool s (not (any (isActivationOf twinId) (Action.legalActions S.alice gs))) "CR 113.6m but not from the battlefield"
-    -- CR 602.5d, rule 702.84a's last sentence. Same board, same priority, same
-    -- Swamp -- only the phase differs, so nothing but the timing restriction can
-    -- withhold it.
-    Spec.assertBool
-      s
-      (not (any (isActivationOf gyId) (Action.legalActions S.alice (gs {GameState.phase = Phase.Ending EndingStep.EndStep}))))
-      "CR 602.5d and not in the end step"
-    case unearthZombie gyId gs [twinId] of
-      (after, [backId]) -> do
-        Spec.assertBool s (Projection.hasKeyword Keyword.Haste backId after) "CR 702.84a the returned permanent has haste"
-        Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste twinId after)) "while the Dregscape Zombie beside it does not"
-        Spec.assertEqWith s "and the graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice after) []
-      (_, other) -> Spec.assertEqWith s "exactly one Zombie returned to the battlefield" (length other) 1
   -- CR 702.84a's fourth sentence, through CR 704.5g. The twin takes the same one
   -- damage on the same board, so "a dead 2/1 is exiled" cannot pass this.
   Spec.it s "CR 702.84a the unearthed permanent that dies is exiled instead" $ do
@@ -3496,19 +3472,6 @@ professorHojoFirstActivationSpec s registry = Spec.describe s "ProfessorHojoFirs
       activateAt towerId victim gs = case filter targeting (Projection.abilitiesOf towerId gs) of
         [ability] -> S.runPure (aimAtOffered victim) (S.runPure (aimAtOffered victim) gs (Activate.activateAbility S.alice towerId ability)) Stack.resolveTop
         _ -> gs
-      protected victim gs =
-        let isProtection k = case k of
-              Keyword.Protection _ -> True
-              _ -> False
-         in any isProtection (Map.keys (PC.keywords (Projection.project victim gs)))
-  Spec.it s "CR 601.2f whole card: the first matching activation of your turn costs {2} less and the second does not" $ do
-    (towerA, towerB, alicesMammoth, _, gs, _) <- board True
-    let first = activateAt towerA alicesMammoth gs
-        second = activateAt towerB alicesMammoth first
-    Spec.assertEqWith s "the first activation at alice's Mammoth pays nothing: its Tower alone is tapped" (S.tappedCount S.alice first) 1
-    Spec.assertEqWith s "and the second pays the printed {1}: its Tower and a Mountain" (S.tappedCount S.alice second) 3
-    Spec.assertEqWith s "the Mammoth gained protection from artifacts" (protected alicesMammoth second) True
-    Spec.assertEqWith s "setup: nothing was tapped before" (S.tappedCount S.alice gs) 0
   -- "The first activated ability you activate": a history of the turn, not a
   -- budget of the Hojo's. An activation made before the Hojo arrived is still
   -- the turn's first (Tezzeret, Betrayer of Flesh's ruling on the same wording).
@@ -3519,13 +3482,6 @@ professorHojoFirstActivationSpec s registry = Spec.describe s "ProfessorHojoFirs
         after = activateAt towerB alicesMammoth withHojo
     Spec.assertEqWith s "the activation with no Hojo pays the printed {1}" (S.tappedCount S.alice before) 2
     Spec.assertEqWith s "and the one after the Hojo arrived is not the first, so pays it too" (S.tappedCount S.alice after) 4
-  -- "During your turn": the same activation on bob's turn is not reduced.
-  Spec.it s "CR 601.2f the reduction does not apply during an opponent's turn" $ do
-    (towerA, _, alicesMammoth, _, gs, _) <- board True
-    let bobsTurn = gs {GameState.activePlayer = S.bob}
-        activated = activateAt towerA alicesMammoth bobsTurn
-    Spec.assertEqWith s "the activation on bob's turn pays the printed {1}" (S.tappedCount S.alice activated) 2
-    Spec.assertEqWith s "and resolved" (protected alicesMammoth activated) True
   -- "Each turn": GameState.activationsThisTurn is cleared at the handoff, so
   -- alice's next turn has a first activation again.
   Spec.it s "CR 601.2f the next turn has a first activation again" $ do
@@ -5281,9 +5237,7 @@ isCraftAbility ability = case ActivatedAbility.keyword ability of
 mastercraftPower :: GameState.GameState -> [Maybe Integer]
 mastercraftPower gs = [Projection.powerOf o gs | o <- Game.zoneMembers Zone.Battlefield S.alice gs, Set.member (CardName.MkCardName (Text.pack "Mastercraft Raptor")) (Projection.namesOf o gs)]
 
-tithingBlade, consumingSepulcher, goblinPiker, armoredGalleon, hillGiantName, dinosaurHeaddress :: CardName.CardName
-tithingBlade = CardName.MkCardName (Text.pack "Tithing Blade")
-consumingSepulcher = CardName.MkCardName (Text.pack "Consuming Sepulcher")
+goblinPiker, armoredGalleon, hillGiantName, dinosaurHeaddress :: CardName.CardName
 goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")
 armoredGalleon = CardName.MkCardName (Text.pack "Armored Galleon")
 hillGiantName = CardName.MkCardName (Text.pack "Hill Giant")

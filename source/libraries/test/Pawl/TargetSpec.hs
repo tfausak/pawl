@@ -1190,31 +1190,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "her white Angelic Edict can -- the half a shroud-shaped reading loses"
       _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
 
-  -- The same card through the CAST path and on to a resolution, which is what the
-  -- set-membership case above stands in for: CR 601.2c makes a spell with no legal
-  -- target for a slot uncastable at all, and the source Cast passes is the card IN
-  -- HAND rather than a spell object on the stack.
-  --
-  -- ONE PAIR OF BOARDS DIFFERING IN ONE THING, and Humility is what moves: "All
-  -- creatures lose all abilities and have base power and toughness 1/1" is CR
-  -- 613.1f at layer 6, and CR 702.16 states no clause holding protection clear of
-  -- it. So the humbled row is the same Apostle with the same Doom Blade in the
-  -- same hand over the same two Swamps, minus the keyword -- which also makes this
-  -- the case that proves the read is POST-layer rather than off the printed card.
-  Spec.it s "CR 601.2c whole card: protection leaves alice's Doom Blade no legal target until Humility takes it away" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    apostle <- S.printingOf s registry "Apostle of Purifying Light"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    humility <- S.printingOf s registry "Humility"
-    let (_, board) = S.addPermanent apostle S.bob (S.landsInPlay swamp 2) -- {1}{B}
-        (base, dbId) = S.handOne doomBlade board
-        humbled = S.withHumility humility base
-        resolve gs = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))) Stack.resolveTop)
-    Spec.assertBool s (not (S.castable S.alice dbId base)) "CR 702.16b protection from black leaves the black Doom Blade no legal target at all"
-    Spec.assertBool s (S.castable S.alice dbId humbled) "CR 613.1f under Humility it has one again"
-    Spec.assertEqWith s "and the humbled Apostle dies to it" (S.creaturesInPlay S.bob (resolve humbled)) 0
-    Spec.assertEqWith s "while the protected one is still standing, never having been aimed at" (S.creaturesInPlay S.bob base) 1
-
   -- CR 702.16k: "Such a permanent or player can't be targeted by spells or
   -- abilities the specified player controls." True-Name Nemesis, whose quality is
   -- Filter.OfChosenPlayer -- answered off Filter.Context.carrierChosenPlayer,
@@ -3275,14 +3250,6 @@ overCounting p = case p of
     State.modify' (+ 1)
     pure (if asked_ == 0 then fmap snd asked else S.preferring (const True) asked)
   _ -> pure (S.identityAnswer p)
-
-mainPhase :: GameState.GameState -> GameState.GameState
-mainPhase gs =
-  gs
-    { GameState.activePlayer = S.alice,
-      GameState.phase = Phase.PrecombatMain,
-      GameState.priority = Just S.alice
-    }
 
 -- CR 115.7d's two halves over a jointly judged slot: Bioshift's `to` must be
 -- "another target creature with the same controller" as its `from`. alice casts

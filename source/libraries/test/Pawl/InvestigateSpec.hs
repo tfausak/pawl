@@ -58,7 +58,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
@@ -115,34 +114,8 @@ clueOf gs = case S.tokensOf gs of
   [oid] -> Just oid
   _ -> Nothing
 
--- The untapped lands on the board -- on this board, alice's Plains and nothing
--- else. Used to build the one-mana board from the two-mana board by tapping one
--- more land and changing nothing else.
-untappedPlains :: GameState.GameState -> [ObjectId.ObjectId]
-untappedPlains gs =
-  filter
-    (\oid -> Set.member CardType.Land (Projection.cardTypesOf oid gs) && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped)
-    (Set.toList (GameState.battlefield gs))
-
-investigateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+investigateSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 investigateSpec s registry = Spec.describe s "Investigate" $ do
-  Spec.it s "CR 111.10f the Clue's {2} is real: one untapped Plains cannot pay it" $ do
-    -- The negative board differs from the positive one ONLY in how many lands
-    -- are untapped: same permanents, same phase, same empty stack. Without
-    -- that, "not activatable" would pass for any of the reasons a cost check
-    -- can fail.
-    twoMana <- investigateBoard s registry
-    case (clueOf twoMana, untappedPlains twoMana) of
-      (Just clueId, first : _) -> do
-        let oneMana = S.tapObject first twoMana
-        Spec.assertEqWith s "two Plains untapped after the {W}" (length (untappedPlains twoMana)) 2
-        Spec.assertEqWith s "one on the negative board" (length (untappedPlains oneMana)) 1
-        case Activatable.abilitiesFor clueId twoMana of
-          [ability] -> do
-            Spec.assertBool s (Activatable.activatable S.alice clueId ability twoMana) "two mana pays {2}"
-            Spec.assertBool s (not (Activatable.activatable S.alice clueId ability oneMana)) "one does not"
-          other -> Spec.assertFailure s ("expected exactly one activated ability on the Clue, got " <> show (length other))
-      _ -> Spec.assertFailure s "expected one token and at least one untapped Plains"
   Spec.it s "CR 111.10f cracking the Clue draws a card, and the token ceases to exist (CR 111.7)" $ do
     before <- investigateBoard s registry
     case clueOf before of
@@ -1326,22 +1299,6 @@ decliningTargets :: Prompt.Prompt r -> r
 decliningTargets p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (const 0) offers
   _ -> S.identityAnswer p
-
--- Takes CR 608.2g's offer and rotates the batch rule 701.57a's last sentence
--- hands the random-order channel; `declining` refuses the offer and answers
--- everything else the same way, so a pair of legs differs in that answer alone.
-discovering :: Prompt.Prompt r -> r
-discovering p = case p of
-  Prompt.OfferedCast {} -> OptionalDecision.Exercises
-  Prompt.Shuffle ids -> case ids of
-    h : t -> t <> [h]
-    [] -> []
-  _ -> S.identityAnswer p
-
-declining :: Prompt.Prompt r -> r
-declining p = case p of
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  _ -> discovering p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do

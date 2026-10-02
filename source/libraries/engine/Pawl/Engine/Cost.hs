@@ -943,9 +943,9 @@ candidateCostsGiven permitted pid name oid gs =
 --
 -- CR 601.2f's LOCK-IN is the CALLER's, not this function's: each caller totals
 -- once per announcement and hands the VALUE to `pay`, which never re-reads the
--- state. Pawl.CostSpec's Altar's Reap group proves it -- the creature paying the
--- additional cost is the cost reducer, so a re-read after CR 601.2h's sacrifice
--- costs a mana more.
+-- state. data/scenarios/cost's Altar's Reap cases prove it -- the creature
+-- paying the additional cost is the cost reducer, so a re-read after CR
+-- 601.2h's sacrifice costs a mana more.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
 total pid oid cost gs = totalWith (spellAdjustments Set.empty pid oid gs) cost
 

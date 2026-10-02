@@ -26,7 +26,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -158,61 +157,6 @@ monarchSpec s registry =
               crowned = resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project oid gs0))] gs0))
           Spec.assertEqWith s "alice is the monarch" (GameState.monarch crowned) (Just S.alice)
           noToken (resolveAll (settle (beginUpkeep crowned)))
-
--- Thrasta, Tempest's Roar's "Thrasta has hexproof as long as it entered this
--- turn": a CR 604.1 static ability whose CR 604.2 clause is
--- Quantity.EnteredThisTurn compared against 1, granting CR 702.11b's hexproof to
--- the permanent itself.
---
--- ONE BOARD, TWO GAMES. Alice hard-casts Thrasta for its printed {10}{G}{G} off
--- twelve Forests, and bob's Doom Blade is offered a target set twice: on the turn
--- Thrasta arrives, and after Engine.handoffTurn. That handoff is the ONLY
--- difference between the two -- same seats, same lands, same spell, same
--- permanent, same id -- and it is what clears the event log the measurement reads
--- (Engine.beginTurnOf), so a reading that answered off anything else (a
--- timestamp, summoning sickness, "the most recent permanent") cannot tell the two
--- games apart.
---
--- A Goblin Piker stands beside Thrasta throughout as the within-board control: it
--- is on the battlefield without having entered (S.addPermanent files no zone
--- change), so it is a legal target in BOTH games. Without it the negative could
--- pass because the offer was empty -- a Doom Blade that reached nothing at all.
---
--- The keyword assertions are the direct reading of the static ability, and the
--- targeting ones are what the rule is for; both are made, because a projection
--- that granted hexproof and a targeting check that ignored it would each pass
--- half of this.
-enteredThisTurnSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-enteredThisTurnSpec s registry = Spec.describe s "EnteredThisTurn" $ do
-  Spec.it s "CR 604.2 Thrasta has hexproof the turn it enters, and loses it at the handoff" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    let (pikerId, staged) = S.addPermanent piker S.alice (S.landsInPlay forest 12)
-        (start, spellId) = S.handOne thrasta staged
-        cast = snd (Engine.runGamePure S.identityAnswer start (S.cast S.alice spellId))
-        arrived = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        -- One whole turn later, through the real handoff -- the same idiom
-        -- Pawl.ExpirySpec's `handoff` uses.
-        later = S.runPure S.identityAnswer arrived Engine.handoffTurn
-        named gs = filter (\oid -> S.soleFaceName oid gs == S.printingName thrasta) (Set.toList (GameState.battlefield gs))
-        hexproof gs oid = Map.member (Keyword.Hexproof Nothing) (Projection.keywordsOf oid gs)
-        reaches gs oid = case S.spellTargetSlot doomBlade of
-          Nothing -> False
-          Just theSlot ->
-            let (blade, onStack) = S.spellOnStack doomBlade S.bob gs
-             in Set.member (Recipient.ToCreature oid) (Target.legalRecipients (Just S.bob) blade theSlot onStack)
-    case named arrived of
-      [thrastaId] -> do
-        Spec.assertBool s (elem thrastaId (named later)) "CR 400.7: the same incarnation is still there next turn"
-        Spec.assertBool s (hexproof arrived thrastaId) "the turn it entered, Thrasta has hexproof"
-        Spec.assertBool s (not (hexproof later thrastaId)) "and next turn it does not"
-        Spec.assertBool s (not (reaches arrived thrastaId)) "CR 702.11b: bob's Doom Blade cannot target it the turn it entered"
-        Spec.assertBool s (reaches later thrastaId) "and can on the next turn"
-        Spec.assertBool s (reaches arrived pikerId) "the Piker beside it was targetable all along"
-        Spec.assertBool s (reaches later pikerId) "in both games"
-      other -> Spec.assertFailure s ("expected exactly one Thrasta on the battlefield, got " <> show (length other))
 
 -- Archfiend's Vessel: "When this creature enters, if it entered from your
 -- graveyard or you cast it from your graveyard, exile it. If you do, create a 5/5
@@ -803,7 +747,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
         "false"
 
   monarchSpec s registry
-  enteredThisTurnSpec s registry
   enteredFromSpec s registry
   interveningRecheckSpec s registry
   foreignGraveyardCastSpec s registry

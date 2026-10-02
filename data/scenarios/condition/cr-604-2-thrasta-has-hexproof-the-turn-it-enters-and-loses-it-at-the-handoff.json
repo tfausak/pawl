@@ -1,0 +1,276 @@
+{
+  "description": "CR 604.2 Thrasta has hexproof the turn it enters, and loses it at the handoff",
+  "note": "bob's two Doom Blades, four Swamps and library card are witnesses added for the targeting assertions: the Blade is offered (the Piker is a legal target) but refused at Thrasta the turn it entered, and next turn the Blades kill both.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-5",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-6",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-7",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-8",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-9",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-10",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-11",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-12",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "ready": true,
+            "label": "piker"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Thrasta, Tempest's Roar",
+            "label": "thrasta-tempest-s-roar",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "s1"
+          },
+          {
+            "card": "Swamp",
+            "label": "s2"
+          },
+          {
+            "card": "Swamp",
+            "label": "s3"
+          },
+          {
+            "card": "Swamp",
+            "label": "s4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Doom Blade",
+            "label": "blade"
+          },
+          {
+            "card": "Doom Blade",
+            "label": "blade-2"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$thrasta-tempest-s-roar",
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            "$forest-4",
+            "$forest-5",
+            "$forest-6",
+            "$forest-7",
+            "$forest-8",
+            "$forest-9",
+            "$forest-10",
+            "$forest-11",
+            "$forest-12"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "bob",
+      "check": {
+        "Keywords": {
+          "object": "Thrasta, Tempest's Roar",
+          "keyword": {
+            "type": "Hexproof"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "Cast $blade",
+            "Cast $blade-2",
+            "ActivateManaAbility $s1",
+            "ActivateManaAbility $s2",
+            "ActivateManaAbility $s3",
+            "ActivateManaAbility $s4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "bob",
+      "refuse": {
+        "Cast": {
+          "object": "$blade",
+          "targets": [
+            "Thrasta, Tempest's Roar"
+          ],
+          "mana": [
+            "$s1",
+            "$s2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "Keywords": {
+          "object": "Thrasta, Tempest's Roar",
+          "keyword": {
+            "type": "Hexproof"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$blade",
+          "targets": [
+            "Thrasta, Tempest's Roar"
+          ],
+          "mana": [
+            "$s1",
+            "$s2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$blade-2",
+          "targets": [
+            "$piker"
+          ],
+          "mana": [
+            "$s3",
+            "$s4"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Thrasta, Tempest's Roar",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Graveyard",
+        "card": "Goblin Piker",
+        "count": 1
+      }
+    }
+  ]
+}

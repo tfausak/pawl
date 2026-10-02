@@ -1,0 +1,58 @@
+{
+  "description": "CR 804.2 the same Piker taps to hand itself to bob, alice's other teammate",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 0,
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 0
+      },
+      {
+        "name": "carol",
+        "team": 0
+      },
+      {
+        "name": "dave",
+        "team": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "deployCreatures": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$goblin-piker",
+          "ability": 0,
+          "targets": [
+            "$bob"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Controller",
+        "object": "$goblin-piker",
+        "is": "bob"
+      }
+    }
+  ]
+}

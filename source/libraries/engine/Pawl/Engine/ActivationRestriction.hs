@@ -159,8 +159,8 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- Read against the board AFTER CR 601.2a's move (Game.withoutBeingCast): a
   -- cast gate asks this one step ahead of it, and the payment asks it after, so
   -- a condition over the zone the card leaves answers the same at both.
-  -- Pawl.ManaSpec's Lys Alana Dignitary group proves the refused offer and its
-  -- Synthetic Hollow Spring group the admitted one.
+  -- data/scenarios/mana's Lys Alana Dignitary cases prove the refused offer and
+  -- its Synthetic Hollow Spring cases the admitted one.
   ActivationRestriction.OnlyIf condition ->
     let moved = Game.withoutBeingCast gs
      in Condition.holds
