@@ -369,22 +369,16 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `CastProhibitionSpec`
 
-- CR 101.4 the active player is asked to name a card first | `ready`
-- CR 101.4b the later chooser knows the name the earlier one chose | `ready`
-- CR 102.2 an answer naming no opponent falls back to the head of the offer | `ready`
-- CR 102.2 at three seats the controller picks which opponent names a card | `ready`
-- CR 201.4 a name no card has is refused and the chooser is asked again | `ready`
-- CR 201.4 a slug the registry answers to is not a card's name | `ready`
-- CR 201.4a a real card the restriction forbids is refused and the chooser is asked again | `ready`
-- CR 201.4a the printed restriction reaches both choosers | `ready`
-- CR 305.1 a land with the chosen name can't be played, and a basic land still can | `ready`
-- CR 305.1 a land with the chosen name can't be played, and an unnamed one still can | `ready`
+- CR 101.4 the active player is asked to name a card first | `check:prompt-order`
+- CR 101.4b the later chooser knows the name the earlier one chose | `check:prompt-payload`
+- CR 201.4 a name no card has is refused and the chooser is asked again | `move:policingCardNames`
+- CR 201.4 a slug the registry answers to is not a card's name | `move:policingCardNames` `check:other-Registry.fetchCard`
+- CR 201.4a a real card the restriction forbids is refused and the chooser is asked again | `move:policingCardNames` `check:other-Interpreter.legalCardName`
+- CR 201.4a the printed restriction reaches both choosers | `check:prompt-payload`
 - CR 514.2 the hexproof outlives the cleanup of the turn it was cast in | `check:player-effects` `move:expect-rejected`
 - CR 514.2 the prohibition ends at cleanup | `check:other-GameState.playerEffects`
 - CR 514.2 the restriction ends at cleanup | `check:helper-offersCast` `check:other-GameState.playerEffects`
 - CR 601.2c the restriction lands on the targeted seat alone | `check:other-ActivePlayerEffect.scope` `check:other-GameState.playerEffects` `check:helper-offersCast`
-- CR 601.3 a spell with the chosen name can't be cast, and its neighbour still can | `ready`
-- CR 601.3 the opponent's chosen name prohibits the controller too | `ready`
 - CR 604.2 destroying the Chamber lifts both prohibitions | `board:object-chosennames`
 - CR 611.2a each opponent is barred during their own next turn and no other | `board:player-effect`
 - CR 611.2a it survives bob's turn and carol's turn, and ends as alice's next turn begins | `check:player-effects` `move:expect-rejected`
@@ -394,17 +388,12 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 611.2b unhacked, with no Swamp the duration never starts | `check:helper-conditionalSilenceCasts` `check:other-GameState.playerEffects`
 - CR 611.2b when the Swamp changes hands the effect is deleted | `board:sickness`
 - CR 611.2b with no Swamp the duration never starts and nothing is stored | `check:other-Stack.resolveTop` `check:other-GameState.playerEffects` `check:helper-conditionalSilenceCasts`
-- CR 611.2c a spell with the name the resolution chose can't be cast, and its neighbour still can | `ready`
+- CR 611.2c a spell with the name the resolution chose can't be cast, and its neighbour still can | `check:other-GameState.playerEffects`
 - CR 612.1/612.2 an Artificial Evolution on Liliana moves the -3 onto the new word | `check:player-effects` `move:expect-rejected`
 - CR 612.7 / 206.3a a Spy Kit host has the Arabian Nights names of cards the game has never seen, and City in a Bottle sweeps it | `board:object-attachedto`
 - CR 612.7 / 702.16e a Spy Kit host has the chosen name of a card in no zone, and its damage is prevented | `board:combat` `board:object-attachedto` `board:object-chosennames`
 - CR 612.7 / 709.4a a Spy Kit host has both names of a split card with a creature half | `board:combat` `board:object-attachedto` `board:object-chosennames`
-- CR 613.10 both prohibitions reach the opponent, not only the controller | `ready`
-- CR 614.1c both the controller and an opponent name a card as it enters | `ready`
-- CR 614.1c the controller alone names a card as the Halo enters | `ready`
 - CR 702.11c once it resolves, alice has gained 2 and bob's Bolt cannot reach her | `check:player-effects` `move:expect-rejected`
-- CR 702.16b the protected player is not a legal target for a spell with the chosen name | `ready`
-- CR 702.16c / 704.5m an Aura already enchanting the player is buried once she gains protection from its name | `ready`
 - CR 702.16e combat damage from a source with the chosen name is prevented, and the same attacker otherwise connects | `board:combat` `board:object-chosennames`
 
 ### `CastRestrictionSpec`
@@ -577,8 +566,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `ConjureSpec`
 
-- CR 400.7j Calim's Breath cannot exile the discarded Calim as one of the two others | `ready`
-- CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped | `ready`
+- CR 400.7j Calim's Breath cannot exile the discarded Calim as one of the two others | `move:ReferenceCards`
+- CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped | `move:ReferenceCards`
 - CR 603.4 conjure behind an intervening if: 4 life gained puts a castable Mox Pearl in hand | `board:stage-no-card-named-mox-pearl`
 - CR 702.140e a duplicate of a mutated Headless Skaab owes the Skaab's additional cost | `board:source-ofmerge`
 - CR 702.178a at max speed the Smasher returns the duplicate with haste, and the end step sacrifices it | `board:exile-linked` `board:player-speed`
@@ -592,7 +581,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 730.3/707.2 a duplicate of a Clone split out of a merge is the Piker again | `board:source-ofmerge`
 - Gate to Seatower's seek puts the nonland card randomness named into the hand, leaving the library's order | `board:stage-no-card-named-gate-to-seatower`
 - Kari Zev's Ragavan attacks without being declared and goes home at the next end step | `board:stage-no-card-named-ragavan-nimble-pilferer`
-- a conjure from the file registry's reference never conjures a synthetic card | `ready`
+- a conjure from the file registry's reference never conjures a synthetic card | `move:ReferenceCards,`
 - a printed spellbook is offered whole, and the card randomness named is the one conjured | `check:prompt-offers`
 - a printed spellbook picked by choice is offered whole, and the card its controller named is the one conjured | `check:prompt-offers`
 - conjure into exile puts the duplicate in the conjurer's exile, exiled with the conjuring creature | `check:exile-linked`
@@ -600,8 +589,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `CopySpec`
 
 - CR 305.7 Blood Moon strips the abilities Vesuva copied from another land | `board:object-bindings`
-- CR 400.11 casting the copy moves nothing out of a graveyard, so Kishla Skimmer does not trigger | `ready`
-- CR 400.11 the copy is cast under Grafdigger's Cage and Aven Interrupter, and not under Drannith Magistrate | `ready`
 - CR 702.103e a bestowed copy whose host died resolves as a token creature | `check:helper-rollickersOn` `check:other-Game.isToken`
 - CR 702.128a embalm exiles the card for a white Zombie token copy with no mana cost, and a Clone of it keeps all three | `check:mana-value`
 - CR 702.129a eternalize makes a black 4/4 Zombie token copy, and neither it nor a Clone of it is a Doom Blade target | `check:mana-value`
@@ -615,13 +602,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.10c a copied trigger's slot is baked, so the offer is a real choice | `ref:stack-ability`
 - CR 707.10c new targets are chosen for a copied activated ability | `ref:stack-ability`
 - CR 707.10e no copy is created where Ivy is not a legal target | `board:continuous-effect`
-- CR 707.13 Garth One-Eye's cast copy of Black Lotus has Black Lotus's characteristics and resolves as a token | `ready`
-- CR 707.13 a declined copy leaves nothing behind, and a name the reference does not know makes no copy | `ready`
+- CR 707.13 Garth One-Eye's cast copy of Black Lotus has Black Lotus's characteristics and resolves as a token | `check:other-Object.castFrom,` `check:other-GameState.outsideCopies`
+- CR 707.13 a declined copy leaves nothing behind, and a name the reference does not know makes no copy | `check:other-GameState.outsideCopies,` `check:other-GameState.namedCopyChoices,` `board:card-reference`
 - CR 707.13 a second activation of the same Garth does not offer Black Lotus again | `check:named-copy-choices`
 - CR 707.14 a Clone of the face-down 3/3 connects and creates no copy | `check:abilities`
 - CR 707.14 the face-down Divination connects and alice casts a copy of Divination for free | `check:outside-the-game`
-- CR 707.2 / 707.10c Transcantation's Bolt resolves at the target its controller chooses anew | `ready`
-- CR 707.2 Transcantation's Bolt left without a new target hits nobody | `ready`
 - CR 707.2 an Adventure that becomes a copy of a Bolt goes to the graveyard | `move:cast-face`
 - CR 707.2a a copy of Blood Moon goes on setting land subtypes once the original is exiled | `check:mana-types` `check:abilities`
 - CR 708.2 a face-down copy of Silent Arbiter no longer bounds the attack | `check:face-down` `check:bindings`
@@ -1565,19 +1550,12 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 118.12a Killing Wave asks each creature's controller, and a paid creature alone survives | `check:prompt-order`
 - CR 118.12a each land is its own offer, and any player's payment saves only that land | `check:prompt-payload`
 - CR 118.3 a seat who cannot pay the sacrifice is not offered it | `check:helper-lands` `check:helper-lives` `check:helper-wormsStands`
-- CR 201.4 Petra Sphinx sends a top card its target did not name to the graveyard | `ready`
-- CR 201.4 the same board with the other card on top draws one instead | `ready`
-- CR 201.4/608.2c a second activation of Petra Sphinx forgets the name the first one chose | `ready`
-- CR 201.4/608.2c whole card: Ancient Vendetta's search reads the name its own first clause chose | `ready`
-- CR 201.4/608.2c whole card: Predict's mill tally reads the name its own first clause chose | `ready`
-- CR 201.4/701.20a whole card: Petra Sphinx matches the name its target chose against the card it revealed | `ready`
 - CR 607.2a: killing the OTHER Dragon returns the OTHER card | `board:exile-linked`
 - CR 607.2a: the dead Dragon returns the card IT exiled, not the other Dragon's | `board:exile-linked`
 - CR 608.2b a Bolt whose only target died fizzles | `check:events`
 - CR 608.2h a modification that cannot be frozen is not stored at all | `check:other-GameState.continuousEffects`
 - CR 608.2h/611.2d Rush of Blood's X is the power of the creature in its own target slot | `check:continuous-effects`
 - CR 615 Fog prevents combat damage but not spell damage (the gate) | `board:replacement`
-- CR 701.17d Bruvac doubles the mill, and Predict is answered by the second milled card too | `ready`
 - CR 701.20b whole card: Grim Reminder's revealed card stays in the library and costs only the opponent who cast its name | `board:replacement`
 - CR 701.23a/701.23e whole card: Hoarding Dragon exiles the artifact it finds, unrevealed | `check:events`
 - CR 701.55a the limb bob takes may be the one that serves alice | `check:prompt-payload`
@@ -1587,8 +1565,8 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `RestampSpec`
 
-- CR 613.7m / 608.2f the controller orders every card one conjure loop made | `ready`
-- CR 614.12 / 608.2f a card one conjure loop made later enters beside the earlier ones, not after them | `ready`
+- CR 613.7m / 608.2f the controller orders every card one conjure loop made | `move:ReferenceCards,` `check:prompt-payload`
+- CR 614.12 / 608.2f a card one conjure loop made later enters beside the earlier ones, not after them | `move:ReferenceCards`
 
 ### `ReversalSpec`
 

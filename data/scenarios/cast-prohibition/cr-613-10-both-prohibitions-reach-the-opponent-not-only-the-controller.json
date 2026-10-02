@@ -1,0 +1,250 @@
+{
+  "description": "CR 613.10 both prohibitions reach the opponent, not only the controller",
+  "note": "alice names bob's Bolt and bob names his own Ash Barrens. bob may cast the Bolt while the Chamber is on the stack and not once it has entered; his Barrens play waits for his own turn, and the control file plays it there with no Chamber cast.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "Plains",
+            "label": "p4"
+          },
+          {
+            "card": "Plains",
+            "label": "p5"
+          },
+          {
+            "card": "Plains",
+            "label": "p6"
+          },
+          {
+            "card": "Plains",
+            "label": "p7"
+          },
+          {
+            "card": "Plains",
+            "label": "p8"
+          },
+          {
+            "card": "Mountain",
+            "label": "m1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          },
+          {
+            "card": "Mountain",
+            "label": "m3"
+          },
+          {
+            "card": "Mountain",
+            "label": "m4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Null Chamber",
+            "label": "chamber"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "bobs-mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bobs-bolt"
+          },
+          {
+            "card": "Ash Barrens",
+            "label": "barrens"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$chamber",
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$p4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "Cast $bobs-bolt",
+            "Activate $barrens",
+            "ActivateManaAbility $bobs-mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCardName",
+          "with": "Lightning Bolt"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCardName",
+          "with": "Ash Barrens"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "Activate $barrens",
+            "ActivateManaAbility $bobs-mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "refuse": {
+        "Cast": {
+          "object": "$bobs-bolt",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$bobs-mountain",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "bob",
+          "is": [
+            "Pass",
+            "PlayLand Swamp",
+            "Activate $barrens",
+            "ActivateManaAbility $bobs-mountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "refuse": {
+        "PlayLand": "$barrens"
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Ash Barrens",
+        "count": 1
+      }
+    },
+    {
+      "Count": {
+        "player": "bob",
+        "zone": "Hand",
+        "card": "Lightning Bolt",
+        "count": 1
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 20
+      }
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "description": "CR 614.1c the controller alone names a card as the Halo enters",
+  "note": "Only alice's name prompt is scheduled, so an ask of bob or carol would fail the run. The name she chose is read through the protection it grants: bob's Curse of Vitality cannot enchant her and can enchant carol.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "a1"
+          },
+          {
+            "card": "Plains",
+            "label": "a2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Runed Halo",
+            "label": "halo"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "b1"
+          },
+          {
+            "card": "Plains",
+            "label": "b2"
+          },
+          {
+            "card": "Plains",
+            "label": "b3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Curse of Vitality",
+            "label": "curse"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Swamp"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$halo",
+          "mana": [
+            "$a1",
+            "$a2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCardName",
+          "with": "Curse of Vitality"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "refuse": {
+        "Cast": {
+          "object": "$curse",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$b1",
+            "$b2",
+            "$b3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$curse",
+          "targets": [
+            "$carol"
+          ],
+          "mana": [
+            "$b1",
+            "$b2",
+            "$b3"
+          ]
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Runed Halo",
+        "count": 1
+      }
+    },
+    {
+      "View": {
+        "of": "AttachedTo",
+        "object": "Curse of Vitality",
+        "is": "carol"
+      }
+    }
+  ]
+}

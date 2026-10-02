@@ -1509,14 +1509,6 @@ aimMimicry subjectId originalId p = case p of
       asked
   _ -> S.identityAnswer p
 
--- Transcantation's resolution: CR 108.1's lookup answered with `bolt`'s card,
--- and CR 707.10c's re-choice answered by `retarget` over the offered slots.
-transcantationAnswer :: Printing.Printing -> (Set.Set Recipient.Recipient -> Set.Set Recipient.Recipient) -> Prompt.Prompt r -> r
-transcantationAnswer bolt retarget p = case p of
-  Prompt.LookUpCard _ -> Just (Printing.card bolt)
-  Prompt.ChooseTargets _ _ _ asked -> fmap (retarget . snd) asked
-  _ -> S.identityAnswer p
-
 copySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- CR 707.2 / 715.3d: Synthetic Mimicry makes Battle Display, cast as an
@@ -1546,49 +1538,6 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertBool s (CardName.MkCardName (Text.pack "Embereth Shieldbreaker") `elem` graveyardNames after) "the card went to alice's graveyard, not into exile"
         Spec.assertEqWith s "bob took the Bolt's 3 and the copy's 3" (S.lifeOf S.bob after) (Just 14)
       _ -> Spec.assertFailure s "the spells never reached the stack"
-  -- Transcantation (CMB2 playtest) {1}{R} Instant: "Target instant or sorcery
-  -- spell becomes a copy of Lightning Bolt. Its controller may choose new targets
-  -- for it." The original is a card NAME (CR 108.1), so the spell acquires no
-  -- choices (CR 707.2), and the Bolt text's target comes only from CR 707.10c's
-  -- re-choice, which offers the one target the text fixes.
-  Spec.it s "CR 707.2 / 707.10c Transcantation's Bolt resolves at the target its controller chooses anew" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    island <- S.printingOf s registry "Island"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    thinkTwice <- S.printingOf s registry "Think Twice"
-    transcantation <- S.printingOf s registry "Transcantation"
-    let lands = S.landsFor island S.alice 2 (S.landsFor mountain S.alice 2 S.threePlayerGame)
-        (withThink, thinkId) = S.handOne thinkTwice lands
-        (transcantationId, withTranscantation) = S.addHandCard transcantation S.alice withThink
-        -- Stocked, so the mutant's draw is a card in hand rather than CR 704.5b.
-        board = snd (S.addLibraryCard island S.alice (snd (S.addLibraryCard island S.alice withTranscantation)))
-        cast1 = snd (Engine.runGamePure S.identityAnswer board (S.cast S.alice thinkId))
-    case topOfStack cast1 of
-      Just thinkSpell -> do
-        let cast2 = snd (Engine.runGamePure (aimedAtObject thinkSpell) cast1 (S.cast S.alice transcantationId))
-            atCarol = Set.filter (== Recipient.ToPlayer S.carol)
-            -- Transcantation, then the Bolt that was Think Twice.
-            after = resolveOne S.identityAnswer (resolveOne (transcantationAnswer bolt atCarol) cast2)
-        Spec.assertEqWith s "carol took the Bolt's 3 at the target chosen anew" (S.lifeOf S.carol after) (Just 17)
-        Spec.assertEqWith s "and alice drew nothing: Think Twice's text never resolved" (S.handSize S.alice after) 0
-      Nothing -> Spec.assertFailure s "Think Twice never reached the stack"
-  -- The ruling's other half: "If the spell's controller doesn't change the
-  -- spell's target so it has one, the spell won't resolve." The subject is a Bolt
-  -- already aimed at bob, so a spell that kept its own target (CR 707.2's choices
-  -- not dropped) would still hit him.
-  Spec.it s "CR 707.2 Transcantation's Bolt left without a new target hits nobody" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    transcantation <- S.printingOf s registry "Transcantation"
-    let (withBolt, boltId) = S.handOne bolt (S.landsFor mountain S.alice 3 S.threePlayerGame)
-        (transcantationId, board) = S.addHandCard transcantation S.alice withBolt
-        cast1 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) board (S.cast S.alice boltId))
-    case topOfStack cast1 of
-      Just boltSpell -> do
-        let cast2 = snd (Engine.runGamePure (aimedAtObject boltSpell) cast1 (S.cast S.alice transcantationId))
-            after = resolveOne S.identityAnswer (resolveOne (transcantationAnswer bolt (const Set.empty)) cast2)
-        Spec.assertEqWith s "bob, the Bolt's old target, and carol are both untouched" (fmap (`S.lifeOf` after) [S.bob, S.carol]) [Just 20, Just 20]
-      Nothing -> Spec.assertFailure s "the Bolt never reached the stack"
 
   -- CR 707.10: "a copy of a spell is owned by the player under whose control it
   -- was put on the stack ... a copy of a spell or ability is controlled by the
@@ -2942,25 +2891,6 @@ garthSpec s registry = Spec.describe s "GarthOneEye" $ do
     Spec.assertEqWith s "the second, named Black Lotus again, cast nothing" (lotusesOnStack second) 0
     Spec.assertEqWith s "Black Lotus is remembered for this Garth" (Map.lookup garthId (GameState.namedCopyChoices second)) (Just (Set.singleton lotusName))
 
-  -- The pair differs only in the permanent bob controls. CR 400.11: the copy is
-  -- in no zone, so neither "from graveyards" rule reaches it, where "anywhere
-  -- other than their hands" does.
-  Spec.it s "CR 400.11 the copy is cast under Grafdigger's Cage and Aven Interrupter, and not under Drannith Magistrate" $ do
-    garth <- S.printingOf s registry "Garth One-Eye"
-    lotus <- S.printingOf s registry "Black Lotus"
-    aven <- S.printingOf s registry "Aven Interrupter"
-    cage <- S.printingOf s registry "Grafdigger's Cage"
-    magistrate <- S.printingOf s registry "Drannith Magistrate"
-    let answer :: Prompt.Prompt r -> r
-        answer = naming [lotus] lotusName OptionalDecision.Exercises
-        under watcher =
-          let (_, withWatcher) = S.addPermanent watcher S.bob (Setup.emptyGame S.bothPlayers)
-              (garthId, board) = garthBoard garth withWatcher
-           in lotusesOnStack (activateGarth answer garthId board)
-    Spec.assertEqWith s "CR 601.3 Grafdigger's Cage does not stop it" (under cage) 1
-    Spec.assertEqWith s "CR 601.2f bob's Aven Interrupter taxes nothing, so the {0} copy is cast with no mana" (under aven) 1
-    Spec.assertEqWith s "CR 601.3 bob's Drannith Magistrate does" (under magistrate) 0
-
   Spec.it s "CR 707.13 a declined copy leaves nothing behind, and a name the reference does not know makes no copy" $ do
     garth <- S.printingOf s registry "Garth One-Eye"
     lotus <- S.printingOf s registry "Black Lotus"
@@ -2971,20 +2901,6 @@ garthSpec s registry = Spec.describe s "GarthOneEye" $ do
     Spec.assertEqWith s "declined: no copy of a card exists anywhere" (length (copies declined), GameState.outsideCopies declined) (0, Set.empty)
     Spec.assertEqWith s "declined: the name is still spent" (Map.lookup garthId (GameState.namedCopyChoices declined)) (Just (Set.singleton lotusName))
     Spec.assertEqWith s "unknown: nothing was cast" (length (GameState.stack unknown), length (copies unknown)) (0, 0)
-
-  -- CR 400.11: nothing left a zone, so Kishla Skimmer's "whenever a card leaves
-  -- your graveyard during your turn" has no event to see. Its trigger would be
-  -- the second object on the stack once priority is settled.
-  Spec.it s "CR 400.11 casting the copy moves nothing out of a graveyard, so Kishla Skimmer does not trigger" $ do
-    garth <- S.printingOf s registry "Garth One-Eye"
-    lotus <- S.printingOf s registry "Black Lotus"
-    skimmer <- S.printingOf s registry "Kishla Skimmer"
-    let answer :: Prompt.Prompt r -> r
-        answer = naming [lotus] lotusName OptionalDecision.Exercises
-        (_, withSkimmer) = S.addPermanent skimmer S.alice (Setup.emptyGame S.bothPlayers)
-        (garthId, board) = garthBoard garth withSkimmer
-        settled = S.runPure answer (activateGarth answer garthId board) Engine.settleForPriority
-    Spec.assertEqWith s "the stack holds the Lotus copy and nothing else" (fmap (\oid -> PC.names (Projection.project oid settled)) (GameState.stack settled)) [Set.singleton lotusName]
 
 lotusName :: CardName.CardName
 lotusName = CardName.MkCardName (Text.pack "Black Lotus")
