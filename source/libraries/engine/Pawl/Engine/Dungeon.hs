@@ -305,7 +305,7 @@ enter pid quality = do
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapFor = 0,
                 Object.exertedBy = Set.empty,
-                Object.activatedOnce = Set.empty
+                Object.activatedOnce = Map.empty
               }
           gs3 =
             Game.insertIntoZone

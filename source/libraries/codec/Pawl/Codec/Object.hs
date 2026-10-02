@@ -141,7 +141,9 @@ codec = Fields.object $ do
   goadedBy <- Fields.defaulted "goadedBy" Set.empty (Common.set PlayerId.codec) Object.goadedBy
   doesNotUntapFor <- Fields.defaulted "doesNotUntapFor" 0 Common.natural Object.doesNotUntapFor
   exertedBy <- Fields.defaulted "exertedBy" Set.empty (Common.set PlayerId.codec) Object.exertedBy
-  activatedOnce <- Fields.defaulted "activatedOnce" Set.empty (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) Object.activatedOnce
+  -- Common.repeats rather than multiset: a spend count never falls to zero,
+  -- and one entry per spend is the array this field was before it counted.
+  activatedOnce <- Fields.defaulted "activatedOnce" Map.empty (Common.repeats (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) Object.activatedOnce
   pure
     Object.MkObject
       { Object.owner = owner,

@@ -351,7 +351,7 @@ dirtied pid object =
       Object.goadedBy = Set.empty,
       Object.doesNotUntapFor = 3,
       Object.exertedBy = Set.singleton pid,
-      Object.activatedOnce = Set.empty
+      Object.activatedOnce = Map.empty
     }
 
 -- CR 400.7: has this object no memory of a previous existence? Applying the
