@@ -651,6 +651,30 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
       (fmap (\oid -> Game.lookupObject oid resolved >>= Object.attachedTo >>= Recipient.objectOf) (printedOnBattlefield "Copy Enchantment" resolved))
       [Just mammothId]
 
+  -- CR 303.4f's "or player" (CR 702.5d) at the same door: Copy Enchantment
+  -- copying bob's Curse of Death's Hold, which enchants carol, and alice
+  -- choosing bob -- the SECOND of three candidates, so neither the first seat
+  -- nor the original's host can stand in for him.
+  Spec.it s "CR 303.4f Copy Enchantment copying a Curse enchants the player its controller chooses" $ do
+    mammoth <- S.printingOf s registry "War Mammoth"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (mammothId, withMammoth) = S.addPermanent mammoth S.bob S.threePlayerGame
+        (maidenId, withMaiden) = S.addPermanent maiden S.carol withMammoth
+        (curseId, withCurse) = S.addPermanent curse S.bob withMaiden
+        board = S.attachTo curseId (Recipient.ToPlayer S.carol) withCurse
+        (_, staged) = S.spellOnStack copyEnchantment S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChoosePlayer _ _ _ offered -> case NonEmpty.toList offered of
+            _ : second : _ -> second
+            _ -> NonEmpty.head offered
+          _ -> copyNamed curseId p
+        resolved = resolveAndSettle answer staged
+    Spec.assertEqWith s "bob's War Mammoth gets -1/-1 from the copy" (S.powerToughnessOf mammothId resolved) (Just (2, 2))
+    Spec.assertEqWith s "and carol's Bird Maiden only the original's" (S.powerToughnessOf maidenId resolved) (Just (0, 1))
+
   -- CR 303.4g's stack branch, as a pair differing in ONE thing: whether bob
   -- controls a creature. Bob's Betrayal ("enchant creature an opponent
   -- controls") is on alice's Balemurk Leech, so a copy alice controls can

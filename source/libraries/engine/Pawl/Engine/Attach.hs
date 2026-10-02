@@ -282,15 +282,48 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 hostsFor :: Filter.Context -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 hostsFor context subject filter_ gs = hostsAmong (Set.toList (GameState.battlefield gs)) context subject filter_ gs
 
--- CR 303.4f: what an Aura entering by any means but resolving may enchant. The
--- battlefield hostsFor offers and every graveyard card besides, since CR 702.5a
--- names no zone -- Animate Dead's "enchant creature card in a graveyard", put
--- onto the battlefield by Replenish. Filter.CanHostSubject is the whole filter,
--- so the Aura's own enchant ability decides which of them it may enchant.
-entryHostsFor :: Filter.Context -> ObjectId -> GameState -> [ObjectId]
+-- CR 303.4f: what an Aura entering by any means but resolving may enchant, "a
+-- legal object or player". The battlefield hostsFor offers and every graveyard
+-- card besides, since CR 702.5a names no zone -- Animate Dead's "enchant
+-- creature card in a graveyard", put onto the battlefield by Replenish -- then
+-- every player still in the game, CR 702.5d's enchant-player Aura (Curse of
+-- Death's Hold). Filter.CanHostSubject and attachmentFor are the whole test, so
+-- the Aura's own enchant ability decides which of them it may enchant.
+entryHostsFor :: Filter.Context -> ObjectId -> GameState -> [Recipient]
 entryHostsFor context subject gs =
   let graveyards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.stillPlaying gs)
-   in hostsAmong (Set.toList (GameState.battlefield gs) <> graveyards) context subject Filter.Type.CanHostSubject gs
+      objects = hostsAmong (Set.toList (GameState.battlefield gs) <> graveyards) context subject Filter.Type.CanHostSubject gs
+      players = filter (\pid -> Maybe.isJust (attachmentFor subject (Recipient.ToPlayer pid) gs)) (Game.stillPlaying gs)
+   in fmap Recipient.ToObject objects <> fmap Recipient.ToPlayer players
+
+-- CR 303.4f's choice over entryHostsFor's offer, made by `chooser`, the player
+-- the Aura enters under.
+--
+-- Objects go to chooseHost's Prompt.ChooseAttachment, players to
+-- Prompt.ChoosePlayer, or Prompt.ChooseOpponent when the offer leaves the
+-- chooser out (Archnemesis' "enchant opponent") -- Target.chooserOf's posture.
+-- Elided at one candidate and filtered, not trusted, as chooseHost is.
+--
+-- An offer holding both is answered from the objects. CR 702.5d bars a
+-- player-enchanting Aura from every permanent, and no printed enchant ability
+-- names a graveyard card and a player at once: Scryfall `o:/^enchant
+-- [^\n]*player/ t:aura`, 2026-10-02, 47 hits, every one "Enchant player".
+chooseEntryHost :: PlayerId -> ObjectId -> [Recipient] -> Game (Maybe Recipient)
+chooseEntryHost chooser subject candidates =
+  case (Maybe.mapMaybe Recipient.objectOf candidates, Maybe.mapMaybe Recipient.playerOf candidates) of
+    ([], first : rest) -> case rest of
+      [] -> pure (Just (Recipient.ToPlayer first))
+      second : more -> do
+        gs <- State.get
+        let offered = first NonEmpty.:| (second : more)
+            decider = Decide.deciderFor chooser gs
+            question =
+              if List.elem chooser (NonEmpty.toList offered)
+                then Prompt.ChoosePlayer decider chooser subject offered
+                else Prompt.ChooseOpponent decider chooser subject offered
+        answer <- Game.choose question
+        pure (Just (Recipient.ToPlayer (if List.elem answer (NonEmpty.toList offered) then answer else first)))
+    (objects, _) -> fmap (fmap Recipient.ToObject) (chooseHost chooser subject objects)
 
 -- hostsFor over the candidates the caller names.
 hostsAmong :: [ObjectId] -> Filter.Context -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
@@ -361,7 +394,7 @@ groupHostsFor context subjects filter_ gs =
 --
 -- CR 303.4f -- changeZoneAttaching's Aura entry -- is that same narrowing with NO
 -- card text to intersect, since there the enchant ability IS the whole restriction.
--- So it asks hostsFor with a bare Filter.CanHostSubject rather than through here.
+-- So it asks entryHostsFor rather than through here.
 --
 -- A bare Filter.contextFor, built here rather than taken from the caller: the
 -- rider is the Aura's OWN card text (CR 303.4k), so there is no resolution whose
