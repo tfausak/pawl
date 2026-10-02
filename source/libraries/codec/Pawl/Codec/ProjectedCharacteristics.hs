@@ -57,6 +57,7 @@ codec = Fields.object $ do
   toughness <- Fields.defaulted "toughness" Nothing (Common.maybe Common.integer) PC.toughness
   loyalty <- Fields.defaulted "loyalty" Nothing (Common.maybe Loyalty.codec) PC.loyalty
   defense <- Fields.defaulted "defense" Nothing (Common.maybe Defense.codec) PC.defense
+  intensity <- Fields.defaulted "intensity" Nothing (Common.maybe Common.integer) PC.intensity
   characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe CharacteristicPT.codec) PC.characteristicPT
   cardTypes <- Fields.required "cardTypes" (Common.set CardType.codec) PC.cardTypes
   subtypes <- Fields.defaulted "subtypes" Set.empty (Common.set Subtype.codec) PC.subtypes
@@ -102,6 +103,7 @@ codec = Fields.object $ do
         PC.toughness = toughness,
         PC.loyalty = loyalty,
         PC.defense = defense,
+        PC.intensity = intensity,
         PC.characteristicPT = characteristicPT,
         PC.cardTypes = cardTypes,
         PC.subtypes = subtypes,

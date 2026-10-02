@@ -436,6 +436,8 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- EachCardInYourHand's answer over the other hidden per-player zone: the
   -- seat is CR 109.5's "you", so no slot names it.
   ObjectRef.EachCardInYourLibrary _ -> Map.empty
+  -- The arm above's answer: the owner is CR 109.5's "you".
+  ObjectRef.EachCardYouOwn _ -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachCardExiledWithAbility _ -> Map.empty
   ObjectRef.EachCardEncodedOnSource {} -> Map.empty
@@ -523,6 +525,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardInYourHand -> []
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
   ObjectRef.EachCardInYourLibrary _ -> []
+  ObjectRef.EachCardYouOwn _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
   ObjectRef.EachCardExiledWithAbility _ -> []
   ObjectRef.EachCardEncodedOnSource _ -> []
@@ -580,6 +583,7 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.EachCardInYourHand -> []
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
   ObjectRef.EachCardInYourLibrary _ -> []
+  ObjectRef.EachCardYouOwn _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
   ObjectRef.EachCardExiledWithAbility _ -> []
   ObjectRef.EachCardEncodedOnSource _ -> []
@@ -2873,6 +2877,17 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- CR 701.23f's search triggers have nothing to reach. A stated characteristic
   -- does not make it one -- rule 701.23b governs a player who is SEARCHING, and
   -- nothing here asks anyone to.
+  -- CR 108.3's owner over every zone at once, so no APNAP order to impose:
+  -- ascending id, the objects map's own order. CR 108.2 keeps a token and a
+  -- copy out of "card"; Game.isCardObject is that classification, a regression
+  -- fence rather than a proved line, since no board here holds a token or a
+  -- copy the Filter would match. data/scenarios/static-discharge-intensifies.json
+  -- proves the owner test and the reach into a hand.
+  ObjectRef.EachCardYouOwn filter_ ->
+    let context = effectContext gs controller source legal (slotBindings resolving gs)
+        viewOf = Projection.viewsOf gs
+        owned oid obj = Object.owner obj == controller && Game.isCardObject oid gs && Filter.matches context (viewOf oid) filter_
+     in Map.keys (Map.filterWithKey owned (GameState.objects gs))
   ObjectRef.EachCardInYourLibrary mFilter ->
     let inLibrary = Game.zoneMembers Zone.Library controller gs
      in case mFilter of

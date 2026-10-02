@@ -1118,6 +1118,7 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       Filter.keywords = Map.keysSet (PC.keywords snapshot),
       Filter.power = PC.power snapshot,
       Filter.toughness = PC.toughness snapshot,
+      Filter.intensity = PC.intensity snapshot,
       -- CR 202.3 off the snapshot, which carries the number: a
       -- ProjectedCharacteristics records a mana value, so this reads what the
       -- object's was AT THE EVENT rather than throwing the question away.
@@ -1360,6 +1361,7 @@ overlaySnapshot deploy snapshot live =
           Filter.keywords = Filter.keywords sampled,
           Filter.power = Filter.power sampled,
           Filter.toughness = Filter.toughness sampled,
+          Filter.intensity = Filter.intensity sampled,
           Filter.manaValue = Filter.manaValue sampled,
           Filter.manaCost = Filter.manaCost sampled,
           Filter.nonManaActivatedAbility = Filter.nonManaActivatedAbility sampled,

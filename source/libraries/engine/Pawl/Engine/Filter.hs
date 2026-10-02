@@ -102,6 +102,10 @@ data View = MkView
     -- every other characteristic-reading quantity, and CR 702.100a's evolve is
     -- the pool's one reader.
     toughness :: Maybe Integer,
+    -- Alchemy's intensity (Pawl.Types.ProjectedCharacteristics.intensity), read
+    -- off the projection in every zone. No Filter atom consults it: it is here
+    -- for Pawl.Engine.Quantity's Intensity arm.
+    intensity :: Maybe Integer,
     -- CR 202.3: the candidate's mana value (CR 202.3a gives a costless object
     -- 0). On the battlefield it comes off the CR 613 projection, so CR 707.2's
     -- copiable mana cost is honoured -- a Clone reports what it copied. Off the
@@ -787,6 +791,7 @@ playerView pid =
       keywords = Set.empty,
       power = Nothing,
       toughness = Nothing,
+      intensity = Nothing,
       -- CR 202.3 reads a mana cost, which is printed on an OBJECT (CR 202.1); a
       -- player has none.
       manaValue = Nothing,

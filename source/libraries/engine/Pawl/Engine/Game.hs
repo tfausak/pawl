@@ -2022,6 +2022,18 @@ isTapped oid gs = case lookupObject oid gs of
 isToken :: ObjectId -> GameState -> Bool
 isToken oid gs = maybe False (sourceIsToken . Object.source) (lookupObject oid gs)
 
+-- CR 108.2: is this object a card? A token (CR 108.2b), a copy of a spell or of
+-- a card and an ability on the stack are not; both cards a melded permanent is
+-- represented by are, and a merged permanent is one whose topmost component is
+-- not a token (CR 730.2d). A classification of the object's KIND, isToken's
+-- standing.
+isCardObject :: ObjectId -> GameState -> Bool
+isCardObject oid gs = case fmap Object.source (lookupObject oid gs) of
+  Just source@(Source.OfMerge _) -> not (sourceIsToken source)
+  Just (Source.OfCard _) -> True
+  Just (Source.OfMeld _) -> True
+  _ -> False
+
 -- The same question of a bare Source, which is what CR 608.2h's record keeps of
 -- an object that has ceased (LastKnown.source). One classification, so a live
 -- object and a departed one cannot answer it differently.

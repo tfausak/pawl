@@ -178,6 +178,9 @@ layer m = case m of
   -- in the layer system reads or writes PC.grantsStationToughness, so
   -- ordering against a P/T or type-changing modification never bites.
   Modification.GrantsStationToughness -> Layer.Ability
+  -- No CR 613.1 layer: intensity is not a characteristic (CR 109.3), so it
+  -- applies after every layer, with CR 613.11's rules-modifying effects.
+  Modification.Intensify _ -> Layer.Rules
 
 -- Apply one modification to characteristics-in-progress. P/T quantities are
 -- evaluated against the CURRENT state (CR 604.2); Resolve freezes a resolution's
@@ -598,6 +601,10 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- with no count and no source to prefer among several grants.
         Modification.GrantsStationToughness ->
           pc {PC.grantsStationToughness = True}
+        -- Alchemy's "intensifies by N": an object with no starting intensity
+        -- counts from 0.
+        Modification.Intensify n ->
+          pc {PC.intensity = fmap (Maybe.fromMaybe 0 (PC.intensity pc) +) (Quantity.evaluate viewOf context gs oid n)}
 
 -- CR 205.3d: an object can't gain a subtype that doesn't correspond to one of
 -- its types. CR 205.1a's removal clause is the same question in the other
@@ -677,6 +684,7 @@ cardTypesAfter m types = case m of
   Modification.SwitchPowerToughness -> types
   Modification.AssignCombatDamageWithToughness -> types
   Modification.GrantsStationToughness -> types
+  Modification.Intensify _ -> types
   Modification.SetLandSubtype _ -> types
   Modification.SetLandSubtypeToChosen -> types
   Modification.AddLandSubtype _ -> types
@@ -1401,6 +1409,7 @@ freezeQuantities gs announcedOn source context m =
         -- No quantity to freeze: two bare markers.
         Modification.AssignCombatDamageWithToughness -> Just m
         Modification.GrantsStationToughness -> Just m
+        Modification.Intensify n -> fmap Modification.Intensify (freeze n)
 
 -- Every Quantity a modification carries, in order. A new Quantity field goes here
 -- as well as in freezeQuantities -- the compiler forces the arm, not its content.
@@ -1450,6 +1459,7 @@ quantitiesOf m = case m of
   Modification.HasFullText _ -> []
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
+  Modification.Intensify n -> [n]
 
 -- CR 612.7 / 108.1: the filter over the Oracle card reference this modification
 -- grants the names of, which the projection cannot ask the interpreter about
@@ -1496,6 +1506,7 @@ referenceQuery m = case m of
   Modification.ExchangeTextBoxes -> Nothing
   Modification.AssignCombatDamageWithToughness -> Nothing
   Modification.GrantsStationToughness -> Nothing
+  Modification.Intensify _ -> Nothing
 
 -- Every filter a live continuous effect asks the reference about
 -- (referenceQuery), each once.
@@ -1564,6 +1575,8 @@ setsLandSubtype m = case m of
   Modification.AddChosenColor -> False
   -- An ability-shaping grant, not a type change.
   Modification.GrantsStationToughness -> False
+  -- Not a characteristic at all.
+  Modification.Intensify _ -> False
 
 -- Every SetLandSubtype and SetLandSubtypeToChosen effect in the game, each with
 -- its source and affected set, for a reader OUTSIDE the layer fold. A legitimate
@@ -2688,6 +2701,7 @@ removesAbilities m = case m of
   Modification.AssignCombatDamageWithToughness -> False
   -- A grant, GainKeyword's answer above: not a removal.
   Modification.GrantsStationToughness -> False
+  Modification.Intensify _ -> False
   Modification.AddLandSubtype _ -> False
   Modification.ChangeSubtypeWord {} -> False
   Modification.AddCardType _ -> False
@@ -3811,6 +3825,8 @@ modificationWrites m = case m of
   -- REGRESSION FENCE rather than a proved behaviour: no board in the pool
   -- makes another effect's affected set depend on it.
   Modification.GrantsStationToughness -> Set.singleton Keywords
+  -- Writes PC.intensity, which no Aspect names: no Filter atom reads it.
+  Modification.Intensify _ -> Set.empty
 
 -- Which aspects a Modification reads -- CR 613.8a clause (b)'s last limb:
 -- applying another effect can change "what it does to any of the things it
@@ -3864,6 +3880,7 @@ modificationReads m = case m of
   -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
   Modification.GrantsStationToughness -> Set.empty
+  Modification.Intensify n -> quantityReads n
   Modification.SetLandSubtype _ -> Set.empty
   Modification.SetLandSubtypeToChosen -> Set.empty
   Modification.AddLandSubtype _ -> Set.empty
@@ -3901,6 +3918,8 @@ quantityReads q = case q of
   Quantity.Type.Count c -> filterReads (Count.Type.filter c) <> aggregationReads (Count.Type.aggregation c)
   Quantity.Type.Power -> Set.singleton PowerA
   Quantity.Type.Toughness -> Set.singleton PowerA
+  -- Intensity is not a characteristic, so no Aspect names it.
+  Quantity.Type.Intensity -> Set.empty
   -- Reads whichever of the two the substitution picks, so it reads PowerA
   -- exactly as Power and Toughness do above.
   Quantity.Type.StationMeasure -> Set.singleton PowerA
@@ -5593,6 +5612,7 @@ grantsKeywordWhere p m = case m of
   -- Neither marker hands out a Keyword, whatever the station one's name says.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
+  Modification.Intensify _ -> False
 
 -- Does this modification write a card type or subtype that intrinsicReplacementsOf
 -- mints an entry replacement from -- CR 306.5b's planeswalker, CR 310.4b's battle
@@ -5670,6 +5690,7 @@ grantsMintingType m = case m of
   -- Neither marker writes a card type or subtype.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
+  Modification.Intensify _ -> False
 
 -- CR 614.1 / 613.1f: does this modification hand its affected objects a quoted
 -- replacement ability? replacementsAffecting's grantor disjunct for a GRANTED
@@ -5757,6 +5778,7 @@ grantsAbilityWhere p m = case m of
   Modification.HasFullText ft -> any (\g -> p g || grantedStaticWrites (grantsAbilityWhere p) g) (FullText.alsoHas ft)
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
+  Modification.Intensify _ -> False
 
 -- CR 306.5b / 310.4b: the card types intrinsicReplacementsOf mints a CR 614.1c row
 -- from. Rule 714.3a's Saga is a SUBTYPE and so is asked one function up.
