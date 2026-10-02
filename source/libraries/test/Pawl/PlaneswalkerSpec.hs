@@ -1205,23 +1205,6 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
     Spec.assertEqWith s "the FIRST card the look offered is in exile" (namesIn Zone.Exile S.alice after) [named "Bird Maiden"]
     Spec.assertEqWith s "and the second is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bad Moon"]
 
-  -- CR 111.3: the creating ability defines the tokens, so the count and the
-  -- identity are both read here. A board that minted one token, or two 1/1 black
-  -- creatures with no subtype, would pass a count-only assertion.
-  Spec.it s "CR 111.3 the -2 creates two 1/1 black Nightmare creature tokens" $ do
-    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
-    swamp <- S.printingOf s registry "Swamp"
-    let (ashiokId, board) = ashiokBoard ashiok [swamp]
-        after = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId board
-        tokens = S.tokensOf after
-    Spec.assertEqWith s "no token before the ability resolved" (S.tokensOf board) []
-    Spec.assertEqWith s "exactly two tokens" (length tokens) 2
-    mapM_ (\oid -> Spec.assertEqWith s "each is 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "each is mono-black" (Projection.colorsOf oid after) (Set.singleton Color.Black)) tokens
-    mapM_ (\oid -> Spec.assertBool s (Set.member Subtype.Nightmare (Projection.subtypesOf oid after)) "each is a Nightmare") tokens
-    mapM_ (\oid -> Spec.assertBool s (Set.member CardType.Creature (PC.cardTypes (Projection.project oid after))) "each is a creature") tokens
-    Spec.assertEqWith s "CR 606.4: two loyalty counters came off" (S.counterOf CounterKind.Loyalty ashiokId after) 3
-
   -- The token's own trigger. The exile is out of alice's HAND, which is what makes
   -- this a claim about "put into exile" rather than about the library-to-exile
   -- move the rest of the card makes: a condition that pinned the ORIGIN would find

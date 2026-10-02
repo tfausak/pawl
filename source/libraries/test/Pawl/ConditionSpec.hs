@@ -382,14 +382,6 @@ bouncing victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter ((== Just victim) . Recipient.objectOf) candidates) sets
   _ -> S.identityAnswer p
 
--- S.aggressiveAnswer with its block declaration switched off when `blocks` is
--- False; every other prompt is answered identically, so the pair of boards below
--- differs in CR 509.1's declaration and nothing else.
-combatAnswer :: Bool -> Prompt.Prompt r -> r
-combatAnswer blocks p = case p of
-  Prompt.DeclareBlockers {} -> if blocks then S.aggressiveAnswer p else Map.empty
-  _ -> S.aggressiveAnswer p
-
 -- CR 608.2h's second clause -- "if the effect has moved it from a public zone to
 -- a hidden zone, the effect uses the object's last known information" -- read for
 -- CR 111.6's token status.
@@ -442,45 +434,6 @@ lastKnownTokenSpec s registry =
             Spec.assertEqWith s "alice's library is untouched" (librarySize after) 1
             Spec.assertEqWith s "though the card really did leave the battlefield" (Set.member victimId (GameState.battlefield after)) False
             Spec.assertEqWith s "with the Kirin's trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
-
--- CR 608.2h read for CR 509.1g's combat status, on CR 603.4's intervening "if".
---
--- Guildsworn Prowler {1}{B} 2/1 Tiefling Rogue Assassin: "Deathtouch. When this
--- creature dies, if it wasn't blocking, draw a card."
--- (data/cards/guildsworn-prowler.json; Oracle text checked against
--- api.scryfall.com, 2026-08-31.) CR 400.7 deletes the id before rule 603.4's
--- first check runs, and CR 506.4 takes the creature out of GameState.combat, so
--- the live read answers "not blocking" for exactly the creature that was.
---
--- The two legs are one board differing in ONE thing -- whether bob declares the
--- block. The Prowler dies to the SAME three marked damage in both (CR 704.5g on a
--- 1-toughness creature), declared blockers or not, so the draw cannot be the
--- kill's doing. Combat damage is never dealt: the fixture stops at the top of the
--- combat damage step.
-lastKnownBlockingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-lastKnownBlockingSpec s registry =
-  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-      run giant prowler swamp blocks k = case S.combatBoardOf [giant] [prowler] of
-        (base, _, [prowlerId]) ->
-          let (_, stocked) = S.addLibraryCard swamp S.bob base
-              declared = S.runToStep (Phase.Combat CombatStep.CombatDamage) (combatAnswer blocks) stocked
-              killed = S.settleSba (S.markDamage prowlerId 3 declared)
-              onStack = settle killed
-           in k prowlerId declared killed (S.runPure S.identityAnswer onStack Stack.resolveTop)
-        _ -> Spec.assertFailure s "combatBoardOf should place exactly one Prowler"
-   in Spec.describe s "LastKnownBlocking" $ do
-        -- THE PROVING TEST for CR 509.1g's half of the record. A live read of the
-        -- dead id answers "it wasn't blocking" and bob draws off a creature that
-        -- spent the step blocking; lastKnownAttackingSpec below is CR 508.1k's.
-        Spec.it s "CR 608.2h a blocking Guildsworn Prowler that dies draws nothing" $ do
-          giant <- S.printingOf s registry "Hill Giant"
-          prowler <- S.printingOf s registry "Guildsworn Prowler"
-          swamp <- S.printingOf s registry "Swamp"
-          run giant prowler swamp True $ \prowlerId declared killed after -> do
-            Spec.assertEqWith s "bob's hand is empty, so CR 603.4's clause was false" (S.handSize S.bob after) 0
-            Spec.assertEqWith s "and it really was blocking before it died" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just True)
-            Spec.assertEqWith s "and it really did die" (Set.member prowlerId (GameState.battlefield killed)) False
-            Spec.assertEqWith s "so nothing was gathered onto the stack" (length (GameState.stack (settle killed))) 0
 
 -- Declares exactly `victim` as an attacker, or nobody at all: the ONE thing the
 -- two legs of lastKnownAttackingSpec differ in. Filters the offered set rather
@@ -539,71 +492,6 @@ lastKnownAttackingSpec s registry =
             Spec.assertEqWith s "and alice's hand is empty, so the draw clause was skipped" (S.handSize S.alice after) 0
             Spec.assertEqWith s "off a Giant that was never attacking" (fmap Filter.attacking (Projection.viewWithLastKnownAnywhere killed giantId)) (Just False)
             Spec.assertEqWith s "and died the same way" (Set.member giantId (GameState.battlefield killed)) False
-
--- Aims a target slot at one OBJECT by filtering the offered set, `bouncing`'s
--- shape for a slot that must be answered: a hand-built recipient could miss CR
--- 608.2b's re-read, and a fixture that merely PREFERS the victim would repair a
--- mutation by finding another legal target.
-damaging :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-damaging victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter ((== Just victim) . Recipient.objectOf) candidates) sets
-  _ -> S.identityAnswer p
-
--- Its player-shaped twin, for CR 120.1's fourth recipient.
-damagingPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-damagingPlayer pid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== Recipient.ToPlayer pid) candidates) sets
-  _ -> S.identityAnswer p
-
--- CR 120.1 / 608.2i read on CR 603.4's intervening "if", for a creature CR 400.7
--- has already deleted.
---
--- Burning-Eye Zubera {2}{R}{R} 3/3 Zubera Spirit: "When this creature dies, if 4
--- or more damage was dealt to it this turn, this creature deals 3 damage to any
--- target." (data/cards/burning-eye-zubera.json; Oracle text checked against
--- api.scryfall.com, 2026-09-01.)
---
--- CR 608.2i and not CR 608.2h: "was dealt this turn" looks back in time, so the
--- answer comes off GameState.events, which the death does not touch, rather than
--- off a Pawl.Types.LastKnown field. Object.damage could not answer it either --
--- CR 400.7 deletes the object the marks were on.
---
--- The two legs are one board differing in ONE thing: alice's Prodigal Sorcerer
--- pings the Zubera or the Hill Giant standing beside it. The same Lightning Bolt
--- kills the Zubera in both (CR 704.5g -- 3 is lethal to a 3/3 whether or not the
--- ping came first), so the 3 damage alice takes cannot be the kill's doing; only
--- the ping's one point moves the turn's total from 3 to 4.
-damageDealtToItSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-damageDealtToItSpec s registry =
-  let run sorcerer zubera giant mountain bolt pingsZubera k =
-        case Face.activatedAbilities (S.combinedFace sorcerer) of
-          ping : _ ->
-            let (sorcererId, gs1) = S.addPermanent sorcerer S.alice (S.landsInPlay mountain 1)
-                (zuberaId, gs2) = S.addPermanent zubera S.bob gs1
-                (giantId, gs3) = S.addPermanent giant S.bob gs2
-                (staged, boltId) = S.handOne bolt gs3
-                ready = staged {GameState.priority = Just S.alice}
-                pingedAt = if pingsZubera then zuberaId else giantId
-                pinged = S.runPure (damaging pingedAt) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop)
-                cast = S.runPure (damaging zuberaId) pinged (S.cast S.alice boltId)
-                killed = S.settleSba (S.runPure (damaging zuberaId) cast Stack.resolveTop)
-                onStack = S.runPure (damagingPlayer S.alice) killed Engine.settleForPriority
-             in k zuberaId pinged killed onStack (S.runPure S.identityAnswer onStack Stack.resolveTop)
-          [] -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability"
-   in Spec.describe s "DamageDealtToThisTurn" $ do
-        -- The negative's twin, one difference: the Sorcerer pings the Hill Giant
-        -- instead, so the Zubera is dealt 3 this turn rather than 4.
-        Spec.it s "CR 603.4 the same Zubera dealt only 3 deals nothing" $ do
-          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-          zubera <- S.printingOf s registry "Burning-Eye Zubera"
-          giant <- S.printingOf s registry "Hill Giant"
-          mountain <- S.printingOf s registry "Mountain"
-          bolt <- S.printingOf s registry "Lightning Bolt"
-          run sorcerer zubera giant mountain bolt False $ \zuberaId pinged killed onStack after -> do
-            Spec.assertEqWith s "alice is untouched at 20" (S.lifeOf S.alice after) (Just 20)
-            Spec.assertEqWith s "off a Zubera nothing had pinged" (S.damageOf zuberaId pinged) (Just 0)
-            Spec.assertEqWith s "which died the same way" (Set.member zuberaId (GameState.battlefield killed)) False
-            Spec.assertEqWith s "and nothing was gathered onto the stack" (length (GameState.stack onStack)) 0
 
 -- Attacks with `attacker` alone, and blocks it or not: the pair's ONE difference.
 -- aggressiveAnswer's head otherwise, so the two legs agree on every other prompt.
@@ -751,9 +639,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   interveningRecheckSpec s registry
   foreignGraveyardCastSpec s registry
   lastKnownTokenSpec s registry
-  lastKnownBlockingSpec s registry
   lastKnownAttackingSpec s registry
-  damageDealtToItSpec s registry
   wasBlockedThisTurnSpec s registry
   ashlingSpec s registry
   rumorGathererSpec s registry

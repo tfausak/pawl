@@ -104,9 +104,6 @@ untappedNamedFor pid printing gs =
           && fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing)
    in length (filter untapped (Game.zoneMembers Zone.Battlefield pid gs))
 
-untappedNamed :: Printing.Printing -> GameState.GameState -> Int
-untappedNamed = untappedNamedFor S.bob
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Airbend" $ do
   Spec.it s "CR 701.65a the airbent permanent is exiled, and the one beside it is not" $ do
@@ -122,27 +119,6 @@ spec s registry = Spec.describe s "Airbend" $ do
     -- Hill Giants, and it is still there before the airbend too.
     Spec.assertBool s (List.elem twin (Game.zoneMembers Zone.Battlefield S.bob after)) "the Hill Giant beside it stayed"
     Spec.assertBool s (List.elem victim (Game.zoneMembers Zone.Battlefield S.bob before)) "and the victim was on the battlefield before the spell"
-  Spec.it s "CR 701.65a its owner casts the exiled card for {2} rather than its mana cost" $ do
-    plains <- S.printingOf s registry "Plains"
-    mountain <- S.printingOf s registry "Mountain"
-    giant <- S.printingOf s registry "Hill Giant"
-    lesson <- S.printingOf s registry "Airbending Lesson"
-    let (victim, _, spare, spell, before) = board plains mountain giant lesson 2
-        after = mainPhaseOf S.bob (airbent victim spell before)
-        recast oid = S.runPure S.castAnswer after (S.cast S.bob oid *> Stack.resolveTop)
-    case exiledCard after of
-      Nothing -> Spec.assertBool s False "the airbend put exactly one card into bob's exile"
-      Just exiled -> do
-        -- THE gameplay reading, and first: bob pays {2} out of two Mountains and
-        -- the Hill Giant is back on the battlefield, making two of them.
-        Spec.assertEqWith s "CR 701.65a the owner's cast of the exiled card resolves" (S.countOnBattlefieldByName (S.printingName giant) S.bob (recast exiled)) 2
-        -- The amount, which the resolve above does not pin on its own: both
-        -- Mountains are tapped, so the cast paid {2} and not CR 118.9's {0}.
-        Spec.assertEqWith s "and it cost {2}, so no Mountain is left untapped" (untappedNamed mountain (recast exiled)) 0
-        -- The paired negative, differing in ONE thing: the same card, the same
-        -- two Mountains, the same turn -- but in bob's hand, where its printed
-        -- {3}{R} is what he owes.
-        Spec.assertBool s (not (S.castable S.bob spare after)) "the same card in hand, at the same two lands, is unaffordable"
   -- CR 701.65a says "its OWNER", where every other permission in the tree names
   -- the granting resolution's controller. Its OWN case, so a mutation that hands
   -- the permission to the airbender reddens this assertion rather than the

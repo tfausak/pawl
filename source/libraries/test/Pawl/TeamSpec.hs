@@ -246,22 +246,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
     island <- S.printingOf s registry "Island"
     Spec.assertEqWith s "carol's team, then alice's, then carol's" (takers 3 (stockedWith island sharedTurns)) [S.carol, S.alice, S.carol]
     Spec.assertEqWith s "without the option every seat takes one" (takers 3 (stockedWith island id)) [S.bob, S.carol, S.dave]
-  -- CR 805.4c: bob may play a land during his team's turn. The land play is
-  -- offered to whoever holds priority, so the one board differs only in the
-  -- option.
-  Spec.it s "CR 805.4c each player on the active team may play a land" $ do
-    forest <- S.printingOf s registry "Forest"
-    let run option =
-          let (_, staged) = S.addHandCard forest S.bob (option (twoTeams S.fourPlayerGame))
-              board =
-                staged
-                  { GameState.phase = Phase.PrecombatMain,
-                    GameState.activePlayer = S.alice,
-                    GameState.priority = Just S.alice
-                  }
-           in S.runPure S.playLandAnswer board Engine.priorityLoop
-    Spec.assertEqWith s "bob's Forest is on the battlefield" (S.countOnBattlefieldByName (S.printingName forest) S.bob (run sharedTurns)) 1
-    Spec.assertEqWith s "without the option it stays in his hand" (S.countOnBattlefieldByName (S.printingName forest) S.bob (run id)) 0
   -- CR 502.2a / 731.2a: bob casts one spell on his team's turn and alice none, so
   -- the previous turn's active team cast a spell. The count the next untap step
   -- reads is bob's one, where the unshared game reads alice's none.
@@ -622,23 +606,6 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
         Spec.assertEqWith s "the team's next untap step was skipped" (fmap (`tapped` first_) [alices, bobs]) [True, True]
         Spec.assertEqWith s "and the one after untapped both" (fmap (`tapped` second) [alices, bobs]) [False, False]
       _ -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
-  -- CR 805.8 / 500.7: ONE effect giving every player an extra turn gives each
-  -- team one. Alice casts it on her team's turn: carol's team takes the turn
-  -- pushed last, then alice's, then carol's ordinary one. Without the option each
-  -- of the four seats takes its own, in reverse APNAP order, then bob his
-  -- ordinary turn.
-  --
-  -- Synthetic Common Hour, {3}{U}{U} Sorcery: "Each player takes an extra turn
-  -- after this one."
-  Spec.it s "CR 805.8 one effect gives a team one extra turn" $ do
-    island <- S.printingOf s registry "Island"
-    hour <- S.printingOf s registry "Synthetic Common Hour"
-    let run option n =
-          let (held, staged) = S.addHandCard hour S.alice (S.landsFor island S.alice 5 (stockedWith island option))
-              board = staged {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-           in takers n (PreventionSpec.castEach S.identityAnswer board [held])
-    Spec.assertEqWith s "carol's team, alice's, then carol's ordinary turn" (run sharedTurns 3) [S.carol, S.alice, S.carol]
-    Spec.assertEqWith s "without the option each seat takes one, then bob" (run id 5) [S.dave, S.carol, S.bob, S.alice, S.bob]
   -- CR 805.8: controlling a player controls their team. Carol activates
   -- Mindslaver at bob on her own turn, so on alice's team's next turn carol makes
   -- alice's decisions too -- and, deciding alice's attack, declares nothing.

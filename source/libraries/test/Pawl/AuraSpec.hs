@@ -1296,7 +1296,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   bestowSpec s registry
   licidSpec s registry
   auraTextChangeSpec s registry
-  sigardasAidSpec s registry
   equipmentTokenSpec s registry
   auraTokenSpec s registry
   animateDeadSpec s registry
@@ -2459,8 +2458,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
 -- at a land with protection from artifacts, which fortificationSpec above shows
 -- -- is refused by CR 702.16b before rule 702.16d is reached and the two
 -- readings agree. Separating them needs an attach whose SOURCE is neither the
--- mover nor the destination, which is Effect.AttachBound: sigardasAidSpec's "CR
--- 702.16b/702.16d whole cards" board targets a protected creature with an
+-- mover nor the destination, which is Effect.AttachBound: data/scenarios/aura/'s
+-- "CR 702.16b/702.16d whole cards" board targets a protected creature with an
 -- enchantment's ability and then watches rule 702.16d refuse the artifact. The
 -- state-based half below covers the same sentence from the other side, and
 -- fortificationSpec's is its Fortification half.
@@ -3606,92 +3605,6 @@ targetingOnly oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
 
--- Aims the trigger's target slot at one creature by FILTERING the offer rather
--- than replacing it -- targetingOnly's discipline, so a creature the engine
--- never offered comes back as an empty set instead of being smuggled in -- and
--- TAKES the printed "may", which S.identityAnswer would decline.
-attachingTo :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-attachingTo oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
-  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  _ -> S.identityAnswer p
-
--- Sigarda's Aid {W} Enchantment -- "You may cast Aura and Equipment spells as
--- though they had flash. Whenever an Equipment you control enters, you may
--- attach it to target creature you control."
---
--- The second sentence is the pool's one producer of Effect.AttachBound, CR
--- 701.3a's third arrangement: the MOVER is the entrant CR 400.7e bound under
--- Binding.became, and the DESTINATION is targeted. Both halves of that are
--- observable here and neither existing opcode has them -- Effect.Attach's mover
--- is the ability's own source, which is the enchantment and not the Equipment,
--- and Effect.AttachTarget's destination is picked as the effect resolves, which
--- CR 115.10a says is no target at all. Three consequences follow from it BEING
--- a target: CR 603.3d's choice refuses a creature with shroud and CR 608.2b
--- drops it if it goes illegal (data/scenarios/aura/'s two Sigarda's Aid pairs),
--- and CR 603.5's "may" is a separate question asked later (the case below).
-sigardasAidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
-  -- CR 603.5's "may", asked as the ability resolves rather than when it was put
-  -- on the stack: the board of
-  -- cr-603-3d-701-3a-whole-cards-sigarda-s-aid-equips-the-piker.json, answered by
-  -- S.identityAnswer, which declines every optional clause. The target was still
-  -- chosen -- declining is not the same as having no target.
-  Spec.it s "CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing" $ do
-    plains <- S.printingOf s registry "Plains"
-    aid <- S.printingOf s registry "Sigarda's Aid"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let base0 = S.landsInPlay plains 1
-        (_, base1) = S.addPermanent aid S.alice base0
-        (pikerId, base2) = S.addPermanent piker S.alice base1
-        (splitterId, ready) = S.addHandCard bonesplitter S.alice base2
-        -- targetingOnly is attachingTo without the ChooseOptional arm, so the
-        -- target is still the Piker and S.identityAnswer declines the "may".
-        cast = S.runPure (targetingOnly pikerId) ready (S.cast S.alice splitterId)
-        entered = S.runPure (targetingOnly pikerId) cast Stack.resolveTop
-        placed = S.runPure (targetingOnly pikerId) entered Engine.settleForPriority
-        after = S.runPure (targetingOnly pikerId) placed Stack.resolveTop
-        splitterOn gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Bonesplitter"))) (Set.toList (GameState.battlefield gs))
-    Spec.assertEqWith s "the trigger went on the stack and targeted the Piker" (length (GameState.stack placed)) 1
-    -- The gameplay-level assertion, against the accepting run above: the same
-    -- board, the same target, the other answer to the same question.
-    Spec.assertEqWith s "CR 603.5: the declined trigger leaves the Piker a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
-    Spec.assertEqWith s "and the Bonesplitter unattached" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid after)) (splitterOn after)) [Just Nothing]
-  -- CR 702.16d's ATTACH gate, separated from CR 702.16b's TARGET gate -- which
-  -- equip could never do, because there the ability's source IS the Equipment,
-  -- so rule 702.16b turns the targeting away before the attach is reached
-  -- (attachRestrictionSpec above says so at length). Here the source is
-  -- Sigarda's Aid, an enchantment: with Synthetic Grave Bulwark in her graveyard
-  -- alice's Piker has protection from artifacts, rule 702.16b lets a white
-  -- enchantment's ability target it anyway, and rule 702.16d then refuses the
-  -- artifact Bonesplitter's move.
-  --
-  -- The trigger STAYING on the stack is what separates the two: had rule 702.16b
-  -- applied, CR 603.3d would have removed the ability for want of a legal target,
-  -- which is the shroud board in the first case above.
-  Spec.it s "CR 702.16b/702.16d whole cards: the protected Piker is a legal target and still cannot be equipped" $ do
-    plains <- S.printingOf s registry "Plains"
-    aid <- S.printingOf s registry "Sigarda's Aid"
-    piker <- S.printingOf s registry "Goblin Piker"
-    bulwark <- S.printingOf s registry "Synthetic Grave Bulwark"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let base0 = S.landsInPlay plains 1
-        (_, base1) = S.addPermanent aid S.alice base0
-        (pikerId, base2) = S.addPermanent piker S.alice base1
-        (_, base3) = S.addGraveyardCard bulwark S.alice base2
-        (splitterId, ready) = S.addHandCard bonesplitter S.alice base3
-        cast = S.runPure (attachingTo pikerId) ready (S.cast S.alice splitterId)
-        entered = S.runPure (attachingTo pikerId) cast Stack.resolveTop
-        placed = S.runPure (attachingTo pikerId) entered Engine.settleForPriority
-        after = S.runPure (attachingTo pikerId) placed Stack.resolveTop
-        splitterOn gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Bonesplitter"))) (Set.toList (GameState.battlefield gs))
-    Spec.assertBool s (Projection.hasKeyword protectionFromArtifacts pikerId placed) "before: the Piker has protection from artifacts"
-    -- The gameplay-level pair. CR 702.16b did NOT apply, and CR 702.16d did.
-    Spec.assertEqWith s "CR 702.16b: an enchantment's ability may still target it, so the trigger is on the stack" (length (GameState.stack placed)) 1
-    Spec.assertEqWith s "CR 702.16d: the artifact Bonesplitter cannot equip it, so it is still a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
-    Spec.assertEqWith s "and the Bonesplitter stayed put, unattached, rather than moving (CR 701.3b)" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid after)) (splitterOn after)) [Just Nothing]
-
 -- CR 702.92a / 702.163a / 702.182a: living weapon, for Mirrodin! and job select
 -- are one sentence three times over -- "When this Equipment enters, create a
 -- [token], then attach this Equipment to it" -- so Pawl.Engine.Keyword mints all
@@ -4222,41 +4135,6 @@ groupAttachSpec s registry =
           Spec.assertEqWith s "both Auras stay on the Brigade" (hostOf strength after, hostOf pacified after) (Just victim, Just victim)
           Spec.assertEqWith s "the Apostle took nothing" (S.powerToughnessOf warded after) (Just (2, 1))
           Spec.assertEqWith s "and the trigger did resolve" (length (GameState.stack after)) 0
-        -- Balan, Wandering Knight {2}{W}{W} 3/3 first strike: "Balan has double
-        -- strike as long as two or more Equipment are attached to it. {1}{W}:
-        -- Attach all Equipment you control to Balan." Flayer Husk is already on
-        -- Balan, so a destination test that excluded any mover's current host
-        -- (Attach.hostsFor's CR 701.3b exclusion, taken per group) would offer
-        -- nothing and move nothing. Bob's Barbed Batterfist is not alice's.
-        Spec.it s "CR 701.3a Balan gathers every Equipment alice controls, including one already on it" $ do
-          plains <- S.printingOf s registry "Plains"
-          balan <- S.printingOf s registry "Balan, Wandering Knight"
-          piker <- S.printingOf s registry "Goblin Piker"
-          giant <- S.printingOf s registry "Hill Giant"
-          bonesplitter <- S.printingOf s registry "Bonesplitter"
-          blade <- S.printingOf s registry "Dúnedain Blade"
-          husk <- S.printingOf s registry "Flayer Husk"
-          batterfist <- S.printingOf s registry "Barbed Batterfist"
-          let g0 = S.landsFor plains S.alice 2 (Setup.emptyGame S.bothPlayers)
-              (knight, g1) = S.addPermanent balan S.alice g0
-              (carrier, g2) = S.addPermanent piker S.alice g1
-              (bobs, g3) = S.addPermanent giant S.bob g2
-              (split, g4) = S.addPermanent bonesplitter S.alice g3
-              (loose, g5) = S.addPermanent blade S.alice g4
-              (worn, g6) = S.addPermanent husk S.alice g5
-              (bobsGear, g7) = S.addPermanent batterfist S.bob g6
-              board = (S.attach bobsGear bobs (S.attach worn knight (S.attach split carrier g7))) {GameState.priority = Just S.alice}
-          case Face.activatedAbilities (S.combinedFace balan) of
-            [ability] -> do
-              let activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice knight ability)
-                  after = S.runPure S.identityAnswer activated Stack.resolveTop
-              Spec.assertEqWith s "all three of alice's Equipment are on Balan" (fmap (`hostOf` after) [split, loose, worn]) [Just knight, Just knight, Just knight]
-              Spec.assertEqWith s "bob's stays on his Giant" (hostOf bobsGear after) (Just bobs)
-              Spec.assertEqWith s "Balan is 3/3 + 2/+0 + 2/+1 + 1/+1" (S.powerToughnessOf knight after) (Just (8, 5))
-              Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike knight after) "with two or more attached, Balan has double strike"
-              Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike knight board)) "where one attached gave him none"
-              Spec.assertEqWith s "the Piker is a plain 2/1" (S.powerToughnessOf carrier after) (Just (2, 1))
-            _ -> Spec.assertFailure s "Balan should print one activated ability"
         -- Vulshok Battlemaster {4}{R} 2/2 haste: "When this creature enters,
         -- attach all Equipment on the battlefield to it. (Control of the
         -- Equipment doesn't change.)" Bob's Batterfist on bob's Giant comes too,

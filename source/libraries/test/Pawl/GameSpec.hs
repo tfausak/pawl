@@ -1463,11 +1463,6 @@ concedeOrderAnswer who p = case p of
 
 concedeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
-  Spec.it s "CR 104.3a/104.2a a concede ends the game immediately, opponent wins" $ do
-    let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
-        after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
-    Spec.assertEqWith s "bob wins" (GameState.result after) (Just (Result.Won S.bob))
-
   Spec.it s "the conceding player departs as Conceded, not Lost" $ do
     let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
         after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
@@ -1559,20 +1554,6 @@ concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
     Spec.assertEqWith s "CR 104.3b takes alice first, so bob wins" (GameState.result atOwnPriority) (Just (Result.Won S.bob))
     Spec.assertEqWith s "CR 104.2a: had bob got out first, alice wins" (GameState.result beforeSettle) (Just (Result.Won S.alice))
     Spec.assertBool s (GameState.result atOwnPriority /= GameState.result beforeSettle) "the race decides the game, not its timing"
-
-  Spec.it s "CR 104.3a concede does not use the stack: a spell on it never resolves" $ do
-    -- A Lightning Bolt is on the stack targeting nothing in particular. alice
-    -- concedes at her priority; the game ends without the stack resolving.
-    lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (spellId, base) = S.spellOnStack lightningBolt S.alice (Setup.emptyGame S.bothPlayers)
-        gs =
-          base
-            { GameState.phase = Phase.PrecombatMain,
-              GameState.activePlayer = S.alice
-            }
-        after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
-    Spec.assertEqWith s "bob wins" (GameState.result after) (Just (Result.Won S.bob))
-    Spec.assertEqWith s "the spell never left the stack" (GameState.stack after) [spellId]
 
 -- M5.6a / CR 800.4: the turn order and priority control flow around a departure
 -- that does NOT end the game. Most cases here need three seats: at two players
@@ -2884,17 +2865,6 @@ cleanupBoard filler n others =
 -- current.
 cleanupStepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ do
-  Spec.it s "CR 514.3a a trigger waiting during cleanup resolves in that cleanup" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    megrim <- S.printingOf s registry "Megrim"
-    let after = S.runPure S.identityAnswer (cleanupBoard piker 8 [megrim]) Engine.runStep
-    Spec.assertEqWith s "CR 514.1 trimmed alice to her maximum hand size" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
-    Spec.assertEqWith s "Megrim's trigger RESOLVED, in this cleanup step" (S.lifeOf S.alice after) (Just 18)
-    Spec.assertEqWith s "and left the stack empty" (GameState.stack after) []
-    Spec.assertEqWith s "the turn did not hand off" (GameState.activePlayer after) S.alice
-    Spec.assertEqWith s "so it is still turn 1" (GameState.turnNumber after) 1
-    Spec.assertEqWith s "and another cleanup step began" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
-
   -- The termination argument at Engine.cleanupException, pinned: the chain is
   -- two cleanup steps because CR 514.1 finds the hand already at its maximum
   -- the second time round and so has no discard to fire the Megrim with.

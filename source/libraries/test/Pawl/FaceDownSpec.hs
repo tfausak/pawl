@@ -2934,29 +2934,6 @@ disguiseSpec s registry =
               Spec.assertEqWith s "the {1}{W} sorcery tapped two lands and no more" (S.tappedCount S.alice after) 2
               Spec.assertEqWith s "CR 701.40d both roads are open" (FaceDown.turnableFaceUp S.alice after) [(permanent, TurnUpProcedure.Disguise), (permanent, TurnUpProcedure.Manifest)]
 
-        -- WHAT THE LISTING IS FOR, at gameplay level: an opponent's removal aimed
-        -- at the face-down permanent fires CR 702.21a's trigger off the listed
-        -- ward, and declining counters the spell.
-        --
-        -- THREE SEATS, ZoneTriggerSpec's ward group's reason: carol is neither the
-        -- caster nor the ward's controller, so "an opponent controls it" is a
-        -- different sentence from "bob controls it".
-        Spec.it s "CR 702.168b / 702.21a the listed ward fires on an opponent's spell, and declining counters it" $ do
-          board <- wardedBoard s registry phantomName disguised
-          case board of
-            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
-            Just (permanent, onStack) -> do
-              -- THE BEHAVIOUR FIRST, ahead of every control below: with the stack
-              -- resolved down, a 5/5 is the Growth having resolved and a 2/2 is CR
-              -- 701.6a's countered spell.
-              let declined = S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
-              Spec.assertEqWith s "CR 702.21a bob declined, so the Growth was countered and it is still a 2/2" (S.powerToughnessOf permanent declined) (Just (2, 2))
-              Spec.assertEqWith s "CR 701.6a and the stack is empty" (length (GameState.stack declined)) 0
-              -- The controls: the Growth really was cast (rule 702.21a is not a CR
-              -- 115 targeting restriction), and the trigger really went on over it.
-              Spec.assertEqWith s "CR 708.2 a 2/2 with the Growth unresolved" (S.powerToughnessOf permanent onStack) (Just (2, 2))
-              Spec.assertEqWith s "the Growth and the ward trigger are both on the stack" (length (GameState.stack onStack)) 2
-
         -- THE PAIR, and the case that makes the one above and
         -- data/scenarios/face-down/cr-702-21a-paying-the-listed-ward-cost-leaves-the-spell-to.json
         -- about the LISTING rather than about the board: the same three seats, the same Giant Growth, the

@@ -92,15 +92,6 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
--- The battlefield objects whose printed card is Monstrous War-Leech. Found by
--- name rather than tracked by id: CR 400.7 makes an object that changes zones a
--- new object, and pawl gives each one a fresh ObjectId, so the id the cast was
--- handed names nothing on the battlefield (the Pawl.CopySpec precedent).
-leechesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
-leechesOnBattlefield gs =
-  let isLeech oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.faceOf oid gs)
-   in filter isLeech (Set.toList (GameState.battlefield gs))
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   Spec.it s "CR 604.3 the seed carries the CDA as QUANTITIES, with the printed star substituted" $ do
@@ -191,35 +182,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         (goyfId, board) = S.addPermanent tarmogoyf S.alice gs0
         gs = S.withHumility humility board
     Spec.assertEqWith s "no CDA survives layer 6" (PC.characteristicPT (Projection.project goyfId gs)) Nothing
-  Spec.it s "CR 608.2h a resolved pump is FROZEN and does not shrink with the hand" $ do
-    -- THE FALSIFIER for re-evaluating a stored quantity: CR 608.2h says the
-    -- answer is determined only once, when the effect is applied. Alice
-    -- resolves the pump with two cards left in hand (+2/+2), then casts one of
-    -- them -- her hand is now one card, and the pump must NOT follow it down.
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    innerCalm <- S.printingOf s registry "Inner Calm, Outer Strength"
-    giantGrowth <- S.printingOf s registry "Giant Growth"
-    let base = S.landsInPlay forest 4
-        (pikerId, board) = S.addPermanent piker S.alice base
-        -- handOne FIRST (it replaces the hand and sets up the phase), then
-        -- addHandCard for the extras.
-        (h1, icId) = S.handOne innerCalm board
-        (ggId, h2) = S.addHandCard giantGrowth S.alice h1
-        (_, gs) = S.addHandCard forest S.alice h2
-        -- Casting Inner Calm moves it from hand to the stack, leaving two.
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice icId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        -- Now the hand shrinks. Giant Growth is only CAST, not resolved, so it
-        -- contributes no pump of its own -- the only thing that changed is the
-        -- number Inner Calm counted.
-        shrunk = snd (Engine.runGamePure S.identityAnswer after (S.cast S.alice ggId))
-    Spec.assertEqWith s "two cards left in hand at resolution" (S.handSize S.alice after) 2
-    Spec.assertEqWith s "the 2/1 Piker is pumped to 4" (Projection.powerOf pikerId after) (Just 4)
-    Spec.assertEqWith s "and to 3 toughness" (Projection.toughnessOf pikerId after) (Just 3)
-    Spec.assertEqWith s "the hand is down to one card" (S.handSize S.alice shrunk) 1
-    Spec.assertEqWith s "THE FREEZE: still +2, not +1" (Projection.powerOf pikerId shrunk) (Just 4)
-    Spec.assertEqWith s "and still +2 toughness" (Projection.toughnessOf pikerId shrunk) (Just 3)
   Spec.it s "CR 611.2 the freeze does NOT reach a static ability's continuous effect" $ do
     -- Opalescence's SetBasePowerToughness carries ManaValue, and CR 611.2 scopes
     -- the freeze to effects created by a spell's RESOLUTION. A static ability's

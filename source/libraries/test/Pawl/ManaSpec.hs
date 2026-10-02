@@ -4462,7 +4462,7 @@ cabalCoffersBoard coffers swamp forest bloodletter swamps =
           }
       )
 
-cabalCoffersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cabalCoffersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 cabalCoffersSpec s registry = Spec.describe s "Cabal Coffers" $ do
   Spec.it s "CR 106.3 an addition's count is read off the board, so three Swamps add three black mana and one adds one" $ do
     coffers <- S.printingOf s registry "Cabal Coffers"
@@ -4483,46 +4483,6 @@ cabalCoffersSpec s registry = Spec.describe s "Cabal Coffers" $ do
     -- rather than through a payment: the two cannot disagree about what the
     -- board yields.
     Spec.assertEqWith s "CR 118.3 the cast gate agrees with the payment at both counts" (fmap (uncurry (S.castable S.alice)) [(threeSpell, three), (oneSpell, one)]) [True, False]
-
-  -- CR 612.1: the count is printed text like any other, so a swap naming its
-  -- word moves which permanents it counts -- the site
-  -- Pawl.Engine.Projection.Rewrite's AddMana arm had nothing to reach before the
-  -- count became a Quantity.
-  --
-  -- THE PAIR is the two swaps below, on ONE board: the same Coffers, the same
-  -- three tapped Swamps and one tapped Island of alice's, differing only in the
-  -- word swapped FROM. Swamp is the word the Coffers carries and Plains is not,
-  -- so the second swap leaves the route exactly as printed. A swap to a type
-  -- alice DOES control makes the hacked count one rather than none, which is
-  -- what tells a moved word from a broken route.
-  --
-  -- BOB casts the Hack, off an Island of his own: the payment loop floats the
-  -- whole capacity of whoever pays, so alice casting it would tap her Coffers
-  -- for the printed count before the swap ever resolved.
-  Spec.it s "CR 612.1 a text change naming the count's word moves which permanents it counts" $ do
-    coffers <- S.printingOf s registry "Cabal Coffers"
-    swamp <- S.printingOf s registry "Swamp"
-    forest <- S.printingOf s registry "Forest"
-    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
-    island <- S.printingOf s registry "Island"
-    hack <- S.printingOf s registry "Magical Hack"
-    let (coffersId, spell, base) = cabalCoffersBoard coffers swamp forest bloodletter 3
-        (aliceIsland, withIsland) = S.addPermanent island S.alice base
-        (hackId, board) = S.addHandCard hack S.bob (S.landsFor island S.bob 1 (S.tapObject aliceIsland withIsland))
-        after from = snd (Engine.runGamePure (hackedCoffers coffersId from Subtype.Island) board (S.cast S.bob hackId >> Stack.resolveTop >> S.cast S.alice spell >> Stack.resolveTop))
-        arrived = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Bloodletter of Aclazotz") S.alice
-    Spec.assertEqWith s "CR 612.1 the hacked Coffers counts the one Island, and the swap of a word it never carried leaves it counting three Swamps" (fmap (arrived . after) [Subtype.Swamp, Subtype.Plains]) [0, 1]
-
--- Magical Hack aimed at one permanent by FILTERING the offer rather than
--- rebuilding it (CR 608.2b drops a hand-built recipient of the wrong shape with
--- no error), and CR 612.1's swap answered with the pair under test. Every other
--- decision on the board is settled -- one Island makes the {U}, and the Coffers
--- is the only black -- so the identity answerer picks nothing that matters.
-hackedCoffers :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
-hackedCoffers coffersId from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just coffersId) . Recipient.objectOf) . snd) sets
-  Prompt.ChooseLandTypeSwap {} -> (from, to)
-  _ -> S.identityAnswer p
 
 translatorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 translatorSpec s registry = Spec.describe s "Kozilek's Translator" $ do

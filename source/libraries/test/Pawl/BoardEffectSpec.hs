@@ -1534,14 +1534,6 @@ gloriousProtectorSpec s registry =
         List.find
           (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (named name))
           (Set.toList (GameState.battlefield gs))
-      -- Cast the Protector and stop with its enters trigger ON THE STACK: the
-      -- spell resolves, then one settle places the trigger (CR 603.3b) and
-      -- nothing resolves it. That is the window CR 610.3b is about.
-      triggerOnStack :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> GameState.GameState
-      triggerOnStack answer (withSpell, spell) =
-        let afterCast = S.runPure answer withSpell (S.cast S.alice spell)
-            entered = S.runPure answer afterCast Stack.resolveTop
-         in S.runPure answer entered Engine.settleForPriority
    in Spec.describe s "GloriousProtector" $ do
         -- The empty answer CR 608.2d admits, which is a different thing from the
         -- may being declined below: the player WAS asked and named nobody.
@@ -1584,39 +1576,6 @@ gloriousProtectorSpec s registry =
                   Spec.assertEqWith
                     s
                     "and the Bird Maiden is back on alice's battlefield"
-                    (controlledNames S.alice after)
-                    (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
-        -- CR 610.3b: kill the Protector while its own enters trigger is still on
-        -- the stack, and nothing is exiled -- the card's ruling states it in those
-        -- words. The answerer is the accepting one, which names every candidate, so
-        -- an engine that exiled would exile three creatures here rather than none.
-        --
-        -- The +1/+1 counter is what makes the leg discriminating, and an
-        -- exile-is-empty reading on its own would not be: the CR 610.3 sweep
-        -- returns whatever was exiled inside this same priority loop, so a board
-        -- read afterwards shows an empty exile either way. What it cannot hand back
-        -- is the OBJECT -- CR 400.7 mints a new one, and the card's ruling spells
-        -- out the consequence, that counters on the exiled permanent cease to
-        -- exist. So the counter surviving on the id the fixture put it on is
-        -- "this creature never moved".
-        Spec.it s "CR 610.3b a source that has left before its trigger resolves exiles nothing" $ do
-          staged <- printings
-          case maidenId (fst staged) of
-            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
-            Just maiden -> do
-              let (board0, spell) = staged
-                  onStack = triggerOnStack accepting (S.addCounter CounterKind.PlusOnePlusOne 1 maiden board0, spell)
-              case permanentNamed "Glorious Protector" onStack of
-                Nothing -> Spec.assertFailure s "the Protector should have entered"
-                Just oid -> do
-                  Spec.assertEqWith s "the enters trigger is on the stack and has not resolved" (length (GameState.stack onStack)) 1
-                  let killed = S.runPure accepting onStack (Event.destroy Regenerability.Regenerable [oid])
-                      after = S.runPure accepting killed Engine.priorityLoop
-                  Spec.assertEqWith s "the Bird Maiden never moved: the same object still carries its +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne maiden after) 1
-                  Spec.assertEqWith s "nothing is exiled" (exiledNames after) []
-                  Spec.assertEqWith
-                    s
-                    "and every creature alice controlled is still hers, the Protector aside"
                     (controlledNames S.alice after)
                     (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
         -- CR 610.3: the return is a one-shot effect created immediately after the

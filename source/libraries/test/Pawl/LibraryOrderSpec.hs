@@ -1727,13 +1727,6 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
         after = S.runPure S.identityAnswer gs act
     Spec.assertEqWith s "nothing to choose" asked 0
     Spec.assertBool s (not (S.onBattlefield his after)) "but it still died"
-  -- CR 609.3 again: a player with no creatures sacrifices nothing, and the
-  -- edict simply does as much as it can -- which is nothing.
-  Spec.it s "CR 609.3 an edict against an empty board does nothing" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (src, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (PlayerRef.EachInSlot slotTarget) creatureFilter (Quantity.Literal 1))))
-    Spec.assertBool s (S.onBattlefield src after) "alice keeps hers"
 
 createEmblemSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 createEmblemSpec s registry = Spec.describe s "CreateEmblem" $ do

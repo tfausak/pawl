@@ -23,7 +23,6 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -52,7 +51,6 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1922,17 +1920,6 @@ furies decision victim p = case p of
 buybackAnnouncements :: [Response.Response] -> [BuybackDecision.BuybackDecision]
 buybackAnnouncements = Maybe.mapMaybe (\response -> case response of Response.AnnouncedBuyback d -> Just d; _ -> Nothing)
 
--- `furies` buying back, plus CR 616.1e's order: take the candidate the Rest in
--- Peace SOURCES when `restFirst`, and rule 702.27a's row -- whose source is the
--- spell's own stack incarnation, an id no fixture holds -- when not. Pinned by
--- source rather than by index, so neither answer can turn into the other under a
--- change to the engine's canonical candidate order.
-racingFuries :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-racingFuries restFirst restId victim p = case p of
-  Prompt.ChooseReplacement _ _ entries ->
-    maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> (ReplacementEntry.source entry == restId) == restFirst) entries)
-  _ -> furies BuybackDecision.BuysBack victim p
-
 buybackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 buybackSpec s registry = Spec.describe s "Buyback" $ do
   -- CR 702.27a's "you MAY pay": declining is a real answer, and CR 608.2n's
@@ -3651,21 +3638,8 @@ harmonizeSpec s registry = Spec.describe s "Harmonize" $ do
 -- ONE BOARD for every case: five Islands, three Plains, Mulldrifter and Flicker of
 -- Fate in hand, six library cards. Both of Mulldrifter's costs are payable on
 -- it, so the cases differ only in which candidate `payingFor` names.
-evokeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+evokeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 evokeSpec s registry = Spec.describe s "Evoke" $ do
-  -- CR 603.4 and CR 400.7: Flicker of Fate, cast with the sacrifice trigger on
-  -- the stack, returns a NEW Mulldrifter nobody paid an evoke cost for, so its
-  -- own instance's "if" fails and it does not trigger. The evoked one's trigger
-  -- then has no object left to sacrifice (CR 400.7): disabling CR 608.2a's
-  -- re-check leaves this case green, so it proves the trigger-time check alone.
-  Spec.it s "CR 603.4 a flickered evoked Mulldrifter is not sacrificed" $ do
-    (board, mulldrifter, flicker) <- evokeBoard s registry
-    let entered = S.runPure (payingFor evokeCost) (S.runPure (payingFor evokeCost) board (S.cast S.alice mulldrifter)) (Stack.resolveTop >> Engine.settleForPriority)
-        flickered = S.runPure S.identityAnswer (S.runPure S.identityAnswer entered (S.cast S.alice flicker)) (Stack.resolveTop >> Engine.settleForPriority)
-        after = S.runPure S.identityAnswer flickered (Monad.replicateM_ (4 :: Int) (Stack.resolveTop >> Engine.settleForPriority))
-    Spec.assertEqWith s "two triggers waited on the stack for Flicker of Fate" (length (GameState.stack entered)) 2
-    Spec.assertEqWith s "CR 603.4 the returned Mulldrifter is still on the battlefield" (length (namedOnBattlefield "Mulldrifter" after)) 1
-    Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
   -- CR 702.170d with CR 118.9a: a plotted card is cast without paying its mana
   -- cost, and that is its only cost -- no second alternative. Aven Interrupter
   -- plots bob's Mulldrifter off the stack; the control is the same Mulldrifter
@@ -4066,74 +4040,6 @@ warpSpec s registry = Spec.describe s "Warp" $ do
 colossusCost, warpCost :: [ManaSymbol.ManaSymbol]
 colossusCost = [ManaSymbol.Generic 9]
 warpCost = [ManaSymbol.Generic 3]
-
--- CR 702.190a on Donatello's Technique {2}{U} Sorcery, "Sneak {U} / Draw two
--- cards." (Oracle text checked on Scryfall, 2026-09-13). Chosen over Splinter's
--- Technique, the issue's card, for its effect alone: both are sorceries with
--- sneak, and a draw is one reading where a library search is several.
---
--- A SORCERY is the point. CR 702.190a's window -- "any time you could cast an
--- instant during your declare blockers step" -- has to WIDEN for this card to be
--- castable at all in that step, and has to NARROW so that the cost paid there is
--- rule 702.190a's and never the printed one.
---
--- THREE ISLANDS on every board, enough for either cost, so no case below turns on
--- mana. What the boards differ in is whether alice has an unblocked attacker.
---
--- CR 702.190b is the group's second card, Splinter, Hamato Yoshi {1}{B}
--- Legendary Creature -- Mutant Ninja Rat 1/3, "Sneak {B} / Menace / Other Ninjas
--- you control get +1\/+1" (Oracle text checked on Scryfall, 2026-09-18): a
--- PERMANENT spell, which the sorcery above cannot be, so that the rider has a
--- permanent to ride on.
-sneakSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-sneakSpec s registry = Spec.describe s "Sneak" $ do
-  Spec.it s "CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer" $ do
-    island <- S.printingOf s registry "Island"
-    technique <- S.printingOf s registry "Donatello's Technique"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (g0, ours, _) = S.combatBoardOf [piker] []
-        pikerId = case ours of
-          oid : _ -> oid
-          -- combatBoardOf returns one id per printing given, so this is
-          -- unreachable; a bogus id fails the assertions rather than the suite.
-          [] -> S.noSource
-        withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) g0 [1 :: Int .. 3]
-        (techniqueId, withCard) = S.addHandCard technique S.alice withLands
-        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) withCard [1 :: Int .. 4]
-        -- CR 509.1h: no blocker was declared for the Piker, so it is an unblocked
-        -- creature. The step is set after the declaration rather than run into, so
-        -- the board states rule 702.190a's window outright.
-        blockersStep gs = gs {GameState.phase = Phase.Combat CombatStep.DeclareBlockers, GameState.priority = Just S.alice}
-        attacking = blockersStep (S.runPure S.aggressiveAnswer stocked (Combat.declareAttackers S.manaPerformer S.alice))
-        -- The same seats, the same three Islands and the same card in hand, one
-        -- turn-based action earlier: nothing is attacking, so rule 702.190a's
-        -- return has no payer. ninjutsuBeforeAttack's paired control.
-        noAttack = blockersStep stocked
-        held gs = length (Game.zoneMembers Zone.Hand S.alice gs)
-        cast wanted = castResolved (payingFor wanted) techniqueId attacking
-    Spec.assertEqWith
-      s
-      "CR 702.190a the sorcery resolved in the declare blockers step: alice drew two and the Piker is home, leaving two drawn cards and the Piker in a hand that held only the Technique"
-      (S.onBattlefield pikerId (cast sneakCost), held (cast sneakCost))
-      (False, 3)
-    Spec.assertEqWith
-      s
-      "CR 702.190a asked for the printed {2}{U} the answerer gets rule 702.190a's cost anyway, because that window offers no other: the Piker still went home"
-      (S.onBattlefield pikerId (cast techniqueCost))
-      False
-    Spec.assertBool
-      s
-      (any (S.isCastOf techniqueId) (Action.legalActions S.alice attacking))
-      "CR 702.190a a SORCERY is offered in the declare blockers step, which CR 117.1a alone would never allow"
-    Spec.assertBool
-      s
-      (not (any (S.isCastOf techniqueId) (Action.legalActions S.alice noAttack)))
-      "the control: the same step and the same mana with nothing attacking offer no cast, so the window alone is not what carried the case above"
-
--- Donatello's Technique's printed {2}{U} and its sneak {U}.
-techniqueCost, sneakCost :: [ManaSymbol.ManaSymbol]
-techniqueCost = [ManaSymbol.Generic 2, theBlue]
-sneakCost = [theBlue]
 
 -- CR 702.117a on Boulder Salvo {4}{R} Sorcery, "Surge {1}{R} / Boulder Salvo
 -- deals 4 damage to target creature." (Oracle text checked on Scryfall,
@@ -4847,17 +4753,6 @@ payingFor wanted p = case p of
   Prompt.ChooseCost _ _ _ candidates ->
     Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
   _ -> S.identityAnswer p
-
-evokeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
-evokeBoard s registry = do
-  island <- S.printingOf s registry "Island"
-  plains <- S.printingOf s registry "Plains"
-  mulldrifter <- S.printingOf s registry "Mulldrifter"
-  flicker <- S.printingOf s registry "Flicker of Fate"
-  let (mulldrifterId, gs1) = S.addHandCard mulldrifter S.alice (S.landsFor plains S.alice 3 (S.landsInPlay island 5))
-      (flickerId, gs2) = S.addHandCard flicker S.alice gs1
-      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs2 [1 :: Int .. 6]
-  pure (aliceOnTurn stocked, mulldrifterId, flickerId)
 
 -- CR 702.133a's two static abilities, on Direct Current {1}{R}{R} Sorcery,
 -- "Direct Current deals 2 damage to any target." plus jump-start.
@@ -5796,7 +5691,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   cleaveSpec s registry
   overloadSpec s registry
   warpSpec s registry
-  sneakSpec s registry
   surgeSpec s registry
   spectacleSpec s registry
   prowlSpec s registry

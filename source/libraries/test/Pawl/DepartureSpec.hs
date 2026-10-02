@@ -191,12 +191,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
     Spec.assertEq s (statusOf S.alice after) . Just $ Status.Departed Departure.Type.Conceded
 
-  Spec.it s "CR 104.2a the last player standing wins, without waiting for a state-based action check" $ do
-    -- leaveGame settles the outcome itself. Nothing runs an SBA pass here.
-    let gs = Setup.emptyGame S.bothPlayers
-        after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
-    Spec.assertEq s (GameState.result after) . Just $ Result.Won S.bob
-
   Spec.it s "an already-decided result is not overwritten" $ do
     let gs = (Setup.emptyGame S.bothPlayers) {GameState.result = Just Result.Drawn}
         after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
@@ -232,12 +226,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     let after = S.runPure S.identityAnswer S.threePlayerGame (Departure.leaveGame Departure.Type.Conceded S.bob)
     Spec.assertEqWith s "bob keeps his seat" (GameState.turnOrder after) [S.alice, S.bob, S.carol]
     Spec.assertEqWith s "but is no longer playing" (Game.stillPlaying after) [S.alice, S.carol]
-
-  Spec.it s "CR 104.2a one departure does not decide a three-player game" $ do
-    let after = S.runPure S.identityAnswer S.threePlayerGame (Departure.leaveGame Departure.Type.Conceded S.bob)
-        andAnother = S.runPure S.identityAnswer after (Departure.leaveGame Departure.Type.Conceded S.carol)
-    Spec.assertEqWith s "two survivors, no result" (GameState.result after) Nothing
-    Spec.assertEqWith s "one survivor, alice wins" (GameState.result andAnother) (Just (Result.Won S.alice))
 
   -- CR 725.4: "If the monarch leaves the game, the active player becomes the
   -- monarch at the same time as that player leaves the game."

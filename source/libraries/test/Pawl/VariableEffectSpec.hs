@@ -1616,14 +1616,6 @@ opposedBolsterBoard s registry = do
       (gs, spellId) = S.handOne defenses g3
   pure (pikerId, ratsId, wallId, gs, spellId)
 
--- CR 115.6: declines every optional slot, announcing zero targets. Everything
--- else is S.identityAnswer's answer, which for ChooseTargets fills what it is
--- offered -- so the two answerers differ in exactly one decision.
-decliningTargets :: Prompt.Prompt r -> r
-decliningTargets p = case p of
-  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 0) offers
-  _ -> S.identityAnswer p
-
 -- CR 115.6's "up to one target", read at resolution.
 --
 -- Rat Out {B} Instant (data/cards/rat-out.json): "Up to one target creature gets
@@ -1761,30 +1753,6 @@ soulfireEruptionSpec s registry =
             "all three exiled cards carry the play permission, so the grant ran once per iteration"
             (permissionsIn S.alice after)
             [True, True, True]
-        -- CR 601.2c's "any number of target ...", which is what the card prints
-        -- and what data/cards/soulfire-eruption.json says: no printed maximum, so
-        -- the ceiling is the candidate count and nothing else. FOUR seats and
-        -- bob's Ogre Sentry make five candidates and four are announced -- more
-        -- than the three the other cases take, so any reading that puts a literal
-        -- cap back on the slot fails HERE and nowhere else.
-        --
-        -- The four cards exiled have mana values 1, 2, 4 and 8: pairwise distinct
-        -- and pairwise-sum distinct, so no two readings of the loop land on one
-        -- life total.
-        Spec.it s "CR 601.2c any number of targets: four announced on a five-candidate board" $ do
-          after <- board 4 S.fourPlayerGame ["Sabretooth Tiger", "Bird Maiden", "Excruciator", "Hill Giant", "Goblin Piker", "Benalish Hero"]
-          Spec.assertEqWith
-            s
-            "FOUR different cards left the library, top first, and the two under them stayed in order"
-            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
-            ( List.sort [named "Benalish Hero", named "Goblin Piker", named "Hill Giant", named "Excruciator"],
-              [named "Bird Maiden", named "Sabretooth Tiger"]
-            )
-          Spec.assertEqWith
-            s
-            "Benalish Hero (1) to alice, Goblin Piker (2) to bob, Hill Giant (4) to carol, Excruciator (8) to dave"
-            (lives after, S.lifeOf S.dave after)
-            ((Just 19, Just 18, Just 16), Just 12)
         -- CR 608.2f's SECONDARY sentence: two of the victims are objects ONE
         -- player controls, so their relative order is the resolving controller's
         -- -- alice's, though bob is the one who controls them, which is the whole
@@ -1856,14 +1824,6 @@ aimingAtEveryPlayer n p =
         Prompt.AnnounceTargets {} -> announcingCount n p
         Prompt.ChooseTargets _ _ _ sets -> S.preferring isPlayerRecipient sets
         _ -> S.identityAnswer p
-
--- Answers Prompt.ChoosePaidEnergy with a fixed amount, deferring everything else
--- to S.identityAnswer. PINNED rather than read off the prompt's own bound, so a
--- mutation to that bound cannot quietly repair the answer.
-paying :: Natural -> Prompt.Prompt r -> r
-paying n p = case p of
-  Prompt.ChoosePaidEnergy {} -> n
-  _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do

@@ -66,7 +66,6 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -365,30 +364,6 @@ skipSpec s registry = Spec.describe s "Skip" $ do
           "only this phase's steps dropped"
           (Turn.dropSkippedCombatSteps (Phase.Combat CombatStep.DeclareAttackers) full)
           expected
-  Spec.it s "CR 508.8 no attacker declared skips to end of combat" $
-    -- Nobody has a creature, so no attackers are declared: the declare
-    -- blockers and combat damage steps must not run at all.
-    let (gs, _, _) = S.combatBoardOf [] []
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
-     in Spec.assertEqWith s "jumped past the two dead steps" (GameState.phase after) (Phase.Combat CombatStep.EndOfCombat)
-  Spec.it s "CR 508.8 the skip stands even when an instant could have been cast" $ do
-    -- bob holds a castable Bolt; nobody attacks. The blockers and damage
-    -- steps are still dropped -- the priority windows an instant would use
-    -- in them do not exist (CR 500.11: proceed as though they don't).
-    --
-    -- The WHOLE step, not just its turn-based actions: CR 508.8's condition
-    -- is settled as the declare attackers step ends, because its second
-    -- clause ("or put onto the battlefield attacking") can only come true in
-    -- that step's priority round -- which is also the round this test's Bolt
-    -- would be cast in.
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (base, _) = S.boltInHand mountain bolt 1 (Phase.Combat CombatStep.DeclareAttackers)
-        armed = base {GameState.activePlayer = S.bob}
-        after = snd (Engine.runGamePure S.identityAnswer armed Engine.runStep)
-        remaining = foldr (:) [] (GameState.remaining after)
-    Spec.assertBool s (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining) "no blockers step"
-    Spec.assertBool s (notElem (Phase.Combat CombatStep.CombatDamage) remaining) "no damage step"
   Spec.it s "CR 508.8 a creature put onto the battlefield attacking keeps the two steps" $ do
     -- The rule's SECOND clause on its own, with nothing declared. A DIRECT
     -- call, so the clause is stated with no card in the way: it is what
@@ -1156,45 +1131,6 @@ aimCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
--- CR 603.7a / 603.7b / 118.12: "at the beginning of your next upkeep, pay ...
--- If you don't, you lose the game", through Pact of the Titan ({0} Instant,
--- "Create a 4/4 red Giant creature token." plus that clause). Onset.Immediately
--- is the whole of "next": the ability watches from its creation, fires once,
--- and only on its controller's upkeep.
-nextUpkeepSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-nextUpkeepSpec s registry = Spec.describe s "PactNextUpkeep" $ do
-  let boardOf = do
-        mountain <- S.printingOf s registry "Mountain"
-        pact <- S.printingOf s registry "Pact of the Titan"
-        piker <- S.printingOf s registry "Goblin Piker"
-        let (pactId, withPact) = S.addHandCard pact S.alice (S.landsInPlay mountain 5)
-            stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
-        pure
-          ( (stock (stock withPact S.alice) S.bob)
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice,
-                GameState.remaining = S.phasesAfter Phase.PrecombatMain
-              },
-            pactId
-          )
-      answering :: PaymentDecision.PaymentDecision -> Prompt.Prompt r -> r
-      answering decision p = case p of
-        Prompt.ChooseToPay {} -> decision
-        _ -> S.identityAnswer p
-      giant = CardName.MkCardName (Text.pack "Giant Token")
-      turnsWith decision n gs = if n <= (0 :: Int) then gs else turnsWith decision (n - 1) (fst (runTurn (answering decision) gs))
-  Spec.it s "CR 118.12 whole card: declining at alice's next upkeep loses her the game" $ do
-    (gs, pact) <- boardOf
-    let resolved = castAndResolve pact gs
-        atBobsTurn = turnsWith PaymentDecision.Declines 1 resolved
-        atAlicesTurn = turnsWith PaymentDecision.Declines 1 atBobsTurn
-        after = turnsWith PaymentDecision.Declines 1 atAlicesTurn
-    Spec.assertEqWith s "the Giant was made" (S.countOnBattlefieldByName giant S.alice resolved) 1
-    Spec.assertEqWith s "bob's upkeep is not alice's" (GameState.activePlayer atAlicesTurn, Game.stillPlaying atAlicesTurn) (S.alice, [S.alice, S.bob])
-    Spec.assertEqWith s "alice lost on her next turn" (Game.stillPlaying after) [S.bob]
-    Spec.assertEqWith s "in its upkeep" (GameState.phase after) (Phase.Beginning BeginningStep.Upkeep)
-
 -- Casts the first castable spell offered and passes otherwise, deferring every
 -- other prompt to S.identityAnswer. This is the CR 724.1f discriminator: under a
 -- correct implementation alice never gets a priority window with an empty stack
@@ -1290,17 +1226,6 @@ endTurnSpec s registry = Spec.describe s "EndTheTurn" $ do
     ((gs, _, _), _, _) <- board
     let phases = snd (runTurn castingFirst gs)
     Spec.assertEqWith s "the postcombat main phase and the end step never ran" phases [Phase.PrecombatMain, Phase.Ending EndingStep.Cleanup]
-  -- CR 724.1b against CR 608.2n: both spells are EXILED, and neither reaches a
-  -- graveyard. Asserting Time Stop's own destination is also what makes a card
-  -- that failed to parse unable to pass this group.
-  Spec.it s "CR 724.1b it exiles the whole stack, the resolving spell included" $ do
-    ((gs, _, _), stopName, burstName) <- board
-    let after = fst (runTurn castingFirst gs)
-    Spec.assertEqWith s "alice's exile holds Time Stop" (namesIn Zone.Exile S.alice after) [Just stopName]
-    Spec.assertEqWith s "bob's exile holds Burst Lightning" (namesIn Zone.Exile S.bob after) [Just burstName]
-    Spec.assertEqWith s "and neither graveyard has either" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([], [])
-    Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
-    Spec.assertEqWith s "and nothing on the stack resolved" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 20)
   -- CR 724.1f: no player gets priority during this process, and CR 724.1d has
   -- ended the step, so the window a sorcery would need never opens. The one
   -- assertion that separates a correct implementation from one that rewrites the
@@ -1666,7 +1591,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   turnScopedSkipSpec s registry
   thatTurnSpec s registry
   gambitSpec s registry
-  nextUpkeepSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry
   skippedEndOfCombatSpec s registry

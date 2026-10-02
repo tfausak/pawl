@@ -185,29 +185,6 @@ choosesDefenderRecordingDecider who p = case p of
     pure who
   _ -> pure (S.identityAnswer p)
 
--- Records the PlayerId of every Prompt.DeclareBlockers ask AND the blocker
--- candidates that ask was offered, then blocks the first attacker with
--- everything. Two accumulators threaded as one State pair: the ASK is what
--- CR 509.1 is about (who declares), and the OFFER is what CR 509.1a is about
--- (whose creatures are even eligible). Everything else delegates, so the
--- wildcard keeps this out of the -Werror exhaustiveness net.
-recordingBlockers :: Prompt.Prompt r -> State.State ([PlayerId.PlayerId], [ObjectId.ObjectId]) r
-recordingBlockers p = case p of
-  Prompt.DeclareBlockers _ pid candidates attackers -> do
-    State.modify' (\(asks, offers) -> (asks <> [pid], offers <> candidates))
-    pure $ case attackers of
-      [] -> Map.empty
-      a : _ -> Map.fromList (fmap (\b -> (b, Set.singleton a)) candidates)
-  _ -> pure (S.identityAnswer p)
-
--- Run Combat.declareBlockers under recordingBlockers. State.runState (State s a)
--- s0 :: (a, s), so the tuple comes back (final state, accumulators) and this
--- flips it to put the accumulators first.
-runRecordingBlockers :: GameState.GameState -> (([PlayerId.PlayerId], [ObjectId.ObjectId]), GameState.GameState)
-runRecordingBlockers gs =
-  let (after, seen) = State.runState (fmap snd (Engine.runGame recordingBlockers gs (Combat.declareBlockers S.manaPerformer))) ([], [])
-   in (seen, after)
-
 -- CR 802: the attack multiple players option, which every game pawl starts uses
 -- (Pawl.Types.GameSettings.attackOption). THREE SEATS throughout, since
 -- at two the option and CR 506.2's base rule coincide exactly and nothing here
@@ -470,33 +447,6 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     Spec.assertEqWith s "alice really had a legal attacker" (fmap (\oid -> Combat.canAttack S.alice oid ready) mine) [True]
     Spec.assertEqWith s "nobody attacked" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertEqWith s "and nothing was tapped" (S.tappedCount S.alice after) 0
-  Spec.it s "CR 509.1 only the defending player is asked to declare blockers" $ do
-    -- CR 509.1's first sentence names THE defending player, singular. CR 802.4
-    -- has several of them declare in APNAP order, which Combat.declareBlockers
-    -- does by looping over Defender.defendingPlayers; this board records carol as
-    -- the only defender, so that loop has one seat to ask.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (board, mine, bobs, carols) = S.threePlayerCombat [piker] [piker] [piker]
-        attackMap = case mine of
-          oid : _ -> Map.singleton oid (AttackTarget.OfPlayer S.carol)
-          [] -> Map.empty
-        ready =
-          board
-            { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
-              GameState.combat =
-                (GameState.combat board)
-                  { Combat.Type.defenders = [S.carol],
-                    Combat.Type.attackers = attackMap
-                  }
-            }
-        ((asked, offeredBlockers), after) = runRecordingBlockers ready
-    Spec.assertEqWith s "the fixture gave bob and carol a blocker each" (length bobs, length carols) (1, 1)
-    -- Discriminating: the behaviour this phase replaces loops over every
-    -- opponent, so `asked` would be [bob, carol].
-    Spec.assertEqWith s "only carol was asked" asked [S.carol]
-    -- And bob's untapped creature is never offered, per CR 509.1a.
-    Spec.assertEqWith s "bob's creature is in no candidate list" (filter (\oid -> elem oid bobs) offeredBlockers) []
-    Spec.assertEqWith s "carol's block was recorded" (Map.size (Combat.Type.blockers (GameState.combat after))) 1
 
 -- Re-sicken alice's creatures, as though they had just resolved this turn.
 justArrived :: GameState.GameState -> GameState.GameState

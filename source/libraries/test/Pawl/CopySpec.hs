@@ -131,7 +131,6 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -140,21 +139,17 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
-import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.EntryR as EntryR
-import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRetention as ManaRetention
@@ -171,14 +166,12 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -333,21 +326,6 @@ resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> G
 resolveAndSettle answer gs =
   snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
 
--- Rite of Replication {2}{U}{U} Sorcery: "Kicker {5} ... Create a token that's a
--- copy of target creature. If this spell was kicked, create five of those tokens
--- instead" -- two clauses on Quantity.WasKicked, the kicked one carrying a count
--- of five (data/cards/rite-of-replication.json).
---
--- Answers CR 702.33a's kicker question with `decision` and aims the one target
--- slot at `victim` -- PINNED to that id rather than searched for, so a mutation
--- cannot be repaired by an answerer that finds another legal target. Every
--- as-enters copy choice a minted token then makes goes to copyNewest.
-rites :: KickerDecision.KickerDecision -> ObjectId -> Prompt.Prompt r -> r
-rites decision victim p = case p of
-  Prompt.ChooseKicker {} -> decision
-  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
-  _ -> copyNewest p
-
 -- Vesuva Land: "You may have this land enter tapped as a copy of any land on the
 -- battlefield" (data/cards/vesuva.json; Oracle text checked against
 -- api.scryfall.com, 2026-08-21). The whole of its printed text, and what makes a
@@ -405,17 +383,6 @@ activates srcId ability p = case p of
 -- mana ability CR 605.3b keeps off the stack, which no priority window offers.
 animationAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 animationAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.combinedFace
-
--- The activated ability Mercurial Pretender's copy exception QUOTES (CR 707.9a),
--- read off the printed card so the priority loop has to offer it on the engine's
--- own account.
-quotedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-quotedAbility printing =
-  Maybe.listToMaybe
-    [ ability
-    | ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy asCopy)) <- fmap PrintedReplacement.effect (Face.replacementEffects (S.combinedFace printing)),
-      CopyException.GainAbility (GrantedAbility.Activated ability) <- AsCopy.exceptions asCopy
-    ]
 
 -- alice, with priority in her own precombat main phase and the rest of the turn
 -- ahead, so a priority loop run over the board can offer her an activation.
@@ -1041,49 +1008,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "a token copy of the survivor is a same-named legend too, so CR 704.5j takes it (CR 707.2)" (length (tokensOnBattlefield minted)) 0
         Spec.assertEqWith s "where a token copy of the nonlegendary Piker beside it stands" (length (tokensOnBattlefield plain)) 1
       others -> Spec.assertFailure s ("expected exactly one Sakashima, got " <> show (length others))
-
-  -- THE PROVING TEST for CR 707.9a's QUOTED arm, CopyException.GainAbility.
-  -- Mercurial Pretender {4}{U} Creature -- Shapeshifter 0/0: "You may have this
-  -- creature enter as a copy of a creature you control, except it has \"{2}{U}{U}:
-  -- Return this creature to its owner's hand.\"" (Oracle text checked against
-  -- api.scryfall.com, 2026-09-11.)
-  --
-  -- The Pretender copies a Goblin Piker, which prints no activated ability, and a
-  -- Clone then copies the Pretender. Each leg activates the quoted ability off ONE
-  -- of the two through the priority loop -- `activates` takes it only if the
-  -- engine offers it -- so a bounce is the ability existing on that permanent,
-  -- and WHICH permanent leaves is its source (CR 113.7). The Clone's leg is CR
-  -- 707.9a's "becomes part of the copiable values" read through CR 707.2: a CR
-  -- 613 grant on the Pretender would not reach the Clone.
-  --
-  -- The control is the same board with the Clone copying the Piker instead: one
-  -- thing differs, and that Clone is offered nothing.
-  Spec.it s "Mercurial Pretender's copy has the quoted ability, and so does a Clone of it (CR 707.9a)" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    pretender <- S.printingOf s registry "Mercurial Pretender"
-    case quotedAbility pretender of
-      Nothing -> Spec.assertFailure s "Mercurial Pretender quotes no activated ability"
-      Just quoted -> do
-        let (pikerId, board0) = S.addPermanent piker S.alice (S.landsInPlay island 4)
-            entering victim printing gs = resolveAndSettle (copyNamed victim) (snd (S.spellOnStack printing S.alice gs))
-            entered = entering pikerId pretender board0
-        case printedOnBattlefield "Mercurial Pretender" entered of
-          [pretenderId] -> do
-            let cloned = entering pretenderId clone entered
-                control = entering pikerId clone entered
-                bounce srcId gs = resolveAll (activates srcId quoted) (readiedForAlice gs)
-            case (clonesOnBattlefield cloned, clonesOnBattlefield control) of
-              ([cloneId], [controlId]) -> do
-                -- THE GAMEPLAY ASSERTIONS, ahead of every diagnostic.
-                Spec.assertEqWith s "the Pretender's copy returns itself, not the Piker it copied (CR 707.9a)" (onBattlefield pretenderId (bounce pretenderId cloned), onBattlefield pikerId (bounce pretenderId cloned)) (False, True)
-                Spec.assertEqWith s "a Clone of the copy has the ability too, and returns itself (CR 707.2)" (onBattlefield cloneId (bounce cloneId cloned), onBattlefield pretenderId (bounce cloneId cloned)) (False, True)
-                Spec.assertBool s (onBattlefield controlId (bounce controlId control)) "where a Clone of the Piker itself is offered nothing"
-                -- Diagnostic, after the behaviour: the copy really was the Piker.
-                Spec.assertEqWith s "the Pretender entered as the Piker's 2/1" (S.powerToughnessOf pretenderId entered) $ Just (2, 1)
-              _ -> Spec.assertFailure s "expected one Clone on each board"
-          others -> Spec.assertFailure s ("expected exactly one Mercurial Pretender, got " <> show (length others))
 
   -- THE PROVING TEST for CR 707.9c, CopyException.DontCopyColors. Vesuvan
   -- Doppelganger {3}{U}{U} Creature -- Shapeshifter 0/0: "You may have this
@@ -1785,28 +1709,6 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
           other -> Spec.assertFailure s ("expected exactly one token copy, got " <> show (length other))
         Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
 
--- CR 702.21a's observer for a copy's targets: bob's Tomakul Honor Guard, {1}{G}
--- 3/1 whose whole text box is "Ward {2}", against alice's Twincast.
---
--- THREE SEATS, and each holds one role: alice copies, bob controls the warded
--- creature, and carol is neither -- so "a spell an opponent controls" is not the
--- same sentence as "a spell alice controls".
---
--- alice's own Goblin Piker is what the ORIGINAL Giant Growth names in the
--- re-target case, so the Guard is a target of the COPY and of nothing else there.
---
--- FIVE LANDS: one Forest and two Islands are the Growth and the Twincast exactly,
--- and the two Forests left over are the ward cost alice CAN pay and declines --
--- so a countered copy is her declining rather than her being unable.
-wardedCopyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, ObjectId, ObjectId, GameState.GameState)
-wardedCopyBoard forest island guard piker growth twincast =
-  let lands = S.landsFor island S.alice 2 (S.landsFor forest S.alice 3 S.threePlayerGame)
-      (withGrowth, growthId) = S.handOne growth lands
-      (twincastId, withTwincast) = S.addHandCard twincast S.alice withGrowth
-      (guardId, withGuard) = S.addPermanent guard S.bob withTwincast
-      (pikerId, gs) = S.addPermanent piker S.alice withGuard
-   in (guardId, pikerId, growthId, twincastId, gs)
-
 -- Resolve until the stack is empty. The two readings of a copy's targets put
 -- DIFFERENT numbers of objects on the stack -- one ward trigger more under the
 -- rule -- so a fixed count of resolutions would leave the two boards at
@@ -1817,40 +1719,6 @@ drainStack answer =
         | fuel <= 0 || null (GameState.stack gs) = gs
         | otherwise = go (fuel - 1) (resolveOne answer gs)
    in go (10 :: Int)
-
-copyTargetSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-copyTargetSpec s registry =
-  let boardOf = do
-        forest <- S.printingOf s registry "Forest"
-        island <- S.printingOf s registry "Island"
-        guard <- S.printingOf s registry "Tomakul Honor Guard"
-        piker <- S.printingOf s registry "Goblin Piker"
-        growth <- S.printingOf s registry "Giant Growth"
-        twincast <- S.printingOf s registry "Twincast"
-        pure (wardedCopyBoard forest island guard piker growth twincast)
-   in Spec.describe s "Pawl.Engine.Copy" $ do
-        -- The same rule for a target the copy KEPT. CR 707.10 copies the
-        -- decisions and CR 707.10c leaves an unchanged target unchanged, but the
-        -- copy is "itself a spell" and the Guard becomes a target of THAT spell
-        -- too, so ward fires a second time.
-        --
-        -- Here the Growth names the Guard, so ward fires once as it is cast; the
-        -- copy's own trigger is the second. Both are declined, so 3/1 is both
-        -- spells countered and 6/4 is the copy having resolved -- which is what
-        -- an engine that recorded only a CHANGED target reads.
-        Spec.it s "CR 707.10 a target the copy KEPT becomes a target of the copy too" $ do
-          (guardId, pikerId, growthId, twincastId, board) <- boardOf
-          let castGrowth = S.runPure (pinTarget (Recipient.ToCreature guardId)) board (S.cast S.alice growthId)
-          case topOfStack castGrowth of
-            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
-            Just growthSpell -> do
-              let cast = S.runPure (pinTarget (Recipient.ToObject growthSpell)) castGrowth (S.cast S.alice twincastId)
-                  copied = resolveOne (pinTarget (Recipient.ToCreature guardId)) cast
-                  after = drainStack S.identityAnswer copied
-              Spec.assertEqWith s "both the copy and the Growth were countered, so the Guard is a 3/1" (S.powerToughnessOf guardId after) (Just (3, 1))
-              Spec.assertEqWith s "alice's Piker, whom nothing named, is untouched" (S.powerToughnessOf pikerId after) (Just (2, 1))
-              Spec.assertEqWith s "TWO ward triggers stand over the copy and the Growth" (length (GameState.stack copied)) 4
-              Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
 
 -- alice holds Stir the Grave and Twincast with three Swamps and two Islands
 -- untapped -- exactly {2}{B} and {U}{U}, so neither cast can fail for mana --
@@ -2219,9 +2087,8 @@ castingRollicker wanted host p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just host) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
 
-bestowingRollicker, printedRollicker :: ObjectId -> Prompt.Prompt r -> r
+bestowingRollicker :: ObjectId -> Prompt.Prompt r -> r
 bestowingRollicker = castingRollicker [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
-printedRollicker = castingRollicker [ManaSymbol.OfType (ManaType.Colored Color.Red)]
 
 -- Every permanent named Nyxborn Rollicker alice has on the battlefield -- by
 -- NAME rather than by Source, so a copy that never became a token and one that
@@ -2664,7 +2531,7 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 -- FIVE DISTINCT PAIRS after the Growths, so no two reads share a number: the
 -- Piker 5/4, the Spider 5/7, the Wall 3/11, Zada 6/6 from the original alone,
 -- and the Mongoose still 2/1.
-zadaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+zadaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 zadaSpec s registry =
   let boardOf = do
         forest <- S.printingOf s registry "Forest"
@@ -2696,35 +2563,6 @@ zadaSpec s registry =
       -- `you`, which stays in because the assertions read objects alone).
       stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Map.delete Binding.triggerSource (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs))))))) (GameState.stack gs)
    in Spec.describe s "Pawl.Engine.Copy" $ do
-        Spec.it s "CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one" $ do
-          (zadaId, pikerId, spiderId, wallId, mongooseId, growthId, board) <- boardOf
-          let cast = snd (Engine.runGamePure (atZada zadaId) board {GameState.priority = Just S.alice} (S.cast S.alice growthId))
-              -- CR 603.3b puts Zada's trigger on the stack above the Growth;
-              -- draining resolves the trigger, then its copies, then the Growth.
-              placed = snd (Engine.runGamePure (atZada zadaId) cast Engine.settleForPriority)
-              -- The trigger alone, which is the moment the copies exist and
-              -- none has resolved -- where "a copy isn't created" is visible.
-              afterTrigger = resolveOne (atZada zadaId) placed
-              after = drainStack (atZada zadaId) placed
-              pt oid = S.powerToughnessOf oid after
-          -- The fixture's own precondition, which no reading of rule 707.10d can
-          -- redden: the Mongoose is on the battlefield to be passed over.
-          Spec.assertBool s (S.powerToughnessOf mongooseId board == Just (2, 1)) "the Mongoose starts 2/1"
-          -- Rule 707.10d's last sentence at the only place it is observable: a
-          -- copy made for the Mongoose anyway would be COUNTERED for an illegal
-          -- target (CR 608.2b) and leave every P/T below reading the same, so
-          -- the copies are counted and named where they sit on the stack.
-          Spec.assertEqWith
-            s
-            "CR 707.10d one copy per creature the Growth could target, each on a different one, and none for the Mongoose"
-            (List.sort (concatMap (Maybe.mapMaybe Recipient.objectOf) (List.init (stackTargets afterTrigger))))
-            (List.sort [pikerId, spiderId, wallId])
-          Spec.assertEqWith s "CR 707.10d a copy targeted the Piker" (pt pikerId) (Just (5, 4))
-          Spec.assertEqWith s "CR 707.10d a different copy targeted the Spider" (pt spiderId) (Just (5, 7))
-          Spec.assertEqWith s "CR 707.10d and a third the Wall" (pt wallId) (Just (3, 11))
-          Spec.assertEqWith s "CR 707.10d the Mongoose has shroud, so the spell could not target it" (pt mongooseId) (Just (2, 1))
-          Spec.assertEqWith s "and Zada took only the original Growth, no copy having been made for it" (pt zadaId) (Just (6, 6))
-          Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
         -- CR 707.10d's one player choice: "the copies are put onto the stack
         -- with those targets in the order of their controller's choice". Two
         -- runs off one board differing in exactly the answer
@@ -2809,9 +2647,8 @@ copiedTriggerTargetSpec s registry =
 -- 2026-09-05.)
 --
 -- Rule 707.10e has two halves and this covers both. The COPY'S TARGET is the
--- object the effect states rather than the one the original announced, which the
--- Growth case reads twice -- off the stack by identity, and off the board after
--- it resolves. And "if that player or object isn't a legal target for each
+-- object the effect states rather than the one the original announced, which
+-- data/scenarios/copy/'s Giant Growth case reads. And "if that player or object isn't a legal target for each
 -- instance of the word 'target', the copy isn't created", which the Reprisal
 -- pair reads: two boards differing in NOTHING but Ivy's power, one where she
 -- clears the spell's "power 4 or greater" and one where she does not.
@@ -2819,19 +2656,9 @@ copiedTriggerTargetSpec s registry =
 -- bob casts in both, so the trigger's "a player casts" is exercised at a seat
 -- that is not the ability's controller, and carol sits out to keep the three
 -- roles apart.
-ivySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ivySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 ivySpec s registry =
-  let growthBoard = do
-        forest <- S.printingOf s registry "Forest"
-        ivy <- S.printingOf s registry "Ivy, Gleeful Spellthief"
-        spider <- S.printingOf s registry "Giant Spider"
-        growth <- S.printingOf s registry "Giant Growth"
-        let lands = S.landsFor forest S.bob 1 S.threePlayerGame
-            (ivyId, g1) = S.addPermanent ivy S.alice lands
-            (spiderId, g2) = S.addPermanent spider S.bob g1
-            (growthId, g3) = S.addHandCard growth S.bob g2
-        pure (ivyId, spiderId, growthId, g3)
-      reprisalBoard = do
+  let reprisalBoard = do
         plains <- S.printingOf s registry "Plains"
         ivy <- S.printingOf s registry "Ivy, Gleeful Spellthief"
         berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
@@ -2862,18 +2689,6 @@ ivySpec s registry =
         let cast = snd (Engine.runGamePure answer board {GameState.priority = Just S.bob} (S.cast S.bob spellId))
          in resolveOne answer (snd (Engine.runGamePure answer cast Engine.settleForPriority))
    in Spec.describe s "Pawl.Engine.Copy" $ do
-        Spec.it s "CR 707.10e the copy targets Ivy rather than what the original announced" $ do
-          (ivyId, spiderId, growthId, board) <- growthBoard
-          let afterTrigger = afterTriggerOf (aimedAt spiderId) growthId board
-              after = drainStack (aimedAt spiderId) afterTrigger
-              pt oid = S.powerToughnessOf oid after
-          -- The fixture's own precondition: two DISTINCT pairs to start with, so
-          -- no read below shares a number with another.
-          Spec.assertEqWith s "Ivy starts 2/1 and the Spider 2/4" (S.powerToughnessOf ivyId board, S.powerToughnessOf spiderId board) (Just (2, 1), Just (2, 4))
-          Spec.assertEqWith s "CR 707.10e the copy pumped Ivy, whom the original never targeted" (pt ivyId) (Just (5, 4))
-          Spec.assertEqWith s "CR 707.10e the copy on the stack names Ivy and nobody else" (fmap (Maybe.mapMaybe Recipient.objectOf) (Maybe.listToMaybe (stackTargets afterTrigger))) (Just [ivyId])
-          Spec.assertEqWith s "CR 707.10 the original still pumped the Spider bob aimed it at" (pt spiderId) (Just (5, 7))
-          Spec.assertEqWith s "CR 707.10e ONE copy, so the stack held the copy and the Growth" (length (stackTargets afterTrigger)) 2
         -- CR 707.10e's "the copy isn't created", on two boards differing in one
         -- thing: whether Ivy clears Reprisal's "power 4 or greater". Legality is
         -- judged for the COPY, whose controller CR 707.10 makes alice, so this is
@@ -2945,49 +2760,6 @@ radiateSpec s registry =
     Spec.assertEqWith s "the Bolt alone was on the stack as Radiate was cast" (length (GameState.stack bolted)) 1
     Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
 
--- CR 707.10d's "could target" is the ORIGINAL's, read from its controller's seat
--- (CR 109.5) and not from the seat of whoever copies it. Ink-Treader Nephilim's
--- ruling (Scryfall, 2006-02-01) gives the example: the copies "see that from the
--- perspective of the original spell's controller", and a copy aimed where only
--- that seat could reach is countered on resolution.
---
--- bob casts Crumb and Get It ("target creature you control") on his Icehide
--- Golem, and alice Radiates it. From bob's seat the Coal Golem is a creature he
--- controls and alice's Spider is not, so the one copy goes to the Coal Golem. The
--- copy is alice's, and from her seat the Coal Golem is no creature she controls,
--- so it is countered (CR 608.2b). Read from alice's seat instead, the Spider
--- would take the copy and grow to 4/6.
-radiatePerspectiveSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-radiatePerspectiveSpec s registry =
-  Spec.describe s "Pawl.Engine.Copy" . Spec.it s "CR 707.10d / 109.5 Radiate's candidates are what the original's controller could target" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    radiate <- S.printingOf s registry "Radiate"
-    crumb <- S.printingOf s registry "Crumb and Get It"
-    spider <- S.printingOf s registry "Giant Spider"
-    coal <- S.printingOf s registry "Coal Golem"
-    icehide <- S.printingOf s registry "Icehide Golem"
-    let lands = S.landsFor plains S.bob 1 (S.landsFor mountain S.alice 5 S.threePlayerGame)
-        (spiderId, g1) = S.addPermanent spider S.alice lands
-        (coalId, g2) = S.addPermanent coal S.bob g1
-        (icehideId, g3) = S.addPermanent icehide S.bob g2
-        (crumbId, g4) = S.addHandCard crumb S.bob g3
-        (radiateId, board) = S.addHandCard radiate S.alice g4
-        aimed :: Maybe ObjectId -> Prompt.Prompt r -> r
-        aimed spell p = case p of
-          Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (\r -> Recipient.objectOf r == Just icehideId || (Maybe.isJust spell && Recipient.objectOf r == spell)) offered) asked
-          _ -> S.identityAnswer p
-        crumbed = snd (Engine.runGamePure (aimed Nothing) board {GameState.priority = Just S.bob} (S.cast S.bob crumbId))
-        crumbOnStack = Maybe.listToMaybe (GameState.stack crumbed)
-        radiated = snd (Engine.runGamePure (aimed crumbOnStack) crumbed {GameState.priority = Just S.alice} (S.cast S.alice radiateId))
-        afterRadiate = resolveOne (aimed crumbOnStack) radiated
-        after = drainStack (aimed crumbOnStack) afterRadiate
-        pt oid = S.powerToughnessOf oid after
-    Spec.assertEqWith s "CR 109.5 alice's Spider is no creature bob controls, so it takes no copy" (pt spiderId) (Just (2, 4))
-    Spec.assertEqWith s "CR 707.10d one copy, for the Coal Golem, over the Crumb" (length (GameState.stack afterRadiate)) 2
-    Spec.assertEqWith s "CR 608.2b the copy is alice's, so the Coal Golem is no legal target and it is countered" (pt coalId) (Just (3, 3))
-    Spec.assertEqWith s "and the Icehide took the original" (pt icehideId) (Just (4, 4))
-
 -- CR 707.10d's "each OTHER" where the other is not the source: Precursor Golem
 -- {5} Artifact Creature -- Golem 3/3, "When this creature enters, create two 3/3
 -- colorless Golem artifact creature tokens. Whenever a player casts an instant or
@@ -3047,7 +2819,7 @@ precursorGolemSpec s registry =
 -- OrderForEach answer reverses the copies. bob Bolts alice's Icehide Golem, so
 -- her other two Golems take one copy each, and only the player who is asked can
 -- change the order.
-precursorGolemSeatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+precursorGolemSeatSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 precursorGolemSeatSpec s registry =
   let -- The Growth-like spell is aimed at the Icehide; nothing else is asked
       -- except the order, which `reorder` answers for bob alone.
@@ -3061,22 +2833,6 @@ precursorGolemSeatSpec s registry =
         let cast = snd (Engine.runGamePure answer board {GameState.priority = Just S.bob} (S.cast S.bob spellId))
          in resolveOne answer (snd (Engine.runGamePure answer cast Engine.settleForPriority))
    in Spec.describe s "Pawl.Engine.Copy" $ do
-        Spec.it s "CR 707.10 / 109.5 Precursor Golem's copies are judged from the caster's seat" $ do
-          plains <- S.printingOf s registry "Plains"
-          precursor <- S.printingOf s registry "Precursor Golem"
-          coal <- S.printingOf s registry "Coal Golem"
-          icehide <- S.printingOf s registry "Icehide Golem"
-          crumb <- S.printingOf s registry "Crumb and Get It"
-          let lands = S.landsFor plains S.bob 1 S.threePlayerGame
-              (precursorId, g1) = S.addPermanent precursor S.alice lands
-              (coalId, g2) = S.addPermanent coal S.bob g1
-              (icehideId, g3) = S.addPermanent icehide S.bob g2
-              (crumbId, board) = S.addHandCard crumb S.bob g3
-              after = drainStack (aimedAt icehideId id) (afterTriggerOf (aimedAt icehideId id) crumbId board)
-              pt oid = S.powerToughnessOf oid after
-          Spec.assertEqWith s "CR 109.5 bob's copy pumped his Coal Golem, a creature he controls" (pt coalId) (Just (5, 5))
-          Spec.assertEqWith s "and alice's Precursor Golem is no creature bob controls" (pt precursorId) (Just (3, 3))
-          Spec.assertEqWith s "the Icehide took the original" (pt icehideId) (Just (4, 4))
         Spec.it s "CR 707.10d the caster, not the Golem's controller, orders the copies" $ do
           mountain <- S.printingOf s registry "Mountain"
           precursor <- S.printingOf s registry "Precursor Golem"
@@ -3259,14 +3015,6 @@ isActivationOf oid a = case a of
   A.Activate o _ -> o == oid
   _ -> False
 
--- Synthetic Mirror of the Fallen's two slots, FILTERED from the offered set
--- rather than built, so CR 608.2b's re-read finds the recipients the engine
--- offered. One predicate for both: the pools are opposite graveyards.
-mirrorTargets :: ObjectId -> ObjectId -> Prompt.Prompt r -> r
-mirrorTargets subject original p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (\r -> r == Recipient.ToObject subject || r == Recipient.ToObject original) . snd) sets
-  _ -> S.identityAnswer p
-
 -- Is Doom Blade, sitting in alice's hand, castable? CR 601.2c: only with a legal
 -- target, and its one slot is "target nonblack creature".
 doomBladeOffered :: ObjectId -> GameState.GameState -> Bool
@@ -3360,55 +3108,6 @@ graveyardTokenCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertEqWith s "and has mana value 0" (PC.manaValue (Projection.project cloneId cloned)) (Just 0)
           Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
-
-  -- CR 707.2 / 613.1f: a graveyard card's keywords are its PROJECTED ones, so
-  -- Synthetic Mirror of the Fallen ("Target card in your graveyard becomes a
-  -- copy of target card in an opponent's graveyard") changes which embalm it
-  -- offers. One board, two casts differing only in the targets: alice's
-  -- Skirmisher becomes a Hill Giant, or her Goblin Piker becomes bob's
-  -- Skirmisher. Each cast leaves the other's subject untouched, so each
-  -- negative has the other board's positive as its control; both leave four
-  -- Islands, exactly embalm's {3}{U}.
-  Spec.it s "CR 707.2 a graveyard card offers the embalm of what it is a copy of, not its printed one" $ do
-    island <- S.printingOf s registry "Island"
-    skirmisher <- S.printingOf s registry "Tah-Crop Skirmisher"
-    piker <- S.printingOf s registry "Goblin Piker"
-    giant <- S.printingOf s registry "Hill Giant"
-    mirror <- S.printingOf s registry "Synthetic Mirror of the Fallen"
-    let (ownSkirmisher, _, base) = graveyardCopyBoard skirmisher island 6 0
-        (ownPiker, withPiker) = S.addGraveyardCard piker S.alice base
-        (theirSkirmisher, withTheirs) = S.addGraveyardCard skirmisher S.bob withPiker
-        (theirGiant, board) = S.addGraveyardCard giant S.bob withTheirs
-        mirrored subject original = castAndResolve (mirrorTargets subject original) mirror board
-        skirmisherAsGiant = mirrored ownSkirmisher theirGiant
-        pikerAsSkirmisher = mirrored ownPiker theirSkirmisher
-        offered oid gs = any (isActivationOf oid) (Action.legalActions S.alice gs)
-    Spec.assertBool s (not (offered ownSkirmisher skirmisherAsGiant)) "a Skirmisher that is a copy of Hill Giant offers no embalm"
-    Spec.assertBool s (offered ownPiker pikerAsSkirmisher) "a Goblin Piker that is a copy of Tah-Crop Skirmisher offers embalm"
-    Spec.assertBool s (offered ownSkirmisher pikerAsSkirmisher) "where the Skirmisher the Mirror did not touch still does"
-
-  -- The same Mirror, and the same crossed pair, for a card's own AUTHORED
-  -- ability rather than a keyword's: Reassembling Skeleton's "{1}{B}: Return
-  -- this card from your graveyard to the battlefield tapped" (CR 113.6m). Both
-  -- casts leave two Swamps, exactly the return's {1}{B}, so the positive is the
-  -- negative's control.
-  Spec.it s "CR 707.2 a graveyard card offers the authored abilities of what it is a copy of" $ do
-    island <- S.printingOf s registry "Island"
-    swamp <- S.printingOf s registry "Swamp"
-    skeleton <- S.printingOf s registry "Reassembling Skeleton"
-    piker <- S.printingOf s registry "Goblin Piker"
-    giant <- S.printingOf s registry "Hill Giant"
-    mirror <- S.printingOf s registry "Synthetic Mirror of the Fallen"
-    let lands = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (ownSkeleton, withSkeleton) = S.addGraveyardCard skeleton S.alice lands
-        (ownPiker, withPiker) = S.addGraveyardCard piker S.alice withSkeleton
-        (theirSkeleton, withTheirs) = S.addGraveyardCard skeleton S.bob withPiker
-        (theirGiant, withGiant) = S.addGraveyardCard giant S.bob withTheirs
-        board = withGiant {GameState.priority = Just S.alice, GameState.activePlayer = S.alice, GameState.phase = Phase.PostcombatMain}
-        mirrored subject original = castAndResolve (mirrorTargets subject original) mirror board
-        offered oid gs = any (isActivationOf oid) (Action.legalActions S.alice gs)
-    Spec.assertBool s (not (offered ownSkeleton (mirrored ownSkeleton theirGiant))) "a Skeleton that is a copy of Hill Giant offers no return"
-    Spec.assertBool s (offered ownPiker (mirrored ownPiker theirSkeleton)) "a Goblin Piker that is a copy of Reassembling Skeleton offers the return"
 
 -- CR 707.2's token copy entering tapped and attacking (CR 110.5b, CR 508.4), and
 -- named later in the same resolution (CR 603.7c): Flamerush Rider, "Whenever this

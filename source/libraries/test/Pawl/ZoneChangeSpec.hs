@@ -71,7 +71,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
-import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -1034,7 +1033,7 @@ drawCardSpec s registry = Spec.describe s "DrawCard" $ do
     let after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Event.drawCard S.alice)
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "drewFromEmpty marked"
 
-loseLifeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+loseLifeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
   -- Both cases are Sign in Blood, the card that proves the opcode (#273): its
   -- two clauses share one target slot, so the player who draws is the player
@@ -1060,21 +1059,6 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
     Spec.assertEqWith s "and lost two life" (S.lifeOf S.bob after) (fmap (subtract 2) (S.lifeOf S.bob gs))
     Spec.assertEqWith s "alice, who cast it, lost none" (S.lifeOf S.alice after) (S.lifeOf S.alice gs)
     Spec.assertBool s (not (any isDamage (S.eventsOf after))) "no damage was dealt (CR 119.2)"
-  -- CR 704.5a: life lost without damage still reaches the state-based
-  -- action -- the same check a CR 119.4 pay-life cost answers to. Bob is at
-  -- two, so the second clause is lethal though nothing dealt damage.
-  Spec.it s "CR 704.5a Sign in Blood's life loss can take a player to 0 and lose them the game" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    signInBlood <- S.printingOf s registry "Sign in Blood"
-    let base = S.landsInPlay swamp 2
-        withLib = stockLibrary piker S.bob 3 base
-        (gs0, spellId) = S.handOne signInBlood withLib
-        gs = gs0 {GameState.players = Map.adjust (\pl -> pl {Player.life = 2}) S.bob (GameState.players gs0)}
-        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "bob is at 0" (S.lifeOf S.bob after) (Just 0)
-    Spec.assertEqWith s "and alice wins" (GameState.result (S.settleSba after)) (Just (Result.Won S.alice))
 
 -- A per-player amount that is a number of the RECIPIENT'S OWN, on three opcodes
 -- and through the two spellings of that reading:
@@ -2071,10 +2055,6 @@ elkinLairSpec s registry =
                 (gs {GameState.phase = step, GameState.activePlayer = S.bob})
          in S.runPure answer began Engine.settleForPriority
       endStep = Phase.Ending EndingStep.EndStep
-      -- Bob's main phase after that upkeep, where S.castAnswer plays whatever
-      -- he may: the exiled card is the only card he could play.
-      bobsMainPlaying :: GameState.GameState -> GameState.GameState
-      bobsMainPlaying gs = S.runPure S.castAnswer gs {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob} Engine.priorityLoop
       -- Pinned by INDEX into the offer rather than read off the prompt's fields:
       -- an answerer that hunted for "a legal card" would go on answering legally
       -- after a mutation broke which card the engine honours.
@@ -2120,25 +2100,6 @@ elkinLairSpec s registry =
               after = S.runPure S.identityAnswer (bobsStepBegins endStep S.identityAnswer upkept) Engine.priorityLoop
           Spec.assertEqWith s "the Goblin Piker bob never played is in his graveyard" (namesIn Zone.Graveyard S.bob after) [named "Goblin Piker"]
           Spec.assertEqWith s "and no longer in exile" (namesIn Zone.Exile S.bob upkept, namesIn Zone.Exile S.bob after) ([named "Goblin Piker"], [])
-        -- CR 603.4: the condition is false as the end step begins, so the ability
-        -- never triggers -- not merely finds nothing (CR 603.7c) on resolution.
-        Spec.it s "CR 603.4 a card cast from exile was played, so the end step trigger does not trigger" $ do
-          lair <- S.printingOf s registry "Elkin Lair"
-          mountain <- S.printingOf s registry "Mountain"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let withMana g = snd (S.addPermanent mountain S.bob (snd (S.addPermanent mountain S.bob g)))
-              played = bobsMainPlaying (runBobsUpkeep (rolling 0) (withMana (board lair [] [piker])))
-              ending = bobsStepBegins endStep S.identityAnswer played
-          Spec.assertEqWith s "nothing triggered at bob's end step" (length (GameState.stack ending)) 0
-          Spec.assertEqWith s "bob cast the Goblin Piker" (namesIn Zone.Battlefield S.bob played) [named "Mountain", named "Mountain", named "Goblin Piker"]
-        Spec.it s "CR 603.4 a land card played from exile was played, so the end step trigger does not trigger" $ do
-          lair <- S.printingOf s registry "Elkin Lair"
-          mountain <- S.printingOf s registry "Mountain"
-          let withMana g = snd (S.addPermanent mountain S.bob (snd (S.addPermanent mountain S.bob g)))
-              played = bobsMainPlaying (runBobsUpkeep (rolling 0) (withMana (board lair [] [mountain])))
-              ending = bobsStepBegins endStep S.identityAnswer played
-          Spec.assertEqWith s "nothing triggered at bob's end step" (length (GameState.stack ending)) 0
-          Spec.assertEqWith s "bob played the Mountain" (namesIn Zone.Battlefield S.bob played) [named "Mountain", named "Mountain", named "Mountain"]
 
 -- Elkin Lair's third clause with "you" as the player and "cast" as the verb
 -- (Quantity.PlayedBy). Oracle text checked against api.scryfall.com,

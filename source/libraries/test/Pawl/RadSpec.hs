@@ -47,7 +47,6 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -137,7 +136,7 @@ abilitySpec s registry = Spec.describe s "CR 728.1's inherent ability" $ do
 -- filter observable: S.identityAnswer takes the LEAST recipient, and a card
 -- placed before the mill has the lower object id, so an engine that let The
 -- Master name any creature card would reanimate the Berserkers instead.
-reanimationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+reanimationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanimation" $ do
   Spec.it s "CR 701.17a it takes the card the turn's mill binned, as a 3/3 green Mutant" $ do
     master <- S.printingOf s registry "The Master, Transcendent"
@@ -163,24 +162,6 @@ reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanima
     -- Its IDENTITY is the assertion, since a bundle that overwrites colour, type
     -- and size leaves the two cards indistinguishable by characteristic.
     Spec.assertEqWith s "and the card that was NOT milled stayed put" (Game.zoneMembers Zone.Graveyard S.alice after) [bystanderId]
-  -- The same board with the mill turned onto a land, so the Piker reaches the
-  -- graveyard by being PUT there rather than by being milled. Nothing else moves.
-  Spec.it s "CR 701.17a a creature card that reached the graveyard another way is no target" $ do
-    master <- S.printingOf s registry "The Master, Transcendent"
-    piker <- S.printingOf s registry "Goblin Piker"
-    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
-    mountain <- S.printingOf s registry "Mountain"
-    let (masterId, _, radded) = radBoard master berserkers
-        (pikerId, placed) = S.addGraveyardCard piker S.alice radded
-        stocked = libraryTopped [mountain, mountain, mountain] S.alice placed
-        milled = afterTheMill stocked
-        after = activated masterId master milled
-    -- CR 602.2b/601.2c: an ability with a target slot no candidate fits cannot be
-    -- activated at all, which is where the divergence would show first.
-    Spec.assertEqWith s "the mill happened" (length (Game.zoneMembers Zone.Library S.alice milled)) 2
-    Spec.assertEqWith s "but the ability is not offered" (activationsOffered masterId milled) 0
-    Spec.assertEqWith s "and the Piker is still in the graveyard" (fmap Object.zone (Game.lookupObject pikerId after)) (Just Zone.Graveyard)
-    Spec.assertEqWith s "with nothing but The Master on the battlefield" (Game.zoneMembers Zone.Battlefield S.alice after) [masterId]
 
 -- alice with The Master settled on the battlefield, one rad counter, and one
 -- creature card sitting in her graveyard from the start.

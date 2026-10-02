@@ -209,27 +209,6 @@ creatureSbaSpec s registry =
       Spec.assertEqWith s "off the battlefield" (Game.zoneMembers Zone.Battlefield S.alice after) []
       Spec.assertEqWith s "in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
-    Spec.it s "CR 704.5g damage below toughness is not lethal" $ do
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
-          -- A Piker is 2/1, so 0 marked damage is survivable and 1 is not.
-          after = S.settleSba (S.markDamage oid 0 gs)
-      Spec.assertEqWith s "still there" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
-
-    Spec.it s "CR 704.5g a Mountain with damage marked is not destroyed" $ do
-      -- Not a creature: 704.5f/g do not apply. This is the classification
-      -- doing its job -- the check never asks WHICH card it is.
-      mountain <- S.printingOf s registry "Mountain"
-      let gs = S.landsInPlay mountain 1
-      case Game.zoneMembers Zone.Battlefield S.alice gs of
-        [] -> Spec.assertFailure s "fixture should have one Mountain"
-        oid : _ ->
-          Spec.assertEqWith
-            s
-            "survives"
-            (length (Game.zoneMembers Zone.Battlefield S.alice (S.settleSba (S.markDamage oid 5 gs))))
-            1
-
     Spec.it s "a destroyed creature conserves objects" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
@@ -2237,40 +2216,7 @@ departedAttackerSpec s registry =
       Spec.assertEqWith s "no assignment names the departed attacker" (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature attacker) assignedAfter) []
       Spec.assertEqWith s "and with alice still in the game the blocker's hit is assigned -- the filter is what did it" (fmap DamageEvent.amount (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature attacker) assignedBefore)) [2]
 
--- CR 800.4e: "If combat damage would be assigned to a player who has left the
--- game, that damage isn't assigned." attackerAssignment reads the defender's
--- status at two independent sites -- the unblocked/trample-through toDefender
--- list, and the CR 702.19b threshold map the assignment prompt offers -- and
--- both need coverage.
---
--- S.identityAnswer's AssignCombatDamage arm dumps the WHOLE amount onto the
--- first CREATURE recipient it finds (Support.hs), never a player one, so it
--- cannot tell whether a ToPlayer entry is present in the threshold map at all:
--- guarded or not, a blocked trampler's excess lands on the blocker either way
--- under that answerer. It is fine for the unblocked path (no prompt is ever
--- issued there), but the trample threshold map needs an answerer that actually
--- spends the excess on a player recipient when one is offered.
--- defenderOrBlockerAnswer assigns each blocker exactly its threshold and routes
--- the leftover to a player recipient if the threshold map offers one, falling
--- back onto the blocker (over-lethal, still legal -- a threshold is a floor and
--- Damage.tiersCleared has no upper bound) when it does not. That is what actually
--- surfaces whether the departed defender was offered.
-defenderOrBlockerAnswer :: Prompt.Prompt r -> r
-defenderOrBlockerAnswer p = case p of
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    let blockerEntries = Map.toList (Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds)
-        toBlockers = Map.fromList blockerEntries
-        spent = sum (fmap snd blockerEntries)
-        leftover = if n >= spent then n - spent else 0
-        defenders = filter (not . S.isCreatureRecipient) (Map.keys thresholds)
-     in case defenders of
-          d : _ -> Map.insert d leftover toBlockers
-          [] -> case blockerEntries of
-            (r, _) : _ -> Map.insertWith (+) r leftover toBlockers
-            [] -> toBlockers
-  _ -> S.aggressiveAnswer p
-
-departedDefenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+departedDefenderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 departedDefenderSpec s registry =
   Spec.describe s "Departed defender (CR 800.4e)" $ do
     Spec.it s "CR 800.4e no combat damage is assigned to a player who has left the game" $ do
@@ -2315,63 +2261,6 @@ departedDefenderSpec s registry =
       Spec.assertEqWith s "nothing is assigned to the departed defender" assignedAfter []
       Spec.assertEqWith s "and with bob still in the game the same board assigns one hit -- the guard is what did it" (length assignedBefore) 1
       Spec.assertEqWith s "to bob" (fmap DamageEvent.target assignedBefore) [Recipient.ToPlayer S.bob]
-
-    Spec.it s "CR 800.4e a departed defender is not offered as a trample recipient either" $ do
-      -- CR 702.19b assigns trample's excess "as its controller chooses", and the
-      -- defending player is one of the choices Prompt.AssignCombatDamage offers.
-      -- CR 800.4e removes the damage, so the choice must not be offered: an
-      -- assignment the engine then discards would silently take damage away from
-      -- the blockers it could otherwise have gone to.
-      --
-      -- CAROL is the defender and the one who leaves, and BOB's Piker blocks, so
-      -- the blocker survives the departure and the board stays in the prompt arm.
-      -- (Making the defender the blocker's controller would work too, right up
-      -- to the point where CR 800.4a's first clause removes their blocker and
-      -- the board falls out of that arm entirely.) War Mammoth is a 3/3 with
-      -- trample; the Piker is a 2/1, so there is excess and a real choice.
-      --
-      -- S.identityAnswer is not the discriminating answerer here (see the
-      -- group comment above): it never picks a player recipient, so a blocked
-      -- trampler's excess lands on the blocker whether the defender is offered
-      -- or not. defenderOrBlockerAnswer is used for both legs instead.
-      warMammoth <- S.printingOf s registry "War Mammoth"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (attacker, b1) = S.addPermanent warMammoth S.alice S.threePlayerGame
-          (blocker, b2) = S.addPermanent piker S.bob b1
-          attacking =
-            b2
-              { GameState.combat =
-                  Combat.Type.MkCombat
-                    { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.carol),
-                      Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
-                      Combat.Type.struckFirst = Nothing,
-                      Combat.Type.attackedUnder = Map.singleton attacker S.carol,
-                      Combat.Type.attackedControlledBy = Map.empty,
-                      Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
-                      Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.carol),
-                      Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.carol),
-                      Combat.Type.declaredAttackedBy = Map.singleton S.alice (Set.singleton (AttackTarget.OfPlayer S.carol)),
-                      -- Empty, because this board stands after the declare attackers
-                      -- step ended: CR 500.1 scopes this half to the step, and
-                      -- Combat.clearAttackedThisStep empties it as one ends.
-                      Combat.Type.declaredAttackedThisStep = Set.empty,
-                      -- CR 508.1a / 509.1a: this board is hand-built rather
-                      -- than declared, so nothing was declared on it.
-                      Combat.Type.declaredAttackers = Set.empty,
-                      Combat.Type.declaredBlockers = Set.empty,
-                      Combat.Type.blockersDeclared = True,
-                      Combat.Type.attackingNothing = Set.empty,
-                      Combat.Type.removedDefending = Map.empty,
-                      Combat.Type.defenders = [S.carol]
-                    }
-              }
-          gone = S.departs Departure.Type.Conceded S.carol attacking
-          (assignedAfter, _) = S.runPureWith defenderOrBlockerAnswer gone (Damage.gatherCombatDamage (const True))
-          (assignedBefore, _) = S.runPureWith defenderOrBlockerAnswer attacking (Damage.gatherCombatDamage (const True))
-      Spec.assertBool s (Maybe.isJust (Game.lookupObject blocker gone)) "the blocker survived carol's departure, so the board is still in the prompt arm"
-      Spec.assertBool s (notElem (Recipient.ToPlayer S.carol) (fmap DamageEvent.target assignedAfter)) "no assignment names the departed defender"
-      Spec.assertEqWith s "all three points land on the blocker instead" (fmap DamageEvent.amount (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature blocker) assignedAfter)) [3]
-      Spec.assertBool s (Maybe.isJust (List.find (\ev -> DamageEvent.target ev == Recipient.ToPlayer S.carol) assignedBefore)) "with carol still in the game the threshold map DOES offer her -- the guard is what did it"
 
 -- Grant deathtouch to `oid` the way Serpent's Gift does: a stored continuous
 -- effect over just that object. Timestamp is arbitrary (no competing layer-6
@@ -2711,14 +2600,6 @@ excessDamageSpec s registry = Spec.describe s "ExcessDamage" $ do
     Spec.assertEqWith s "CR 120.6: 1 was lethal, so 1 is what is marked" (S.damageOf pikerId after) (Just 1)
     Spec.assertEqWith s "and the spell's controller took none of it" (S.lifeOf S.alice after) (S.lifeOf S.alice before)
     Spec.assertBool s (not (S.onBattlefield pikerId (S.settleSba after))) "CR 704.5g: 1 is still lethal to a 2/1"
-  Spec.it s "CR 120.4a nothing is excess on an undamaged Wall of Stone, so nothing is redirected" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    flameSpill <- S.printingOf s registry "Flame Spill"
-    wall <- S.printingOf s registry "Wall of Stone"
-    let (wallId, before, after) = spillBoard mountain flameSpill wall (\_ gs -> gs)
-    Spec.assertEqWith s "CR 120.4a: 4 is under the 0/8's bar, so bob loses nothing" (S.lifeOf S.bob after) (S.lifeOf S.bob before)
-    Spec.assertEqWith s "and all 4 are marked on the Wall" (S.damageOf wallId after) (Just 4)
-    Spec.assertBool s (S.onBattlefield wallId (S.settleSba after)) "CR 704.5g: 4 is not lethal to a 0/8"
   -- CR 120.4a's last clause: "if the first permanent has multiple card types
   -- from among the list of creature, planeswalker, and battle, the excess damage
   -- is the greatest of the calculated amounts for each of the card types it

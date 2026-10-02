@@ -649,27 +649,6 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "alice drew (one card now in hand)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
-  Spec.it s "CR 725.2 the end-step draw fires only on the monarch's own end step" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_, gs0) = S.addLibraryCard piker S.bob (S.withMonarch S.bob (Setup.emptyGame S.bothPlayers))
-        -- alice is the active player; her end step is not bob's (the monarch).
-        began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
-        after = monarchResolveAll (monarchSettle began)
-    Spec.assertEqWith s "bob did not draw on alice's end step" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
-  Spec.it s "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat
-        began = S.withEvents [GameEvent.DamageDealt dmg] gs0
-        after = monarchResolveAll (monarchSettle began)
-    Spec.assertEqWith s "bob took the crown" (GameState.monarch after) (Just S.bob)
-  Spec.it s "CR 725.2 noncombat damage to the monarch does not hand over the crown" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
-        began = S.withEvents [GameEvent.DamageDealt dmg] gs0
-        after = monarchResolveAll (monarchSettle began)
-    Spec.assertEqWith s "alice keeps the crown" (GameState.monarch after) (Just S.alice)
   Spec.it s "CR 725 Palace Jailer: ETB makes the caster monarch and exiles an opponent's creature until an opponent takes the crown" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     palaceJailer <- S.printingOf s registry "Palace Jailer"

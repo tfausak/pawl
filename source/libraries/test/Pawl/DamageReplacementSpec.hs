@@ -974,14 +974,6 @@ proteanHydraSpec s registry = Spec.describe s "Protean Hydra (CR 107.3m, CR 615.
     Spec.assertEqWith s "CR 615.6: nothing was marked, the damage having been prevented" (S.damageOf hydra after) (Just 0)
     Spec.assertEqWith s "so the 4/4 is a 1/1" (S.powerToughnessOf hydra after) (Just (1, 1))
 
--- Announces this value of X and answers every other prompt with the identity
--- fallback. Pawl.CastSpec's answerXOf without its target arm, which the Hydra
--- has no use for -- it targets nothing.
-answerXOf :: Natural.Natural -> Prompt.Prompt r -> r
-answerXOf n p = case p of
-  Prompt.ChooseX {} -> n
-  _ -> S.identityAnswer p
-
 -- CR 604.2's "as long as" clause on a PRINTED replacement ability, whose producer
 -- is Jared Carthalion, True Heir ({R}{G}{W} Legendary Creature -- Human Warrior
 -- 3/3): "If damage would be dealt to Jared Carthalion while you're the monarch,
@@ -1095,13 +1087,6 @@ glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ 
       -- the SBAs have to run or a dead Lion still reads as being on the
       -- battlefield.
       dealAndCheck lion attacker gs = S.settleSba (settleDamage S.identityAnswer gs (hits attacker lion))
-  -- The CONTROL, and what stops the case below passing vacuously: a Lion that
-  -- never had the prevention would die on both boards.
-  Spec.it s "CR 614.1 the printed ability prevents the 2 that would otherwise be lethal" $ do
-    (lion, attacker, g) <- board
-    let after = dealAndCheck lion attacker g
-    Spec.assertBool s (S.onBattlefield lion after) "the 2/2 survives 2 damage, because all of it is prevented"
-    Spec.assertEqWith s "with nothing marked on it (CR 615.6)" (S.damageOf lion after) (Just 0)
   -- THE PROVING CASE. The same board and the same 2 damage, with the Lion's own
   -- {3} resolved in between. A removal reaching only PC.activatedAbilities leaves
   -- the prevention standing and the Lion alive -- the two implementations

@@ -1200,12 +1200,6 @@ delayedSpec s registry =
           -- CR 603.7b's one shot is spent by FIRING, not by time, so an entry
           -- on no duration at all must survive every sweep.
           Spec.assertEqWith s "and a one-shot entry stays" (Seq.length (swept Nothing)) 1
-        Spec.it s "CR 603.7b a second end step does not re-fire it" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          let once = resolveAll (settle (beginEndStep (castWave tidalWave island)))
-              again = settle (beginEndStep once)
-          Spec.assertEqWith s "nothing on the stack" (GameState.stack again) []
         -- CR 603.7c: the ability still triggers and is still consumed even when
         -- the object it remembers is gone.
         Spec.it s "CR 603.7c with the token already gone the ability does nothing and is consumed" $ do

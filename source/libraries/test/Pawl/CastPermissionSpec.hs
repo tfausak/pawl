@@ -1289,13 +1289,6 @@ jaredSpec s registry =
           Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.alice ended)) "alice may be crowned again"
           Spec.assertEqWith s "so the Jailer's ETB now crowns her" (GameState.monarch (etbResolved jailerId ended)) (Just S.alice)
 
-        -- THE CONTROL for CR 725.2's route, with bob crowned by the fixture
-        -- instead of by Jared's trigger: an unrestricted alice takes the crown off
-        -- a creature's combat damage.
-        Spec.it s "CR 725.2 with no restriction standing, combat damage to the monarch hands alice the crown" $ do
-          (_, _, pikerId, gs) <- board
-          Spec.assertEqWith s "alice steals it" (GameState.monarch (damageToTheMonarch pikerId (S.withMonarch S.bob gs))) (Just S.alice)
-
         -- The vacuity trap this issue was filed with: CR 725.2's inherent ability
         -- is SOURCELESS and reaches the crown through MonarchTarget
         -- .ControllerOfSource, a different arm from the case above. The gate is

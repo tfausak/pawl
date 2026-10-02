@@ -59,6 +59,7 @@ import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
 import qualified Pawl.Codec.AlternativeActivationCostSpec
 import qualified Pawl.Codec.AlternativeCostSpec
+import qualified Pawl.Codec.AnswerSpec
 import qualified Pawl.Codec.AnyNumberDiscardSpec
 import qualified Pawl.Codec.AnyNumberMatchingSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
@@ -558,8 +559,6 @@ import qualified Pawl.Codec.StepBeginsSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SubtypesAreSpec
-import qualified Pawl.Codec.AnswerSpec
-import qualified Pawl.Codec.ViewIsSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.SuspendCountersSpec
 import qualified Pawl.Codec.SuspendSpec
@@ -605,6 +604,7 @@ import qualified Pawl.Codec.UntapRewriteSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
+import qualified Pawl.Codec.ViewIsSpec
 import qualified Pawl.Codec.VillainousChoiceRSpec
 import qualified Pawl.Codec.VillainousChoiceRewriteSpec
 import qualified Pawl.Codec.VoteSpec
@@ -1444,7 +1444,6 @@ spec s registry = do
   Pawl.ConspiracySpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CopySpec.copySpellSpec s registry
-  Pawl.CopySpec.copyTargetSpec s registry
   Pawl.CopySpec.stirCopySpec s registry
   Pawl.CopySpec.copiedAbilitySpec s registry
   Pawl.CopySpec.faceDownCopySpec s registry
@@ -1455,7 +1454,6 @@ spec s registry = do
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.zadaSpec s registry
   Pawl.CopySpec.radiateSpec s registry
-  Pawl.CopySpec.radiatePerspectiveSpec s registry
   Pawl.CopySpec.precursorGolemSpec s registry
   Pawl.CopySpec.precursorGolemSeatSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry

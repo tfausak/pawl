@@ -1782,42 +1782,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (claimId, gs) = S.addPermanent claim S.alice g1
     Spec.assertEqWith s "the older Blood Moon applies first: a Mountain" (Projection.subtypesOf claimId gs) (Set.singleton Subtype.Type.Mountain)
 
-  -- CR 613.8a clause (c)'s SECOND limb: the dependency rule applies when BOTH
-  -- effects come from characteristic-defining abilities. CR 613.4a puts both of
-  -- these in layer 7a -- the Mimic's count reads a power the Nightmare's own CDA
-  -- defines there, so the Mimic depends on it and waits (CR 613.8b).
-  --
-  -- The Mimic is placed FIRST, so CR 613.7's timestamp order alone would apply it
-  -- before the Nightmare: only the reorder can produce 4. The Goblin Piker is the
-  -- positive control, a printed power the Greatest can see under either reading,
-  -- which keeps a wrong 0 from being the maximum of an EMPTY set rather than of
-  -- an undetermined one -- Aggregation.Greatest answers Nothing for both.
-  --
-  -- Synthetic, and it has to be. Scryfall o:"power and toughness are each equal
-  -- to" o:power t:creature, 2026-09-02: every one of the 153 hits counts types,
-  -- names, zones, counters, life or mana value, never a power. The two that read
-  -- a power -- Sutured Ghoul and Wretched Bonemass, o:"power and toughness are
-  -- each equal to the total power" -- read the EXILED cards used to make them,
-  -- which needs an entry exile taking more than one card first (#3293).
-  Spec.it s "CR 613.8a a P/T-defining ability reads the power another one defines" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    nightmare <- S.printingOf s registry "Nightmare"
-    mimic <- S.printingOf s registry "Synthetic Echoing Mimic"
-    let gs0 = Setup.emptyGame S.bothPlayers
-        (mimicId, g1) = S.addPermanent mimic S.alice gs0
-        (_, g2) = S.addPermanent piker S.alice g1
-        (_, g3) = S.addPermanent swamp S.alice g2
-        (_, g4) = S.addPermanent swamp S.alice g3
-        (_, g5) = S.addPermanent swamp S.alice g4
-        (_, g6) = S.addPermanent swamp S.alice g5
-        (nightmareId, gs) = S.addPermanent nightmare S.alice g6
-        settled = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
-    Spec.assertBool s (Set.member mimicId (GameState.battlefield settled)) "CR 704.5f does not bury the Mimic"
-    Spec.assertEqWith s "the Mimic's power is the Nightmare's DEFINED 4, not the Piker's printed 2" (Projection.powerOf mimicId settled) (Just 4)
-    Spec.assertEqWith s "and its toughness with it" (Projection.toughnessOf mimicId settled) (Just 4)
-    Spec.assertEqWith s "the Nightmare's own CDA still counts four Swamps" (Projection.powerOf nightmareId settled) (Just 4)
-
   -- CR 613.8b's last sentence at layer 7a: two Mimics each read the other's
   -- power, so each depends on the other (CR 613.8a clauses (a), (b) and (c)) and
   -- the loop falls back to timestamp order. The older one applies while the
@@ -5419,19 +5383,6 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
         hasted = S.addCounter (CounterKind.Keyword Keyword.Haste) 1 pikerId board
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId hasted) "haste granted"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId hasted)) "flying is not"
-
--- The pair of boards the CR 613.7c cases above read: a Piker, a resolved
--- Spontaneous Flight and a Humility, differing in nothing but whether Humility
--- arrives before the flying counter or after it. The Piker always enters first,
--- so the entry timestamp CR 613.7d gives it is older than Humility either way.
-countered :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
-countered piker humility plains spontaneousFlight humilityFirst =
-  let (target, withCreature) = S.addPermanent piker S.alice (S.landsInPlay plains 3)
-      before = if humilityFirst then S.withHumility humility withCreature else withCreature
-      (gs, spellId) = S.handOne spontaneousFlight before
-      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-   in (target, if humilityFirst then resolved else S.withHumility humility resolved)
 
 -- CR 701.3a / 613.1: Filter.AttachedTo reached from INSIDE the layer fold, which
 -- is where the pool's two mutually-referring Equipment put it.

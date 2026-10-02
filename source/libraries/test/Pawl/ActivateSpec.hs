@@ -139,7 +139,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationOnlyOnceSpec s registry
   printedActivationOnlyOnceEachTurnSpec s registry
   printedActivationThresholdReductionSpec s registry
-  printedActivationConjunctionSpec s registry
   printedActivationCombatPointSpec s registry
   printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
@@ -1672,16 +1671,6 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
     Spec.assertEqWith s "nothing minted for it on the battlefield" (Activatable.abilitiesFor guardId gs) []
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "and no Activate offered"
 
--- The card names in one player's copy of a zone, sorted. Written by NAME rather
--- than by object id because CR 400.7 mints a new incarnation on every zone
--- change, so the id a fixture placed a card under answers Nothing the moment the
--- card moves -- which is indistinguishable from "moved somewhere else".
-namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
-namesIn zone pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
-
-named :: String -> CardName.CardName
-named = CardName.MkCardName . Text.pack
-
 isActivate :: A.Action -> Bool
 isActivate a = case a of
   A.Activate _ _ -> True
@@ -1740,100 +1729,6 @@ printedActivationRestrictionSpec s registry = Spec.describe s "PrintedActivation
     Spec.assertBool s (not (Set.null (Combat.Type.attacked (GameState.combat later)))) "the attack is still on the record"
     Spec.assertEqWith s "still offered in the step it names" (length (activationsOf desertId (Action.legalActions S.bob (attacked {GameState.phase = Phase.Combat CombatStep.EndOfCombat})))) 1
     Spec.assertEqWith s "and not one phase later" (activationsOf desertId (Action.legalActions S.bob later)) []
-
--- CR 602.5's conjunction, printed on a card about itself: Kongming's
--- Contraptions (Portal Three Kingdoms) prints "{T}: This creature deals 2 damage
--- to target attacking creature. Activate only during the declare attackers step
--- and only if you've been attacked this step."
---
--- TWO clauses on ONE ability, which is what Desert's group above cannot reach:
--- Desert prints the step clause alone, so a reader that stopped after the first
--- clause would satisfy every assertion up there. CR 602.5 -- "A player can't
--- begin to activate an ability that's prohibited from being activated" -- is what
--- makes a printed list of clauses a conjunction, the ability-side counterpart of
--- CR 601.3 for a spell.
---
--- THREE SEATS, and that is the whole fixture. The pair of boards below differs in
--- nothing but WHOM alice attacked. With carol as the defending player (CR 507.1,
--- which is CR 506.2's choice once there are three seats to choose from)
--- bob is still in the declare attackers step, still holds priority, and still has
--- an attacking creature to target -- everything the first clause asks for -- so
--- only the second clause can withhold the ability. On two seats "an attack
--- happened" and "bob was attacked" are one fact, and the second clause would go
--- untested.
---
--- bob also gets a Prodigal Sorcerer, the same control Desert's group uses: an
--- unrestricted {T} of bob's on the same board, so a board that offered him
--- nothing at all cannot be mistaken for the rider working.
-kongmingBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-kongmingBoard piker contraptions sorcerer defender =
-  let (gs0, _, theirs, _) = S.threePlayerCombat [piker] [contraptions, sorcerer] []
-      -- Combat.defenders is STATED rather than run: the beginning of combat
-      -- step's turn-based action is what would fill it in, and a direct-call
-      -- test never reaches it. ONE seat in it, so the declaration below has
-      -- exactly one target and CR 802.3's announcement is elided.
-      ready =
-        gs0
-          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = (GameState.combat gs0) {Combat.Type.defenders = [defender]}
-          }
-      -- CR 508.1, then priority to bob -- who is the defending player on one of
-      -- these two boards and a bystander on the other, which is the variable.
-      declared = (S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.bob}
-   in case theirs of
-        contraptionsId : sorcererId : _ -> (contraptionsId, sorcererId, declared)
-        -- threePlayerCombat returns one id per printing given, so this is
-        -- unreachable; bogus ids fail the assertions rather than the suite.
-        _ -> (S.noSource, S.noSource, declared)
-
-printedActivationConjunctionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-printedActivationConjunctionSpec s registry = Spec.describe s "PrintedActivationConjunction" $ do
-  -- The second clause, isolated. Everything the FIRST clause asks for holds --
-  -- the game is in the declare attackers step, bob has priority, his Contraptions
-  -- is untapped and settled, and alice's Piker is attacking and so a legal target
-  -- -- and the ability is withheld anyway, because the attack was on carol.
-  --
-  -- Both halves of "everything the first clause asks for" are asserted rather
-  -- than assumed: without the attack there would be no attacking creature to
-  -- target, and the ability would be absent for a reason that has nothing to do
-  -- with either clause.
-  Spec.it s "CR 602.5 the Contraptions' ping is NOT offered when the attack was on somebody else" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    contraptions <- S.printingOf s registry "Kongming's Contraptions"
-    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (contraptionsId, sorcererId, board) = kongmingBoard piker contraptions prodigalSorcerer S.carol
-        offered = Action.legalActions S.bob board
-    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.carol) (Combat.Type.declaredAttacked (GameState.combat board))) "carol is the player who was attacked"
-    Spec.assertBool s (not (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat board)))) "and bob is not"
-    Spec.assertBool s (not (Set.null (Combat.Type.attacked (GameState.combat board)))) "but there IS an attacking creature to target"
-    Spec.assertEqWith s "no activation of the Contraptions" (activationsOf contraptionsId offered) []
-    Spec.assertBool s (not (null (activationsOf sorcererId offered))) "and bob's unrestricted ability is offered in the same step"
-
-  -- The discriminating twin: the same seats, the same step, the same permanent,
-  -- one fact changed. Without this half the assertion above would pass on an
-  -- engine that never offered this ability at all.
-  Spec.it s "CR 602.5 the Contraptions' ping IS offered when bob is the player attacked" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    contraptions <- S.printingOf s registry "Kongming's Contraptions"
-    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (contraptionsId, _, board) = kongmingBoard piker contraptions prodigalSorcerer S.bob
-        offered = Action.legalActions S.bob board
-    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat board))) "bob is the player who was attacked"
-    Spec.assertEqWith s "exactly one activation, the ping" (length (activationsOf contraptionsId offered)) 1
-
-  -- The first clause has not gone soft under the second: the same attack ON BOB,
-  -- one step later. CR 511.3 keeps the attacker in combat through the end of
-  -- combat step, and CR 508.1's declaration record is not cleared either, so the
-  -- second clause still holds -- and the ability is gone all the same.
-  Spec.it s "CR 602.5 being attacked is not enough on its own: not offered in the end of combat step" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    contraptions <- S.printingOf s registry "Kongming's Contraptions"
-    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (contraptionsId, _, board) = kongmingBoard piker contraptions prodigalSorcerer S.bob
-        later = board {GameState.phase = Phase.Combat CombatStep.EndOfCombat}
-    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat later))) "bob is still on the record as attacked"
-    Spec.assertBool s (not (Set.null (Combat.Type.attacked (GameState.combat later)))) "and the attacker is still attacking"
-    Spec.assertEqWith s "but the step has passed" (activationsOf contraptionsId (Action.legalActions S.bob later)) []
 
 -- alice controls a Jade Statue and two Mountains, and holds priority. The {2} is
 -- payable exactly once, which is all any of these tests needs.
@@ -1947,15 +1842,6 @@ augurUpkeep active gs =
       GameState.remaining = Seq.drop 1 (GameState.remaining gs)
     }
 
--- Activates the first offered activation, else passes -- the interpreter that
--- takes the Augur's pump the moment it is offered.
-pumpAnswer :: Prompt.Prompt r -> r
-pumpAnswer p = case p of
-  Prompt.ChooseAction _ _ options -> case filter isActivate options of
-    a : _ -> a
-    [] -> A.Pass
-  _ -> S.aggressiveAnswer p
-
 printedActivationTurnScopeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedActivationTurnScopeSpec s registry = Spec.describe s "PrintedActivationTurnScope" $ do
   -- The window the card names, reached: alice's own upkeep.
@@ -1999,18 +1885,6 @@ printedActivationTurnScopeSpec s registry = Spec.describe s "PrintedActivationTu
         later = mine {GameState.phase = Phase.Beginning BeginningStep.DrawStep}
     Spec.assertEqWith s "still offered in the step it names" (length (activationsOf augurId (Action.legalActions S.alice mine))) 1
     Spec.assertEqWith s "and not one step later" (activationsOf augurId (Action.legalActions S.alice later)) []
-
-  -- The same board, the same interpreter, the same step -- on bob's turn. The
-  -- gameplay-level twin of the enumeration test above, and the one an
-  -- implementation that reads only the phase cannot pass: nothing happens at all.
-  Spec.it s "CR 307.5/109.5 whole card: the Augur does nothing in the opponent's upkeep" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    augur <- S.printingOf s registry "Llanowar Augur"
-    let (augurId, pikerId, board) = augurBoard piker augur
-        after = S.runPure pumpAnswer (augurUpkeep S.bob board) Engine.runStep
-    Spec.assertEqWith s "the Piker is still a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
-    Spec.assertBool s (not (Projection.hasKeyword Keyword.Trample pikerId after)) "and has no trample"
-    Spec.assertBool s (Set.member augurId (GameState.battlefield after)) "and the Augur is still on the battlefield"
 
 -- Alice with `n` untapped Mountains and a settled Cinder Elemental, holding
 -- priority. `n` is the whole of what the {X} is measured against: the activation
@@ -4954,7 +4828,7 @@ isCast a = case a of
   A.Cast {} -> True
   _ -> False
 
-printedActivationThresholdReductionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationThresholdReductionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedActivationThresholdReductionSpec s registry = Spec.describe s "PrintedActivationThresholdReduction" $ do
   -- CR 702.34a: flashback casts the card from the graveyard and exiles it as it
   -- resolves, so the exile is what says the {U} was actually paid -- a cast that
@@ -4967,18 +4841,6 @@ printedActivationThresholdReductionSpec s registry = Spec.describe s "PrintedAct
         after = S.runPure scholarAnswer board Engine.priorityLoop
     Spec.assertEqWith s "CR 702.34a exiled Think Twice as it resolved" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
     Spec.assertEqWith s "and alice drew the card it promised" (S.handSize S.alice after) 1
-
-  -- One card fewer in the graveyard and nothing else changed: the ability is
-  -- never offered, so {2}{U} stands and one Island cannot pay it.
-  Spec.it s "CR 602.5 whole card: with six cards buried the flashback stays unaffordable" $ do
-    scholar <- S.printingOf s registry "Shellfish Scholar"
-    island <- S.printingOf s registry "Island"
-    thinkTwice <- S.printingOf s registry "Think Twice"
-    let (_, board) = shellfishBoard scholar island thinkTwice 5
-        after = S.runPure scholarAnswer board Engine.priorityLoop
-    Spec.assertEqWith s "nothing was flashed back, so nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
-    Spec.assertEqWith s "Think Twice is still in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 6
-    Spec.assertEqWith s "and alice drew nothing" (S.handSize S.alice after) 0
 
 -- CR 602.5b's counted rider, printed on a card about itself: Greenbelt Guardian
 -- (Aetherdrift) prints "{G}: Target creature gains trample until end of turn."

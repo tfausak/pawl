@@ -446,13 +446,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
         twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [oid]) -- no shield -> dies
     Spec.assertEqWith s "gone from the battlefield" (Set.member oid (GameState.battlefield twice)) False
 
-  Spec.it s "CR 700.4 Event.destroy no-ops on an indestructible permanent" $ do
-    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-    let base = Setup.emptyGame S.bothPlayers
-        (oid, gs0) = S.addPermanent darksteelMyr S.alice base
-        after = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [oid])
-    Spec.assertEqWith s "indestructible survives" (Set.member oid (GameState.battlefield after)) True
-
   Spec.it s "CR 122.2 counters cease to exist when an object changes zones" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"

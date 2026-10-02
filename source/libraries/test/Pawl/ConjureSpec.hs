@@ -64,7 +64,6 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
-import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Room as Room
@@ -617,28 +616,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "asked once, offering the three nonland cards and no land, and revealing nothing"
       (offers, [() | GameEvent.Revealed _ <- S.eventsOf final])
       ([[lightningBolt, thinkTwice, ornithopter]], [])
-  -- CR 707.2 / 601.2b: the additional cost is rules text, so it is copiable too.
-  -- A Clone copying Headless Skaab ({2}{U}, "As an additional cost to cast this
-  -- spell, exile a creature card from your graveyard") is duplicated, and the
-  -- duplicate owes the exile. The pair differs only in a Goblin Piker in the
-  -- graveyard; three Islands pay the Skaab's {2}{U} and not the Clone's {3}{U}.
-  Spec.it s "CR 707.2/601.2b a duplicate of a Clone owes the additional cost of what the Clone copies" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    skaab <- S.printingOf s registry "Headless Skaab"
-    let (skaabId, board) = S.addPermanent skaab S.alice (S.landsInPlay island 2)
-    case conjuredDuplicate clone reflections skaabId board of
-      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      Just (duplicate, conjured) -> do
-        let bare = S.landsFor island S.alice 3 conjured
-            (_, stocked) = S.addGraveyardCard piker S.alice bare
-        Spec.assertEqWith
-          s
-          "CR 601.2b castable only with a creature card to exile: (empty graveyard, a Piker in it)"
-          (S.castable S.alice duplicate bare, S.castable S.alice duplicate stocked)
-          (False, True)
   -- CR 707.2 / 118.9: the alternative cost is copiable for the same reason. A
   -- Clone copying Asmoranomardicadaistinaculdacar (no mana cost; "As long as
   -- you've discarded a card this turn, you may pay {B/R} to cast this spell") is
@@ -662,81 +639,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "CR 118.9 castable for {B/R} only once a card is discarded: (undiscarded, discarded)"
           (S.castable S.alice duplicate undiscarded, S.castable S.alice duplicate discarded)
           (False, True)
-  -- CR 707.2 / 601.2f: the self-reduction is copiable for the same reason. A
-  -- Clone copying Thrasta, Tempest's Roar ({10}{G}{G}, "This spell costs {3} less
-  -- to cast for each other spell cast this turn") is duplicated by the one spell
-  -- cast this turn, so the duplicate costs {7}{G}{G}: nine Forests pay it and
-  -- eight do not. Bob controls the original, the Asmor case's reason.
-  Spec.it s "CR 707.2/601.2f a duplicate of a Clone takes the cost reduction of what the Clone copies" $ do
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
-    let (thrastaId, board) = S.addPermanent thrasta S.bob (S.landsInPlay island 2)
-    case conjuredDuplicate clone reflections thrastaId board of
-      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      Just (duplicate, conjured) ->
-        Spec.assertEqWith
-          s
-          "CR 601.2f castable at {7}{G}{G}: (eight Forests, nine Forests)"
-          (S.castable S.alice duplicate (S.landsFor forest S.alice 8 conjured), S.castable S.alice duplicate (S.landsFor forest S.alice 9 conjured))
-          (False, True)
-  -- CR 707.2 / 702.41a: keywords are copiable, affinity among them. A Clone
-  -- copying Frogmite ({4}, "Affinity for artifacts") is duplicated, and the
-  -- duplicate costs {1} less for each of the two artifacts alice controls --
-  -- Frogmite and the Clone copying it -- so two fresh Islands pay it and one
-  -- does not.
-  Spec.it s "CR 707.2/702.41a a duplicate of a Clone has the affinity of what the Clone copies" $ do
-    island <- S.printingOf s registry "Island"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    frogmite <- S.printingOf s registry "Frogmite"
-    let (frogmiteId, board) = S.addPermanent frogmite S.alice (S.landsInPlay island 2)
-    case conjuredDuplicate clone reflections frogmiteId board of
-      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      Just (duplicate, conjured) ->
-        Spec.assertEqWith
-          s
-          "CR 702.41a castable at {2} off two artifacts: (one Island, two Islands)"
-          (S.castable S.alice duplicate (S.landsFor island S.alice 1 conjured), S.castable S.alice duplicate (S.landsFor island S.alice 2 conjured))
-          (False, True)
-  -- CR 707.2 / 702.51a: convoke, likewise. A Clone copying Siege Wurm
-  -- ({5}{G}{G}, convoke, trample) is duplicated, and alice's two green creatures
-  -- -- the Wurm and the Clone copying it -- pay two of the seven, so five Forests
-  -- are enough and four are not.
-  Spec.it s "CR 707.2/702.51a a duplicate of a Clone has the convoke of what the Clone copies" $ do
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    wurm <- S.printingOf s registry "Siege Wurm"
-    let (wurmId, board) = S.addPermanent wurm S.alice (S.landsInPlay island 2)
-    case conjuredDuplicate clone reflections wurmId board of
-      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      Just (duplicate, conjured) ->
-        Spec.assertEqWith
-          s
-          "CR 702.51a castable with two creatures convoking: (four Forests, five Forests)"
-          (S.castable S.alice duplicate (S.landsFor forest S.alice 4 conjured), S.castable S.alice duplicate (S.landsFor forest S.alice 5 conjured))
-          (False, True)
-  -- CR 707.2 / 702.143a: foretell, likewise. A Clone copying Augury Raven
-  -- ({3}{U}, flying, foretell {1}{U}) is duplicated, and the duplicate is a card
-  -- with foretell in alice's hand, so two fresh Islands let her foretell it.
-  Spec.it s "CR 707.2/702.143a a duplicate of a Clone has the foretell of what the Clone copies" $ do
-    island <- S.printingOf s registry "Island"
-    clone <- S.printingOf s registry "Clone"
-    reflections <- S.printingOf s registry "Sinister Reflections"
-    raven <- S.printingOf s registry "Augury Raven"
-    let (ravenId, board) = S.addPermanent raven S.alice (S.landsInPlay island 2)
-    case conjuredDuplicate clone reflections ravenId board of
-      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
-      Just (duplicate, conjured) ->
-        Spec.assertEqWith
-          s
-          "CR 702.143a the duplicate is among the cards alice may foretell"
-          (elem duplicate (Foretell.foretellable S.alice (S.landsFor island S.alice 2 conjured)))
-          True
   -- CR 707.2 / 113.6b: the abilities a card has off the battlefield are its
   -- copiable values' too. A Clone copying bob's Anger is duplicated and the
   -- duplicate discarded, so alice's graveyard holds a card printed Clone whose

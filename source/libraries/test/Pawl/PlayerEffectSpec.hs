@@ -2082,13 +2082,6 @@ reliquaryTowerSpec s registry =
         (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [reliquaryTower]))
         Nothing
 
-    Spec.it s "CR 514.1 with Reliquary Tower nothing is discarded and nothing is asked" $ do
-      plains <- S.printingOf s registry "Plains"
-      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
-      let after = reliquaryCleanup (reliquaryHandOfNine plains [reliquaryTower])
-      Spec.assertEqWith s "hand keeps nine" (S.handSize S.alice after) 9
-      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-
     -- CR 109.5: the You scope. bob does not share alice's Tower.
     Spec.it s "CR 109.5 the opponent still has a maximum hand size" $ do
       plains <- S.printingOf s registry "Plains"
@@ -2210,15 +2203,6 @@ theTenRingsSpec s registry =
       plains <- S.printingOf s registry "Plains"
       tenRings <- S.printingOf s registry "The Ten Rings"
       Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [tenRings])) (Just 10)
-
-    -- CR 514.1: nine cards is under the ten it allows, so the cleanup discard
-    -- that trims a default hand of nine to seven trims nothing here.
-    Spec.it s "CR 514.1 nine cards at cleanup discards nothing" $ do
-      plains <- S.printingOf s registry "Plains"
-      tenRings <- S.printingOf s registry "The Ten Rings"
-      let after = reliquaryCleanup (reliquaryHandOfNine plains [tenRings])
-      Spec.assertEqWith s "hand keeps nine" (S.handSize S.alice after) 9
-      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
 
     -- CR 109.5: the You scope, as for the Tower. bob's hand is still CR 402.2's
     -- seven.

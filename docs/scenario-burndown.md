@@ -247,10 +247,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 118.9b the player may decline the alternative and pay the printed cost | `board:player-designations`
 - CR 302.6 a stolen creature's {T} ability is not offered to the thief | `check:helper-isActivate`
 - CR 307.5 the Desert's ping is NOT offered in the postcombat main phase | `check:other-Combat.Type.attacked`
-- CR 307.5/109.5 whole card: the Augur does nothing in the opponent's upkeep | `ready`
 - CR 400.3 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 400.7 / 602.5b the permanent that returns may activate it again | `check:helper-activationsOf` `check:helper-isOnlyOnce`
-- CR 506.7b/g the rider opens at the declaration and runs to the end of the combat phase | `ready`
+- CR 506.7b/g the rider opens at the declaration and runs to the end of the combat phase | `board:hypothetical` `check:other-Turn.afterBlockersDeclared`
 - CR 513.2 the encore tokens are sacrificed at the beginning of the next end step | `check:delayed-triggers`
 - CR 601.2b the ChooseX bound is the energy the player can spend | `check:prompt-payload`
 - CR 601.2b/611.2d an activated {X} pump freezes the announced X into the stored effect | `board:face`
@@ -266,10 +265,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 602.2a cycling from hand reveals the Mauler as the ability is announced | `check:helper-revealed` `check:events`
 - CR 602.2b an activation cost with one black symbol costs a Swamp | `move:ChooseSacrifices`
 - CR 602.2b two black symbols in an activation cost cost two Swamps | `move:ChooseSacrifices`
-- CR 602.5 being attacked is not enough on its own: not offered in the end of combat step | `ready`
-- CR 602.5 the Contraptions' ping IS offered when bob is the player attacked | `ready`
-- CR 602.5 the Contraptions' ping is NOT offered when the attack was on somebody else | `ready`
-- CR 602.5 whole card: with six cards buried the flashback stays unaffordable | `ready`
 - CR 602.5b the per-turn rider resets at the handoff and the per-game one does not | `board:turn-number`
 - CR 602.5b the permanent's other ability is untouched | `check:helper-activationsOf` `check:helper-isOnlyOnce`
 - CR 608.2h the value is LAST KNOWN, not printed: a pumped Fire-Eater deals 5 | `board:continuous-effect`
@@ -295,10 +290,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 400.7 whole cards: a Troll bounced by Unsummon and replayed the same turn is no longer prohibited | `check:other-GameState.activationProhibitions`
 - CR 602.2 whole cards: the Troll Deadlock Trap named cannot be activated, and its twin can | `check:other-GameState.activationProhibitions`
-
-### `AirbendSpec`
-
-- CR 701.65a its owner casts the exiled card for {2} rather than its mana cost | `ready`
 
 ### `ArchenemySpec`
 
@@ -343,10 +334,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 303.4d whole cards: an Aura made a creature unattaches, then is buried | `board:continuous-effect` `board:mana-pool`
 - CR 303.4e whole cards: Aura Graft takes bob's Control Magic and the creature it moves onto | `check:other-Object.sickness`
 - CR 303.4j whole cards: Crown of the Ages cannot move Setessan Training onto an opponent's creature | `board:controller` `board:mana-pool`
-- CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing | `ready`
 - CR 608.2c Battlefield Improvisation attaches the chosen Equipment only to an attacking target | `move:ChooseAnyNumberOfPermanents`
 - CR 608.2d naming a permanent that was never offered does not move the Aura there | `move:ChooseAttachment`
-- CR 608.2h Fumble takes the Auras and Equipment that were attached to the bounced creature | `ready`
+- CR 608.2h Fumble takes the Auras and Equipment that were attached to the bounced creature | `check:intermediate-state`
 - CR 608.2h whole card: an Auratouched Mage killed in response still finds the Aura and reveals it to hand | `move:Search` `move:Shuffle` `board:continuous-effect`
 - CR 613.1b the host's controller is the projected one, not its owner | `board:sickness`
 - CR 613.1b/704.5m Control Magic keeps a crewed Vehicle and loses it the instant the crew wears off | `board:stage-a-placement-cannot-be-attached-to-o0`
@@ -354,7 +344,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.8b two Confiscates enchanting each other apply in timestamp order | `board:object-attachedto`
 - CR 614.1c whole card: Convincing Mirage makes a Mountain the chosen basic land type | `move:ChooseBasicLandType`
 - CR 701.3 whole card: Crown of the Ages moves Unholy Strength from the Piker to the Mammoth | `board:controller` `board:mana-pool`
-- CR 701.3a Balan gathers every Equipment alice controls, including one already on it | `ready`
 - CR 701.3a equipping again moves the Equipment off the first creature | `check:helper-attachedTo`
 - CR 701.3a whole card: Auratouched Mage finds only an Aura that could enchant it | `move:Search` `move:Shuffle`
 - CR 701.3a whole card: Sovereigns of Lost Alara finds the Aura that could enchant the creature its trigger bound | `move:out-of-range-answer` `check:other-Attach.attachableWithLastKnown`
@@ -362,7 +351,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.3c attaching to a different creature restamps; re-attaching to the same one does not | `check:other-Object.timestamp`
 - CR 701.3c moving an Aura to a different creature restamps it | `check:helper-attachedTo` `check:other-Object.timestamp`
 - CR 702.103f: when its host dies the bestowed Aura stays, unattached, and is a 1/1 Satyr creature again | `board:stage-a-placement-cannot-be-attached-to-o5`
-- CR 702.16b/702.16d whole cards: the protected Piker is a legal target and still cannot be equipped | `ready`
 - CR 702.16d whole card: a land that gains protection from artifacts sheds its Fortification | `board:mana-pool`
 - CR 702.5a whole card: Cloudform becomes an Aura with a granted enchant ability and attaches to what it manifests | `check:other-Card.foldEnchant` `check:other-Projection.enchantOf` `check:other-TargetSlot.required`
 - CR 702.5c: a copied trigger's second granted enchant still admits the returned creature | `ref:stack-ability` `check:abilities`
@@ -443,7 +431,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 609.3 a one-card library gives up its one card | `check:helper-permissionsIn`
 - CR 610.3 the departure returns exactly the subset that was exiled | `move:ChooseAnyNumberOfPermanents`
 - CR 610.3 the return uses no stack: one settle brings the creature back | `move:ChooseAnyNumberOfPermanents`
-- CR 610.3b a source that has left before its trigger resolves exiles nothing | `ready`
 - CR 611.2c a creature that becomes attacking after the spell resolves is not in the set | `check:helper-affected`
 - CR 611.2c an enchantment that enters after the trigger resolves is not stolen | `move:other-addPermanent`
 - CR 611.2c the stored control effect holds the swept ids, not the filter that swept them | `check:helper-affectedSets`
@@ -518,7 +505,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.6a / 113.9 with Spider-Punk the ability survives the Stifle and resolves | `ref:stack-ability`
 - CR 702.138a an escaped Chimera takes neither Serra Paragon's use nor its rider | `move:ChooseExilesFromGraveyard`
 - CR 708.2a a face-down cast spends the grant off the face the gate read | `board:library-order` `board:mana-pool` `board:player-effect`
-- CR 725.2 with no restriction standing, combat damage to the monarch hands alice the crown | `ready`
 
 ### `CastProhibitionSpec`
 
@@ -594,7 +580,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.3 a searching SPELL offers the cast too | `move:CastWhileSearching` `move:Search` `move:Shuffle`
 - CR 601.3: cast Panglacial during Evolving Wilds' search, then it resolves 9/5 | `move:CastWhileSearching` `move:Search` `move:Shuffle`
 - CR 603.12/603.3d a reflexive ability's target is chosen as IT goes on the stack, after the payment | `check:delayed-triggers`
-- CR 603.4 a flickered evoked Mulldrifter is not sacrificed | `ready`
 - CR 608.2b a spell whose only target came from spliced text does not resolve once it is illegal | `move:other-changeZone` `check:mana-pool`
 - CR 608.2h a Mage killed in response still leaves its token | `move:ChooseKicker`
 - CR 608.2h a Scrapshooter killed in response still has the promised opponent draw | `move:ChooseKicker` `move:ChooseOpponent` `board:continuous-effect`
@@ -620,7 +605,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.176a cast for impending, the Overlord is not a creature until alice's fourth end step removes its last time counter | `move:ChooseMovedCounters`
 - CR 702.180b tapping the chosen creature for mana reverses the cast | `move:ChooseCost:unmatchable` `move:ReverseManaAbilities`
 - CR 702.185c a spell warped this turn makes Insatiable Skittermaw's end step trigger; the same Colossus cast for {9} does not | `move:OrderTriggers-departed-source`
-- CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer | `ready`
 - CR 702.192a the first resolution is exiled and each of its controller's precombat mains casts one free copy, which arms nothing more | `move:OfferedCast`
 - CR 702.194a Team Tactics cast using teamwork also grants trample; without it, double strike alone | `move:ChooseKicker` `move:ChooseTapsForTotalPower`
 - CR 702.34a a countered flashback spell is exiled too | `move:other-counter`
@@ -642,7 +626,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.2 / 400.7 a Clone of a dashed Scout and the Scout flickered neither have haste nor return | `board:controller` `board:delayed-trigger` `board:mana-pool` `board:object-castusing`
 - CR 707.2 a Clone of a paid Mage makes no token | `move:ChooseKicker`
 - CR 707.2 a copy of a spliced spell does not have the spliced text | `move:ChooseSplice`
-- CR 707.2 a graveyard card that is a copy is priced at the copy's mana cost | `ready`
+- CR 707.2 a graveyard card that is a copy is priced at the copy's mana cost | `check:other-Cost.costsFor` `check:other-Cost.Type.mana`
 - CR 707.2 a token copy of the escaped Chimera did not escape | `move:ChooseExilesFromGraveyard`
 - CR 709.3b the half the player chose is the half on the stack | `move:CastWhileSearching` `move:Search` `move:Shuffle`
 - a casting game conserves objects | `move:ChooseDiscard` `move:DeclareMulligan` `move:Shuffle`
@@ -712,7 +696,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.1j the payer orders the two taxing permanents: Hollow Warrior before Exalted Dragon | `move:OrderCombatTolls`
 - CR 508.1j the way the attacker's controller announced is the way the toll is paid | `move:AnnouncePhyrexianPayment`
 - CR 509.1 the rewound declaration is made again: the taxed blocker is dropped and the free one blocks | `move:ChooseManaSource`
-- CR 509.1a / 802.4a whole card: Flash Foliage cannot name a creature attacking a planeswalker you control | `ready`
 - CR 509.1c a Prized Unicorn does not force a block an Oppressive Rays taxes | `check:other-Combat.legalBlockDeclaration`
 - CR 509.1d a cost to block that is not mana sacrifices a land | `move:ChooseSacrifices`
 - CR 509.1d the total is per CREATURE, not per pair: a Palace Guard blocking two owes {3} once | `move:ChooseManaSource`
@@ -740,7 +723,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `CombatEffectSpec`
 
 - CR 509.1h a BLOCKER that stops being a creature leaves the attacker blocked, so nothing is dealt combat damage | `board:combat` `board:object-worldsince`
-- CR 701.26b/500.8 the same activation untaps both attackers and adds a combat phase after this one | `ready`
 - CR 702.20b vigilance still attacks | `check:helper-attackersOf`
 
 ### `CombatSpec`
@@ -753,7 +735,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.1a a creature that is also a battle is not offered as an attacker | `check:other-Combat.legalAttackers`
 - CR 508.1c aimed elsewhere, both of alice's twins attack | `board:attackprohibitions` `board:hand-order` `board:mana-pool`
 - CR 508.1c the creature Netter en-Dal named cannot attack, and its twin still does | `board:attackprohibitions` `board:hand-order` `board:mana-pool`
-- CR 509.1 only the defending player is asked to declare blockers | `ready`
 - CR 509.1a a Mountain is not a legal blocker, flier or no flier | `check:other-Combat.legalBlockers`
 - CR 509.1a a creature that is also a battle is not offered as a blocker either | `check:other-Combat.legalBlockers`
 - CR 509.1b Wan Shi Tong's Spirit tokens can't block a non-Spirit, and can block a Spirit | `move:expect-rejected`
@@ -804,8 +785,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `ConditionSpec`
 
 - CR 603.4 a creature entering from anywhere else does not | `board:controller` `board:hand-order` `board:mana-pool`
-- CR 603.4 the same Zubera dealt only 3 deals nothing | `ready`
-- CR 608.2h a blocking Guildsworn Prowler that dies draws nothing | `ready`
 - CR 608.2i the turn handoff resets the tally | `board:mana-pool` `board:turn-number`
 
 ### `ConjureSpec`
@@ -817,12 +796,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.178a at max speed the Smasher returns the duplicate with haste, and the end step sacrifices it | `board:exile-linked` `board:player-speed`
 - CR 702.178a one short of max speed, the duplicate stays in exile | `board:exile-linked` `board:player-speed`
 - CR 707.2/118.9 a duplicate of a Clone offers the alternative cost of what the Clone copies | `ready`
-- CR 707.2/601.2b a duplicate of a Clone owes the additional cost of what the Clone copies | `ready`
-- CR 707.2/601.2f a duplicate of a Clone takes the cost reduction of what the Clone copies | `ready`
-- CR 707.2/702.143a a duplicate of a Clone has the foretell of what the Clone copies | `ready`
 - CR 707.2/702.37e a duplicate of a Clone of Ainok Tracker is cast face down and turned up for its morph cost | `check:tapped-count`
-- CR 707.2/702.41a a duplicate of a Clone has the affinity of what the Clone copies | `ready`
-- CR 707.2/702.51a a duplicate of a Clone has the convoke of what the Clone copies | `ready`
 - CR 707.2/709.5b a duplicate of a copied Room is cast as a door | `move:cast-face` `move:action-UnlockDoor`
 - CR 707.2/715.2b a duplicate of a Clone of Flaxen Intruder is cast as Welcome Home | `move:cast-face` `check:tapped-count`
 - CR 715.3a a duplicate of Flaxen Intruder cast as Welcome Home costs Welcome Home's cost | `move:expect-rejected`
@@ -850,7 +824,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.99a Last Thoughts is encoded on the chosen Piker, which casts a copy when it connects | `move:ChooseEncode` `move:OfferedCast`
 - CR 702.99c a flickered Piker is no longer encoded and offers nothing | `move:ChooseEncode` `board:sickness`
 - CR 707.10 a copied activated ability was not activated, so no mana was spent to activate it | `ref:stack-ability`
-- CR 707.10 a target the copy KEPT becomes a target of the copy too | `ready`
 - CR 707.10 a triggered ability is copied, and its copy takes a new target | `move:ChooseDiscard`
 - CR 707.10/702.150a a copy of a compleated planeswalker spell enters with the printed loyalty | `move:AnnouncePhyrexianPayment`
 - CR 707.10b a copied activated ability keeps its source, and the copy is not activated | `ref:stack-ability`
@@ -859,14 +832,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.10c a card the copied X does not reach is not offered | `check:legal-targets` `move:out-of-range-answer`
 - CR 707.10c a copied trigger's slot is baked, so the offer is a real choice | `ref:stack-ability`
 - CR 707.10c new targets are chosen for a copied activated ability | `ref:stack-ability`
-- CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one | `ready`
 - CR 707.10d the copies go onto the stack in their controller's chosen order | `move:OrderForEach`
 - CR 707.10e no copy is created where Ivy is not a legal target | `board:continuous-effect`
-- CR 707.10e the copy targets Ivy rather than what the original announced | `ready`
 - CR 707.10d Radiate copies the Bolt for each other permanent or player it could target | `move:OrderForEach`
 - CR 707.10d Precursor Golem copies the spell for each OTHER Golem, under the caster's control | `move:OrderForEach`
-- CR 707.10d / 109.5 Radiate's candidates are what the original's controller could target | `ready`
-- CR 707.10 / 109.5 Precursor Golem's copies are judged from the caster's seat | `ready`
 - CR 707.10d the caster, not the Golem's controller, orders the copies | `move:OrderForEach`
 - CR 707.12 Mizzix's Mastery casts a copy of the exiled Bolt, which the card itself never becomes | `move:OfferedCast`
 - CR 707.12a overloaded, each of the two exiled Bolts is copied and its copy offered separately | `move:ChooseOfferedCastSpell` `move:OfferedCast`
@@ -877,8 +846,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 707.14 the face-down Divination connects and alice casts a copy of Divination for free | `board:mana-pool`
 - CR 707.2 / 707.10c Transcantation's Bolt resolves at the target its controller chooses anew | `move:LookUpCard`
 - CR 707.2 Transcantation's Bolt left without a new target hits nobody | `move:LookUpCard`
-- CR 707.2 a graveyard card offers the authored abilities of what it is a copy of | `ready`
-- CR 707.2 a graveyard card offers the embalm of what it is a copy of, not its printed one | `ready`
 - CR 707.2 an Adventure that becomes a copy of a Bolt goes to the graveyard | `move:cast-face`
 - CR 707.2a a copy of Blood Moon goes on setting land subtypes once the original is exiled | `check:mana-types` `check:abilities`
 - CR 708.2 a face-down copy of Silent Arbiter no longer bounds the attack | `check:face-down` `check:bindings`
@@ -886,7 +853,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 708.2 the rulings: an effect turning the face-down Divination face up leaves it face down | `board:mana-pool`
 - CR 712.15 Magar puts a modal double-faced card with a sorcery front onto the battlefield face down | `board:mana-pool`
 - Copycrook's copy connives when it attacks, and a Clone of the same creature does not (CR 707.9a, CR 701.50a) | `move:ChooseDiscard`
-- Mercurial Pretender's copy has the quoted ability, and so does a Clone of it (CR 707.9a) | `ready`
 - Multiversal Recruitment's token copy is not legendary, and neither is a copy of it (CR 707.9b) | `check:supertypes` `move:ChooseLegend`
 - Omni-Changeling's copy is every creature type, and so is a token copy of it (CR 604.3a) | `check:subtype-member`
 - Unstable Shapeshifter becomes a copy and keeps a noncopy effect (CR 707.4) | `board:continuous-effect` `board:hand-order` `board:mana-pool`
@@ -922,7 +888,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 400.3 a land its payer does not own goes back to its owner's hand | `board:sickness`
 - CR 601.2f Bury in Books aimed at the attacking Giant is cast off three Islands | `check:mana-pool`
 - CR 601.2f a different tapped creature is a different amount of damage | `check:helper-isTapped`
-- CR 601.2f aimed at the Dreadnought instead, the Sliver keeps its {5}, and the Vehicle gets +2/+2 | `ready`
 - CR 601.2f on one board, aiming at the Giant at home costs all five Islands and the attacker three | `check:mana-pool`
 - CR 601.2f one opponent's two spells take {U} off; two opponents' one each do not | `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 601.2f the perpetually discounted Sliver is cast off four Islands and enters a 5/5 | `board:continuous-effect` `board:mana-pool`
@@ -1096,7 +1061,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 609.7b the shield rechecks the source: a Piker made green deals its 2 | `board:continuous-effect` `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 611.2c a permanent alice controls is covered by the same countdown | `move:ChooseDamageSource`
 - CR 611.2c the chosen source's damage to bob's own creature is not covered | `move:ChooseDamageSource`
-- CR 614.1 the printed ability prevents the 2 that would otherwise be lethal | `ready`
 - CR 614.1a the enchanted creature pays a +1/+1 counter to untap in its controller's untap step | `board:controller` `board:mana-pool`
 - CR 614.1a with no +1/+1 counter to remove it stays tapped | `board:controller` `board:mana-pool`
 - CR 614.3 the row covers the next damage event and no later one | `board:hand-order` `board:objects-ids`
@@ -1142,7 +1106,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 120.3c infect damage to a planeswalker takes loyalty, not -1/-1 counters | `board:controller` `board:hand-order` `board:mana-pool`
 - CR 120.3f a Goblin Piker dealing the same two gains nobody anything | `check:events`
 - CR 120.4a Flame Spill's excess goes to the creature's controller | `check:helper-subtract`
-- CR 120.4a nothing is excess on an undamaged Wall of Stone, so nothing is redirected | `ready`
 - CR 120.4a the excess is the greatest across the card types the permanent has | `board:controller` `board:hand-order` `board:mana-pool`
 - CR 120.4a/120.6 the bar is lethal damage, not toughness | `check:helper-subtract`
 - CR 120.6 a regenerated creature carries no marked damage and is still a legal target | `board:mana-pool` `board:replacement`
@@ -1159,14 +1122,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.2b a Typhoid Rats' one damage destroys the 0/8 Wall | `check:events` `check:intermediate-state`
 - CR 702.2c a deathtouch-granted trampler needs only 1 on the blocker, spilling the rest | `board:continuous-effect`
 - CR 702.4b/120.3g a double-striking Branchblight Stalker poisons twice | `board:continuous-effect`
-- CR 704.5g a Mountain with damage marked is not destroyed | `ready`
-- CR 704.5g damage below toughness is not lethal | `ready`
 - CR 704.5j a Thalia and an Urborg coexist under one controller | `check:helper-inPlay`
 - CR 704.5j two copies of a NON-legendary creature both survive | `check:helper-inPlay`
 - CR 704.5j two players may each control a Thalia | `check:helper-inPlay`
 - CR 704.5k a lone world permanent survives | `check:helper-inPlay`
 - CR 704.5k whole cards: resolving Living Plane buries the Concordant Crossroads already out | `board:object-worldsince`
-- CR 800.4e a departed defender is not offered as a trample recipient either | `ready`
 - life <= 0 loses | `check:other-GameState.players` `check:other-Player.commander` `check:other-Player.commanderCasts` `check:other-Player.commanderDamage` `check:other-Player.companion` `check:other-Player.companionTaken` `check:other-Player.completedDungeonNames` `check:other-Player.completedDungeons` `check:other-Player.counters` `check:other-Player.designations` `check:other-Player.dungeons` `check:other-Player.outsideTheGame` `check:other-Player.ringTemptations` `check:other-Player.speed` `check:other-Player.startingDeck` `check:other-Player.status`
 
 ### `DaytimeSpec`
@@ -1187,8 +1147,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `DepartureSpec`
 
-- CR 104.2a one departure does not decide a three-player game | `ready`
-- CR 104.2a the last player standing wins, without waiting for a state-based action check | `ready`
 - CR 104.3a a conceding player leaves immediately, with Conceded as the reason | `check:helper-statusOf`
 - CR 603.3a/800.4d a borrowed permanent's trigger is the departing player's, so it is never put on the stack | `board:sickness`
 - CR 725.4 the monarch departs on someone else's turn: the active player takes the crown | `check:helper-crownings`
@@ -1266,7 +1224,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `EmperorSpec`
 
-- CR 809.5c the game is a draw for a team if it is a draw for its emperor | `ready`
+- CR 809.5c the game is a draw for a team if it is a draw for its emperor | `check:other-Player.status,` `check:helper-stillPlaying`
 
 ### `EntryReplacementSpec`
 
@@ -1297,7 +1255,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 101.4b Fleshbag Marauder's later victim knows the earlier victim's pick | `move:ChooseSacrifices`
 - CR 603/614 whole card: cast Rest in Peace, ETB exiles graveyards, then deaths are exiled | `board:library-order`
-- CR 700.4 Event.destroy no-ops on an indestructible permanent | `ready`
 - CR 800.4b no token is created under the control of a player who has left the game | `check:other-Game.objectCount`
 
 ### `EventTriggerSpec`
@@ -1369,9 +1326,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 614.10a the skipped end step defers the sacrifice to alice's next one | `board:turn-number`
 - CR 614.1b a Bell aimed at carol leaves alice's own ending phase alone | `board:turn-number`
 - CR 707.2a a copy of Titania's Song hands over its own effect | `check:continuous-effects`
-- CR 725.2 combat damage to the monarch hands the crown to the damager's controller | `ready`
-- CR 725.2 noncombat damage to the monarch does not hand over the crown | `ready`
-- CR 725.2 the end-step draw fires only on the monarch's own end step | `ready`
 - Pearl Collector's perpetual lifelink survives the graveyard, where an indefinite grant does not | `board:continuous-effect`
 
 ### `FaceDownSpec`
@@ -1392,7 +1346,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.40e the second card manifested counts the first, so it enters tapped and the first does not | `move:ChooseManaToSpend`
 - CR 701.40g a manifested SORCERY stays face down, and still deals a 2/2's damage | `board:controller` `board:entered-with` `board:face-down` `board:mana-pool`
 - CR 701.40g a turn-face-up trigger does not fire for a manifested sorcery | `board:controller` `board:entered-with` `board:face-down` `board:hand-order` `board:mana-pool`
-- CR 702.168b / 702.21a the listed ward fires on an opponent's spell, and declining counters it | `ready`
 - CR 702.37b the manifest procedure pays no megamorph cost, so no counter lands | `board:controller` `board:entered-with` `board:face-down` `board:hand-order` `board:mana-pool`
 - CR 708 a manifested CREATURE turns face up, and deals its printed damage | `board:controller` `board:entered-with` `board:face-down` `board:mana-pool`
 - CR 708.12 a manifested land card is not a creature card, whatever CR 708.2a made the permanent | `board:controller` `board:face-down` `board:library-order`
@@ -1423,14 +1376,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `GameSpec`
 
 - CR 104.2c gameplay: a Shahrazad subgame won by a team excludes every player on it | `move:RandomFirstPlayer` `move:Shuffle` `move:nested`
-- CR 104.3a concede does not use the stack: a spell on it never resolves | `ready`
-- CR 104.3a/104.2a a concede ends the game immediately, opponent wins | `ready`
 - CR 305.2 at most one land per turn | `move:ChooseDiscard` `move:DeclareMulligan` `move:Shuffle`
 - CR 305.2a gameplay: Word of Command makes bob play a land on his turn | `move:ChooseCardInHand`
 - CR 400.7/727.2 gameplay: a restart puts Painter's Servant into a library with its chosen colour forgotten | `board:controller` `board:hand-order` `board:mana-pool` `board:object-chosencolor`
 - CR 514.3 a cleanup step with nothing waiting grants no priority | `check:helper-runCountingActions`
 - CR 514.3a a state-based action alone fires the exception | `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 514.3a a trigger waiting during cleanup resolves in that cleanup | `check:step`
 - CR 514.3a the exception grants a real priority round | `check:prompt-count`
 - CR 514.3a the second cleanup step finds nothing waiting and ends the turn | `check:prompt-count`
 - CR 603.4/100.6a gameplay: Shahrazad and Sindbad does not trigger once the match has had a subgame | `board:hand-order` `board:subgamesthismatch`
@@ -1531,7 +1481,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `LeavesTriggerSpec`
 
 - CR 109.5 an opponent's spell naming ANOTHER player fires nothing | `check:helper-payResponses`
-- CR 110.2a a stolen Young Wolf comes back under its OWNER's control | `ready`
+- CR 110.2a a stolen Young Wolf comes back under its OWNER's control | `ref:stack-ability`
 - CR 113.3c a TRIGGERED ability naming the same creature draws nothing | `check:designations`
 - CR 113.6k the same ability does not fire from a graveyard | `board:exiledwith` `board:haunting` `board:mana-pool`
 - CR 113.6m an ability whose delayed trigger returns it from the graveyard functions there | `board:controller` `board:delayed-trigger` `board:entered-with` `board:mana-pool`
@@ -1561,7 +1511,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 114.2 CreateEmblem puts an emblem in the command zone under the resolver | `check:other-GameState.command` `check:other-Object.owner` `check:other-Object.zone`
 - CR 302.6 GainControl does NOT re-Sick a permanent its controller already controlled | `check:other-Object.sickness`
 - CR 603.5 whole card: Deadly Complication's optional clause is asked about while its target lives | `board:object-designations` `check:designations`
-- CR 609.3 an edict against an empty board does nothing | `ready`
 - CR 609.3 an empty library looks at nothing and does nothing | `check:helper-zoneNames`
 - CR 609.3 an empty library raises no question | `check:helper-asks`
 - CR 614.1a Kenessos makes Crystal Ball's scry 2 a scry 3 | `move:ChooseScry`
@@ -1670,7 +1619,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing | `check:helper-tappedFor` `check:other-Cost.manaActivations` `check:other-Mana.canPay` `check:other-Mana.manaTypesOf` `check:other-Object.chosenColor`
 - CR 607.2d a Coldsteel Heart that chose blue offers blue and nothing else | `board:controller` `board:hand-order` `board:mana-pool` `board:object-chosencolor`
 - CR 607.2d the colour is the player's, not the engine's | `move:ChooseColor` `move:ChooseReplacement`
-- CR 612.1 a text change naming the count's word moves which permanents it counts | `ready`
 - the color is the player's: a Birds tapped for green does not pay {B} | `move:ReverseManaAbilities`
 
 ### `ManaSymbolSpec`
@@ -1680,7 +1628,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 107.4h whole card: Berg Strider's victim does not untap when snow mana paid for it, and does when it did not | `board:controller` `board:hand-order` `board:mana-pool` `board:object-doesnotuntapfor`
 - CR 118.13b the half announced as the trigger resolves is the mana that resolution spends | `move:AnnounceHybridHalf`
 - CR 601.2b whichever half of {G/U} is announced, the OTHER floats | `move:AnnounceHybridHalf` `check:mana-pool`
-- CR 601.2f Baral's reduction reaches the castability gate for a {2/R} | `ready`
 
 ### `MassEffectSpec`
 
@@ -1827,7 +1774,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.26g the Aura phases in with its host, still attached | `check:helper-attachedHostOf` `check:helper-onBattlefield` `check:other-Phasing.isPhasedOut`
 - CR 702.26h an object named AND dragged phases out indirectly | `check:phasing`
 - CR 702.26i an Aura attached to a PLAYER phases in still attached | `check:phasing`
-- CR 702.26j phasing an enchanted permanent out and back in does not re-trigger | `ready`
 - CR 702.26j/702.26d neither transition emits an event | `check:events`
 - CR 702.26j/702.26i a phase-in detach is no unattachment | `board:mana-pool`
 
@@ -1843,7 +1789,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 506.4 a planeswalker that stops being a planeswalker stops being attacked, so Soul Snare cannot name the attacker | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 506.4 a planeswalker whose CONTROLLER changes stops being attacked, so the new controller's Soul Snare cannot name the attacker | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 506.4 a planeswalker whose controller changes and changes BACK stays removed from combat, so Soul Snare still cannot name the attacker | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool`
-- CR 506.4c a planeswalker that phases out stops being attacked, so Soul Snare cannot name the attacker | `ready`
 - CR 506.4d whole cards: a blocking Jace that stops being BOTH card types is removed from combat | `board:continuous-effect` `board:mana-pool`
 - CR 506.4d whole cards: a blocking Jace that stops being a planeswalker is still a blocking creature | `board:continuous-effect` `board:mana-pool`
 - CR 506.4e / 704.5x whole cards: becoming a battle mid-combat, he gets no protector, so bob's Snare cannot name the Elf | `board:continuous-effect` `board:mana-pool`
@@ -1858,13 +1803,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.14c and the same theft with the lands swapped leaves that block legal | `move:ChooseAttachment`
 - CR 702.19c an unblocked 7/7 pays Jace's 3 loyalty and sends the other 4 at bob | `check:helper-assignmentLog`
 - CR 702.19c the whole 7 may stay on Jace instead | `check:helper-assignmentLog`
-- CR 704.5i two attackers take all three loyalty counters and Jace is buried | `ready`
 - CR 802.2a a planeswalker stolen mid-combat leaves its attacker reading the seat it was taken from | `move:ChooseAttachment`
 
 ### `PlaneswalkerSpec`
 
 - CR 107.1b / 704.5i announced at X=0 she enters with no loyalty and is buried | `check:helper-graveyardCount`
-- CR 111.3 the -2 creates two 1/1 black Nightmare creature tokens | `ready`
 - CR 111.6 a TOKEN put into exile is not a card, so the intervening if fails | `check:events`
 - CR 111.6 a card put into exile from the battlefield satisfies the token's intervening if | `check:events`
 - CR 205.1b the -6 untaps two lands and makes them 5/5 Elemental creature lands with flying and haste | `check:tapped-count`
@@ -1903,8 +1846,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 119.7 bob's Giant Cindermaw stops alice gaining anything | `check:events` `check:helper-lifeGainsOf`
 - CR 119.8 alice's Platinum Emperion takes the 3 damage without the 3 life | `check:events` `check:helper-lifeLossesOf` `check:other-DamageEvent.amount` `check:other-DamageEvent.target`
 - CR 120.3a with no restriction the Bolt's 3 damage costs 3 life | `check:events` `check:helper-lifeLossesOf`
-- CR 514.1 nine cards at cleanup discards nothing | `ready`
-- CR 514.1 with Reliquary Tower nothing is discarded and nothing is asked | `ready`
 - CR 601.2b a hybrid reduction's {2} half keeps a {2/X}'s generic route on offer | `move:AnnounceHybridPayment` `move:ChooseReductionHalf`
 - CR 601.2f payment spends the total cost | `check:tapped-count`
 - CR 601.2f whole cards: the rewritten filter decides a real cast | `move:expect-rejected`
@@ -1923,7 +1864,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `PowerToughnessSpec`
 
 - CR 119.3/608.2i two gains in one turn add up: +2/+2 then +4/+4 | `board:events`
-- CR 608.2h a resolved pump is FROZEN and does not shrink with the hand | `ready`
 - CR 608.2i last turn's life gain does not count | `board:continuous-effect` `board:mana-pool` `board:turn-number`
 - CR 613.1d a Convincing Mirage'd Forest stops being one, and the pump stops with it | `board:hypothetical`
 - CR 614.1c/614.14 the exiled card's mana value is the Avatar's power and toughness | `move:ChooseCardInGraveyard`
@@ -1931,7 +1871,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `PreparationSpec`
 
 - CR 722.2b a Clone of the Aviator becomes prepared and mints a Jump copy | `check:designations`
-- CR 722.3c the Aviator phases in prepared and mints a fresh Jump copy | `ready`
 
 ### `PreventionSpec`
 
@@ -2008,7 +1947,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 613.7a a granted changeling beats an OLDER Turn to Frog, where a printed one loses to it | `board:continuous-effect` `board:mana-pool`
 - CR 613.7a a levelled Student's text box applies after the Wings on its new host | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 613.7a without the grant the same Piker is a Frog and nothing else | `board:continuous-effect` `board:mana-pool`
-- CR 613.8a a P/T-defining ability reads the power another one defines | `ready`
 - CR 613.8b Armored Galleon's Hack and the exchange loop back to timestamp order | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 613.8b Kird Ape's Hack and the exchange loop back to timestamp order | `board:continuous-effect` `board:hand-order` `board:mana-pool`
 - CR 613.8b a Hack on the Piker waits for Kird Ape's text | `board:continuous-effect` `board:hand-order` `board:mana-pool`
@@ -2027,7 +1965,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `RadSpec`
 
-- CR 701.17a a creature card that reached the graveyard another way is no target | `ready`
 - CR 701.17a it takes the card the turn's mill binned, as a 3/3 green Mutant | `check:legal-targets`
 - CR 728.1 those counters then mill bob, cost him life and burn themselves down | `board:controller` `board:hand-order` `board:mana-pool`
 
@@ -2262,7 +2199,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 113.3b Squelch's pool holds the activated ability alone where Stifle's holds both | `check:legal-targets`
 - CR 113.9 Stifle's pool holds only the ability and Cancel's only the spell | `check:legal-targets`
 - CR 115.1 the opponent alice named picks the second target, and alice picks only the first | `move:ChooseOpponent`
-- CR 115.7d / 702.21a an unchanged target already illegal may stay, and the new one draws ward | `ready`
+- CR 115.7d / 702.21a an unchanged target already illegal may stay, and the new one draws ward | `ref:departed-object,` `check:bindings`
 - CR 115.7d a new target that makes an unchanged target illegal is refused | `check:spell-targets`
 - CR 601.2c Bioshift's second slot cannot be a creature its first slot's controller does not control | `check:legal-targets`
 - CR 601.2c Dwell on the Past's card slot is scoped to the player its other slot targets | `move:Shuffle`
@@ -2292,11 +2229,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 725.4 the active team's primary player names the new monarch | `check:prompt-offers` `move:ChooseActivePlayer`
 - CR 805.10b a teammate pays the toll on their own attacker | `move:ChooseManaSource`
 - CR 805.2 a departed active player's teammate declares the attack | `board:player-status`
-- CR 805.4c each player on the active team may play a land | `ready`
-- CR 805.5 a teammate who passed is asked again before the team passes | `ready`
+- CR 805.5 a teammate who passed is asked again before the team passes | `check:prompt-order`
 - CR 805.5b a departed active player's teammate receives priority | `board:player-status`
 - CR 805.8 controlling a player controls their team | `check:player-control`
-- CR 805.8 one effect gives a team one extra turn | `ready`
 - CR 805.8 one effect skips a team's step once | `board:face-down` `move:action-TurnFaceUp`
 - CR 805.9 the banding creature's controller names the active player who divides | `move:ChoosePlayer`
 
@@ -2349,7 +2284,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 603.6a whole cards: a second Soul Warden entering gains alice exactly 1 life | `check:intermediate-state`
 - CR 603.7 the token is sacrificed at the beginning of the next end step | `check:delayed-triggers`
 - CR 603.7b a non-final chapter triggering leaves the one-shot entry armed | `board:delayed-trigger` `board:hand-order` `board:mana-pool`
-- CR 603.7b a second end step does not re-fire it | `ready`
 - CR 603.7b the delayed ability sacrifices the token at alice's end step | `check:helper-thopters` `check:other-GameState.delayedTriggers`
 - CR 603.7c one token already gone leaves the rest sacrificed | `check:delayed-triggers`
 - CR 603.7c placement-time's own chosen mode wins a collision with the captured environment | `check:other-Binding.fromChoices` `check:other-Binding.modesOf` `check:other-Object.bindings`
@@ -2368,7 +2302,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `TurnSpec`
 
-- CR 118.12 whole card: declining at alice's next upkeep loses her the game | `ready`
 - CR 500.11 whole card: Savor the Moment's extra turn skips its untap step | `board:turn-number`
 - CR 500.5a an until-end-of-combat effect expires though the end of combat step never ran | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 500.7 damage can't be prevented during the Gambit's own extra turn, and on no other | `check:intermediate-state` `check:player-effects`
@@ -2379,18 +2312,15 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 500.8 Aurelia's added combat phase goes AFTER this one, not inside it | `check:other-GameState.remaining` `check:other-Turn.expandExtraPhase`
 - CR 506.1 the control combat phase runs the rest of its steps | `board:combat` `board:continuous-effect` `board:mana-pool`
 - CR 508.8 a creature put onto the battlefield attacking keeps the two steps | `check:combat` `check:other-Combat.skipEmptyCombat` `check:other-GameState.remaining`
-- CR 508.8 no attacker declared skips to end of combat | `ready`
-- CR 508.8 the skip stands even when an instant could have been cast | `ready`
 - CR 511.3 combat is emptied though the end of combat step never ran | `board:combat` `board:continuous-effect` `board:hand-order` `board:mana-pool` `board:replacement`
 - CR 511.3 the control end of combat step runs, and the phase's end sweeps anyway | `check:other-Turn.afterBlockersDeclared`
 - CR 601.3 Mandate of Peace is castable only during a combat phase | `board:combat` `board:continuous-effect` `board:mana-pool`
 - CR 603.7a uncleaved, alice loses at the end step of the unpreventable extra turn | `check:intermediate-state`
 - CR 611.1 the until-end-of-turn prohibition outlives the phase it ended | `board:combat` `board:continuous-effect` `board:mana-pool`
 - CR 614.10a the end of combat step never begins, and the phase ends anyway | `check:helper-began` `check:other-GameState.remaining`
-- CR 724.1b it exiles the whole stack, the resolving spell included | `ready`
 - CR 724.1d ending the turn during combat expires that phase's effects | `board:combat` `board:continuous-effect` `board:mana-pool`
-- CR 724.1d ending the turn skips straight to the cleanup step | `ready`
-- CR 724.1f no player gets priority once the turn has ended | `ready`
+- CR 724.1d ending the turn skips straight to the cleanup step | `check:step`
+- CR 724.1f no player gets priority once the turn has ended | `check:prompt-count`
 - CR 724.2b it exiles the whole stack, the resolving spell included | `board:combat` `board:continuous-effect` `board:mana-pool`
 - CR 724.2d an until-end-of-combat effect expires though the end of combat step never ran | `board:combat` `board:continuous-effect` `board:mana-pool`
 - CR 724.2d ending the combat phase skips straight to the next phase | `board:combat` `board:continuous-effect` `board:mana-pool`
@@ -2415,7 +2345,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 - CR 115.6 Rat Out aimed at a creature shrinks it and still makes the Rat | `check:intermediate-state`
 - CR 601.2c X=1 announcing three targets destroys only one | `move:out-of-range-answer`
-- CR 601.2c any number of targets: four announced on a five-candidate board | `ready`
 - CR 601.2h whole card: Dawnhand Dissident's blight is paid as the ability is activated | `move:ChooseBlight`
 - CR 603.2c two counters on one creature at once is one trigger | `move:ChooseBlight`
 - CR 608.2c two clauses of one resolution are two trigger events | `check:helper-minusCountersOn` `check:helper-placementGroups`
@@ -2463,8 +2392,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 401.7 Unexpectedly Absent with X = 0 puts it on top | `board:sickness`
 - CR 401.7 Unexpectedly Absent with X = 2 puts it just beneath the top two cards | `board:sickness`
 - CR 603.4 Psychic Theft's card, once alice casts it, triggers nothing at her end step | `board:delayed-trigger` `board:hand-order` `board:mana-pool`
-- CR 603.4 a card cast from exile was played, so the end step trigger does not trigger | `ready`
-- CR 603.4 a land card played from exile was played, so the end step trigger does not trigger | `ready`
 - CR 608.2c Make a Wish returns two DISTINCT cards, the same answer given twice | `check:prompt-offers`
 - CR 611.2a Grinning Totem's card is not castable in alice's upkeep, and goes to bob's graveyard | `move:Search` `move:Shuffle`
 - CR 701.10d doubling a life total leaves the target at twice its OWN total, as a life gain | `check:helper-lifeGains` `check:helper-lifeLosses`
@@ -2481,7 +2408,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.9b Duress discards the card its caster chose from the revealed hand | `check:other-prompt-offer` `check:helper-revealsOf`
 - CR 701.9c a creature card Aether Rift discarded into exile is not returned | `check:helper-battlefieldNames` `check:helper-namesIn` `check:helper-payResponses`
 - CR 701.9c a land discarded into a library unrevealed does not return Psychic Miasma | `check:helper-revealsOf`
-- CR 704.5a Sign in Blood's life loss can take a player to 0 and lose them the game | `ready`
 - CR 707.2 a Clone copying the UNTRANSFORMED Thraben Gargoyle keeps that face's mana value | `check:mana-value`
 - CR 724.1e Psychic Theft's card cast before a Time Stop triggers nothing at the next turn's end step | `board:delayed-trigger` `board:mana-pool`
 - CR 800.4a Vision Skeins does not draw for a player who has left the game | `check:helper-drawersOf`

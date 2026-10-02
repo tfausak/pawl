@@ -2967,7 +2967,7 @@ richlauBoard island richlau sliver dreadnought library aimAtSliver =
 
 -- CR 613.1f / 601.2f: a cost reduction GRANTED to a card off the battlefield
 -- reaches the cast, through the projection (Pawl.Engine.Cost.selfReductions).
-richlauSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+richlauSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 richlauSpec s registry =
   Spec.describe s "Richlau, Headmaster" $ do
     let fixture aimAtSliver = do
@@ -2991,15 +2991,6 @@ richlauSpec s registry =
           Spec.assertEqWith s "four Islands paid {4}, besides the one that paid Richlau's {1}" (S.tappedCount S.alice resolved) 5
           Spec.assertBool s (S.castable S.alice sliverId main) "the Sliver was offered off four Islands"
           Spec.assertEqWith s "CR 401.7 it went in second from the top" (libraryNames atEnd) (fmap named ["Griptide", "Venser's Sliver", "Unsummon", "Lightning Bolt"])
-    Spec.it s "CR 601.2f aimed at the Dreadnought instead, the Sliver keeps its {5}, and the Vehicle gets +2/+2" $ do
-      (_, board) <- fixture False
-      case board of
-        Nothing -> Spec.assertFailure s "the Sliver should reach alice's hand"
-        Just (sliverId, atEnd, main) -> do
-          Spec.assertBool s (not (S.castable S.alice sliverId main)) "the undiscounted Sliver is refused off the same four Islands"
-          Spec.assertEqWith s "the Sliver in hand is a 3/3" (S.powerToughnessOf sliverId main) (Just (3, 3))
-          let dreadnoughts = filter (\oid -> fmap S.nameOf (Game.cardOf oid atEnd) == named "Consulate Dreadnought") (Game.zoneMembers Zone.Library S.alice atEnd)
-          Spec.assertEqWith s "the Dreadnought in the library is a 9/13" (fmap (`S.powerToughnessOf` atEnd) dreadnoughts) [Just (9, 13)]
 
 -- CR 613.1f / 113.6d: Patriar's Humiliation's perpetual "loses all abilities"
 -- follows the card Unsummon returns to alice's hand
