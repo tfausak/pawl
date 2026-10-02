@@ -3036,6 +3036,20 @@ zadaSpec s registry =
           Spec.assertEqWith s "CR 707.10d the Mongoose has shroud, so the spell could not target it" (pt mongooseId) (Just (2, 1))
           Spec.assertEqWith s "and Zada took only the original Growth, no copy having been made for it" (pt zadaId) (Just (6, 6))
           Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+        -- CR 608.2h through rule 707.10d's "could target": carol Cancels the
+        -- Growth while Zada's trigger waits, and the trigger still copies it for
+        -- each other creature the Growth, as it last existed, could target.
+        Spec.it s "CR 608.2h Zada still copies a Growth countered while the trigger waited" $ do
+          (zadaId, pikerId, _, _, _, growthId, base) <- boardOf
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          let (cancelId, board) = S.addHandCard cancel S.carol (S.landsFor island S.carol 3 base)
+              placed = snd (Engine.runGamePure (atZada zadaId) (snd (Engine.runGamePure (atZada zadaId) board {GameState.priority = Just S.alice} (S.cast S.alice growthId))) Engine.settleForPriority)
+              growthSpell = last (GameState.stack placed)
+              cancelled = snd (Engine.runGamePure (atZada growthSpell) placed {GameState.priority = Just S.carol} (S.cast S.carol cancelId))
+              after = drainStack (atZada zadaId) cancelled
+          Spec.assertEqWith s "CR 608.2h a copy of the countered Growth pumped the Piker" (S.powerToughnessOf pikerId after) (Just (5, 4))
+          Spec.assertEqWith s "CR 701.6a the countered Growth itself pumped nothing, and Zada stays 3/3" (S.powerToughnessOf zadaId after) (Just (3, 3))
         -- CR 707.10d's one player choice: "the copies are put onto the stack
         -- with those targets in the order of their controller's choice". Two
         -- runs off one board differing in exactly the answer
@@ -3185,6 +3199,36 @@ ivySpec s registry =
           Spec.assertEqWith s "CR 707.10e the copy on the stack names Ivy and nobody else" (fmap (Maybe.mapMaybe Recipient.objectOf) (Maybe.listToMaybe (stackTargets afterTrigger))) (Just [ivyId])
           Spec.assertEqWith s "CR 707.10 the original still pumped the Spider bob aimed it at" (pt spiderId) (Just (5, 7))
           Spec.assertEqWith s "CR 707.10e ONE copy, so the stack held the copy and the Growth" (length (stackTargets afterTrigger)) 2
+        -- CR 608.2h over a spell that has left the stack: carol Cancels the
+        -- Growth while Ivy's trigger waits, and the trigger still copies it, as
+        -- the Growth last existed -- Ivy's ruling (2022-09-09). CR 707.10e's
+        -- "could target" is that last-known spell's, so the copy is aimed at Ivy.
+        Spec.it s "CR 608.2h the copy is made even when the Growth was countered first" $ do
+          (ivyId, spiderId, growthId, base) <- growthBoard
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          let (cancelId, board) = S.addHandCard cancel S.carol (S.landsFor island S.carol 3 base)
+              -- bob aims the Growth at his Spider and carol the Cancel at the
+              -- Growth's stack object (CR 400.7 gave it a new id), each FILTERED
+              -- out of the offered set.
+              aimed :: [ObjectId] -> Prompt.Prompt r -> r
+              aimed victims p = case p of
+                Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (maybe False (`elem` victims) . Recipient.objectOf) offered) asked
+                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                _ -> S.identityAnswer p
+              cast = snd (Engine.runGamePure (aimed [spiderId]) board {GameState.priority = Just S.bob} (S.cast S.bob growthId))
+              triggered = snd (Engine.runGamePure (aimed [spiderId]) cast Engine.settleForPriority)
+              growthSpell = last (GameState.stack triggered)
+              answer :: Prompt.Prompt r -> r
+              answer = aimed [spiderId, growthSpell]
+              cancelled = snd (Engine.runGamePure answer triggered {GameState.priority = Just S.carol} (S.cast S.carol cancelId))
+              -- The Cancel, then Ivy's trigger: the moment the copy either
+              -- exists or does not, with the Growth already in bob's graveyard.
+              afterTrigger = resolveOne answer (resolveOne answer cancelled)
+              after = drainStack answer afterTrigger
+          Spec.assertEqWith s "CR 608.2h the copy of the countered Growth pumped Ivy" (S.powerToughnessOf ivyId after) (Just (5, 4))
+          Spec.assertEqWith s "CR 707.10e the copy alone was on the stack, naming Ivy" (fmap (Maybe.mapMaybe Recipient.objectOf) (stackTargets afterTrigger)) [[ivyId]]
+          Spec.assertEqWith s "CR 701.6a the countered Growth pumped nothing, and the Spider stays 2/4" (S.powerToughnessOf spiderId after) (Just (2, 4))
         -- CR 707.10e's "the copy isn't created", on two boards differing in one
         -- thing: whether Ivy clears Reprisal's "power 4 or greater". Legality is
         -- judged for the COPY, whose controller CR 707.10 makes alice, so this is
