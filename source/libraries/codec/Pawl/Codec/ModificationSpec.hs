@@ -11,6 +11,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
@@ -281,6 +282,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.GainAbilitiesOfSource (Set.singleton Keyword.Flash))
       " {\"type\":\"GainAbilitiesOfSource\",\"value\":[{\"type\":\"Flash\"}]} "
+  -- layer 6, CR 607.2a: the abilities come off the linked cards, so the arm
+  -- carries only the rider's restrictions.
+  Spec.it s "GainLinkedActivatedAbilities" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.GainLinkedActivatedAbilities [ActivationRestriction.OnlyOnceEachTurn])
+      " {\"type\":\"GainLinkedActivatedAbilities\",\"value\":[{\"type\":\"OnlyOnceEachTurn\"}]} "
   -- layer 3, CR 612.5: the two sides come from the effect's affected set, so
   -- the arm itself is payload-free.
   Spec.it s "ExchangeTextBoxes" $

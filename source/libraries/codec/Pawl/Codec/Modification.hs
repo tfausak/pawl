@@ -2,6 +2,7 @@ module Pawl.Codec.Modification where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
@@ -41,6 +42,7 @@ codec abilityCodec =
           Arm.payload "LoseEnchant" TargetSlot.codec Modification.LoseEnchant (\x -> case x of Modification.LoseEnchant y -> Just y; _ -> Nothing),
           Arm.payload "GainCastingPermission" CastingPermission.codec Modification.GainCastingPermission (\x -> case x of Modification.GainCastingPermission y -> Just y; _ -> Nothing),
           Arm.payload "GainAbilitiesOfSource" (Common.set Keyword.codec) Modification.GainAbilitiesOfSource (\x -> case x of Modification.GainAbilitiesOfSource y -> Just y; _ -> Nothing),
+          Arm.payload "GainLinkedActivatedAbilities" (Common.list ActivationRestriction.codec) Modification.GainLinkedActivatedAbilities (\x -> case x of Modification.GainLinkedActivatedAbilities y -> Just y; _ -> Nothing),
           Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
           Arm.payload "LoseNamedAbility" AbilityName.codec Modification.LoseNamedAbility (\x -> case x of Modification.LoseNamedAbility y -> Just y; _ -> Nothing),
           Arm.payload "LoseKeyword" Keyword.codec Modification.LoseKeyword (\x -> case x of Modification.LoseKeyword y -> Just y; _ -> Nothing),
@@ -83,6 +85,7 @@ tagOf x = case x of
   Modification.LoseEnchant {} -> "LoseEnchant"
   Modification.GainCastingPermission {} -> "GainCastingPermission"
   Modification.GainAbilitiesOfSource {} -> "GainAbilitiesOfSource"
+  Modification.GainLinkedActivatedAbilities {} -> "GainLinkedActivatedAbilities"
   Modification.LoseAllAbilities {} -> "LoseAllAbilities"
   Modification.LoseNamedAbility {} -> "LoseNamedAbility"
   Modification.LoseKeyword {} -> "LoseKeyword"

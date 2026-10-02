@@ -6035,6 +6035,45 @@ craftBattlefieldNames gs = Set.unions (fmap (\o -> Projection.namesOf o gs) (Gam
 craftNamesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
 craftNamesIn zone gs = List.sort (Maybe.mapMaybe (\o -> fmap S.nameOf (Game.cardOf o gs)) (Game.zoneMembers zone S.alice gs))
 
+-- CR 702.167c / 613.1f: The Enigma Jewel // Locus of Enlightenment, "Craft with
+-- four or more nonlands with activated abilities {8}{U}", whose back face "has
+-- each activated ability of the exiled cards used to craft it. You may activate
+-- each of those abilities only once each turn." (Oracle text checked against
+-- Scryfall, 2026-10-02). Its second ability, "Whenever you activate an ability
+-- that isn't a mana ability, copy it", is not transcribed (#4603), which leaves
+-- pawl's card STRICTER than printed: bob takes 1 below where the copy would deal
+-- 2.
+--
+-- The four materials sit in the graveyard, exactly the minimum, so the prompt
+-- is elided; Omen Hawker's only ability is a mana ability, which "with
+-- activated abilities" admits. Nine Islands pay the craft, and six Mountains
+-- added afterwards pay Brothers of Fire's {1}{R}{R} twice, so the second
+-- refusal is the rider's and not the mana's.
+locusSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+locusSpec s registry =
+  Spec.it s "CR 702.167c Locus of Enlightenment has a material's activated ability, once each turn" $ do
+    jewel <- S.printingOf s registry "The Enigma Jewel"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    materials <- mapM (S.printingOf s registry) ["Brothers of Fire", "Ashling the Pilgrim", "Words of Worship", "Omen Hawker"]
+    let (jewelId, g0) = S.addPermanent jewel S.alice (S.landsInPlay island 9)
+        g1 = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) g0 materials
+        board = g1 {GameState.priority = Just S.alice, GameState.activePlayer = S.alice, GameState.phase = Phase.PostcombatMain}
+        (brothersId, brothersOnly) = S.addPermanent brothers S.bob board
+        brothersModals = fmap ActivatedAbility.modal (Activatable.abilitiesFor brothersId brothersOnly)
+        crafted = case filter isCraftAbility (Activatable.abilitiesFor jewelId board) of
+          [ability] -> S.runPure S.identityAnswer board (Activate.activateAbility S.alice jewelId ability >> Stack.resolveTop)
+          _ -> board
+        withMountains = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) crafted [1 .. 6 :: Int]
+        locusIds = [o | o <- Game.zoneMembers Zone.Battlefield S.alice withMountains, Set.member (CardName.MkCardName (Text.pack "Locus of Enlightenment")) (Projection.namesOf o withMountains)]
+        borrowed g = [(o, a) | A.Activate o a <- Action.legalActions S.alice g, o `elem` locusIds, ActivatedAbility.modal a `elem` brothersModals]
+        fired = case borrowed withMountains of
+          (o, a) : _ -> S.runPure (aimAt S.bob) withMountains (Activate.activateAbility S.alice o a >> Stack.resolveTop)
+          [] -> withMountains
+    Spec.assertEqWith s "CR 702.167c / 613.1f the Locus pings bob with the exiled Brothers of Fire's ability" (S.lifeOf S.bob fired) (Just 19)
+    Spec.assertEqWith s "CR 602.5b and that ability is not offered again this turn, three Mountains still untapped" (fmap fst (borrowed fired)) []
+
 -- Saheeli's Lattice on alice's battlefield with five Mountains, which is exactly
 -- {4}{R}, and the named printings on her battlefield, in her graveyard and in
 -- exile, their ids answered in that order.
@@ -6193,6 +6232,8 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
         let after = S.runPure (craftExiling goyfId) board (Activate.activateAbility S.alice latticeId ability >> Stack.resolveTop)
         Spec.assertEqWith s "CR 604.3 / 702.167c the Raptor's power is the exiled Goyf's 3, not a blank read as 0" (mastercraftPower after) [Just 3]
       _ -> Spec.assertFailure s "expected one craft ability and five extras"
+
+  locusSpec s registry
 
 -- Leonin Shikari {1}{W} Creature -- Cat Soldier 2/2: "You may activate equip
 -- abilities any time you could cast an instant." Forge Anew {2}{W} Enchantment

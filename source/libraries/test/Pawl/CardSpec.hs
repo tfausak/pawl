@@ -909,6 +909,8 @@ modificationCounts modification = case modification of
   -- Rule 702.165a's grant names the source, and the keywords it carries are
   -- minted from the card's Backup keyword, swept there.
   Modification.GainAbilitiesOfSource _ -> []
+  -- The rider's CR 602.5 conditions; the abilities are the linked cards'.
+  Modification.GainLinkedActivatedAbilities extra -> concatMap conditionCounts (concatMap restrictionConditions extra)
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
@@ -4098,6 +4100,8 @@ modificationFilters modification = case modification of
   Modification.GainAbility _ -> []
   -- Minted, and swept as the Backup keyword -- see modificationCounts.
   Modification.GainAbilitiesOfSource _ -> []
+  -- The rider's CR 602.5 conditions, as a printed ability's are swept.
+  Modification.GainLinkedActivatedAbilities extra -> frame Unframed (concatMap conditionFilters (concatMap restrictionConditions extra))
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []

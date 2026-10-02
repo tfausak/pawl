@@ -2,6 +2,7 @@ module Pawl.Types.Modification where
 
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -147,6 +148,10 @@ data Modification ability
     -- gave the creature with backup is not granted. Pawl.KeywordTriggerSpec's Backup group
     -- proves the first half.
     GainAbilitiesOfSource (Set.Set Keyword.Keyword)
+  | -- | layer 6, CR 613.1f / 607.2a: this object has each activated ability of
+    -- the cards in exile linked to this effect's source, each carrying these
+    -- extra restrictions (Locus of Enlightenment, CR 702.167c).
+    GainLinkedActivatedAbilities [ActivationRestriction.ActivationRestriction]
   | LoseAllAbilities -- layer 6 (Humility)
   | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name
     -- -- "this creature loses this ability", the clause every Licid prints ahead

@@ -57,6 +57,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -123,6 +124,7 @@ layer m = case m of
   Modification.GainCastingPermission _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
   Modification.GainAbilitiesOfSource _ -> Layer.Ability
+  Modification.GainLinkedActivatedAbilities _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
   -- CR 613.1f again, and the same layer as the wipe above: what differs is the
   -- SCOPE of the removal, never when it applies.
@@ -295,6 +297,15 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- put in GameState.continuousEffects. The identity keeps the walk total,
         -- which is the posture SetController's arm below takes.
         Modification.GainAbilitiesOfSource _ -> pc
+        -- CR 613.1f / 607.2a: the activated abilities of each card in exile linked
+        -- to `src`, read off its copiable values (CR 707.2), each with the rider's
+        -- restrictions added. Like GainAbility above, the receiver is their source
+        -- (CR 113.7). Pawl.ActivateSpec's Locus of Enlightenment case proves it.
+        Modification.GainLinkedActivatedAbilities extra ->
+          let linked = filter (\o -> fmap ExileLink.source (Map.lookup o (GameState.exiledWith gs)) == Just src) (Set.toAscList (GameState.exile gs))
+              gained = foldMap (PC.activatedAbilities . (`copiableCharacteristics` gs)) linked
+              restricted a = a {ActivatedAbility.restrictions = ActivatedAbility.restrictions a <> extra}
+           in pc {PC.activatedAbilities = PC.activatedAbilities pc <> fmap restricted gained}
         -- CR 604.3: a CDA is a static ability, so this loses it too.
         Modification.LoseAllAbilities ->
           pc
@@ -634,6 +645,7 @@ cardTypesAfter m types = case m of
   Modification.GainCastingPermission _ -> types
   Modification.GainAbility _ -> types
   Modification.GainAbilitiesOfSource _ -> types
+  Modification.GainLinkedActivatedAbilities _ -> types
   Modification.LoseAllAbilities -> types
   Modification.LoseNamedAbility _ -> types
   Modification.LoseKeyword _ -> types
@@ -1333,6 +1345,7 @@ freezeQuantities gs announcedOn source context m =
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
         Modification.GainAbilitiesOfSource _ -> Just m
+        Modification.GainLinkedActivatedAbilities _ -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.LoseNamedAbility _ -> Just m
         Modification.LoseKeyword _ -> Just m
@@ -1384,6 +1397,7 @@ quantitiesOf m = case m of
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
   Modification.GainAbilitiesOfSource _ -> []
+  Modification.GainLinkedActivatedAbilities _ -> []
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
   Modification.LoseKeyword _ -> []
@@ -1432,6 +1446,7 @@ referenceQuery m = case m of
   Modification.GainCastingPermission _ -> Nothing
   Modification.GainAbility _ -> Nothing
   Modification.GainAbilitiesOfSource _ -> Nothing
+  Modification.GainLinkedActivatedAbilities _ -> Nothing
   Modification.LoseAllAbilities -> Nothing
   Modification.LoseNamedAbility _ -> Nothing
   Modification.LoseKeyword _ -> Nothing
@@ -1480,6 +1495,7 @@ setsLandSubtype m = case m of
   -- An ability grant is layer 6 and sets no subtype at all.
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainLinkedActivatedAbilities _ -> False
   Modification.GainKeyword _ -> False
   Modification.GainKeywordAtManaCost _ -> False
   Modification.GainEnchant _ -> False
@@ -2617,6 +2633,7 @@ removesAbilities m = case m of
   -- green.
   Modification.GainAbility _ -> False
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainLinkedActivatedAbilities _ -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
   -- by setLandSubtypeTo and the two gates beside it, never a layer-6 removal.
   -- setsLandSubtype is the classification; this one answers CR 613.1f.
@@ -3691,6 +3708,7 @@ modificationWrites m = case m of
   -- creature into the Ascent's set" proves it.
   Modification.GainAbility _ -> Set.singleton Keywords
   Modification.GainAbilitiesOfSource _ -> Set.singleton Keywords
+  Modification.GainLinkedActivatedAbilities _ -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
   -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
@@ -3787,6 +3805,7 @@ modificationReads m = case m of
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
   Modification.GainAbilitiesOfSource _ -> Set.empty
+  Modification.GainLinkedActivatedAbilities _ -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
   -- Carries a name, which is not a Quantity.
   Modification.LoseNamedAbility _ -> Set.empty
@@ -5501,6 +5520,7 @@ grantsKeywordWhere p m = case m of
   -- one whose own modifications grant one.
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainLinkedActivatedAbilities _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   -- Take keywords AWAY, which is the opposite of what this asks.
@@ -5582,6 +5602,7 @@ grantsMintingType m = case m of
   -- A granted static ability's own parts, grantsKeywordWhere's reason.
   Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainLinkedActivatedAbilities _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
@@ -5659,6 +5680,7 @@ grantsAbilityWhere p m = case m of
   Modification.LoseEnchant _ -> False
   Modification.GainCastingPermission _ -> False
   Modification.GainAbilitiesOfSource _ -> False
+  Modification.GainLinkedActivatedAbilities _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False

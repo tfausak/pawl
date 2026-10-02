@@ -294,6 +294,9 @@ rewriteModification pairs m =
         -- ability was put on the stack (CR 702.165d, Pawl.Engine.Resolve.Effect's
         -- expandGrant).
         Modification.GainAbilitiesOfSource _ -> acc
+        -- Carries no word: the abilities are the linked cards', read at
+        -- projection time, and the restrictions name none.
+        Modification.GainLinkedActivatedAbilities _ -> acc
         -- Carries no word: the type is read off the source at projection time.
         Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word either.
