@@ -161,7 +161,7 @@
           },
           "modifications": [
             {
-              "type": "GainLinkedActivatedAbilities",
+              "type": "GainCraftMaterialAbilities",
               "value": [
                 {
                   "type": "OnlyOnceEachTurn"

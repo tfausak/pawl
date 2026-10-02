@@ -209,6 +209,8 @@ codec =
       -- CR 607.2a: no slot to name, so the payload IS the whole arm -- what to
       -- read off each card the source exiled.
       Arm.payload "AgainstCardsExiledWith" codec Quantity.AgainstCardsExiledWith (\x -> case x of Quantity.AgainstCardsExiledWith y -> Just y; _ -> Nothing),
+      -- CR 702.167c: the arm above's shape, over the craft materials alone.
+      Arm.payload "AgainstCraftMaterials" codec Quantity.AgainstCraftMaterials (\x -> case x of Quantity.AgainstCraftMaterials y -> Just y; _ -> Nothing),
       -- CR 702.184c, engine-only: Power's shape, nothing on the wire.
       Arm.nullary "StationMeasure" Quantity.StationMeasure
     ]
@@ -282,4 +284,6 @@ tagOf x = case x of
   Quantity.BlockersBeyondFirst {} -> "BlockersBeyondFirst"
   Quantity.AgainstSlot {} -> "AgainstSlot"
   Quantity.AgainstCardsExiledWith {} -> "AgainstCardsExiledWith"
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.AgainstCraftMaterials {} -> "AgainstCraftMaterials"
   Quantity.StationMeasure {} -> "StationMeasure"

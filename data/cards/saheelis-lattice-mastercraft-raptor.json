@@ -121,7 +121,7 @@
     },
     {
       "characteristicPT": {
-        "type": "AgainstCardsExiledWith",
+        "type": "AgainstCraftMaterials",
         "value": {
           "type": "Power"
         }

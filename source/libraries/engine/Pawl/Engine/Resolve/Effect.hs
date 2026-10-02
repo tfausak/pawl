@@ -2433,15 +2433,16 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
 
 -- CR 702.167c: the cards exiled to pay the cost of the craft ability resolving
 -- as `resolving` (Binding.craftMaterials), linked to the permanent it put onto
--- the battlefield as `entered`, so CR 607.2a's readers -- AgainstCardsExiledWith,
--- EachCardExiledWithSource -- find them from that permanent. Only those still in
--- exile, which is the rule's "cards in exile". Pawl.ActivateSpec's Mastercraft
--- Raptor case is the proof.
+-- the battlefield as `entered`, under Binding.craftLink so the craft readers
+-- (Quantity.AgainstCraftMaterials, Modification.GainCraftMaterialAbilities)
+-- tell them from what that permanent's other abilities exile. Only those still
+-- in exile, which is the rule's "cards in exile". Pawl.ActivateSpec's
+-- Mastercraft Raptor case is the proof.
 linkCraftMaterials :: ObjectId -> ObjectId -> GameState -> GameState
 linkCraftMaterials resolving entered gs =
   let paid = foldMap Set.toList (Map.lookup Binding.craftMaterials (Binding.targetsOf (slotBindings resolving gs)))
       materials = filter (`Set.member` GameState.exile gs) (Maybe.mapMaybe Recipient.objectOf paid)
-      link = ExileLink.MkExileLink {ExileLink.source = entered, ExileLink.ability = Nothing}
+      link = ExileLink.MkExileLink {ExileLink.source = entered, ExileLink.ability = Just Binding.craftLink}
    in gs {GameState.exiledWith = foldr (`Map.insert` link) (GameState.exiledWith gs) materials}
 
 -- CR 607.2a's name for the ability resolving as `resolving`: an activated

@@ -284,12 +284,12 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       " {\"type\":\"GainAbilitiesOfSource\",\"value\":[{\"type\":\"Flash\"}]} "
   -- layer 6, CR 607.2a: the abilities come off the linked cards, so the arm
   -- carries only the rider's restrictions.
-  Spec.it s "GainLinkedActivatedAbilities" $
+  Spec.it s "GainCraftMaterialAbilities" $
     Common.assertCodec
       s
       codec
-      (Modification.GainLinkedActivatedAbilities [ActivationRestriction.OnlyOnceEachTurn])
-      " {\"type\":\"GainLinkedActivatedAbilities\",\"value\":[{\"type\":\"OnlyOnceEachTurn\"}]} "
+      (Modification.GainCraftMaterialAbilities [ActivationRestriction.OnlyOnceEachTurn])
+      " {\"type\":\"GainCraftMaterialAbilities\",\"value\":[{\"type\":\"OnlyOnceEachTurn\"}]} "
   -- layer 3, CR 612.5: the two sides come from the effect's affected set, so
   -- the arm itself is payload-free.
   Spec.it s "ExchangeTextBoxes" $
