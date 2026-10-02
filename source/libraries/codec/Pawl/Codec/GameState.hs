@@ -19,6 +19,7 @@ import qualified Pawl.Codec.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Codec.ActiveUntapProhibition as ActiveUntapProhibition
 import qualified Pawl.Codec.Arrival as Arrival
+import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
@@ -204,6 +205,7 @@ codec resolve = Fields.object $ do
   spellsCastLastTurn <- Fields.defaulted "spellsCastLastTurn" 0 Common.natural GameState.spellsCastLastTurn
   castsLastTurn <- Fields.defaulted "castsLastTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.castsLastTurn
   castsBeforeThisTurn <- Fields.defaulted "castsBeforeThisTurn" Seq.empty (Common.seq SpellWasCast.codec) GameState.castsBeforeThisTurn
+  attacksInOwnLastTurn <- Fields.defaulted "attacksInOwnLastTurn" Map.empty (Common.naturalMap PlayerId.codec (Common.seq AttackerDeclared.codec)) GameState.attacksInOwnLastTurn
   resolvedNames <- Fields.defaulted "resolvedNames" Map.empty (Common.naturalMap PlayerId.codec (Common.set CardName.codec)) GameState.resolvedNames
   exiledUntilMonarch <- Fields.defaulted "exiledUntilMonarch" Map.empty (Common.naturalMap ObjectId.codec MonarchWatch.codec) GameState.exiledUntilMonarch
   movedUntilSourceLeaves <- Fields.defaulted "movedUntilSourceLeaves" Map.empty (Common.naturalMap ObjectId.codec ReturnWatch.codec) GameState.movedUntilSourceLeaves
@@ -312,6 +314,7 @@ codec resolve = Fields.object $ do
         GameState.spellsCastLastTurn = spellsCastLastTurn,
         GameState.castsLastTurn = castsLastTurn,
         GameState.castsBeforeThisTurn = castsBeforeThisTurn,
+        GameState.attacksInOwnLastTurn = attacksInOwnLastTurn,
         GameState.resolvedNames = resolvedNames,
         GameState.exiledUntilMonarch = exiledUntilMonarch,
         GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,

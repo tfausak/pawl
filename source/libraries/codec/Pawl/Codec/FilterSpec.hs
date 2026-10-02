@@ -519,6 +519,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.EnteredWithSource
       " {\"type\":\"EnteredWithSource\"} "
+  Spec.it s "AttachedNoLaterThanSource" $
+    Common.assertCodec
+      s
+      codec
+      Filter.AttachedNoLaterThanSource
+      " {\"type\":\"AttachedNoLaterThanSource\"} "
   Spec.it s "IsHostOfSource" $
     Common.assertCodec
       s

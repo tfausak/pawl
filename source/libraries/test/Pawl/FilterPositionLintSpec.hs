@@ -309,6 +309,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsAttachedToEvaluated -> 0
   Filter.Type.IsHostOfSource -> 0
   Filter.Type.EnteredWithSource -> 0
+  Filter.Type.AttachedNoLaterThanSource -> 0
   -- Zero: the MIRROR atom is not this one, and its own lint counts it through the
   -- codec (canAttachToSubjectCounts) rather than through this recursion.
   Filter.Type.CanAttachToSubject -> 0

@@ -212,6 +212,14 @@ data Quantity
     -- turns option each player on the active team is an attacking player (CR
     -- 805.10a).
     AttackersDeclaredThisTurn PlayerRef.PlayerRef
+  | -- | CR 508.1a: 1 if the object this quantity is evaluated against was
+    -- declared as an attacker during that player's own most recent turn
+    -- (GameState.attacksInOwnLastTurn), else 0.
+    AttackedInLastTurnOf PlayerRef.PlayerRef
+  | -- | CR 508.1b / 800.4i: how many players attacked that player during their
+    -- own most recent turn, a departed one included until their next turn
+    -- would have begun.
+    AttackersInTheirLastTurn PlayerRef.PlayerRef
   | -- | CR 701.9a / 608.2i: how many cards that player discarded this turn,
     -- folded from the turn-scoped GameEvent.Discarded log.
     CardsDiscardedThisTurn PlayerRef.PlayerRef

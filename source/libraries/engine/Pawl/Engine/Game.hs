@@ -3218,6 +3218,30 @@ bendingsThisTurn gs pid =
 attackersDeclaredThisTurn :: GameState -> PlayerId -> Natural
 attackersDeclaredThisTurn gs pid = Natural.length (filter (declaredBy pid . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
 
+-- CR 508.1a: this turn's attacker declarations, in order, off the log
+-- Engine.beginTurn snapshots into GameState.attacksInOwnLastTurn as it clears it.
+attacksInLog :: GameState -> Seq.Seq AttackerDeclared.AttackerDeclared
+attacksInLog gs = Seq.fromList (Maybe.mapMaybe (attackOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+  where
+    attackOf event = case event of
+      GameEvent.AttackerDeclared x -> Just x
+      _ -> Nothing
+
+-- CR 508.1a: was this object declared as an attacker during this player's own
+-- most recent turn? Giant Turtle's "if it attacked during your last turn".
+attackedInLastTurnOf :: GameState -> PlayerId -> ObjectId -> Bool
+attackedInLastTurnOf gs pid oid =
+  any ((== oid) . AttackerDeclared.attacker) (Map.findWithDefault Seq.empty pid (GameState.attacksInOwnLastTurn gs))
+
+-- CR 508.1b / 800.4i: how many players attacked this player during their OWN
+-- most recent turn -- Avenge's "a player attacked you during their last turn".
+-- Every row counts, a departed player's among them, CR 800.4i's limb on actions
+-- of a player who left the game; the row's own expiry is the seat walk's.
+attackersInTheirLastTurn :: GameState -> PlayerId -> Natural
+attackersInTheirLastTurn gs victim =
+  let attackedVictim attacking row = AttackerDeclared.attackingPlayer row == attacking && AttackerDeclared.target row == AttackTarget.OfPlayer victim
+   in Natural.length (filter (\(attacking, rows) -> any (attackedVictim attacking) rows) (Map.toList (GameState.attacksInOwnLastTurn gs)))
+
 -- CR 509.1h / 608.2i: did this OBJECT become a blocked creature this turn?
 -- attackersDeclaredThisTurn's footing over the other combat log, and its extent
 -- is the turn for the same reason: Pawl.Engine.Engine.beginTurnOf clears

@@ -418,6 +418,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsAttachedToEvaluated -> predicate
         Filter.Type.IsHostOfSource -> predicate
         Filter.Type.EnteredWithSource -> predicate
+        Filter.Type.AttachedNoLaterThanSource -> predicate
         Filter.Type.CanHostSubject -> predicate
         Filter.Type.CanAttachToSubject -> predicate
         Filter.Type.HostOfSubjectHasCardType _ -> predicate

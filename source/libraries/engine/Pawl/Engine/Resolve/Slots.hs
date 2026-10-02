@@ -2601,8 +2601,9 @@ legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 -- names nobody (`legalOne`).
 --
 -- CR 102.1: a departed player keeps their row in GameState.players, so `everyone`
--- is Game.stillPlaying rather than the map's keys; whether a departed player can
--- be named from elsewhere is CR 800.4d/800.4i's question (#3863). In PlayerId
+-- is Game.stillPlaying rather than the map's keys; a question about a departed
+-- player's actions reads the record holding them instead (CR 800.4i,
+-- Game.attackersInTheirLastTurn). In PlayerId
 -- order, a PlayerRef naming an unordered SET, so a caller with an ordering rule
 -- imposes it.
 playerRefPlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
