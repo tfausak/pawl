@@ -1,0 +1,39 @@
+{
+  "description": "CR 509.1g a blocker stays blocking once its attacker is removed from combat",
+  "note": "After blocks, alice activates the first Labyrinth of Skophos on her own attacker and lets it resolve, removing it from combat. Bob's Piker is still a blocking creature (CR 509.1g ends that only with its own removal), so the second Labyrinth's \"target attacking or blocking creature\" still admits it: the activation is offered and resolves. Each Labyrinth pays its {4} with four Islands and declines its own {C} (CR 605.3a's further-source offer).",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true },
+          { "card": "Island", "label": "i1" },
+          { "card": "Island", "label": "i2" },
+          { "card": "Island", "label": "i3" },
+          { "card": "Island", "label": "i4" },
+          { "card": "Island", "label": "i5" },
+          { "card": "Island", "label": "i6" },
+          { "card": "Island", "label": "i7" },
+          { "card": "Island", "label": "i8" },
+          { "card": "Labyrinth of Skophos", "label": "maze1" },
+          { "card": "Labyrinth of Skophos", "label": "maze2" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "blocker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "$blocker": ["$attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "$maze1", "targets": ["$attacker"], "mana": ["$i1", "$i2", "$i3", "$i4", null] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Activate": { "object": "$maze2", "targets": ["$blocker"], "mana": ["$i5", "$i6", "$i7", "$i8", null] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Tapped": { "object": "$maze2", "tapped": true } } }
+  ]
+}
