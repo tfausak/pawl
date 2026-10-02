@@ -183,6 +183,8 @@ overSlots f quantity =
         Quantity.BendingsThisTurn _ -> pure quantity
         -- And another, CR 508.1a's declaration tally likewise.
         Quantity.AttackersDeclaredThisTurn _ -> pure quantity
+        Quantity.AttackedInLastTurnOf _ -> pure quantity
+        Quantity.AttackersInTheirLastTurn _ -> pure quantity
         -- And another, CR 119.3's life-gain tally likewise.
         Quantity.LifeGainedThisTurn _ -> pure quantity
         -- And another, CR 120.1's damage tally likewise.
@@ -350,6 +352,8 @@ nestedRefs quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked ref -> Set.singleton (Left ref)
   Quantity.AttackersDeclaredThisTurn ref -> Set.singleton (Left ref)
+  Quantity.AttackedInLastTurnOf ref -> Set.singleton (Left ref)
+  Quantity.AttackersInTheirLastTurn ref -> Set.singleton (Left ref)
   Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
   Quantity.CardsDrawnThisTurn ref -> Set.singleton (Left ref)
   Quantity.BendingsThisTurn ref -> Set.singleton (Left ref)
@@ -464,6 +468,8 @@ nestedCounts quantity = case quantity of
   Quantity.ObjectCountersOfAnyKind -> []
   Quantity.OpponentsAttacked _ -> []
   Quantity.AttackersDeclaredThisTurn _ -> []
+  Quantity.AttackedInLastTurnOf _ -> []
+  Quantity.AttackersInTheirLastTurn _ -> []
   Quantity.CardsDiscardedThisTurn _ -> []
   Quantity.CardsDrawnThisTurn _ -> []
   Quantity.BendingsThisTurn _ -> []
@@ -607,6 +613,8 @@ mapPlayerRefs f intoCount quantity =
         Quantity.Devotion d -> Quantity.Devotion d {Devotion.player = f (Devotion.player d)}
         Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
         Quantity.AttackersDeclaredThisTurn ref -> Quantity.AttackersDeclaredThisTurn (f ref)
+        Quantity.AttackedInLastTurnOf ref -> Quantity.AttackedInLastTurnOf (f ref)
+        Quantity.AttackersInTheirLastTurn ref -> Quantity.AttackersInTheirLastTurn (f ref)
         Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
         Quantity.CardsDrawnThisTurn ref -> Quantity.CardsDrawnThisTurn (f ref)
         Quantity.BendingsThisTurn ref -> Quantity.BendingsThisTurn (f ref)
