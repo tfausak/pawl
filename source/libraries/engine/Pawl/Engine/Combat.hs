@@ -81,6 +81,7 @@ emptyCombat =
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.attackingNothing = Set.empty,
+      Combat.blockingNothing = Set.empty,
       Combat.removedDefending = Map.empty,
       Combat.defenders = []
     }
@@ -1597,7 +1598,8 @@ exchangeBlocks first second gs =
                  && withinLimit (arity blocker) (Set.size attackers)
                  && all (\attacker -> pairAllowed [first, second] attacking blocker attacker gs) (Set.toList attackers)
              )
-      isBlocker oid = any (Set.member oid) (Map.elems (Combat.blockers c))
+      -- The one fold, so a target Sorrow's Path admits is one this gate does.
+      isBlocker oid = Game.isBlocking oid gs
       removed = Game.removeFromCombat second (Game.removeFromCombat first gs)
       pairs = fmap (\attacker -> (first, attacker)) (Set.toList onSecond) <> fmap (\attacker -> (second, attacker)) (Set.toList onFirst)
       add m (blocker, attacker) = Map.insertWith Set.union attacker (Set.singleton blocker) m
@@ -1632,11 +1634,15 @@ exchangeBlocks first second gs =
         then gs
         else List.foldl' blocks (List.foldl' record exchanged pairs) [(first, onSecond), (second, onFirst)]
 
--- Every creature currently IN combat: the attackers, plus everything still
--- blocking one of them. Not the keys of Combat.joinedUnder, which can outlive the
--- record it was taken for.
+-- Every creature currently IN combat: the attackers, plus every blocking
+-- creature, Combat.blockingNothing's included (CR 509.1g). Not the keys of
+-- Combat.joinedUnder, which can outlive the record it was taken for.
+--
+-- That inclusion is a regression fence rather than proved behaviour: dropping it
+-- leaves the Combat specs green, no board yet changing the control of a creature
+-- blocking nothing.
 combatants :: Combat -> Set ObjectId
-combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.elems (Combat.blockers c)))
+combatants c = Set.unions [Map.keysSet (Combat.attackers c), Combat.blockingNothing c, Set.unions (Map.elems (Combat.blockers c))]
 
 -- CR 506.4's two clauses whose trigger is DERIVED state -- a combatant's
 -- controller changing, and an attacking or blocking creature stopping being a

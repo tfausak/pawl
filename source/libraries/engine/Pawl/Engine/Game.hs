@@ -451,13 +451,22 @@ setGraveyardOrder pid order gs =
 --     it" is spelled, which Combat.isBlocked reads and CR 510.1c applies to.
 --     Filtering the emptied entries away would turn the attacker unblocked and
 --     let its damage through to the defending player.
+--
+-- Dropping an attacker's key must not end its blockers' blocking, which is CR
+-- 509.1g: one left blocking no attacker still in combat moves to
+-- Combat.blockingNothing. The combat-effect scenario
+-- cr-509-1g-a-blocker-stays-blocking-once-its-attacker-is-removed is the proof.
 removeFromCombat :: ObjectId -> GameState -> GameState
 removeFromCombat oid gs =
   let c = GameState.combat gs
+      blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c))
+      stillBlocking = Set.unions (Map.elems blockers)
+      orphaned = Set.difference (Map.findWithDefault Set.empty oid (Combat.blockers c)) stillBlocking
       c1 =
         (recordDefending oid c)
           { Combat.attackers = Map.delete oid (Combat.attackers c),
-            Combat.blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c)),
+            Combat.blockers = blockers,
+            Combat.blockingNothing = Set.delete oid (Set.union orphaned (Combat.blockingNothing c)),
             Combat.joinedUnder = Map.delete oid (Combat.joinedUnder c),
             -- CR 506.4c is about a creature that is STILL attacking, so a
             -- creature that has itself left combat has no place in that record
@@ -575,13 +584,16 @@ chosenNamesWithLastKnown oid gs = case lookupObject oid gs of
   Nothing -> maybe Set.empty LastKnown.chosenNames (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
--- the answer is membership in some attacker's set rather than a key lookup.
+-- the answer is membership in some attacker's set rather than a key lookup, or
+-- in Combat.blockingNothing once every attacker it blocked has left combat.
 --
 -- The ONE fold, so Pawl.Engine.Projection's live Filter.blocking and the
 -- CR 608.2h record Pawl.Types.LastKnown.blocking keeps cannot answer it
 -- differently -- sourceIsToken's posture one field over.
 isBlocking :: ObjectId -> GameState -> Bool
-isBlocking oid gs = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs)))
+isBlocking oid gs =
+  let c = GameState.combat gs
+   in Set.member oid (Combat.blockingNothing c) || any (Set.member oid) (Map.elems (Combat.blockers c))
 
 -- CR 303.4b / 301.5a with the arrow turned round: the permanents attached to
 -- this one. pawl keeps the link on the ATTACHED permanent, so there is nothing
