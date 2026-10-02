@@ -403,8 +403,9 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- default precisely because CR 800.4c tells them apart. Writing a
           -- layer-2 answer into this field would put a control-changing
           -- effect on the wrong side of that line (see Pawl.Types.Object).
-          -- Nothing in the pool changes a spell's control, so the two
-          -- coincide today.
+          -- A stolen spell's thief controls the permanent through the layer-2
+          -- effect CarryOver.Carried re-keys onto it (below), not through
+          -- this field; Pawl.SpecialActionSpec's Aethersnatch pair observes it.
           --
           -- PROVED by Pawl.CastRestrictionSpec's HostageTaker group: alice casts
           -- bob's Goblin Piker out of the Taker's exile and the permanent
@@ -572,9 +573,24 @@ armBecame oid obj gs1 arrivals = do
   -- still exists -- the reading the Aura branch above takes of its own subtype
   -- question. So a spell whose type line an effect changed answers for what it
   -- was, not for whatever the permanent turns out to be.
-  let hasted = if Set.member CardType.Creature (Projection.cardTypesOf oid gs1) then Keyword.castUsingHaste (Object.castUsing obj) else Nothing
+  --
+  -- "YOU" IS THE CASTER (CR 405.4, defaultControllerOf), not the controller the
+  -- spell resolved under, and "until you lose control of the spell" ended for
+  -- good (CR 611.2b) if any layer-2 effect ever gave the spell to someone else:
+  -- a spell's control changes only by a resolved effect over a fixed id set
+  -- (installControl, CR 611.2c), and one taken back is still in the list. A
+  -- caster who kept the spell but not the permanent is grantHaste's never-started
+  -- duration. Pawl.SpecialActionSpec's Aethersnatch pair proves the scan; the
+  -- caster argument is a REGRESSION FENCE behind it, since a board where it
+  -- differs from the resolving controller fails the scan too.
+  let caster = Projection.defaultControllerOf obj
+      gaveAway eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
+        (Modification.SetController pid, Affected.TheseObjects oids) -> pid /= caster && Set.member oid oids
+        _ -> False
+      keptSpell = not (any gaveAway (GameState.continuousEffects gs1))
+      hasted = if keptSpell && Set.member CardType.Creature (Projection.cardTypesOf oid gs1) then Keyword.castUsingHaste (Object.castUsing obj) else Nothing
   Foldable.for_ hasted $ \duration ->
-    Foldable.for_ permanents (grantHaste duration (Resolve.spellController obj oid gs1))
+    Foldable.for_ permanents (grantHaste duration caster)
 
 -- CR 611.2: one stored continuous effect granting haste, for a duration that
 -- ends when its own source stops being controlled by `controller`.
