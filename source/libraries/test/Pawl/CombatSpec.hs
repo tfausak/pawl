@@ -50,6 +50,7 @@ import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Choices as Choices
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -1972,10 +1973,11 @@ defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerComb
 -- CR 508.1c's PAIRWISE attacking restriction: one naming WHAT the attack is aimed
 -- at rather than which creatures may attack. Blazing Archon ({6}{W}{W}{W}
 -- Creature -- Archon 5/6, "Flying / Creatures can't attack you." -- checked
--- against Scryfall, 2026-09-01) is the pool's first, and CR 802.3a is the rule
+-- against Scryfall, 2026-09-01) is one, and CR 802.3a is the rule
 -- that says such a restriction reaches only the creatures attacking that player.
--- Vow of Flight, at the foot of the group, is the pool's second, and names two
--- of CR 506.3's three attackable things where the Archon names one.
+-- Vow of Flight, near the foot of the group, names two of CR 506.3's three
+-- attackable things where the Archon names one; Teferi's Moat, last, reads its
+-- own chosen colour.
 --
 -- Two seats throughout, deliberately: this is not a multiplayer rule. CR 508.1b
 -- makes a planeswalker its controller controls a SECOND announcement at two
@@ -2073,6 +2075,23 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
         -- so.
         Spec.assertEqWith s "the Vow really is attached, so the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId board) (Just (4, 3))
       _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Vow and a Jace on one board, an Archon and a Jace on the other"
+
+  -- CR 607.2d: Teferi's Moat ("As this enchantment enters, choose a color. /
+  -- Creatures of the chosen color without flying can't attack you.", Scryfall
+  -- 2026-10-02) reads its own CR 105.2 choice in the restriction's affected set.
+  -- The boards differ only in the colour chosen; the red Bird Maiden flies.
+  Spec.it s "CR 607.2d Teferi's Moat bars only nonflying creatures of the colour it chose" $ do
+    moat <- S.printingOf s registry "Teferi's Moat"
+    piker <- S.printingOf s registry "Goblin Piker"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    let (gs, mine, theirs) = S.combatBoardOf [piker, maiden] [moat]
+    case (mine, theirs) of
+      ([pikerId, maidenId], [moatId]) -> do
+        let choosing color = gs {GameState.objects = Map.adjust (\o -> o {Object.chosenColor = Just color}) moatId (GameState.objects gs)}
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pikerId] (choosing Color.Red))) "red chosen: the red Piker may not attack bob"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [pikerId] (choosing Color.Green)) "green chosen: the red Piker may"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [maidenId] (choosing Color.Red)) "red chosen: the red Bird Maiden flies, so it may"
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and a Bird Maiden and bob a Moat"
 
 -- CR 802.3a: a restriction that applies to attacking a SPECIFIC PLAYER applies
 -- only to the creatures attacking that player. Armored Galleon ({4}{U} Creature

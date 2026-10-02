@@ -1493,7 +1493,8 @@ data Context = MkContext
     -- beside it that names "the chosen color", so the positions that fill it are
     -- the ones such an ability's filter is matched in. All but one go through
     -- Pawl.Engine.SourceContext, which fills every choice at once: the affected
-    -- set (Pawl.Engine.Projection.affectedContext), a trigger condition
+    -- set (Pawl.Engine.Projection.affectedContext, a combat restriction's too:
+    -- Teferi's Moat), a trigger condition
     -- (Pawl.Engine.Event.Match, Kindred Discovery), a resolution's own filters
     -- (Pawl.Engine.Resolve.Slots.effectContext, Brass Herald) and the cost pools
     -- of Pawl.Engine.Cost and Pawl.Engine.Replacement.matchesPermanent. The other
