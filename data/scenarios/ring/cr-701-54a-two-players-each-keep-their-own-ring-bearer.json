@@ -1,0 +1,158 @@
+{
+  "description": "CR 701.54a two players each keep their own Ring-bearer",
+  "note": "bob casts his Birthday Escape on his own turn 2, so his library holds a second card for that turn's draw (CR 104.3c).",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "ai"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "alices"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Birthday Escape",
+            "label": "ae"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "bi"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "bobs"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Birthday Escape",
+            "label": "be"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          },
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$ae",
+          "mana": [
+            "$ai"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "RingBearer",
+          "object": "$alices",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": []
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$be",
+          "mana": [
+            "$bi"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 2,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Command",
+          "card": "The Ring",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "RingBearer",
+          "object": "$bobs",
+          "is": "bob"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "RingBearer",
+          "object": "$alices",
+          "is": "alice"
+        }
+      }
+    }
+  ]
+}

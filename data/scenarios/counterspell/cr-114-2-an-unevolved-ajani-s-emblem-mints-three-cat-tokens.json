@@ -1,0 +1,171 @@
+{
+  "description": "CR 114.2 an unevolved Ajani's emblem mints three Cat Tokens",
+  "note": "Ajani, Adversary of Tyrants at seven loyalty uses its -7; the emblem it creates (CR 114.2, made by the move, not placed) triggers at alice's end step and mints three 1/1 lifelink Cat tokens. The control for the evolved cases.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island"
+          },
+          {
+            "card": "Ajani, Adversary of Tyrants",
+            "label": "ajani",
+            "counters": [
+              {
+                "key": {
+                  "type": "Loyalty"
+                },
+                "value": 7
+              }
+            ]
+          }
+        ],
+        "hand": [
+          {
+            "card": "Artificial Evolution",
+            "label": "evolution"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$ajani",
+          "ability": 2,
+          "mana": [
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "do": {
+        "OrderTimestamps": [
+          "Cat Token",
+          "Cat Token#2",
+          "Cat Token#3"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Cat Token",
+          "count": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Subtypes": {
+          "object": "Cat Token",
+          "subtypes": [
+            "Cat"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "Cat Token",
+          "names": [
+            "Cat Token"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Subtypes": {
+          "object": "Cat Token#2",
+          "subtypes": [
+            "Cat"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "Cat Token#2",
+          "names": [
+            "Cat Token"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Subtypes": {
+          "object": "Cat Token#3",
+          "subtypes": [
+            "Cat"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndStep",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "Cat Token#3",
+          "names": [
+            "Cat Token"
+          ]
+        }
+      }
+    }
+  ]
+}

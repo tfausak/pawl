@@ -1,0 +1,135 @@
+{
+  "description": "CR 701.54c a bigger creature can't block the Ring-bearer, an equal or smaller one can",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "ai"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "bearer",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Birthday Escape",
+            "label": "escape"
+          }
+        ],
+        "library": [
+          {
+            "card": "Goblin Piker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "bigger"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "equal"
+          },
+          {
+            "card": "Llanowar Elves",
+            "label": "smaller"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$escape",
+          "mana": [
+            "$ai"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$bearer"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "RingBearer",
+          "object": "$bearer",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "refuse": {
+        "Block": {
+          "$bigger": [
+            "$bearer"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$equal": [
+            "$bearer"
+          ],
+          "$smaller": [
+            "$bearer"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Blockers": {
+          "attacker": "$bearer",
+          "blockers": [
+            "$equal",
+            "$smaller"
+          ]
+        }
+      }
+    }
+  ]
+}

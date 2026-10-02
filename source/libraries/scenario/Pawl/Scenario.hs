@@ -1370,6 +1370,14 @@ renderView gs viewIs =
         View.Designations -> do
           oid <- needObject
           pure (ReplyType.Array (foldMap (fmap (encoded Codec.Designation.codec) . Set.toList . Object.designations) (Game.lookupObject oid gs)))
+        View.Supertypes -> do
+          oid <- needObject
+          pure (ReplyType.Array (fmap (ReplyType.Text . Text.pack . show) (Set.toList (Projection.supertypesOf oid gs))))
+        View.CommanderDamage -> do
+          pid <- needPlayer
+          let dealt = foldMap (Map.toList . Player.commanderDamage) (Map.lookup pid (GameState.players gs))
+              nameOf printingId = maybe (Text.pack "unknown") (CardName.unwrap . Face.name . NonEmpty.head . Card.faces . Printing.card) (Game.printingOf printingId gs)
+          pure (ReplyType.Array [ReplyType.Array [ReplyType.Text (nameOf printingId), ReplyType.Number (toInteger amount)] | (printingId, amount) <- dealt])
         View.RingBearer -> do
           oid <- needObject
           maybe (pure ReplyType.Null) (named . labelOf) (Game.lookupObject oid gs >>= Object.ringBearerFor)

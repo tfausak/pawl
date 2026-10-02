@@ -32,4 +32,9 @@ data View
     Designations
   | -- | CR 701.54a: whose Ring-bearer an object is, if anyone's.
     RingBearer
+  | -- | CR 205.4: an object's supertypes.
+    Supertypes
+  | -- | CR 903.10a: the combat damage each commander has dealt a player, by
+    -- the commander's name.
+    CommanderDamage
   deriving (Bounded, Enum, Eq, Ord, Show)

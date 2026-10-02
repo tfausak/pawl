@@ -3867,51 +3867,9 @@ prowlBoardKilling swamp mountain theft attacker bolt =
       (boltId, g1) = S.addHandCard bolt S.bob (S.landsFor mountain S.bob 1 board)
    in (theftId, attackerId, boltId, g1)
 
--- CR 702.173a on Eagle Vision {4}{U} Sorcery, "Freerunning {1}{U} / Draw three
--- cards." (Oracle text checked on Scryfall, 2026-09-12).
---
--- prowlSpec's board discipline: two Islands in every case, short of the printed
--- {4}{U}, so only rule 702.173a's clause can put the Vision on the stack. The
--- last two cases share a board and differ in the designation alone.
-freerunningSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-freerunningSpec s registry = Spec.describe s "Freerunning" $ do
-  Spec.it s "CR 702.173a an Assassin's or a commander's combat damage buys the Vision for {1}{U}; an ordinary creature's does not" $ do
-    island <- S.printingOf s registry "Island"
-    vision <- S.printingOf s registry "Eagle Vision"
-    offender <- S.printingOf s registry "Repeat Offender"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let after (visionId, board) = castResolved (payingFor freerunningCost) visionId (S.runCombat (S.attackTo S.bob) board)
-        (assassinId, _, assassinBoard) = freerunningBoard island vision offender
-        (pikerVision, pikerId, pikerBoard) = freerunningBoard island vision piker
-        assassin = after (assassinId, assassinBoard)
-        ordinary = after (pikerVision, pikerBoard)
-        general = after (pikerVision, asCommander pikerId pikerBoard)
-    Spec.assertEqWith s "CR 702.173a the Assassin connected, so the freerunning Vision drew alice three cards" (S.handSize S.alice assassin) 3
-    Spec.assertEqWith s "CR 702.173a an ordinary Goblin Warrior is neither, so the Vision's {4}{U} is unpayable and it stays in hand" (S.handSize S.alice ordinary) 1
-    Spec.assertEqWith s "CR 903.3 the same Goblin designated alice's commander buys the Vision" (S.handSize S.alice general) 3
-
--- prowlBoard over two Islands, Eagle Vision and a library deep enough for its
--- three cards (CR 104.3c).
-freerunningBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-freerunningBoard island vision attacker =
-  let (combat, ours, _) = S.combatBoardOf [attacker] []
-      stock g _ = snd (S.addLibraryCard island S.alice g)
-      g1 = List.foldl' stock (S.landsFor island S.alice 2 combat) [1 .. (4 :: Int)]
-      (visionId, g2) = S.addHandCard vision S.alice g1
-   in (visionId, Maybe.fromMaybe visionId (Maybe.listToMaybe ours), g2)
-
--- CR 903.3: alice's commander is whatever printing this object was made from.
--- The designation lives on the PLAYER (Pawl.Types.Player.commander), so a board
--- needs no command zone to have one.
-asCommander :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-asCommander oid gs = case fmap Object.source (Game.lookupObject oid gs) of
-  Just (Source.OfCard printingId) -> gs {GameState.players = Map.adjust (\player -> player {Player.commander = Set.singleton printingId}) S.alice (GameState.players gs)}
-  _ -> gs
-
--- Morsel Theft's prowl {1}{B} and Eagle Vision's freerunning {1}{U}.
-prowlCost, freerunningCost :: [ManaSymbol.ManaSymbol]
+-- Morsel Theft's prowl {1}{B}.
+prowlCost :: [ManaSymbol.ManaSymbol]
 prowlCost = [ManaSymbol.Generic 1, theBlack]
-freerunningCost = [ManaSymbol.Generic 1, theBlue]
 
 theBlack :: ManaSymbol.ManaSymbol
 theBlack = ManaSymbol.OfType (ManaType.Colored Color.Black)
@@ -4751,7 +4709,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   warpSpec s registry
   surgeSpec s registry
   prowlSpec s registry
-  freerunningSpec s registry
   giftSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry

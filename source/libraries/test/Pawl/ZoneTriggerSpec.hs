@@ -660,21 +660,12 @@ anyOfEffectZoneTriggerSpec s registry =
 --   * The emblem is the ONLY bearer, and CR 114.1 keeps it in the command zone
 --     for its whole existence -- there is no battlefield reading of this ability
 --     for the assertion to be passing on instead.
---   * Three seats, and the two boards differ in exactly one thing: WHOSE end step
---     began. "At the beginning of YOUR end step" is CR 114.2's controller, and a
---     scan that took the active player, or the owner of some other object, would
---     fire on bob's.
-commandZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+--
+-- The trigger's gathering and resolution, and the other seat's end step, are
+-- scenarios under data/scenarios/zone-trigger.
+commandZoneTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 commandZoneTriggerSpec s registry =
-  let endStep = Phase.Ending EndingStep.EndStep
-      -- One seat's end step, everything else held equal.
-      beginEndStepOf pid gs =
-        Event.recordEvent
-          (GameEvent.StepBegan (StepBegan.MkStepBegan endStep pid))
-          gs {GameState.phase = endStep, GameState.activePlayer = pid}
-      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
-      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-      catName = CardName.MkCardName (Text.pack "Cat Token")
+  let catName = CardName.MkCardName (Text.pack "Cat Token")
       cats gs = length (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just catName) (Set.toList (GameState.battlefield gs)))
       ultimate = 2 :: Int
       -- alice's Ajani at seven loyalty, its ultimate activated and resolved, at
@@ -696,31 +687,6 @@ commandZoneTriggerSpec s registry =
           (emblems, gs) <- emblemBoard
           Spec.assertEqWith s "one emblem" (length emblems) 1
           Spec.assertEqWith s "no Cats yet" (cats gs) 0
-        -- The gathering itself, at the narrowest path: one trigger, borne by the
-        -- emblem, from a zone no other source reads.
-        Spec.it s "CR 114.4 the emblem's trigger is gathered from the command zone" $ do
-          (emblems, gs) <- emblemBoard
-          let atEnd = beginEndStepOf S.alice gs
-          Spec.assertEqWith
-            s
-            "exactly one trigger, borne by the emblem"
-            (fmap PendingTrigger.source (gathered atEnd))
-            (fmap TriggerSource.OfObject emblems)
-        -- End to end through the real engine: placed, resolved, three Cats.
-        Spec.it s "CR 114.4 whole card: three Cat tokens arrive at its controller's end step" $ do
-          (_, gs) <- emblemBoard
-          let placed = settle (beginEndStepOf S.alice gs)
-              after = resolveAll placed
-          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
-          Spec.assertEqWith s "three Cats" (cats after) 3
-        -- The negative, on the same board with one thing changed: CR 114.2 makes
-        -- the emblem alice's, and bob's end step is not hers.
-        Spec.it s "CR 114.2 another seat's end step fires nothing" $ do
-          (_, gs) <- emblemBoard
-          let atBobs = beginEndStepOf S.bob gs
-              after = resolveAll (settle atBobs)
-          Spec.assertEqWith s "no trigger gathered" (length (gathered atBobs)) 0
-          Spec.assertEqWith s "no Cats" (cats after) 0
 
 -- CR 603.8 on an emblem: a STATE trigger, which Pawl.Engine.Event.Trigger.stateTriggers
 -- gathers rather than eventTriggers, from the command zone CR 114.4 names.
