@@ -3929,11 +3929,13 @@ foretellCost keywords =
 -- | What CR 702.51a, CR 702.66a and CR 702.126a let a caster spend rather than
 -- pay one stated mana of a spell's total cost. A CLASSIFICATION of the payment,
 -- which is all Pawl.Engine.Cost.manaSubstitutions needs to name the candidates
--- and mint the component: the two arms differ in the ZONE they spend out of and
--- in what spending means there.
+-- and mint the component: the arms differ in the ZONE they spend out of, in what
+-- spending means there, and in whether CR 702.51c records the spending.
 data Substitute
-  = -- | CR 702.51a / 702.126a: tap one untapped permanent the Filter admits.
+  = -- | CR 702.126a / 701.67a: tap one untapped permanent the Filter admits.
     TapUntapped (Filter Keyword)
+  | -- | CR 702.51a / 702.51c: tap one untapped creature the Filter admits, which convokes the spell.
+    TapToConvoke (Filter Keyword)
   | -- | CR 702.66a: exile one card the Filter admits from your own graveyard.
     ExileFromGraveyard (Filter Keyword)
   deriving (Eq, Ord, Show)
@@ -3960,14 +3962,16 @@ data Substitute
 -- them (Pawl.Engine.Filter's rewriteKeyword), and Pawl.CardSpec's filter
 -- traversals never see them.
 --
--- Or'd WITHIN an arm where a spell carries two keywords that spend the same way,
--- since either ability may pay a given generic mana, and left as two entries
--- across arms, where no one criterion can say it: CR 702.51d, CR 702.66c and CR
--- 702.126c make a second instance of ONE of them redundant, which a Set already
--- is. Scryfall `keyword:convoke keyword:delve`, 2026-09-12, answers Hogaak,
--- Arisen Necropolis alone, and that one cannot be transcribed -- its "You can't
--- spend mana to cast this spell" has no representation -- so the two-entry answer
--- is a fence rather than proven behaviour.
+-- One entry per keyword, never Or'd into one criterion: the payer says how many
+-- of a generic symbol each keyword pays, and an artifact creature on a spell
+-- with both convoke and improvise convokes it only where the payer tapped it
+-- through convoke (CR 702.51c). CR 702.51d, CR 702.66c and CR 702.126c make a
+-- second instance of ONE of them redundant, which a Set already is. Pawl.CostSpec's
+-- "CR 702.51c an artifact creature tapped for improvise did not convoke the
+-- Loxodon" proves the convoke-and-improvise pair. Scryfall `keyword:convoke
+-- keyword:delve`, 2026-09-12, answers Hogaak, Arisen Necropolis alone, and that
+-- one cannot be transcribed -- its "You can't spend mana to cast this spell" has
+-- no representation -- so that pair is a fence rather than proven behaviour.
 --
 -- The case is a WILDCARD, morphCosts' caveat and for its reason: a new keyword
 -- stating this kind of substitute owes an arm here, and -Werror will not ask for
@@ -3982,25 +3986,19 @@ manaSubstitutesFor symbol keywords =
             ]
               <> narrower
           )
-      tapCriterionOf keyword = case keyword of
+      substituteOf keyword = case keyword of
         Keyword.Convoke -> case symbol of
-          ManaSymbol.Generic _ -> Just (untapped CardType.Creature [])
-          ManaSymbol.OfType (ManaType.Colored color) -> Just (untapped CardType.Creature [Filter.HasColor color])
+          ManaSymbol.Generic _ -> Just (TapToConvoke (untapped CardType.Creature []))
+          ManaSymbol.OfType (ManaType.Colored color) -> Just (TapToConvoke (untapped CardType.Creature [Filter.HasColor color]))
           _ -> Nothing
         Keyword.Improvise -> case symbol of
-          ManaSymbol.Generic _ -> Just (untapped CardType.Artifact [])
+          ManaSymbol.Generic _ -> Just (TapUntapped (untapped CardType.Artifact []))
           _ -> Nothing
-        _ -> Nothing
-      exileCriterionOf keyword = case keyword of
         Keyword.Delve -> case symbol of
-          ManaSymbol.Generic _ -> Just (Filter.And [])
+          ManaSymbol.Generic _ -> Just (ExileFromGraveyard (Filter.And []))
           _ -> Nothing
         _ -> Nothing
-      gather wrap criterionOf = case Maybe.mapMaybe criterionOf (Set.toAscList keywords) of
-        [] -> []
-        [one] -> [wrap one]
-        many -> [wrap (Filter.Or many)]
-   in gather TapUntapped tapCriterionOf <> gather ExileFromGraveyard exileCriterionOf
+   in Maybe.mapMaybe substituteOf (Set.toAscList keywords)
 
 -- The one exile CR 702.34a, CR 702.127a and CR 702.133a all print, in the same
 -- words. Filter.IsSource, because the rule says "this card". `whenDestination =

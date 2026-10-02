@@ -1254,7 +1254,7 @@ totalManas adjustments =
 -- an already TOTALLED mana cost be paid by spending something else -- tapping a
 -- permanent, or exiling a card from a graveyard -- rather than with mana. One
 -- entry per distinct set of symbols the substitutes could cover, each a residual
--- mana cost paired with the components that spending is written as; the FIRST
+-- mana cost paired with the substitutes spent and how many of each; the FIRST
 -- entry substitutes nothing, which is rule 702.51a's "you may" said of every
 -- symbol at once.
 --
@@ -1286,7 +1286,7 @@ totalManas adjustments =
 -- rather than the object, which is what lets rule 701.67b scope it to one
 -- component of the total: `waterbendOffers` caps it at the waterbend cost's own
 -- generic amount where a keyword's offer is capped only by the symbol.
-manaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+manaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
 manaSubstitutions components slots pid oid gs =
   let keywords = Map.keysSet (spellKeywords pid oid gs)
    in substitutionsOffering (\symbol -> fmap (\substitute -> (substitute, Nothing)) (Keyword.manaSubstitutesFor symbol keywords) <> waterbendOffers components symbol) slots pid oid gs
@@ -1301,7 +1301,7 @@ manaSubstitutions components slots pid oid gs =
 -- The answer for a cost stating no waterbend is exactly one entry substituting
 -- nothing -- `offers` is empty, so the product is the empty vector -- which is
 -- the answer every such payment had before rule 701.67a arrived.
-waterbendSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+waterbendSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
 waterbendSubstitutions components = substitutionsOffering (waterbendOffers components)
 
 -- CR 701.67a as an offer, and CR 701.67b as the CEILING on it: "for each generic
@@ -1335,7 +1335,7 @@ waterbendCriterion =
 -- cover. Each offer carries its own CEILING beside the symbol's own count -- rule
 -- 701.67b's, or Nothing where the rule stating the substitute bounds it by the
 -- symbol alone.
-substitutionsOffering :: (ManaSymbol.ManaSymbol -> [(Keyword.Substitute, Maybe Natural)]) -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+substitutionsOffering :: (ManaSymbol.ManaSymbol -> [(Keyword.Substitute, Maybe Natural)]) -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]
 substitutionsOffering offersFor slots pid oid gs manaCost =
   let -- The cost's symbols as one entry per KIND, a Generic counting for its own
       -- amount (CR 107.4b) where every other symbol is one mana.
@@ -1361,7 +1361,7 @@ substitutionsOffering offersFor slots pid oid gs manaCost =
       withinCost vector = all (\(symbol, n, _, _) -> sum [k | (s, _, _, k) <- vector, s == symbol] <= n) vector
       entry vector =
         ( List.foldl' (\acc (symbol, _, _, k) -> withoutMana symbol k acc) manaCost vector,
-          [substituteComponent substitute k | (_, _, substitute, k) <- vector, k > 0]
+          [(substitute, k) | (_, _, substitute, k) <- vector, k > 0]
         )
    in fmap entry vectors
 
@@ -1372,6 +1372,7 @@ substitutionsOffering offersFor slots pid oid gs manaCost =
 substituteCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Keyword.Substitute -> GameState -> [ObjectId]
 substituteCandidates slots pid oid substitute gs = case substitute of
   Keyword.TapUntapped criterion -> tapCandidates slots pid oid criterion gs
+  Keyword.TapToConvoke criterion -> tapCandidates slots pid oid criterion gs
   Keyword.ExileFromGraveyard criterion -> exileCandidates slots pid oid criterion gs
 
 -- The component that SPENDS this many of a Keyword.Substitute's objects. Carrying
@@ -1382,7 +1383,20 @@ substituteCandidates slots pid oid substitute gs = case substitute of
 substituteComponent :: Keyword.Substitute -> Natural -> CostComponent.CostComponent Keyword.Type.Keyword
 substituteComponent substitute n = case substitute of
   Keyword.TapUntapped criterion -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion False)
+  Keyword.TapToConvoke criterion -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion False)
   Keyword.ExileFromGraveyard criterion -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion)
+
+-- The components an offer's substitutes are paid as, `substituteComponent` over
+-- each.
+substituteComponents :: [(Keyword.Substitute, Natural)] -> [CostComponent.CostComponent Keyword.Type.Keyword]
+substituteComponents = fmap (uncurry substituteComponent)
+
+-- CR 702.51c: does spending this substitute convoke the spell?
+convokes :: Keyword.Substitute -> Bool
+convokes substitute = case substitute of
+  Keyword.TapToConvoke _ -> True
+  Keyword.TapUntapped _ -> False
+  Keyword.ExileFromGraveyard _ -> False
 
 -- A SUBSTITUTION's mana halves folded into a TOTALLING, which is the shape
 -- Mana.announce's `total` parameter takes. The offer arrives as a parameter
@@ -1401,7 +1415,7 @@ substituteComponent substitute n = case substitute of
 -- PROVEN, not a fence: Pawl.CostSpec's "CR 601.2b the payer announces a convoked
 -- spell's hybrid halves, both blue" reddens on a bare `total_`, Merrow Skyswimmer
 -- being the transcribable printing that states convoke beside a hybrid symbol.
-substitutedManas :: (ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> ManaCost.ManaCost -> [ManaCost.ManaCost]
+substitutedManas :: (ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> ManaCost.ManaCost -> [ManaCost.ManaCost]
 substitutedManas substitute total_ manaCost = concatMap (fmap fst . substitute) (total_ manaCost)
 
 -- This much of ONE kind of mana taken out of a cost: a generic amount comes off
@@ -2956,7 +2970,7 @@ canPayReading slots subject pid oid cost gs = case Cost.mana cost of
     -- canPaySomeCompletionGiven weighs them: `any` entry of the offer, each
     -- entry's residual mana beside the union of the components.
     let payableWith (residual, extra) =
-          let components = Cost.components cost <> extra
+          let components = Cost.components cost <> substituteComponents extra
            in -- CR 118.14's permission is a CAST's, and no caller of this one is
               -- casting -- what reaches here is a special action's cost and CR
               -- 118.12's resolution-time payment -- so the mana is spent as it
@@ -3444,7 +3458,7 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- (`manaSubstitutions`), and this asks `any` of those too. A CAST passes
 -- `manaSubstitutions` and an ACTIVATION `waterbendSubstitutions`, which is
 -- the waterbend half alone; `canPayReading` asks the latter's the same way.
-canPaySomeCompletion :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletion :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletion slots subject spending pid oid total_ substitute cost gs =
   let pcs = Projection.projectAll gs
    in canPaySomeCompletionGiven slots subject spending (supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ substitute cost gs
@@ -3528,7 +3542,7 @@ midPayment capacity measure pcs pid oid cost restrictions ability gs =
 -- COMPONENTS are still asked through canPayComponent, whose Sacrifice,
 -- TapForTotalPower and CollectEvidence arms make per-object walks of their own
 -- (#1448).
-canPaySomeCompletionGiven :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ substitute cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
@@ -3543,7 +3557,7 @@ canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ subs
         -- asked of the UNION, once per entry -- and the no-substitute entry every
         -- other caller offers is answered out of the hoisted pair, which is the
         -- whole of what this costs a cast with neither keyword.
-        componentsWith extra = Cost.components cost <> extra
+        componentsWith extra = Cost.components cost <> substituteComponents extra
         claimsWith extra = if null extra then claimed else claimsOf slots pid oid (componentsWith extra) gs
         ownComponentsOk = componentsPayable slots pid oid (Cost.components cost) gs
         componentsOkWith extra = if null extra then ownComponentsOk else componentsPayable slots pid oid (componentsWith extra) gs
@@ -4370,25 +4384,25 @@ restoreKeepingLibraryActions before = do
 -- before the payer says how much of a Siege Wurm's cost is convoked" is the
 -- proof.
 --
--- The answer is the residual cost and the SUBSTITUTION COMPONENTS APART, rather
--- than one cost with the components folded in: CR 702.51c's record is of the
+-- The answer is the residual cost and the SUBSTITUTES APART, rather than one
+-- cost with their components folded in: CR 702.51c's record is of the
 -- creatures tapped THIS way, and Binding.tappedPermanent names every permanent
 -- any tap component of the cost took (`paySubstituting`).
-announceSubstitutions :: ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])
+announceSubstitutions :: ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])
 announceSubstitutions substituting pid oid cost = do
   slots <- State.gets (announcedSlots (Just oid))
   announceSubstitutionsReading slots substituting pid oid cost
 
 -- `announceSubstitutions` with the slot map its component criteria read handed
 -- in (`payReading`).
-announceSubstitutionsReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])
+announceSubstitutionsReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [(Keyword.Substitute, Natural)])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])
 announceSubstitutionsReading slots substituting pid oid cost = case Cost.mana cost of
   -- CR 118.6: an unpayable cost states no symbol to substitute for.
   Nothing -> pure (cost, [])
   Just manaCost -> do
     gs <- State.get
     let variant (residual, extra) = (cost {Cost.mana = Just residual}, extra)
-        whole (candidate, extra) = candidate {Cost.components = Cost.components candidate <> extra}
+        whole (candidate, extra) = candidate {Cost.components = Cost.components candidate <> substituteComponents extra}
         offered = filter (\candidate -> componentsPayable slots pid oid (Cost.components (whole candidate)) gs) (fmap variant (substituting (Cost.components cost) slots pid oid gs manaCost))
     case offered of
       -- REACHABLE, and not by the gate's measurement: this runs after CR 601.2g's
@@ -4500,14 +4514,16 @@ payReading slots perform began moment subject spending pid oid cost = fmap fst (
 --
 -- KEPT APART is the other half, and CR 702.51c's: the record is of the creatures
 -- tapped THIS way, where Binding.tappedPermanent names every permanent any tap
--- component of the cost took. Pawl.Engine.Cast reads the second answer.
+-- component of the cost took. The second answer is the slots the CONVOKING
+-- substitutes bound alone (`convokes`), and Pawl.Engine.Cast reads it.
 --
 -- `earlier` are the mana windows the announcement already ran for OTHER
 -- players, oldest first -- CR 702.132a's assisting player's, and nothing
 -- otherwise. A refused payment reverses them with its own, so each of those
 -- players is asked too (`reverseIllegal`).
 --
--- The two groups go through payComponents SEPARATELY, so each makes CR 601.2h's
+-- The cost's own components and the substitutes (split again by `convokes`) go
+-- through payComponents SEPARATELY, so each group makes CR 601.2h's
 -- two passes of its own. That is not the rule: CR 601.2h wants ONE first pass
 -- over everything that moves no card out of a library, then one second pass over
 -- the rest -- so a cost carrying a MillCards component of its own would have it
@@ -4515,14 +4531,14 @@ payReading slots perform began moment subject spending pid oid cost = fmap fst (
 -- Nothing in `data/cards/` observes it, which is why no issue is filed: no
 -- printing there that states convoke, delve or improvise carries a cost
 -- component at all (checked 2026-09-13), and one that did would refute this.
-paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
+paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
 paySubstituting perform began earlier moment subject announced spending pid oid substituting cost = do
   slots <- State.gets (announcedSlots announced)
   paySubstitutingReading slots perform began earlier moment subject announced spending pid oid substituting cost
 
 -- `paySubstituting` with the slot map its component criteria read handed in
 -- rather than read off `announced` (`payReading`).
-paySubstitutingReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
+paySubstitutingReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [(Keyword.Substitute, Natural)])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
 paySubstitutingReading slots perform began earlier moment subject announced spending pid oid substituting cost =
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action, and
@@ -4542,13 +4558,22 @@ paySubstitutingReading slots perform began earlier moment subject announced spen
         if paidMana
           then payComponents moment slots pid oid (Cost.components cost)
           else pure Payment.Unpaid
+      -- The convoking taps are paid as a group of their own so that their
+      -- bindings stay apart (CR 702.51c), after the other substitutes. The
+      -- payer still picks every permanent in each group, so the order between
+      -- the groups decides nothing.
+      let (convoking, others) = List.partition (convokes . fst) substitutes
       (outcome, substituted) <- case paidOwn of
         Payment.Unpaid -> pure (Payment.Unpaid, Map.empty)
         Payment.Paid bound -> do
-          paidSubstitutes <- payComponents moment slots pid oid substitutes
-          pure $ case paidSubstitutes of
-            Payment.Unpaid -> (Payment.Unpaid, Map.empty)
-            Payment.Paid extra -> (mergeBound bound paidSubstitutes, extra)
+          paidOthers <- payComponents moment slots pid oid (substituteComponents others)
+          case paidOthers of
+            Payment.Unpaid -> pure (Payment.Unpaid, Map.empty)
+            Payment.Paid _ -> do
+              paidConvoking <- payComponents moment slots pid oid (substituteComponents convoking)
+              pure $ case paidConvoking of
+                Payment.Unpaid -> (Payment.Unpaid, Map.empty)
+                Payment.Paid convoked -> (mergeBound bound (mergeBound convoked paidOthers), convoked)
       case outcome of
         -- The components' bound slots ride out unchanged: the mana window
         -- above binds none, and a caller that has a binding environment to
@@ -5112,7 +5137,7 @@ payManaExcept perform inFlight record subject spending pid cost = do
 -- The window LOOP still reads the unsubstituted cost, which is what `covered`
 -- below asks about: nothing has been substituted yet while the window is open,
 -- so CR 118.3c's question is put against the whole of it.
-payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])) -> ManaCost.ManaCost -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], ManaWindow.ManaWindow)
+payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [(Keyword.Substitute, Natural)])) -> ManaCost.ManaCost -> Game (Bool, [(Keyword.Substitute, Natural)], ManaWindow.ManaWindow)
 payManaWindow perform inFlight record subject spending pid substituting cost = do
   -- Where the window OPENED, which is the far end of the announcement's diff:
   -- everything between the caller's own snapshot and this is what the
@@ -5174,7 +5199,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
       -- WHICH mana goes is the payer's (Mana.spendChosen), so this asks rather
       -- than reading `settlement`'s assignment: that one answers only whether the
       -- pool pays.
-      settle :: [ObjectId] -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], ManaWindow.ManaWindow)
+      settle :: [ObjectId] -> Game (Bool, [(Keyword.Substitute, Natural)], ManaWindow.ManaWindow)
       settle activated = do
         -- The state the window CLOSED on, which is the one a payer who declines
         -- to reverse their mana abilities goes back to: this is after every
