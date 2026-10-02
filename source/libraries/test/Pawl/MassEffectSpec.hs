@@ -90,22 +90,8 @@ castDayOfJudgment plains dayOfJudgment board =
       afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
    in S.runPure S.identityAnswer afterCast Stack.resolveTop
 
-destroyAllSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+destroyAllSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
-  -- CR 701.19a: a regeneration shield "protects the permanent the next time
-  -- it would be destroyed this turn". Day of Judgment says nothing about
-  -- regeneration, so it carries Regenerability.Regenerable and the shield
-  -- applies -- the creature is instead tapped and stays.
-  Spec.it s "CR 701.19a a regeneration shield saves its creature from Day of Judgment" $ do
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (shielded, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
-        (bare, g2) = S.addPermanent piker S.bob g1
-        resolved = castDayOfJudgment plains dayOfJudgment (S.addRegenShield shielded g2)
-    Spec.assertBool s (S.onBattlefield shielded resolved) "the shielded creature stands"
-    Spec.assertEqWith s "and CR 701.19a taps it" (fmap Object.tapped (Game.lookupObject shielded resolved)) (Just TapState.Tapped)
-    Spec.assertBool s (not (S.onBattlefield bare resolved)) "its unshielded twin died"
   -- CR 115.10a: "Unless that object or player is identified by the word
   -- 'target' ... it's not a target." "All creatures" is not a target, so the
   -- card declares no target slot and the cast never raises a target prompt

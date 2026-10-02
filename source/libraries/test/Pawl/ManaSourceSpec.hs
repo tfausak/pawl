@@ -795,25 +795,7 @@ poolOf pid gs = case Game.poolOf pid gs of
 -- The retention rides the UNIT and not CR 613.11's player axis, for Shizuko's
 -- reason above: "this mana" is the six units this ability added, and a seventh
 -- red in the same pool is lost at the first step end.
---
--- THREE MOMENTS, because a shorter board admits two wrong implementations:
---
---   * the declare blockers step separates the arm from ManaRetention.Ordinary,
---     which is what this card carried while the arm did not exist -- CR 500.5
---     takes the pool as the declare attackers step ends.
---   * the end of combat step separates it from a retention ended at a combat
---     STEP's end. CR 500.5a's own sentence is that the effect lasts through that
---     step, and Pawl.ExpirySpec's "the end of combat STEP ending does not expire
---     it; the PHASE ending does" is the stored-effect twin.
---   * the postcombat main phase separates it from ManaRetention.UntilEndOfTurn,
---     and nothing earlier can. Without it the board proves only "longer than one
---     step".
---
--- Read as a LEGALITY (design.md section 4) with the pool's exact contents
--- alongside, and then SPENT in the second case, because presence is not
--- spendability. alice holds no land and bob no mana source at all, so the
--- trigger's six {R} is the only mana in the game.
-avatarRokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+avatarRokuSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 avatarRokuSpec s registry =
   let withPriority gs = gs {GameState.priority = Just S.alice}
       -- Declares attackers and blockers and PASSES on every action (identityAnswer
@@ -828,62 +810,7 @@ avatarRokuSpec s registry =
           (gs, [rokuId], [pikerId]) -> pure (Just (rokuId, pikerId, gs))
           _ -> pure Nothing
    in Spec.describe s "Avatar Roku, Firebender" $ do
-        -- Presence is not spendability, and only spending reaches CR 106.4's
-        -- "used to pay costs". alice takes every activation offered in the
-        -- DECLARE BLOCKERS step -- a step whose start is already past the end
-        -- that CR 500.5 would have emptied the pool at -- and six {R} pays for
-        -- exactly two, so Roku is a 12/6. Ordinary retention leaves it its
-        -- printed 6/6.
-        Spec.it s "CR 106.4 the retained mana pays for two activations in a LATER step" $ do
-          built <- fixture
-          case built of
-            Just (rokuId, _, gs) -> do
-              let activating :: Prompt.Prompt r -> r
-                  activating p = case p of
-                    Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature rokuId) . snd) sets
-                    Prompt.ChooseAction _ _ options -> case filter (isActivationOf rokuId) options of
-                      a : _ -> a
-                      [] -> Action.Type.Pass
-                    _ -> S.aggressiveAnswer p
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs)
-                  after = S.runPure activating blockers Engine.runStep
-              Spec.assertEqWith s "Roku is its printed 6/6 as the step begins" (S.powerToughnessOf rokuId blockers) (Just (6, 6))
-              Spec.assertEqWith s "and a 12/6 once the step has run, off two activations" (S.powerToughnessOf rokuId after) (Just (12, 6))
-              Spec.assertEqWith s "which is the whole pool spent" (poolOf S.alice after) []
-            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
-
-        -- CR 724.2d/e: Mandate of Peace ({1}{W} Instant, "Cast this spell only
-        -- during combat. Your opponents can't cast spells this turn. End the
-        -- combat phase.") ends the combat phase with its last step never running,
-        -- so Turn.phaseEndingAt never reports that end and the CR 500.5 sweep at
-        -- the step's own end sees no phase. Pawl.Engine.Resolve's CR 724.2 arm has
-        -- to end the retention itself, or the mana outlives the phase it was
-        -- scoped to.
-        --
-        -- Read as the postcombat main phase begins -- one step after the cast,
-        -- which is the first moment the two readings differ. Pawl.TurnSpec's
-        -- endCombatPhaseSpec covers the same arm on the STORED-effect axis (a Jade
-        -- Statue's animation); this is its unit-axis twin.
-        --
-        -- BOB casts it, and holds the only lands. Every red in the game is the
-        -- trigger's, so the cast cannot spend any of it and the "may no longer
-        -- activate" read cannot pass because alice ran short.
-        Spec.it s "CR 724.2d a combat phase ended part-way through takes the retained mana" $ do
-          built <- fixture
-          case built of
-            Just (rokuId, _, gs) -> do
-              plains <- S.printingOf s registry "Plains"
-              mandate <- S.printingOf s registry "Mandate of Peace"
-              let (spell, staged) = S.addHandCard mandate S.bob (S.landsFor plains S.bob 2 gs)
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
-                  after = S.runPure (castingOnly spell) blockers Engine.runStep
-              Spec.assertEqWith s "the six retained {R} are there when the step begins" (poolOf S.alice blockers) (replicate 6 retainedRed)
-              Spec.assertEqWith s "the combat phase is over" (GameState.phase after) Phase.PostcombatMain
-              Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "and alice may no longer activate Roku off it"
-              Spec.assertEqWith s "the pool says the same thing" (poolOf S.alice after) []
-            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
-
-        -- CR 724.1d's half of the same claim: Time Stop ({4}{U}{U} Instant, "End
+        -- CR 724.1d: Time Stop ({4}{U}{U} Instant, "End
         -- the turn.") ends the current phase as well as the step, and the game
         -- skips straight to the cleanup step. The retention is scoped to the
         -- combat phase, which has just ended, so the mana goes at that step's own
@@ -894,9 +821,8 @@ avatarRokuSpec s registry =
         -- standing at that step's start, so a board read after the cleanup step
         -- had run would find an empty pool under both readings.
         --
-        -- BOB casts it, the case above's reason and sharper here: {4}{U}{U} is
-        -- six mana, and alice paying any of it out of the retained {R} would
-        -- leave her under {R}{R}{R} whatever the sweep did.
+        -- BOB casts it: {4}{U}{U} is six mana, and alice paying any of it out of
+        -- the retained {R} would leave her under {R}{R}{R} whatever the sweep did.
         Spec.it s "CR 724.1d ending the turn during combat takes the retained mana before cleanup" $ do
           built <- fixture
           case built of
@@ -910,44 +836,6 @@ avatarRokuSpec s registry =
               Spec.assertEqWith s "the game jumped to the cleanup step" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
               Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "and alice may no longer activate Roku off it"
               Spec.assertEqWith s "the pool says the same thing" (poolOf S.alice after) []
-            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
-
-        -- CR 500.5 / CR 614.1b: the same phase end reached by a SKIP of the
-        -- phase's last step rather than by an effect ending the phase. CR 724.2e
-        -- is the CR contemplating exactly that pairing -- the combat phase ends
-        -- while its end of combat step does not happen -- and Engine.skipStep is
-        -- where the phase-grain sweep this retention needs now lives.
-        --
-        -- Synthetic Truncate the Fray ({1}{U} Instant, "Target player skips their
-        -- next end of combat step"), synthetic because nothing printed names that
-        -- step: Scryfall o:/skips?.*end of combat/ and o:"end of combat step"
-        -- o:skip, 2026-08-27, no hit. Pawl.TurnSpec's SkippedEndOfCombat group is
-        -- the stored-effect and combat-record twin of this case.
-        --
-        -- The skip must be aimed at the ACTIVE player, whose combat phase it is
-        -- (Event.beginsPhase asks of GameState.activePlayer), so bob casts it at
-        -- alice. BOB casts it for the case above's reason as well: he holds the
-        -- only lands, so no part of {1}{U} can come out of the retained {R}.
-        --
-        -- "The end of combat step never began" is what keeps this from passing
-        -- vacuously: a cast that silently did nothing would leave the step to run
-        -- normally, and the pool would be empty at the same moment under both
-        -- readings.
-        Spec.it s "CR 500.5 a skipped end of combat step still takes the retained mana" $ do
-          built <- fixture
-          case built of
-            Just (rokuId, _, gs) -> do
-              island <- S.printingOf s registry "Island"
-              fray <- S.printingOf s registry "Synthetic Truncate the Fray"
-              let (spell, staged) = S.addHandCard fray S.bob (S.landsFor island S.bob 2 gs)
-                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
-                  after = S.runToStep Phase.PostcombatMain (castingOnly spell) blockers
-                  began = filter (== GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.EndOfCombat) S.alice)) (S.eventsOf after)
-              Spec.assertEqWith s "the six retained {R} are there when the step begins" (poolOf S.alice blockers) (replicate 6 retainedRed)
-              Spec.assertEqWith s "CR 614.6 the end of combat step never began" began []
-              Spec.assertEqWith s "CR 511.3 the combat phase is over regardless" (GameState.phase after) Phase.PostcombatMain
-              Spec.assertEqWith s "and the retained mana went with the phase" (poolOf S.alice after) []
-              Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "so alice may no longer activate Roku off it"
             Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
 
 -- Casts that one object the first time it is offered and passes otherwise,

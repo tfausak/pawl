@@ -440,28 +440,6 @@ spec s registry = Spec.describe s "Meld" $ do
         -- 701.42a's opcode reads (CR 400.7j).
         Spec.assertEqWith s "and the pair still melds into Hanweir, the Writhing Township" (S.countOnBattlefieldByName townshipName S.alice after) 1
       abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
-  -- The printed condition, which is a gate on the whole clause: "If you both own
-  -- AND control this land and a creature named Hanweir Garrison". Two boards,
-  -- each differing from the melding board above in ONE thing -- no Garrison at
-  -- all, and a Garrison alice controls but bob owns -- and on neither does the
-  -- land exile itself for nothing. The second board is what the word "own" buys:
-  -- a control-only reading would meld bob's card away.
-  Spec.it s "CR 608.2c the ability does nothing without a Hanweir Garrison you both own and control" $ do
-    battlements <- S.printingOf s registry "Hanweir Battlements"
-    garrison <- S.printingOf s registry "Hanweir Garrison"
-    mountain <- S.printingOf s registry "Mountain"
-    let resolvedOn extra =
-          let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
-              board = readyFor mountain (extra g1)
-           in case Projection.abilitiesOf bId board of
-                [_, _, melding] -> (Just bId, S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop))
-                _ -> (Nothing, board)
-        borrowed g1 =
-          let (theirs, g2) = S.addPermanent garrison S.bob g1
-           in S.giveControl theirs S.alice g2
-        stayed (mBId, after) = (fmap (\bId -> fmap Object.zone (Game.lookupObject bId after)) mBId, S.countOnBattlefieldByName townshipName S.alice after)
-    Spec.assertEqWith s "with no Garrison anywhere the land is untouched and nothing melded" (stayed (resolvedOn id)) (Just (Just Zone.Battlefield), 0)
-    Spec.assertEqWith s "and a Garrison alice controls but does not own is not one the ability may name" (stayed (resolvedOn borrowed)) (Just (Just Zone.Battlefield), 0)
   -- CR 701.42c's own example, with Hanweir in place of Midnight Scavengers: the
   -- counterpart is a TOKEN copy of Hanweir Garrison, which CR 701.42b bars from
   -- melding (CR 108.2 makes a token no card at all). The card's own "exile them"

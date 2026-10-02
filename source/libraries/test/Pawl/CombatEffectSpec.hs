@@ -1287,33 +1287,6 @@ blockAndWane jaceId atBob marchId p = case p of
     [] -> A.Pass
   _ -> blockWithJace jaceId atBob p
 
--- blockWithJace, plus: whoever is offered the cast of the Aura named `aura`
--- takes it and enchants Jace with it -- the other half of the pair blockAndWane
--- makes, stripping card types by CR 205.1a's set rather than by ending an
--- animation. Song of the Dryads strips both at once; Kenrith's Transformation
--- only the planeswalker type.
---
--- The recipient is FILTERED out of what the prompt offers rather than built, and
--- the caller names its tag: Song's "enchant permanent" is a Pool.Permanents slot
--- offering Recipient.ToObject, Kenrith's "enchant creature" a Pool.Creatures one
--- offering Recipient.ToCreature. A hand-built recipient of the wrong tag would be
--- dropped with no error by CR 608.2b's re-read at resolution, where a filter that
--- matches nothing leaves the slot empty and reddens loudly.
---
--- Wax // Wane is in the same hand and both its halves are affordable once the
--- Forests are seated, so unlike blockAndWane the name filter is load-bearing here.
-blockAndEnchant :: Text.Text -> Recipient.Recipient -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-blockAndEnchant aura onJace jaceId atBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (onJace ==) . snd) sets
-  Prompt.ChooseAction _ _ actions -> case filter isAuraCast actions of
-    a : _ -> a
-    [] -> A.Pass
-  _ -> blockWithJace jaceId atBob p
-  where
-    isAuraCast a = case a of
-      A.Cast _ name _ -> name == CardName.MkCardName aura
-      _ -> False
-
 isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
   AttackTarget.OfPlaneswalker _ -> True

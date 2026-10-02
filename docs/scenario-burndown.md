@@ -916,24 +916,15 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 603.10 stripping the PRIDEMATE takes the second gain from it and not the first | `check:other-Projection.triggeredAbilitiesOf`
 - CR 603.2c two Knights connecting in one step are one trigger event, so the entry fires once | `check:delayed-triggers` `check:events`
 - CR 603.7b / 514.2 the same Knights connecting on alice's next turn crown nobody | `check:delayed-triggers`
-- CR 603.7b a fourth seat is a fourth candidate | `board:delayed-trigger`
-- CR 603.7b a per-occurrence entry on the same batch is asked once | `board:delayed-trigger`
-- CR 603.7b one occurrence is not a choice, so bob pays for his own gain | `board:delayed-trigger`
-- CR 603.7b the controller names carol's gain out of three simultaneous ones | `board:delayed-trigger`
-- CR 603.7b the same batch answered differently drains bob instead | `board:delayed-trigger`
-- CR 603.7b the same entry fires again for alice, whose gain is 1 | `board:delayed-trigger`
 - CR 702.15e two lifelink attackers connecting at once are two life gain events | `check:events`
 
 ### `ManaSourceSpec`
 
-- CR 106.4 the retained mana pays for two activations in a LATER step | `board:combat`
 - CR 106.4 the three green land in the UPKEEP player's pool, not the controller's | `check:helper-poolOf` `check:helper-retainedGreen`
 - CR 106.6 the mana pays an equip cost and casts no spell | `check:other-Object.manaSpent`
-- CR 500.5 a skipped end of combat step still takes the retained mana | `board:combat`
 - CR 603.2b on the controller's own upkeep the same trigger pays the controller | `check:helper-poolOf` `check:helper-retainedGreen`
 - CR 605.1b the enters trigger resolves off the stack and adds {R}{G} | `check:helper-plainGreen` `check:helper-plainRed` `check:helper-poolUnits`
-- CR 724.1d ending the turn during combat takes the retained mana before cleanup | `board:combat`
-- CR 724.2d a combat phase ended part-way through takes the retained mana | `board:combat`
+- CR 724.1d ending the turn during combat takes the retained mana before cleanup | `check:intermediate-state`
 
 ### `ManaSpec`
 
@@ -960,14 +951,12 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 608.2d the second choice is made among the cards the first left | `check:prompt-candidates`
 - CR 608.2d two cards are taken from among the seven, both of them chosen | `check:prompt-candidates`
 - CR 701.17c the return chooses among the milled cards, not among the graveyard | `check:prompt-candidates`
-- CR 701.19a a regeneration shield saves its creature from Day of Judgment | `board:replacement`
 - CR 701.20e the choice ranges over the matching revealed cards, not over all five | `check:prompt-candidates`
 
 ### `MeldSpec`
 
 - CR 202.3c a copy of a melded permanent has mana value 0 | `board:source-ofmeld`
 - CR 202.3c a melded permanent's mana value is its components' front faces combined | `check:mana-value` `check:can-block`
-- CR 608.2c the ability does nothing without a Hanweir Garrison you both own and control | `board:sickness`
 - CR 608.2f the pair leaves the battlefield in one event | `check:events`
 - CR 612.7 / 701.42c a Spy Kit host is a Hanweir Garrison the game never saw, and both it and the land stay exiled | `board:object-attachedto`
 - CR 701.42a a one-or-more-cards-leave-exile trigger counts both melded cards | `check:events` `check:other-Binding.eventAmount` `check:other-Binding.toAmount` `check:other-Event.eventBindings` `check:other-LoggedEvent.event` `check:other-Moved.change` `check:other-Moved.departures` `check:other-ZoneChange.from` `check:other-ZoneChange.object` `check:other-ZoneChange.to`
@@ -1008,12 +997,11 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `MutateSpec`
 
 - CR 702.140a a stolen mutate spell may target the owner's creature and not the caster's | `board:exile-linked` `move:expect-rejected`
-- CR 702.140b a mutating creature spell whose target became illegal resolves as an ordinary creature spell | `board:continuous-effect`
 - CR 702.140c a merge asks for its side exactly once, whatever represents the target | `board:source-ofmeld`
 - CR 702.140e a Dormant Gomazoa under a Cubwarden still does not untap | `board:source-ofmerge`
 - CR 702.140e a Prized Unicorn under a Cubwarden still makes bob block it | `board:source-ofmerge`
 - CR 702.140e an Exalted Dragon under a Cubwarden still charges a land to attack | `board:source-ofmerge`
-- CR 730.2/707.10 a copy of a mutating creature spell merges, as a copy and not as a card | `board:objects-ids`
+- CR 730.2/707.10 a copy of a mutating creature spell merges, as a copy and not as a card | `check:other-Game.componentsOf`
 - CR 730.2a/613.7 a merge outranks Mirrorweave's copy at once and is recomputed when it ends | `board:copyeffects`
 - CR 730.2a/712.8g Cubwarden merges with a melded permanent, over and under | `board:source-ofmeld`
 - CR 730.2a/730.2e a face-down merged permanent turned face up shows the topmost component's own face | `board:battlefield` `board:objects-ids`
@@ -1060,7 +1048,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.26a the cycle repeats every untap step | `check:helper-onBattlefield`
 - CR 702.26a/702.26c a phased-out permanent phases in at its controller's next untap step | `check:creature-count` `check:helper-onBattlefield` `check:other-Phasing.isPhasedOut`
 - CR 702.26b Reality Ripple phases out a creature with no phasing | `check:other-Phasing.phasedOutStatus` `check:helper-zoneOf`
-- CR 702.26f a for-as-long-as duration ends when its permanent phases out | `board:continuous-effect`
 - CR 702.26g the Aura phases in with its host, still attached | `check:helper-attachedHostOf` `check:helper-onBattlefield` `check:other-Phasing.isPhasedOut`
 - CR 702.26h an object named AND dragged phases out indirectly | `check:phasing`
 - CR 702.26i an Aura attached to a PLAYER phases in still attached | `check:phasing`
@@ -1074,17 +1061,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 
 ### `PlaneswalkerCombatSpec`
 
-- CR 110.2 a Towershell its attacker does not own returns under the ATTACKER's control | `board:sickness`
-- CR 506.4 a planeswalker that stops being a planeswalker stops being attacked, so Soul Snare cannot name the attacker | `board:combat` `board:continuous-effect`
-- CR 506.4 a planeswalker whose CONTROLLER changes stops being attacked, so the new controller's Soul Snare cannot name the attacker | `board:combat` `board:continuous-effect`
-- CR 506.4 a planeswalker whose controller changes and changes BACK stays removed from combat, so Soul Snare still cannot name the attacker | `board:combat` `board:continuous-effect`
-- CR 506.4d whole cards: a blocking Jace that stops being BOTH card types is removed from combat | `board:continuous-effect`
-- CR 506.4d whole cards: a blocking Jace that stops being a planeswalker is still a blocking creature | `board:continuous-effect`
-- CR 506.4e / 704.5x whole cards: becoming a battle mid-combat, he gets no protector, so bob's Snare cannot name the Elf | `board:continuous-effect`
 - CR 506.4e whole card: a creature attacking the planeswalker is attacking a battle bob protects, so his Snare exiles it | `board:continuous-effect` `board:protector`
 - CR 506.4e whole cards: attacked as a battle, it stops being one and is still a planeswalker that's being attacked | `board:continuous-effect` `board:protector`
 - CR 506.4e whole cards: attacked as a planeswalker, it stops being one and is still a battle that's being attacked | `board:continuous-effect` `board:protector`
-- CR 506.4e whole cards: becoming a battle mid-combat, then no planeswalker, he is still a battle that's being attacked | `board:continuous-effect`
 - CR 508.3a the tokens are attacking, and the attack trigger fired only for the Garrison | `check:events`
 - CR 508.4 whole card: Hanweir Garrison's two Humans enter tapped and attacking | `check:sickness`
 - CR 702.19c an unblocked 7/7 pays Jace's 3 loyalty and sends the other 4 at bob | `check:helper-assignmentLog`
@@ -1121,10 +1100,10 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2f whole cards: the rewritten filter decides a real cast | `move:expect-rejected`
 - CR 612.1 an evolved Edgewalker discounts Zombies and no longer discounts Clerics | `check:helper-textChangesAffecting` `check:helper-totalManaCost`
 - CR 612.2 a land-type pair leaves the creature-type filter alone | `check:helper-textChangesAffecting` `check:helper-totalManaCost`
-- CR 612.5 the evolved discount moves to the Piker with the text box | `board:continuous-effect`
+- CR 612.5 the evolved discount moves to the Piker with the text box | `check:helper-totalManaCost` `check:helper-textBoxHolderOf`
 - CR 613.11 an increase after Reliquary Tower still leaves no maximum | `check:other-PlayerEffect.maximumHandSize`
 - CR 613.11 the Cindermaw's controller can't gain either | `check:events` `check:helper-lifeGainsOf`
-- CR 613.8b an Evolution on the Piker waits for the Edgewalker's text | `board:continuous-effect`
+- CR 613.8b an Evolution on the Piker waits for the Edgewalker's text | `check:helper-totalManaCost` `check:helper-textChangesAffecting`
 - without the reducer the same spell is full price | `check:helper-green` `check:helper-totalManaCost`
 
 ### `PopulateSpec`
@@ -1134,21 +1113,19 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `PowerToughnessSpec`
 
 - CR 119.3/608.2i two gains in one turn add up: +2/+2 then +4/+4 | `board:events`
-- CR 608.2i last turn's life gain does not count | `board:continuous-effect`
 - CR 613.1d a Convincing Mirage'd Forest stops being one, and the pump stops with it | `board:hypothetical`
 
 ### `PreventionSpec`
 
 - CR 400.7c the shield follows the chosen permanent spell onto the battlefield | `check:prompt-offers`
-- CR 601.2c the shield's description names the object the spell targeted | `board:replacement`
 - CR 603.7 the creature the resolution named is exiled when it dies, and no other is | `board:delayed-trigger` `board:player-effect` `board:unregeneratables`
 - CR 603.7b the entry is gone by the next turn, so the same death exiles nothing | `board:delayed-trigger` `board:player-effect` `board:unregeneratables`
-- CR 609.7a a slot the installing resolution bound but the row never names is not offered | `board:replacement`
+- CR 609.7a a slot the installing resolution bound but the row never names is not offered | `move:name-departed-object`
 - CR 609.7a a source only a waiting ability still refers to is offered, and shields the damage it deals | `ref:departed-object`
 - CR 609.7a a source only a waiting delayed trigger still refers to is offered | `board:delayed-trigger` `board:entered-with` `board:graveyard`
-- CR 609.7a a source only a waiting row's captured slot still names is offered | `board:replacement`
-- CR 609.7a a source only a waiting shield's baked field still names is offered | `board:replacement`
-- CR 609.7a an activated ability a waiting delayed trigger still names is not offered as a source | `board:delayed-trigger`
+- CR 609.7a a source only a waiting row's captured slot still names is offered | `move:name-departed-object`
+- CR 609.7a a source only a waiting shield's baked field still names is offered | `move:name-departed-object`
+- CR 609.7a an activated ability a waiting delayed trigger still names is not offered as a source | `board:delayed-trigger` `move:name-departed-object`
 - CR 609.7a an object bound by an unrelated clause of the row's own resolution is not offered | `check:prompt-payload`
 - CR 611.2c the shield covers whatever matches its description when the damage would happen | `board:combat` `board:replacement`
 - CR 614.1b Eon Hub replaces the upkeep step with nothing | `check:helper-began` `check:other-GameState.remaining`

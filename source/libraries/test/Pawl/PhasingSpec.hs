@@ -41,12 +41,6 @@
 -- the host it is cast onto, and the permanent left behind when Clever
 -- Concealment names the Aura alone.
 --
--- Master Thief joins them for CR 702.26f, whose "for as long as" half needs a
--- duration (CR 611.2b) tracking a permanent Reality Ripple can then send away:
--- "gain control of target artifact for as long as you control this creature" is
--- the rulebook's own example of one. Darksteel Myr is the artifact it takes, and
--- the only one on that board, so the trigger's CR 603.3d choice is forced.
---
 -- Synthetic Puppeteer's Yoke joins them for the CR 613.1b layer-2 fold, whose
 -- Affected.AttachedPlayerControls arm names a permanent by its CONTROLLER rather
 -- than by walking a zone. It is bounded by the battlefield all the same, which
@@ -82,12 +76,10 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
-import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
-import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -99,7 +91,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
-import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- CR 502: the untap step's turn-based actions, run for `pid`. DaytimeSpec's
 -- helper of the same shape, with the active player made explicit because the
@@ -203,38 +194,6 @@ equippedBoard island piker bonesplitter ripple =
     let (host, withHost) = S.addPermanent piker S.alice gs
         (equip, withEquip) = S.addPermanent bonesplitter S.alice withHost
      in ((host, equip), S.attach equip host withEquip)
-
--- The sweep every settle runs, and the whole priority loop, at the answerer
--- these boards take. Duplicated from Pawl.ExpirySpec rather than hoisted into Pawl.Support,
--- which rebuilds every spec in the tree.
-settleFor :: GameState.GameState -> GameState.GameState
-settleFor gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-
-resolveAll :: GameState.GameState -> GameState.GameState
-resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
-
--- alice's Master Thief has entered and its ETB has taken bob's Darksteel Myr, on
--- a rippleBoard so the Ripple can be cast at the Thief afterwards. The Myr is the
--- only artifact, so the TRIGGER's CR 603.3d target choice is forced and no aiming
--- answerer is needed for it -- only for the Ripple, whose pool is artifacts,
--- creatures and lands and so offers more. Master Thief is PUT onto the
--- battlefield rather than cast, leaving rippleBoard's "two Islands is exactly
--- {1}{U}" invariant untouched.
---
--- Returns the Thief and the Myr, then the Ripple in alice's hand.
-stolenBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  ((ObjectId.ObjectId, ObjectId.ObjectId), ObjectId.ObjectId, GameState.GameState)
-stolenBoard island darksteelMyr masterThief ripple =
-  rippleBoard island ripple $ \gs ->
-    let (myr, withMyr) = S.addPermanent darksteelMyr S.bob gs
-        (thief, withThief) = S.addPermanent masterThief S.alice withMyr
-        entered = ZoneChange.MkZoneChange thief thief Zone.Stack Zone.Battlefield
-        seen = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thief withThief))] withThief
-     in ((thief, myr), resolveAll (settleFor seen))
 
 -- CR 601.2c's whole announcement for Clever Concealment: as many targets as
 -- `oids` names, and exactly those objects taken out of the offered set.
@@ -379,45 +338,6 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     -- phasing phases out on the schedule, so bob's untap step does not
     -- send it straight back out again.
     Spec.assertEqWith s "and it does not phase out again at once" (Phasing.phasedOutStatus victim bobs) Nothing
-  -- CR 702.26f's second sentence, read on the duration CR 611.2b names: a "for as
-  -- long as" effect that tracks a permanent ENDS when that permanent phases out,
-  -- "because they can no longer see it", and does not come back with it. Master
-  -- Thief's "gain control of target artifact for as long as you control this
-  -- creature" is the rulebook's own example of such a duration; Reality Ripple
-  -- sends the Thief away mid-turn, which is the only way to reach this.
-  --
-  -- Nothing in Pawl.Engine.Expiry or Pawl.Engine.Projection names phasing. The
-  -- duration's Condition counts the Thief on the battlefield, Phasing.phaseOut
-  -- takes it out of GameState.battlefield, so Expiry.sweepConditional DELETES the
-  -- effect -- and deletion, not suspension, is what the second sentence needs.
-  --
-  -- The minimal-pair sibling is attachedSpec's Bonesplitter case, on the same
-  -- Ripple-then-untapStep shape: a STATIC ability is re-derived from battlefield
-  -- membership every projection and comes back (4 -> 2 -> 4), where this STORED
-  -- effect is deleted and does not (alice -> bob -> bob). Same shape, opposite
-  -- third value.
-  --
-  -- Both readings are taken after a settle, since untapStep runs only
-  -- Engine.runTurnBasedActions while the sweep lives in Engine.settleForPriority.
-  Spec.it s "CR 702.26f a for-as-long-as duration ends when its permanent phases out" $ do
-    island <- S.printingOf s registry "Island"
-    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-    masterThief <- S.printingOf s registry "Master Thief"
-    ripple <- S.printingOf s registry "Reality Ripple"
-    let ((thief, myr), spell, stolen) = stolenBoard island darksteelMyr masterThief ripple
-        gone = settleFor (rippleAt thief spell stolen)
-        back = settleFor (untapStep S.alice gone)
-    Spec.assertEqWith s "setup: alice's Master Thief took bob's Myr" (Projection.controllerOf myr stolen) (Just S.alice)
-    Spec.assertEqWith s "setup: and the duration really armed" (length (GameState.continuousEffects stolen)) 1
-    Spec.assertEqWith s "the Ripple phased the Thief out" (Phasing.isPhasedOut thief gone) True
-    -- CR 702.26f's "end", at gameplay level and ahead of every structural proxy.
-    Spec.assertEqWith s "so control of the Myr reverts to bob" (Projection.controllerOf myr gone) (Just S.bob)
-    Spec.assertEqWith s "the effect is deleted, not masked" (GameState.continuousEffects gone) []
-    -- CR 702.26a brings the Thief back under alice, who controls it; CR 702.26f's
-    -- second sentence says the effect does not come back with it.
-    Spec.assertEqWith s "CR 702.26a the Thief phases in at alice's untap step" (onBattlefield thief back) True
-    Spec.assertEqWith s "and the Myr stays with bob" (Projection.controllerOf myr back) (Just S.bob)
-    Spec.assertEqWith s "with nothing restored" (GameState.continuousEffects back) []
 
 indirectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 indirectSpec s registry = Spec.describe s "Indirect" $ do

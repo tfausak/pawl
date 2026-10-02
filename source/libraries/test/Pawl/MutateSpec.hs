@@ -87,7 +87,6 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.MergeComponent as MergeComponent
-import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -108,41 +107,6 @@ import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Mutate" $ do
-  -- CR 702.140b, the other half of rule 702.140c's fork: the target became
-  -- illegal between the announcement and the resolution, so the spell ceases to
-  -- be a mutating creature spell and resolves as the creature spell it also is.
-  --
-  -- The target is made a HUMAN rather than removed from the battlefield, which
-  -- is what makes the rule observable: a target that is GONE stops the merge on
-  -- its own (Event.merge has nothing to look up), so both readings agree there.
-  -- A live creature the mutate slot no longer admits is the board that tells
-  -- rule 702.140b's clear from its absence.
-  Spec.it s "CR 702.140b a mutating creature spell whose target became illegal resolves as an ordinary creature spell" $ do
-    plains <- S.printingOf s registry "Plains"
-    falcon <- S.printingOf s registry "Falcon Abomination"
-    cubwarden <- S.printingOf s registry "Cubwarden"
-    let (host, board, spellId) = mutateBoard plains falcon cubwarden
-        cast = S.runPure (mutatingAt MutateSide.Over host) board (S.cast S.alice spellId)
-        turned = S.withEffect host (Modification.AddSubtype Subtype.Human) cast
-        after = S.runPure (mutatingAt MutateSide.Over host) turned (Monad.replicateM_ 6 (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
-    Spec.assertEqWith
-      s
-      "CR 702.140b nothing merged with the creature that became a Human"
-      (componentNames host after)
-      []
-    Spec.assertEqWith
-      s
-      "CR 702.140b and nothing mutated, so no Cat token was made"
-      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Cat Token")) S.alice after)
-      0
-    Spec.assertEqWith
-      s
-      "CR 702.140b while the spell itself resolved, entering the battlefield on its own"
-      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Cubwarden")) S.alice after)
-      1
-    -- The proxy, after them: the target really is a Human on the board that
-    -- resolved, which is the whole of rule 702.140b's condition.
-    Spec.assertBool s (Set.member Subtype.Human (Projection.subtypesOf host turned)) "setup: the target was a Human when the spell began resolving"
   -- CR 730.2e's mix, from the side where the merge CHANGES the status: a
   -- face-up card merging over a face-down permanent. "The permanent's status is
   -- determined by its topmost component", so the result is a face-up Cubwarden

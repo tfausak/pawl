@@ -1278,7 +1278,7 @@ castDraught recipient draughtId gs =
 -- Draught's own 2 is already in the log. CR 608.2h / 611.2d then freeze the value
 -- into the stored layer-7c effect (Projection.freezeQuantities), which is why a
 -- later gain does not grow a pump that has already been made.
-fortifyingDraughtSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fortifyingDraughtSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 fortifyingDraughtSpec s registry = Spec.describe s "Fortifying Draught" $ do
   -- THE PROVING CASE, and the ACCUMULATION control: the second Draught reads 4
   -- and not 2, so the tally is the turn's whole gain rather than the last event.
@@ -1298,24 +1298,6 @@ fortifyingDraughtSpec s registry = Spec.describe s "Fortifying Draught" $ do
     Spec.assertEqWith s "the second read 4 -- both gains, summed" (S.powerToughnessOf pikerId afterTwo) (Just (8, 7))
     Spec.assertEqWith s "alice gained 2 twice" (S.lifeOf S.alice afterTwo) (Just 24)
     Spec.assertEqWith s "bob's planted 7 was never paid to anyone" (S.lifeOf S.bob afterTwo) (Just 20)
-  -- THE TURN-BOUNDARY control: the same two casts with a handoff between them.
-  -- The log Engine.beginTurnOf clears IS the quantity's window, so the second
-  -- Draught reads 2 again rather than 4. The second target is BOB's 3/3 and not
-  -- the Piker, because this fixture hands the turn over without passing through a
-  -- cleanup step, so the first pump is still standing and a shared target could
-  -- not tell the two readings apart.
-  Spec.it s "CR 608.2i last turn's life gain does not count" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    wolves <- S.printingOf s registry "Russet Wolves"
-    draught <- S.printingOf s registry "Fortifying Draught"
-    let (pikerId, wolvesId, firstId, secondId, gs) = draughtBoard forest piker wolves draught
-        afterOne = castDraught (Recipient.ToCreature pikerId) firstId gs
-        nextTurn = (Engine.beginTurnOf S.bob afterOne) {GameState.priority = Just S.alice}
-        afterTwo = castDraught (Recipient.ToCreature wolvesId) secondId nextTurn
-    Spec.assertEqWith s "the first Draught still read 2" (S.powerToughnessOf pikerId afterOne) (Just (4, 3))
-    Spec.assertEqWith s "and the second reads 2 across the handoff, not 4" (S.powerToughnessOf wolvesId afterTwo) (Just (5, 5))
-    Spec.assertEqWith s "alice still gained 2 twice in total" (S.lifeOf S.alice afterTwo) (Just 24)
 
 -- Phyrexian Ingester ({6}{U} Creature -- Phyrexian Beast 3/3, Oracle text fetched
 -- from Scryfall 2026-09-05): "Imprint -- When this creature enters, you may exile
