@@ -71,6 +71,7 @@ import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Suspend as Suspend
@@ -1608,7 +1609,7 @@ balothAnswer p = case p of
   Prompt.ChooseAction {} -> S.castAnswer p
   _ -> S.attackTo S.bob p
 
-suspendHaste :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+suspendHaste :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
   Spec.it s "CR 702.62a cast off its own suspend ability the Baloth attacks the turn it arrives; cast from hand that turn it cannot" $ do
     forest <- S.printingOf s registry "Forest"
@@ -1626,6 +1627,62 @@ suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
         S.countOnBattlefieldByName (S.printingName baloth) S.alice hardCast
       )
       (1, 1)
+  -- CR 702.62a's "until you lose control of the SPELL": Aethersnatch takes the
+  -- free cast on the stack, and the haste goes to nobody.
+  Spec.it s "CR 702.62a / 110.2b the Baloth bob Aethersnatched off the stack enters under him without haste" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    snatch <- S.printingOf s registry "Aethersnatch"
+    let played = runUntil snatchAnswer alicesPostcombat (snatchBoard island snatch [S.bob] (balothBoard forest baloth True))
+        arrived = balothsIn baloth played
+    Spec.assertEqWith
+      s
+      "CR 702.62a the caster lost control of the spell, so bob's Baloth has no haste"
+      (fmap (\oid -> (Projection.controllerOf oid played, Projection.hasKeyword Keyword.Haste oid played)) arrived)
+      [(Just S.bob, False)]
+  -- The duration ENDS once and for good (CR 611.2b): alice taking the spell back
+  -- before it resolves does not restart it. The one road to a stolen Baloth
+  -- arriving on its caster's own turn, where haste is an attack.
+  Spec.it s "CR 702.62a / 611.2b the Baloth alice snatched back from bob does not attack the turn it arrives" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    snatch <- S.printingOf s registry "Aethersnatch"
+    let played = runUntil snatchAnswer alicesPostcombat (snatchBoard island snatch [S.alice, S.bob] (balothBoard forest baloth True))
+    Spec.assertEqWith s "CR 702.62a alice lost control of the spell to bob, so her Baloth could not attack" (S.lifeOf S.bob played) (Just 20)
+    Spec.assertEqWith
+      s
+      "the control: the Baloth arrived under alice, who took the spell back"
+      (fmap (`Projection.controllerOf` played) (balothsIn baloth played))
+      [Just S.alice]
+
+-- balothBoard's exiled Baloth, with an Aethersnatch and the six Islands that
+-- pay for it in each listed player's hand and battlefield.
+snatchBoard :: Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId] -> GameState.GameState -> GameState.GameState
+snatchBoard island snatch thieves gs0 =
+  List.foldl' (\g pid -> snd (S.addHandCard snatch pid (S.landsFor island pid 6 g))) gs0 thieves
+
+-- balothAnswer, except that a target prompt takes the EARLIEST object offered.
+-- Aethersnatch is offered only while a spell is on the stack, so alice's (when
+-- she holds one) is cast first with the Baloth its one target, and bob's answers
+-- it; the Baloth spell was put on the stack before either Aethersnatch, so the
+-- lowest id is it.
+snatchAnswer :: Prompt.Prompt r -> r
+snatchAnswer p = case p of
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (Maybe.isJust . Recipient.objectOf) (List.sortOn Recipient.objectOf (Set.toList recipients)))) slots
+  _ -> balothAnswer p
+
+-- The postcombat main phase of alice's turn: the countdown's upkeep and her
+-- combat have both run.
+alicesPostcombat :: GameState.GameState -> Bool
+alicesPostcombat g = GameState.phase g == Phase.PostcombatMain && GameState.activePlayer g == S.alice
+
+-- Every Durkwood Baloth on the battlefield, whoever controls it: alice owns it,
+-- and Game.zoneMembers indexes by owner.
+balothsIn :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
+balothsIn baloth gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName baloth)) (Game.zoneMembers Zone.Battlefield S.alice gs)
 
 -- Delay (TSP 57) {1}{U} Instant, "Counter target spell. If the spell is
 -- countered this way, exile it with three time counters on it instead of

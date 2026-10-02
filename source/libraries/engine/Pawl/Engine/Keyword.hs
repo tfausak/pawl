@@ -9400,12 +9400,8 @@ madnessCast manaCost payload =
 -- WHAT the duration counts is the effect's own source, which
 -- Pawl.Engine.Stack.armBecame makes the permanent the spell became: rule
 -- 702.62a's "the permanent it becomes", read through Filter.IsSource the way CR
--- 611.2b's Master Thief clause is.
---
--- Not implemented: rule 702.62a's "the spell" half of that duration -- pawl arms
--- against the controller the spell resolved under, so a spell whose control
--- changed between the cast and the resolution grants the haste to the new
--- controller rather than to nobody (#3666).
+-- 611.2b's Master Thief clause is. Pawl.Engine.Stack.armBecame answers the
+-- "the spell" half.
 castUsingHaste :: Maybe Keyword -> Maybe Duration.Duration
 castUsingHaste castUsing = case castUsing of
   Just (Keyword.Suspend _) -> Just (Duration.ForAsLongAs youControlSource)
