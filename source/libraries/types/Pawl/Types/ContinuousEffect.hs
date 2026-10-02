@@ -17,7 +17,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- Made by a spell or ability RESOLVING, all but two of them. One exception is
 -- CR 106.6a's rider effect, which is created as the mana is SPENT and so lands
 -- inside a cost payment (Pawl.Engine.ManaRider.granted, from
--- Pawl.Engine.Cost's recordSpent). The other is the one clause that turns a
+-- Pawl.Engine.Cost.recordPayment). The other is the one clause that turns a
 -- static ability's effect into a stored one:
 -- StaticAbility.lingers, Titania's Song's "if this enchantment leaves the
 -- battlefield, this effect continues until end of turn", which
