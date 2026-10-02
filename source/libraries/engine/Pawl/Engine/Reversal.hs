@@ -91,6 +91,7 @@ withoutAnnouncement before entry closed = do
   enteringPending <- mapOf GameState.enteringPending
   refusedEntries <- one GameState.refusedEntries
   enteringCounters <- mapOfMaps GameState.enteringCounters
+  copyExceptionCounters <- mapOfMaps GameState.copyExceptionCounters
   playerEffects <- listOf GameState.playerEffects
   blockRequirements <- listOf GameState.blockRequirements
   attackRequirements <- listOf GameState.attackRequirements
@@ -208,6 +209,7 @@ withoutAnnouncement before entry closed = do
         GameState.enteringPending = enteringPending,
         GameState.refusedEntries = refusedEntries,
         GameState.enteringCounters = enteringCounters,
+        GameState.copyExceptionCounters = copyExceptionCounters,
         GameState.playerEffects = playerEffects,
         GameState.blockRequirements = blockRequirements,
         GameState.attackRequirements = attackRequirements,

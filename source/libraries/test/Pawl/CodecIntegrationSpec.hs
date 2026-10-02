@@ -502,7 +502,9 @@ gameStateRoundTripSpec s registry = do
         gs =
           gs0
             { GameState.enteringCounters =
-                Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 2)
+                Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 2),
+              GameState.copyExceptionCounters =
+                Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 1)
             }
     roundTrips "a pending +1/+1 counter" gs
 

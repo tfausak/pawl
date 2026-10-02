@@ -597,7 +597,8 @@ data Prompt r where
   -- Filter against it.
   ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Seq.Seq (PlayerId.PlayerId, CardName.CardName) -> Prompt CardName.CardName
   -- | Which opponent a card's text names, as a permanent enters (CR 614.12a),
-  -- at resolution for CR 701.29a's fateseal, for a resolving
+  -- which opponent an entering Aura enchants (CR 303.4f; Archnemesis), at
+  -- resolution for CR 701.29a's fateseal, for a resolving
   -- Pawl.Types.Effect.ChoosePlayer whose scope leaves the chooser out
   -- (Skullwinder), or at CR 601.2c for which opponent ANNOUNCES a slot the
   -- controller does not (CR 801.5a, Cuombajj Witches); the chooser is CR 109.5's
@@ -609,7 +610,8 @@ data Prompt r where
   -- are Pawl.Engine.Battle.protectorCandidates.
   ChooseProtector :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 614.1c with CR 614.12a: which player the entering permanent's
-  -- controller chooses (Stuffy Doll), or, at resolution, which player a
+  -- controller chooses (Stuffy Doll), or an entering Aura enchants (CR
+  -- 303.4f; Curse of Death's Hold), or, at resolution, which player a
   -- resolving effect's controller chooses (CR 608.2d; Stadium Vendors), or which
   -- active player a banding creature's controller names under CR 805.9
   -- (Pawl.Engine.Damage.blockerChooser) -- the ObjectId is the entering

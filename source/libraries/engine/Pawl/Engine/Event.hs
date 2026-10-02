@@ -2340,14 +2340,22 @@ apply batch candidate event =
                 -- snapshot above but placed on the object -- and it happens only
                 -- where a copy was actually made.
                 --
-                -- Through addEnteringCounters, the WithCounters arm's funnel and
-                -- for its reasons: CR 122.6's counters must be on the permanent
-                -- before it exists on the battlefield, and CR 614.16 applies
-                -- inside this entry's own CR 616.1 loop (Doubling Season). The
+                -- Through addEnteringCounters (inside addCopyExceptionCounters),
+                -- the WithCounters arm's funnel and for its reasons: CR 122.6's
+                -- counters must be on the permanent before it exists on the
+                -- battlefield, and CR 614.16 applies inside this entry's own CR
+                -- 616.1 loop (Doubling Season). The
                 -- amount is read the same way too -- CR 107.3m's announced X
                 -- substituted in (Altered Ego announces X on the spell, and CR
                 -- 400.7 leaves the permanent none), and evaluated against
                 -- boardAsEntering rather than the live battlefield.
+                --
+                -- CR 707.9e's second sentence first: an earlier copy effect's
+                -- exception on this entry no longer happens, this one being
+                -- applied after it (Altered Ego copying an uncopied Quicksilver
+                -- Gargantuan), so takeBackCopyException lifts its counters off
+                -- the pending map before this row's own go on.
+                takeBackCopyException oid
                 Foldable.for_ (AsCopy.counters asCopy) $ \withCounters -> do
                   gs2 <- State.get
                   let viewOf = Projection.viewWithLastKnown oid gs2
@@ -2356,7 +2364,7 @@ apply batch candidate event =
                   Foldable.for_ (Map.toList (WithCounters.counters withCounters)) $ \(kind, quantity) ->
                     case Quantity.evaluate viewOf context (Projection.boardAsEntering gs2) oid (Quantity.substituteAnnouncedX announcedX quantity) of
                       Nothing -> pure () -- unevaluable quantity: no counters, the WithCounters arm's posture
-                      Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
+                      Just n -> addCopyExceptionCounters oid kind (Integer.toNaturalSaturating n)
                 -- CR 707.9g: a linked trigger an EARLIER copy effect on this entry
                 -- armed no longer triggers, this one being applied after it; then
                 -- this row's own is armed (Replacement.linkedCopyTrigger), on this
@@ -4565,10 +4573,8 @@ runEntry given oid = do
 -- Answers False for CR 303.4g, nothing legal to enchant; the caller unmakes the
 -- entry. MINUS `batch` and GameState.enteringSubjects for the EntersAttachedTo
 -- arm's reason: a permanent entering beside this one is not on the battlefield
--- when the choice is made.
---
--- Not implemented: an Aura that enchants a PLAYER, which Attach.entryHostsFor
--- never offers (#4542).
+-- when the choice is made. Pawl.CopySpec's Curse of Death's Hold case proves
+-- the player half (CR 702.5d).
 seatEnteringAura :: Set ObjectId -> ObjectId -> Game Bool
 seatEnteringAura batch oid = do
   gs <- State.get
@@ -4576,11 +4582,11 @@ seatEnteringAura batch oid = do
   case Projection.controllerOf oid gs of
     Just controller | unattached && Set.member Subtype.Aura (Projection.subtypesOf oid gs) -> do
       let entering h = Set.member h batch || Set.member h (GameState.enteringSubjects gs)
-          hosts = filter (not . entering) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid gs)
-      chosen <- Attach.chooseHost controller oid hosts
+          hosts = filter (not . maybe False entering . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid gs)
+      chosen <- Attach.chooseEntryHost controller oid hosts
       -- THE TAG the enchant slot produced, for changeZoneAttaching's reason:
       -- Sba.stillLegalEnchant compares the (pool, tag) pair.
-      case chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs of
+      case chosen >>= \h -> Attach.attachmentFor oid h gs of
         Nothing -> pure False
         Just recipient -> do
           State.modify' $ \g -> g {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Just recipient}) oid (GameState.objects g)}
@@ -4634,7 +4640,7 @@ showsInstantBackFace oid gs = Maybe.fromMaybe False $ do
 flushEnteringCounters :: ObjectId -> Game ()
 flushEnteringCounters oid = do
   pending <- State.gets (Map.findWithDefault Map.empty oid . GameState.enteringCounters)
-  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs)})
+  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs), GameState.copyExceptionCounters = Map.delete oid (GameState.copyExceptionCounters gs)})
   Monad.mapM_ (\(kind, n) -> Monad.void (settleCounters oid kind n)) (Map.toAscList pending)
 
 -- CR 310.9a: "as a battle enters the battlefield, its controller chooses a player
@@ -5034,6 +5040,31 @@ addEnteringCounters oid kind n =
       { GameState.enteringCounters =
           Map.insertWith (Map.unionWith (+)) oid (Map.singleton kind n) (GameState.enteringCounters gs)
       }
+
+-- CR 707.9e: addEnteringCounters for a copy effect's additional-counters
+-- exception, remembering the share in GameState.copyExceptionCounters so that a
+-- copy effect applied to the same entry afterwards can take it back.
+addCopyExceptionCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game ()
+addCopyExceptionCounters oid kind n = do
+  addEnteringCounters oid kind n
+  Monad.when (n > 0) . State.modify' $ \gs ->
+    gs
+      { GameState.copyExceptionCounters =
+          Map.insertWith (Map.unionWith (+)) oid (Map.singleton kind n) (GameState.copyExceptionCounters gs)
+      }
+
+-- CR 707.9e: the earlier copy effect's exception does not happen, so its share
+-- comes back off the pending map. Exact rather than approximate: CR 616.1c ranks
+-- every copy effect ahead of a CR 616.1e counter scaler (Doubling Season), so
+-- nothing can have rescaled the share between the two copy effects.
+takeBackCopyException :: ObjectId -> Game ()
+takeBackCopyException oid = State.modify' $ \gs ->
+  let placed = Map.findWithDefault Map.empty oid (GameState.copyExceptionCounters gs)
+      takeBack pending = Map.differenceWith (\n m -> Monad.mfilter (> 0) (Just (Natural.minusSaturating n m))) pending placed
+   in gs
+        { GameState.enteringCounters = Map.adjust takeBack oid (GameState.enteringCounters gs),
+          GameState.copyExceptionCounters = Map.delete oid (GameState.copyExceptionCounters gs)
+        }
 
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
@@ -6316,8 +6347,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- prompt.
           --
           -- Asked of `gs`, the PRE-MOVE board, which is where the Aura still is and
-          -- where the hosts already are. Attach.entryHostsFor sweeps the battlefield
-          -- and the graveyards, and
+          -- where the hosts already are. Attach.entryHostsFor sweeps the battlefield,
+          -- the graveyards and the players still in the game, and
           -- Attach.attachmentFor reads Projection.subtypesOf and Game.faceOf, both
           -- of which answer for an object in any zone.
           --
@@ -6334,9 +6365,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- player according to the Aura's enchant ability and any other applicable
           -- effects" is the whole restriction -- there is no card text to intersect
           -- it with, which is the difference from CR 303.4k's Attach.turnUpHosts.
-          --
-          -- Not implemented: an Aura that enchants a PLAYER, which
-          -- Attach.entryHostsFor never offers (#4542).
+          -- A player is offered too (CR 702.5d); Pawl.AuraSpec's returned Curse
+          -- proves it.
           --
           -- The Aura test is the PROJECTION's subtypes (CR 205.3 -- CR 303.4 speaks
           -- about characteristics) rather than the printed type line
@@ -6383,8 +6413,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- Aura's own enchant ability, so there is no resolution
                     -- whose slots the filter could name -- and CanHostSubject,
                     -- the whole filter here, names none.
-                    hosts = filter (\h -> not (Set.member h batch)) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid gs)
-                chosen <- Attach.chooseHost chooser oid hosts
+                    hosts = filter (not . maybe False (`Set.member` batch) . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid gs)
+                chosen <- Attach.chooseEntryHost chooser oid hosts
                 -- THE TAG the Aura's own enchant slot produced, never a hand-built
                 -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so
                 -- a ToObject stored where the slot offers a ToCreature falls through
@@ -6392,9 +6422,9 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                 --
                 -- attachmentFor answering Nothing collapses into CR 303.4g's
                 -- "remains in its current zone" too, and is unreachable rather than
-                -- a second reading: entryHostsFor's Filter.CanHostSubject conjunct is
-                -- that same function, so every candidate it offered admits.
-                pure (fmap Just (chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs))
+                -- a second reading: entryHostsFor admits every candidate through that
+                -- same function.
+                pure (fmap Just (chosen >>= \h -> Attach.attachmentFor oid h gs))
               else pure (Just seed)
           case settledSeed of
             Nothing -> pure Seq.empty
