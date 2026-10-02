@@ -4032,9 +4032,10 @@ canPayComponent slots pid oid component gs = case component of
   -- a flip the payer goes on to lose pays the cost exactly as a won one does.
   CostComponent.FlipCoin -> True
   -- CR 102.2 / CR 104.2a: rule 702.174a's cost names an opponent, so a payer
-  -- with none left cannot pay it. Nothing about `oid`: the choice is about the
-  -- table, not about the object the cost is on.
-  CostComponent.ChooseOpponent -> not (null (Game.opponentsOf pid gs))
+  -- with none left, or none in range (CR 801.5a), cannot pay it -- the payment
+  -- arm's own offer. Nothing about `oid`: the choice is about the table, not
+  -- about the object the cost is on.
+  CostComponent.ChooseOpponent -> not (null (Game.opponentsInReach pid gs))
   -- CR 601.2b: the component BEFORE X is announced, so there is no
   -- ceiling for rule 701.67b to scope -- BlightX's arm below, verbatim.
   -- Unreachable from the activation path, which substitutes before it
@@ -6429,8 +6430,8 @@ payPayable moment slots pid oid component = case component of
   CostComponent.ChooseOpponent -> do
     gs <- State.get
     case Game.opponentsInReach pid gs of
-      -- CR 118.3 over the opponents still in reach, which `payComponent`'s guard
-      -- does not narrow to.
+      -- Unreachable behind `payComponent`'s guard, which reads the same offer;
+      -- defensive, as CR 118.3 would have it.
       [] -> pure Payment.Unpaid
       -- CR 102.2: a two-player game leaves exactly one opponent, and one option
       -- is not a choice.
