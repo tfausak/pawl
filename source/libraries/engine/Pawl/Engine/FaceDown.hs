@@ -6,7 +6,8 @@
 -- characteristic read gets it for free; CR 708.3/708.4's turning-over-before-the-
 -- move lives at Pawl.Engine.Event.changeZoneFaceDown; CR 708.9's reveal is
 -- Object.newIncarnation putting the status back to FaceUp, and the Revealed
--- event Pawl.Engine.Event.changeZoneAttaching records. What is left is an
+-- event Pawl.Engine.Event.changeZoneAttaching and
+-- Pawl.Engine.Departure.objectsLeaveWith record. What is left is an
 -- action a player takes, and an action needs a place to be offered from and
 -- performed in.
 --

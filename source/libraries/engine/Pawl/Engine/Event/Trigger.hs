@@ -520,7 +520,8 @@ looksBack condition = case condition of
   TriggerCondition.SelfPutFromBattlefieldInto _ -> True
   TriggerCondition.PermanentLeavesTheBattlefield _ -> True
   -- CR 603.6c's family too: CR 708.9's reveal happens only as the permanent
-  -- moves from the battlefield, so this triggers on that move. A watcher swept
+  -- leaves the battlefield, by a move or with its owner, so this triggers on
+  -- that departure. A watcher swept
   -- up in the same batch is offered it (Pawl.FaceDownSpec's Day of Judgment
   -- case).
   TriggerCondition.FaceDownPermanentLeavesRevealed -> True
@@ -2228,7 +2229,7 @@ eventTriggers events gs =
             -- CR 400.7d: an ability of a permanent may read what costs were
             -- paid for the spell it was, so the bearer's record rides on every
             -- ability it triggers (Binding.paidCostRecord).
-            pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (Map.union (Binding.paidCostRecord bindings) (eventBindingsOver board gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event)) Nothing (Just event)
+            pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (Map.union (Binding.paidCostRecord bindings) (eventBindingsOver board gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event)) Nothing (Just event) (copiesIn (fmap snd abilities) ab)
             -- CR 805.4d: one trigger per player whose step this is, each naming
             -- its own "that player", where the ability reads that player.
             pends (cond, ab) =
@@ -3360,7 +3361,7 @@ stateTriggers gs
           armed (before, ab) = 1 + length (filter (ab ==) before) > instancesOnStack oid ab
           -- CR 400.7d, the event scan's stamp above on this road too. A
           -- fence: no state trigger in data/cards/ reads the record.
-          pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (maybe Map.empty (Binding.paidCostRecord . Object.bindings) (Game.lookupObject oid gs)) Nothing Nothing
+          pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (maybe Map.empty (Binding.paidCostRecord . Object.bindings) (Game.lookupObject oid gs)) Nothing Nothing (copiesIn abilities ab)
        in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7a's floor is the watermark's job, and is all an ordinary entry
@@ -3425,6 +3426,12 @@ reflexiveFiring entry =
     -- CR 603.12: the entry's existence is the affirmative answer, so there
     -- is no one event this fired from.
     Nothing
+    1
+
+-- CR 113.2c: how many instances of `ability` a bearer's list holds, which is
+-- PendingTrigger.copies. Two Well Rested grant one creature two.
+copiesIn :: [TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)] -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Natural
+copiesIn abilities ability = List.genericLength (filter (== ability) abilities)
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
 -- that TRIGGERS is REMOVED from the store (CR 603.7b) unless it carries a stated
@@ -3591,6 +3598,8 @@ delayedPending grouped gs =
           (Just (DelayedTrigger.createdAt entry))
           -- CR 603.2's event, the same one the slots above were read off.
           (Just (LoggedEvent.event logged))
+          -- One entry is one instance, CR 603.7's ability created on its own.
+          1
       store = GameState.delayedTriggers gs
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4

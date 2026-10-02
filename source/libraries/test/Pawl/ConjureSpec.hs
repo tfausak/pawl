@@ -1070,7 +1070,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     Spec.assertEqWith
       s
       "the printed rider is spent, so a later second main phase has nothing left to fire"
-      (Set.size (GameState.triggeredThisGame fired))
+      (length (GameState.triggeredThisGame fired))
       1
   -- The control, one cast apart: three life gained is one short of the printed
   -- four, so CR 603.4 keeps the ability off the stack entirely -- which the
@@ -1095,7 +1095,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     Spec.assertEqWith
       s
       "the intervening if is what held it back: the rider is unspent"
-      (Set.size (GameState.triggeredThisGame fired))
+      (length (GameState.triggeredThisGame fired))
       0
   -- Fear of Change ({G}{U} Enchantment Creature -- Nightmare, 2/3, "When this
   -- creature enters or dies, exile another creature you control. If you do,
