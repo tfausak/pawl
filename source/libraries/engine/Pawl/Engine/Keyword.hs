@@ -152,6 +152,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
+import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -5138,19 +5139,30 @@ mintedRemovalRestrictionsFor keyword =
 -- and into the empty Or -- protection from nothing -- where none was chosen.
 -- Pawl.FilterPositionLintSpec's grantedChosenColors admits the bare atom
 -- alone, so a card burying it is rejected rather than misread.
-grantedBy :: ObjectId -> Maybe Color.Color -> Keyword -> Keyword
-grantedBy granter chosen keyword = case keyword of
+--
+-- CR 702.16p's spare (Benevolent Blessing) likewise, conjunct by conjunct: "you"
+-- is the granter's controller `you`, and Filter.AttachedNoLaterThanSource is
+-- `already`, the host's attachments stamped no later than the granter (CR
+-- 613.7e restamps each attach, so that is "already attached when the effect
+-- started to apply").
+grantedBy :: ObjectId -> Maybe Color.Color -> Maybe PlayerId -> [ObjectId] -> Keyword -> Keyword
+grantedBy granter chosen you already keyword = case keyword of
   Keyword.Protection protection ->
     Keyword.Protection
       protection
         { Protection.quality = case Protection.quality protection of
             Filter.HasChosenColor -> maybe (Filter.Or []) Filter.HasColor chosen
             quality -> quality,
-          Protection.spares = case Protection.spares protection of
-            Just Filter.IsSource -> Just (Filter.IsObject granter)
-            spares -> spares
+          Protection.spares = fmap spare (Protection.spares protection)
         }
   _ -> keyword
+  where
+    spare filter_ = case filter_ of
+      Filter.IsSource -> Filter.IsObject granter
+      Filter.ControlledBy PlayerRelation.You -> maybe (Filter.Or []) Filter.ControlledByPlayer you
+      Filter.AttachedNoLaterThanSource -> Filter.Or (fmap Filter.IsObject already)
+      Filter.And filters -> Filter.And (fmap spare filters)
+      _ -> filter_
 
 -- Exhaustive for `abilitiesFor`'s reason: the next keyword that forbids an
 -- attachment must break this build rather than silently forbid nothing.
@@ -5228,12 +5240,11 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- Pawl.Engine.Attach.attachmentFor and Pawl.Engine.Sba.fallsOff through
   -- Pawl.Engine.PlayerEffect.protectedFrom. Rule 702.16d has no player half.
   --
-  -- The QUALITY alone, rule 702.16n's exception being about removal and not
-  -- about becoming attached: mintedRemovalRestrictionsFor above narrows this row
-  -- for the state-based halves, and Spectra Ward and White Ward are the cards.
-  --
-  -- Not implemented: rule 702.16p (Benevolent Blessing), whose "already
-  -- attached to" is a moment rather than a state (#3046).
+  -- The QUALITY alone, rule 702.16n's and rule 702.16p's exceptions being about
+  -- removal, and rule 702.16p's "other permanents with the stated quality can't
+  -- become attached" being this row unnarrowed: mintedRemovalRestrictionsFor
+  -- above narrows it for the state-based halves, and Spectra Ward, White Ward
+  -- and Benevolent Blessing are the cards.
   Keyword.Protection protection ->
     [ AttachRestriction.MkAttachRestriction
         { AttachRestriction.affected = Affected.Matching Filter.IsSource,

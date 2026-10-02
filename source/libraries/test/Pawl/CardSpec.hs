@@ -4773,6 +4773,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsAttachedToEvaluated -> []
   Filter.Type.IsHostOfSource -> []
   Filter.Type.EnteredWithSource -> []
+  Filter.Type.AttachedNoLaterThanSource -> []
   Filter.Type.CanHostSubject -> []
   Filter.Type.CanAttachToSubject -> []
   Filter.Type.HostOfSubjectHasCardType _ -> []
