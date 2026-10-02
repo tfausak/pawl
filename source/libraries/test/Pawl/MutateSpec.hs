@@ -912,6 +912,38 @@ spec s registry = Spec.describe s "Mutate" $ do
       (List.sort [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Falcon Abomination")])
     Spec.assertEqWith s "CR 730.3 and the merged permanent itself is gone" (Game.lookupObject host dead) Nothing
     Spec.assertEqWith s "setup: alice's graveyard was empty before it died" (graveyardNames merged) []
+  -- CR 730.3c read by rule 702.55a's "exile it": Cubwarden mutated over Blind
+  -- Hunter has haunt (CR 702.140e), and when it dies its `became` names BOTH
+  -- cards, so both are exiled haunting the one target (CR 702.55b's "cards").
+  -- Blind Hunter, {2}{W}{B} Creature -- Bat 2/2, Oracle verified 2026-10-02:
+  -- "Flying / Haunt / When this creature enters or the creature it haunts dies,
+  -- target player loses 2 life and you gain 2 life." Two identical Pikers, so
+  -- the haunt target is a real choice and the drain reads the link, not a kill.
+  Spec.it s "CR 730.3c/702.55b a mutated creature with haunt exiles both cards haunting its target" $ do
+    plains <- S.printingOf s registry "Plains"
+    hunter <- S.printingOf s registry "Blind Hunter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+        (host, withHost) = S.addPermanent hunter S.alice base
+        (victim, withVictim) = S.addPermanent piker S.bob withHost
+        (_, withBystander) = S.addPermanent piker S.bob withVictim
+        (board, spellId) = S.handOne cubwarden withBystander
+        merged = merging MutateSide.Over host board spellId
+        -- Every target pinned by FILTERING the offered set: the haunt slot down
+        -- to the victim, the drain's "target player" down to bob.
+        aimed :: Prompt.Prompt r -> r
+        aimed p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (\r -> Recipient.objectOf r == Just victim || r == Recipient.ToPlayer S.bob) . snd) sets
+          _ -> S.identityAnswer p
+        dies oid gs = S.runPure aimed gs (Event.destroy Regenerability.Regenerable [oid] >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+        exiled = dies host merged
+        drained = dies victim exiled
+        exileNames gs = List.sort (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.exile gs)))
+    Spec.assertEqWith s "CR 730.3c both cards are exiled" (exileNames exiled) (List.sort [CardName.MkCardName (Text.pack "Blind Hunter"), CardName.MkCardName (Text.pack "Cubwarden")])
+    Spec.assertEqWith s "CR 702.55b each haunts the targeted Piker" (GameState.haunting exiled) (Map.fromSet (const victim) (GameState.exile exiled))
+    Spec.assertEqWith s "CR 702.55c the haunted Piker's death drains bob for alice" (S.lifeOf S.alice drained, S.lifeOf S.bob drained) (Just 22, Just 18)
+    Spec.assertEqWith s "setup: the merged permanent held two components" (fmap (Seq.length . Game.componentsOf . Object.source) (Game.lookupObject host merged)) (Just 2)
   -- CR 730.3's split read by CR 603.6c's last sentence: each component card is
   -- put into the graveyard, and a "put into a graveyard from anywhere" trigger is
   -- never a leaves-the-battlefield ability, so it fires off the CARD that arrived

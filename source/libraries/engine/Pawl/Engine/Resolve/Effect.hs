@@ -8421,20 +8421,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- The card is read LIVE off the resolving object, never out of
           -- `chosen`: rule 702.55a's "it" is the graveyard incarnation the death
           -- minted (CR 400.7e), and CR 115.10a makes it no target.
-          mCard <- State.gets (slotOne card resolving)
-          case mCard of
-            Nothing -> pure ()
-            Just oid -> do
-              -- CR 400.7 mints the exiled incarnation; CR 702.55b's link is filed
-              -- against THAT id, which puts the ability in exile for CR 113.6k. A
-              -- cancelled move (CR 614.6) leaves no link.
-              --
-              -- The link names the object the ability TARGETED, so it goes on
-              -- matching after that object has stopped being a creature, and is
-              -- what TriggerCondition.HauntedCreatureDies compares against.
-              mNew <- Event.changeZoneReturning oid Zone.Exile
-              Monad.forM_ mNew $ \newId ->
-                State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
+          --
+          -- EVERY card the slot holds, group first: a merged or melded creature
+          -- dies as several cards, and CR 730.3c / 712.21c take "the same
+          -- actions ... upon each of them", so each is exiled haunting the one
+          -- target (CR 702.55b's "cards"). Pawl.MutateSpec's "CR 730.3c/702.55b
+          -- a mutated creature with haunt exiles both cards haunting its target"
+          -- proves it.
+          cards <- slotBoundObjects resolving Map.empty card
+          Monad.forM_ (Maybe.fromMaybe [] cards) $ \oid -> do
+            -- CR 400.7 mints the exiled incarnation; CR 702.55b's link is filed
+            -- against THAT id, which puts the ability in exile for CR 113.6k. A
+            -- cancelled move (CR 614.6) leaves no link.
+            --
+            -- The link names the object the ability TARGETED, so it goes on
+            -- matching after that object has stopped being a creature, and is
+            -- what TriggerCondition.HauntedCreatureDies compares against.
+            mNew <- Event.changeZoneReturning oid Zone.Exile
+            Monad.forM_ mNew $ \newId ->
+              State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
       _ -> pure ()
   Effect.Counter (Counter.MkCounter ref mSlot mSources mExiled) -> do
     gs <- State.get

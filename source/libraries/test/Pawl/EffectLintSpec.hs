@@ -2091,9 +2091,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- objectRefObjects, which reads slotGroup and attaches every member.
           Effect.AttachBound (AttachBound.MkAttachBound _ destination) -> [destination]
           Effect.ExileUntilMonarch slot -> [slot]
-          -- Both slots: the host through legalOne, the haunting card through
-          -- slotOne.
-          Effect.ExileHaunting (ExileHaunting.MkExileHaunting card host) -> [card, host]
+          -- The host alone, through legalOne: the haunting card goes through
+          -- slotBoundObjects, which reads slotGroup first and exiles every member.
+          Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ host) -> [host]
           -- CR 122.8's read.
           Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> [from]
           Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot _) -> [slot]
@@ -2305,12 +2305,12 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- than `clashes` answering True for any two effects.
     Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside TurnFaceUp is caught"
     Spec.assertBool s (not (clashes [destruction, removal elsewhereSlot])) "a singular read of another slot is left alone"
-    -- The other funnel on the same board: ExileHaunting's haunting card is read
-    -- through slotOne rather than through legalOne. Paired with AttachBound,
-    -- which takes the same two slot names and is NOT an offender -- its first
-    -- slot goes through objectRefObjects, which attaches every member of a group
-    -- (CR 712.21c).
-    Spec.assertBool s (clashes [destruction, Effect.ExileHaunting (ExileHaunting.MkExileHaunting destroyedSlot elsewhereSlot)]) "a slotOne read of a plurally bound slot is caught"
+    -- One effect, both postures: ExileHaunting's host is a legalOne read and
+    -- its haunting card a group-tolerant one (slotGroup first, CR 730.3c), so
+    -- the same two slot names swapped are the pair. AttachBound is the second
+    -- group-tolerant read, its subject going through objectRefObjects.
+    Spec.assertBool s (clashes [destruction, Effect.ExileHaunting (ExileHaunting.MkExileHaunting elsewhereSlot destroyedSlot)]) "a legalOne read of a plurally bound slot is caught"
+    Spec.assertBool s (not (clashes [destruction, Effect.ExileHaunting (ExileHaunting.MkExileHaunting destroyedSlot elsewhereSlot)])) "a group-tolerant haunting card is left alone"
     Spec.assertBool s (not (clashes [destruction, Effect.AttachBound (AttachBound.MkAttachBound destroyedSlot elsewhereSlot)])) "a group-tolerant read of a plurally bound slot is left alone"
     -- The BINDING side's own two, each against the same singular read and each
     -- paired with the board that must stay legal, differing in the slot name.

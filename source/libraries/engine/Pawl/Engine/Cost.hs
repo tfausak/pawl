@@ -4185,7 +4185,8 @@ criteriaOf component = case component of
 -- paid -- rather than against the half-paid state the refusal left, which is
 -- what Pawl.Engine.Game.ask hands the answerer. It also keeps CR 104.4b's
 -- stamp: `Game.choose` writes GameState.lastChoice, and each state an answer
--- leaves is put with the live stamp rather than the one it was composed with.
+-- leaves is put with the live stamp rather than the one it was composed with,
+-- and with the live GameState.nextTimestamp the stamp was drawn from.
 --
 -- Every restore goes through `keepingLibraryActions` rather than a bare
 -- State.put, CR 733.1's last sentence's reason: a shuffle or a reveal one of the
@@ -4212,9 +4213,26 @@ reverseIllegal windows before =
         (askers, Just table) -> do
           -- The flags for the answers given so far, a window not yet answered
           -- still standing; and the state they leave, put with the live CR
-          -- 104.4b stamp so that no answer's is discarded.
+          -- 104.4b stamp so that no answer's is discarded. The stamp was drawn
+          -- from the live GameState.nextTimestamp, so that supply comes across
+          -- with it: a state that goes back past the announcement would
+          -- otherwise hold a stamp ahead of its own supply, which
+          -- Pawl.Engine.Engine.checkMandatoryLoop's gap underflows on. The
+          -- scenario cost/cr-733-1-an-underpaid-curtain-of-light-reverses-its-plains
+          -- is the proof.
           let flags answers = [Maybe.fromMaybe (asks window) (lookup i answers) | (i, window) <- zip [0 :: Int ..] windows]
-              settle answers = Monad.forM_ (lookup (flags answers) table) (\composedState -> State.modify' (\live -> composedState {GameState.lastChoice = GameState.lastChoice live}))
+              settle answers =
+                Monad.forM_
+                  (lookup (flags answers) table)
+                  ( \composedState ->
+                      State.modify'
+                        ( \live ->
+                            composedState
+                              { GameState.lastChoice = GameState.lastChoice live,
+                                GameState.nextTimestamp = max (GameState.nextTimestamp composedState) (GameState.nextTimestamp live)
+                              }
+                        )
+                  )
           settle []
           cancelled <- State.get
           let rank (_, window) = List.elemIndex (ManaWindow.payer window) (Game.apnapOrder cancelled)

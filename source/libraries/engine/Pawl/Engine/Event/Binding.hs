@@ -1157,29 +1157,21 @@ admittedAttackers gs bearer you p attacker = Seq.fromList (filter admits (Set.to
 -- ahead of the recipient path for ObjectRef.InSlot.
 --
 -- The shape is conditional because the two readers are: an ObjectRef reads
--- either, while a bare SlotName (Effect.ExileHaunting's `card`,
--- Pawl.Engine.Resolve's legalOne) reads only the recipient. Every
--- condition that can carry a split is a battlefield DEPARTURE -- CR 712.21's own
--- scope -- and the pool's three readers under those (Promise of Tomorrow, Yedora
--- Grave Gardener and Endless Cockroaches, all under SelfDies or PermanentDies)
--- spend the slot as an ObjectRef, so the group reaches every one of them.
+-- either, while a bare SlotName read through Pawl.Engine.Resolve's legalOne
+-- (Unstable Shapeshifter) reads only the recipient. That reader hangs on
+-- PermanentEnters, which cannot split. Every condition that can carry a split is
+-- a battlefield DEPARTURE -- CR 712.21's own scope -- and its readers reach the
+-- whole group: Promise of Tomorrow, Yedora Grave Gardener and Endless
+-- Cockroaches spend the slot as an ObjectRef, and rule 702.55a's haunt
+-- (Effect.ExileHaunting under SelfDies) reads it group first. Screams from
+-- Within is NOT among these: its `became` comes from AttachedCreatureDies, which
+-- binds the AURA's own incarnation (`bearerBecame`) rather than the event's
+-- arrivals, and no Aura is a meld component.
 --
--- Two bare-SlotName readers exist and neither is reachable. Unstable
--- Shapeshifter hangs on PermanentEnters, which cannot split -- Agent's Toolkit
--- hangs there too and is no longer one of these at all, CR 122.5's destination
--- having become an ObjectRef. Rule
--- 702.55a's haunt ability (Pawl.Engine.Keyword) hands Binding.became to
--- Effect.ExileHaunting under SelfDies, which CAN split -- but haunt is granted by
--- no card and printed on neither half of the pool's one meld pair, so no board
--- reaches it (#3105). Screams from Within is NOT among these: its `became` comes
--- from AttachedCreatureDies, which binds the AURA's own incarnation
--- (`bearerBecame`) rather than the event's arrivals, and no Aura is a meld
--- component.
---
--- Not implemented: a group and a recipient at once, which would let a bare
--- SlotName reader see the first card while an ObjectRef reader saw both.
--- Pawl.Types.Binding's `objects` states the invariant that no slot carries both
--- (#3105).
+-- No arrival here is a CR 903.9c command-zone component: that split happens
+-- only under CR 903.9b's replacement, for a move to a hand or a library, and
+-- every arm above that can see such a move binds nothing for a hidden
+-- destination (CR 400.7e).
 setBecameArrivals :: Moved.Moved -> Map.Map SlotName.SlotName Binding -> Map.Map SlotName.SlotName Binding
 setBecameArrivals m = case Moved.arrivals m of
   only Seq.:<| Seq.Empty -> Binding.setBecame only
