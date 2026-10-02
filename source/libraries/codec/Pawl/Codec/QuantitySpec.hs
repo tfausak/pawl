@@ -713,6 +713,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstCardsExiledWith Quantity.Toughness)))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"AgainstCardsExiledWith\",\"value\":{\"type\":\"Toughness\"}}}} "
+  -- CR 702.167c: the arm above's shape, over the craft materials alone.
+  Spec.it s "AgainstCraftMaterials" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AgainstCraftMaterials Quantity.Power)
+      " {\"type\":\"AgainstCraftMaterials\",\"value\":{\"type\":\"Power\"}} "
   -- CR 107.1a's direction and the value it applies to, in that order. Nested
   -- once for AgainstSlot's reason -- a recursive decoder is where a payload gets
   -- lost -- and over a Count, which is the shape both producers print.

@@ -12,10 +12,12 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Types.AbilityName as AbilityName
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.Binding as Binding
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectId as ObjectId
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import Pawl.Types.Recipient (Recipient)
@@ -492,6 +494,20 @@ exiledCard = SlotName.MkSlotName (Text.pack "thatExiledCard")
 -- targetSlots may name it" sweep as sacrificedPermanent above.
 craftMaterials :: SlotName
 craftMaterials = SlotName.MkSlotName (Text.pack "thoseCraftMaterials")
+
+-- CR 702.167c: the ExileLink.ability a craft material's link carries, so "the
+-- exiled cards used to craft it" reads those cards alone and not what the
+-- permanent's other abilities exile (CR 607.2a). Reserved, as the slot names
+-- above are.
+craftLink :: AbilityName.AbilityName
+craftLink = AbilityName.MkAbilityName (Text.pack "thoseCraftMaterials")
+
+-- CR 602.5c: the name each activated ability a permanent acquires from one
+-- craft material carries, drawn from that material's id, so two identically
+-- worded abilities acquired from two materials are two abilities to a
+-- restriction on their use. Reserved, as craftLink is.
+craftMaterialAbility :: ObjectId -> AbilityName.AbilityName
+craftMaterialAbility oid = AbilityName.MkAbilityName (Text.pack ("thatCraftMaterial" <> show (ObjectId.unwrap oid)))
 
 -- CR 400.7j: the reserved slot under which the card a DiscardThis COST payment
 -- discarded is bound, as the object it became in the graveyard -- Calim, Djinn
