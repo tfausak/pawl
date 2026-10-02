@@ -172,6 +172,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.EachCardInYourLibrary (Just (Filter.HasSubtype Subtype.Mountain)))
       " {\"type\":\"EachCardInYourLibrary\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}} "
+  -- Static Discharge's "cards you own named Static Discharge": the owner is CR
+  -- 109.5's "you", so the Filter is the whole payload.
+  Spec.it s "EachCardYouOwn" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachCardYouOwn (Filter.HasSubtype Subtype.Mountain))
+      " {\"type\":\"EachCardYouOwn\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}} "
   -- No player, for a rule: CR 607.2a's set is defined by which object exiled the
   -- card. The bare tag is the whole linked set, which is what three of the four
   -- printings that read one take.
@@ -448,7 +456,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a random card in a graveyard, a random card in a library, a chosen subset of the battlefield, one chosen permanent, the source with one chosen permanent and what is attached to a bound object all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, every card you own, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a random card in a graveyard, a random card in a library, a chosen subset of the battlefield, one chosen permanent, the source with one chosen permanent and what is attached to a bound object all encode differently"
       ( Set.size
           ( Set.fromList
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -457,6 +465,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.Scoped PlayerScope.You) Nothing)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInYourLibrary Nothing),
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardYouOwn (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachAbility (Filter.Not Filter.IsSource)),
@@ -482,7 +491,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      28
+      29
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

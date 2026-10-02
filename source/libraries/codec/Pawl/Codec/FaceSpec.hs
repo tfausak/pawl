@@ -136,6 +136,7 @@ baseFace =
       Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.startingIntensity = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,
@@ -193,6 +194,7 @@ minimalFace =
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.startingIntensity = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,
@@ -724,6 +726,10 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
   Spec.it s "MkFace, CR 103.1c's starting-player claim" $ do
     v <- Common.assertJson s " {\"name\":\"Power Play\",\"typeLine\":{\"types\":[{\"type\":\"Conspiracy\"}]},\"claimsStartingPlayer\":true} "
     Spec.assertEq s (Face.claimsStartingPlayer <$> decodeFace v) (Right True)
+  -- Alchemy's starting intensity, for the vanguard's reason.
+  Spec.it s "MkFace, a starting intensity" $ do
+    v <- Common.assertJson s " {\"name\":\"Static Discharge\",\"typeLine\":{\"types\":[{\"type\":\"Sorcery\"}]},\"startingIntensity\":3} "
+    Spec.assertEq s (Face.startingIntensity <$> decodeFace v) (Right (Just 3))
   -- Every field at once, including the recursive card-in-card ones that only
   -- Card itself ties the knot on.
   Spec.it s "MkFace, every field populated at once" $

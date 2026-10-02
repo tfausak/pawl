@@ -385,6 +385,7 @@ vanillaFace name typeLine =
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.startingIntensity = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,
@@ -925,6 +926,7 @@ modificationCounts modification = case modification of
   Modification.LoseKeywordFamily _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityCounts p <> foldMap quantityCounts t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
+  Modification.Intensify n -> quantityCounts n
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
@@ -3828,6 +3830,8 @@ objectRefFilters ref = case ref of
   -- Caldera Breaker's "all Mountain cards from your library" does state one, and
   -- states it here -- optional, exactly as the hand and linked exile arms are.
   ObjectRef.EachCardInYourLibrary f -> unframed (Foldable.toList f)
+  -- Static Discharge's "cards you own named Static Discharge".
+  ObjectRef.EachCardYouOwn f -> unframed [f]
   -- Hoarding Dragon's "the exiled card" usually holds none: CR 607.2a's set is
   -- named by which object exiled the cards rather than by their characteristics.
   -- Karn Liberated's "all non-Aura permanent cards exiled with Karn" is the one
@@ -3949,6 +3953,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ManaValue -> []
   Quantity.Type.Power -> []
   Quantity.Type.Toughness -> []
+  Quantity.Type.Intensity -> []
   Quantity.Type.InSlot _ -> []
   Quantity.Type.WasBound _ -> []
   Quantity.Type.BoundCount _ -> []
@@ -4112,6 +4117,7 @@ modificationFilters modification = case modification of
   Modification.GainCraftMaterialAbilities extra -> frame Unframed (concatMap conditionFilters (concatMap restrictionConditions extra))
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
+  Modification.Intensify n -> quantityFilters n
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
   -- CR 702.14a again, from the other side: a removal names the keyword in full,

@@ -1,0 +1,59 @@
+{
+  "description": "Alchemy's intensity: Static Discharge deals its intensity, then intensifies the cards named Static Discharge its controller owns",
+  "note": "The second copy waits in alice's hand, so the first cast's sweep has to reach a hidden zone and the perpetual effect has to follow the card onto the stack. Bob owns a third copy, which alice's sweeps must not reach.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "first mana" },
+          { "card": "Mountain", "label": "second mana" },
+          { "card": "Mountain", "label": "third mana" },
+          { "card": "Mountain", "label": "fourth mana" }
+        ],
+        "hand": [
+          { "card": "Static Discharge", "label": "first" },
+          { "card": "Static Discharge", "label": "second" }
+        ],
+        "library": [{ "card": "Mountain" }, { "card": "Mountain" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Mountain", "label": "bob first mana" },
+          { "card": "Mountain", "label": "bob second mana" }
+        ],
+        "hand": [{ "card": "Static Discharge", "label": "bobs" }],
+        "library": [{ "card": "Mountain" }, { "card": "Mountain" }]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$first", "targets": ["$bob"], "mana": ["$first mana", "$second mana", null] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "$second", "targets": ["$bob"], "mana": ["$third mana", "$fourth mana"] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 13 } } },
+    {
+      "turn": 2,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": { "Cast": { "object": "$bobs", "targets": ["$alice"], "mana": ["$bob first mana", "$bob second mana"] } }
+    },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "do": "Pass" },
+    { "turn": 2, "step": "PrecombatMain", "player": "bob", "check": { "Life": { "player": "alice", "life": 17 } } }
+  ]
+}

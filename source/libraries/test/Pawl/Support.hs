@@ -2391,6 +2391,7 @@ stubView table oid =
                 Filter.keywords = Set.empty,
                 Filter.power = Nothing,
                 Filter.toughness = Nothing,
+                Filter.intensity = Nothing,
                 Filter.manaValue = Nothing,
                 -- CR 202.1: the table registers no mana cost, so CR 700.5's
                 -- devotion reads no symbol off this stub.

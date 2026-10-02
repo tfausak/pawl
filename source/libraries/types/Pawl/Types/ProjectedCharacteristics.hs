@@ -142,6 +142,10 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- only CR 310.4a's question, and the one reader is CR 310.4b's intrinsic
     -- enters-with replacement.
     defense :: Maybe Defense.Defense,
+    -- | Alchemy's intensity, which no CR rule names: the face's starting
+    -- intensity plus every Modification.Intensify applied to the object.
+    -- Nothing for an object that has neither.
+    intensity :: Maybe Integer,
     -- | CR 613.4a layer 7a: the object's characteristic-defining P/T, as the pair
     -- of UNEVALUATED quantities with the printed star already substituted. Seeded
     -- from the card, so it rides copiableCharacteristics and a Clone acquires the

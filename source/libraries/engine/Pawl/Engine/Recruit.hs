@@ -79,6 +79,7 @@ soldierToken =
               Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
               Face.loyalty = Nothing,
               Face.defense = Nothing,
+              Face.startingIntensity = Nothing,
               Face.vanguard = Nothing,
               Face.canBeYourCommander = False,
               Face.claimsStartingPlayer = False,

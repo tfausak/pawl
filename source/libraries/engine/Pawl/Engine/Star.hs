@@ -36,6 +36,7 @@ substituteStar star quantity = case quantity of
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
   Quantity.Toughness -> quantity
+  Quantity.Intensity -> quantity
   Quantity.InSlot _ -> quantity
   Quantity.WasBound _ -> quantity
   Quantity.BoundCount _ -> quantity

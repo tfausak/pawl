@@ -334,6 +334,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.GrantsStationToughness
       " {\"type\":\"GrantsStationToughness\"} "
+  -- Alchemy's "intensifies by 1" (Static Discharge).
+  Spec.it s "Intensify" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.Intensify (Quantity.Literal 1))
+      " {\"type\":\"Intensify\",\"value\":{\"type\":\"Literal\",\"value\":1}} "
   -- layer 6, CR 613.1f: a whole quoted activated ability, Presence of Gond's
   -- "{T}: Create a 1/1 green Elf Warrior creature token" reduced to its cost.
   Spec.it s "GainAbility" $

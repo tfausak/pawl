@@ -115,6 +115,7 @@ faceDownFace listed =
       Face.toughness = FaceDownCharacteristics.toughness listed,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.startingIntensity = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
       Face.claimsStartingPlayer = False,
@@ -563,6 +564,7 @@ merge2 l r =
           Face.toughness = fmap Toughness.MkToughness (fst toughnessBox),
           Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
           Face.defense = firstJust (Face.defense l) (Face.defense r),
+          Face.startingIntensity = firstJust (Face.startingIntensity l) (Face.startingIntensity r),
           -- The same left bias, and vacuous today: CR 313.2 keeps a vanguard card in
           -- the command zone, so no vanguard has ever been printed with two faces
           -- for this to combine.

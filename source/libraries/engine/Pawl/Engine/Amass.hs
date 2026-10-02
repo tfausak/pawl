@@ -88,6 +88,7 @@ armyToken subtype =
               Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 0)),
               Face.loyalty = Nothing,
               Face.defense = Nothing,
+              Face.startingIntensity = Nothing,
               Face.vanguard = Nothing,
               Face.canBeYourCommander = False,
               Face.claimsStartingPlayer = False,

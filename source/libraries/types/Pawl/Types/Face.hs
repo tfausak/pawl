@@ -95,6 +95,10 @@ data Face card = MkFace
     -- replacement, which needs the defense of the permanent as it WOULD exist on
     -- the battlefield (CR 614.12).
     defense :: Maybe Defense.Defense,
+    -- | Alchemy's printed "Starting intensity N" (Static Discharge), which no CR
+    -- rule names. Read through Pawl.Engine.Projection's PC.intensity, never
+    -- directly, since an intensify effect adds to it.
+    startingIntensity :: Maybe Natural.Natural,
     -- | CR 313.6 \/ 313.7: the two numbers in a vanguard card's lower corners.
     -- Nothing for every card that is not a vanguard; the CardSpec lint family
     -- holds that biconditional in both directions, as it does for loyalty and
