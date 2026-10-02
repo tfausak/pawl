@@ -9356,9 +9356,9 @@ triggeredSources gs =
 -- window needs no stored flag -- the record is CR 603.3b's own log, and
 -- GameState.events is cleared at the turn handoff, which makes "in the log" mean
 -- "this turn". The per-GAME window reads GameState.triggeredThisGame, which
--- survives that handoff and which Engine.reactions writes. The two are read as
--- ONE spent tally: the ability VALUE is part of the key and carries its own
--- limit, so a per-turn key and a per-game key can never be equal. CR 702.179d's
+-- survives that handoff and which Engine.reactions writes. The log records a
+-- per-game trigger too, so each window is tallied from its own store alone and
+-- a per-game trigger is counted once. CR 702.179d's
 -- inherent twin is limited here like any other, the log recording a sourceless
 -- trigger too. Keyed on the SOURCE and the ABILITY, so two permanents with the
 -- same printed ability spend separate limits (CR 113.7), one that leaves and
@@ -9372,6 +9372,7 @@ triggeredSources gs =
 withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
 withinTriggerLimit gs =
   let spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
+      perTurn record = TriggeredAbility.limit (AbilityTriggered.ability record) == TriggerLimit.OncePerTurn
       tally :: [LimitKey] -> Map LimitKey Natural
       tally = List.foldl' (\m key -> Map.insertWith (+) key 1 m) Map.empty
       go _ [] = []
@@ -9382,7 +9383,7 @@ withinTriggerLimit gs =
           | otherwise -> pending : go (Map.insertWith (+) key 1 spent) rest
    in go
         ( tally
-            ( fmap spentKey (Maybe.mapMaybe (abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+            ( fmap spentKey (filter perTurn (Maybe.mapMaybe (abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
                 <> fmap spentKey (Foldable.toList (GameState.triggeredThisGame gs))
             )
         )

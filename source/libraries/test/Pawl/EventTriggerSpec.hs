@@ -52,6 +52,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -1974,7 +1975,7 @@ oreskosSunGuideSpec s registry =
 -- Two on one Goblin Piker grant it two value-identical instances. The untap
 -- step fires both; a second untap that turn, through Event.untap, fires
 -- neither.
-wellRestedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+wellRestedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 wellRestedSpec s registry =
   Spec.describe s "Well Rested" $ do
     Spec.it s "CR 113.2c two Well Rested on one creature each trigger once that turn" $ do
@@ -1993,6 +1994,24 @@ wellRestedSpec s registry =
       Spec.assertEqWith s "both instances resolved: four +1/+1 counters" (countersOn rested1) (Just 4)
       Spec.assertEqWith s "and 4 life and two cards" (S.lifeOf S.alice rested1, S.handSize S.alice rested1) (Just 24, 2)
       Spec.assertEqWith s "a second untap that turn triggers neither" (length (GameState.stack rested2)) 0
+    -- The per-GAME rider on the same tally. Engine.reactions writes one
+    -- Acrobatic Cheerleader triggering to the turn's log AND to
+    -- GameState.triggeredThisGame; it is one triggering, so a second instance
+    -- is still owed its own. A regression fence driving withinTriggerLimit
+    -- directly: no card in data/cards/ grants a "triggers only once" ability,
+    -- and the Cheerleader's event recurs once a turn, so no board gives a source
+    -- its second instance between two such events in one turn.
+    Spec.it s "CR 113.2c a per-game rider spent this turn is counted once" $ do
+      cheerleader <- S.printingOf s registry "Acrobatic Cheerleader"
+      case Face.triggeredAbilities (S.combinedFace cheerleader) of
+        [] -> Spec.assertFailure s "Acrobatic Cheerleader should declare one triggered ability"
+        ability : _ -> do
+          let (oid, g0) = S.addPermanent cheerleader S.alice (Setup.emptyGame S.bothPlayers)
+              record = AbilityTriggered.MkAbilityTriggered (TriggerSource.OfObject oid) S.alice ability
+              spent = Event.recordEvent (GameEvent.AbilityTriggered record) g0 {GameState.triggeredThisGame = Seq.singleton record}
+              pending = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) S.alice ability Map.empty Nothing Nothing
+          Spec.assertEqWith s "the second of two instances still triggers" (length (Event.withinTriggerLimit spent [pending 2])) 1
+          Spec.assertEqWith s "while a lone instance is spent" (length (Event.withinTriggerLimit spent [pending 1])) 0
 
 -- CR 701.68d's blight as a TRIGGER EVENT, which nothing could watch: the whole
 -- printed pool blights, and not one card triggers on a player doing it
