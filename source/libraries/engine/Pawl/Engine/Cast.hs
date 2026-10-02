@@ -3417,36 +3417,26 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- is recorded at the payment and a spell that is
                           -- countered still leaves it behind -- Activate's
                           -- GameEvent.Crewed and for its reason. A case on the
-                          -- rule-702 keyword stamp, never on an effect.
+                          -- rule-702 substitute (Cost.convokes), never on an
+                          -- effect.
                           --
-                          -- The taps CONVOKE only where the spell has convoke:
-                          -- CR 702.126a's improvise substitutes through the same
-                          -- component and rule 702.126 names no relation at all.
-                          -- No printing states both (Scryfall keyword:convoke
-                          -- keyword:improvise, 2026-09-13, no hit), but a grant
-                          -- can give a spell both (Chief Engineer's convoke on
-                          -- Foundry Assembler). Not implemented: telling the taps
-                          -- apart then, so an artifact tapped for improvise is
-                          -- recorded as convoking (#4586).
-                          --
-                          -- Off the SUBSTITUTION's own bindings rather than the
-                          -- whole payment's, which Binding.tappedPermanent would
-                          -- have shared with a tap the printed cost demanded.
-                          Monad.when
-                            (Map.member Keyword.Type.Convoke (Cost.spellKeywords pid sid pricedGs))
-                            ( let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent (Binding.targetsOf substitutedBindings))))
-                               in Monad.unless
-                                    (Set.null convokers)
-                                    ( State.modify'
-                                        ( Event.recordEvent
-                                            ( GameEvent.Convoked
-                                                Convoking.MkConvoking
-                                                  { Convoking.spell = sid,
-                                                    Convoking.convokedBy = convokers
-                                                  }
-                                            )
-                                        )
+                          -- Off the CONVOKING substitutes' own bindings
+                          -- (Cost.paySubstituting) rather than the whole
+                          -- payment's, which Binding.tappedPermanent would have
+                          -- shared with a tap the printed cost demanded, or with
+                          -- an artifact tapped for improvise.
+                          let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent (Binding.targetsOf substitutedBindings))))
+                          Monad.unless
+                            (Set.null convokers)
+                            ( State.modify'
+                                ( Event.recordEvent
+                                    ( GameEvent.Convoked
+                                        Convoking.MkConvoking
+                                          { Convoking.spell = sid,
+                                            Convoking.convokedBy = convokers
+                                          }
                                     )
+                                )
                             )
                           -- CR 601.2i / 611.3d: the permission's rider is an
                           -- effect that modifies the spell as it is cast, so it
