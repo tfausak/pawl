@@ -412,7 +412,14 @@ answerPrompt asked = do
                 then do
                   State.modify' (\rehearsal -> rehearsal {pending = Nothing, reversing = Nothing})
                   answerTopPrompt decider asked
-                else failWith (Failure.MkUnrefusedMove key verb (Just kind))
+                else do
+                  -- A prompt the refused action raises on its way to being
+                  -- reversed (a kicker, CR 733.1's ReverseManaAbilities) is
+                  -- answered by an Answer and leaves the refusal pending.
+                  found <- takeAnswer gs decider kind
+                  case found of
+                    Just (answerKey, index, timed) -> answerGeneric gs answerKey kind index timed prompt
+                    Nothing -> failWith (Failure.MkUnrefusedMove key verb (Just kind))
           -- Any other prompt means the action has finished. A choice it never
           -- asked for is a scenario error, reported here rather than at the
           -- next prompt that happens to want an answer.

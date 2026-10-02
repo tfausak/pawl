@@ -139,6 +139,29 @@
       "turn": 1,
       "step": "PrecombatMain",
       "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
       "do": {
         "Activate": {
           "object": "$tower-of-the-magistrate-2",
@@ -218,18 +241,6 @@
           "tapped": false
         }
       }
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": "Pass"
-    },
-    {
-      "turn": 1,
-      "step": "PrecombatMain",
-      "player": "alice",
-      "do": "Pass"
     },
     {
       "turn": 1,
