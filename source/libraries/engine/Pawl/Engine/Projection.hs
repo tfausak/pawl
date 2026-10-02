@@ -2591,7 +2591,7 @@ abilityRemovalAfter gs =
         else \_ _ -> False
 
 -- CR 613.11 / 613.1f: the rule abilities layer-6 grants give `oid`, which each
--- of the thirteen gatherers (Pawl.Engine.CombatRestriction and its siblings)
+-- of the fourteen gatherers (Pawl.Engine.CombatRestriction and its siblings)
 -- reads next to the object's own (ruleAbilitiesOf): a stored grant's (Chomping
 -- Kavu's backup), and a static ability's, which the fold recorded on the
 -- receiver (Zurgo, Thunder's Decree) and only a whole-board projection reads
@@ -2605,7 +2605,7 @@ abilityRemovalAfter gs =
 -- the host out of a granted ability, and it is read off `oid` itself rather
 -- than textBoxHolderOf, for grantedStaticAbilitiesOf's reason.
 -- Pawl.KeywordTriggerSpec's Backup group proves the removal order and the CR
--- 305.7 exemption, through the combat restriction; the other twelve families
+-- 305.7 exemption, through the combat restriction; the other thirteen families
 -- are regression fences, no printing with backup granting one.
 grantedRuleAbilities :: GameState -> ObjectId -> RuleAbilities.RuleAbilities
 grantedRuleAbilities gs =

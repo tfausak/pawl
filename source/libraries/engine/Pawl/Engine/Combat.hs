@@ -14,6 +14,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.AttackCost as AttackCost
+import qualified Pawl.Engine.AttackPermission as AttackPermission
 import qualified Pawl.Engine.AttackRequirement as AttackRequirement
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
@@ -404,15 +405,15 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- dropped in attemptAttackDeclaration rather than here, which is the same
 -- posture and one step later.
 --
--- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
--- each one battlefield-wide walk, taken once per declaration pass. An
+-- canAttackGiven is the half a LOOP wants: `grants`, `pcs`, `restricted` and
+-- `waived` are each one battlefield-wide walk, taken once per declaration pass. An
 -- absent projection is a cache miss the projection recovers from, while an absent
 -- restriction set is a wrong answer -- which is why canAttack computes one.
 canAttack :: PlayerId -> ObjectId -> GameState -> Bool
-canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantAttack [oid] gs) pid oid gs
+canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantAttack [oid] gs) (AttackPermission.waivesDefender [oid] gs) pid oid gs
 
-canAttackGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
-canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs of
+canAttackGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set ObjectId -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
+canAttackGiven grants pcs restricted waived pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
     Projection.controllerOfGiven grants oid gs == Just pid
@@ -434,8 +435,10 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
       -- is the board.
       && not (Projection.isBattleGiven pcs oid gs)
       -- CR 508.1c through CR 702.3b: a creature with defender can't attack. It may
-      -- still block -- 702.3b says nothing about blocking.
-      && not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs)
+      -- still block -- 702.3b says nothing about blocking. `waived` is the
+      -- creatures an effect lets attack as though they didn't have it (Prison
+      -- Barricade kicked).
+      && (not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs) || Set.member oid waived)
       -- CR 508.1c: every per-creature attacking restriction in force -- printed
       -- (Pacifism), CR 701.35a's detain, stored by the resolution that said it
       -- (Netter en-Dal), or on the controller (Angelic Arbiter).
@@ -454,7 +457,8 @@ legalAttackers pid gs =
       pcs = Projection.projectAll gs
       controlled = Projection.controlsGiven grants pid gs
       restricted = CombatRestriction.cantAttack controlled gs
-   in filter (\oid -> canAttackGiven grants pcs restricted pid oid gs) controlled
+      waived = AttackPermission.waivesDefender controlled gs
+   in filter (\oid -> canAttackGiven grants pcs restricted waived pid oid gs) controlled
 
 -- CR 506.5: a creature attacks alone if it is the only creature DECLARED as an
 -- attacker during the declare attackers step. `alone` is the set of candidates a

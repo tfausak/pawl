@@ -34,6 +34,7 @@ import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
+import qualified Pawl.Types.AttackPermission as AttackPermission
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.AttackTargetRef as AttackTargetRef
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -1163,7 +1164,7 @@ rewritePlayerStaticAbility pairs ability =
       PlayerStaticAbility.effect = rewritePlayerEffect pairs (PlayerStaticAbility.effect ability)
     }
 
--- CR 613.11's thirteen families under CR 612.1, each at the positions its
+-- CR 613.11's fourteen families under CR 612.1, each at the positions its
 -- gatherer module rewrites (Pawl.Engine.CombatRestriction and its siblings), so
 -- the layer fold and the gatherers agree on where a word is. CR 508.1h's and CR
 -- 509.1d's costs stay as printed, as their gatherers leave them.
@@ -1176,6 +1177,7 @@ rewriteRuleAbilities pairs abilities =
         { RuleAbilities.activationProhibitions = fmap (\x -> x {ActivationProhibition.affected = affected (ActivationProhibition.affected x)}) (RuleAbilities.activationProhibitions abilities),
           RuleAbilities.attachRestrictions = fmap (\x -> x {AttachRestriction.affected = affected (AttachRestriction.affected x), AttachRestriction.attachers = Filter.rewrite pairs (AttachRestriction.attachers x)}) (RuleAbilities.attachRestrictions abilities),
           RuleAbilities.attackCosts = RuleAbilities.attackCosts abilities,
+          RuleAbilities.attackPermissions = fmap (\x -> x {AttackPermission.affected = affected (AttackPermission.affected x)}) (RuleAbilities.attackPermissions abilities),
           RuleAbilities.attackRequirements = fmap (\x -> x {AttackRequirement.subject = affected (AttackRequirement.subject x), AttackRequirement.while = condition (AttackRequirement.while x)}) (RuleAbilities.attackRequirements abilities),
           RuleAbilities.blockCosts = RuleAbilities.blockCosts abilities,
           RuleAbilities.blockPermissions = fmap (\x -> x {BlockPermission.affected = affected (BlockPermission.affected x), BlockPermission.additional = fmap (rewriteQuantity pairs) (BlockPermission.additional x), BlockPermission.while = condition (BlockPermission.while x)}) (RuleAbilities.blockPermissions abilities),

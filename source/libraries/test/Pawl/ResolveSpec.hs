@@ -4423,6 +4423,7 @@ subgameSpellOn borrowed name effects gs0 =
             Face.attachRestrictions = [],
             Face.counterRestrictions = [],
             Face.crewRestrictions = [],
+            Face.attackPermissions = [],
             Face.activationProhibitions = [],
             Face.entryRestrictions = [],
             Face.attackCosts = [],

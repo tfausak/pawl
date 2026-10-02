@@ -24,6 +24,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
+import qualified Pawl.Types.AttackPermission as AttackPermission
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -161,6 +162,7 @@ baseFace =
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
       Face.crewRestrictions = [],
+      Face.attackPermissions = [],
       Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
@@ -226,6 +228,7 @@ minimalFace =
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
       Face.crewRestrictions = [],
+      Face.attackPermissions = [],
       Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
@@ -412,6 +415,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "crewRestrictions (CR 702.122d/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.crewRestrictions <$> decodeFace v) (Right [])
+    Spec.it s "attackPermissions (CR 702.3b) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.attackPermissions <$> decodeFace v) (Right [])
     Spec.it s "attachRestrictions (CR 303.4/301.5/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attachRestrictions <$> decodeFace v) (Right [])
@@ -553,6 +559,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.crewRestrictions = [CrewRestriction.MkCrewRestriction Affected.Attached]}
         (init baseFaceJson <> ",\"crewRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
+    Spec.it s "attackPermissions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.attackPermissions = [AttackPermission.MkAttackPermission Affected.Attached]}
+        (init baseFaceJson <> ",\"attackPermissions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
     Spec.it s "attachRestrictions" $
       Common.assertJsonCodec
         s
