@@ -18,6 +18,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -108,6 +109,8 @@ testCharacteristics =
       -- what the case is about is that the field carries a whole card through
       -- the wire (CR 709.5).
       PC.halves = Just CardSpec.mountainCard,
+      -- CR 707.9b, synthetic for halves' reason.
+      PC.exceptions = [CopyException.NoManaCost],
       -- Synthetic for halves' reason: a Mountain has no inset frame, and what
       -- the case is about is that the field carries a whole FACE through the
       -- wire (CR 722.2b).
@@ -155,6 +158,7 @@ testCharacteristicsJson =
     <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"grantedCostReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]},"
+    <> "\"exceptions\":[{\"type\":\"NoManaCost\"}],"
     <> "\"prepare\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
     <> "\"alternativeSpell\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
     <> "\"spell\":{\"modes\":[{},{}]},"
@@ -201,6 +205,7 @@ minimalCharacteristics =
       PC.costReductions = [],
       PC.grantedCostReductions = [],
       PC.halves = Nothing,
+      PC.exceptions = [],
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
       PC.spell = Face.Type.defaultSpell,
