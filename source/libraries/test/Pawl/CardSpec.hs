@@ -909,6 +909,8 @@ modificationCounts modification = case modification of
   -- Rule 702.165a's grant names the source, and the keywords it carries are
   -- minted from the card's Backup keyword, swept there.
   Modification.GainAbilitiesOfSource _ -> []
+  -- The rider's CR 602.5 conditions; the abilities are the linked cards'.
+  Modification.GainCraftMaterialAbilities extra -> concatMap conditionCounts (concatMap restrictionConditions extra)
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
@@ -4025,6 +4027,8 @@ quantityKindFilters quantity = case quantity of
   -- AgainstSlot's answer: aiming the evaluation at CR 607.2a's linked cards
   -- does not stop the payload from naming a kind.
   Quantity.Type.AgainstCardsExiledWith inner -> quantityKindFilters inner
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.Type.AgainstCraftMaterials inner -> quantityKindFilters inner
 
 -- BOTH axes of every Quantity a Condition compares, off conditionQuantities
 -- above rather than off conditionCounts beside it: reading the Counts alone drops
@@ -4100,6 +4104,8 @@ modificationFilters modification = case modification of
   Modification.GainAbility _ -> []
   -- Minted, and swept as the Backup keyword -- see modificationCounts.
   Modification.GainAbilitiesOfSource _ -> []
+  -- The rider's CR 602.5 conditions, as a printed ability's are swept.
+  Modification.GainCraftMaterialAbilities extra -> frame Unframed (concatMap conditionFilters (concatMap restrictionConditions extra))
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []

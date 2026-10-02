@@ -294,6 +294,9 @@ rewriteModification pairs m =
         -- ability was put on the stack (CR 702.165d, Pawl.Engine.Resolve.Effect's
         -- expandGrant).
         Modification.GainAbilitiesOfSource _ -> acc
+        -- Carries no word: the abilities are the linked cards', read at
+        -- projection time, and the restrictions name none.
+        Modification.GainCraftMaterialAbilities _ -> acc
         -- Carries no word: the type is read off the source at projection time.
         Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word either.
@@ -2136,6 +2139,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (rewriteQuantity pairs inner))
   -- AgainstSlot's answer: not a leaf, and the payload may hide a Count.
   Quantity.Type.AgainstCardsExiledWith inner -> Quantity.Type.AgainstCardsExiledWith (rewriteQuantity pairs inner)
+  -- CR 702.167c: AgainstCardsExiledWith's answer, over the craft link alone.
+  Quantity.Type.AgainstCraftMaterials inner -> Quantity.Type.AgainstCraftMaterials (rewriteQuantity pairs inner)
 
 -- CR 612.1 over a damage clause: the recipient's ref, and the amount CR 120.1
 -- has that recipient dealt.
