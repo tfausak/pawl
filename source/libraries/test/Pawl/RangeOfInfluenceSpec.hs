@@ -13,9 +13,11 @@
 -- worldVictims (CR 801.12), Pawl.Engine.Event.Trigger's eventWithinRange (CR
 -- 801.7), Pawl.Engine.Replacement's reaches, preventsInRange and
 -- redirectDestination (CR 801.13), Pawl.Engine.Resolve.Slots'
--- playerRefPlayers, zoneScopePlayers and battlefieldMatching, Pawl.Engine.Count's
--- playersFor and the choice offers Game.reachableBy feeds (CR 801.5a, 801.10,
--- 801.11), and Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
+-- playerRefPlayers, zoneScopePlayers and battlefieldMatching,
+-- Pawl.Engine.Resolve.Effect's objectRefRecipients, Pawl.Engine.Count's
+-- playersFor and the choice offers Game.reachableBy, Game.opponentsInReach and
+-- Game.inRangeOf feed (CR 801.5a, 801.10, 801.11), and
+-- Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
 -- 801.15), and Pawl.Engine.Engine's checkMandatoryLoop (CR 801.16); and CR
 -- 801.2c's turn-start seating, Pawl.Types.GameState's departedThisTurn.
 --
@@ -26,6 +28,7 @@
 module Pawl.RangeOfInfluenceSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -59,6 +62,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
@@ -337,6 +341,18 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (not (stillThere bobs (enters (S.withRange 1)))) "and bob's, in range, is exiled"
     Spec.assertBool s (not (stillThere carols (enters id))) "at an unlimited range carol's is exiled too"
 
+  -- CR 801.10 for damage to each opponent: alice's Fanatic of Mogis ("When this
+  -- creature enters, it deals damage to each opponent equal to your devotion to
+  -- red.") enters at devotion 1.
+  Spec.it s "CR 801.10 damage to each opponent does not reach an opponent outside its controller's range" $ do
+    fanatic <- S.printingOf s registry "Fanatic of Mogis"
+    let enters ranged =
+          let (entrant, placed) = S.addPermanent fanatic S.alice (ranged S.fourPlayerGame)
+           in entering entrant placed
+    Spec.assertEqWith s "CR 801.10 at range 1 carol is untouched" (S.lifeOf S.carol (enters (S.withRange 1))) (Just 20)
+    Spec.assertEqWith s "and bob, in range, takes 1" (S.lifeOf S.bob (enters (S.withRange 1))) (Just 19)
+    Spec.assertEqWith s "at an unlimited range carol takes 1 too" (S.lifeOf S.carol (enters id)) (Just 19)
+
   -- CR 801.11: alice's Malignus ("Malignus's power and toughness are each equal
   -- to half the highest life total among your opponents, rounded up.") while
   -- carol, two seats away, is at 40 and bob and dave, one seat away, at 20.
@@ -346,6 +362,38 @@ spec s registry = Spec.describe s "Range of influence" $ do
         board = g0 {GameState.players = Map.adjust (\p -> p {Player.life = 40}) S.carol (GameState.players g0)}
     Spec.assertEqWith s "CR 801.11 at range 1 Malignus reads only bob's and dave's 20" (S.powerToughnessOf creature (S.withRange 1 board)) (Just (10, 10))
     Spec.assertEqWith s "at an unlimited range it reads carol's 40" (S.powerToughnessOf creature board) (Just (20, 20))
+
+  -- CR 801.5a for a resolving "choose a player": alice's Stadium Vendors ("When
+  -- this creature enters, choose a player. That player adds two mana ...").
+  Spec.it s "CR 801.5a a resolving choice of player offers only players within the controller's range" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vendors <- S.printingOf s registry "Stadium Vendors"
+    let (spellId, board) = S.addHandCard vendors S.alice (S.landsFor mountain S.alice 4 S.fourPlayerGame)
+        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        recording p = case p of
+          Prompt.ChoosePlayer _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
+          _ -> pure (S.identityAnswer p)
+        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
+    Spec.assertEqWith s "CR 801.5a at range 1 the trigger does not offer carol" (offered (S.withRange 1 board)) [[S.alice, S.bob, S.dave]]
+    Spec.assertEqWith s "at an unlimited range it does" (offered board) [[S.alice, S.bob, S.carol, S.dave]]
+
+  -- CR 801.5a for the as-enters opponent choices: Snake of the Golden Grove's
+  -- tribute (CR 702.104a) and Null Chamber's naming opponent.
+  Spec.it s "CR 801.5a tribute and a naming opponent offer only opponents within the controller's range" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    snake <- S.printingOf s registry "Snake of the Golden Grove"
+    chamber <- S.printingOf s registry "Null Chamber"
+    let recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        recording p = case p of
+          Prompt.ChooseOpponent _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
+          _ -> pure (S.identityAnswer p)
+        offeredFor card land lands =
+          let (spellId, board) = S.addHandCard card S.alice (S.landsFor land S.alice lands S.fourPlayerGame)
+              offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
+           in (offered (S.withRange 1 board), offered board)
+    Spec.assertEqWith s "CR 801.5a at range 1 tribute does not offer carol, and does at an unlimited range" (offeredFor snake forest 5) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
+    Spec.assertEqWith s "CR 801.5a at range 1 Null Chamber does not offer carol, and does at an unlimited range" (offeredFor chamber plains 4) ([[S.bob, S.dave]], [[S.bob, S.carol, S.dave]])
 
   -- CR 104.2b / 801.14: alice's Felidar Sovereign ("At the beginning of your
   -- upkeep, if you have 40 or more life, you win the game.") at 40 life. At range
@@ -462,6 +510,8 @@ spec s registry = Spec.describe s "Range of influence" $ do
       let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
           staged = S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs
        in resolveAll (snd (Engine.runGamePure S.identityAnswer staged Engine.settleForPriority))
+    -- A main phase with alice holding priority, for an instant she casts.
+    onMain gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
     -- CR 510.2: these creatures, attacking `defender` on `active`'s turn, deal
     -- their combat damage.
     strike active attackers defender gs =

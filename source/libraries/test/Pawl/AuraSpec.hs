@@ -1073,6 +1073,46 @@ replenishSpec s registry =
             "and the batch's processing order changes nothing (CR 608.2f)"
             auraFirst
             hostFirst
+        -- CR 303.4f's "a legal object OR PLAYER", with CR 702.5d: Replenish
+        -- returns Curse of Death's Hold ("Enchant player. Creatures enchanted
+        -- player controls get -1/-1."), and its controller picks the player.
+        -- Three seats, answered by INDEX at the third, so neither alice (the
+        -- first candidate) nor bob can stand in for carol.
+        Spec.it s "CR 303.4f a returned Curse's controller chooses the player it enchants" $ do
+          plains <- S.printingOf s registry "Plains"
+          replenish <- S.printingOf s registry "Replenish"
+          curse <- S.printingOf s registry "Curse of Death's Hold"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let withLands = S.landsFor plains S.alice 8 S.threePlayerGame
+              (mammothId, withMammoth) = S.addPermanent mammoth S.bob withLands
+              (maidenId, withMaiden) = S.addPermanent maiden S.carol withMammoth
+              (_, withCurse) = S.addGraveyardCard curse S.alice withMaiden
+              (gs, spell) = S.handOne replenish withCurse
+              choosing :: Prompt.Prompt r -> r
+              choosing p = case p of
+                Prompt.ChoosePlayer _ _ _ offered -> nth 3 offered
+                _ -> S.castAnswer p
+              (after, _) = run choosing spell gs
+          Spec.assertEqWith s "carol's Bird Maiden gets -1/-1" (S.powerToughnessOf maidenId after) (Just (0, 1))
+          Spec.assertEqWith s "and bob's War Mammoth does not" (S.powerToughnessOf mammothId after) (Just (3, 3))
+        -- The same choice for "Enchant opponent" (Archnemesis), whose offer
+        -- leaves alice out, so it is Prompt.ChooseOpponent's; carol is the
+        -- second of two.
+        Spec.it s "CR 303.4f a returned enchant-opponent Aura's controller chooses the opponent" $ do
+          plains <- S.printingOf s registry "Plains"
+          replenish <- S.printingOf s registry "Replenish"
+          archnemesis <- S.printingOf s registry "Archnemesis"
+          let withLands = S.landsFor plains S.alice 8 S.threePlayerGame
+              (_, withAura) = S.addGraveyardCard archnemesis S.alice withLands
+              (gs, spell) = S.handOne replenish withAura
+              choosing :: Prompt.Prompt r -> r
+              choosing p = case p of
+                Prompt.ChooseOpponent _ _ _ offered -> nth 2 offered
+                _ -> S.castAnswer p
+              (after, _) = run choosing spell gs
+              hosts = [Game.lookupObject oid after >>= Object.attachedTo | oid <- Set.toList (GameState.battlefield after), Game.cardOf oid after == Just (Printing.card archnemesis)]
+          Spec.assertEqWith s "Archnemesis enchants carol" hosts [Just (Recipient.ToPlayer S.carol)]
         -- CR 708.2a against CR 303.4f, on Soul Summons rather than Replenish: an
         -- Aura card MANIFESTED off a library (CR 701.40a) enters as a 2/2 with no
         -- subtypes and no enchant ability, so it is not an Aura the rule speaks

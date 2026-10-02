@@ -33,6 +33,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -41,6 +42,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -840,7 +842,7 @@ secondMainPhaseSpec s registry =
           Spec.assertEqWith s "no flying counter: the third main phase is not the second" (flyingOn oid after) Nothing
           Spec.assertEqWith s "the extra main phase really ran, with the Cheerleader untapped" (GameState.phase secondMain, tapState oid secondMain) (Phase.PostcombatMain, Just TapState.Untapped)
           Spec.assertEqWith s "and the third main phase really ran, with it tapped" (GameState.phase thirdMain, tapState oid thirdMain) (Phase.PostcombatMain, Just TapState.Tapped)
-          Spec.assertEqWith s "the rider is unspent, so nothing but the ordinal held the trigger back" (Set.size (GameState.triggeredThisGame after)) 0
+          Spec.assertEqWith s "the rider is unspent, so nothing but the ordinal held the trigger back" (length (GameState.triggeredThisGame after)) 0
 
 -- The same CR 601.2i cast, read for WHICH cast of the turn it was --
 -- SpellCast.ordinal. The cast-side twin of Erudite Wizard's draw ordinal
@@ -1253,6 +1255,54 @@ oreskosSunGuideSpec s registry =
           Spec.assertEqWith s "untapping the Guide gains alice 2" (S.lifeOf S.alice (resolveOne (untapOne guideId))) (Just 22)
           Spec.assertEqWith s "untapping the Piker instead gains nothing" (S.lifeOf S.alice (resolveOne (untapOne pikerId))) (Just 20)
 
+-- CR 113.2c: two instances of one ability function independently, so each
+-- spends its own "This ability triggers only once each turn"
+-- (Pawl.Engine.Event.withinTriggerLimit). Well Rested, {1}{G} Enchantment --
+-- Aura: "Enchant creature / Enchanted creature has 'Whenever this creature
+-- becomes untapped, put two +1/+1 counters on it, then you gain 2 life and draw
+-- a card. This ability triggers only once each turn.'" Nothing omitted.
+--
+-- Two on one Goblin Piker grant it two value-identical instances. The untap
+-- step fires both; a second untap that turn, through Event.untap, fires
+-- neither.
+wellRestedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wellRestedSpec s registry =
+  Spec.describe s "Well Rested" $ do
+    Spec.it s "CR 113.2c two Well Rested on one creature each trigger once that turn" $ do
+      rested <- S.printingOf s registry "Well Rested"
+      piker <- S.printingOf s registry "Goblin Piker"
+      island <- S.printingOf s registry "Island"
+      let (pikerId, g0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+          (first, g1) = S.addPermanent rested S.alice g0
+          (second, g2) = S.addPermanent rested S.alice g1
+          stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (S.attach second pikerId (S.attach first pikerId g2)) [1 .. (5 :: Int)]
+          resolveOne gs = S.runPure S.identityAnswer gs Stack.resolveTop
+          settle gs = resolveOne (resolveOne (S.runPure S.identityAnswer gs Engine.settleForPriority))
+          rested1 = settle (S.runPure S.identityAnswer (S.tapObject pikerId stocked) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)))
+          rested2 = S.runPure S.identityAnswer (S.runPure S.identityAnswer (S.tapObject pikerId rested1) (Event.untap pikerId)) Engine.settleForPriority
+          countersOn gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject pikerId gs)
+      Spec.assertEqWith s "both instances resolved: four +1/+1 counters" (countersOn rested1) (Just 4)
+      Spec.assertEqWith s "and 4 life and two cards" (S.lifeOf S.alice rested1, S.handSize S.alice rested1) (Just 24, 2)
+      Spec.assertEqWith s "a second untap that turn triggers neither" (length (GameState.stack rested2)) 0
+    -- The per-GAME rider on the same tally. Engine.reactions writes one
+    -- Acrobatic Cheerleader triggering to the turn's log AND to
+    -- GameState.triggeredThisGame; it is one triggering, so a second instance
+    -- is still owed its own. A regression fence driving withinTriggerLimit
+    -- directly: no card in data/cards/ grants a "triggers only once" ability,
+    -- and the Cheerleader's event recurs once a turn, so no board gives a source
+    -- its second instance between two such events in one turn.
+    Spec.it s "CR 113.2c a per-game rider spent this turn is counted once" $ do
+      cheerleader <- S.printingOf s registry "Acrobatic Cheerleader"
+      case Face.triggeredAbilities (S.combinedFace cheerleader) of
+        [] -> Spec.assertFailure s "Acrobatic Cheerleader should declare one triggered ability"
+        ability : _ -> do
+          let (oid, g0) = S.addPermanent cheerleader S.alice (Setup.emptyGame S.bothPlayers)
+              record = AbilityTriggered.MkAbilityTriggered (TriggerSource.OfObject oid) S.alice ability
+              spent = Event.recordEvent (GameEvent.AbilityTriggered record) g0 {GameState.triggeredThisGame = Seq.singleton record}
+              pending = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) S.alice ability Map.empty Nothing Nothing
+          Spec.assertEqWith s "the second of two instances still triggers" (length (Event.withinTriggerLimit spent [pending 2])) 1
+          Spec.assertEqWith s "while a lone instance is spent" (length (Event.withinTriggerLimit spent [pending 1])) 0
+
 -- CR 701.68d's blight as a TRIGGER EVENT, which nothing could watch: the whole
 -- printed pool blights, and not one card triggers on a player doing it
 -- (Scryfall oracle:blight, every "whenever" clause read, 2026-09-05). So the
@@ -1386,4 +1436,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   kambalSpec s registry
   brinebornCutthroatSpec s registry
   oreskosSunGuideSpec s registry
+  wellRestedSpec s registry
   blightChroniclerSpec s registry

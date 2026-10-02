@@ -24,6 +24,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -78,8 +79,8 @@ lockedHalves = halvesWhere not
 --
 -- The COMPLEMENT of lockedHalves under the same gate rather than
 -- Object.unlockedHalves read directly, so the two answers cannot disagree about
--- what a half is: a name in that set naming no face of the object's copiable
--- halves is no half at all, and rule 709.5c scopes both questions to a permanent
+-- what a half is: a position in that set past the object's copiable halves is
+-- no half at all, and rule 709.5c scopes both questions to a permanent
 -- with a shared type line on the battlefield.
 unlockedHalves :: ObjectId -> GameState -> [Face.Face Card.Type.Card]
 unlockedHalves = halvesWhere id
@@ -94,9 +95,9 @@ halvesWhere keep oid gs = Maybe.fromMaybe [] $ do
     then Nothing
     else
       Just
-        ( filter
-            (\face -> keep (Set.member (Face.name face) (Object.unlockedHalves obj)))
-            (NonEmpty.toList (Card.Type.faces card))
+        ( fmap
+            snd
+            (filter (keep . fst) (NonEmpty.toList (Card.withOpenness (Object.unlockedHalves obj) card)))
         )
 
 -- CR 709.5e: the unlock cost of one half -- "a player who controls a permanent

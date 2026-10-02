@@ -358,7 +358,8 @@ choiceVariants face =
 -- through this as the board's candidates do. The victim is named outright for
 -- `emerged`'s reason (CR 702.48b), and its mana cost is read off the
 -- projection, so a Clone reduces by what it copied; CR 702.48c sends that
--- through CR 118.7.
+-- through CR 118.7. The offering keyword is `spellKeywords`', rule 702.48a's
+-- ability functioning while the spell is on the stack.
 withOffering :: PlayerId -> ObjectId -> GameState -> CandidateCost.CandidateCost -> [CandidateCost.CandidateCost]
 withOffering pid oid gs candidate =
   candidate
@@ -367,7 +368,7 @@ withOffering pid oid gs candidate =
             CandidateCost.reductions = CandidateCost.reductions candidate <> [Maybe.fromMaybe (ManaCost.MkManaCost []) (Filter.manaCost (Projection.viewOfObject vid gs))],
             CandidateCost.instantSpeed = True
           }
-      | quality <- Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs)),
+      | quality <- Keyword.offeringQualities (Map.keysSet (spellKeywords pid oid gs)),
         vid <- Replacement.sacrificeCandidates (Just pid) Map.empty pid (Just oid) quality gs
       ]
 
@@ -393,6 +394,16 @@ candidateCostsGiven permitted pid name oid gs =
       -- once for every keyword-offered cost below rather than once per keyword
       -- -- each read projects the card, and that gathers the whole board (#435).
       keywords = Map.keysSet (Projection.keywordsOf oid gs)
+      -- CR 113.6d / 601.2a: what the SPELL has once it is on the stack, which
+      -- is where an ability offering an alternative cost functions -- so a
+      -- grant to "spells you cast" (Hunting Velociraptor) reaches it. Read by
+      -- the arms whose keyword's own rule says it functions on the stack;
+      -- evoke, bestow, prototype and the graveyard's keep `keywords`, their
+      -- rules naming the zone the card is cast from. Pawl.CastSpec's "CR
+      -- 113.6d a Hunting Velociraptor's granted prowl buys a Ridgetop Raptor
+      -- for {2}{R}" proves it.
+      spell = asSpellProjected pid oid gs
+      onStack = Map.keysSet (PC.keywords spell)
       -- The card-backed body the two printing-carrying arms above share. CR 601.2
       -- is why they share it rather than the copy getting a price of its own: a
       -- cast copy goes through that rule's steps like any other spell, so every
@@ -430,15 +441,19 @@ candidateCostsGiven permitted pid name oid gs =
                     gs
                     oid
                     cond
-              -- CR 113.6d / 613.1f: a printed alternative cost is an ability, so
-              -- a layer-6 wipe takes it from the card wherever it lies. The
-              -- projection is asked only of a face printing one. Pawl.CostSpec's
-              -- "CR 118.9 an Asmoranomardicadaistinaculdacar that perpetually
-              -- lost all abilities has no alternative cost" proves it.
+              -- CR 113.6d / 613.1f: a printed alternative cost is an ability that
+              -- functions on the stack, so a layer-6 wipe takes it only where
+              -- it reaches the SPELL (`spell`): a perpetual one does, one
+              -- confined to graveyards does not. The projection is asked only
+              -- of a face printing one. Pawl.CostSpec's "CR 118.9 an
+              -- Asmoranomardicadaistinaculdacar that perpetually lost all
+              -- abilities has no alternative cost" and "CR 113.6d under Yixlid
+              -- Jailer a Fireblast cast from the graveyard still sacrifices two
+              -- Mountains" prove both.
               alternatives = case Face.alternativeCosts face of
                 [] -> []
                 printedAlternatives ->
-                  if PC.lostAllAbilities (Projection.project oid gs)
+                  if PC.lostAllAbilities spell
                     then []
                     else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
               -- CR 702.103a: bestow, offered from EVERY zone the printed cost is
@@ -489,29 +504,34 @@ candidateCostsGiven permitted pid name oid gs =
               -- using its mutate ability follows the rules for paying alternative
               -- costs".
               --
-              -- The keywords are read off the PROJECTION, bestow's read and for
-              -- rule 613.1's reason.
+              -- The keywords are `onStack`'s, rule 702.140a's static ability
+              -- functioning on the stack.
               mutated =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
-                  (Keyword.mutateCosts keywords)
+                  (Keyword.mutateCosts onStack)
               -- CR 702.74a, 702.109a, 702.113a, 702.148a and 702.152a: evoke,
               -- dash, blitz, cleave and awaken, offered from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone
               -- from which the card with evoke can be cast" -- wrapped in
-              -- `withAdditional` for flashback's, read off the PROJECTION for
-              -- bestow's, and tagged with the keyword itself.
+              -- `withAdditional` for flashback's, and tagged with the keyword
+              -- itself. Evoke is read off `keywords`, bestow's read; the rest
+              -- off `onStack`, each of their rules saying it functions while
+              -- the spell is on the stack.
+              isEvoke keyword = case keyword of
+                Keyword.Type.Evoke _ -> True
+                _ -> False
               evoked =
                 fmap
                   (\(keyword, cost) -> CandidateCost.plain (Just keyword) (withAdditional cost))
-                  (Keyword.plainAlternativeCosts keywords)
+                  (Keyword.plainAlternativeCosts (Set.filter isEvoke keywords) <> Keyword.plainAlternativeCosts (Set.filter (not . isEvoke) onStack))
               -- CR 702.119a and CR 702.119b: emerge, evoked's offer with rule
               -- 702.119a's two clauses attached -- the sacrifice in the candidate's
               -- components, the generic reduction in `CandidateCost.reductions`.
               -- Offered from every zone for bestow's reason, rule 702.119a's
               -- abilities functioning "while the spell with emerge is on the
               -- stack", which CR 113.6e reaches from wherever the cast begins; read
-              -- off the projection for bestow's reason and wrapped in
+              -- off `onStack` for that reason and wrapped in
               -- `withAdditional` for flashback's, rule 702.119a sending the cast
               -- through CR 601.2f-h in its own words.
               --
@@ -565,9 +585,9 @@ candidateCostsGiven permitted pid name oid gs =
                         False
                  in concatMap
                       (\emerge -> fmap (offer emerge) (victims (Maybe.fromMaybe (Filter.Type.HasCardType CardType.Creature) (Emerge.quality emerge))))
-                      (Keyword.emergeCosts keywords)
+                      (Keyword.emergeCosts onStack)
               -- CR 702.117a and CR 702.137a: surge and spectacle, evoked's offer
-              -- with a GATE -- read off the projection, wrapped by
+              -- with a GATE -- read off `onStack`, wrapped by
               -- `withAdditional` and tagged with the keyword for that list's
               -- reasons, and offered from every zone because rule 702.117a's
               -- ability functions "while the spell with surge is on the stack"
@@ -584,11 +604,11 @@ candidateCostsGiven permitted pid name oid gs =
               -- and rule 702.137a's "you".
               surged =
                 if Game.yourTeamCastASpellThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Surge cost)) (withAdditional cost)) (Keyword.surgeCosts keywords)
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Surge cost)) (withAdditional cost)) (Keyword.surgeCosts onStack)
                   else []
               spectacled =
                 if Game.opponentLostLifeThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts keywords)
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts onStack)
                   else []
               -- CR 702.76a and CR 702.173a: prowl and freerunning, surged's shape
               -- with a clause of their own -- a player dealt combat damage this
@@ -597,19 +617,19 @@ candidateCostsGiven permitted pid name oid gs =
               -- the stack, which CR 113.6e reaches from wherever the cast begins.
               --
               -- Rule 702.76a's clause names THIS SPELL's creature types, so the
-              -- gate is passed the projection's subtypes rather than the printed
-              -- face's -- CR 613.1, and a CR 612.2 text change or a CR 205.1b
-              -- type-changing effect on the card in hand moves what prowl asks
-              -- about. Filtered to creature types because rule 702.76a says
+              -- gate is passed the subtypes `spell` projects on the stack rather
+              -- than the printed face's -- CR 613.1, and a CR 612.2 text change
+              -- or a CR 205.1b type-changing effect on the spell moves what
+              -- prowl asks about. Filtered to creature types because rule 702.76a says
               -- creature types; a Kindred card's other subtypes are not offered
               -- to the comparison.
               prowled =
-                if Game.prowlDamageThisTurn pid (Set.filter Subtype.isCreatureType (Projection.subtypesOf oid gs)) gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Prowl cost)) (withAdditional cost)) (Keyword.prowlCosts keywords)
+                if Game.prowlDamageThisTurn pid (Set.filter Subtype.isCreatureType (PC.subtypes spell)) gs
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Prowl cost)) (withAdditional cost)) (Keyword.prowlCosts onStack)
                   else []
               freerun =
                 if Game.freerunningDamageThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts keywords)
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts onStack)
                   else []
               -- CR 702.185a: warp, evoked's offer with ONE ZONE. Rule 702.185a's
               -- first static ability says "you may cast this card FROM YOUR
@@ -619,14 +639,15 @@ candidateCostsGiven permitted pid name oid gs =
               -- rule 702.185a's second ability grants that cast a PERMISSION and
               -- states no cost of its own.
               --
-              -- Read off the projection and wrapped by `withAdditional` for
-              -- evoked's reasons, and tagged with the keyword itself, which is
+              -- Read off `onStack`, rule 702.185a's abilities functioning on the
+              -- stack, wrapped by `withAdditional` for evoked's reason, and
+              -- tagged with the keyword itself, which is
               -- what Keyword.resolutionDelayedAbility reads back off
               -- Object.castUsing to arm rule 702.185a's exile.
               warped =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Warp cost)) (withAdditional cost))
-                  (Keyword.warpCosts keywords)
+                  (Keyword.warpCosts onStack)
               -- CR 712.11d: the face this card may be cast TRANSFORMED or CONVERTED
               -- as, which is what Pawl.Engine.Card.convertedFace answers and what
               -- put that face in castableFaces. Asked through that function rather
@@ -1062,10 +1083,8 @@ selfSentences pid oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, G
 --
 -- What the CARD has where it lies, before the move -- the keywords that permit
 -- the cast from that zone (Cast.projectedKeywords) -- is a different question,
--- asked of the proposal board. Not implemented: candidateCostsGiven asks that
--- board for every alternative cost, including those whose keyword functions
--- on the stack (prowl, blitz), so one granted to spells you cast is not offered
--- (#4585).
+-- asked of the proposal board. candidateCostsGiven asks both, each alternative
+-- cost of the one its keyword's rule names.
 spellKeywords :: PlayerId -> ObjectId -> GameState -> Map.Map Keyword.Type.Keyword Natural
 spellKeywords pid oid gs = PC.keywords (asSpellProjected pid oid gs)
 
@@ -4013,9 +4032,10 @@ canPayComponent slots pid oid component gs = case component of
   -- a flip the payer goes on to lose pays the cost exactly as a won one does.
   CostComponent.FlipCoin -> True
   -- CR 102.2 / CR 104.2a: rule 702.174a's cost names an opponent, so a payer
-  -- with none left cannot pay it. Nothing about `oid`: the choice is about the
-  -- table, not about the object the cost is on.
-  CostComponent.ChooseOpponent -> not (null (Game.opponentsOf pid gs))
+  -- with none left, or none in range (CR 801.5a), cannot pay it -- the payment
+  -- arm's own offer. Nothing about `oid`: the choice is about the table, not
+  -- about the object the cost is on.
+  CostComponent.ChooseOpponent -> not (null (Game.opponentsInReach pid gs))
   -- CR 601.2b: the component BEFORE X is announced, so there is no
   -- ceiling for rule 701.67b to scope -- BlightX's arm below, verbatim.
   -- Unreachable from the activation path, which substitutes before it
@@ -6410,8 +6430,8 @@ payPayable moment slots pid oid component = case component of
   CostComponent.ChooseOpponent -> do
     gs <- State.get
     case Game.opponentsInReach pid gs of
-      -- CR 118.3 over the opponents still in reach, which `payComponent`'s guard
-      -- does not narrow to.
+      -- Unreachable behind `payComponent`'s guard, which reads the same offer;
+      -- defensive, as CR 118.3 would have it.
       [] -> pure Payment.Unpaid
       -- CR 102.2: a two-player game leaves exactly one opponent, and one option
       -- is not a choice.

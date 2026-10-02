@@ -9,6 +9,7 @@ module Pawl.CodecIntegrationSpec where
 import qualified Data.Foldable as Foldable
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -327,7 +328,7 @@ gameStateRoundTripSpec s registry = do
 
   -- GameState.triggeredThisGame: the spent record behind the printed rider "This
   -- ability triggers only once" (Pawl.Types.TriggerLimit's OncePerGame), and the
-  -- one field the turn handoff deliberately does not clear. An EMPTY set round
+  -- one field the turn handoff deliberately does not clear. An EMPTY record round
   -- trips whether or not the codec names the field at all, so the case carries a
   -- record -- built from the card's own ability, since that value is what the key
   -- is compared by.
@@ -344,7 +345,7 @@ gameStateRoundTripSpec s registry = do
                   AbilityTriggered.controller = S.alice,
                   AbilityTriggered.ability = ability
                 }
-         in roundTrips "a spent per-game rider" gs {GameState.triggeredThisGame = Set.singleton spent}
+         in roundTrips "a spent per-game rider" gs {GameState.triggeredThisGame = Seq.singleton spent}
 
   -- GameState.castsBeforeThisTurn, CR 601.2i's casts of earlier turns, the
   -- other record the handoff keeps. Built through a real cast and handoff, so
@@ -502,7 +503,9 @@ gameStateRoundTripSpec s registry = do
         gs =
           gs0
             { GameState.enteringCounters =
-                Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 2)
+                Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 2),
+              GameState.copyExceptionCounters =
+                Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 1)
             }
     roundTrips "a pending +1/+1 counter" gs
 

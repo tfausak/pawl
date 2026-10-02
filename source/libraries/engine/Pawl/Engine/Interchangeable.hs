@@ -127,10 +127,11 @@ representatives pcs gs candidates =
 -- 509.1b, CR 508.1c, CR 602.2, CR 502.3), so two creatures
 -- alike in every characteristic are told apart by which of them a row covers.
 --
--- GameState.enteringCounters, GameState.enteringTogether,
--- GameState.detachedBindings and GameState.broughtIn are listed below because
--- each holds ObjectIds, and NOT because any board reaches this with one of them
--- non-empty: the first is empty outside an entry loop, the second outside a CR
+-- GameState.enteringCounters, GameState.copyExceptionCounters,
+-- GameState.enteringTogether, GameState.detachedBindings and
+-- GameState.broughtIn are listed below because each holds ObjectIds, and NOT
+-- because any board reaches this with one of them non-empty: the first two are
+-- empty outside an entry loop, the third outside a CR
 -- 608.2f action, and the other two are CR 729's subgame bookkeeping.
 -- They are in the list rather than in the account above because requiring a
 -- field empty is the direction that cannot make a player's choice, so an
@@ -159,6 +160,7 @@ quiet gs =
     && Map.null (GameState.enteringPending gs)
     && Maybe.isNothing (GameState.refusedEntries gs)
     && Map.null (GameState.enteringCounters gs)
+    && Map.null (GameState.copyExceptionCounters gs)
     && Map.null (GameState.detachedBindings gs)
     && Maybe.isNothing (GameState.enteringTogether gs)
     && GameState.combat gs == noCombat

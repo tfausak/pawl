@@ -143,6 +143,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -166,6 +167,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -2757,6 +2759,19 @@ unmaskingSpec s registry = Spec.describe s "Revealed as it leaves (CR 708.9)" $ 
     Spec.assertEqWith s "setup: CR 708.9 the manifest was revealed" (departureReveals wiped) [S.bob]
     Spec.assertBool s (Maybe.isNothing (Game.lookupObject witness wiped)) "setup: the Witness was destroyed too"
 
+  -- CR 708.9's third sentence and CR 800.4a: bob concedes a three-player game,
+  -- so his permanents leave the game rather than the battlefield's zone. The
+  -- negative leg is the same board with the same Forest face up.
+  Spec.it s "CR 708.9 the Witness draws when a face-down permanent's owner leaves the game" $ do
+    faceDownBoard <- departureBoard s registry True
+    faceUpBoard <- departureBoard s registry False
+    let concede board = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob >> Engine.priorityLoop)
+        left = concede faceDownBoard
+        control = concede faceUpBoard
+    Spec.assertEqWith s "CR 708.9 the Witness drew one card" (libraryCount faceDownBoard - libraryCount left) 1
+    Spec.assertEqWith s "a face-up Forest leaving with bob draws nothing" (libraryCount faceUpBoard - libraryCount control) 0
+    Spec.assertEqWith s "CR 708.9 bob, the owner, revealed it" (departureReveals left) [S.bob]
+
 -- alice's main phase with priority: three Swamps for Murder, two Forests for
 -- Hauntwoods Shrieker, four Plains for Day of Judgment, Murder and Day of
 -- Judgment in hand, the Witness and the Shrieker under her, and her library
@@ -2784,6 +2799,21 @@ unmaskBoard s registry = do
   case entered of
     Just manifest -> pure (board, murderId, judgmentId, manifest, pikerId, witnessId, shriekerId)
     Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+
+-- A three-player game in alice's main phase with priority: the Witness under
+-- her, her library stocked, and a Forest under bob, face down (a manifest) when
+-- `faceDown` holds and face up otherwise.
+departureBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m GameState.GameState
+departureBoard s registry faceDown = do
+  forest <- S.printingOf s registry "Forest"
+  witness <- S.printingOf s registry "Synthetic Unmasking Witness"
+  let (_, g1) = S.addPermanent witness S.alice S.threePlayerGame
+      (g2, entered) = if faceDown then enterFaceDown forest S.bob g1 else faceUp (S.addPermanent forest S.bob g1)
+      faceUp (oid, g) = (g, Just oid)
+      board = stockLibrary forest g2 {GameState.priority = Just S.alice}
+  case entered of
+    Just _ -> pure board
+    Nothing -> Spec.assertFailure s "bob's Forest did not reach the battlefield"
 
 -- Who made each CR 708.9 departure reveal on the log, in order.
 departureReveals :: GameState.GameState -> [PlayerId.PlayerId]

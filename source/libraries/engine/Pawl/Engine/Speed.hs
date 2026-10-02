@@ -216,5 +216,5 @@ pendingFor events gs you =
       -- below 4 having spent no trigger.
       below = Maybe.maybe False (< maxSpeed) (speedOf you gs)
    in if hasSpeed && below && List.any lostLife events
-        then [PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty Nothing Nothing]
+        then [PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty Nothing Nothing 1]
         else []

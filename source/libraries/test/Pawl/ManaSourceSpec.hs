@@ -70,6 +70,7 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
@@ -1808,7 +1809,7 @@ creepingPeeperSpec s registry = Spec.describe s "Creeping Peeper" $ do
     -- alone, the red one being unpayable on this board.
     Spec.assertEqWith s "CR 709.5e so the blue door is on offer and the red one is not" (Room.unlockable S.alice before) [(roomId, steamingSauna)]
     let after = S.runPure S.identityAnswer before (Room.unlock S.manaPerformer S.alice roomId steamingSauna)
-    Spec.assertEqWith s "CR 709.5e and the restricted mana opened it" (fmap Object.unlockedHalves (Game.lookupObject roomId after)) (Just (Set.singleton steamingSauna))
+    Spec.assertEqWith s "CR 709.5e and the restricted mana opened it" (fmap Object.unlockedHalves (Game.lookupObject roomId after)) (Just (Set.singleton RoomHalf.RightHalf))
 
   Spec.it s "CR 601.2h the same mana casts an enchantment spell and no creature spell" $ do
     (_, before) <- peeperBoard s registry

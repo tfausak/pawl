@@ -1589,8 +1589,8 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
 -- THREE seats, and both opponents defending (CR 802.2): Combat.declarableTargets
 -- concatenates CR 508.1b's announcements defending player by defending player,
 -- so the leader on life can be the SECOND announcement. That is what makes
--- Combat.attackCeilingGiven's `bestFor` a maximization observable at gameplay
--- level -- "the earliest freely announceable target" and "the earliest of those
+-- Combat.attackCeilingGiven's maximization over announcements observable at
+-- gameplay level -- "the earliest freely announceable target" and "the earliest of those
 -- obeying the most" disagree here, where on every board reachable before this
 -- card they agreed.
 --
@@ -1641,8 +1641,8 @@ mostLifeRequirementSpec s registry = Spec.describe s "MostLifeRequirement" $ do
     -- Through Combat.declareAttackers rather than the legality predicate, with
     -- an interpreter that announces BOB for every attacker: CR 508.1d refuses
     -- that declaration on the leg where carol leads, and the combat record is the
-    -- assertion. Combat.forcedAttackDeclaration reads `bestFor`'s target
-    -- directly, so this is the fold's own output.
+    -- assertion. Combat.forcedAttackDeclaration reads the ceiling's witness
+    -- directly, so this is the search's own output.
     galactus <- S.printingOf s registry "Galactus, Devourer of Worlds"
     piker <- S.printingOf s registry "Goblin Piker"
     let (base, mine, _, _) = S.threePlayerCombat [galactus] [piker] [piker]

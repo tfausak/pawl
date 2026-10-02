@@ -32,6 +32,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Decider as Decider
 import Pawl.Types.Departure (Departure)
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -45,6 +46,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ReplacementBucket as ReplacementBucket
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Teams as Teams
@@ -374,8 +376,16 @@ objectsLeaveWith pid gs =
           { GameState.lastKnown = Map.fromList (Maybe.mapMaybe filed owned) <> GameState.lastKnown removed,
             GameState.continuousEffects = handover <> GameState.continuousEffects removed
           }
+      -- CR 708.9's third sentence: the departing player reveals each face-down
+      -- permanent they own, read off `gs` for `filed`'s reason and recorded
+      -- ahead of its LeftTheGame, as the zone-change funnel reveals before the
+      -- move. `permanents` again, for CR 702.26b. Pawl.FaceDownSpec's
+      -- "CR 708.9 the Witness draws when a face-down permanent's owner leaves
+      -- the game" proves it.
+      revealed = Maybe.mapMaybe (\oid -> Event.revealedOn RevealCause.LeavingFaceDown pid oid gs) (filter faceDown permanents)
+      faceDown oid = maybe False (Facing.isFaceDown . Object.facing) (Map.lookup oid (GameState.objects gs))
    in Event.simultaneouslyPure
-        (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame oid) g1) g permanents)
+        (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame oid) g1) (List.foldl' (flip Event.recordEvent) g revealed) permanents)
         recorded
 
 -- CR 800.4a, second clause: any effects which give that player control of

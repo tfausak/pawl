@@ -220,5 +220,5 @@ pendingFor events gs you =
       -- other players may respond to.
       irradiated = Maybe.maybe False (>= 1) (radCountersOf you gs)
    in if irradiated && List.any precombatMainBegan events
-        then [PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you ability Map.empty Nothing Nothing]
+        then [PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you ability Map.empty Nothing Nothing 1]
         else []

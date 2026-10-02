@@ -733,8 +733,8 @@ reactions incoming = do
       State.modify' (\g -> List.foldl' (flip Event.recordEvent) g (fmap triggeredEvent batch))
       -- The per-GAME rider's own record, written beside the log because the log
       -- is cleared at the turn handoff. Only that rider's bearers are stored, so
-      -- the set stays the size of the rider's use rather than the game's.
-      State.modify' (\g -> g {GameState.triggeredThisGame = List.foldl' (flip Set.insert) (GameState.triggeredThisGame g) (Maybe.mapMaybe perGameRecord batch)})
+      -- the record stays the size of the rider's use rather than the game's.
+      State.modify' (\g -> g {GameState.triggeredThisGame = GameState.triggeredThisGame g <> Seq.fromList (Maybe.mapMaybe perGameRecord batch)})
       gs <- State.get
       let recorded = Event.unscannedGrouped gs
           fresh = Event.reactionTriggers recorded gs

@@ -888,6 +888,28 @@ fireblastSpec s registry =
           askedTwo = answersFor S.identityAnswer twoMountains (S.cast S.alice two)
       Spec.assertBool s (wasAskedToSacrifice askedThree) "asked with three"
       Spec.assertBool s (not (wasAskedToSacrifice askedTwo)) "not asked with exactly two"
+    -- CR 113.6d: Yixlid Jailer ("Cards in graveyards lose all abilities.")
+    -- wipes the Fireblast where it lies, but its alternative cost functions
+    -- on the stack, where the Jailer does not reach. Yawgmoth's Will is the
+    -- CR 601.3 permission, held where fireblastBoard puts its card; the
+    -- boards differ only in whether bob has the
+    -- Jailer, and the tapped Mountains leave the alternative the only route.
+    Spec.it s "CR 113.6d under Yixlid Jailer a Fireblast cast from the graveyard still sacrifices two Mountains" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      swamp <- S.printingOf s registry "Swamp"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
+      will <- S.printingOf s registry "Yawgmoth's Will"
+      jailer <- S.printingOf s registry "Yixlid Jailer"
+      let (willId, tapped) = fireblastBoard mountain will 2 True
+          (buried, g2) = S.addGraveyardCard fireblastPrinting S.alice (S.landsFor swamp S.alice 3 tapped)
+          blasted board =
+            let willed = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.alice willId)) Stack.resolveTop
+             in S.runPure S.identityAnswer (S.runPure S.identityAnswer willed (S.cast S.alice buried)) Stack.resolveTop
+          jailed = blasted (snd (S.addPermanent jailer S.bob g2))
+          free = blasted g2
+          left g = (length (Game.zoneMembers Zone.Battlefield S.alice g), length (Game.zoneMembers Zone.Graveyard S.alice g))
+      Spec.assertEqWith s "CR 113.6d under the Jailer the Fireblast left the graveyard and both Mountains were sacrificed, leaving the three Swamps" (left jailed) (3, 0)
+      Spec.assertEqWith s "the control: without the Jailer the same cast leaves the same board" (left free) (3, 0)
     Spec.it s "CR 118.3 one Mountain pays neither cost" $ do
       mountain <- S.printingOf s registry "Mountain"
       fireblastPrinting <- S.printingOf s registry "Fireblast"

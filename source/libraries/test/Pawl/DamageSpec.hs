@@ -20,6 +20,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
@@ -878,7 +879,8 @@ saunaName = CardName.MkCardName (Text.pack "Steaming Sauna")
 -- covers the end-to-end route and asserts against this same field.
 unlockDoors :: Set.Set CardName.CardName -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 unlockDoors doors oid gs =
-  gs {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = doors}) oid (GameState.objects gs)}
+  let positions = maybe Set.empty (\card -> Set.fromList (Maybe.mapMaybe (`Card.halfPositionOf` card) (Set.toList doors))) (Game.halvesOf oid gs)
+   in gs {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = positions}) oid (GameState.objects gs)}
 
 -- Keeps the first candidate CR 704.5j offers, recording each offer.
 recordingLegend :: Prompt.Prompt r -> State.State [Set.Set ObjectId.ObjectId] r

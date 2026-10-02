@@ -847,6 +847,19 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "carol gains 1 life: the trigger was hers all along" (S.lifeOf S.carol after) (Just 21)
     Spec.assertEqWith s "the same settle that took bob out of the game put her trigger on the stack" (length (GameState.stack settled), statusOf S.bob settled) (1, Just (Status.Departed Departure.Type.Lost))
 
+  -- CR 102.1: carol has conceded a four-seat game, and alice's Fanatic of
+  -- Mogis ("When this creature enters, it deals damage to each opponent equal to
+  -- your devotion to red.") enters at devotion 1 beside her Exquisite Blood
+  -- ("Whenever an opponent loses life, you gain that much life.").
+  Spec.it s "CR 102.1 damage to each opponent does not reach an opponent who has left the game" $ do
+    fanatic <- S.printingOf s registry "Fanatic of Mogis"
+    blood <- S.printingOf s registry "Exquisite Blood"
+    let (_, g0) = S.addPermanent blood S.alice S.fourPlayerGame
+        (_, staged) = S.entersWithTrigger fanatic S.alice (S.departs Departure.Type.Conceded S.carol g0)
+        resolved = snd (Engine.runGamePure S.identityAnswer (S.runPure S.identityAnswer staged Engine.settleForPriority) Engine.priorityLoop)
+    Spec.assertEqWith s "CR 102.1 alice gains 1 each for bob and dave, none for the departed carol" (S.lifeOf S.alice resolved) (Just 22)
+    Spec.assertEqWith s "and bob, still playing, took 1" (S.lifeOf S.bob resolved) (Just 19)
+
   -- CR 800.4f: "if an object requires a player who has left the game to pay a
   -- cost or choose whether to pay a cost, that cost is not paid."
   --

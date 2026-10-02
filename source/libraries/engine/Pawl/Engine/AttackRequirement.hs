@@ -93,8 +93,8 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 -- Trove of Temptation is the printing that is both at once, and
 -- Pawl.CombatCostSpec's TroveOfTemptation group proves it.
 --
--- A FENCE on both halves, because nothing else is one: attackCeiling's scan is
--- greedy over the pairs, and exact only while a pair requirement is a weight on
+-- A FENCE on both halves, because nothing else is one: attackCeiling's flow is
+-- over the pairs, and exact only while a pair requirement is a weight on
 -- ONE (creature, target) pair, so that the pair half of a declaration's
 -- obedience is a sum of independent non-negative terms. The group half is exact
 -- only because the search pins a WITNESS announcement per group and scans the

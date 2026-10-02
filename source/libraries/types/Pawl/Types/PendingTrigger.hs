@@ -1,6 +1,7 @@
 module Pawl.Types.PendingTrigger where
 
 import qualified Data.Map.Strict as Map
+import Numeric.Natural (Natural)
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -48,6 +49,11 @@ data PendingTrigger = MkPendingTrigger
     -- inherent ability the rulebook states never watches. Read by
     -- Pawl.Engine.ManaAbility.isTriggeredManaAbility, CR 605.5a asking what
     -- added the mana rather than only what the ability watches.
-    firedBy :: Maybe GameEvent.GameEvent
+    firedBy :: Maybe GameEvent.GameEvent,
+    -- | CR 113.2c: how many value-identical instances of `ability` the source
+    -- bore as it triggered, 1 unless a printing or a grant repeats it. The
+    -- allowance Pawl.Engine.Event.withinTriggerLimit gives a "triggers only
+    -- once" rider, since the instances themselves are equal values.
+    copies :: Natural
   }
   deriving (Eq, Ord, Show)

@@ -3664,6 +3664,25 @@ prowlSpec s registry = Spec.describe s "Prowl" $ do
     Spec.assertEqWith s "CR 702.73a/613.1 the Changeling is a Rogue by its own ability rather than by its type line, so the Theft prowls" (S.lifeOf S.bob shifter) (Just 15)
     Spec.assertEqWith s "CR 608.2h the Faerie died to bob's Bolt after connecting, and the Theft prowls anyway" (S.lifeOf S.bob killed, length (namedOnBattlefield "Faerie Macabre" bolted)) (Just 15, 0)
 
+-- CR 113.6d / 601.2a: Hunting Velociraptor's "Dinosaur spells you cast have
+-- prowl {2}{R}" (Oracle text checked on Scryfall, 2026-10-02) reaches the
+-- Ridgetop Raptor only once it is a spell, so the offer reads the card as it
+-- stands on the stack. The boards differ only in which Dinosaur connected: a
+-- Giant Cindermaw meets rule 702.76a's clause just as well but grants nothing,
+-- so three Mountains stay short of {3}{R}.
+grantedProwlSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+grantedProwlSpec s registry = Spec.describe s "Granted prowl" $ do
+  Spec.it s "CR 113.6d a Hunting Velociraptor's granted prowl buys a Ridgetop Raptor for {2}{R}; a Giant Cindermaw's damage does not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    raptor <- S.printingOf s registry "Ridgetop Raptor"
+    velociraptor <- S.printingOf s registry "Hunting Velociraptor"
+    cindermaw <- S.printingOf s registry "Giant Cindermaw"
+    let after attacker =
+          let (raptorId, _, board) = prowlBoard mountain raptor attacker
+           in castResolved (payingFor [ManaSymbol.Generic 2, theRed]) raptorId (S.runCombat (S.attackTo S.bob) (S.landsFor mountain S.alice 1 board))
+    Spec.assertEqWith s "CR 113.6d the Velociraptor connected and grants prowl, so the Ridgetop Raptor resolved for {2}{R}" (length (namedOnBattlefield "Ridgetop Raptor" (after velociraptor))) 1
+    Spec.assertEqWith s "CR 702.76a the Cindermaw connected but grants nothing, so the Ridgetop Raptor's {3}{R} is unpayable" (length (namedOnBattlefield "Ridgetop Raptor" (after cindermaw))) 0
+
 -- alice attacking bob with one creature, two Swamps up and Morsel Theft in hand
 -- over a stocked library -- CR 104.3c, since the Theft's second clause draws.
 prowlBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
@@ -4476,6 +4495,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   warpSpec s registry
   surgeSpec s registry
   prowlSpec s registry
+  grantedProwlSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

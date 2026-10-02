@@ -2126,6 +2126,7 @@ oneMountainState mountain ph =
           GameState.enteringPending = Map.empty,
           GameState.refusedEntries = Nothing,
           GameState.enteringCounters = Map.empty,
+          GameState.copyExceptionCounters = Map.empty,
           GameState.playerEffects = [],
           GameState.blockRequirements = [],
           GameState.unregeneratables = [],

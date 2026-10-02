@@ -1082,6 +1082,8 @@ library codec
     Pawl.Codec.RollDieSpec
     Pawl.Codec.RollModifier
     Pawl.Codec.RollModifierSpec
+    Pawl.Codec.RoomHalf
+    Pawl.Codec.RoomHalfSpec
     Pawl.Codec.RoomIndex
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
@@ -2456,6 +2458,7 @@ library types
     Pawl.Types.RollAdjustment
     Pawl.Types.RollDie
     Pawl.Types.RollModifier
+    Pawl.Types.RoomHalf
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
     Pawl.Types.RuleAbilities

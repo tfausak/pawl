@@ -157,6 +157,7 @@ codec resolve = Fields.object $ do
   enteringPending <- Fields.defaulted "enteringPending" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) GameState.enteringPending
   refusedEntries <- Fields.defaulted "refusedEntries" Nothing (Common.maybe (Common.set ObjectId.codec)) GameState.refusedEntries
   enteringCounters <- Fields.defaulted "enteringCounters" Map.empty (Common.naturalMap ObjectId.codec (Common.multiset (CounterKind.codec Keyword.codec))) GameState.enteringCounters
+  copyExceptionCounters <- Fields.defaulted "copyExceptionCounters" Map.empty (Common.naturalMap ObjectId.codec (Common.multiset (CounterKind.codec Keyword.codec))) GameState.copyExceptionCounters
   playerEffects <- Fields.defaulted "playerEffects" [] (Common.list ActivePlayerEffect.codec) GameState.playerEffects
   blockRequirements <- Fields.defaulted "blockRequirements" [] (Common.list ActiveBlockRequirement.codec) GameState.blockRequirements
   attackRequirements <- Fields.defaulted "attackRequirements" [] (Common.list ActiveAttackRequirement.codec) GameState.attackRequirements
@@ -196,7 +197,7 @@ codec resolve = Fields.object $ do
   activationsThisTurn <- Fields.defaulted "activationsThisTurn" Seq.empty (Common.seq PastActivation.codec) GameState.activationsThisTurn
   castPermissionsUsedThisTurn <- Fields.defaulted "castPermissionsUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set CastFromZone.codec)) GameState.castPermissionsUsedThisTurn
   rollModifiersUsedThisTurn <- Fields.defaulted "rollModifiersUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set ModifiedRoll.codec)) GameState.rollModifiersUsedThisTurn
-  triggeredThisGame <- Fields.defaulted "triggeredThisGame" Set.empty (Common.set AbilityTriggered.codec) GameState.triggeredThisGame
+  triggeredThisGame <- Fields.defaulted "triggeredThisGame" Seq.empty (Common.seq AbilityTriggered.codec) GameState.triggeredThisGame
   pendingControl <- Fields.defaulted "pendingControl" Map.empty (Common.naturalMap PlayerId.codec Decider.codec) GameState.pendingControl
   control <- Fields.defaulted "control" Map.empty (Common.naturalMap PlayerId.codec (Common.nonEmpty PlayerControl.codec)) GameState.control
   monarch <- Fields.defaulted "monarch" Nothing (Common.maybe PlayerId.codec) GameState.monarch
@@ -266,6 +267,7 @@ codec resolve = Fields.object $ do
         GameState.enteringPending = enteringPending,
         GameState.refusedEntries = refusedEntries,
         GameState.enteringCounters = enteringCounters,
+        GameState.copyExceptionCounters = copyExceptionCounters,
         GameState.playerEffects = playerEffects,
         GameState.blockRequirements = blockRequirements,
         GameState.attackRequirements = attackRequirements,

@@ -942,20 +942,27 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   -- does with Game.halvesOf underneath it.
   --
   -- The stamp's CR 707.9 exceptions are copiable values too (CR 707.9a /
-  -- 707.9b), so they are re-applied over that rebuild rather than lost with the
-  -- snapshot it went around. Pawl.RoomSpec's "CR 707.9a a copy of a Room keeps
-  -- the changeling its copy effect gave it" proves it.
-  Nothing -> withCopyExceptions Nothing Nothing (rebuiltExceptionsOf oid gs) (baseCharacteristics oid gs)
+  -- 707.9b), and so are the abilities a merge grafted onto it (CR 702.140e), so
+  -- both are re-applied over that rebuild rather than lost with the snapshot it
+  -- went around. Pawl.RoomSpec's "CR 707.9a a copy of a Room keeps the
+  -- changeling its copy effect gave it" and Pawl.MutateSpec's "CR 702.140e
+  -- mutating under an animated Room keeps the abilities from under it" prove
+  -- them.
+  Nothing ->
+    let owed = rebuiltStampOf oid gs
+        excepted = withCopyExceptions Nothing Nothing (foldMap PC.exceptions owed) (baseCharacteristics oid gs)
+     in List.foldl' (flip withMergedAbilities) excepted (foldMap PC.mergedDonors owed)
 
--- CR 707.9: the exceptions `copiableCharacteristics` above owes its rebuild --
--- the stamp's, when copiableSnapshotOf went around it for its halves, and none
--- when it answered Nothing for having no stamp or for being face down, since CR
--- 708.2's listed characteristics replace the exceptions with the rest.
-rebuiltExceptionsOf :: ObjectId -> GameState -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)]
-rebuiltExceptionsOf oid gs
-  | maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs) = []
-  | derivesFromCopiedHalves oid gs = foldMap PC.exceptions (stampedSnapshotOf oid gs)
-  | otherwise = []
+-- CR 707.9 / 702.140e: the stamp `copiableCharacteristics` above owes its
+-- rebuild the exceptions and grafts of -- the stamp, when copiableSnapshotOf
+-- went around it for its halves, and none when it answered Nothing for having no
+-- stamp or for being face down, since CR 708.2's listed characteristics replace
+-- them with the rest.
+rebuiltStampOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
+rebuiltStampOf oid gs
+  | maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs) = Nothing
+  | derivesFromCopiedHalves oid gs = stampedSnapshotOf oid gs
+  | otherwise = Nothing
 
 -- CR 707.9a / 707.9b: fold a copy effect's exceptions into copiable values and
 -- record them there SETTLED (settleCopyException below), after any the values
@@ -1693,6 +1700,8 @@ noCharacteristics =
       PC.halves = Nothing,
       -- CR 707.9: no copy effect, so no exception either.
       PC.exceptions = [],
+      -- CR 702.140e: no merge, so no graft either.
+      PC.mergedDonors = [],
       -- CR 722.2b, for the same reason one line up.
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
@@ -1866,6 +1875,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- effect's exceptions arrive with its stamp, and
               -- copiableCharacteristics re-applies them over this seed.
               PC.exceptions = [],
+              -- The same starting point, for a merge's grafts.
+              PC.mergedDonors = [],
               -- CR 722.2b: the prepare spell this object has, which `face` cannot
               -- carry either -- CR 722.4 leaves the normal half alone in every
               -- zone, so the inset frame is nowhere in it. Game.prepareSpellOf
@@ -1954,7 +1965,8 @@ withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupO
 -- CR 730.2c keeps every continuous effect that applied to it applying, so a
 -- merge that minted a new one would reorder every layer already on it.
 --
--- The ability fields and no other. PC.characteristicPT is deliberately NOT among
+-- The ability fields and no other, beside the record of the graft (PC.mergedDonors).
+-- PC.characteristicPT is deliberately NOT among
 -- them although CR 604.3 makes a CDA an ability: rule 730.2a keeps the POWER AND
 -- TOUGHNESS characteristic the topmost component's, so a donor CDA that set the
 -- box would override the very sentence this function's base implements. No card
@@ -1973,7 +1985,10 @@ withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupO
 withMergedAbilities :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 withMergedAbilities donor base =
   base
-    { -- CR 702.1: a keyword IS an ability, and the map counts instances, so a
+    { -- Recorded, so a rebuild of the base's halves re-grafts it
+      -- (copiableCharacteristics).
+      PC.mergedDonors = PC.mergedDonors base <> [donor],
+      -- CR 702.1: a keyword IS an ability, and the map counts instances, so a
       -- component carrying a keyword the topmost one also has contributes a
       -- second instance (CR 702.1b's redundancy is then the layer fold's).
       PC.keywords = Map.unionWith (+) (PC.keywords base) (PC.keywords donor),

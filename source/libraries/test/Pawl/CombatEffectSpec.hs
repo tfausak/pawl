@@ -327,9 +327,9 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
 -- because "no more than one" is a ceiling and not a quota: a reading of the bound
 -- as "exactly one" passes every other assertion in the first case.
 --
--- The last two cases are CR 802.3a's OTHER sentence, through Crawlspace: a bound
--- scoped to one seat, which every case before them is the unscoped counterpart
--- of. They need three seats, and say why at the site.
+-- The Crawlspace cases are CR 802.3a's OTHER sentence: a bound scoped to one
+-- seat, which every case before them is the unscoped counterpart of. Those
+-- naming carol need three seats, and say why at the site.
 boundedDeclarationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
   Spec.it s "CR 508.1c a Silent Arbiter allows EITHER attacker but not both" $ do
@@ -592,12 +592,32 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice mine control) "without the Crawlspace all three attack"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first, second] control)) "and the pair no longer attains the maximum"
       _ -> Spec.assertFailure s "fixture should have three creatures"
+  Spec.it s "CR 508.1d three required creatures under bob's Crawlspace with carol defending: the maximum is THREE" $ do
+    -- The case above with carol defending too, where the bound couples the
+    -- creatures' announcements: two Berserkers attack bob and the third is
+    -- re-aimed at carol, so three requirements are obeyable. A ceiling that aims
+    -- each creature alone sends all three at bob, drops the third, and answers
+    -- two -- accepting the pair at bob.
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    let (gs, mine) = bothAttackable [berserkers, berserkers, berserkers] [crawlspace]
+        at defender = fmap (\oid -> (oid, AttackTarget.OfPlayer defender))
+    case mine of
+      [first, second, third] -> do
+        -- The proving assertion.
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice (at S.bob [first, second]) gs)) "two at bob obeys a requirement fewer than re-aiming the third at carol"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice (at S.bob [first, second] <> at S.carol [third]) gs) "two at bob with the third at carol attains the maximum"
+        -- The witness is a legal declaration too, not merely one obeying as
+        -- many: three at bob also obeys three.
+        Spec.assertEqWith s "the forced declaration re-aims the third at carol" (Combat.forcedAttackDeclaration (Combat.attackCeiling mine gs) mine) (at S.bob [first, second] <> at S.carol [third])
+        Spec.assertEqWith s "all three are offered" (Combat.legalAttackers S.alice gs) mine
+      _ -> Spec.assertFailure s "fixture should have three creatures"
   Spec.it s "CR 509.1c a Lure under a bound of one: the maximum is ONE blocker" $ do
-    -- The blocking twin of the case above, over blockCeiling's fold. Lure makes
-    -- every creature able to block the enchanted attacker do so, which is all
-    -- three of bob's; the bound allows one. So declining becomes illegal, exactly
-    -- one blocker is legal, and two remain forbidden -- the requirement and the
-    -- restriction each moving one of the three answers.
+    -- The blocking twin of the maximum-is-TWO case above, over blockCeiling's
+    -- fold. Lure makes every creature able to block the enchanted attacker do
+    -- so, which is all three of bob's; the bound allows one. So declining
+    -- becomes illegal, exactly one blocker is legal, and two remain forbidden --
+    -- the requirement and the restriction each moving one of the three answers.
     lure <- S.printingOf s registry "Lure"
     silentArbiter <- S.printingOf s registry "Silent Arbiter"
     piker <- S.printingOf s registry "Goblin Piker"

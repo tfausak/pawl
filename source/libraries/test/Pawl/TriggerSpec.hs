@@ -1201,7 +1201,7 @@ delayedSpec s registry =
               -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
               -- the collision is the real production shape, not a fabricated one.
               captured = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 7))
-              pending = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject (ObjectId.MkObjectId 0)) S.alice ability captured Nothing Nothing
+              pending = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject (ObjectId.MkObjectId 0)) S.alice ability captured Nothing Nothing 1
               after = snd (Engine.runGamePure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Engine.placeOne pending))
               placedModes = case GameState.stack after of
                 placedId : _ -> case Game.lookupObject placedId after of

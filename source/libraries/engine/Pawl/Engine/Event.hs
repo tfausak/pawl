@@ -208,6 +208,7 @@ import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.ScryR as ScryR
@@ -2339,14 +2340,22 @@ apply batch candidate event =
                 -- snapshot above but placed on the object -- and it happens only
                 -- where a copy was actually made.
                 --
-                -- Through addEnteringCounters, the WithCounters arm's funnel and
-                -- for its reasons: CR 122.6's counters must be on the permanent
-                -- before it exists on the battlefield, and CR 614.16 applies
-                -- inside this entry's own CR 616.1 loop (Doubling Season). The
+                -- Through addEnteringCounters (inside addCopyExceptionCounters),
+                -- the WithCounters arm's funnel and for its reasons: CR 122.6's
+                -- counters must be on the permanent before it exists on the
+                -- battlefield, and CR 614.16 applies inside this entry's own CR
+                -- 616.1 loop (Doubling Season). The
                 -- amount is read the same way too -- CR 107.3m's announced X
                 -- substituted in (Altered Ego announces X on the spell, and CR
                 -- 400.7 leaves the permanent none), and evaluated against
                 -- boardAsEntering rather than the live battlefield.
+                --
+                -- CR 707.9e's second sentence first: an earlier copy effect's
+                -- exception on this entry no longer happens, this one being
+                -- applied after it (Altered Ego copying an uncopied Quicksilver
+                -- Gargantuan), so takeBackCopyException lifts its counters off
+                -- the pending map before this row's own go on.
+                takeBackCopyException oid
                 Foldable.for_ (AsCopy.counters asCopy) $ \withCounters -> do
                   gs2 <- State.get
                   let viewOf = Projection.viewWithLastKnown oid gs2
@@ -2355,7 +2364,7 @@ apply batch candidate event =
                   Foldable.for_ (Map.toList (WithCounters.counters withCounters)) $ \(kind, quantity) ->
                     case Quantity.evaluate viewOf context (Projection.boardAsEntering gs2) oid (Quantity.substituteAnnouncedX announcedX quantity) of
                       Nothing -> pure () -- unevaluable quantity: no counters, the WithCounters arm's posture
-                      Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
+                      Just n -> addCopyExceptionCounters oid kind (Integer.toNaturalSaturating n)
                 -- CR 707.9g: a linked trigger an EARLIER copy effect on this entry
                 -- armed no longer triggers, this one being applied after it; then
                 -- this row's own is armed (Replacement.linkedCopyTrigger), on this
@@ -2594,8 +2603,8 @@ apply batch candidate event =
             -- CR 102.1 makes a player one of the people IN the game, and CR
             -- 104.3a lets one leave at any time -- so the offer is
             -- Game.stillPlaying and not GameState.turnOrder, which keeps a
-            -- departed seat.
-            let opponents = Game.opponentsOf controller gs
+            -- departed seat -- cut to the controller's range (CR 801.5a).
+            let opponents = Game.opponentsInReach controller gs
             opponent <- case opponents of
               -- CR 102.2: a two-player game leaves exactly one opponent, and
               -- one option is not a choice. The empty case is a game whose
@@ -3303,10 +3312,10 @@ apply batch candidate event =
           -- Unreachable, and defensive for the reason riot's arm gives above.
           Nothing -> pure (Just event)
           Just controller -> do
-            -- CR 102.1's seats still in the game, Game.opponentsOf's own read --
-            -- a player who has left (CR 104.3a) is nobody's opponent and cannot be
-            -- offered the choice.
-            chosen <- case Game.opponentsOf controller gs of
+            -- CR 102.1's seats still in the game, cut to the controller's range
+            -- (CR 801.5a) -- a player who has left (CR 104.3a) is nobody's
+            -- opponent and cannot be offered the choice.
+            chosen <- case Game.opponentsInReach controller gs of
               -- No opponent left to ask, a board CR 104.2a has already ended the
               -- game on. Nobody decides, so tribute is not paid -- the state rule
               -- 702.104b's condition reads as true.
@@ -4564,10 +4573,8 @@ runEntry given oid = do
 -- Answers False for CR 303.4g, nothing legal to enchant; the caller unmakes the
 -- entry. MINUS `batch` and GameState.enteringSubjects for the EntersAttachedTo
 -- arm's reason: a permanent entering beside this one is not on the battlefield
--- when the choice is made.
---
--- Not implemented: an Aura that enchants a PLAYER, which Attach.entryHostsFor
--- never offers (#4542).
+-- when the choice is made. Pawl.CopySpec's Curse of Death's Hold case proves
+-- the player half (CR 702.5d).
 seatEnteringAura :: Set ObjectId -> ObjectId -> Game Bool
 seatEnteringAura batch oid = do
   gs <- State.get
@@ -4575,11 +4582,11 @@ seatEnteringAura batch oid = do
   case Projection.controllerOf oid gs of
     Just controller | unattached && Set.member Subtype.Aura (Projection.subtypesOf oid gs) -> do
       let entering h = Set.member h batch || Set.member h (GameState.enteringSubjects gs)
-          hosts = filter (not . entering) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid gs)
-      chosen <- Attach.chooseHost controller oid hosts
+          hosts = filter (not . maybe False entering . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid gs)
+      chosen <- Attach.chooseEntryHost controller oid hosts
       -- THE TAG the enchant slot produced, for changeZoneAttaching's reason:
       -- Sba.stillLegalEnchant compares the (pool, tag) pair.
-      case chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs of
+      case chosen >>= \h -> Attach.attachmentFor oid h gs of
         Nothing -> pure False
         Just recipient -> do
           State.modify' $ \g -> g {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Just recipient}) oid (GameState.objects g)}
@@ -4633,7 +4640,7 @@ showsInstantBackFace oid gs = Maybe.fromMaybe False $ do
 flushEnteringCounters :: ObjectId -> Game ()
 flushEnteringCounters oid = do
   pending <- State.gets (Map.findWithDefault Map.empty oid . GameState.enteringCounters)
-  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs)})
+  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs), GameState.copyExceptionCounters = Map.delete oid (GameState.copyExceptionCounters gs)})
   Monad.mapM_ (\(kind, n) -> Monad.void (settleCounters oid kind n)) (Map.toAscList pending)
 
 -- CR 310.9a: "as a battle enters the battlefield, its controller chooses a player
@@ -4712,22 +4719,23 @@ designateProtector oid = do
 unlockHalves :: PlayerId -> ObjectId -> Set.Set CardName.CardName -> Game ()
 unlockHalves actor oid halves = do
   gs <- State.get
-  case Game.lookupObject oid gs of
-    Nothing -> pure ()
-    Just obj -> do
-      let given = Set.difference halves (Object.unlockedHalves obj)
+  -- CR 709.5b: the halves the permanent HAS, which for one that copied a Room
+  -- are the copied Room's (Game.halvesOf) and not the card printed underneath
+  -- it. The chosen names become CR 709.5c's positions against them.
+  case (Game.lookupObject oid gs, Game.halvesOf oid gs) of
+    (Just obj, Just card) -> do
+      let chosen = Set.fromList (Maybe.mapMaybe (`Card.halfPositionOf` card) (Set.toList halves))
+          given = Set.difference chosen (Object.unlockedHalves obj)
           opened = Set.union (Object.unlockedHalves obj) given
       Monad.unless (Set.null given) $ do
         State.modify' $ \g ->
           let open o = o {Object.unlockedHalves = opened}
            in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
-        -- CR 709.5b: the halves the permanent HAS, which for one that copied a
-        -- Room are the copied Room's (Game.halvesOf) and not the card printed
-        -- underneath it. Off the object's own card this answers False for every
-        -- copy, since no copier's printed card has a shared type line.
-        let fully = fullyUnlockedAfter opened (Game.halvesOf oid gs)
-        Monad.forM_ (Set.toAscList given) $ \half ->
-          State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid actor half (fully && Set.lookupMax given == Just half))))
+        let fully = fullyUnlockedAfter opened (Just card)
+        Monad.forM_ (Set.toAscList given) $ \position ->
+          Monad.forM_ (Card.halfNameAt position card) $ \half ->
+            State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid actor half (fully && Set.lookupMax given == Just position))))
+    _ -> pure ()
 
 -- CR 709.5g: take one unlocked designation back away -- "that permanent loses
 -- the appropriate unlocked designation". unlockHalves's inverse and the single
@@ -4745,9 +4753,11 @@ unlockHalves actor oid halves = do
 -- door already shut.
 lockHalf :: ObjectId -> CardName.CardName -> Game ()
 lockHalf oid half =
-  State.modify' $ \g ->
-    let shut o = o {Object.unlockedHalves = Set.delete half (Object.unlockedHalves o)}
-     in g {GameState.objects = Map.adjust shut oid (GameState.objects g)}
+  State.modify' $ \g -> case Game.halvesOf oid g >>= Card.halfPositionOf half of
+    Nothing -> g
+    Just position ->
+      let shut o = o {Object.unlockedHalves = Set.delete position (Object.unlockedHalves o)}
+       in g {GameState.objects = Map.adjust shut oid (GameState.objects g)}
 
 -- CR 709.5i's "fully unlocks", answered about the designations a permanent has
 -- ONCE a write has landed: "such an ability triggers when that permanent has one
@@ -4782,12 +4792,10 @@ lockHalf oid half =
 --
 -- Nothing -- a designation written for an object whose card cannot be found --
 -- answers False, there being no faces to compare against.
-fullyUnlockedAfter :: Set CardName.CardName -> Maybe Card -> Bool
+fullyUnlockedAfter :: Set RoomHalf.RoomHalf -> Maybe Card -> Bool
 fullyUnlockedAfter halves card = case card of
   Nothing -> False
-  Just c ->
-    Card.hasSharedTypeLine c
-      && all (\face -> Set.member (Face.name face) halves) (Card.Type.faces c)
+  Just c -> Card.hasSharedTypeLine c && all fst (Card.withOpenness halves c)
 
 -- CR 615: settle one proposed damage event. Empty means it does not happen; two
 -- or more is CR 614.9's counted redirection having moved part of it (Harm's
@@ -5032,6 +5040,31 @@ addEnteringCounters oid kind n =
       { GameState.enteringCounters =
           Map.insertWith (Map.unionWith (+)) oid (Map.singleton kind n) (GameState.enteringCounters gs)
       }
+
+-- CR 707.9e: addEnteringCounters for a copy effect's additional-counters
+-- exception, remembering the share in GameState.copyExceptionCounters so that a
+-- copy effect applied to the same entry afterwards can take it back.
+addCopyExceptionCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game ()
+addCopyExceptionCounters oid kind n = do
+  addEnteringCounters oid kind n
+  Monad.when (n > 0) . State.modify' $ \gs ->
+    gs
+      { GameState.copyExceptionCounters =
+          Map.insertWith (Map.unionWith (+)) oid (Map.singleton kind n) (GameState.copyExceptionCounters gs)
+      }
+
+-- CR 707.9e: the earlier copy effect's exception does not happen, so its share
+-- comes back off the pending map. Exact rather than approximate: CR 616.1c ranks
+-- every copy effect ahead of a CR 616.1e counter scaler (Doubling Season), so
+-- nothing can have rescaled the share between the two copy effects.
+takeBackCopyException :: ObjectId -> Game ()
+takeBackCopyException oid = State.modify' $ \gs ->
+  let placed = Map.findWithDefault Map.empty oid (GameState.copyExceptionCounters gs)
+      takeBack pending = Map.differenceWith (\n m -> Monad.mfilter (> 0) (Just (Natural.minusSaturating n m))) pending placed
+   in gs
+        { GameState.enteringCounters = Map.adjust takeBack oid (GameState.enteringCounters gs),
+          GameState.copyExceptionCounters = Map.delete oid (GameState.copyExceptionCounters gs)
+        }
 
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
@@ -5532,7 +5565,8 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 --
 -- A HALF and not always a face that is up, which is CR 709.5d's use of the same
 -- parameter: a Room permanent shows both halves at once, so changeZoneAttaching
--- spends the name on an unlocked designation and leaves Object.face empty. Every
+-- spends the name on an unlocked designation, placed by position against the
+-- halves (CR 709.5c), and leaves Object.face empty. Every
 -- other caller's half IS the face the object arrives showing.
 --
 -- The name is a MAYBE, because the third rule asking for this door does not
@@ -6140,7 +6174,9 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- between, one of which stops being right the moment the
                     -- second door opens.
                     Object.face = if dest == requestedDest && not unlocking then shown else Nothing,
-                    Object.unlockedHalves = if unlocking then foldMap Set.singleton shown else Set.empty,
+                    -- CR 709.5d's designation is a POSITION (CR 709.5c), so the cast
+                    -- half's name is placed against the halves the permanent has.
+                    Object.unlockedHalves = if unlocking then foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs) else Set.empty,
                     -- CR 708.4 / 708.3: the object is turned face down BEFORE it
                     -- is put onto the stack or enters the battlefield, so this is
                     -- part of the move rather than a stamp on what the move
@@ -6311,8 +6347,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- prompt.
           --
           -- Asked of `gs`, the PRE-MOVE board, which is where the Aura still is and
-          -- where the hosts already are. Attach.entryHostsFor sweeps the battlefield
-          -- and the graveyards, and
+          -- where the hosts already are. Attach.entryHostsFor sweeps the battlefield,
+          -- the graveyards and the players still in the game, and
           -- Attach.attachmentFor reads Projection.subtypesOf and Game.faceOf, both
           -- of which answer for an object in any zone.
           --
@@ -6329,9 +6365,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
           -- player according to the Aura's enchant ability and any other applicable
           -- effects" is the whole restriction -- there is no card text to intersect
           -- it with, which is the difference from CR 303.4k's Attach.turnUpHosts.
-          --
-          -- Not implemented: an Aura that enchants a PLAYER, which
-          -- Attach.entryHostsFor never offers (#4542).
+          -- A player is offered too (CR 702.5d); Pawl.AuraSpec's returned Curse
+          -- proves it.
           --
           -- The Aura test is the PROJECTION's subtypes (CR 205.3 -- CR 303.4 speaks
           -- about characteristics) rather than the printed type line
@@ -6378,8 +6413,8 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                     -- Aura's own enchant ability, so there is no resolution
                     -- whose slots the filter could name -- and CanHostSubject,
                     -- the whole filter here, names none.
-                    hosts = filter (\h -> not (Set.member h batch)) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid gs)
-                chosen <- Attach.chooseHost chooser oid hosts
+                    hosts = filter (not . maybe False (`Set.member` batch) . Recipient.objectOf) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid gs)
+                chosen <- Attach.chooseEntryHost chooser oid hosts
                 -- THE TAG the Aura's own enchant slot produced, never a hand-built
                 -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so
                 -- a ToObject stored where the slot offers a ToCreature falls through
@@ -6387,9 +6422,9 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                 --
                 -- attachmentFor answering Nothing collapses into CR 303.4g's
                 -- "remains in its current zone" too, and is unreachable rather than
-                -- a second reading: entryHostsFor's Filter.CanHostSubject conjunct is
-                -- that same function, so every candidate it offered admits.
-                pure (fmap Just (chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs))
+                -- a second reading: entryHostsFor admits every candidate through that
+                -- same function.
+                pure (fmap Just (chosen >>= \h -> Attach.attachmentFor oid h gs))
               else pure (Just seed)
           case settledSeed of
             Nothing -> pure Seq.empty
@@ -6744,7 +6779,7 @@ changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition see
                   -- connects to it -- which is also the player a Room's own "when you
                   -- unlock this door" reads as "you" (CR 109.5).
                   Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
+                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton (shown >>= \n -> Card.halfPositionOf n =<< Game.halvesOf oid gs)) (Game.cardOf oid gs)))))
                   -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
                   -- what an enters trigger scans -- alongside the id it had in `fromZone`,
                   -- which is the key `lastKnown` is filed under and so the only route back
@@ -8794,7 +8829,8 @@ shuffleAttractionDeck pid = do
 --
 -- The `cause` is what a later rule asks about the reveal (see RevealCause): CR
 -- 702.94a's "this way" from the draw funnel's miracle window, CR 708.9's
--- departure from changeZoneAttaching, and Ordinary from every other caller.
+-- departure from changeZoneAttaching and Pawl.Engine.Departure.objectsLeaveWith,
+-- and Ordinary from every other caller.
 --
 -- CR 708.12 does NOT move this read, and that is the rule rather than an
 -- oversight: it governs what a revealing ability READS, not what the log records,
@@ -8808,8 +8844,14 @@ shuffleAttractionDeck pid = do
 reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get
-  Monad.when (Maybe.isJust (Game.lookupObject oid gs)) $
-    State.modify' (recordEvent (GameEvent.Revealed (Revealed.MkRevealed pid oid cause (Projection.project oid gs))))
+  Monad.mapM_ (State.modify' . recordEvent) (revealedOn cause pid oid gs)
+
+-- `reveal`'s event, read off `gs` without recording it: Nothing when the object
+-- does not exist there. Pawl.Engine.Departure.objectsLeaveWith reads it on the
+-- board before CR 800.4a's departure and records it after.
+revealedOn :: RevealCause.RevealCause -> PlayerId -> ObjectId -> GameState -> Maybe GameEvent.GameEvent
+revealedOn cause pid oid gs =
+  fmap (const (GameEvent.Revealed (Revealed.MkRevealed pid oid cause (Projection.project oid gs)))) (Game.lookupObject oid gs)
 
 -- CR 603.2: does this condition fire on this event, for the permanent that bears
 -- it? `bearer` is the object whose ability this is and `you` its controller (CR
@@ -9317,31 +9359,40 @@ triggeredSources gs =
 -- The printed riders "This ability triggers only once each turn" and "This
 -- ability triggers only once" (Pawl.Types.TriggerLimit), applied to one gathered
 -- batch: drop every entry whose ability carries a rider and has already triggered
--- inside that rider's window. The per-TURN window needs no stored flag -- the
--- record is CR 603.3b's own log, and GameState.events is cleared at the turn
--- handoff, which makes "in the log" mean "this turn". The per-GAME window reads
--- GameState.triggeredThisGame, which survives that handoff and which Engine.reactions
--- writes. The two are read as ONE spent set: the ability VALUE is part of the key
--- and carries its own limit, so a per-turn key and a per-game key can never be
--- equal. CR 702.179d's inherent twin is limited here like any other, the log
--- recording a sourceless trigger too. Keyed on the SOURCE and the ABILITY, so two
--- permanents with the same printed ability spend separate limits (CR 113.7), one
--- that leaves and returns re-arms (CR 400.7), and two DISTINCT abilities of one
--- source spend separate limits; a change of CONTROL spends nothing. Spent on
--- TRIGGERING.
+-- inside that rider's window as often as its source bears it. The per-TURN
+-- window needs no stored flag -- the record is CR 603.3b's own log, and
+-- GameState.events is cleared at the turn handoff, which makes "in the log" mean
+-- "this turn". The per-GAME window reads GameState.triggeredThisGame, which
+-- survives that handoff and which Engine.reactions writes. The log records a
+-- per-game trigger too, so each window is tallied from its own store alone and
+-- a per-game trigger is counted once. CR 702.179d's
+-- inherent twin is limited here like any other, the log recording a sourceless
+-- trigger too. Keyed on the SOURCE and the ABILITY, so two permanents with the
+-- same printed ability spend separate limits (CR 113.7), one that leaves and
+-- returns re-arms (CR 400.7), and two DISTINCT abilities of one source spend
+-- separate limits; a change of CONTROL spends nothing. Spent on TRIGGERING.
+--
+-- COUNTED against PendingTrigger.copies, as stateTriggers counts CR 603.8's
+-- suppression: CR 113.2c makes two value-identical instances on one source two
+-- abilities, each with its own allowance. Pawl.EventTriggerSpec's "CR 113.2c two
+-- Well Rested on one creature each trigger once that turn" proves it.
 withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
 withinTriggerLimit gs =
   let spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
+      perTurn record = TriggeredAbility.limit (AbilityTriggered.ability record) == TriggerLimit.OncePerTurn
+      tally :: [LimitKey] -> Map LimitKey Natural
+      tally = List.foldl' (\m key -> Map.insertWith (+) key 1 m) Map.empty
       go _ [] = []
       go spent (pending : rest) = case limitedKey pending of
         Nothing -> pending : go spent rest
         Just key
-          | Set.member key spent -> go spent rest
-          | otherwise -> pending : go (Set.insert key spent) rest
+          | Map.findWithDefault 0 key spent >= PendingTrigger.copies pending -> go spent rest
+          | otherwise -> pending : go (Map.insertWith (+) key 1 spent) rest
    in go
-        ( Set.union
-            (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
-            (Set.map spentKey (GameState.triggeredThisGame gs))
+        ( tally
+            ( fmap spentKey (filter perTurn (Maybe.mapMaybe (abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+                <> fmap spentKey (Foldable.toList (GameState.triggeredThisGame gs))
+            )
         )
 
 -- What ONE INSTANCE of a triggered ability is, for the rider's purposes: what it
@@ -9356,8 +9407,10 @@ withinTriggerLimit gs =
 -- active teammate's speed rises once": under the shared team turns option two
 -- active players each spend their own instance of rule 702.179d's ability.
 --
--- Not implemented: two VALUE-IDENTICAL limited abilities on one source are one
--- instance here, so one spends the other's turn (#3198).
+-- Not implemented: value-identical instances on one source share a key and are
+-- COUNTED rather than told apart, so when the instance that triggered goes and
+-- an identical one that has not stays, the one that stays reads as spent
+-- (#4627).
 type LimitKey = (TriggerSource.TriggerSource, Maybe PlayerId, TriggeredAbility.TriggeredAbility Card (GrantedAbility.Type.GrantedAbility Card))
 
 limitKey :: TriggerSource.TriggerSource -> PlayerId -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.Type.GrantedAbility Card) -> LimitKey

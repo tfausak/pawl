@@ -96,6 +96,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -113,6 +114,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -332,7 +334,7 @@ foreignRoom s registry doors = do
   leech <- S.printingOf s registry "Balemurk Leech"
   key <- S.printingOf s registry "Synthetic Skeleton Key"
   let (permId, withRoom) = S.addPermanent room S.bob gs
-      opened o = o {Object.unlockedHalves = doors}
+      opened o = o {Object.unlockedHalves = Set.fromList (Maybe.mapMaybe (`Card.halfPositionOf` Printing.card room) (Set.toList doors))}
       shown = withRoom {GameState.objects = Map.adjust opened permId (GameState.objects withRoom)}
       (_, withAlices) = S.addPermanent leech S.alice shown
       (_, withBobs) = S.addPermanent leech S.bob withAlices
@@ -419,7 +421,7 @@ spec s registry = Spec.describe s "Room" $ do
           s
           "CR 709.5d: the left door, and only the left door, is unlocked"
           (fmap Object.unlockedHalves (Game.lookupObject permId after))
-          (Just (Set.singleton furnaceName))
+          (Just (Set.singleton RoomHalf.LeftHalf))
         -- CR 709.5c gives a Room designations rather than a face that is up, so
         -- the field CR 712.13 would have written stays empty.
         Spec.assertEqWith
@@ -472,7 +474,7 @@ spec s registry = Spec.describe s "Room" $ do
           s
           "CR 709.5c: both designations now"
           (fmap Object.unlockedHalves (Game.lookupObject permId opened))
-          (Just (Set.fromList [furnaceName, saunaName]))
+          (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
         -- CR 709.4a, THE PLURAL CASE: with both doors open the permanent has
         -- TWO names, and "has this name" is a membership test rather than a
         -- comparison. Each half answers True on its own; the joined string the
@@ -549,7 +551,7 @@ spec s registry = Spec.describe s "Room" $ do
           s
           "the control: both designations before the lock"
           (fmap Object.unlockedHalves (Game.lookupObject permId opened))
-          (Just (Set.fromList [furnaceName, saunaName]))
+          (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
         Spec.assertBool s (lockOffered keys keysId opened) "CR 307.5: the lock ability is on alice's menu"
         let locked = activateKeys keys keysId (keysAnswer permId (ClauseIndex.MkClauseIndex 1) saunaName) opened
         -- THE GAMEPLAY-LEVEL ASSERTION, and it is CR 709.5's subtraction rather
@@ -578,7 +580,7 @@ spec s registry = Spec.describe s "Room" $ do
           s
           "CR 709.5g: the blue door's designation alone is gone"
           (fmap Object.unlockedHalves (Game.lookupObject permId locked))
-          (Just (Set.singleton furnaceName))
+          (Just (Set.singleton RoomHalf.LeftHalf))
         -- CR 709.5e reads the same derivation backwards: a door that was locked
         -- is one the special action may pay to open again.
         Spec.assertEqWith s "and the shut door is offered for its unlock cost again" (unlocksOffered locked) [(permId, saunaName)]
@@ -619,7 +621,7 @@ spec s registry = Spec.describe s "Room" $ do
           s
           "CR 709.5f: the red door's designation was given"
           (fmap Object.unlockedHalves (Game.lookupObject permId unlocked))
-          (Just (Set.fromList [furnaceName, saunaName]))
+          (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 709.5h, on the door the special action opened rather than the one the
   -- cast did: "These abilities trigger when that permanent is given the
@@ -709,13 +711,13 @@ spec s registry = Spec.describe s "Room" $ do
           s
           "CR 709.5d gave one designation, so CR 709.5i is not satisfied"
           (fmap Object.unlockedHalves (Game.lookupObject permId after))
-          (Just (Set.singleton furnaceName))
+          (Just (Set.singleton RoomHalf.LeftHalf))
         let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.manaPerformer S.alice permId saunaName))))
         Spec.assertEqWith
           s
           "the control: CR 709.5e opened the second door"
           (fmap Object.unlockedHalves (Game.lookupObject permId opened))
-          (Just (Set.fromList [furnaceName, saunaName]))
+          (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
         -- CR 709.5i fires ONCE, so one more life apiece and no more.
         Spec.assertEqWith s "fully unlocking costs bob one more life" (S.lifeOf S.bob opened) (Just 18)
         Spec.assertEqWith s "and carol one more" (S.lifeOf S.carol opened) (Just 18)
@@ -751,7 +753,7 @@ spec s registry = Spec.describe s "Room" $ do
       s
       "the control: the second door really opened"
       (fmap Object.unlockedHalves (Game.lookupObject permId after))
-      (Just (Set.fromList [furnaceName, saunaName]))
+      (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
   -- CR 709.5g in the plural: "To lock half of a permanent, a player chooses an
   -- unlocked half of that permanent, and that permanent loses the appropriate
   -- unlocked designation." Skeleton Key's other ability names every unlocked
@@ -816,7 +818,7 @@ spec s registry = Spec.describe s "Room" $ do
       [permId] -> case Game.lookupObject permId after of
         Nothing -> Spec.assertFailure s "expected to find the Room permanent"
         Just obj -> do
-          Spec.assertEqWith s "the control: this incarnation has the red door open" (Object.unlockedHalves obj) (Set.singleton furnaceName)
+          Spec.assertEqWith s "the control: this incarnation has the red door open" (Object.unlockedHalves obj) (Set.singleton RoomHalf.LeftHalf)
           Spec.assertEqWith s "the next one has neither" (Object.unlockedHalves (Object.newIncarnation obj)) Set.empty
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 709.5d's last sentence: "If it's entering the battlefield and neither half
@@ -981,7 +983,7 @@ spec s registry = Spec.describe s "Room" $ do
             Spec.assertEqWith s "the copy's second door fully unlocks it" (S.lifeOf S.bob both) (Just 17)
             Spec.assertEqWith s "and carol with him" (S.lifeOf S.carol both) (Just 17)
             Spec.assertEqWith s "CR 109.5: alice, who controls the Leech, loses nothing" (S.lifeOf S.alice both) (Just 20)
-            Spec.assertEqWith s "the control: the copy really has both designations" (fmap Object.unlockedHalves (Game.lookupObject copyId both)) (Just (Set.fromList [furnaceName, saunaName]))
+            Spec.assertEqWith s "the control: the copy really has both designations" (fmap Object.unlockedHalves (Game.lookupObject copyId both)) (Just (Set.fromList [RoomHalf.LeftHalf, RoomHalf.RightHalf]))
           other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 707.2a over the ability kind CR 614 asks about: "A copy acquires the
@@ -1076,3 +1078,75 @@ spec s registry = Spec.describe s "Room" $ do
             Spec.assertEqWith s "CR 707.2: Copy Enchantment's copy of that copy has changeling too" (fmap (`changeling` recopied) (newPermanent resolved recopied)) [True]
           other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5b over a STORED copy effect: Mirrorweave's "each other creature
+  -- becomes a copy of target nonlegendary creature until end of turn" keeps its
+  -- copiable values in a row rather than a stamp (CR 611.2a), and each creature
+  -- it covers has the copied Room's halves all the same, read against its OWN
+  -- designations (CR 709.5c).
+  --
+  -- Opalescence makes both open Rooms creatures, and Mirrorweave copies Spiked
+  -- Corridor // Torture Pit with its left door open, a 4/4. The Hill Giant has no
+  -- designation, so it is nameless with mana value 0, a 0/0 that its +1/+1
+  -- counter (CR 122.1a, no copiable value) keeps alive as a 1/1; its own card
+  -- would leave it a named 4/4. Roaring Furnace // Steaming Sauna keeps "left
+  -- half unlocked", so it is Spiked Corridor, a 4/4; its own card would leave it
+  -- a 2/2 Roaring Furnace.
+  Spec.it s "CR 709.5b a creature Mirrorweave makes a copy of an animated Room has its halves" $ do
+    (_, _, gs) <- setUp s registry
+    room <- S.printingOf s registry "Roaring Furnace"
+    corridor <- S.printingOf s registry "Spiked Corridor"
+    opalescence <- S.printingOf s registry "Opalescence"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    let (_, withOpalescence) = S.addPermanent opalescence S.alice gs
+        (giant, withGiant) = S.addPermanent hillGiant S.alice withOpalescence
+        countered = S.addCounter CounterKind.PlusOnePlusOne 1 giant withGiant
+        (roomPerm, withRoom) = S.addPermanent room S.alice countered
+        (corridorPerm, withCorridor) = S.addPermanent corridor S.alice withRoom
+        leftOpen o = o {Object.unlockedHalves = Set.singleton RoomHalf.LeftHalf}
+        opened = withCorridor {GameState.objects = Map.adjust leftOpen corridorPerm (Map.adjust leftOpen roomPerm (GameState.objects withCorridor))}
+        (staged, weaveId) = S.handOne mirrorweave opened
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just corridorPerm) . Recipient.objectOf) . snd) sets
+          _ -> S.identityAnswer p
+        woven = S.runPure answer staged (S.cast S.alice weaveId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the Hill Giant is a nameless 1/1 Room" (Projection.namesOf giant woven, S.powerToughnessOf giant woven) (Set.empty, Just (1, 1))
+    Spec.assertEqWith s "and the Furnace Room, its left door open, is a 4/4 Spiked Corridor" (Projection.namesOf roomPerm woven, S.powerToughnessOf roomPerm woven) (Set.singleton corridorName, Just (4, 4))
+  -- CR 709.5c over a permanent that starts copying a DIFFERENT Room: the
+  -- designations are positional ("left half unlocked"), so the open door stays
+  -- open on the new card's halves -- whatever that half is called.
+  --
+  -- Opalescence animates each Room as it enters, so Unstable Shapeshifter
+  -- ("whenever another creature enters, this creature becomes a copy of that
+  -- creature, except it has this ability") copies Roaring Furnace // Steaming
+  -- Sauna, unlocks its own left door, and then copies Spiked Corridor // Torture
+  -- Pit, cast as its RIGHT door so Spiked Corridor's Devils stay out of it. The
+  -- +1/+1 counter (CR 122.1a, no copiable value) keeps the doorless 0/0 copies
+  -- alive. Left half unlocked on the second Room is Spiked Corridor, {3}{R}, so
+  -- a 5/5; a name-keyed designation matches neither door and leaves a nameless
+  -- 1/1.
+  Spec.it s "CR 709.5c a Room that copies another Room keeps its left door open" $ do
+    room <- S.printingOf s registry "Roaring Furnace"
+    corridor <- S.printingOf s registry "Spiked Corridor"
+    opalescence <- S.printingOf s registry "Opalescence"
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    mountain <- S.printingOf s registry "Mountain"
+    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addPermanent printing S.alice g)) g0 [1 .. n :: Int]
+        (_, withOpalescence) = S.addPermanent opalescence S.alice (addAll mountain 10 (Setup.emptyGame S.threePlayers))
+        (shapeId, withShape) = S.addPermanent shapeshifter S.alice withOpalescence
+        countered = S.addCounter CounterKind.PlusOnePlusOne 1 shapeId withShape
+        (roomId, withRoom) = S.addHandCard room S.alice countered
+        (corridorId, withCorridor) = S.addHandCard corridor S.alice withRoom
+        board =
+          withCorridor
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        copiedFurnace = castDoor furnaceName roomId board
+        opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer copiedFurnace (Room.unlock S.manaPerformer S.alice shapeId furnaceName))))
+        copiedCorridor = castDoor tortureName corridorId opened
+    Spec.assertEqWith s "as a copy of the second Room it is a 5/5 Spiked Corridor" (Projection.namesOf shapeId copiedCorridor, S.powerToughnessOf shapeId copiedCorridor) (Set.singleton corridorName, Just (5, 5))
+    -- The control, after it: the Shapeshifter copied the first Room and opened its left door.
+    Spec.assertEqWith s "setup: the Shapeshifter is a 3/3 Roaring Furnace" (Projection.namesOf shapeId opened, S.powerToughnessOf shapeId opened) (Set.singleton furnaceName, Just (3, 3))

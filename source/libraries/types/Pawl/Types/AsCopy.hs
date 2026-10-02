@@ -59,17 +59,16 @@ data AsCopy ability effect = MkAsCopy
     -- printed copy exception puts a permanent onto the battlefield attacking,
     -- blocking, transformed or face down. So the narrow payload is the whole
     -- sayable clause, and Pawl.Engine.Event's AsCopy arm places it through
-    -- addEnteringCounters, the same funnel the CR 614.1c row uses, so CR 614.16
-    -- sees it (Doubling Season).
+    -- addEnteringCounters (by way of addCopyExceptionCounters), the same funnel
+    -- the CR 614.1c row uses, so CR 614.16 sees it (Doubling Season).
     --
     -- Placed only where the copy is actually MADE, `exceptions`' reason: CR 707.9
     -- makes the clause a modification of the copying process, so declining
     -- Clone's "may" leaves the permanent its printed self and no counters.
     --
-    -- Not implemented: CR 707.9e's second sentence, a copy effect applied to
-    -- the object AFTER this one suppressing the counters -- Altered Ego copying
-    -- an uncopied Quicksilver Gargantuan, whose own AsCopy then applies to the
-    -- same entry (CR 616.2), still enters with them (#4580).
+    -- CR 707.9e's second sentence takes them back when a later copy effect is
+    -- applied to the same entry: the scenario "CR 707.9e a copy effect applied
+    -- after Altered Ego's takes back its additional counters" proves it.
     counters :: Maybe WithCounters.WithCounters,
     -- | CR 707.9g / 603.11: the triggered ability linked to this replacement,
     -- "When you do, ..." in the same paragraph (Wall of Stolen Identity). Empty

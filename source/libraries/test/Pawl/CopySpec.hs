@@ -96,7 +96,9 @@
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
@@ -471,6 +473,30 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
       "the copy is on the battlefield, attached to the Mammoth"
       (fmap (\oid -> Game.lookupObject oid resolved >>= Object.attachedTo >>= Recipient.objectOf) (printedOnBattlefield "Copy Enchantment" resolved))
       [Just mammothId]
+
+  -- CR 303.4f's "or player" (CR 702.5d) at the same door: Copy Enchantment
+  -- copying bob's Curse of Death's Hold, which enchants carol, and alice
+  -- choosing bob -- the SECOND of three candidates, so neither the first seat
+  -- nor the original's host can stand in for him.
+  Spec.it s "CR 303.4f Copy Enchantment copying a Curse enchants the player its controller chooses" $ do
+    mammoth <- S.printingOf s registry "War Mammoth"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (mammothId, withMammoth) = S.addPermanent mammoth S.bob S.threePlayerGame
+        (maidenId, withMaiden) = S.addPermanent maiden S.carol withMammoth
+        (curseId, withCurse) = S.addPermanent curse S.bob withMaiden
+        board = S.attachTo curseId (Recipient.ToPlayer S.carol) withCurse
+        (_, staged) = S.spellOnStack copyEnchantment S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChoosePlayer _ _ _ offered -> case NonEmpty.toList offered of
+            _ : second : _ -> second
+            _ -> NonEmpty.head offered
+          _ -> copyNamed curseId p
+        resolved = resolveAndSettle answer staged
+    Spec.assertEqWith s "bob's War Mammoth gets -1/-1 from the copy" (S.powerToughnessOf mammothId resolved) (Just (2, 2))
+    Spec.assertEqWith s "and carol's Bird Maiden only the original's" (S.powerToughnessOf maidenId resolved) (Just (0, 1))
 
   -- CR 303.4g's stack branch, as a pair differing in ONE thing: whether bob
   -- controls a creature. Bob's Betrayal ("enchant creature an opponent
@@ -1860,6 +1886,105 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertBool s (elem abilId (GameState.stack afterEngine)) "setup: and the original was under the copy before the Stifle resolved"
         Spec.assertEqWith s "setup: both Pikers left alice's hand before the copy resolved" (handSize S.alice stifled) 0
       _ -> Spec.assertFailure s "Rumor Gatherer's trigger should be on the stack, and Lithoform Engine should declare a {2} ability"
+
+-- CR 707.10d, end to end: Zada, Hedron Grinder {3}{R} Legendary Creature --
+-- Goblin Ally 3/3, "Whenever you cast an instant or sorcery spell that targets
+-- only Zada, copy that spell for each other creature you control that the spell
+-- could target. Each copy targets a different one of those creatures."
+-- (data/cards/zada-hedron-grinder.json, Oracle text verified 2026-09-03.)
+zadaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+zadaSpec s registry =
+  let boardOf = do
+        forest <- S.printingOf s registry "Forest"
+        zada <- S.printingOf s registry "Zada, Hedron Grinder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        spider <- S.printingOf s registry "Giant Spider"
+        wall <- S.printingOf s registry "Wall of Stone"
+        mongoose <- S.printingOf s registry "Blurred Mongoose"
+        growth <- S.printingOf s registry "Giant Growth"
+        let lands = S.landsFor forest S.alice 1 S.threePlayerGame
+            (zadaId, g1) = S.addPermanent zada S.alice lands
+            (pikerId, g2) = S.addPermanent piker S.alice g1
+            (spiderId, g3) = S.addPermanent spider S.alice g2
+            (wallId, g4) = S.addPermanent wall S.alice g3
+            (mongooseId, g5) = S.addPermanent mongoose S.alice g4
+            (withGrowth, growthId) = S.handOne growth g5
+        pure (zadaId, pikerId, spiderId, wallId, mongooseId, growthId, withGrowth)
+      -- The Growth is aimed at Zada and at nothing else, which is the trigger's
+      -- whole condition; the copies' targets are the effect's and reach no
+      -- prompt at all.
+      atZada :: ObjectId -> Prompt.Prompt r -> r
+      atZada zadaId p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just zadaId) . Recipient.objectOf) offered) asked
+        _ -> S.identityAnswer p
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        -- CR 608.2h through rule 707.10d's "could target": carol Cancels the
+        -- Growth while Zada's trigger waits, and the trigger still copies it for
+        -- each other creature the Growth, as it last existed, could target.
+        Spec.it s "CR 608.2h Zada still copies a Growth countered while the trigger waited" $ do
+          (zadaId, pikerId, _, _, _, growthId, base) <- boardOf
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          let (cancelId, board) = S.addHandCard cancel S.carol (S.landsFor island S.carol 3 base)
+              placed = snd (Engine.runGamePure (atZada zadaId) (snd (Engine.runGamePure (atZada zadaId) board {GameState.priority = Just S.alice} (S.cast S.alice growthId))) Engine.settleForPriority)
+              growthSpell = last (GameState.stack placed)
+              cancelled = snd (Engine.runGamePure (atZada growthSpell) placed {GameState.priority = Just S.carol} (S.cast S.carol cancelId))
+              after = drainStack (atZada zadaId) cancelled
+          Spec.assertEqWith s "CR 608.2h a copy of the countered Growth pumped the Piker" (S.powerToughnessOf pikerId after) (Just (5, 4))
+          Spec.assertEqWith s "CR 701.6a the countered Growth itself pumped nothing, and Zada stays 3/3" (S.powerToughnessOf zadaId after) (Just (3, 3))
+
+-- CR 707.10e, end to end: Ivy, Gleeful Spellthief {G}{U} Legendary Creature --
+-- Faerie Rogue 2/1, "Flying. Whenever a player casts a spell that targets only a
+-- single creature other than Ivy, you may copy that spell. The copy targets
+-- Ivy." (data/cards/ivy-gleeful-spellthief.json, Oracle text verified
+-- 2026-09-05.)
+ivySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+ivySpec s registry =
+  let growthBoard = do
+        forest <- S.printingOf s registry "Forest"
+        ivy <- S.printingOf s registry "Ivy, Gleeful Spellthief"
+        spider <- S.printingOf s registry "Giant Spider"
+        growth <- S.printingOf s registry "Giant Growth"
+        let lands = S.landsFor forest S.bob 1 S.threePlayerGame
+            (ivyId, g1) = S.addPermanent ivy S.alice lands
+            (spiderId, g2) = S.addPermanent spider S.bob g1
+            (growthId, g3) = S.addHandCard growth S.bob g2
+        pure (ivyId, spiderId, growthId, g3)
+      -- What each object on the stack targets, top first, read live off its
+      -- bindings the way Pawl.Engine.Resolve.Effect.targetsOnStack does, less CR
+      -- 201.5's reserved self slot, the sibling helper's reason.
+      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Map.delete Binding.triggerSource (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs))))))) (GameState.stack gs)
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        -- CR 608.2h over a spell that has left the stack: carol Cancels the
+        -- Growth while Ivy's trigger waits, and the trigger still copies it, as
+        -- the Growth last existed -- Ivy's ruling (2022-09-09). CR 707.10e's
+        -- "could target" is that last-known spell's, so the copy is aimed at Ivy.
+        Spec.it s "CR 608.2h the copy is made even when the Growth was countered first" $ do
+          (ivyId, spiderId, growthId, base) <- growthBoard
+          island <- S.printingOf s registry "Island"
+          cancel <- S.printingOf s registry "Cancel"
+          let (cancelId, board) = S.addHandCard cancel S.carol (S.landsFor island S.carol 3 base)
+              -- bob aims the Growth at his Spider and carol the Cancel at the
+              -- Growth's stack object (CR 400.7 gave it a new id), each FILTERED
+              -- out of the offered set.
+              aimed :: [ObjectId] -> Prompt.Prompt r -> r
+              aimed victims p = case p of
+                Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (maybe False (`elem` victims) . Recipient.objectOf) offered) asked
+                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                _ -> S.identityAnswer p
+              cast = snd (Engine.runGamePure (aimed [spiderId]) board {GameState.priority = Just S.bob} (S.cast S.bob growthId))
+              triggered = snd (Engine.runGamePure (aimed [spiderId]) cast Engine.settleForPriority)
+              growthSpell = last (GameState.stack triggered)
+              answer :: Prompt.Prompt r -> r
+              answer = aimed [spiderId, growthSpell]
+              cancelled = snd (Engine.runGamePure answer triggered {GameState.priority = Just S.carol} (S.cast S.carol cancelId))
+              -- The Cancel, then Ivy's trigger: the moment the copy either
+              -- exists or does not, with the Growth already in bob's graveyard.
+              afterTrigger = resolveOne answer (resolveOne answer cancelled)
+              after = drainStack answer afterTrigger
+          Spec.assertEqWith s "CR 608.2h the copy of the countered Growth pumped Ivy" (S.powerToughnessOf ivyId after) (Just (5, 4))
+          Spec.assertEqWith s "CR 707.10e the copy alone was on the stack, naming Ivy" (fmap (Maybe.mapMaybe Recipient.objectOf) (stackTargets afterTrigger)) [[ivyId]]
+          Spec.assertEqWith s "CR 701.6a the countered Growth pumped nothing, and the Spider stays 2/4" (S.powerToughnessOf spiderId after) (Just (2, 4))
 
 -- CR 115.1's "targets only a single ..." NARROWED by a description of the one
 -- target, end to end: Leyline of Resonance {2}{R}{R} Enchantment, "If this card

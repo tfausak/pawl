@@ -40,6 +40,7 @@ import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -203,7 +204,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.protector = Just (PlayerId.MkPlayerId 17),
           Object.ventureRoom = Just (RoomIndex.MkRoomIndex 18),
           Object.classLevel = Just (ClassLevel.MkClassLevel 2),
-          Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Fire")),
+          Object.unlockedHalves = Set.singleton RoomHalf.LeftHalf,
           Object.designations = Set.singleton Designation.Renowned,
           Object.designationValues = Map.singleton Designation.Monstrous 26,
           Object.paidCosts =
@@ -262,7 +263,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"ringBearerFor\":16"
           <> ",\"duplicate\":{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
           <> ",\"protector\":17"
-          <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
+          <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[{\"type\":\"LeftHalf\"}]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
           <> ",\"designationValues\":[{\"designation\":{\"type\":\"Monstrous\"},\"value\":26}]"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Squad\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]}},\"value\":25}]"

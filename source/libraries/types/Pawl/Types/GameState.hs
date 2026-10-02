@@ -238,6 +238,10 @@ data GameState = MkGameState
     -- enter with, pending until runEntry flushes them onto the object. Empty
     -- outside an entry.
     enteringCounters :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural),
+    -- | CR 707.9e: the share of each entering permanent's enteringCounters that
+    -- the copy effect applied to it last placed as its exception, which a later
+    -- copy effect on the same entry takes back. Empty outside an entry.
+    copyExceptionCounters :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural),
     -- | CR 611.1 / 613.11: stored player- and rules-modifying continuous effects
     -- from resolutions, each with an expiry; printed ones are re-derived live.
     playerEffects :: [ActivePlayerEffect.ActivePlayerEffect],
@@ -385,10 +389,11 @@ data GameState = MkGameState
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
     -- ability carrying that rider, as the same record CR 603.3b's log carries.
-    -- A stored set rather than the log, because `events` is cleared at the turn
-    -- handoff and this record must outlive it; Pawl.Engine.Event.withinTriggerLimit
-    -- derives its key from these exactly as it does from the log.
-    triggeredThisGame :: Set.Set AbilityTriggered.AbilityTriggered,
+    -- Stored beside the log rather than read off it, because `events` is cleared
+    -- at the turn handoff and this record must outlive it; a sequence rather
+    -- than a set, because Pawl.Engine.Event.withinTriggerLimit COUNTS these
+    -- records exactly as it counts the log's (CR 113.2c).
+    triggeredThisGame :: Seq.Seq AbilityTriggered.AbilityTriggered,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
     -- controlled; last created wins (CR 723.1a), promoted into `control` at
     -- that player's turn (CR 723.1b).
