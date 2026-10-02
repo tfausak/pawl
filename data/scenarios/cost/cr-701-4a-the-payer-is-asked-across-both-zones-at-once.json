@@ -1,0 +1,137 @@
+{
+  "description": "CR 701.4a the payer is asked across both zones at once",
+  "note": "One Swamp closes the \"or pay {1}\" option, so the behold is the cost. Its one ask offers the Dragon card in hand and the Dragon on the battlefield together (refusing either stands); refused answers naming the Swamp and bob's Galleon, neither a Dragon alice may behold, are refused already. The hand Dragon pays and the Galleon is a 2/1.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp"
+          },
+          {
+            "card": "Exalted Dragon",
+            "label": "field-dragon"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Hoarding Dragon",
+            "label": "hand-dragon"
+          },
+          {
+            "card": "Caustic Exhale",
+            "label": "exhale"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Armored Galleon",
+            "label": "galleon"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$exhale",
+          "targets": [
+            "$galleon"
+          ],
+          "mana": [
+            "$swamp"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseBehold",
+          "with": "$swamp"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseBehold",
+          "with": "$galleon"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseBehold",
+          "with": "$hand-dragon"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$galleon",
+          "power": 2,
+          "toughness": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Hoarding Dragon",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Exalted Dragon",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

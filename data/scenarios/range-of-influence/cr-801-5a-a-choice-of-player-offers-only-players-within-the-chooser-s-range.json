@@ -1,0 +1,307 @@
+{
+  "description": "CR 801.5a a choice of player offers only players within the chooser's range",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "alice-m"
+          },
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Island",
+            "label": "i3"
+          },
+          {
+            "card": "Island",
+            "label": "i4"
+          },
+          {
+            "card": "Island",
+            "label": "i5"
+          },
+          {
+            "card": "Island",
+            "label": "i6"
+          },
+          {
+            "card": "Island",
+            "label": "i7"
+          },
+          {
+            "card": "Island",
+            "label": "i8"
+          },
+          {
+            "card": "Island",
+            "label": "i9"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "alice-bolt"
+          },
+          {
+            "card": "True-Name Nemesis",
+            "label": "tnn1"
+          },
+          {
+            "card": "True-Name Nemesis",
+            "label": "tnn2"
+          },
+          {
+            "card": "True-Name Nemesis",
+            "label": "tnn3"
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "bob-m"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bob-bolt"
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "carol-m"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "carol-bolt"
+          }
+        ],
+        "range": 1
+      },
+      {
+        "name": "dave",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "dave-m"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "dave-bolt"
+          }
+        ],
+        "range": 1
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$tnn1",
+          "mana": [
+            "$i1",
+            "$i2",
+            "$i3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$tnn2",
+          "mana": [
+            "$i4",
+            "$i5",
+            "$i6",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "bob"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$tnn3",
+          "mana": [
+            "$i7",
+            "$i8",
+            "$i9",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "carol"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChoosePlayer",
+          "with": "dave"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$alice-bolt",
+          "targets": [
+            "True-Name Nemesis"
+          ],
+          "mana": [
+            "$alice-m",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "refuse": {
+        "Cast": {
+          "object": "$bob-bolt",
+          "targets": [
+            "True-Name Nemesis#2"
+          ],
+          "mana": [
+            "$bob-m",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "dave",
+      "refuse": {
+        "Cast": {
+          "object": "$dave-bolt",
+          "targets": [
+            "True-Name Nemesis#3"
+          ],
+          "mana": [
+            "$dave-m",
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "note": "Range 1, four seats: carol, two seats from alice, is the plausible non-member, and a ChoosePlayer naming her is refused as unoffered at each of three casts. Each member is shown offered by a do and its effect: the True-Name Nemesis that chose alice, bob or dave has protection from that player, whose Lightning Bolt at it is reversed. The control is the unlimited board, where carol is offered too."
+}

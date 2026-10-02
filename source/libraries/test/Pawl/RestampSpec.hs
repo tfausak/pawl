@@ -215,16 +215,9 @@ faceNames oids gs = fmap (\oid -> fmap (Text.unpack . CardName.unwrap . Face.nam
 -- two write base P/T in layer 7b (1/1 and 3/3), and bob's Goblin Piker (2/1)
 -- reads whichever is later. The Godhead is conjured first, so the arrival order
 -- stamps the Archon later; the two boards differ only in alice's answer.
-conjuredOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conjuredOrderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 conjuredOrderSpec s registry =
   Spec.describe s "Conjure" $ do
-    Spec.it s "CR 613.7m / 608.2f the controller orders every card one conjure loop made" $ do
-      (board, pikerId, fixture) <- ornateBoard s registry ["Godhead of Awe", "Harmonious Archon"] False
-      let (after, asked) = ornateImitations fixture (Just [1, 0]) board
-          (canonical, _) = ornateImitations fixture Nothing board
-      Spec.assertEqWith s "CR 613.7m alice stamped the Godhead last, so bob's Goblin Piker is 1/1" (S.powerToughnessOf pikerId after) (Just (1, 1))
-      Spec.assertEqWith s "while the arrival order leaves the Archon last, so it is 3/3" (S.powerToughnessOf pikerId canonical) (Just (3, 3))
-      Spec.assertEqWith s "and alice was asked once, over both cards" asked [(S.alice, 2)]
     -- CR 614.12 over the same loop: Tayam, Luminous Enigma (mana value 4, "Each
     -- other creature you control enters with an additional vigilance counter on
     -- it.") is conjured at 4 and the Godhead at 5. Entering at the same moment,

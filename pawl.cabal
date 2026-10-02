@@ -1868,7 +1868,6 @@ library test
     Pawl.TargetSpec
     Pawl.TeamSpec
     Pawl.Test
-    Pawl.TimeTravelSpec
     Pawl.TransformSpec
     Pawl.TriggerSpec
     Pawl.TurnSpec

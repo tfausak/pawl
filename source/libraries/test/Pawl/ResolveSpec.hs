@@ -1210,34 +1210,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         Spec.assertEqWith s "CR 608.2d the possible branch ran and its sibling did not: the Piker is tapped" (twiddleTapState pikerId after) (Just TapState.Tapped)
         Spec.assertEqWith s "and no branch question was put at all" (branchesAnnounced asked) []
         Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the surviving branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
-  -- The other limb off the same board, one answer changed: rule 701.55a's second
-  -- option is bob's to take even though it is alice who acts on it, which is
-  -- what a villainous choice is for. This is also what stops the case above
-  -- passing because the discard ran unconditionally.
-  Spec.it s "CR 701.55a the limb bob takes may be the one that serves alice" $ do
-    board <- planBoard s registry 4
-    let (asks, after) = planResolved (ClauseIndex.MkClauseIndex 2) board
-    Spec.assertEqWith s "CR 701.55a alice cast one of the three cards she drew: two are left in her hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 2
-    Spec.assertEqWith s "and the spell she cast without paying is on the stack" (length (GameState.stack after)) 1
-    Spec.assertEqWith s "CR 608.2d the limb bob passed over did not run: all four of his cards are still in hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 4
-    Spec.assertEqWith s "CR 701.55a and he was asked once, over both limbs" asks [(S.bob, [ClauseIndex.MkClauseIndex 1, ClauseIndex.MkClauseIndex 2])]
-  -- CR 701.55b, an exception to rule 608.2d: "while facing a villainous choice, a
-  -- player may choose an option that is illegal or impossible. In that case, they
-  -- perform as much of the action as is possible." The SAME board with bob's hand
-  -- EMPTY, which is what makes "they discard three cards" impossible
-  -- (Resolve.Effect.clauseIsImpossible) and nothing else about the board
-  -- different.
-  --
-  -- Rule 608.2d alone would filter that limb out of the offer, leave one
-  -- survivor, force it with no prompt raised, and hand alice a free spell bob
-  -- never agreed to -- which is what alice's hand is read for, FIRST, since the
-  -- transcript assertion below would not notice it.
-  Spec.it s "CR 701.55b Great Intelligence's Plan still offers the discard to an empty-handed opponent" $ do
-    board <- planBoard s registry 0
-    let (asks, after) = planResolved (ClauseIndex.MkClauseIndex 1) board
-    Spec.assertEqWith s "CR 701.55b bob took the impossible limb, so as much of it as was possible happened -- nothing -- and alice cast nothing: she still holds the three cards she drew" (length (Game.zoneMembers Zone.Hand S.alice after)) 3
-    Spec.assertEqWith s "and nothing was cast onto the stack" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "CR 701.55b he was asked over BOTH limbs, the impossible one included, rather than forced into the other" asks [(S.bob, [ClauseIndex.MkClauseIndex 1, ClauseIndex.MkClauseIndex 2])]
   -- CR 701.55d, an exception to rule 608.2e: "if more than one player is
   -- instructed to face a villainous choice, the entire process described in rule
   -- 701.55a is performed for each of those players one at a time in APNAP
@@ -2215,48 +2187,6 @@ twiddleAnswer branch decision target p = case p of
 twiddleTapState :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 twiddleTapState oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
--- CR 701.55: the board Great Intelligence's Plan's three cases share. Alice
--- holds the Plan over lands enough to cast it and a library of four Goblin
--- Pikers, so drawing three leaves one behind rather than decking her (CR
--- 104.3c); carol holds two cards, and `bobsCards` is the ONE thing the cases
--- differ in.
-planBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, ObjectId.ObjectId)
-planBoard s registry bobsCards = do
-  island <- S.printingOf s registry "Island"
-  swamp <- S.printingOf s registry "Swamp"
-  piker <- S.printingOf s registry "Goblin Piker"
-  plan <- S.printingOf s registry "Great Intelligence's Plan"
-  let dealt n pid base = List.foldl' (\acc _ -> snd (S.addHandCard piker pid acc)) base [1 .. n]
-      lands = S.landsFor swamp S.alice 3 (S.landsFor island S.alice 5 S.threePlayerGame)
-      stocked = List.foldl' (\acc _ -> snd (S.addLibraryCard piker S.alice acc)) lands [1 .. 4 :: Int]
-      hands = dealt (2 :: Int) S.carol (dealt bobsCards S.bob stocked)
-      (planId, gs) = S.addHandCard plan S.alice hands
-  pure (gs, planId)
-
--- One cast and resolution of that board, keeping WHO CR 608.2d asked and WHICH
--- limbs it put to them: an engine offering one limb answers the same way as one
--- offering both, so the pool is what the cases read rather than the answer.
-planResolved :: ClauseIndex.ClauseIndex -> (GameState.GameState, ObjectId.ObjectId) -> ([(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])], GameState.GameState)
-planResolved branch (gs, planId) =
-  let ((_, after), asks) = State.runState (Engine.runGame (planAnswer branch) gs (S.cast S.alice planId >> Stack.resolveTop)) []
-   in (reverse asks, after)
-
--- Great Intelligence's Plan's answers. In State, not a pure function, so the
--- branch prompt's POOL is recorded and not just its answer; the branch itself is
--- pinned by ordinal and filtered back through the offer, so a mutation cannot be
--- repaired by an answerer that hunts for a legal option.
-planAnswer :: ClauseIndex.ClauseIndex -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])] r
-planAnswer branch p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring (== Recipient.ToPlayer S.bob) sets)
-  Prompt.ChooseClause _ pid _ _ live _ -> do
-    State.modify' ((pid, NonEmpty.toList live) :)
-    pure (if elem branch live then branch else NonEmpty.head live)
-  Prompt.ChooseDiscard _ _ ids n -> pure (List.genericTake n ids)
-  -- CR 608.2g's "may", taken: alice accepts every free cast she is offered, so
-  -- a limb that reached her is visible on the stack.
-  Prompt.OfferedCast {} -> pure OptionalDecision.Exercises
-  _ -> pure (S.identityAnswer p)
-
 -- CR 701.55d: the board The Dalek Emperor's two cases share. THREE SEATS,
 -- because "each opponent" is the whole point -- two collapse rule 701.55d's
 -- several players onto one, where rule 608.2e's ask-everybody-then-act is
@@ -2529,21 +2459,6 @@ copyingWayfinderAnswer hers p = case p of
           Seq.EmptyR -> OptionalDecision.Declines
   Prompt.Search _ _ matches cap -> pure (List.genericTake cap matches)
   _ -> pure (S.identityAnswer p)
-
--- Alice's Petra Sphinx over bob's three-card library, `top` on top of it. The two
--- fillers are what keep the library assertion from being vacuous -- a one-card
--- library empties whichever way the comparison goes -- and keep bob off CR
--- 104.3c.
-sphinxBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (GameState.GameState, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), ObjectId.ObjectId)
-sphinxBoard s registry top = do
-  sphinx <- S.printingOf s registry "Petra Sphinx"
-  piker <- S.printingOf s registry "Goblin Piker"
-  card <- S.printingOf s registry top
-  -- Added last is on top, S.addLibraryCard's order and predictBoard's reason.
-  let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
-      (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
-      g1 = List.foldl' (flip stock) g0 [piker, piker, card]
-  pure (g1 {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)), sphinxId)
 
 -- Alice's Synthetic Split Reliquary over a graveyard of one creature card and
 -- one land card: each exiling ability takes its one candidate on its own

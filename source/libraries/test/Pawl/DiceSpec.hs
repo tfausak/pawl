@@ -97,7 +97,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -116,7 +115,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   resultsTableSpec s registry
   modifierSpec s registry
   severalDiceSpec s registry
-  totalSpec s registry
   dieRollRSpec s registry
   rerollSpec s registry
   costedRerollSpec s registry
@@ -385,19 +383,8 @@ endeavorPrompts rolls spell board =
       (offers, choices, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], [], rolls)
    in (reverse offers, reverse choices)
 
-severalDiceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+severalDiceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 severalDiceSpec s registry = Spec.describe s "RollSeveralDice" $ do
-  -- The choice is ELIDED where it is not one. Two dice showing the same number
-  -- leave both slots holding that number whichever is named, so the engine asks
-  -- nothing -- and the resolution still reads both results.
-  Spec.it s "CR 706.4 two equal results are not a choice" $ do
-    (spell, _, strong, board) <- endeavorBoard s registry
-    let (offers, choices) = endeavorPrompts [3, 3] spell board
-    Spec.assertEqWith s "nothing was asked to choose" choices []
-    Spec.assertEqWith s "asked twice, offering six sides each" offers [6, 6]
-    let after = runEndeavor [3, 3] 0 spell board
-    Spec.assertEqWith s "CR 706.4: the other result is the other 3" (S.countOnBattlefieldByName knight S.alice after) 3
-    Spec.assertBool s (not (S.onBattlefield strong after)) "and power 4 is at least 3, so it is destroyed"
   -- Supporting, and in its own case so it cannot stand in for a count above:
   -- what the engine ASKED. Two dice of six sides, and one choice offering both
   -- results in roll order.
@@ -406,77 +393,6 @@ severalDiceSpec s registry = Spec.describe s "RollSeveralDice" $ do
     let (offers, choices) = endeavorPrompts [5, 2] spell board
     Spec.assertEqWith s "asked twice, offering six sides each" offers [6, 6]
     Spec.assertEqWith s "and offered both results, in roll order" choices [[5, 2]]
-
--- CR 706.4's total, whose producer is Neverwinter Hydra ({X}{X}{G}{G} Creature
--- -- Hydra 0/0, "As this creature enters, roll X d6. It enters with a number of
--- +1/+1 counters on it equal to the total of those results. / Trample / Ward
--- {4}"; checked against api.scryfall.com 2026-09-25). alice casts it from hand
--- over eight Forests, with X announced by the answerer.
---
--- THE ASSERTED QUANTITY is the Hydra's +1/+1 counters once the spell has
--- resolved and the board settled. Nothing else on the board puts a counter, so
--- the count is the total. The rolls are 2, 5 and 4: distinct, so a reading that
--- took the first (2), the largest (5), the last (4) or the number of dice (3)
--- is a different number from their total (11).
---
--- The counters are PUT by the as-enters effect as the settle drains it, before CR
--- 704.5f reads the 0/0 and with the entry's CR 603.10 sample retaken after them.
-hydraBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
-hydraBoard s registry = do
-  hydra <- S.printingOf s registry "Neverwinter Hydra"
-  forest <- S.printingOf s registry "Forest"
-  let (held, spell) = S.handOne hydra (S.landsInPlay forest 8)
-  pure (spell, held)
-
--- Answers X with `x` and each die with the next of `rolls`, six once they run
--- out; records every die prompt's sides and every result choice it was shown.
--- STATEFUL for endeavorAnswer's reason: the die prompts are structurally
--- identical.
-hydraAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [Natural.Natural], [[Natural.Natural]]) r
-hydraAnswer x p = case p of
-  Prompt.ChooseX {} -> pure x
-  Prompt.RollDie sides -> do
-    (scripted, seen, asked) <- State.get
-    case scripted of
-      h : t -> do
-        State.put (t, sides : seen, asked)
-        pure h
-      [] -> do
-        State.put ([], sides : seen, asked)
-        pure 6
-  Prompt.ChooseDieResult _ _ _ candidates -> do
-    State.modify' (\(scripted, seen, asked) -> (scripted, seen, NonEmpty.toList candidates : asked))
-    pure 0
-  _ -> pure (S.identityAnswer p)
-
--- Cast the Hydra with X = `x`, resolve it and settle. Returns the board, the
--- die prompts' sides and the result choices shown, both in order.
-runHydra :: Natural.Natural -> [Natural.Natural] -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [Natural.Natural], [[Natural.Natural]])
-runHydra x rolls spell board =
-  let ((_, after), (_, seen, asked)) = State.runState (Engine.runGame (hydraAnswer x) board (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) (rolls, [], [])
-   in (after, reverse seen, reverse asked)
-
--- The +1/+1 counters on each of alice's battlefield Hydras.
-hydraCounters :: GameState.GameState -> [Natural.Natural]
-hydraCounters gs =
-  let named oid = fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack "Neverwinter Hydra"))
-   in fmap (\oid -> S.counterOf CounterKind.PlusOnePlusOne oid gs) (filter named (Game.zoneMembers Zone.Battlefield S.alice gs))
-
-totalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-totalSpec s registry = Spec.describe s "RollDiceTotal" $ do
-  -- The pair of boards differs in ONE thing, X, over the same scripted rolls:
-  -- the third die is what X = 3 adds and X = 2 does not.
-  Spec.it s "CR 706.4 the Hydra's counters are the total of X dice" $ do
-    (spell, board) <- hydraBoard s registry
-    let (three, seen, asked) = runHydra 3 [2, 5, 4] spell board
-        (two, _, _) = runHydra 2 [2, 5, 4] spell board
-    -- THE GAMEPLAY ASSERTION, first: 2 + 5 + 4.
-    Spec.assertEqWith s "CR 706.4: three dice showing 2, 5 and 4 put eleven counters on the Hydra" (hydraCounters three) [11]
-    Spec.assertEqWith s "CR 107.3m: X = 2 rolls two of them, and 2 + 5 is seven" (hydraCounters two) [7]
-    -- Supporting, after the counts: X d6 were offered, and a total is not a
-    -- choice, so no result was offered to choose from.
-    Spec.assertEqWith s "asked three times, offering six sides each" seen [6, 6, 6]
-    Spec.assertEqWith s "and nothing was asked to choose" asked []
 
 -- CR 614.1a over CR 706.1, and CR 706.6 behind it: Pixie Guide's "if you would
 -- roll one or more dice, instead roll that many dice plus one and ignore the
@@ -514,25 +430,6 @@ dieRollRSpec s registry = Spec.describe s "DieRollR" $ do
     -- replacement says nothing about.
     Spec.assertEqWith s "CR 706.1a: two d20 under the Guide" (snd (guideCombat [7, 13] guarded)) [20, 20]
     Spec.assertEqWith s "CR 706.1a: one d20 without it" (snd (guideCombat [7, 13] bare)) [20]
-  Spec.it s "CR 706.6 rolls tied for the lowest leave nothing to ask" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    guide <- S.printingOf s registry "Pixie Guide"
-    let guarded = snd (S.addPermanent guide S.alice board)
-        (offers, choices) = endeavorPrompts [4, 4, 4] spell guarded
-    -- Three dice all showing 4: rule 706.6's second sentence gives the roller the
-    -- tie-break, and every way of breaking it leaves the same two 4s -- so no
-    -- board can tell the answers apart and the engine asks nothing. CR 706.4's
-    -- choice among what is left is elided for its own reason, the two being equal.
-    Spec.assertEqWith s "CR 706.1: three dice under the Guide" offers [6, 6, 6]
-    Spec.assertEqWith s "nothing was asked to choose" choices []
-    -- And exactly ONE of the tied rolls went: two 4s are left, so the other
-    -- result is a 4 and four Knights arrive. An implementation that dropped every
-    -- copy of the lowest leaves one result and mints none.
-    Spec.assertEqWith
-      s
-      "CR 706.6: one of the tied 4s is ignored, so the other result is the other 4"
-      (S.countOnBattlefieldByName knight S.alice (runEndeavor [4, 4, 4] 0 spell guarded))
-      4
   Spec.it s "CR 614.5 a second Guide adds a second die and a second ignore" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     guide <- S.printingOf s registry "Pixie Guide"
@@ -610,31 +507,8 @@ guideCombat rolls board =
 -- different card: rule 706.1a makes the die's size the whole description of a
 -- die, and a d20 that comes up 3 is the board on which the Clam's "six-sided"
 -- narrowing is visible.
-rerollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rerollSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 rerollSpec s registry = Spec.describe s "Reroll" $ do
-  Spec.it s "CR 706.2a two free offers to the same player are one question" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    clam <- S.printingOf s registry "Clam-I-Am"
-    let clammed = snd (S.addPermanent clam S.alice (snd (S.addPermanent clam S.alice board)))
-    -- Two Clams state two modifiers over the same 3, and neither states a cost,
-    -- so the two offers are the same question put to the same player: either
-    -- accepted throws the same die, and no board can tell which Clam was taken.
-    -- Where the rules leave nothing to ask, don't prompt -- so ONE offer is
-    -- raised and a decline is a decline of both. The costed case is the opposite
-    -- reading and has its own group below: a stated cost is something the payer
-    -- can tell apart.
-    Spec.assertEqWith
-      s
-      "CR 706.2a: two Clams raise one offer"
-      (snd (rerollPrompts [3, 6, 2] [OptionalDecision.Declines] spell clammed))
-      [3]
-    -- Supporting, and in its own assertion: the one offer really is live, so the
-    -- reading above is an elision rather than a modifier that never applied.
-    Spec.assertEqWith
-      s
-      "CR 706.2b: accepting that one offer rerolls the die"
-      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed))
-      6
   Spec.it s "CR 706.2 a rerolled die that repeats the number is offered again" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     clam <- S.printingOf s registry "Clam-I-Am"
@@ -655,28 +529,6 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
       "CR 706.2b: both offers carried the natural 3"
       (snd (rerollPrompts [3, 3, 5, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed))
       [3, 3]
-  Spec.it s "CR 706.2 the offer is gated on the number the card names" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    clam <- S.printingOf s registry "Clam-I-Am"
-    let clammed = snd (S.addPermanent clam S.alice board)
-    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
-    -- mutation: two d6 come up 2 and 5, neither of them the 3 the Clam names, so
-    -- the roller chooses the 2 and the 5 is the other result. Every reroll on
-    -- offer is ACCEPTED in this script, so an engine whose gate is wider in
-    -- EITHER direction takes the 1 waiting behind them: one that matches every
-    -- number rerolls the 2 and mints six, and one that matches 3 and up rerolls
-    -- the 5 and mints one.
-    Spec.assertEqWith
-      s
-      "CR 706.2: neither die shows the Clam's 3, so both stand"
-      (S.countOnBattlefieldByName knight S.alice (runReroll [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] 0 spell clammed))
-      5
-    -- Supporting, and in its own assertion: two dice were thrown and nothing was
-    -- offered, which separates a gate that matched from a reroll the roller
-    -- happened to decline.
-    let (offers, naturals) = rerollPrompts [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed
-    Spec.assertEqWith s "CR 706.1: two d6 were thrown" offers [6, 6]
-    Spec.assertEqWith s "and no reroll was offered" naturals []
 
 -- Answers all three questions one Endeavor under a CR 706.2 reroll asks: each
 -- die comes up the next number of `rolls`, each reroll offer takes the next
@@ -781,36 +633,6 @@ costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
     Spec.assertEqWith s "the reroll is alice's second roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 2
     Spec.assertEqWith s "and bob, who paid, did not roll" (rolls S.bob (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 0
     Spec.assertEqWith s "a declined reroll is no roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell withWall)) 1
-  Spec.it s "CR 706.2a each costed modifier is its own offer" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    wall <- S.printingOf s registry "Wall of Fortune"
-    let (first_, withFirst) = S.addPermanent wall S.alice board
-        (second_, withBoth) = S.addPermanent wall S.alice withFirst
-        after = runReroll [3, 6, 2] [OptionalDecision.Declines, OptionalDecision.Exercises] 1 spell withBoth
-    -- THE GAMEPLAY ASSERTION: two Walls state two modifiers, each with its own
-    -- cost to pay, so declining the first leaves the second still to be offered
-    -- -- and the reroll taken off it produces the same 6. An engine that read
-    -- the first decline as the answer for every modifier in force leaves the 3
-    -- standing and mints three.
-    Spec.assertEqWith
-      s
-      "CR 706.2a: the second Wall's offer still stands after the first is declined"
-      (S.countOnBattlefieldByName knight S.alice after)
-      6
-    -- Supporting, and in its own assertion: ONE Wall paid. Rule 706.2b applies
-    -- one modifier to a roll, not both.
-    Spec.assertEqWith
-      s
-      "CR 706.2b: exactly one Wall was tapped"
-      (length (filter (\oid -> Game.isTapped oid after) [first_, second_]))
-      1
-    -- And in its own assertion again: the offers really were two, over the same
-    -- natural 3, rather than one offer asked twice by a loop.
-    Spec.assertEqWith
-      s
-      "CR 706.2a: both Walls offered over the natural 3"
-      (take 2 (snd (rerollPrompts [3, 6, 2] [OptionalDecision.Declines, OptionalDecision.Exercises] spell withBoth)))
-      [3, 3]
 
   Spec.it s "CR 706.2b the player who rolled picks which modifier applies" $ do
     (spell, _, _, board) <- endeavorBoard s registry
@@ -1022,25 +844,6 @@ nightShiftSpec s registry = Spec.describe s "IncreaseOrDecrease" $ do
         Spec.assertEqWith s "CR 706.3a: 21 is not 20, so nothing is scried" (Maybe.listToMaybe (tableLibrary (run RollAdjustment.Increase))) (Just first)
         Spec.assertEqWith s "CR 706.3a: 19 is in 10-19, so scry 2" (Maybe.listToMaybe (tableLibrary (run RollAdjustment.Decrease))) (Just third)
       _ -> Spec.assertFailure s "the fixture library is six cards"
-  -- CR 706.2b's two steps in order, on the pair of producers: Clam-I-Am's
-  -- reroll ("If you roll a 3 on a six-sided die, you may reroll that die") is
-  -- the first step, Night Shift's shift the second. Every reroll offer in this
-  -- script is ACCEPTED.
-  Spec.it s "CR 706.2b rerolls come before increases and decreases" $ do
-    (spell, _, _, board) <- endeavorBoard s registry
-    shift <- S.printingOf s registry "Night Shift of the Living Dead"
-    clam <- S.printingOf s registry "Clam-I-Am"
-    let both = snd (S.addPermanent clam S.alice (snd (S.addPermanent shift S.alice board)))
-        -- A natural 2 shifted UP to 3 lands on the Clam's number after step
-        -- one is over, so it is NOT rerolled: the other result is the 3. An
-        -- engine that ran the rerolls again after the shift throws the 1
-        -- waiting in the script and mints one Knight.
-        (shiftedOnto, _) = nightShiftRun [2, 5, 1] [OptionalDecision.Exercises] [Just (0, RollAdjustment.Increase)] 1 spell both
-        -- A natural 3 IS rerolled, before the shift is offered: the shift sees
-        -- the rerolled 1, not the 3.
-        (_, shownAfterReroll) = nightShiftRun [3, 1, 5] [OptionalDecision.Exercises] [Nothing] 1 spell both
-    Spec.assertEqWith s "CR 706.2b: a 3 made by the shift is not rerolled" (S.countOnBattlefieldByName knight S.alice shiftedOnto) 3
-    Spec.assertEqWith s "CR 706.2b: the shift is offered over the rerolled die" shownAfterReroll [[1, 5]]
 
 zombieEmployee :: CardName.CardName
 zombieEmployee = CardName.MkCardName (Text.pack "Zombie Employee Token")

@@ -1,0 +1,128 @@
+{
+  "description": "CR 725.4 the active team's primary player names the new monarch",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 2,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 1,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "turn": 2,
+    "step": "Upkeep",
+    "monarch": "carol"
+  },
+  "timeline": [
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "carol",
+      "do": "Concede"
+    },
+    {
+      "turn": 3,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Monarch": {
+          "player": "alice"
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 2
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "dave",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 0
+        }
+      }
+    }
+  ],
+  "note": "Control 2: without shared team turns alice is the one active player and takes the crown with nobody asked."
+}

@@ -1,0 +1,132 @@
+{
+  "description": "CR 701.59a one card of mana value 3 pays it, and the rest stays put",
+  "note": "Collect evidence 3 is offered over alice's whole graveyard (refusing the Bolt or the Acidic Soil there stands) and a refused answer naming the Researcher itself is refused already. The Soil alone, mana value 3, pays: bob's Piker is tapped, the Bolt stays and one card is exiled.",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forensic Researcher",
+            "label": "researcher",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          },
+          {
+            "card": "Acidic Soil",
+            "label": "soil"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$researcher",
+          "ability": 1,
+          "costOrder": [
+            0,
+            1
+          ],
+          "targets": [
+            "$piker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseCollectEvidence",
+          "with": [
+            "$researcher"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCollectEvidence",
+          "with": [
+            "$soil"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$piker",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Graveyard",
+          "is": [
+            "$bolt"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": [
+            "Acidic Soil"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,297 @@
+{
+  "description": "CR 701.56a the choice is offered over the whole candidate set, and over nothing else",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Hill Giant",
+            "label": "giant",
+            "counters": [
+              {
+                "key": {
+                  "type": "Time"
+                },
+                "value": 3
+              }
+            ]
+          },
+          {
+            "card": "Ornithopter",
+            "label": "thopter"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ],
+        "exile": [
+          {
+            "card": "Durkwood Baloth",
+            "label": "baloth",
+            "counters": [
+              {
+                "key": {
+                  "type": "Time"
+                },
+                "value": 7
+              }
+            ]
+          },
+          {
+            "card": "Island",
+            "label": "land",
+            "counters": [
+              {
+                "key": {
+                  "type": "Time"
+                },
+                "value": 9
+              }
+            ]
+          }
+        ],
+        "hand": [
+          {
+            "card": "Wibbly-wobbly, Timey-wimey",
+            "label": "wibbly"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "piker",
+            "counters": [
+              {
+                "key": {
+                  "type": "Time"
+                },
+                "value": 5
+              }
+            ]
+          }
+        ],
+        "exile": [
+          {
+            "card": "Chronomantic Escape",
+            "label": "escape",
+            "counters": [
+              {
+                "key": {
+                  "type": "Time"
+                },
+                "value": 11
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$wibbly",
+          "mana": [
+            "$i1",
+            "$i2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseTimeTravel",
+          "with": [
+            [
+              "$thopter",
+              "Add"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseTimeTravel",
+          "with": [
+            [
+              "$piker",
+              "Add"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseTimeTravel",
+          "with": [
+            [
+              "$land",
+              "Add"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseTimeTravel",
+          "with": [
+            [
+              "$escape",
+              "Add"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTimeTravel",
+          "with": [
+            [
+              "$giant",
+              "Add"
+            ],
+            [
+              "$baloth",
+              "Remove"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$giant",
+          "kind": {
+            "type": "Time"
+          },
+          "count": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$baloth",
+          "kind": {
+            "type": "Time"
+          },
+          "count": 6
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$thopter",
+          "kind": {
+            "type": "Time"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$piker",
+          "kind": {
+            "type": "Time"
+          },
+          "count": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$land",
+          "kind": {
+            "type": "Time"
+          },
+          "count": 9
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$escape",
+          "kind": {
+            "type": "Time"
+          },
+          "count": 11
+        }
+      }
+    }
+  ],
+  "note": "One ChooseTimeTravel, asked of alice. The four non-candidates are each refused as unoffered: the Ornithopter (alice's, no time counter), bob's Piker (time counters, not alice's), the Island in exile (time counters, no suspend) and bob's suspended Chronomantic Escape. Both candidates are shown offered by the answer adding a counter to the Hill Giant and removing one from the suspended Baloth, and nothing else moves."
+}

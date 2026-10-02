@@ -17,8 +17,6 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
-import qualified Pawl.Engine.Activatable as Activatable
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -236,44 +234,6 @@ stackSpec s registry = Spec.describe s "Stack" $ do
   Spec.it s "resolving an empty stack is a no-op" $
     let gs = Setup.emptyGame S.bothPlayers
      in Spec.assertEqWith s "unchanged" (snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop)) gs
-  -- CR 702.37c / 708.4: the granted permission's affected set (a card you own
-  -- in your library) still matches the 2/2 face-down creature card, so CR 601.3
-  -- allows the morph cast too, and the player picks between the two casts.
-  Spec.it s "CR 702.37c a granted permission offers Skirk Marauder face down while searching" $ do
-    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
-    forest <- S.printingOf s registry "Forest"
-    mountain <- S.printingOf s registry "Mountain"
-    marauder <- S.printingOf s registry "Skirk Marauder"
-    blessing <- S.printingOf s registry "Synthetic Glacial Blessing"
-    nullChamber <- S.printingOf s registry "Null Chamber"
-    let g0 = Setup.emptyGame S.bothPlayers
-        (ewId, g1) = S.addPermanent evolvingWilds S.alice g0
-        g2 = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) g1 [1 .. (3 :: Int)]
-        (_, g3) = S.addPermanent mountain S.alice g2
-        (_, g4) = S.addLibraryCard marauder S.alice g3
-        gs = (snd (S.addPermanent blessing S.alice g4)) {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-        -- Pinned to the face-down option, so the engine's order cannot pick it.
-        castFaceDown :: Prompt.Prompt r -> r
-        castFaceDown p = case p of
-          Prompt.CastWhileSearching _ _ options -> List.find (\(_, _, facing) -> Facing.isFaceDown facing) options
-          _ -> S.identityAnswer p
-        -- CR 400.7: a new object on the battlefield, found by its printed card.
-        faceDownMarauder after =
-          filter
-            (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just (S.printingName marauder) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid after))
-            (Game.zoneMembers Zone.Battlefield S.alice after)
-    case Projection.abilitiesOf ewId gs of
-      ewAbility : _ -> do
-        let after = snd (Engine.runGamePure castFaceDown gs (do Activate.activateAbility S.alice ewId ewAbility; Stack.resolveTop; Stack.resolveTop))
-        Spec.assertEqWith s "CR 708.4 Skirk Marauder resolved onto the battlefield face down" (length (faceDownMarauder after)) 1
-        Spec.assertEqWith s "both casts offered, face up and face down" (fmap (\(_, _, facing) -> Facing.isFaceDown facing) (Cast.castableWhileSearching S.alice gs)) [False, True]
-        -- CR 708.4: the face-down cast has no name, so a Null Chamber naming the
-        -- card prohibits only the face-up one. The name is written straight
-        -- onto the Chamber, as Pawl.FaceDownSpec's hand-cast twin does.
-        let (chamber, chambered) = S.addPermanent nullChamber S.bob gs
-            named = chambered {GameState.objects = Map.adjust (\o -> o {Object.chosenNames = Set.singleton (S.printingName marauder)}) chamber (GameState.objects chambered)}
-        Spec.assertEqWith s "CR 708.4 Null Chamber naming it leaves only the face-down cast" (fmap (\(_, _, facing) -> Facing.isFaceDown facing) (Cast.castableWhileSearching S.alice named)) [True]
-      [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do
@@ -3185,77 +3145,6 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
         creatureBoard = aliceOnTurn creature2
     Spec.assertEqWith s "CR 702.119b four Swamps paid {5}{B}{B} less the Crawlspace's three, so Crabomination resolved, and CR 702.119c sacrificed that artifact" (length (namedOnBattlefield "Crabomination" after), length (namedInGraveyard "Crawlspace" after)) (1, 1)
     Spec.assertBool s (not (S.castable S.alice creatureSpell creatureBoard)) "CR 702.119b a creature of the same mana value is not a [quality] permanent, so the same four Swamps cannot pay the emerge cost at all"
-
-  -- Crabomination's enters trigger (Oracle text checked on Scryfall,
-  -- 2026-09-25): "target opponent exiles the top card of their library, a card
-  -- at random from their graveyard, and a card at random from their hand. You
-  -- may cast a spell from among cards exiled this way without paying its mana
-  -- cost."
-  --
-  -- "This way" is the three cards this resolution moved (CR 400.7j), not every
-  -- card linked to Crabomination by CR 607.2a, so the card narrows the link by
-  -- Filter.IsBound on the three slots. Lithoform Engine's copy of the trigger
-  -- keeps its source (CR 707.10b) and resolves first, which is what files a
-  -- second pile against the same Crabomination: its library card, Ancestral
-  -- Recall, is declined and stays linked in exile, where the original's offer
-  -- must not reach it.
-  --
-  -- bob's graveyard holds a Forest and a Sign in Blood, his hand a Plains and a
-  -- Lightning Bolt. Randomness names the lands for the copy, so the original
-  -- takes a spell from each of the three zones and its offer is a choice among
-  -- three, while every land stays off both offers (CR 305.1: a land is never a
-  -- spell). alice holds eight Swamps: six for the creature, two for the Engine,
-  -- none for Divination, so its cast is the free one (CR 118.9).
-  Spec.it s "CR 400.7j Crabomination offers a spell from its own three exiled cards alone" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    engine <- S.printingOf s registry "Lithoform Engine"
-    crab <- S.printingOf s registry "Crabomination"
-    recall <- S.printingOf s registry "Ancestral Recall"
-    divination <- S.printingOf s registry "Divination"
-    signInBlood <- S.printingOf s registry "Sign in Blood"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    forest <- S.printingOf s registry "Forest"
-    plains <- S.printingOf s registry "Plains"
-    island <- S.printingOf s registry "Island"
-    let stock printing pid add gs = snd (add printing pid gs)
-        (engineId, gs1) = S.addPermanent engine S.alice (S.landsInPlay swamp 8)
-        -- bob's library, the last added on top: the copy takes the Recall, the
-        -- original the Divination beneath it.
-        gs2 = foldr (\p -> stock p S.bob S.addLibraryCard) gs1 [recall, divination, island]
-        (forestId, gs3) = S.addGraveyardCard forest S.bob (stock signInBlood S.bob S.addGraveyardCard gs2)
-        (plainsId, gs4) = S.addHandCard plains S.bob (stock bolt S.bob S.addHandCard gs3)
-        -- alice's library feeds the Divination's two draws.
-        gs5 = foldr (\p -> stock p S.alice S.addLibraryCard) gs4 [island, island, island]
-        (crabId, gs6) = S.addHandCard crab S.alice gs5
-        entered = S.runPure S.identityAnswer (S.runPure S.identityAnswer (aliceOnTurn gs6) (S.cast S.alice crabId)) (Stack.resolveTop >> Engine.settleForPriority)
-        trigger = Maybe.listToMaybe (GameState.stack entered)
-        -- Each offer the engine made, in order: Left for CR 601.3's choice among
-        -- several, Right for the "may" over one. The Recall is declined and the
-        -- Divination taken, both answered by the name the engine offered.
-        answering :: Prompt.Prompt r -> State.State [Either [CardName.CardName] CardName.CardName] r
-        answering p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== trigger) . Recipient.objectOf) sets)
-          Prompt.RandomObject offered -> pure (Maybe.fromMaybe (NonEmpty.head offered) (List.find (`elem` [forestId, plainsId]) offered))
-          Prompt.ChooseOfferedCastSpell _ _ options -> do
-            State.modify' (<> [Left (fmap snd (NonEmpty.toList options))])
-            pure (Maybe.fromMaybe (NonEmpty.head options) (List.find ((== S.printingName divination) . snd) options))
-          Prompt.OfferedCast _ _ _ name -> do
-            State.modify' (<> [Right name])
-            pure (if name == S.printingName divination then OptionalDecision.Exercises else OptionalDecision.Declines)
-          _ -> pure (S.identityAnswer p)
-        driven = case Activatable.abilitiesFor engineId entered of
-          copier : _ -> Activate.activateAbility S.alice engineId copier >> Engine.priorityLoop
-          [] -> pure ()
-        (after, offers) = State.runState (fmap snd (Engine.runGame answering entered driven)) []
-        namesOf zone pid = fmap (\o -> fmap S.nameOf (Game.cardOf o after)) (Game.zoneMembers zone pid after)
-        named = S.printingName
-    Spec.assertEqWith
-      s
-      "CR 400.7j each offer reached its own resolution's spells: the Recall the copy exiled, then the original's three, the linked Recall and every land left off"
-      offers
-      [Right (named recall), Left (fmap named [divination, signInBlood, bolt]), Right (named divination)]
-    Spec.assertEqWith s "CR 608.2g the Divination was cast free and resolved: alice drew two, and it is in bob's graveyard" (length (Game.zoneMembers Zone.Hand S.alice after), namesOf Zone.Graveyard S.bob) (2, [Just (named divination)])
-    Spec.assertEqWith s "and bob's exile holds the other five cards the two resolutions took" (List.sort (namesOf Zone.Exile S.bob)) (List.sort (fmap (Just . named) [recall, signInBlood, bolt, forest, plains]))
 
 -- CR 702.48a on Patron of the Akki {4}{R}{R}, "Goblin offering" (Oracle text
 -- checked on Scryfall, 2026-09-25), with priority passed to alice in bob's

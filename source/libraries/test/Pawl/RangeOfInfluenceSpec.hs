@@ -26,7 +26,6 @@
 module Pawl.RangeOfInfluenceSpec where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -59,9 +58,7 @@ import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
@@ -350,53 +347,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 801.11 at range 1 Malignus reads only bob's and dave's 20" (S.powerToughnessOf creature (S.withRange 1 board)) (Just (10, 10))
     Spec.assertEqWith s "at an unlimited range it reads carol's 40" (S.powerToughnessOf creature board) (Just (20, 20))
 
-  -- CR 801.5a for a player: alice casts True-Name Nemesis ("As this creature
-  -- enters, choose a player."), and the choice offers only the players in her
-  -- range.
-  Spec.it s "CR 801.5a a choice of player offers only players within the chooser's range" $ do
-    nemesis <- S.printingOf s registry "True-Name Nemesis"
-    island <- S.printingOf s registry "Island"
-    let (spellId, board) = S.addHandCard nemesis S.alice (S.landsFor island S.alice 3 S.fourPlayerGame)
-        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
-        recording p = case p of
-          Prompt.ChoosePlayer _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
-    Spec.assertEqWith s "CR 801.5a at range 1 carol is not offered" (offered (S.withRange 1 board)) [[S.alice, S.bob, S.dave]]
-    Spec.assertEqWith s "at an unlimited range she is" (offered board) [[S.alice, S.bob, S.carol, S.dave]]
-
-  -- CR 801.5a for an opponent: alice's Pulling Teeth ("Clash with an opponent.
-  -- ...") offers only the opponents in her range.
-  Spec.it s "CR 801.5a a choice of opponent offers only opponents within the chooser's range" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    teeth <- S.printingOf s registry "Pulling Teeth"
-    let (spellId, board) = S.addHandCard teeth S.alice (S.landsFor swamp S.alice 2 S.fourPlayerGame)
-        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
-        recording p = case p of
-          Prompt.ChooseOpponent _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
-    Spec.assertEqWith s "CR 801.5a at range 1 carol is not offered" (offered (S.withRange 1 board)) [[S.bob, S.dave]]
-    Spec.assertEqWith s "at an unlimited range she is" (offered board) [[S.bob, S.carol, S.dave]]
-
-  -- CR 801.10 for proliferate: alice's Steady Progress ("Proliferate. Draw a
-  -- card.") while bob, one seat away, and carol, two seats away, each have a
-  -- poison counter.
-  Spec.it s "CR 801.10 proliferate offers only players within its controller's range" $ do
-    island <- S.printingOf s registry "Island"
-    progress <- S.printingOf s registry "Steady Progress"
-    let (spellId, g0) = S.addHandCard progress S.alice (S.landsFor island S.alice 3 S.fourPlayerGame)
-        (_, g1) = S.addLibraryCard island S.alice g0
-        poisoned = Set.fromList [S.bob, S.carol]
-        board = g1 {GameState.players = Map.mapWithKey (\pid p -> if Set.member pid poisoned then p {Player.counters = Map.singleton PlayerCounterKind.Poison 1} else p) (GameState.players g1)}
-        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
-        recording p = case p of
-          Prompt.ChooseProliferate _ _ _ players -> State.modify' (<> [players]) >> pure (Set.empty, Set.fromList players)
-          _ -> pure (S.identityAnswer p)
-        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
-    Spec.assertEqWith s "CR 801.10 at range 1 only bob is offered" (offered (S.withRange 1 board)) [[S.bob]]
-    Spec.assertEqWith s "at an unlimited range carol is too" (offered board) [[S.bob, S.carol]]
-
   -- CR 104.2b / 801.14: alice's Felidar Sovereign ("At the beginning of your
   -- upkeep, if you have 40 or more life, you win the game.") at 40 life. At range
   -- 1 only bob and dave, her opponents in range, lose; carol plays on.
@@ -512,8 +462,6 @@ spec s registry = Spec.describe s "Range of influence" $ do
       let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
           staged = S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs
        in resolveAll (snd (Engine.runGamePure S.identityAnswer staged Engine.settleForPriority))
-    -- A main phase with alice holding priority, for an instant she casts.
-    onMain gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
     -- CR 510.2: these creatures, attacking `defender` on `active`'s turn, deal
     -- their combat damage.
     strike active attackers defender gs =

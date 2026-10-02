@@ -368,50 +368,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "the trigger's own sacrifice ran, so one of alice's two Islands is gone"
       (length islands)
       1
-  -- Tome of the Infinite ({2}{U} Legendary Artifact -- Book, "{U}, {T}: Conjure
-  -- a random card from Tome of the Infinite's spellbook into your hand."), the
-  -- printed SPELLBOOK: ten candidates in the card file and one pick over them.
-  --
-  -- Not implemented: the rider, "It perpetually gains 'You may spend mana as
-  -- though it were mana of any color to cast this spell.'" A perpetual effect
-  -- over a card in a hand, granting it an ability about paying for itself; pawl's
-  -- Tome is stricter than the printing, never weaker (#3291).
-  --
-  --
-  -- The answerer pins the pick to the LAST candidate, which the offered list's
-  -- head is not: Pawl.Engine.Replay.defaultAnswer takes the head, so an engine
-  -- that rolled the pick itself rather than honouring the answer lands on
-  -- Assault Strobe.
-  Spec.it s "a printed spellbook is offered whole, and the card randomness named is the one conjured" $ do
-    islandPrinting <- S.printingOf s registry "Island"
-    tome <- S.printingOf s registry "Tome of the Infinite"
-    let board0 = S.landsInPlay islandPrinting 1
-        (tomeId, board1) = S.addPermanent tome S.alice board0
-        board = board1 {GameState.phase = Phase.PrecombatMain}
-        logging :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
-        logging p = case p of
-          Prompt.RandomCard offered -> do
-            State.modify' (NonEmpty.toList offered :)
-            pure (tomeAnswer tomeId swordsToPlowshares p)
-          _ -> pure (tomeAnswer tomeId swordsToPlowshares p)
-        (offers, final) = case State.runState (Engine.runGame logging board Engine.priorityLoop) [] of
-          ((_, gs), asked) -> (reverse asked, gs)
-    -- THE GAMEPLAY ASSERTION: the card in alice's hand is the one the answer
-    -- named, and it is a card of the spellbook rather than of her deck.
-    Spec.assertEqWith
-      s
-      "the conjured card in alice's hand is the one randomness named"
-      (namesIn Zone.Hand final)
-      [swordsToPlowshares]
-    -- Supporting, and LAST so it cannot absorb a mutation the assertion above
-    -- should catch: the whole spellbook was offered, once, in the card file's
-    -- order. Recorded off the prompt, since the candidate list is not readable
-    -- off the resulting board.
-    Spec.assertEqWith
-      s
-      "asked once, offering every card of the printed spellbook"
-      offers
-      [tomeSpellbook]
   -- Follow the Tracks ({2}{G} Sorcery, "Conjure a card of your choice from
   -- Follow the Tracks's spellbook onto the battlefield."), Oracle text verified
   -- on Scryfall 2026-09-14. The Tome's case one group above with the other
@@ -477,43 +433,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "CR 601.3 the exiled Lightning Bolt is castable and the exiled Mountain is not playable"
       (fmap (\oid -> castOffered oid lightningBolt boltGame) bolts, fmap (`playsLand` mountainGame) mountains)
       ([True], [False])
-  Spec.it s "a printed spellbook picked by choice is offered whole, and the card its controller named is the one conjured" $ do
-    forest <- S.printingOf s registry "Forest"
-    tracks <- S.printingOf s registry "Follow the Tracks"
-    let (spell, board0) = S.addHandCard tracks S.alice (S.landsInPlay forest 3)
-        board = board0 {GameState.phase = Phase.PrecombatMain}
-        logging :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
-        logging p = case p of
-          Prompt.ChooseConjuredCard _ _ offered -> do
-            State.modify' (NonEmpty.toList offered :)
-            pure (tracksAnswer gateToSeatower p)
-          _ -> pure (tracksAnswer gateToSeatower p)
-        (offers, final) = case State.runState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) [] of
-          ((_, gs), asked) -> (reverse asked, gs)
-        gates = filter (/= forestName) (namesIn Zone.Battlefield final)
-    -- THE GAMEPLAY ASSERTION: the Gate on the battlefield is the one alice's
-    -- answer named, and no other member of the spellbook came with it.
-    Spec.assertEqWith
-      s
-      "the conjured Gate on the battlefield is the one alice chose"
-      gates
-      [gateToSeatower]
-    -- The conjured card carries its own printed text rather than just its name:
-    -- the Gate's "enters the battlefield tapped" is CR 614.1d's replacement
-    -- effect, and it applied to the arrival.
-    Spec.assertEqWith
-      s
-      "and it entered tapped, as its own printed replacement effect says"
-      (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid final)) (namedIn gateToSeatower Zone.Battlefield final))
-      [Just TapState.Tapped]
-    -- Supporting, and LAST so it cannot absorb a mutation the assertions above
-    -- should catch: the whole spellbook was offered, once, in the card file's
-    -- order.
-    Spec.assertEqWith
-      s
-      "asked once, offering every card of the printed spellbook"
-      offers
-      [tracksSpellbook]
   -- Gate to Seatower, the spellbook's Island Gate, Oracle text verified on
   -- Scryfall 2026-09-25: "{3}{U}, {T}: Seek a nonland card. Activate only once."
   -- Seek is Alchemy's: a card at random from your library matching the
@@ -1475,41 +1394,6 @@ torturePit = CardName.MkCardName (Text.pack "Torture Pit")
 cloneName :: CardName.CardName
 cloneName = CardName.MkCardName (Text.pack "Clone")
 
--- The ten cards data/cards/tome-of-the-infinite.json prints as the Tome's
--- spellbook, in the order the card file writes them.
-tomeSpellbook :: [CardName.CardName]
-tomeSpellbook =
-  fmap
-    (CardName.MkCardName . Text.pack)
-    [ "Assault Strobe",
-      "Dark Ritual",
-      "Duress",
-      "Fog",
-      "Force Spike",
-      "Giant Growth",
-      "Lightning Bolt",
-      "Light of Hope",
-      "Ponder",
-      "Swords to Plowshares"
-    ]
-
-swordsToPlowshares :: CardName.CardName
-swordsToPlowshares = CardName.MkCardName (Text.pack "Swords to Plowshares")
-
--- Taps the Island for {U}, activates the Tome the first time its ability is
--- offered -- once, since the activation taps it -- and pins the random pick to
--- `who`. FILTERED out of the offered candidates rather than built, so a name
--- the engine never offered cannot slip through, falling back to the head.
-tomeAnswer :: ObjectId.ObjectId -> CardName.CardName -> Prompt.Prompt r -> r
-tomeAnswer tome who p = case p of
-  Prompt.ChooseAction _ _ actions -> case List.find (activationOf tome) actions of
-    Just action -> action
-    Nothing -> case List.find manaActivation actions of
-      Just action -> action
-      Nothing -> Action.Pass
-  Prompt.RandomCard offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
-  _ -> S.identityAnswer p
-
 activationOf :: ObjectId.ObjectId -> Action.Action -> Bool
 activationOf oid action = case action of
   Action.Activate o _ -> o == oid
@@ -1539,8 +1423,9 @@ spellConjures printing =
   ]
 
 -- Activates the Gate the first time its ability is offered, taps any OTHER land
--- for mana until it is, and pins the random pick to `who`, filtered out of the
--- offer for tomeAnswer's reason. Never the Gate's own mana ability, which would
+-- for mana until it is, and pins the random pick to `who`, FILTERED out of the
+-- offer rather than built, so a name the engine never offered cannot slip
+-- through. Never the Gate's own mana ability, which would
 -- tap away its {T} cost. A shuffle is answered REVERSED, so one the engine asked
 -- for would show in the library's order.
 gateAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -1554,29 +1439,5 @@ gateAnswer gate who p = case p of
   Prompt.Shuffle cards -> reverse cards
   _ -> S.identityAnswer p
 
--- The five Gates data/cards/follow-the-tracks.json prints as the spellbook, in
--- the order the card file writes them.
-tracksSpellbook :: [CardName.CardName]
-tracksSpellbook =
-  fmap
-    (CardName.MkCardName . Text.pack)
-    [ "Gate of the Black Dragon",
-      "Gate to Manorborn",
-      "Gate to Seatower",
-      "Gate to the Citadel",
-      "Gate to Tumbledown"
-    ]
-
 gateToSeatower :: CardName.CardName
 gateToSeatower = CardName.MkCardName (Text.pack "Gate to Seatower")
-
-forestName :: CardName.CardName
-forestName = CardName.MkCardName (Text.pack "Forest")
-
--- Pins the chosen pick to `who`, FILTERED out of the offered candidates rather
--- than built, tomeAnswer's reason: a name the engine never offered cannot slip
--- through, and the fallback is the head.
-tracksAnswer :: CardName.CardName -> Prompt.Prompt r -> r
-tracksAnswer who p = case p of
-  Prompt.ChooseConjuredCard _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
-  _ -> S.identityAnswer p

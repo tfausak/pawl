@@ -995,32 +995,6 @@ nullChamberSpec s registry =
       Spec.assertEqWith s "CR 101.4b told alice named Goblin Piker, bob named it too" (run (S.printingName piker)) (Just (Set.singleton (S.printingName piker)))
       Spec.assertEqWith s "CR 101.4b told alice named Hill Giant, bob named it too" (run (S.printingName giant)) (Just (Set.singleton (S.printingName giant)))
 
-    -- CR 201.4a: "If a player is instructed to choose a card name with certain
-    -- characteristics, the player must choose the name of a card whose Oracle
-    -- text matches those characteristics." Null Chamber's characteristics are
-    -- "other than a basic land card name". The engine hands them to the prompt
-    -- and does not judge the answer -- it holds no reference to judge it by -- so this
-    -- case proves the half the engine owns: the restriction reaches the player
-    -- being asked, unaltered, for BOTH choosers. The two cases after it prove the
-    -- half the interpreter owns.
-    --
-    -- Nothing else in this group would notice its loss: the restriction is never
-    -- written to the board, so authoring Filter.And [] -- the trivial predicate,
-    -- which forbids nothing -- would leave every other case here green.
-    Spec.it s "CR 201.4a the printed restriction reaches both choosers" $ do
-      plains <- S.printingOf s registry "Plains"
-      mountain <- S.printingOf s registry "Mountain"
-      nullChamber <- S.printingOf s registry "Null Chamber"
-      piker <- S.printingOf s registry "Goblin Piker"
-      cancel <- S.printingOf s registry "Cancel"
-      let (oid, board) = nullChamberBoard plains mountain nullChamber
-          picks pid = if pid == S.alice then S.printingName piker else S.printingName cancel
-          asked =
-            State.execState
-              (Engine.runGame (recordingChamberAnswer S.bob picks) board (S.cast S.alice oid >> Stack.resolveTop))
-              []
-      Spec.assertEqWith s "the card's own restriction, on both asks" (fmap snd asked) [nonBasicLandName, nonBasicLandName]
-
     -- CR 201.4: "the player must choose the name of a card in the Oracle card
     -- reference." Pawl.Registry is that reference, and it sits on the far side of
     -- Pawl.Engine.Engine.runGameAsked, so the refusal is

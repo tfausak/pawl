@@ -1799,59 +1799,6 @@ conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttack
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [required] under) "and attacking with it is legal either way"
       _ -> Spec.assertFailure s "fixture should have one Juggernaut"
 
--- CR 608.2d's random half, proved by Ruhan of the Fomori ("At the beginning of
--- combat on your turn, choose an opponent at random. Ruhan attacks that player
--- this combat if able."). Two effects in one resolution: the first binds the
--- opponent randomness named into a slot, the second reads it back through
--- PlayerRef.InSlot as the requirement's defender.
---
--- THREE SEATS, and that is load-bearing: CR 102.2 leaves a two-player game
--- exactly one opponent, so the pick is elided and every implementation agrees.
---
--- The pair of boards differs in ONE thing -- which opponent randomness named --
--- and under CR 802.2 both opponents are defending players, so BOTH are
--- attackable on both boards and the requirement is what separates them:
---
---   * named carol: attacking carol obeys the requirement, attacking bob does
---     not, and CR 508.1d forbids both declining and the bob declaration.
---   * named bob: the same three assertions with the seats swapped.
---
--- That symmetry is what CR 802.2 bought. Before it the bob leg was vacuous --
--- one opponent was attackable at a time, so a requirement naming the other
--- could not be obeyed by any declaration and declining was legal.
---
--- An engine that rolled the head of the offer itself rather than honouring the
--- answer collapses the pair onto the bob leg, and one that never landed the bind
--- makes declining legal on both.
-randomPlayerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-randomPlayerSpec s registry = Spec.describe s "RandomPlayer" $ do
-  Spec.it s "CR 104.3a the offer is the opponents still in the game, and never the controller" $ do
-    ruhan <- S.printingOf s registry "Ruhan of the Fomori"
-    let (board, _, _, _) = S.threePlayerCombat [ruhan] [] []
-        logging :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
-        logging p = case p of
-          Prompt.RandomPlayer offered -> do
-            State.modify' (NonEmpty.toList offered :)
-            pure (ruhanAnswer S.carol p)
-          _ -> pure (ruhanAnswer S.carol p)
-        offers = reverse (State.execState (Engine.runGame logging board Engine.runStep) [])
-    -- Recorded off the prompt, since the candidate list is not readable off the
-    -- resulting board. The engine never rolls -- it offers and filters back -- so
-    -- WHAT it offered is the part of that posture a test can see.
-    Spec.assertEqWith s "asked once, offering both opponents and not alice" offers [[S.bob, S.carol]]
-
--- Pins which opponent randomness names (CR 608.2d). FILTERED out of the offered
--- candidates rather than built, so an answer the engine never offered cannot slip
--- through, and falling back to the head where `who` was not offered.
---
--- CR 507.1's question is not pinned because it is not asked: CR 802.2 takes the
--- turn-based action without a choice, and every opponent defends.
-ruhanAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-ruhanAnswer who p = case p of
-  Prompt.RandomPlayer offered ->
-    Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
-  _ -> S.identityAnswer p
-
 -- Declines CR 508.1a's declaration the first time and declares everything the
 -- second, counting the asks. The first answer is ILLEGAL rather than
 -- unaffordable, which is CR 508.1's preamble reached through CR 508.1d instead of
@@ -2213,7 +2160,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   mostLifeRequirementSpec s registry
   troveOfTemptationSpec s registry
   conditionalAttackRequirementSpec s registry
-  randomPlayerSpec s registry
   declarationRetrySpec s registry
   blockCostSpec s registry
   tollReversalSpec s registry

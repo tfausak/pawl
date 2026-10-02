@@ -9,7 +9,6 @@ module Pawl.LibraryOrderSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -821,50 +820,6 @@ enhancedSurveillanceSpec s registry = Spec.describe s "EnhancedSurveillance" $ d
     Spec.assertEqWith s "the library is what it was" (Game.zoneMembers Zone.Library S.alice after) ids
     Spec.assertEqWith s "with an empty graveyard" (surveilGraveyard after) []
 
--- CR 701.29a: "to 'fateseal N' means to look at the top N cards of an opponent's
--- library, then put any number of them on the bottom of that library in any
--- order and the rest on top of that library in any order."
---
--- Spin into Myth ({4}{U} instant, "Put target creature on top of its owner's
--- library, then fateseal 2") is the producer, cast for real.
---
--- THREE SEATS, because two cannot tell "the opponent the fatesealer chose" from
--- "an opponent" or from "every opponent" -- and the answer names CAROL, who is
--- not the first candidate, so an implementation that ignored the answer and took
--- the head would fateseal bob and fail.
---
--- alice targets HER OWN Piker with the first half, so the library the creature
--- lands in and the library the fateseal reorders are different libraries: a
--- fateseal that looked at its own controller's library would have to disturb the
--- card just placed there.
---
--- Returns (alice's library card, bob's library top-first, carol's library
--- top-first, alice's creature, the spell in hand, the board).
-fatesealBoard ::
-  (Monad m) =>
-  Spec.Spec m n ->
-  Registry.Registry m ->
-  NonEmpty.NonEmpty PlayerId.PlayerId ->
-  m (ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-fatesealBoard s registry seats = do
-  island <- S.printingOf s registry "Island"
-  piker <- S.printingOf s registry "Goblin Piker"
-  maiden <- S.printingOf s registry "Bird Maiden"
-  mountain <- S.printingOf s registry "Mountain"
-  forest <- S.printingOf s registry "Forest"
-  spin <- S.printingOf s registry "Spin into Myth"
-  let deal pid (acc, g) printing = let (oid, g2) = S.addLibraryCard printing pid g in (oid : acc, g2)
-      (creatureId, b1) = S.addPermanent piker S.alice (S.landsFor island S.alice 5 (Setup.emptyGame seats))
-      (aliceLib, b2) = S.addLibraryCard forest S.alice b1
-      (bobIds, b3) = List.foldl' (deal S.bob) ([], b2) [forest, mountain]
-      -- Only when carol is at the table: a library belonging to a seat the game
-      -- does not have would be a fixture nothing in the rules can reach.
-      (carolIds, b4)
-        | List.elem S.carol (NonEmpty.toList seats) = List.foldl' (deal S.carol) ([], b3) [forest, mountain, maiden]
-        | otherwise = ([], b3)
-      (board, spellId) = S.handOne spin b4
-  pure (aliceLib, bobIds, carolIds, creatureId, spellId, board)
-
 -- Answers Prompt.ChooseFateseal with a FIXED pair of lists, surveilAnswer's
 -- posture and for its reason.
 fatesealAnswer :: ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
@@ -872,40 +827,8 @@ fatesealAnswer split p = case p of
   Prompt.ChooseFateseal {} -> split
   _ -> S.identityAnswer p
 
-fatesealSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fatesealSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 fatesealSpec s registry = Spec.describe s "Fateseal" $ do
-  let aimAt :: ObjectId.ObjectId -> PlayerId.PlayerId -> ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
-      aimAt creatureId victim split p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature creatureId))) sets
-        -- PINNED to the second candidate, not the first: S.identityAnswer and
-        -- Replay.defaultAnswer both take the head, so a fateseal that dropped
-        -- this answer would still reorder a library and still pass a membership
-        -- assertion -- against the WRONG seat.
-        Prompt.ChooseOpponent {} -> victim
-        Prompt.ChooseFateseal {} -> split
-        _ -> S.identityAnswer p
-  -- WHO is asked and about WHOSE library -- the half a board cannot show by its
-  -- final state. The fatesealer is shown the cards; the library's owner is shown
-  -- nothing and asked nothing.
-  Spec.it s "CR 701.29a the fatesealer is asked, about the chosen opponent's top cards" $ do
-    (_, _, carolIds, creatureId, spellId, board) <- fatesealBoard s registry S.threePlayers
-    case carolIds of
-      [carolTop, carolMiddle, _] -> do
-        let recording :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, PlayerId.PlayerId, [ObjectId.ObjectId])] r
-            recording p = case p of
-              Prompt.ChooseFateseal _ seat owner looked -> do
-                State.modify (<> [(seat, owner, looked)])
-                pure ([], looked)
-              _ -> pure (aimAt creatureId S.carol ([], []) p)
-            asked =
-              State.execState
-                ( Engine.runGame recording board $ do
-                    S.cast S.alice spellId
-                    Stack.resolveTop
-                )
-                []
-        Spec.assertEqWith s "alice asked, about carol's library, showing its top two" asked [(S.alice, S.carol, [carolTop, carolMiddle])]
-      _ -> Spec.assertFailure s "expected three library cards for carol"
   -- The elision pair for the SPLIT question, two boards differing in one card:
   -- a lone card that is the whole library has its top and its bottom at the same
   -- position, so both answers give the same library and there is nothing to ask

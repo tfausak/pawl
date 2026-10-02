@@ -36,7 +36,6 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   lizrogSpec s registry
-  spiderManSpec s registry
   overseerSpec s registry
   eventidesShadowSpec s registry
 
@@ -133,47 +132,6 @@ lizrogBoard s registry = do
       counted = S.addCounter plusOne 2 pikerId (S.addCounter plusOne 1 giantId (S.addCounter plusOne 3 bobsId withBobs))
       (lizrogId, entered) = S.entersWithTrigger lizrog S.alice counted
   pure (lizrogId, pikerId, giantId, bobsId, entered)
-
--- Sensational Spider-Man {1}{W}{U} Legendary Creature -- Spider Human Hero 3/3
--- (Oracle text checked against Scryfall 2026-09-27): "Whenever Sensational
--- Spider-Man attacks, tap target creature defending player controls and put a
--- stun counter on it. Then you may remove up to three stun counters from among
--- all permanents. Draw cards equal to the number of stun counters removed this
--- way."
---
--- RemovalCount.UpTo, and a tally a Draw reads.
---
--- THE BOARD: alice attacks with Spider-Man; bob defends with a Goblin Piker,
--- which the trigger targets, and a Hill Giant carrying the stun counters given.
--- alice's library holds five cards.
-spiderManSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-spiderManSpec s registry =
-  let stun = CounterKind.Stun
-      run answer (board, pikerId) = State.runState (fmap snd (Engine.runGame (recording answer (plan OptionalDecision.Exercises (Just pikerId))) board S.combatGame)) []
-      drawn board after = S.handSize S.alice after - S.handSize S.alice board
-   in Spec.describe s "Sensational Spider-Man" $ do
-        Spec.it s "CR 608.2d up to three stun counters from among all permanents, and a card for each" $ do
-          (board, _, pikerId, giantId) <- spiderManBoard s registry 2
-          let (after, asked) = run (Map.fromList [(pikerId, 1), (giantId, 2)]) (board, pikerId)
-          Spec.assertEqWith s "CR 121.2 alice drew three" (drawn board after) 3
-          Spec.assertEqWith s "CR 122.1 the Piker's new stun counter came off" (S.counterOf stun pikerId after) 0
-          Spec.assertEqWith s "and both of the Giant's" (S.counterOf stun giantId after) 0
-          Spec.assertEqWith s "alice was asked once, capped at three, over both" asked [UpTo 3 (Map.fromList [(pikerId, 1), (giantId, 2)])]
-
--- The board spiderManSpec's cases share, described above it, with the Giant's
--- stun counters given.
-spiderManBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Natural -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
-spiderManBoard s registry stunned = do
-  spider <- S.printingOf s registry "Sensational Spider-Man"
-  piker <- S.printingOf s registry "Goblin Piker"
-  giant <- S.printingOf s registry "Hill Giant"
-  forest <- S.printingOf s registry "Forest"
-  let (gs0, ours, theirs) = S.combatBoardOf [spider] [piker, giant]
-      stock g = snd (S.addLibraryCard forest S.alice g)
-      stocked = stock (stock (stock (stock (stock gs0))))
-  case (ours, theirs) of
-    ([spiderId], [pikerId, giantId]) -> pure (S.addCounter CounterKind.Stun stunned giantId stocked, spiderId, pikerId, giantId)
-    _ -> Spec.assertFailure s "fixture should give alice Spider-Man and bob a Piker and a Giant"
 
 -- Overseer of Vault 76 {2}{W} Legendary Creature -- Human Advisor 3/3 (Oracle
 -- text checked against Scryfall 2026-09-27): "First Contact -- Whenever Overseer

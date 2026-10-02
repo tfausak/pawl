@@ -1,0 +1,166 @@
+{
+  "description": "CR 702.82c devour artifact 1 offers the artifacts and not the creatures",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "m1"
+          },
+          {
+            "card": "Plains",
+            "label": "m2"
+          },
+          {
+            "card": "Plains",
+            "label": "m3"
+          },
+          {
+            "card": "Plains",
+            "label": "m4"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "p1"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "p2"
+          },
+          {
+            "card": "Soldevi Digger",
+            "label": "d1"
+          },
+          {
+            "card": "Soldevi Digger",
+            "label": "d2"
+          },
+          {
+            "card": "Soldevi Digger",
+            "label": "d3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Caprichrome",
+            "label": "subject"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseAnyNumberToSacrifice",
+          "with": [
+            "$p1"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseAnyNumberToSacrifice",
+          "with": [
+            "$p2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseAnyNumberToSacrifice",
+          "with": [
+            "$d1",
+            "$d2",
+            "$d3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$subject",
+          "mana": [
+            "$m1",
+            "$m2",
+            "$m3",
+            "$m4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "Caprichrome",
+          "kind": {
+            "type": "PlusOnePlusOne"
+          },
+          "count": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "Caprichrome",
+          "power": 5,
+          "toughness": 5
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Battlefield",
+          "is": [
+            "$m1",
+            "$m2",
+            "$m3",
+            "$m4",
+            "$p1",
+            "$p2",
+            "Caprichrome"
+          ]
+        }
+      }
+    }
+  ],
+  "note": "Each Piker is a non-artifact creature, the plausible non-member, and an answer naming it is refused as unoffered; the three Diggers are shown offered by the answer taking them, three counters and a 5/5, with both Pikers still there."
+}

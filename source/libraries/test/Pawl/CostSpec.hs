@@ -1649,24 +1649,6 @@ causticExhaleSpec s registry =
       Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
       Spec.assertBool s (all (\d -> List.elem d (Game.zoneMembers Zone.Hand S.alice resolved)) held) "CR 701.4a and the card she revealed never left her hand"
       Spec.assertEqWith s "CR 701.20a and the table saw it: the hand half of rule 701.4a is a reveal" (S.revealsOf resolved) [(S.alice, Set.singleton (CardName.MkCardName (Text.pack "Hoarding Dragon")))]
-    -- The two halves in ONE pool, which is the whole of rule 701.4a's "or": each
-    -- zone holds exactly one Dragon, so a reading that offered either zone alone
-    -- would raise no prompt at all.
-    Spec.it s "CR 701.4a the payer is asked across both zones at once" $ do
-      swamp <- S.printingOf s registry "Swamp"
-      exhale <- S.printingOf s registry "Caustic Exhale"
-      galleon <- S.printingOf s registry "Armored Galleon"
-      inHand <- S.printingOf s registry "Hoarding Dragon"
-      onBattlefield <- S.printingOf s registry "Exalted Dragon"
-      let (spell, _, held, dragons, gs) = causticExhaleBoard 1 swamp exhale galleon [inHand] [onBattlefield]
-          offered :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
-          offered p = case p of
-            Prompt.ChooseBehold _ _ _ candidates -> do
-              State.modify' (<> [NonEmpty.toList candidates])
-              pure (NonEmpty.head candidates)
-            _ -> pure (S.identityAnswer p)
-          asked = State.execState (Engine.runGame offered gs (S.cast S.alice spell)) []
-      Spec.assertEqWith s "CR 701.4a one ask, over the card in hand and the permanent together" (fmap List.sort asked) [List.sort (held <> dragons)]
     -- CR 118.3 with the same mana and the same hand size: a Goblin Piker in place
     -- of the Dragon card, so nothing in either zone answers the criterion.
     Spec.it s "CR 118.3 neither zone holding a Dragon cannot pay" $ do
@@ -2026,31 +2008,9 @@ kindleBoard s registry inHand extra = do
 -- either. bob's Goblin Piker is the 2/1 the ability aims at. The only two
 -- numbers here that coincide are the threshold and the Soil's mana value, which
 -- is the point of the second case; everything else is distinct.
-forensicResearcherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forensicResearcherSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 forensicResearcherSpec s registry =
   Spec.describe s "Forensic Researcher" $ do
-    -- The case that says the number is a TOTAL and not a count: ONE card of mana
-    -- value 3 pays a collect evidence 3, and the Bolt beside it stays where it is.
-    -- A component that counted cards would need three and refuse this board.
-    Spec.it s "CR 701.59a one card of mana value 3 pays it, and the rest stays put" $ do
-      researcher <- S.printingOf s registry "Forensic Researcher"
-      bolt <- S.printingOf s registry "Lightning Bolt"
-      soil <- S.printingOf s registry "Acidic Soil"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (srcId, victimId, buried, gs) = forensicResearcherBoard researcher piker [bolt, soil]
-          soilId = case buried of
-            [_, only] -> only
-            _ -> S.noSource
-          boltId = case buried of
-            only : _ -> only
-            _ -> S.noSource
-          (after, offers) = afterCollecting srcId [soilId] victimId gs
-      Spec.assertEqWith s "CR 701.26a the ability resolved and bob's Piker is tapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Tapped)
-      Spec.assertEqWith s "CR 701.59a and the card she did not choose is still in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice after) [boltId]
-      Spec.assertEqWith s "so exactly one card was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
-      -- Which is the payer's choice and not the engine's: "any number" means the
-      -- whole graveyard is offered, and the Bolt stays only because she left it.
-      Spec.assertEqWith s "CR 701.59a and she was asked over her whole graveyard" (fmap List.sort offers) [List.sort buried]
     -- CR 701.59b, against the first case's board one Bolt short: two mana value 1
     -- cards total 2, and a player who cannot reach the total can't choose to
     -- collect evidence at all.

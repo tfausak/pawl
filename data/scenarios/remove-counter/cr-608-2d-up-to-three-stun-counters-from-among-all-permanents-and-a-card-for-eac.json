@@ -1,0 +1,195 @@
+{
+  "description": "CR 608.2d up to three stun counters from among all permanents, and a card for each",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Sensational Spider-Man",
+            "label": "sensational-spider-man",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Forest"
+          },
+          {
+            "card": "Forest"
+          },
+          {
+            "card": "Forest"
+          },
+          {
+            "card": "Forest"
+          },
+          {
+            "card": "Forest"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "goblin-piker",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "hill-giant",
+            "ready": true,
+            "counters": [
+              {
+                "key": {
+                  "type": "Stun"
+                },
+                "value": 2
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$sensational-spider-man"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTargets",
+          "with": [
+            [
+              "target",
+              [
+                [
+                  "Creature",
+                  "$goblin-piker"
+                ]
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseOptional",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseCounterRemovalUpTo",
+          "with": [
+            [
+              "$sensational-spider-man",
+              1
+            ],
+            [
+              "$hill-giant",
+              2
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseCounterRemovalUpTo",
+          "with": [
+            [
+              "$goblin-piker",
+              1
+            ],
+            [
+              "$hill-giant",
+              2
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {}
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Forest",
+          "count": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$goblin-piker",
+          "kind": {
+            "type": "Stun"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "alice",
+      "check": {
+        "Counters": {
+          "object": "$hill-giant",
+          "kind": {
+            "type": "Stun"
+          },
+          "count": 0
+        }
+      }
+    }
+  ],
+  "note": "One ChooseCounterRemovalUpTo, over both stun bearers: an answer naming Spider-Man, which carries none, is refused as unoffered, and the answer taking the Piker's 1 and the Giant's 2 removes all three and draws three. The cap is pinned from above by the existing data/scenarios/remove-counter/cr-608-2d-an-answer-above-three-removes-nothing.json, where four on offer and an answer of four remove nothing."
+}

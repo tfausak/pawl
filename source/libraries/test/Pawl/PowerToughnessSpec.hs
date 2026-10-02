@@ -803,7 +803,7 @@ handOfThePraetorsSpec s registry = Spec.describe s "Hand of the Praetors" $ do
 -- (Filter.IsTapped, spelled `Not IsTapped` for "untapped").
 --
 -- The counter half of the same entry rewrite is Shimatsu the Bloodcloaked's, in
--- Pawl.ReplacementSpec.
+-- data/scenarios/replacement/.
 woodElementalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 woodElementalSpec s registry = Spec.describe s "Wood Elemental" $ do
   -- CR 604.3: a characteristic-defining ability functions in all zones, so the

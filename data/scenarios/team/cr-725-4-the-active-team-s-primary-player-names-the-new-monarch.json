@@ -1,0 +1,162 @@
+{
+  "description": "CR 725.4 the active team's primary player names the new monarch",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "team": 1,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "team": 2,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "team": 2,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "dave",
+        "team": 1,
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "turn": 2,
+    "step": "Upkeep",
+    "monarch": "carol",
+    "sharedTeamTurns": true
+  },
+  "timeline": [
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "carol",
+      "do": "Concede"
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "dave",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseActivePlayer",
+          "with": "bob"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "dave",
+      "refuse": {
+        "Answer": {
+          "prompt": "ChooseActivePlayer",
+          "with": "carol"
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "Upkeep",
+      "player": "dave",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseActivePlayer",
+          "with": "dave"
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Monarch": {
+          "player": "dave"
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "step": "Upkeep",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "dave",
+          "zone": "Hand",
+          "card": "Island",
+          "count": 2
+        }
+      }
+    }
+  ],
+  "note": "Shared team turns, alice and dave against bob and carol; dave is the team's primary player. carol, the monarch, concedes in the team's upkeep. The ChooseActivePlayer entries are keyed by dave, so he is asked; bob and the departed carol are refused as unoffered, and dave names himself: he is the monarch and draws at the end step beside his draw-step card. Control: dave names alice instead, so alice is offered too. Control 2: without the option alice takes the crown unasked."
+}
