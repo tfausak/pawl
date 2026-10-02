@@ -1035,8 +1035,8 @@ proposedFor oid castFor gs =
 -- The same rule withholds a candidate from a face printing a floor on X (CR
 -- 101.1, Face.minimumX): CR 107.3b's 0 is below it, so Mind Grind cast "without
 -- paying its mana cost" is no cast at all.
-candidateAllowed :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
-candidateAllowed pid oid name proposed candidate =
+candidateAllowed :: PlayerId -> ObjectId -> GameState -> CandidateCost.CandidateCost -> Bool
+candidateAllowed pid oid proposed candidate =
   let board = proposedFor oid (CandidateCost.keyword candidate) proposed
       choice = Cost.variableChoice (CandidateCost.cost candidate)
       fixedBelowFloor = case Game.faceOf oid board of
@@ -1045,7 +1045,7 @@ candidateAllowed pid oid name proposed candidate =
             && Face.minimumX face > 0
             && Cost.hasVariable (Cost.Type.MkCost (Face.manaCost face) [])
         Nothing -> False
-   in not fixedBelowFloor && not (PlayerEffect.prohibitsCasting pid oid name choice board)
+   in not fixedBelowFloor && not (PlayerEffect.prohibitsCasting pid oid choice board)
 
 -- CR 601.2c asked of ONE candidate, on the same board rule 702.103d judges it on:
 -- a bestowed Nyxborn Rollicker is an Aura spell with enchant creature, so it is
@@ -1650,11 +1650,11 @@ turnedUpForPlay oid facing gs = case facing of
 -- necessity -- once stamped, the two resolve the same face -- and each carries a
 -- job the other cannot: as an ARGUMENT, which is how the ones that read the CARD
 -- -- the timing window, the printed restrictions, the candidate costs, the target
--- slots -- resolve their face, and where the name is used AS A NAME (CR 601.3a's
--- prohibitions, Null Chamber; Cost.candidateCostsFor); and as `asProposed`'s
--- STAMP, which is how the ones that go on to read the OBJECT resolve theirs:
--- CR 601.2f's adjustments through Cost.total, and any
--- filter measuring the spell's own characteristics. Thalia's "noncreature spells
+-- slots -- resolve their face, and where the name is used AS A NAME
+-- (Cost.candidateCostsFor); and as `asProposed`'s STAMP, which is how the ones
+-- that go on to read the OBJECT resolve theirs: CR 601.2f's adjustments through
+-- Cost.total, and any filter measuring the spell's own characteristics, CR
+-- 601.3a's prohibitions among them (Null Chamber's chosen names). Thalia's "noncreature spells
 -- cost {1} more to cast" is the observable: it taxes the Sorcery half of an
 -- adventurer card and not the Creature half, off one card in one hand.
 --
@@ -1685,12 +1685,6 @@ castableGiven shared pid oid name facing gs =
       payable extra spending board cost = case shared of
         Just (grants, pcs) -> payableCostGiven pcs (Cost.supplyManaSourcesGiven grants pcs pid board) extra spending pid oid board cost
         Nothing -> payableCost extra spending pid oid board cost
-      -- CR 708.2a's "no name", where the name is used AS A NAME. Taken off the
-      -- proposed face rather than from the argument, so a face-down proposal
-      -- carries the empty name CR 708.4 gives it and a face-up one carries the
-      -- half's own -- the two coincide for every face-up cast, since
-      -- `proposedFace` resolved that half by this very name.
-      proposedName = maybe name Face.name (proposedFace oid name proposed)
       -- CR 601.3, CR 601.2c and CR 601.2b, asked TOGETHER and per candidate,
       -- because CR 702.103d makes them one question: a candidate is one this
       -- player may announce when the board its own choice produces neither
@@ -1699,10 +1693,10 @@ castableGiven shared pid oid name facing gs =
       -- independent `any`s, an unpayable bestow route and a prohibited printed one
       -- would together offer a cast neither of them allows.
       --
-      -- CR 601.3's prohibition names a quality of the spell (Null Chamber by
-      -- name, Damping Engine by Filter), and both readings go through
-      -- `candidateAllowed` -- the half's own name, and the OBJECT for the Filter,
-      -- read off the `proposed` stamp this call already carries.
+      -- CR 601.3's prohibition names a quality of the spell (Null Chamber's
+      -- chosen name, Damping Engine's card types), a Filter `candidateAllowed`
+      -- reads off the `proposed` stamp this call already carries: a face-down
+      -- proposal shows CR 708.2a's empty name, a face-up one the half's own.
       --
       -- CR 118.14 is read off the card WHERE IT LIES, which is the only place it
       -- can be read: this gate runs before any move, so the permission is still
@@ -1713,7 +1707,7 @@ castableGiven shared pid oid name facing gs =
       -- permission the cast could be made under (Dawnhand Dissident's).
       extras = maybe [[]] (\face -> permissionCostChoices pid oid face proposed) (proposedFace oid name proposed)
       candidateOk candidate =
-        candidateAllowed pid oid proposedName proposed candidate
+        candidateAllowed pid oid proposed candidate
           && candidateFillable pid oid name proposed candidate
           && any (\extra -> payable (CandidateCost.reductions candidate) (spendingFor pid oid proposed) (proposedFor oid (CandidateCost.keyword candidate) proposed) (withPermissionCosts extra (CandidateCost.cost candidate))) extras
    in cardGatesOk pid oid name proposed
@@ -1764,8 +1758,7 @@ cardGatesOk pid oid name proposed =
 couldBeginToCast :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 couldBeginToCast pid oid name gs =
   let proposed = asProposed oid name Facing.FaceUp gs
-      proposedName = maybe name Face.name (proposedFace oid name proposed)
-      allowed = candidateAllowed pid oid proposedName proposed
+      allowed = candidateAllowed pid oid proposed
       candidates = windowedCandidates True pid oid name proposed (Cost.candidateCostsFor pid name oid proposed)
    in cardGatesOk pid oid name proposed && any allowed candidates
 
@@ -2067,34 +2060,31 @@ castableWhileSearching pid gs =
 -- will pay for it.
 castableWhenOffered :: ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> [CandidateCost.CandidateCost] -> GameState -> Bool
 castableWhenOffered spending pid oid name candidates proposed =
-  let -- CR 708.2a's "no name" where the name is used AS A NAME, `castable`'s
-      -- reading: a face-down proposal escapes a Null Chamber naming its card.
-      proposedName = maybe name Face.name (proposedFace oid name proposed)
-   in -- CR 702.61a, for CR 601.3's own reason: an offered cast is still a cast.
-      -- Reachable because CR 702.61b keeps triggered abilities going on the stack, so
-      -- one can resolve ABOVE the split-second spell and offer a cast while it is
-      -- still there.
-      not (SplitSecond.inForce proposed)
-        -- CR 601.3's prohibit half, CR 601.2c's fillability and CR 601.2b's
-        -- affordability, asked per candidate for `castable`'s reason and through its
-        -- predicates: CR 702.103d judges a bestow announcement on the Aura it makes of
-        -- the spell, and an offer that hands in the card's own list (CR 118.9's
-        -- absent) carries that candidate.
-        --
-        -- A REGRESSION FENCE on this path rather than a proved behaviour: no board in
-        -- the pool puts a CastOffer together with a bestow card and either a
-        -- prohibition or an empty battlefield, so reverting the per-candidate reading
-        -- here leaves the suite green. `castable` and `castSpellWith` are where the
-        -- same two predicates are proved.
-        && any
-          ( \candidate ->
-              candidateAllowed pid oid proposedName proposed candidate
-                && candidateFillable pid oid name proposed candidate
-                && payableCost (CandidateCost.reductions candidate) (spendingWith spending pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
-          )
-          candidates
-        && printedRestrictionsOk pid oid name proposed
-        && legendaryRestrictionOk pid oid name proposed
+  -- CR 702.61a, for CR 601.3's own reason: an offered cast is still a cast.
+  -- Reachable because CR 702.61b keeps triggered abilities going on the stack, so
+  -- one can resolve ABOVE the split-second spell and offer a cast while it is
+  -- still there.
+  not (SplitSecond.inForce proposed)
+    -- CR 601.3's prohibit half, CR 601.2c's fillability and CR 601.2b's
+    -- affordability, asked per candidate for `castable`'s reason and through its
+    -- predicates: CR 702.103d judges a bestow announcement on the Aura it makes of
+    -- the spell, and an offer that hands in the card's own list (CR 118.9's
+    -- absent) carries that candidate.
+    --
+    -- A REGRESSION FENCE on this path rather than a proved behaviour: no board in
+    -- the pool puts a CastOffer together with a bestow card and either a
+    -- prohibition or an empty battlefield, so reverting the per-candidate reading
+    -- here leaves the suite green. `castable` and `castSpellWith` are where the
+    -- same two predicates are proved.
+    && any
+      ( \candidate ->
+          candidateAllowed pid oid proposed candidate
+            && candidateFillable pid oid name proposed candidate
+            && payableCost (CandidateCost.reductions candidate) (spendingWith spending pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
+      )
+      candidates
+    && printedRestrictionsOk pid oid name proposed
+    && legendaryRestrictionOk pid oid name proposed
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them
 -- the chance to cast a castable-while-searching card from it, before any card is
@@ -2280,7 +2270,7 @@ castSpellWith perform timed offered applied widened pid oid name facing = do
           -- all of them or the gate above kept none.
           candidates =
             filter
-              (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
+              (\candidate -> candidateAllowed pid oid proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
                   (windowedCandidates timed pid oid name proposed (if null applied then Cost.candidateCostsGiven offered pid name oid proposed else applied))

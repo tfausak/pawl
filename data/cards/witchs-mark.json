@@ -1,0 +1,220 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Witch's Mark",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Discard",
+                    "value": {
+                      "type": "Counted",
+                      "value": {
+                        "quantity": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "slot": "you"
+                      }
+                    }
+                  }
+                ],
+                "optionality": {
+                  "type": "Optional"
+                }
+              },
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": {
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    }
+                  }
+                ],
+                "ifTaken": {
+                  "type": "AnyTaken",
+                  "value": [
+                    0
+                  ]
+                }
+              },
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "enchant": [
+                              {
+                                "pool": {
+                                  "type": "Creatures"
+                                }
+                              }
+                            ],
+                            "name": "Wicked",
+                            "staticAbilities": [
+                              {
+                                "affected": {
+                                  "type": "Matching",
+                                  "value": {
+                                    "type": "And",
+                                    "value": [
+                                      {
+                                        "type": "HasCardType",
+                                        "value": {
+                                          "type": "Creature"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasAttached",
+                                        "value": {
+                                          "type": "IsSource"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "modifications": [
+                                  {
+                                    "type": "ModifyPowerToughness",
+                                    "value": {
+                                      "power": {
+                                        "type": "Literal",
+                                        "value": 1
+                                      },
+                                      "toughness": {
+                                        "type": "Literal",
+                                        "value": 1
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ],
+                            "triggeredAbilities": [
+                              {
+                                "condition": {
+                                  "type": "SelfDies"
+                                },
+                                "modal": {
+                                  "modes": [
+                                    {
+                                      "clauses": [
+                                        {
+                                          "effects": [
+                                            {
+                                              "type": "LoseLife",
+                                              "value": {
+                                                "player": {
+                                                  "type": "Relative",
+                                                  "value": {
+                                                    "type": "Opponent"
+                                                  }
+                                                },
+                                                "quantity": {
+                                                  "type": "Literal",
+                                                  "value": 1
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            ],
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Aura"
+                                },
+                                {
+                                  "type": "Role"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Enchantment"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "riders": {
+                        "attachedTo": "creature"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "creature": {
+                "count": {
+                  "type": "Printed",
+                  "value": {
+                    "least": 0,
+                    "most": 1
+                  }
+                },
+                "filter": {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

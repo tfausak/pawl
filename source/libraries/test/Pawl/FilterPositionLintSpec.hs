@@ -12,7 +12,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (ActivationCostFramed, AffectedSetFramed, AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, ManaRestrictionFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, TriggerConditionFramed, Unframed), anyFace, cardCounts, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, modalFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (ActivationCostFramed, AffectedSetFramed, AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, ManaRestrictionFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, PlayerEffectFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, StoredPlayerEffectFramed, TriggerConditionFramed, Unframed), anyFace, cardCounts, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, modalFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
@@ -352,7 +352,11 @@ hostFramed framing = case framing of
   -- what the split is about is CR 201.4's chosen names, not CR 303.4b's host,
   -- which all four evaluators supply.
   StandingHostFramed -> True
+  PlayerEffectFramed -> True
   ReplacementRowFramed -> True
+  -- The stored CR 611.2c row's: a resolved spell has no permanent behind it to
+  -- be attached to anything.
+  StoredPlayerEffectFramed -> False
   Unframed -> False
   AttachDestination -> False
   EntryAttachDestination -> False
@@ -614,18 +618,19 @@ hostOfSubjectCardTypeOffends card =
 hasChosenNameTag :: Text.Text
 hasChosenNameTag = Text.pack "HasChosenName"
 
--- How many CR 201.4 chosen-name atoms this card carries inside one of the three
--- ADMITTED positions -- a CR 701.23 search's filter, a CR 701.17 mill's tally, or
--- an EFFECT's ObjectRef -- and how many anywhere else. The second number is
--- the offence; the first is what Ancient Vendetta, Predict and Petra Sphinx
--- legitimately have one each of.
+-- How many CR 201.4 chosen-name atoms this card carries inside one of the
+-- ADMITTED positions -- a CR 701.23 search's filter, a CR 701.17 mill's tally,
+-- an EFFECT's ObjectRef, or a player effect's own Filter, printed or stored --
+-- and how many anywhere else. The second number is the offence; the first is
+-- what Ancient Vendetta, Predict, Petra Sphinx, Null Chamber, Conjurer's Ban and
+-- Runed Halo legitimately have.
 --
 -- SourceHostFramed and not `hostFramed`: since #3320 that tag means an effect's
 -- ObjectRef and nothing else, which is what makes it admissible here. The
 -- positions it used to share the tag with carry StandingHostFramed and are
--- REJECTED -- CR 604.2's clause, CR 603.4's intervening "if" and a printed player
--- ability's own Filters are each read outside a resolution, through
--- Filter.contextFor or Filter.contextWithSlots, where sourceChosenNames is empty.
+-- REJECTED -- CR 604.2's clause and CR 603.4's intervening "if" are each read
+-- outside a resolution, through Filter.contextFor or Filter.contextWithSlots,
+-- where sourceChosenNames is empty.
 -- The self-test below plants the atom in a static condition and expects the
 -- offence.
 --
@@ -636,25 +641,25 @@ hasChosenNameTag = Text.pack "HasChosenName"
 -- fact answer. Widen it when a card wants one of them.
 hasChosenNameCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenNameCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms hasChosenNameTag f) (filter (\(framing, _) -> elem framing [SearchFramed, MillTallyFramed, SourceHostFramed] == wanted) (cardFilters card)))
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms hasChosenNameTag f) (filter (\(framing, _) -> elem framing [SearchFramed, MillTallyFramed, SourceHostFramed, PlayerEffectFramed, StoredPlayerEffectFramed] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
 -- is filled: by Pawl.Engine.SourceContext -- in Pawl.Engine.Resolve.Slots.effectContext,
 -- which all but one of a resolution's positions go through (the search filter,
 -- the mill tally and an ObjectRef's own Filter among them), a trigger condition,
--- an affected set and a cost criterion -- and by
--- Pawl.Engine.Replacement.candidateContext, where rule 702.16e's minted shield is
--- the only filter written. Filter.contextFor, Filter.contextWithSlots,
+-- an affected set, a cost criterion, a replacement row
+-- (Pawl.Engine.Replacement.candidateContext, where rule 702.16e's minted shield
+-- is the only filter written) and a player effect's own Filter
+-- (Pawl.Engine.PlayerEffect.contextFor). Filter.contextFor, Filter.contextWithSlots,
 -- Filter.contextComparingPower and
 -- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
--- a target slot, a static ability's CR 604.2 condition, a triggered ability's CR
--- 603.4 intervening "if" or a printed player ability is a silent False rather
--- than a rejected card. This is where that is made loud -- the three condition
+-- a target slot, a static ability's CR 604.2 condition or a triggered ability's
+-- CR 603.4 intervening "if" is a silent False rather than a rejected card. This is where that is made loud -- the three condition
 -- positions through StandingHostFramed, which #3320 split off SourceHostFramed
 -- precisely so this allowlist could refuse them.
 --
--- The three positions hasChosenNameCounts admits are narrower than that, on
+-- The positions hasChosenNameCounts admits are narrower than that, on
 -- purpose: see its own note. So a card rejected here is not necessarily one the
 -- engine would answer wrong.
 --
@@ -664,7 +669,7 @@ hasChosenNameCounts card =
 -- three.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside those three positions, or the traversal and the codec
+-- traversal found the atom outside those positions, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence. Unlike its three siblings' the second disjunct is PROVED here rather
@@ -1295,9 +1300,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace hasChosenNameOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only where the resolution overlays the chosen names" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and ALL THREE cards that do are
-    -- ACCEPTED here rather than skipped -- one per admitted position, so a
-    -- framing that stopped marking any would redden.
+    -- NOT vacuous: the pool authors the atom, and EVERY card that does is
+    -- ACCEPTED here rather than skipped -- at least one per admitted position,
+    -- so a framing that stopped marking any would redden.
     vendetta <- S.printingOf s registry "Ancient Vendetta"
     Spec.assertEqWith
       s
@@ -1316,11 +1321,29 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Petra Sphinx's one atom is framed by the ObjectRef its move names"
       (hasChosenNameCounts (S.combinedFace sphinx))
       (1, 0)
+    chamber <- S.printingOf s registry "Null Chamber"
     Spec.assertEqWith
       s
-      "and the three are the pool's only ones"
+      "Null Chamber's two atoms are framed by its printed player abilities"
+      (hasChosenNameCounts (S.combinedFace chamber))
+      (2, 0)
+    halo <- S.printingOf s registry "Runed Halo"
+    Spec.assertEqWith
+      s
+      "Runed Halo's one atom is framed by its printed player ability"
+      (hasChosenNameCounts (S.combinedFace halo))
+      (1, 0)
+    ban <- S.printingOf s registry "Conjurer's Ban"
+    Spec.assertEqWith
+      s
+      "Conjurer's Ban's two atoms are framed by its stored player effects"
+      (hasChosenNameCounts (S.combinedFace ban))
+      (2, 0)
+    Spec.assertEqWith
+      s
+      "and the six cards' atoms are the pool's only ones"
       (sum (fmap (uncurry (+) . hasChosenNameCounts . S.combinedFace) ps))
-      3
+      8
   -- CR 702.16k's chosen player in the same frame one atom over: answerable only
   -- where a protection quality is read, and every one of those four positions
   -- takes its filter off a keyword. See ofChosenPlayerOffends for the two
@@ -2354,6 +2377,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (InTargetSlot, [bound]),
         (SourceHostFramed, [bound]),
         (StandingHostFramed, [bound]),
+        (PlayerEffectFramed, [bound]),
+        (StoredPlayerEffectFramed, [bound]),
         (SearchFramed, [bound]),
         (ReplacementRowFramed, [bound]),
         (OutsideTheGameFramed, [bound]),

@@ -36,8 +36,6 @@ codec =
         [ Arm.nullary "CantCastSpells" PlayerEffect.CantCastSpells,
           Arm.payload "CantActivateAbilities" (Common.maybe KeywordDesignator.codec) PlayerEffect.CantActivateAbilities (\x -> case x of PlayerEffect.CantActivateAbilities y -> Just y; _ -> Nothing),
           Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan (\x -> case x of PlayerEffect.CantCastMoreThan y -> Just y; _ -> Nothing),
-          Arm.nullary "CantCastChosenName" PlayerEffect.CantCastChosenName,
-          Arm.nullary "CantPlayLandChosenName" PlayerEffect.CantPlayLandChosenName,
           Arm.payload "IncreaseSpellCost" IncreaseSpellCost.codec PlayerEffect.IncreaseSpellCost (\x -> case x of PlayerEffect.IncreaseSpellCost y -> Just y; _ -> Nothing),
           Arm.payload "IncreaseActivationCost" IncreaseActivationCost.codec PlayerEffect.IncreaseActivationCost (\x -> case x of PlayerEffect.IncreaseActivationCost y -> Just y; _ -> Nothing),
           Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost (\x -> case x of PlayerEffect.ReduceSpellCost y -> Just y; _ -> Nothing),
@@ -62,7 +60,6 @@ codec =
           Arm.payload "DamageCantBePrevented" DamagePattern.codec PlayerEffect.DamageCantBePrevented (\x -> case x of PlayerEffect.DamageCantBePrevented y -> Just y; _ -> Nothing),
           Arm.payload "DamageCantBeRedirected" DamagePattern.codec PlayerEffect.DamageCantBeRedirected (\x -> case x of PlayerEffect.DamageCantBeRedirected y -> Just y; _ -> Nothing),
           Arm.payload "CantSearchLibraries" CantSearchLibraries.codec PlayerEffect.CantSearchLibraries (\x -> case x of PlayerEffect.CantSearchLibraries y -> Just y; _ -> Nothing),
-          Arm.nullary "HasProtectionFromChosenName" PlayerEffect.HasProtectionFromChosenName,
           Arm.payload "HasProtectionFrom" filterCodec PlayerEffect.HasProtectionFrom (\x -> case x of PlayerEffect.HasProtectionFrom y -> Just y; _ -> Nothing),
           Arm.nullary "CantBecomeMonarch" PlayerEffect.CantBecomeMonarch,
           Arm.nullary "CantSetSchemesInMotion" PlayerEffect.CantSetSchemesInMotion,
@@ -88,8 +85,6 @@ tagOf x = case x of
   PlayerEffect.CantCastSpells {} -> "CantCastSpells"
   PlayerEffect.CantActivateAbilities {} -> "CantActivateAbilities"
   PlayerEffect.CantCastMoreThan {} -> "CantCastMoreThan"
-  PlayerEffect.CantCastChosenName {} -> "CantCastChosenName"
-  PlayerEffect.CantPlayLandChosenName {} -> "CantPlayLandChosenName"
   PlayerEffect.IncreaseSpellCost {} -> "IncreaseSpellCost"
   PlayerEffect.IncreaseActivationCost {} -> "IncreaseActivationCost"
   PlayerEffect.ReduceSpellCost {} -> "ReduceSpellCost"
@@ -114,7 +109,6 @@ tagOf x = case x of
   PlayerEffect.DamageCantBePrevented {} -> "DamageCantBePrevented"
   PlayerEffect.DamageCantBeRedirected {} -> "DamageCantBeRedirected"
   PlayerEffect.CantSearchLibraries {} -> "CantSearchLibraries"
-  PlayerEffect.HasProtectionFromChosenName {} -> "HasProtectionFromChosenName"
   PlayerEffect.HasProtectionFrom {} -> "HasProtectionFrom"
   PlayerEffect.CantBecomeMonarch {} -> "CantBecomeMonarch"
   PlayerEffect.CantSetSchemesInMotion {} -> "CantSetSchemesInMotion"
