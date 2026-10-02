@@ -163,9 +163,8 @@ data CostComponent keyword
     -- exception to rule 109.2. Pawl.Engine.Cost.materialCandidates is the union
     -- and Prompt.ChooseMaterials the ask.
     --
-    -- Binds nothing, unlike ExileThis above. Not implemented: CR 702.167c's "the
-    -- exiled cards used to craft it", which is what would want the exiled
-    -- materials bound here (#3931).
+    -- BINDS the exiled materials for CR 702.167c's "the exiled cards used to
+    -- craft it" (Pawl.Engine.Binding.craftMaterials).
     ExileMaterials (ExileMaterials.ExileMaterials keyword)
   | -- | CR 406.2 in its fixed form / Circling Vultures: exile the topmost card of
     -- the paying player's graveyard matching the Filter, which CR 404.2's fixed
