@@ -146,6 +146,8 @@ viewOfCard face =
           Filter.power = printedPower face,
           -- CR 208.1's other half off the printed toughness box.
           Filter.toughness = printedToughness face,
+          -- The printed starting intensity; no intensify effect reaches a face.
+          Filter.intensity = fmap toInteger (Face.startingIntensity face),
           -- CR 202.3: printed on the card, and rule 202.3 names no zone.
           Filter.manaValue = Just (Quantity.manaValueOf face),
           -- CR 202.1 off the same printed box the value above totals; Nothing for
@@ -479,6 +481,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.keywords = Map.keysSet (PC.keywords pc),
       Filter.power = PC.power pc,
       Filter.toughness = PC.toughness pc,
+      Filter.intensity = PC.intensity pc,
       -- CR 202.3 / 707.2 off the PROJECTION: mana cost is copiable, so layer 1
       -- replaces it. The printed cost is read in baseCharacteristics.
       Filter.manaValue = PC.manaValue pc,
@@ -1666,6 +1669,7 @@ noCharacteristics =
       PC.toughness = Nothing,
       PC.loyalty = Nothing,
       PC.defense = Nothing,
+      PC.intensity = Nothing,
       PC.characteristicPT = Nothing,
       PC.cardTypes = Set.empty,
       PC.subtypes = Set.empty,
@@ -1805,6 +1809,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               PC.loyalty = Face.loyalty face,
               -- CR 310.4a: a literal number, likewise.
               PC.defense = Face.defense face,
+              -- Alchemy's printed starting intensity; Modification.Intensify adds
+              -- to it after the layers.
+              PC.intensity = fmap toInteger (Face.startingIntensity face),
               PC.characteristicPT = seedCharacteristicPT face,
               PC.cardTypes = TypeLine.types (Face.typeLine face),
               PC.subtypes = TypeLine.subtypes (Face.typeLine face),

@@ -14,6 +14,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
@@ -73,7 +74,8 @@ codec abilityCodec =
           Arm.payload "HasFullText" (FullText.codec abilityCodec) Modification.HasFullText (\x -> case x of Modification.HasFullText y -> Just y; _ -> Nothing),
           Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness,
           Arm.nullary "AssignCombatDamageWithToughness" Modification.AssignCombatDamageWithToughness,
-          Arm.nullary "GrantsStationToughness" Modification.GrantsStationToughness
+          Arm.nullary "GrantsStationToughness" Modification.GrantsStationToughness,
+          Arm.payload "Intensify" Quantity.codec Modification.Intensify (\x -> case x of Modification.Intensify y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: Modification.Modification ability -> String
@@ -117,3 +119,4 @@ tagOf x = case x of
   Modification.SwitchPowerToughness {} -> "SwitchPowerToughness"
   Modification.AssignCombatDamageWithToughness {} -> "AssignCombatDamageWithToughness"
   Modification.GrantsStationToughness {} -> "GrantsStationToughness"
+  Modification.Intensify {} -> "Intensify"

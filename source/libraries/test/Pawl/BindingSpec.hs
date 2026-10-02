@@ -32,6 +32,7 @@ sampleSnapshot =
       PC.toughness = Just 1,
       PC.loyalty = Nothing,
       PC.defense = Nothing,
+      PC.intensity = Nothing,
       PC.characteristicPT = Nothing,
       PC.cardTypes = Set.empty,
       PC.subtypes = Set.empty,

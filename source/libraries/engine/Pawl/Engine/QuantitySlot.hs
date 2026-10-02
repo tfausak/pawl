@@ -93,6 +93,7 @@ overSlots f quantity =
         Quantity.ManaValue -> pure quantity
         Quantity.Power -> pure quantity
         Quantity.Toughness -> pure quantity
+        Quantity.Intensity -> pure quantity
         Quantity.InSlot slot -> fmap Quantity.InSlot (f slot)
         -- CR 701.4b's reader names a slot too, and is visited here for
         -- AgainstSlot's reason below: the slot has to be on the READ side of the
@@ -303,6 +304,7 @@ nestedRefs quantity = case quantity of
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
   Quantity.Toughness -> Set.empty
+  Quantity.Intensity -> Set.empty
   -- The amount reader, which `slots` above reports itself.
   Quantity.InSlot _ -> Set.empty
   -- AgainstSlot's answer below: `slots` above DOES report this arm's own slot,
@@ -410,6 +412,7 @@ nestedCounts quantity = case quantity of
   Quantity.ManaValue -> []
   Quantity.Power -> []
   Quantity.Toughness -> []
+  Quantity.Intensity -> []
   -- A slot read, not a fold over game state: the value was bound by an earlier
   -- effect of the same resolution and there is no Count inside it.
   Quantity.InSlot _ -> []
@@ -660,6 +663,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.ManaValue -> quantity
         Quantity.Power -> quantity
         Quantity.Toughness -> quantity
+        Quantity.Intensity -> quantity
         Quantity.InSlot _ -> quantity
         Quantity.WasBound _ -> quantity
         Quantity.BoundCount _ -> quantity

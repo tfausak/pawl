@@ -192,6 +192,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.Power -> mView >>= Filter.power
         -- CR 208.1's other half, read off the same view and Nothing in the same places.
         Quantity.Toughness -> mView >>= Filter.toughness
+        -- Alchemy's intensity, read off the same view in every zone: Static
+        -- Discharge reads its own on the stack.
+        Quantity.Intensity -> mView >>= Filter.intensity
         -- A value bound into the slot, read off the effect's SOURCE, then off the
         -- object on the stack, then out of the announcement the context carries, and
         -- last out of the ambient channel. Nothing when none of the four holds an
@@ -1241,6 +1244,7 @@ objectSlots quantity = case quantity of
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
   Quantity.Toughness -> Set.empty
+  Quantity.Intensity -> Set.empty
   Quantity.Star -> Set.empty
   -- DESCENT: a composite's payload is card text like any other, and
   -- QuantitySlot.slots descends into each of these three the same way.
@@ -1529,6 +1533,7 @@ readsX quantity = case quantity of
   Quantity.ManaValue -> False
   Quantity.Power -> False
   Quantity.Toughness -> False
+  Quantity.Intensity -> False
   Quantity.Star -> False
   Quantity.ManaCount _ -> False
   Quantity.LifeTotal _ -> False

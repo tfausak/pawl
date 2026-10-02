@@ -41,6 +41,10 @@ data Quantity
   | -- | CR 208.1: the projected toughness of the object this quantity is
     -- evaluated against.
     Toughness
+  | -- | Alchemy's intensity of the object this quantity is evaluated against
+    -- (Static Discharge), which no CR rule names; see
+    -- Pawl.Types.ProjectedCharacteristics.intensity.
+    Intensity
   | -- | A number an earlier effect of the same resolution bound at that slot;
     -- Nothing when it holds no amount. CR 601.2b's X is this arm, at
     -- Pawl.Engine.Binding.variableX.

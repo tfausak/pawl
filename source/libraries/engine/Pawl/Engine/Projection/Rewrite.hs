@@ -329,6 +329,8 @@ rewriteModification pairs m =
         -- Nothing to rewrite: two bare markers naming no subtype word.
         Modification.AssignCombatDamageWithToughness -> acc
         Modification.GrantsStationToughness -> acc
+        -- CR 612.1 through the amount, ModifyPowerToughness's descent below.
+        Modification.Intensify n -> Modification.Intensify (rewriteQuantity [(from, to)] n)
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
         -- hacked Aspect of Wolf counts the new type. rewriteQuantity is the same
         -- descent rewriteCondition and the CDA path take.
@@ -1048,6 +1050,7 @@ rewriteObjectRef pairs ref = case ref of
   -- states this Filter is under a triggered ability no card in the pool changes
   -- the text of, so dropping the rewrite here leaves the suite green.
   ObjectRef.EachCardInYourLibrary f -> ObjectRef.EachCardInYourLibrary (fmap (Filter.rewrite pairs) f)
+  ObjectRef.EachCardYouOwn f -> ObjectRef.EachCardYouOwn (Filter.rewrite pairs f)
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachCardExiledWithAbility name -> ObjectRef.EachCardExiledWithAbility name
   ObjectRef.EachCardEncodedOnSource f -> ObjectRef.EachCardEncodedOnSource (fmap (Filter.rewrite pairs) f)
@@ -2076,6 +2079,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.ManaValue -> quantity
   Quantity.Type.Power -> quantity
   Quantity.Type.Toughness -> quantity
+  Quantity.Type.Intensity -> quantity
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.WasBound _ -> quantity
   Quantity.Type.BoundCount _ -> quantity
