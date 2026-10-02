@@ -26,6 +26,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -444,12 +445,12 @@ data Object = MkObject
     -- 716.2b's retention clause being about a permanent that stops being a CLASS
     -- rather than one that changes zones.
     classLevel :: Maybe ClassLevel.ClassLevel,
-    -- | CR 709.5c: the UNLOCKED DESIGNATIONS this permanent has. Named by HALF
-    -- rather than positionally, and a Set rather than a pair of Bools:
-    -- docs/design.md section 2.11's rule against baking arity into the card
-    -- model, and CR 709.4a's convention that a split card's halves are referred
-    -- to by name. Empty for every object that is not a Room permanent and for a
-    -- Room that entered with neither door open (CR 709.5d).
+    -- | CR 709.5c: the UNLOCKED DESIGNATIONS this permanent has. By POSITION, as
+    -- the rule words them ("left half unlocked"), so a permanent that starts
+    -- copying a different Room keeps its open doors open: a half's NAME is the
+    -- copied card's, and one stored from the old card would match neither new
+    -- half. Empty for every object that is not a Room permanent and for a Room
+    -- that entered with neither door open (CR 709.5d).
     --
     -- STORED rather than projected, for protector's reason: CR 709.5e's special
     -- action and CR 709.5f/709.5g's unlock and lock all write it, and what it
@@ -459,7 +460,7 @@ data Object = MkObject
     --
     -- Per-incarnation: cleared by newIncarnation, and CR 709.5d re-decides it
     -- from the half that was cast every time the permanent enters.
-    unlockedHalves :: Set.Set CardName.CardName,
+    unlockedHalves :: Set.Set RoomHalf.RoomHalf,
     -- | Every designation this permanent has: CR 702.112b's renowned, CR 701.37b's
     -- monstrous, CR 701.60b's suspected, CR 719.3b's solved, CR 722.3b's
     -- prepared and CR 701.64b's harnessed, which

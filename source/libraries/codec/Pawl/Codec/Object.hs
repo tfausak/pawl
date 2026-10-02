@@ -28,6 +28,7 @@ import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
+import qualified Pawl.Codec.RoomHalf as RoomHalf
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.Sickness as Sickness
 import qualified Pawl.Codec.Source as Source
@@ -119,7 +120,7 @@ codec = Fields.object $ do
   protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
   ventureRoom <- Fields.defaulted "ventureRoom" Nothing (Common.maybe RoomIndex.codec) Object.ventureRoom
   classLevel <- Fields.defaulted "classLevel" Nothing (Common.maybe ClassLevel.codec) Object.classLevel
-  unlockedHalves <- Fields.defaulted "unlockedHalves" Set.empty (Common.set CardName.codec) Object.unlockedHalves
+  unlockedHalves <- Fields.defaulted "unlockedHalves" Set.empty (Common.set RoomHalf.codec) Object.unlockedHalves
   designations <- Fields.defaulted "designations" Set.empty (Common.set Designation.codec) Object.designations
   designationValues <- Fields.defaulted "designationValues" Map.empty (Common.keyedList designationValue) Object.designationValues
   paidCosts <- Fields.defaulted "paidCosts" Map.empty (Common.multiset Keyword.codec) Object.paidCosts
