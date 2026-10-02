@@ -197,7 +197,7 @@ codec resolve = Fields.object $ do
   activationsThisTurn <- Fields.defaulted "activationsThisTurn" Seq.empty (Common.seq PastActivation.codec) GameState.activationsThisTurn
   castPermissionsUsedThisTurn <- Fields.defaulted "castPermissionsUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set CastFromZone.codec)) GameState.castPermissionsUsedThisTurn
   rollModifiersUsedThisTurn <- Fields.defaulted "rollModifiersUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set ModifiedRoll.codec)) GameState.rollModifiersUsedThisTurn
-  triggeredThisGame <- Fields.defaulted "triggeredThisGame" Set.empty (Common.set AbilityTriggered.codec) GameState.triggeredThisGame
+  triggeredThisGame <- Fields.defaulted "triggeredThisGame" Seq.empty (Common.seq AbilityTriggered.codec) GameState.triggeredThisGame
   pendingControl <- Fields.defaulted "pendingControl" Map.empty (Common.naturalMap PlayerId.codec Decider.codec) GameState.pendingControl
   control <- Fields.defaulted "control" Map.empty (Common.naturalMap PlayerId.codec (Common.nonEmpty PlayerControl.codec)) GameState.control
   monarch <- Fields.defaulted "monarch" Nothing (Common.maybe PlayerId.codec) GameState.monarch
