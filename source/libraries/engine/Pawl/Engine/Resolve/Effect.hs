@@ -3023,7 +3023,7 @@ rearmStackExile subject copied obj gs =
 -- at a source that may have left (CR 113.7a).
 --
 -- The Source itself, unclassified: which of CR 113.3's arms carries an ability,
--- and which list it joins, is Replacement.applyCopyException's to say, and it
+-- and which list it joins, is Projection.View.applyCopyException's to say, and it
 -- says it by casing on the arm rather than on the ability.
 thisAbilitySource :: ObjectId -> GameState -> Maybe Source.Source
 thisAbilitySource resolving gs = fmap Object.source (Game.lookupObject resolving gs)

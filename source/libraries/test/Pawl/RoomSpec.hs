@@ -48,7 +48,8 @@
 -- Pawl.Engine.Projection.copiableReplacementsOf a producer over a copied door.
 -- Copy Enchantment is the copier, being the one printing in data/cards/ whose
 -- copy is eligible for an enchantment, and Lightning Bolt is the noncombat
--- damage the replacement reads.
+-- damage the replacement reads. Opalescence, Omni-Changeling and
+-- Glorious Anthem are the last case's: a copy exception over a Room (CR 707.9a).
 --
 -- Pawl.Engine.Room's own coverage is here rather than beside Resolve's, since
 -- rule 709.5c's derivation is what both the action and the opcode filter their
@@ -102,6 +103,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -1060,3 +1062,42 @@ spec s registry = Spec.describe s "Room" $ do
             Spec.assertEqWith s "and behind it the bolt deals that much plus 2" (S.lifeOf S.bob (boltBob boltId opened)) (Just 15)
           other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Spiked Corridor, got " <> show (length other))
+  -- CR 707.9a over a copy of a Room: the ability a copy effect's exception
+  -- grants "becomes part of the copiable values for the copy", and CR 709.5's
+  -- rebuild of a copied Room against its own doors must not lose it.
+  --
+  -- Opalescence makes the open Room a 2/2 creature, which is what lets
+  -- Omni-Changeling ("enter as a copy of any creature on the battlefield,
+  -- except it has changeling") aim at it. The copy enters with both doors shut
+  -- (CR 709.5d), so Opalescence makes it a 0/0, and Glorious Anthem keeps it
+  -- out of CR 704.5f's reach. The keyword is the observer: CR 205.3d lets
+  -- changeling, applied first in layer 4 (CR 613.3, with CR 613.8a(c) keeping
+  -- Opalescence's dependency out of it), add no creature type to what is then
+  -- an Enchantment Room, so no subtype filter can see it.
+  --
+  -- Copy Enchantment copying THAT copy is CR 707.2's half: the exception rode
+  -- the copy's copiable values, so the second copy has changeling too.
+  Spec.it s "CR 707.9a a copy of a Room keeps the changeling its copy effect gave it" $ do
+    (roomId, _, gs) <- setUp s registry
+    opalescence <- S.printingOf s registry "Opalescence"
+    anthem <- S.printingOf s registry "Glorious Anthem"
+    omni <- S.printingOf s registry "Omni-Changeling"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (_, withOpalescence) = S.addPermanent opalescence S.alice gs
+        (_, withAnthem) = S.addPermanent anthem S.alice withOpalescence
+        after = castDoor furnaceName roomId withAnthem
+        changeling = Projection.hasKeyword Keyword.Changeling
+    case roomPermanent after of
+      [origId] -> do
+        let resolved = copyOf origId after omni
+        case newPermanent after resolved of
+          [copyId] -> do
+            -- THE GAMEPLAY-LEVEL ASSERTION: the exception survived the rebuild.
+            Spec.assertEqWith s "Omni-Changeling's copy of the Room has changeling" (changeling copyId resolved) True
+            -- The control that the copy is on CR 709.5's rebuild: both of its
+            -- doors are shut, so it shows neither name.
+            Spec.assertEqWith s "the copy shows neither door" (Projection.namesOf copyId resolved) Set.empty
+            let recopied = copyOf copyId resolved copyEnchantment
+            Spec.assertEqWith s "CR 707.2: Copy Enchantment's copy of that copy has changeling too" (fmap (`changeling` recopied) (newPermanent resolved recopied)) [True]
+          other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
