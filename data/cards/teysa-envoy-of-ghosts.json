@@ -3,32 +3,53 @@
     {
       "keywords": [
         {
-          "type": "Trample"
+          "type": "Protection",
+          "value": {
+            "quality": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            },
+            "spares": null
+          }
+        },
+        {
+          "type": "Vigilance"
         }
       ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 2
+          "value": 5
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
             }
           }
         }
       ],
-      "name": "Shroofus Sproutsire",
+      "name": "Teysa, Envoy of Ghosts",
       "power": {
         "type": "Literal",
-        "value": 1
+        "value": 4
       },
       "toughness": {
         "type": "Literal",
-        "value": 1
+        "value": 4
       },
       "triggeredAbilities": [
         {
@@ -36,24 +57,13 @@
             "type": "PermanentDealsCombatDamageToPlayer",
             "value": {
               "filter": {
-                "type": "And",
-                "value": [
-                  {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Saproling"
-                    }
-                  },
-                  {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "You"
-                    }
-                  }
-                ]
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
               },
               "recipient": {
-                "type": "AnyPlayer"
+                "type": "You"
               }
             }
           },
@@ -64,6 +74,18 @@
                   {
                     "effects": [
                       {
+                        "type": "Destroy",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "thatDamager"
+                          },
+                          "regenerability": {
+                            "type": "Regenerable"
+                          }
+                        }
+                      },
+                      {
                         "type": "Create",
                         "value": {
                           "card": {
@@ -71,10 +93,18 @@
                               {
                                 "colorIndicator": [
                                   {
-                                    "type": "Green"
+                                    "type": "White"
+                                  },
+                                  {
+                                    "type": "Black"
                                   }
                                 ],
-                                "name": "Saproling Token",
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  }
+                                ],
+                                "name": "Spirit Token",
                                 "power": {
                                   "type": "Literal",
                                   "value": 1
@@ -86,7 +116,7 @@
                                 "typeLine": {
                                   "subtypes": [
                                     {
-                                      "type": "Saproling"
+                                      "type": "Spirit"
                                     }
                                   ],
                                   "types": [
@@ -99,8 +129,8 @@
                             ]
                           },
                           "quantity": {
-                            "type": "InSlot",
-                            "value": "thatMuch"
+                            "type": "Literal",
+                            "value": 1
                           }
                         }
                       }
@@ -115,7 +145,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Saproling"
+            "type": "Advisor"
+          },
+          {
+            "type": "Human"
           }
         ],
         "supertypes": [

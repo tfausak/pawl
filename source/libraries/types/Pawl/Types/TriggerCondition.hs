@@ -17,6 +17,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
@@ -87,11 +88,9 @@ data TriggerCondition
     -- (Ripjaw Raptor).
     SelfIsDealtDamage
   | -- | CR 603.2 / 509-510 read by a bystander: a permanent the Filter admits
-    -- dealt combat damage to a player (Tovolar, Dire Overlord).
-    --
-    -- Not implemented: narrowing the damaged player -- Teysa, Envoy of Ghosts'
-    -- "whenever a creature deals combat damage to you" (#4472).
-    PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
+    -- dealt combat damage to a player the relation admits (Tovolar, Dire
+    -- Overlord; Teysa, Envoy of Ghosts).
+    PermanentDealsCombatDamageToPlayer PermanentDealsCombatDamageToPlayer.PermanentDealsCombatDamageToPlayer
   | -- | CR 603.2c's batch reading of the arm above, with the damaged player
     -- narrowed: "whenever one or more artifact creatures you control deal combat
     -- damage to a player" (Pia Nalaar, Chief Mechanic), once per CR 510.2 step,

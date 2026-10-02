@@ -897,6 +897,8 @@ library codec
     Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.PermanentCandidate
     Pawl.Codec.PermanentCandidateSpec
+    Pawl.Codec.PermanentDealsCombatDamageToPlayer
+    Pawl.Codec.PermanentDealsCombatDamageToPlayerSpec
     Pawl.Codec.PermanentSacrificed
     Pawl.Codec.PermanentSacrificedSpec
     Pawl.Codec.PermanentsBecomeTargeted
@@ -2346,6 +2348,7 @@ library types
     Pawl.Types.PerCreature
     Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.PermanentCandidate
+    Pawl.Types.PermanentDealsCombatDamageToPlayer
     Pawl.Types.PermanentSacrificed
     Pawl.Types.PermanentsBecomeTargeted
     Pawl.Types.PermanentsDealCombatDamageToPlayer

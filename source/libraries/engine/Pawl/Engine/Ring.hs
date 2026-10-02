@@ -68,6 +68,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -418,7 +419,7 @@ theRingDrainsOnCombatDamage =
               Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer yourRingBearer,
+        { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentDealsCombatDamageToPlayer.MkPermanentDealsCombatDamageToPlayer yourRingBearer PlayerRelation.AnyPlayer),
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))

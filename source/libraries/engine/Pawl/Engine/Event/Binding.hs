@@ -138,8 +138,8 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- (see Binding.eventAmount) and the same one the bystander arm below stamps.
   --
   -- Both stamped on the ToPlayer branch alone. The other four recipients are
-  -- events this condition does not admit -- matchesTrigger requires
-  -- isPlayerRecipient -- so claiming a slot there would name a match that never
+  -- events this condition does not admit -- matchesTrigger requires a player
+  -- recipient -- so claiming a slot there would name a match that never
   -- happened. Given a match both are unconditional, which is what
   -- eventBindingSlots' per-condition promise needs: every GameEvent.DamageDealt
   -- carries a DamageEvent.amount.
@@ -212,7 +212,7 @@ eventBindingsOver board gs bearerBecame becameInGraveyard bearer you cond event 
   -- All three unconditional given a match, which is what eventBindingSlots'
   -- per-condition promise needs: every GameEvent.DamageDealt carries a
   -- DamageEvent.source and a DamageEvent.amount, and matchesTrigger has already
-  -- required isPlayerRecipient of the target -- so Recipient.playerOf's Nothing is
+  -- required a player target -- so Recipient.playerOf's Nothing is
   -- unreachable for an event this condition admitted.
   (TriggerCondition.PermanentDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     maybe id Binding.setTriggerPlayer (Recipient.playerOf (DamageEvent.target ev)) (Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty))
