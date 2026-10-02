@@ -532,11 +532,20 @@ answerDedicated decider asked =
         Prompt.Type.AnnounceTargets who _ asking offered -> do
           key <- whenOf gs (Decider.unwrap who)
           let named = Maybe.fromMaybe asking (Game.abilitySourceOf asking gs)
-          found <- takeForSource gs key named
-          case fmap (Timed.entry . snd) found of
-            Just (Entry.Do verb@(Move.ChooseTargets chosen)) -> announceSlots key verb offered chosen
-            Just entry -> failWith (Failure.MkUnexpectedPrompt key entry kind [])
-            Nothing -> unscheduled []
+              -- A refused entry naming a target no slot offers is refused
+              -- already, so the announcement reads the entry after it.
+              announce = do
+                found <- takeForSource gs key named
+                case found of
+                  Just (_, Timed.MkTimed {Timed.entry = Entry.Do verb@(Move.ChooseTargets chosen)}) -> announceSlots key verb offered chosen
+                  Just (index, Timed.MkTimed {Timed.entry = Entry.Refuse verb@(Move.ChooseTargets chosen)}) -> do
+                    everyOffered <- offersAll gs offered chosen
+                    if everyOffered
+                      then announceSlots key verb offered chosen
+                      else popAt key index >> announce
+                  Just (_, timed) -> failWith (Failure.MkUnexpectedPrompt key (Timed.entry timed) kind [])
+                  Nothing -> unscheduled []
+          announce
         -- Keyed by what is resolving, since two "may"s can share a moment: the
         -- spell, or the object an ability came from (CR 113.7), which is what
         -- a board can label.
@@ -851,6 +860,7 @@ onEntry unscheduled key kind offers select match = do
             -- refused already: the prompt takes the next entry instead.
             case State.runStateT action before {refusing = Just (key, verb, kind)} of
               Left Failure.MkUnofferedObject {} -> onEntry unscheduled key kind offers select match
+              Left Failure.MkActionNotOffered {} -> onEntry unscheduled key kind offers select match
               Left failure -> failWith failure
               Right (answer, after) -> answer <$ State.put after
       entry -> failWith (Failure.MkUnexpectedPrompt key entry kind offers)
@@ -1103,10 +1113,26 @@ resolveSlots gs key verb offered chosen =
           Map.traverseWithKey
             ( \slot (count, candidates) -> do
                 let refs = Foldable.toList (Map.findWithDefault Seq.empty slot chosen)
-                selected <- fmap Set.fromList (mapM (\ref -> resolveRecipient gs ref candidates refused) refs)
+                undoing <- State.gets reversing
+                let unoffered ref = case undoing of
+                      Just _ -> fmap (either Recipient.ToPlayer Recipient.ToObject) (resolveEither ref gs)
+                      Nothing -> refused
+                selected <- fmap Set.fromList (mapM (\ref -> resolveRecipient gs ref candidates (unoffered ref)) refs)
                 if Natural.length refs == count && Natural.length selected == count then pure selected else refused
             )
             offered
+
+-- | Whether every target an entry names is among its slot's candidates.
+offersAll :: GameState.GameState -> Map.Map SlotName.SlotName (TargetCount.TargetCount, Set.Set Recipient.Recipient) -> Map.Map SlotName.SlotName (Seq.Seq Reference.Reference) -> Run Bool
+offersAll gs offered chosen =
+  fmap and . sequence $
+    [ do
+        target <- resolveEither ref gs
+        pure (any (matchesRecipient target) candidates)
+    | (slot, refs) <- Map.toList chosen,
+      let candidates = maybe Set.empty snd (Map.lookup slot offered),
+      ref <- Foldable.toList refs
+    ]
 
 -- | How many targets each offered slot's entry names, within CR 601.2c's range.
 announceSlots :: When.When -> Move.Move -> Map.Map SlotName.SlotName (TargetCount.TargetCount, Set.Set Recipient.Recipient) -> Map.Map SlotName.SlotName (Seq.Seq Reference.Reference) -> Run (Map.Map SlotName.SlotName Natural)
@@ -1123,13 +1149,16 @@ announceSlots key verb offered chosen =
             )
             offered
 
+-- | Whether a recipient is the player or object a reference resolved to.
+matchesRecipient :: Either PlayerId.PlayerId ObjectId.ObjectId -> Recipient.Recipient -> Bool
+matchesRecipient target recipient = case target of
+  Left pid -> recipient == Recipient.ToPlayer pid
+  Right oid -> Recipient.objectOf recipient == Just oid
+
 resolveRecipient :: GameState.GameState -> Reference.Reference -> Set.Set Recipient.Recipient -> Run Recipient.Recipient -> Run Recipient.Recipient
 resolveRecipient gs ref offered unmatched = do
   target <- resolveEither ref gs
-  let matches recipient = case target of
-        Left pid -> recipient == Recipient.ToPlayer pid
-        Right oid -> Recipient.objectOf recipient == Just oid
-  case filter matches (Set.toList offered) of
+  case filter (matchesRecipient target) (Set.toList offered) of
     [recipient] -> pure recipient
     _ -> unmatched
 

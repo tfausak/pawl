@@ -74,8 +74,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   already; one it offers is taken, its targets sent to the engine whether
   offered or not, and must leave the stack and the player's hand and
   battlefield as they were. At any other prompt, a refused move naming
-  something the prompt did not offer (a summoning-sick attacker) is refused
-  already, and the prompt takes the next entry.
+  something the prompt did not offer (a summoning-sick attacker, a target no
+  slot admits) is refused already, and the prompt takes the next entry.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones,
   `Stack` included; the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),
