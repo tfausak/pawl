@@ -63,6 +63,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
@@ -621,6 +622,33 @@ withToughnessBoost oid gs =
 withPermanents :: PlayerId.PlayerId -> [Printing.Printing] -> GameState.GameState -> GameState.GameState
 withPermanents who ps gs = List.foldl' (\g p -> snd (S.addPermanent p who g)) gs ps
 
+-- Prison Barricade {1}{W} Creature -- Wall 1/3, whole text: "Defender / Kicker
+-- {1}{W} / If this creature was kicked, it enters with a +1/+1 counter on it and
+-- with 'This creature can attack as though it didn't have defender.'" (Oracle
+-- checked on Scryfall). Cast off four Plains with `kicks` as the kicker answer,
+-- then settled (CR 302.6, a fixture precondition both boards share) and run
+-- through a combat aimed at bob. Returns the board after combat and the Wall.
+barricadeCombat :: Printing.Printing -> Printing.Printing -> Natural.Natural -> (GameState.GameState, Maybe ObjectId.ObjectId)
+barricadeCombat plains barricade kicks =
+  let (board, cardId) = S.handOne barricade (S.landsInPlay plains 4)
+      cast = S.runPure (kickWith kicks) board (S.cast S.alice cardId >> Stack.resolveTop >> Engine.settleForPriority)
+      wall = List.find (\o -> Projection.hasName (CardName.MkCardName (Text.pack "Prison Barricade")) o cast) (Set.toList (GameState.battlefield cast))
+      settle o = o {Object.sickness = Sickness.Settled S.alice}
+      ready =
+        cast
+          { GameState.objects = maybe id (Map.adjust settle) wall (GameState.objects cast),
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
+            GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
+          }
+   in (S.runCombat (S.attackTo S.bob) ready, wall)
+
+-- CR 702.33a's answer, and S.identityAnswer's to everything else.
+kickWith :: Natural.Natural -> Prompt.Prompt r -> r
+kickWith kicks p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision kicks
+  _ -> S.identityAnswer p
+
 evasionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 evasionSpec s registry = Spec.describe s "Evasion" $ do
   -- The same Aura's other half, so the card is proved whole rather than in the
@@ -639,6 +667,18 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (Combat.canAttack S.alice other board) "the one beside it can"
         Spec.assertBool s (Projection.hasKeyword Keyword.Defender tethered board) "defender is what stops it"
       _ -> Spec.assertFailure s "fixture should have two creatures"
+  -- CR 702.3b lifted: the pair of boards differs only in the kicker answer, so
+  -- the kicked entry's quoted ability is what lets the Wall attack. Declared
+  -- through the turn-based action, not asked of Combat.canAttack.
+  Spec.it s "CR 702.3b a kicked Prison Barricade attacks as though it didn't have defender" $ do
+    plains <- S.printingOf s registry "Plains"
+    barricade <- S.printingOf s registry "Prison Barricade"
+    case (barricadeCombat plains barricade 1, barricadeCombat plains barricade 0) of
+      ((kicked, Just wall), (unkicked, Just _)) -> do
+        Spec.assertEqWith s "CR 702.3b kicked, the Wall is declared as an attacker" (S.attackerDeclarationsOf kicked) [wall]
+        Spec.assertBool s (Projection.hasKeyword Keyword.Defender wall kicked) "and it still has defender"
+        Spec.assertEqWith s "CR 702.3b unkicked, defender keeps it home" (S.attackerDeclarationsOf unkicked) []
+      _ -> Spec.assertFailure s "the Barricade should be on the battlefield after each cast"
   -- CR 509.1b's "unless" gate read against CR 205.3m: Graxiplon "can't be blocked
   -- unless defending player controls three or more creatures that share a
   -- creature type". Every board declares the same Hill Giant of bob's blocking;

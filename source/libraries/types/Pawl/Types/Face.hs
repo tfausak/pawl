@@ -21,6 +21,7 @@ import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackCost as AttackCost
+import qualified Pawl.Types.AttackPermission as AttackPermission
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -517,6 +518,11 @@ data Face card = MkFace
     -- 702.122d forbids paying a COST, where CR 508.1c and CR 509.1b forbid a
     -- combat declaration, so nothing that reads one may read the other.
     crewRestrictions :: [CrewRestriction.CrewRestriction],
+    -- | CR 604.1/604.2 / 702.3b: this face's printed ATTACKING PERMISSIONS --
+    -- "can attack as though it didn't have defender"; read by
+    -- Pawl.Engine.AttackPermission, rewritten by no layer, for
+    -- blockRequirements' CR 613.11 reason.
+    attackPermissions :: [AttackPermission.AttackPermission],
     -- | CR 604.1/604.2 / 303.4 / 301.5 / 101.2: this face's printed ATTACHMENT
     -- PROHIBITIONS -- "enchanted land ... can't be enchanted by other Auras"
     -- (Consecrate Land), "this creature can't be equipped" (Goblin Brawler);

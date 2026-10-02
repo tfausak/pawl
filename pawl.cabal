@@ -190,6 +190,8 @@ library codec
     Pawl.Codec.AttackLimitUnlessSpec
     Pawl.Codec.AttackOption
     Pawl.Codec.AttackOptionSpec
+    Pawl.Codec.AttackPermission
+    Pawl.Codec.AttackPermissionSpec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.AttackRequirementSpec
     Pawl.Codec.AttackTarget
@@ -1334,6 +1336,7 @@ library engine
     Pawl.Engine.Attach
     Pawl.Engine.AttachRestriction
     Pawl.Engine.AttackCost
+    Pawl.Engine.AttackPermission
     Pawl.Engine.AttackRequirement
     Pawl.Engine.Attraction
     Pawl.Engine.Battle
@@ -1945,6 +1948,7 @@ library types
     Pawl.Types.AttackingPlayers
     Pawl.Types.AttackLimitUnless
     Pawl.Types.AttackOption
+    Pawl.Types.AttackPermission
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.AttackTargetKind
