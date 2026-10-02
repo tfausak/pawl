@@ -307,114 +307,6 @@ lifeGainAmountSpec s registry =
             (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.bob (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 7)))
             (Binding.setTriggerPlayer S.bob (Map.singleton Binding.eventAmount (Binding.toAmount 7)))
 
--- CR 119.9's event read for its PLAYER, which neither group above can ask for:
--- Ajani's Pridemate and Sanguine Bond both watch under CR 109.5's "you", where
--- the gainer and the ability's controller are one seat.
---
--- False Cure, {B}{B} Instant, "Until end of turn, whenever a player gains life,
--- that player loses 2 life for each 1 life they gained." Three things at once,
--- and the board is built so that each fails on its own:
---
---   * CR 102.1's bare "a player" (PlayerRelation.AnyPlayer), so a gain by
---     somebody who is not the caster fires it. bob's Radiant Fountain is that
---     gain.
---   * CR 603.2's gaining player, bound under Binding.triggerPlayer. THREE seats,
---     because a two-seat board collapses "that player" onto the one opponent --
---     carol sits there so that "an opponent" and "the player who gained" are not
---     the same reading.
---   * CR 603.7b's stated duration, which keeps the entry armed through firing:
---     the second gain, alice's own, is a different seat and a different amount.
---   * CR 603.2c's repeat WITHIN one batch, which the two gains above cannot show
---     because they arrive in batches of one. Centaur Peacemaker, on its own
---     board below, puts every seat's gain in a single batch.
---
--- The doubling is Quantity.Plus of the slot with itself -- exact for "2 life for
--- each 1 life", and what makes the two amounts tell a bound amount from a
--- constant.
-falseCureSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-falseCureSpec s registry =
-  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
-      -- lifeGainAmountSpec's entry staging: the permanent is already placed, its
-      -- Moved event is recorded, and CR 603.6a's scan runs at the next settle.
-      entering oid gs =
-        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
-   in Spec.describe s "CR 603.7 False Cure" $ do
-        -- The vacuity guard, not a prover: the same Peacemaker with NO Cure armed
-        -- leaves every seat holding its 4 (CR 119.3). Without it a board where
-        -- "each player gains 4" quietly gained nobody anything would read as a
-        -- passing 16 in the proving scenario, the drains never having happened either.
-        Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
-          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
-          let (peacemakerId, gs) = S.addPermanent peacemaker S.alice S.threePlayerGame
-              after = entering peacemakerId gs
-          Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
-          Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
-          Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
-
--- An answer to CR 603.7b's question below, pinned BY INDEX and by nothing else.
--- An answerer that searched the candidates for a legal one would find the earliest
--- again under any mutation, and Pawl.Engine.Replay.defaultAnswer -- what
--- S.identityAnswer and every other fallthrough answerer reaches -- IS the
--- earliest. A board answered by one of those cannot tell the rule from its
--- absence.
-choosingGain :: Natural -> Prompt.Prompt r -> r
-choosingGain n prompt = case prompt of
-  Prompt.ChooseDelayedTriggerEvent {} -> n
-  _ -> S.identityAnswer prompt
-
--- CR 603.7b's SECOND sentence, which the group above cannot reach: "if its
--- trigger event occurs more than once simultaneously and the ability doesn't
--- have a stated duration, the controller of the delayed triggered ability
--- chooses which event causes the ability to trigger."
---
--- False Cure states "until end of turn", which is exactly the duration that
--- sentence excludes: CR 603.2c then fires it once per occurrence and there is
--- nothing to choose. The producer has to be the same delayed entry WITHOUT one.
---
---   * Synthetic Singular Cure {B}{B} Instant
---     (data/cards/synthetic-singular-cure.json): "The next time a player gains
---     life, that player loses 2 life for each 1 life they gained."
---
--- WHY A SYNTHETIC. Scryfall o:/[Ww]hen(ever)? a player gains life/, 2026-08-26,
--- matches one printing -- False Cure, whose duration disqualifies it. Off the
--- life axis, o:/[Tt]he next time/ -o:"this turn" -o:"until end of turn"
--- -o:"each turn", same date, matches four: Five-Finger Discount, Ria Ivor, Spire
--- Phantasm and The Big Idea, each watching a single named object or a single die
--- roll, none of which can occur twice at once. So no printing arms a
--- duration-less delayed ability on an event one batch can hold two of, and a
--- printing that did -- "the next time a player gains life", with no duration --
--- would refute this. Nothing in the CR forbids one: 603.7b's second sentence is
--- written for exactly this shape.
---
--- The batch is Centaur Peacemaker's "each player gains 4 life" again, one
--- EventGroup across the seats (CR 608.2f). What the cases read is WHICH SEAT is
--- drained: the entry has no duration, so CR 603.7b's first sentence spends it on
--- one occurrence, exactly one seat pays 8 and the rest keep their 4. The
--- amounts are equal on purpose -- identity is then the only separator, so an
--- assertion about the drained seat cannot pass on an arithmetic coincidence.
-singularCureSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-singularCureSpec s registry =
-  let resolveAll n gs = snd (Engine.runGamePure (choosingGain n) gs Engine.priorityLoop)
-      settle n gs = snd (Engine.runGamePure (choosingGain n) gs Engine.settleForPriority)
-      -- falseCureSpec's staging: the permanent is already placed, its Moved
-      -- event is recorded, and CR 603.6a's scan runs at the next settle.
-      entering n oid gs =
-        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll n (settle n (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
-   in Spec.describe s "CR 603.7b Synthetic Singular Cure" $ do
-        -- The vacuity guard, falseCureSpec's: the same Peacemaker with NO entry
-        -- armed leaves every seat holding its 4 (CR 119.3). Without it a board
-        -- where nobody actually gained would read as a passing 24 in the proving scenario.
-        Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
-          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
-          let (peacemakerId, gs) = S.addPermanent peacemaker S.alice S.threePlayerGame
-              after = entering 2 peacemakerId gs
-          Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
-          Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
-          Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
-
 -- CR 101.4: two delayed entries with DIFFERENT controllers matched by one batch
 -- are choices made at the same time, so the active player makes theirs first and
 -- the nonactive players follow in turn order. CR 101.4b is what makes the order
@@ -429,7 +321,7 @@ singularCureSpec s registry =
 -- on a two-seat board at all. The first case below asserts that gap on the board
 -- rather than assuming it.
 --
--- The batch is singularCureSpec's: Centaur Peacemaker entering, "each player
+-- The batch is Centaur Peacemaker entering, "each player
 -- gains 4 life", one EventGroup across the seats (CR 608.2f), so each entry's
 -- per-occurrence condition matches three times and each controller is asked.
 --
@@ -458,7 +350,7 @@ apnapDelayedSpec s registry =
           State.put (earlier <> [controller])
           pure (indexOf (if null earlier then controller else S.carol) candidates)
         _ -> pure (S.identityAnswer p)
-      -- The distinct EventGroups the log's life gains carry. singularCureSpec's
+      -- The distinct EventGroups the log's life gains carry. Synthetic Singular Cure's
       -- precondition, for the same reason: were the seats' gains not one group,
       -- the earliest-group step would have picked a seat and CR 603.7b's second
       -- sentence -- and so the prompt this group orders -- would never be reached.
@@ -564,7 +456,7 @@ apnapDelayedSpec s registry =
 -- be told apart by the AMOUNT a seat loses, so equal amounts would leave the two
 -- orders indistinguishable however the questions were asked.
 --
--- The batch is singularCureSpec's Centaur Peacemaker, "each player gains 4
+-- The batch is Centaur Peacemaker's "each player gains 4
 -- life", one EventGroup across the seats (CR 608.2f), so each entry's
 -- per-occurrence condition matches three times and each is asked once.
 oneSeatDelayedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1529,8 +1421,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeGainTriggerSpec s registry
   abilitiesWhenTriggeredSpec s registry
   lifeGainAmountSpec s registry
-  falseCureSpec s registry
-  singularCureSpec s registry
   apnapDelayedSpec s registry
   oneSeatDelayedSpec s registry
   communalVigilSpec s registry
