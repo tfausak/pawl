@@ -1741,22 +1741,26 @@ matchesFiltered viewOf gs candidate filter_ oid =
 -- CR 201.4's chosen names and CR 614.1c's chosen player ride along on the same
 -- footing, and LIVE for CR 609.7b's reason: a prevention shield's source half is
 -- rechecked at the event, so a name or a seat the source chose between the row's
--- installation and the damage is the one this reads. The names go through
--- Pawl.Engine.PlayerEffect.chosenNamesOf, which falls back to CR 608.2h's last
--- known information for a source already in a graveyard; the player has no such
+-- installation and the damage is the one this reads. The names, with the
+-- colour and subtype beside them, go through Pawl.Engine.SourceContext, which
+-- falls back to CR 608.2h's last known information for a source already in a
+-- graveyard; the player has no such
 -- fallback because Pawl.Types.LastKnown records no chosen player, and rule
 -- 702.16k's carrier is a permanent on the battlefield whenever its own static
 -- ability mints a row.
 candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
 candidateContext gs candidate =
-  ( Filter.contextWithSlots
-      (Game.teams gs)
-      (ReplacementCandidate.controller candidate)
-      (Just (ReplacementCandidate.source candidate))
-      (ReplacementCandidate.slots candidate)
+  ( SourceContext.withChoicesOf
+      (ReplacementCandidate.source candidate)
+      gs
+      ( Filter.contextWithSlots
+          (Game.teams gs)
+          (ReplacementCandidate.controller candidate)
+          (Just (ReplacementCandidate.source candidate))
+          (ReplacementCandidate.slots candidate)
+      )
   )
     { Filter.sourceAttachedTo = Projection.hostOf (ReplacementCandidate.source candidate) gs,
-      Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just (ReplacementCandidate.source candidate)) gs,
       Filter.carrierChosenPlayer = Game.lookupObject (ReplacementCandidate.source candidate) gs >>= Object.chosenPlayer
     }
 

@@ -1565,9 +1565,11 @@ offerCastOnce context named caster optionality verb retake offer = do
         | verb == PermissionVerb.Play && Cast.landDropOpen caster gs =
             [ (oid, mName, Face.name face)
             | oid <- named,
+              -- CR 406.3a: judged on the card turned up, as Cast.asProposed does
+              -- for a cast, so a land exiled face down shows its name.
+              not (PlayerEffect.prohibitsPlayingLand caster oid (Cast.turnedUpForPlay oid Facing.FaceUp gs)),
               Just obj <- [Game.lookupObject oid gs],
               Just card <- [Game.cardOf oid gs],
-              not (PlayerEffect.prohibitsPlayingLand caster (Game.copiableNamesOf obj card) oid gs),
               (mName, face) <- Game.landFacesOf obj card
             ]
         | otherwise = []
@@ -2428,6 +2430,19 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
   -- battlefield, before the next instruction reads the board. After the window
   -- above, so what they exile is filed by their own windows, not this one's.
   runEntryEffects
+
+-- CR 702.167c: the cards exiled to pay the cost of the craft ability resolving
+-- as `resolving` (Binding.craftMaterials), linked to the permanent it put onto
+-- the battlefield as `entered`, so CR 607.2a's readers -- AgainstCardsExiledWith,
+-- EachCardExiledWithSource -- find them from that permanent. Only those still in
+-- exile, which is the rule's "cards in exile". Pawl.ActivateSpec's Mastercraft
+-- Raptor case is the proof.
+linkCraftMaterials :: ObjectId -> ObjectId -> GameState -> GameState
+linkCraftMaterials resolving entered gs =
+  let paid = foldMap Set.toList (Map.lookup Binding.craftMaterials (Binding.targetsOf (slotBindings resolving gs)))
+      materials = filter (`Set.member` GameState.exile gs) (Maybe.mapMaybe Recipient.objectOf paid)
+      link = ExileLink.MkExileLink {ExileLink.source = entered, ExileLink.ability = Nothing}
+   in gs {GameState.exiledWith = foldr (`Map.insert` link) (GameState.exiledWith gs) materials}
 
 -- CR 607.2a's name for the ability resolving as `resolving`: an activated
 -- ability's ActivatedAbility.name, which is how a linked reference names one of
@@ -4118,11 +4133,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- move of a ceased object (CR 400.7) already does nothing, so
           -- removing it reddens nothing.
           --
-          -- Every card found moves as ONE event (CR 608.2f), so the cards
-          -- entering together see each other (CR 603.6a) and take CR 613.7m's
-          -- order as one batch (Event.together). A REGRESSION FENCE: no board
-          -- in the suite finds two cards that could observe each other, so
-          -- removing the bracket reddens nothing.
+          -- Every card found moves as ONE event (CR 608.2f) on ONE board, the
+          -- one the event began on, so the cards entering together see each
+          -- other (CR 603.6a), take CR 613.7m's order as one batch
+          -- (Event.together), and each CR 616.1 loop reads `before`. A
+          -- REGRESSION FENCE: no board in the suite finds two cards that could
+          -- observe each other, so removing the bracket or the board reddens
+          -- nothing.
+          before <- State.get
           arrivals <- Event.simultaneously . Event.together . fmap concat . Monad.forM decisions $ \(searcher, owner, chosenZones, found, foundOutside) -> do
             -- Read HERE rather than when the arm was entered, the reason the
             -- context above is a function of the board: CR 608.2c carries the
@@ -4132,7 +4150,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             let stillThere gs oid = any (\zone -> List.elem oid (Game.zoneMembers zone owner gs)) (Set.toList chosenZones)
             fromZones <- fmap concat . Monad.forM found $ \oid -> do
               present <- State.gets (`stillThere` oid)
-              if present then putFound searcher host destination oid else pure []
+              if present then putFound before searcher host destination oid else pure []
             -- CR 400.11b: a card found outside the game is brought in rather
             -- than moved, the reveal riding along as it arrives (#2450).
             fromOutside <- case outsideArrival destination of
@@ -4887,8 +4905,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- battlefield, for Filter.EnteredWithSource. Read off where the
             -- incarnation landed, so a redirected move records nothing.
             landed <- State.gets (fmap Object.zone . Game.lookupObject newId)
-            Monad.when (landed == Just Zone.Battlefield) $
+            Monad.when (landed == Just Zone.Battlefield) $ do
               State.modify' (\g -> g {GameState.enteredWith = Map.insert newId source (GameState.enteredWith g)})
+              State.modify' (linkCraftMaterials resolving newId)
           pure (foldr Set.insert sofar mNew, mNew : acc)
         -- The context a CHOICE's candidates are filtered in, off the board the
         -- choice is being made on: the resolution's own slots ride along, so a
@@ -8584,7 +8603,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- (Oracle text, Scryfall, 2026-09-06). Either card would refute this.
   --
   -- Written to the SOURCE and not to `resolving`: Pawl.Engine.PlayerEffect
-  -- .chosenNamesOf and the resolution's own context both ask about a source (CR
+  -- .contextFor and the resolution's own context both ask about a source (CR
   -- 113.7), and for a spell the two ids are the same object anyway.
   --
   -- Not implemented: SEVERAL choosers of ONE instruction kept apart. Their
@@ -10879,24 +10898,26 @@ differentlyNamed gs = go Set.empty
             then oid : go (Set.union seen names) rest
             else go seen rest
 
-putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game [ObjectId]
-putFound searcher subject destination cardId = case destination of
+-- One found card's move, a member of the search's batch whose board is `asOf`
+-- (Event.changeZoneInBatch).
+putFound :: GameState -> PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game [ObjectId]
+putFound asOf searcher subject destination cardId = case destination of
   -- Nature's Lore's "put that card onto the battlefield", and Evolving Wilds'
   -- "put it onto the battlefield tapped": CR 110.5b's default, or the card's
   -- own rider, is the one difference between the two arms.
-  SearchDestination.Battlefield -> putOntoBattlefield searcher TapState.Untapped cardId
-  SearchDestination.BattlefieldTapped -> putOntoBattlefield searcher TapState.Tapped cardId
+  SearchDestination.Battlefield -> putOntoBattlefield asOf searcher TapState.Untapped cardId
+  SearchDestination.BattlefieldTapped -> putOntoBattlefield asOf searcher TapState.Tapped cardId
   -- The reveal comes FIRST, in the card's own order, and CR 701.20b makes that an
   -- order rather than decoration: revealing does not move the card. The two lines
   -- do not commute -- swapped, CR 400.7 has already ceased `cardId` and the
   -- reveal shows nothing.
   SearchDestination.RevealThenHand -> do
     Event.reveal RevealCause.Ordinary searcher cardId
-    Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
+    Foldable.toList <$> Event.changeZoneInBatchReturning asOf cardId Zone.Hand
   -- Hoarding Dragon's "exile it": the move alone, with NO Event.reveal ahead of
   -- it (CR 701.23e). Which card this instruction exiled is CR 607.2a's link,
   -- filed by recordExiledWith off the effect that ran rather than here.
-  SearchDestination.Exile -> Foldable.toList <$> Event.changeZoneReturning cardId Zone.Exile
+  SearchDestination.Exile -> Foldable.toList <$> Event.changeZoneInBatchReturning asOf cardId Zone.Exile
   -- Auratouched Mage's "put that Aura card onto the battlefield attached to it",
   -- and Sovereigns of Lost Alara's "put it onto the battlefield attached to that
   -- creature". WHICH object "it" is, is Search.subject, resolved by the arm that
@@ -10907,7 +10928,7 @@ putFound searcher subject destination cardId = case destination of
   -- 303.4i).
   SearchDestination.BattlefieldAttached -> case subject of
     Nothing -> pure []
-    Just host -> attachFound searcher host cardId
+    Just host -> attachFound asOf searcher host cardId
   -- The arm above with the card's second sentence added: "If this creature is
   -- still on the battlefield ... Otherwise, reveal the Aura card and put it into
   -- your hand."
@@ -10928,14 +10949,14 @@ putFound searcher subject destination cardId = case destination of
   SearchDestination.BattlefieldAttachedOrHand -> do
     gs <- State.get
     if maybe False (\host -> Set.member host (GameState.battlefield gs)) subject
-      then concat <$> traverse (\host -> attachFound searcher host cardId) (Maybe.maybeToList subject)
+      then concat <$> traverse (\host -> attachFound asOf searcher host cardId) (Maybe.maybeToList subject)
       else do
         -- CR 701.20b makes the order matter, for RevealThenHand's reason above:
         -- swapped, CR 400.7 has already ceased `cardId` and the reveal shows
         -- nothing. The reveal is the CARD's own instruction (CR 701.23e), which
         -- is why it is written here rather than in the searching rule.
         Event.reveal RevealCause.Ordinary searcher cardId
-        Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
+        Foldable.toList <$> Event.changeZoneInBatchReturning asOf cardId Zone.Hand
   -- Grim Reminder's "reveal it": CR 701.20b leaves the card in the library, so the
   -- object found is the object a later clause names.
   SearchDestination.Reveal -> do
@@ -10943,7 +10964,7 @@ putFound searcher subject destination cardId = case destination of
     pure [cardId]
   -- Rhystic Tutor's "put that card into your hand": the move alone, with no
   -- reveal, CR 701.23e.
-  SearchDestination.Hand -> Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
+  SearchDestination.Hand -> Foldable.toList <$> Event.changeZoneInBatchReturning asOf cardId Zone.Hand
 
 -- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
 -- sentence they have in common is written once.
@@ -10964,14 +10985,14 @@ putFound searcher subject destination cardId = case destination of
 -- zone" -- unreachable from a filter naming Filter.CanAttachToSubject, since that
 -- atom is this same function, and the honest answer for a card whose filter does
 -- not.
-attachFound :: PlayerId -> ObjectId -> ObjectId -> Game [ObjectId]
-attachFound searcher host cardId = do
+attachFound :: GameState -> PlayerId -> ObjectId -> ObjectId -> Game [ObjectId]
+attachFound asOf searcher host cardId = do
   gs <- State.get
   case Attach.attachmentFor cardId (Recipient.ToObject host) gs of
     Nothing -> pure []
     Just seed ->
       Foldable.toList
-        <$> Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
+        <$> Event.changeZoneAttaching (Just asOf) Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
 
 -- Put a found card onto the battlefield, untapped or tapped as the card says.
 --
@@ -10983,10 +11004,10 @@ attachFound searcher host cardId = do
 -- The tap state rides the move rather than a write after it, for CR 603.2e's
 -- reason: this is the permanent ENTERING tapped, and an ability that triggers
 -- when a permanent "becomes tapped" doesn't trigger if it enters in that state.
-putOntoBattlefield :: PlayerId -> TapState.TapState -> ObjectId -> Game [ObjectId]
-putOntoBattlefield searcher tapped cardId =
+putOntoBattlefield :: GameState -> PlayerId -> TapState.TapState -> ObjectId -> Game [ObjectId]
+putOntoBattlefield asOf searcher tapped cardId =
   Foldable.toList
-    <$> Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue Nothing tapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
+    <$> Event.changeZoneAttaching (Just asOf) Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue Nothing tapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
 
 -- Write a whole new order back to a player's library: the shuffle after a CR
 -- 701.23 search, and CR 701.22a's scry, CR 701.25a's surveil and CR 701.29a's
@@ -11097,19 +11118,20 @@ decideSurveil n pid = do
       pure (pid, Just (onTop <> beneath, toGraveyard))
 
 -- One decided surveil's move. Half of it IS a zone change: the graveyard cards
--- go through Event.changeZone in the order the answer named them, so the first
--- named ends up deepest (CR 404.1), an order that is the player's rather than
--- the engine's (CR 404.3) -- so the scope does not ask for it again
+-- go through Event.changeZoneInBatch in the order the answer named them, so the
+-- first named ends up deepest (CR 404.1), an order that is the player's rather
+-- than the engine's (CR 404.3) -- so the scope does not ask for it again
 -- (Event.arrangedAlready).
 applySurveil :: (PlayerId, Maybe ([ObjectId], [ObjectId])) -> Game ()
 applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
   -- Order-independent: Game.removeFromZones takes each mover out of the library
   -- by identity rather than by position.
   State.modify' (reorderLibrary pid kept)
-  -- ONE event (CR 608.2f), and one CR 401.4 scope for a redirect into a
-  -- library.
+  -- ONE event (CR 608.2f) on ONE board, and one CR 401.4 scope for a redirect
+  -- into a library.
   Event.simultaneously $ do
-    arrived <- Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) toGraveyard
+    before <- State.get
+    arrived <- Monad.mapM (\c -> Event.changeZoneInBatchReturning before c Zone.Graveyard) toGraveyard
     State.modify' (Event.arrangedAlready (Foldable.fold arrived))
 
 -- CR 701.29a: one player's fateseal -- decideScry's question over an opponent's

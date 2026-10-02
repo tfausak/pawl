@@ -430,7 +430,17 @@ candidateCostsGiven permitted pid name oid gs =
                     gs
                     oid
                     cond
-              alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
+              -- CR 113.6d / 613.1f: a printed alternative cost is an ability, so
+              -- a layer-6 wipe takes it from the card wherever it lies. The
+              -- projection is asked only of a face printing one. Pawl.CostSpec's
+              -- "CR 118.9 an Asmoranomardicadaistinaculdacar that perpetually
+              -- lost all abilities has no alternative cost" proves it.
+              alternatives = case Face.alternativeCosts face of
+                [] -> []
+                printedAlternatives ->
+                  if PC.lostAllAbilities (Projection.project oid gs)
+                    then []
+                    else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
               -- CR 702.103a: bestow, offered from EVERY zone the printed cost is
               -- -- "a static ability that functions in any zone from which you
               -- could play the card it's on" -- so it joins `ordinary` below
@@ -1002,14 +1012,15 @@ spellAdjustments targets pid oid gs =
 --
 -- The PRINTED reductions come straight off the object rather than through a
 -- projection: it is the half Cast.asProposed already stamped (CR 709.3b), with
--- its copy stamp's costs laid over it (Game.castingFaceOf, CR 707.2). The
--- GRANTED ones (CR 613.1f) are read off the projection, which is where layer 6
--- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. The
--- KEYWORDS are the projection's too, printed and granted alike (CR 702.41a, CR
--- 702.125a), so a spell given affinity is reduced by it -- Pawl.CostSpec's
--- Mycosynth Golem group proves it. Not
--- implemented: an effect removing a printed reduction from a card off the
--- battlefield (#1859).
+-- its copy stamp's costs laid over it (Game.castingFaceOf, CR 707.2). They are
+-- abilities (CR 113.6d), so a layer-6 wipe in force on the spell takes them
+-- (CR 613.1f) -- Pawl.CostSpec's "CR 601.2f a Thrasta that perpetually lost all
+-- abilities is not reduced" proves it. The GRANTED ones (CR 613.1f) are read
+-- off the projection, which is where layer 6 records them -- Pawl.CostSpec's
+-- Richlau, Headmaster group proves it. The KEYWORDS are the projection's too,
+-- printed and granted alike (CR 702.41a, CR 702.125a), so a spell given
+-- affinity is reduced by it -- Pawl.CostSpec's Mycosynth Golem group proves
+-- it.
 selfReductions :: Set.Set ObjectId -> PlayerId -> ObjectId -> GameState -> [(CostDirection.CostDirection, ManaCost.ManaCost)]
 selfReductions targets pid oid gs =
   let -- CR 109.5: the perspective is the would-be controller, `pid` -- not
@@ -1037,7 +1048,8 @@ selfSentences pid oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, G
   (Just obj, Just card, Just printedFace) ->
     let face = Game.castingFaceOf obj card printedFace
         projected = asSpellProjected pid oid gs
-     in Face.costReductions face <> PC.grantedCostReductions projected <> Keyword.selfCostReductionsOf (PC.keywords projected)
+        printed = if PC.lostAllAbilities projected then [] else Face.costReductions face
+     in printed <> PC.grantedCostReductions projected <> Keyword.selfCostReductionsOf (PC.keywords projected)
   _ -> []
 
 -- CR 601.2a / 613.1f: the keywords of the spell `pid` is casting, printed and
@@ -5859,9 +5871,10 @@ payPayable moment slots pid oid component = case component of
   -- candidates makes the whole payment Unpaid, which pay's restore turns into a
   -- no-op.
   --
-  -- The sacrifices are ONE event group, ExileCardsFromGraveyard's reason below.
-  -- Pawl.CostSpec's "CR 601.2h Phyrexian Tribute's two sacrifices grow Vengeful
-  -- Townsfolk once" proves it.
+  -- The sacrifices are ONE event on ONE board (Event.sacrificeAll),
+  -- ExileCardsFromGraveyard's reason below. Pawl.CostSpec's "CR 601.2h Phyrexian
+  -- Tribute's two sacrifices grow Vengeful Townsfolk once" proves the event, and
+  -- its Anafenza case the board.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> do
     gs <- State.get
     let candidates = Replacement.sacrificeCandidates (Just pid) slots pid (Just oid) criterion gs
@@ -5872,7 +5885,7 @@ payPayable moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n Seq.empty)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
-        Event.simultaneously (Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen))
+        Event.sacrificeAll (fmap ((,) pid) (Set.toAscList chosen))
         -- CR 608.2h: the permanents are gone by the time anything this cost paid
         -- for resolves, so an effect that reads one ("the sacrificed creature's
         -- power") needs a name for it. One of the components that bind a slot
@@ -5956,10 +5969,10 @@ payPayable moment slots pid oid component = case component of
   -- candidates as the count leaves one legal answer and the prompt is elided --
   -- and reject-not-repair, Sacrifice's.
   --
-  -- Through Event.changeZone, the CR 400.7 funnel, and never a direct zone poke:
-  -- ReturnThis' call and for its reason, with CR 400.3 making the bare Zone.Hand
-  -- the printed "its owner's". The returns are ONE event group, Sacrifice's
-  -- reason; Pawl.CostSpec's "CR 601.2h Gush's two returned Islands draw once for
+  -- Through Event.changeZonesTogether, the CR 400.7 funnel's batch door, and
+  -- never a direct zone poke: ReturnThis' reason, with CR 400.3 making the bare
+  -- Zone.Hand the printed "its owner's". The returns are ONE event on ONE board,
+  -- Sacrifice's reason; Pawl.CostSpec's "CR 601.2h Gush's two returned Islands draw once for
   -- Synthetic Return Ledger" proves it.
   --
   -- Binds Binding.returnedPermanent, the ids as they were BEFORE the move: CR
@@ -5975,7 +5988,7 @@ payPayable moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseReturns decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
-        Event.simultaneously (Monad.mapM_ (\returned -> Event.changeZone returned Zone.Hand) (Set.toAscList chosen))
+        Monad.void (Event.changeZonesTogether (fmap (\returned -> (returned, Zone.Hand)) (Set.toAscList chosen)))
         pure (Payment.Paid (Binding.paidObjects Binding.returnedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
@@ -6446,9 +6459,9 @@ payPayable moment slots pid oid component = case component of
   -- ONCE, before the prompt, so the answer is checked against the same list the
   -- player was offered.
   --
-  -- The exiles are ONE event group (Event.simultaneously): paying CR 601.2h's
-  -- cost exiles them as a single action (Rakshasa Vizier's ruling, 2014-09-20),
-  -- so a "one or more cards" trigger fires once for the lot.
+  -- The exiles are ONE event on ONE board (Event.changeZonesTogether): paying
+  -- CR 601.2h's cost exiles them as a single action (Rakshasa Vizier's ruling,
+  -- 2014-09-20), so a "one or more cards" trigger fires once for the lot.
   -- Pawl.CostSpec's "CR 601.2h delving three cards fires Rakshasa Vizier once,
   -- for three counters" proves it; ExileMaterials and CollectEvidence below
   -- follow.
@@ -6462,7 +6475,7 @@ payPayable moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseExilesFromGraveyard decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
-        Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
+        Monad.void (Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) (Set.toAscList chosen)))
         pure bindsNothing
       else pure Payment.Unpaid
   -- CR 702.167a's [materials]: the arm above over the battlefield and the
@@ -6477,8 +6490,9 @@ payPayable moment slots pid oid component = case component of
   -- answer either way, the whole pool, so eliding decides nothing for the payer;
   -- with fewer the check below leaves the component Unpaid.
   --
-  -- Binds nothing. Not implemented: CR 702.167c's "the exiled cards used to craft
-  -- it", which is what would want the materials bound here (#3931).
+  -- BINDS the materials' exile incarnations under Binding.craftMaterials, which
+  -- is CR 702.167c's "the exiled cards used to craft it": the craft ability's
+  -- return links them to the permanent it puts onto the battlefield.
   CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore criterion) -> do
     gs <- State.get
     let candidates = materialCandidates slots pid oid criterion gs
@@ -6490,8 +6504,8 @@ payPayable moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseMaterials decider pid oid candidates n orMore)
     if Set.isSubsetOf chosen (Set.fromList candidates) && enough chosen
       then do
-        Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
-        pure bindsNothing
+        arrived <- Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) (Set.toAscList chosen))
+        pure (Payment.Paid (Binding.paidObjects Binding.craftMaterials (Set.fromList (fmap Recipient.ToObject (foldMap Foldable.toList arrived)))))
       else pure Payment.Unpaid
   -- CR 701.59a: the payer chooses WHICH cards and HOW MANY, so this is a prompt,
   -- and it is NEVER elided -- TapForTotalPower's posture, the number being a
@@ -6501,7 +6515,7 @@ payPayable moment slots pid oid component = case component of
   -- Reject-not-repair, Sacrifice's posture. The total is summed over the answer as
   -- given, and the candidates are read HERE so an earlier component of the same
   -- cost that emptied the graveyard leaves this Unpaid. The exile goes through
-  -- Event.changeZone, ExileCardsFromGraveyard's route above.
+  -- Event.changeZonesTogether, ExileCardsFromGraveyard's route above.
   --
   -- BINDS the exiled cards under Binding.collectedEvidence, which is what CR
   -- 701.59c's linked "if evidence was collected" is read off, through
@@ -6515,7 +6529,7 @@ payPayable moment slots pid oid component = case component of
     let collected = sum (fmap (`evidenceValue` gs) (Set.toAscList chosen))
     if Set.isSubsetOf chosen (Set.fromList candidates) && collected >= toInteger n
       then do
-        Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
+        Monad.void (Event.changeZonesTogether (fmap (\c -> (c, Zone.Exile)) (Set.toAscList chosen)))
         -- CR 701.59a's "whenever you collect evidence" reads this.
         State.modify' (Event.recordEvent (GameEvent.CollectedEvidence pid))
         pure (Payment.Paid (Binding.paidObjects Binding.collectedEvidence (Set.map Recipient.ToObject chosen)))

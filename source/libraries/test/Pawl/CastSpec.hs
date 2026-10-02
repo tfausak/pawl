@@ -42,6 +42,7 @@ import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
+import Pawl.SpecialActionSpec (humiliatedBoard)
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -5291,8 +5292,8 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
     Spec.assertBool s (elem (S.printingName gorger) (namesIn Zone.Graveyard resolved)) "setup: the Gorger was in the graveyard before triggers were placed"
   -- Asylum Visitor prints madness {1}{B} and the Gorger grants one at its mana
   -- cost {1}{B}: which of the two exiles it is a choice between indistinguishable
-  -- answers, so ONE trigger goes on the stack above the Reunion (#4443 is the
-  -- case where the costs differ).
+  -- answers, so ONE trigger goes on the stack above the Reunion. Bloodmad
+  -- Vampire's case below is the one where the costs differ.
   Spec.it s "CR 702.35a Asylum Visitor under the Gorger has one madness trigger" $ do
     mountain <- S.printingOf s registry "Mountain"
     swamp <- S.printingOf s registry "Swamp"
@@ -5303,6 +5304,30 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
         discarded = S.runPure madnessAnswer ready (S.cast S.alice reunionId)
         placed = S.runPure madnessAnswer discarded Engine.placePendingTriggers
     Spec.assertEqWith s "CR 702.35a the Reunion and one madness trigger are on the stack" (length (GameState.stack placed)) 2
+  -- CR 616.1 / 702.35a: Bloodmad Vampire prints madness {1}{R} and the Gorger
+  -- grants one at its mana cost {2}{R}; its owner chooses which exiles it, and
+  -- only that one triggers. Three Mountains are left after the Reunion, so the
+  -- {1}{R} cast leaves one untapped and the {2}{R} cast none.
+  Spec.it s "CR 616.1 Bloodmad Vampire under the Gorger casts for the madness cost chosen" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vampire <- S.printingOf s registry "Bloodmad Vampire"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    gorger <- S.printingOf s registry "Falkenrath Gorger"
+    let base = aliceOnTurn (S.landsInPlay mountain 5)
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) base [1 :: Int .. 4]
+        handed = snd (S.addHandCard mountain S.alice (snd (S.addHandCard vampire S.alice stocked)))
+        (reunionId, ready) = S.addHandCard reunion S.alice (snd (S.addPermanent gorger S.alice handed))
+        red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        cheap = ManaCost.MkManaCost [ManaSymbol.Generic 1, red]
+        dear = ManaCost.MkManaCost [ManaSymbol.Generic 2, red]
+        placed = S.runPure (bloodmadAnswer cheap) (S.runPure (bloodmadAnswer cheap) ready (S.cast S.alice reunionId)) Engine.placePendingTriggers
+        untapped gs = length (filter (\oid -> S.soleFaceName oid gs == S.printingName mountain && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped) (Game.zoneMembers Zone.Battlefield S.alice gs))
+        outcome want =
+          let after = gorgerRunWith (bloodmadAnswer want) (reunionId, ready)
+           in (S.countOnBattlefieldByName (S.printingName vampire) S.alice after, untapped after)
+    Spec.assertEqWith s "CR 616.1 choosing {1}{R} casts the Vampire with one Mountain to spare" (outcome cheap) (1, 1)
+    Spec.assertEqWith s "CR 616.1 choosing {2}{R} on the same board casts it with none to spare" (outcome dear) (1, 0)
+    Spec.assertEqWith s "CR 702.35a only the chosen madness ability triggers: the Reunion and one trigger" (length (GameState.stack placed)) 2
 
 -- alice on her turn with two Mountains and three Swamps untapped, Bloodrage
 -- Vampire {2}{B} and a Mountain in hand beside Cathartic Reunion, and Falkenrath
@@ -5328,11 +5353,22 @@ gorgerTweezeAnswer gorgerId vampireId p = case p of
 -- Cast the Reunion, place whatever triggered, and resolve twice: rule 702.35a's
 -- trigger and the Vampire it cast, or else the Reunion and then nothing.
 gorgerRun :: (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
-gorgerRun (reunionId, ready) =
-  let discarded = S.runPure madnessAnswer ready (S.cast S.alice reunionId)
-      placed = S.runPure madnessAnswer discarded Engine.placePendingTriggers
-      first = S.runPure madnessAnswer placed Stack.resolveTop
-   in S.runPure madnessAnswer first Stack.resolveTop
+gorgerRun = gorgerRunWith madnessAnswer
+
+-- `gorgerRun` under another answerer.
+gorgerRunWith :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+gorgerRunWith answer (reunionId, ready) =
+  let discarded = S.runPure answer ready (S.cast S.alice reunionId)
+      placed = S.runPure answer discarded Engine.placePendingTriggers
+      first = S.runPure answer placed Stack.resolveTop
+   in S.runPure answer first Stack.resolveTop
+
+-- `madnessAnswer`, choosing the madness ability that settles to `want` (CR
+-- 616.1) by its value rather than by its place in the offer.
+bloodmadAnswer :: ManaCost.ManaCost -> Prompt.Prompt r -> r
+bloodmadAnswer want p = case p of
+  Prompt.ChooseCost _ _ _ candidates -> Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just want) . Cost.Type.mana) candidates)
+  _ -> madnessAnswer p
 
 -- Takes rule 702.35a's offered cast and answers everything else as S.identityAnswer
 -- does, which is what the declining case reuses unchanged.
@@ -5803,9 +5839,44 @@ sharedEnumerationSpec s registry = Spec.describe s "SharedEnumeration" $ do
     -- The boards discriminate: each offers some casts and refuses others.
     Spec.assertBool s (not (null (plain tight)) && length (plain tight) < length (plain roomy) && length (plain roomy) < length (Cast.castProposals S.alice roomy)) "some casts are offered and some refused on each board"
 
+-- CR 613.1f / 113.6e: Patriar's Humiliation's perpetual "loses all abilities"
+-- follows the card Unsummon returns to alice's hand
+-- (Pawl.SpecialActionSpec.humiliatedBoard), so the flash or morph printed on it
+-- is gone there. Each pair differs only in whether the Humiliation took the
+-- card's abilities or bob's Goblin Piker's; the Plains and Island paid for
+-- both spells.
+humiliationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+humiliationSpec s registry =
+  Spec.describe s "CR 613.1f Patriar's Humiliation" $ do
+    let build base victim = do
+          plains <- S.printingOf s registry "Plains"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          humiliation <- S.printingOf s registry "Patriar's Humiliation"
+          unsummon <- S.printingOf s registry "Unsummon"
+          pure (humiliatedBoard base victim plains island piker humiliation unsummon)
+    -- alice's end step, where only an instant-speed cast is open; three Forests
+    -- pay the Cheetah's {2}{G}.
+    Spec.it s "CR 702.8a a Pouncing Cheetah that perpetually lost all abilities has no flash" $ do
+      forest <- S.printingOf s registry "Forest"
+      cheetah <- S.printingOf s registry "Pouncing Cheetah"
+      board <- build (S.landsInPlay forest 3) cheetah
+      let castableIn (mId, gs) = maybe False (\oid -> S.castable S.alice oid gs {GameState.phase = Phase.Ending EndingStep.EndStep}) mId
+      Spec.assertBool s (not (castableIn (board True))) "CR 613.1f the humiliated Cheetah cannot be cast in the end step"
+      Spec.assertBool s (castableIn (board False)) "the control: with the Piker humiliated instead, it can"
+    -- Three Forests pay the face-down {3}, not the face-up {5}{R}.
+    Spec.it s "CR 702.37a an Ainok Tracker that perpetually lost all abilities cannot be cast face down" $ do
+      forest <- S.printingOf s registry "Forest"
+      tracker <- S.printingOf s registry "Ainok Tracker"
+      board <- build (S.landsInPlay forest 3) tracker
+      let faceDownIn (mId, gs) = any (\(oid, _, facing) -> Just oid == mId && facing /= Facing.FaceUp) (Cast.castableSpells S.alice gs)
+      Spec.assertBool s (not (faceDownIn (board True))) "CR 613.1f the humiliated Tracker is offered no face-down cast"
+      Spec.assertBool s (faceDownIn (board False)) "the control: with the Piker humiliated instead, it may be cast face down"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
+  humiliationSpec s registry
   sharedEnumerationSpec s registry
   castEngineSpec s registry
   stackSpec s registry

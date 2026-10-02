@@ -798,13 +798,29 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
   -- (CR 118.6) at zero. A pair differing only in whether alice's land drop is
   -- spent: open, the Forest is played as her land; spent, it stays hidden.
   Spec.it s "CR 305.9 a hidden Forest is played as the turn's land and never cast for free" $ do
-    (_, land, leg) <- attackedHeightsHiding s registry Nothing "Forest"
-    let forests = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice
+    (_, land, legWith) <- attackedHeightsHiding s registry Nothing "Forest"
+    let leg = legWith id
+        forests = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice
         spent = leg 1 3 land
         open = leg 0 3 land
     Spec.assertEqWith s "CR 305.2b / 305.9: with the land drop spent the Forest is not cast instead" (forests spent) 0
     Spec.assertEqWith s "CR 305.2a: with it open the Forest is played" (forests open) 1
     Spec.assertEqWith s "and counts as her land for the turn" (Map.lookup S.alice (GameState.landsPlayed open)) (Just 1)
+
+  -- CR 406.3a / 305.1: the hidden card is turned face up just before it is
+  -- played, so Null Chamber's name reaches it. A pair differing only in the name
+  -- alice chose: Mutavault stays hidden, Goblin Piker leaves it playable.
+  Spec.it s "CR 406.3a a land played from face-down exile is stopped by a prohibition naming it" $ do
+    nullChamber <- S.printingOf s registry "Null Chamber"
+    (_, land, legWith) <- attackedHeightsHiding s registry Nothing "Mutavault"
+    let mutavault = CardName.MkCardName (Text.pack "Mutavault")
+        naming name gs =
+          let (chamber, withChamber) = S.addPermanent nullChamber S.alice gs
+           in withChamber {GameState.objects = Map.adjust (\o -> o {Object.chosenNames = Set.singleton name}) chamber (GameState.objects withChamber)}
+        mutavaults = S.countOnBattlefieldByName mutavault S.alice
+        named = legWith (naming mutavault) 0 3 land
+        unnamed = legWith (naming (CardName.MkCardName (Text.pack "Goblin Piker"))) 0 3 land
+    Spec.assertEqWith s "CR 305.1: named, the Mutavault is not played; otherwise it is" (fmap mutavaults [named, unnamed]) [0, 1]
 
   Spec.it s "CR 607.2a the play ability names only what THIS permanent exiled, and a copy names what the copy exiled" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -864,17 +880,18 @@ attackedHeights ::
   m (ObjectId.ObjectId, ObjectId.ObjectId, Int -> ObjectId.ObjectId -> GameState.GameState)
 attackedHeights s registry copier = do
   (original, landId, leg) <- attackedHeightsHiding s registry copier "Goblin Piker"
-  pure (original, landId, leg 0)
+  pure (original, landId, leg id 0)
 
--- attackedHeights with the hidden card named, and a leg that also says how many
--- lands alice has already played this turn when she activates (CR 305.2a).
+-- attackedHeights with the hidden card named, and a leg that also takes a change
+-- to the combat-ready board and says how many lands alice has already played
+-- this turn when she activates (CR 305.2a).
 attackedHeightsHiding ::
   (Monad m) =>
   Spec.Spec m n ->
   Registry.Registry m ->
   Maybe String ->
   String ->
-  m (ObjectId.ObjectId, ObjectId.ObjectId, Natural -> Int -> ObjectId.ObjectId -> GameState.GameState)
+  m (ObjectId.ObjectId, ObjectId.ObjectId, (GameState.GameState -> GameState.GameState) -> Natural -> Int -> ObjectId.ObjectId -> GameState.GameState)
 attackedHeightsHiding s registry copier hidden = do
   heights <- S.printingOf s registry "Windbrisk Heights"
   played <- maybe (pure heights) (S.printingOf s registry) copier
@@ -926,10 +943,10 @@ attackedHeightsHiding s registry copier hidden = do
             GameState.remaining = S.phasesAfterThroughPostcombatMain S.beginningOfCombat,
             GameState.priority = Just S.alice
           }
-      leg landsAlready attackers activated =
+      leg change landsAlready attackers activated =
         S.runPure
           (activating activated plainsId)
-          (S.runCombat (attackingWith attackers) combatReady {GameState.landsPlayed = Map.singleton S.alice landsAlready})
+          (S.runCombat (attackingWith attackers) (change combatReady) {GameState.landsPlayed = Map.singleton S.alice landsAlready})
           Engine.priorityLoop
   pure (original, landId, leg)
 

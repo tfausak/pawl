@@ -2632,6 +2632,7 @@ reservedSlots =
       Binding.sacrificedPermanent,
       Binding.returnedPermanent,
       Binding.exiledCard,
+      Binding.craftMaterials,
       Binding.discardedCard,
       Binding.tappedPermanent,
       Binding.copiedObject,
@@ -3018,21 +3019,26 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- Nalaar, Chief Mechanic's "create an X\/X colorless Vehicle artifact token named
 -- Nalaar Aetherjet". The same half of rule 111.4 as the legendary case, but
 -- nothing in the card data marks it, so this is a hand-kept list rather than a
--- predicate. CR 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles)
--- and the copy tokens of CR 111.4's own Spitting Image example (named Doomed
--- Dissenter, "not Human Token or Doomed Dissenter Token") will each want a line
--- here too.
+-- predicate. CR 111.10's named predefined tokens are listed too (111.10j's
+-- Cursed, 111.10q's Wicked); 111.10d's Walker, the other Roles and the copy
+-- tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter, "not
+-- Human Token or Doomed Dissenter Token") will each want a line here as their
+-- cards arrive.
 namedTokens :: Set.Set CardName.CardName
 namedTokens =
   Set.fromList
     [ -- Synthetic Ursine Rite's, whose card-authored name spells its own Bear
       -- subtype inside a longer word -- the CR 612.2 boundary case.
       CardName.MkCardName (Text.pack "Bearer of the Wilds"),
+      -- CR 111.10j's Cursed Role (Spiteful Hexmage).
+      CardName.MkCardName (Text.pack "Cursed"),
       CardName.MkCardName (Text.pack "Nalaar Aetherjet"),
       CardName.MkCardName (Text.pack "Rabid Sheep"),
       -- Preston Garvey, Minuteman's "create a green Aura enchantment token named
       -- Settlement attached to up to one target land you control".
-      CardName.MkCardName (Text.pack "Settlement")
+      CardName.MkCardName (Text.pack "Settlement"),
+      -- CR 111.10q's Wicked Role (Witch's Mark, Twisted Fealty).
+      CardName.MkCardName (Text.pack "Wicked")
     ]
 
 tokenNameOffends :: Face.Face Card.Type.Card -> Bool
@@ -4842,10 +4848,6 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantActivateAbilities _ -> []
   PlayerEffect.CantCastMoreThan _ -> []
-  -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
-  -- the source entered, which is not a Filter and is not written by the card.
-  PlayerEffect.CantCastChosenName -> []
-  PlayerEffect.CantPlayLandChosenName -> []
   -- CR 305.2 carries a bare count of extra land plays, not a Filter: it names
   -- how many lands, never which spells.
   PlayerEffect.PlayAdditionalLands _ -> []
@@ -4893,12 +4895,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 701.23's prohibition narrows by WHOSE library and WHOSE spell or
   -- ability, both PlayerScopes, and by no quality a Filter could state.
   PlayerEffect.CantSearchLibraries _ -> []
-  -- CR 702.16a's quality is a chosen card NAME, read off the source's
-  -- Object.chosenNames rather than written by the card, so this arm carries no
-  -- Filter for the same reason the two chosen-name prohibitions above carry
-  -- none.
-  PlayerEffect.HasProtectionFromChosenName -> []
-  -- CR 702.16a's other quality IS a Filter the card writes (The Stasis Coffin's
+  -- CR 702.16a's quality IS a Filter the card writes (The Stasis Coffin's
   -- rule 702.16j "everything"), so it is linted like every other written one.
   PlayerEffect.HasProtectionFrom f -> [f]
   -- CR 725 names no quality either: the designation has no parts (Jared
@@ -5286,9 +5283,7 @@ blockPermissionFilters permission =
 --     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
 --     triggered ability's CR 603.4 clause
 --     (Pawl.Engine.Event.Trigger.interveningHolds and Pawl.Engine.Stack's CR
---     608.2a re-check), and a printed PLAYER ability's own clause and effect
---     (Pawl.Engine.PlayerEffect.matchesObjectFrom, which takes the source off the
---     row `applying` returns).
+--     608.2a re-check), and a printed PLAYER ability's own clause.
 --
 --     Split off SourceHostFramed by #3320 over ONE field: CR 201.4's
 --     Filter.HasChosenName is answerable at an effect's ObjectRef and nowhere
@@ -5380,6 +5375,16 @@ data Framing
     -- resolution, so CR 201.4's chosen names are empty at all three. See the
     -- overview above for the evaluators and for what the split buys.
     StandingHostFramed
+  | -- | A printed or granted PLAYER ability's own effect Filters, read through
+    -- Pawl.Engine.PlayerEffect.contextFor off the row `applying` returns: the
+    -- source's host and its CR 607.2d choices (Pawl.Engine.SourceContext) are
+    -- both supplied (Oppressive Rays, Null Chamber, Runed Halo).
+    PlayerEffectFramed
+  | -- | Effect.AffectPlayers' effect Filters, a CR 611.2c stored row's: the same
+    -- evaluator as PlayerEffectFramed, so the source's choices are supplied
+    -- through CR 608.2h (Conjurer's Ban), but not host-framed, a resolved
+    -- spell having no permanent behind it to be attached to anything.
+    StoredPlayerEffectFramed
   | -- | CR 701.23's search filter, the one position whose evaluator supplies the
     -- object a CR 701.3a question can be asked ABOUT from the candidate's side:
     -- Pawl.Engine.Resolve's Effect.Search arm overlays
@@ -5567,6 +5572,10 @@ sweptForSingularSlots framing = case framing of
   -- (Filter.contextWithSlots), and where the other two read none the sweep can
   -- only reject more, SlotlessCostFramed's argument.
   StandingHostFramed -> True
+  -- SWEPT, as both were before they were split off: the split is about CR
+  -- 607.2d's chosen values, not about slots.
+  PlayerEffectFramed -> True
+  StoredPlayerEffectFramed -> True
   SearchFramed -> True
   OutsideTheGameFramed -> True
   ReplacementRowFramed -> True
@@ -5616,11 +5625,6 @@ unframed = fmap ((,) Unframed)
 -- site that turns an ObjectRef into objects.
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
-
--- sourceHosted's sibling for the positions that supply the host and NOTHING a
--- resolution does; see StandingHostFramed for the list and for the split.
-standingHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
-standingHosted = fmap ((,) StandingHostFramed)
 
 -- Tag a Filter position as a SEARCH's, the one position whose evaluator supplies
 -- Filter.View.canAttachToSubject (CR 701.3a from the candidate's side).
@@ -5967,7 +5971,7 @@ effectFilters effect = case effect of
   Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> frame Unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
-  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> frame Unframed (durationFilters duration) <> unframed (playerEffectFilters playerEffect)
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> frame Unframed (durationFilters duration) <> fmap ((,) StoredPlayerEffectFramed) (playerEffectFilters playerEffect)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters blocker <> objectRefFilters attacker)
   -- RequireBlock's arm one axis narrower.
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
@@ -6449,9 +6453,8 @@ cardFilters card =
     -- Pawl.Engine.PlayerEffect.matchesObjectFrom is handed the row's own source,
     -- so CR 303.4b's atom is answerable in every arm of a printed player ability
     -- (Oppressive Rays' "enchanted creature"). The STORED CR 611.2c carrier is
-    -- not -- Effect.AffectPlayers' own filters stay unframed above, because a
-    -- resolved spell has no permanent behind it to be attached to anything.
-    <> concatMap (standingHosted . playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
+    -- not -- Effect.AffectPlayers' own filters are StoredPlayerEffectFramed.
+    <> concatMap (fmap ((,) PlayerEffectFramed) . playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap activatedAbilityFilters (grantedActivatedAbilities card)
@@ -6462,7 +6465,7 @@ cardFilters card =
     -- A granted player ability is its RECEIVER's, so it is framed against the
     -- permanent holding it, exactly as a printed one above is.
     <> concatMap (frame StandingHostFramed . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (grantedPlayerAbilities card)
-    <> concatMap (standingHosted . playerEffectFilters . PlayerStaticAbility.effect) (grantedPlayerAbilities card)
+    <> concatMap (fmap ((,) PlayerEffectFramed) . playerEffectFilters . PlayerStaticAbility.effect) (grantedPlayerAbilities card)
     -- A granted reduction of its own cost, Unframed for the printed one's reason.
     <> frame Unframed (concatMap (quantityFilters . CostReduction.perEach) (grantedCostReductions card))
     <> frame Unframed (concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (grantedCostReductions card))

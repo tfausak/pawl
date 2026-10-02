@@ -141,14 +141,16 @@ data Face card = MkFace
     --
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
-    -- keyword whose ability functions in a zone where no pool effect changes a
-    -- card's keywords (#1859) -- the carve-out additionalCosts takes. A
-    -- GRAVEYARD is no longer one of those zones: rule 702.34a's flashback is read
-    -- there through the projection, so a granted one reaches the cost
-    -- (Pawl.Engine.Cost.costsFor). Nor is a HAND for FLASH:
-    -- Pawl.Engine.Cast.instantSpeed reads rule 702.8a's keyword through the
-    -- projection, which is what lets Teferi, Mage of Zhalfir grant it to a card
-    -- in a hand.
+    -- reader off the battlefield that still takes the printed card (#1859) --
+    -- the carve-out additionalCosts takes. A GRAVEYARD reader of rule
+    -- 702.34a's flashback goes through the projection, so a granted one reaches
+    -- the cost (Pawl.Engine.Cost.costsFor). So do the HAND readers of rule
+    -- 702.8a's flash (Pawl.Engine.Cast.instantSpeed: Teferi, Mage of Zhalfir's
+    -- grant, Patriar's Humiliation's perpetual removal) and of rule 702.62a's
+    -- suspend and rule 702.170a's plot (Pawl.Engine.Suspend.suspendOf,
+    -- Pawl.Engine.Plot.plotCostsOf). Pawl.Engine.Cast.castFacings reads rule
+    -- 702.37a's morph and rule 702.168a's disguise printed, less a layer-6
+    -- wipe.
     keywords :: Map.Map Keyword.Keyword Natural.Natural,
     -- | CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana
@@ -410,6 +412,10 @@ data Face card = MkFace
     -- 118.9 is about SPELLS, so this lives on a face and never on
     -- ActivatedAbility -- a rules fact, not an elision.
     --
+    -- An ability (CR 113.6d), so Pawl.Engine.Cost.candidateCostsGiven offers
+    -- none once a layer-6 wipe is in force on the card where it lies (CR
+    -- 613.1f).
+    --
     -- CONDITIONED only where the card states a condition (CR 604.2), which is
     -- Pawl.Types.AlternativeCost's own field. Rule 702.34a's flashback cost is
     -- still deliberately NOT one of these: its gate is a ZONE rather than a
@@ -423,9 +429,9 @@ data Face card = MkFace
     --
     -- The third member of the additionalCosts/alternativeCosts family above, and
     -- read the way they are: straight off the card or its copy stamp
-    -- (Game.castingFaceOf), never through the projection, so an effect removing
-    -- one from a card off the battlefield is not seen (#1859). A GRANTED one is
-    -- read off the projection instead (ProjectedCharacteristics.grantedCostReductions).
+    -- (Game.castingFaceOf), and dropped when a layer-6 wipe is in force on the
+    -- object (CR 113.6d, 613.1f). A GRANTED one is read off the projection
+    -- instead (ProjectedCharacteristics.grantedCostReductions).
     -- Pawl.Engine.Cost.selfReductions is the one reader, and it folds both in
     -- alongside the CR 613.11 reductions other permanents generate, so CR
     -- 601.2f's "minus all cost reductions" is applied once over all of them.
@@ -612,12 +618,12 @@ data Face card = MkFace
     -- | CR 116.2: the special actions this face's printed text grants -- CR
     -- 116.2e's "you may discard this card any time you could cast an instant"
     -- (Circling Vultures). WHERE it is read from is the reader's question and
-    -- differs per row. CR 116.2e's is read directly from the card: the ability
-    -- functions in the HAND (CR 113.6), where
-    -- Pawl.Engine.Action.discardableCards takes the printed card
-    -- (#1859). CR 116.2d's is read off the copiable snapshot
-    -- (Pawl.Engine.Projection.specialActionsOf), since a permanent that is
-    -- a copy grants what it copied (CR 707.2a).
+    -- differs per row. Both rows are read through
+    -- Pawl.Engine.Projection.specialActionsOf: the copiable snapshot, since a
+    -- permanent that is a copy grants what it copied (CR 707.2a), and nothing
+    -- once a layer-6 wipe has removed the object's abilities (CR 613.1f). CR
+    -- 116.2e's functions in the HAND (CR 113.6), where
+    -- Pawl.Engine.Action.discardableCards asks it.
     --
     -- A LIST rather than a flag, matching every neighbouring permission field:
     -- nothing in CR 116.2 caps how many such lines a face may print, and

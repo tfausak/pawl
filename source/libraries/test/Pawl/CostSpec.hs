@@ -44,6 +44,7 @@ import qualified Pawl.Extra.Natural as Natural.Extra
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
+import Pawl.SpecialActionSpec (humiliatedBoard)
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -1011,6 +1012,37 @@ fireblastSpec s registry =
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 1 True
       Spec.assertBool s (not (S.castable S.alice fireblast gs)) "not castable"
+
+-- Phyrexian Tribute {2}{B} Sorcery: "As an additional cost to cast this spell,
+-- sacrifice two creatures. Destroy target artifact." Checked against Scryfall
+-- 2026-09-22; no rulings. One cost component moving several permanents is one
+-- event; the batch triggers that read it are data/scenarios/cost's.
+costBatchSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+costBatchSpec s registry =
+  let mainPhase gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      resolveAll g = if null (GameState.stack g) then g else resolveAll (S.runPure S.identityAnswer g Stack.resolveTop)
+   in Spec.describe s "a cost moving several permanents" $ do
+        -- Anafenza, the Foremost (Scryfall 2026-10-01): "If a nontoken creature
+        -- an opponent owns would die ..., exile that card instead." Alice
+        -- sacrifices her and a Piker she controls but bob owns. One event on one
+        -- board, so Anafenza's replacement still applies to the Piker. Anafenza has
+        -- the lower id, so she moves first.
+        Spec.it s "CR 601.2h Phyrexian Tribute sacrificing Anafenza beside bob's Piker still exiles the Piker" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+          solRing <- S.printingOf s registry "Sol Ring"
+          tribute <- S.printingOf s registry "Phyrexian Tribute"
+          let (anafenzaId, g0) = S.addPermanent anafenza S.alice (S.landsInPlay swamp 3)
+              (pikerId, g1) = S.addPermanent piker S.bob g0
+              (_, g2) = S.addPermanent solRing S.bob (S.giveControl pikerId S.alice g1)
+              (tributeId, gs) = S.addHandCard tribute S.alice (mainPhase g2)
+              cast = S.runPure S.identityAnswer gs (S.cast S.alice tributeId)
+              after = resolveAll (S.runPure S.identityAnswer cast Engine.settleForPriority)
+          Spec.assertEqWith s "CR 614.1a bob's Piker is exiled, not put into his graveyard" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+          -- The preconditions and proxies, AFTER the assertion above.
+          Spec.assertBool s (anafenzaId < pikerId) "Anafenza moves first"
+          Spec.assertEqWith s "both were sacrificed" (S.creaturesInPlay S.alice after) 0
 
 -- alice controls one untapped Swamp -- the {B} half of Asmoranomardicadaistinaculdacar's
 -- {B/R} -- and holds the card itself plus a Circling Vultures, with priority in
@@ -2653,6 +2685,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   magmaticInsightSpec s registry
   safeholdSentrySpec s registry
   fireblastSpec s registry
+  costBatchSpec s registry
   asmorSpec s registry
   asmorFoodSpec s registry
   crossCheckSpec s registry
@@ -2663,6 +2696,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   synchronizedEvictionSpec s registry
   weightOfConscienceSpec s registry
   richlauSpec s registry
+  humiliationSpec s registry
   targetCostSpec s registry
   frogmiteSpec s registry
   mycosynthGolemSpec s registry
@@ -3067,6 +3101,46 @@ richlauSpec s registry =
           Spec.assertEqWith s "the Sliver in hand is a 3/3" (S.powerToughnessOf sliverId main) (Just (3, 3))
           let dreadnoughts = filter (\oid -> fmap S.nameOf (Game.cardOf oid atEnd) == named "Consulate Dreadnought") (Game.zoneMembers Zone.Library S.alice atEnd)
           Spec.assertEqWith s "the Dreadnought in the library is a 9/13" (fmap (`S.powerToughnessOf` atEnd) dreadnoughts) [Just (9, 13)]
+
+-- CR 613.1f / 113.6d: Patriar's Humiliation's perpetual "loses all abilities"
+-- follows the card Unsummon returns to alice's hand
+-- (Pawl.SpecialActionSpec.humiliatedBoard), so the cost abilities printed on
+-- it are gone there. Each pair differs only in whether the Humiliation took the
+-- card's abilities or bob's Goblin Piker's; the Plains and Island paid for
+-- both spells.
+humiliationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+humiliationSpec s registry =
+  Spec.describe s "CR 613.1f Patriar's Humiliation" $ do
+    let build base victim = do
+          plains <- S.printingOf s registry "Plains"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          humiliation <- S.printingOf s registry "Patriar's Humiliation"
+          unsummon <- S.printingOf s registry "Unsummon"
+          pure (humiliatedBoard base victim plains island piker humiliation unsummon)
+    -- Two spells were cast this turn, so a Thrasta keeping its ability costs
+    -- {4}{G}{G}, and six Forests pay it.
+    Spec.it s "CR 601.2f a Thrasta that perpetually lost all abilities is not reduced" $ do
+      forest <- S.printingOf s registry "Forest"
+      thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
+      board <- build (S.landsInPlay forest 6) thrasta
+      let castableIn (mId, gs) = maybe False (\oid -> S.castable S.alice oid gs) mId
+      Spec.assertBool s (not (castableIn (board True))) "CR 613.1f the humiliated Thrasta costs {10}{G}{G}, more than six Forests"
+      Spec.assertBool s (castableIn (board False)) "the control: with the Piker humiliated instead, six Forests pay {4}{G}{G}"
+    -- Asmoranomardicadaistinaculdacar has no mana cost (CR 118.6), so its
+    -- alternative cost is the only way to cast it. alice discards a Piker of
+    -- her own first, the alternative cost's condition.
+    Spec.it s "CR 118.9 an Asmoranomardicadaistinaculdacar that perpetually lost all abilities has no alternative cost" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      asmor <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      board <- build (S.landsInPlay swamp 1) asmor
+      let castableIn (mId, gs) =
+            let (pikerId, held) = S.addHandCard piker S.alice gs
+                discarded = S.runPure S.identityAnswer held (Event.discard DiscardCause.Ordinary S.alice pikerId)
+             in maybe False (\oid -> S.castable S.alice oid discarded) mId
+      Spec.assertBool s (not (castableIn (board True))) "CR 613.1f the humiliated card back in hand cannot be cast for {B/R}"
+      Spec.assertBool s (castableIn (board False)) "the control: with the Piker humiliated instead, the Swamp pays {B/R}"
 
 -- alice holds Thrasta, Tempest's Roar ({10}{G}{G}) and `elves` copies of
 -- Glistener Elf ({G}), with `forests` untapped Forests and priority in her own

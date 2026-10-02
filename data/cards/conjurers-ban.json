@@ -54,7 +54,10 @@
                         "type": "UntilYourNextTurn"
                       },
                       "effect": {
-                        "type": "CantCastChosenName"
+                        "type": "CantCastMatching",
+                        "value": {
+                          "type": "HasChosenName"
+                        }
                       },
                       "players": {
                         "type": "Scoped",
@@ -71,7 +74,10 @@
                         "type": "UntilYourNextTurn"
                       },
                       "effect": {
-                        "type": "CantPlayLandChosenName"
+                        "type": "CantPlayLands",
+                        "value": {
+                          "type": "HasChosenName"
+                        }
                       },
                       "players": {
                         "type": "Scoped",

@@ -1,0 +1,153 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Spiteful Hexmage",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "enchant": [
+                                  {
+                                    "pool": {
+                                      "type": "Creatures"
+                                    }
+                                  }
+                                ],
+                                "name": "Cursed",
+                                "staticAbilities": [
+                                  {
+                                    "affected": {
+                                      "type": "Matching",
+                                      "value": {
+                                        "type": "And",
+                                        "value": [
+                                          {
+                                            "type": "HasCardType",
+                                            "value": {
+                                              "type": "Creature"
+                                            }
+                                          },
+                                          {
+                                            "type": "HasAttached",
+                                            "value": {
+                                              "type": "IsSource"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "modifications": [
+                                      {
+                                        "type": "SetBasePowerToughness",
+                                        "value": {
+                                          "power": {
+                                            "type": "Literal",
+                                            "value": 1
+                                          },
+                                          "toughness": {
+                                            "type": "Literal",
+                                            "value": 1
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ],
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Aura"
+                                    },
+                                    {
+                                      "type": "Role"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Enchantment"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "riders": {
+                            "attachedTo": "target"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "filter": {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Warlock"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

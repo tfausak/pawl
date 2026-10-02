@@ -1962,7 +1962,7 @@ representativeEvents cond =
         -- so the pin here is that an inherent condition binds nothing from the
         -- log, which is what Event.eventBindingSlots claims for it.
         TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2))
-        TriggerCondition.SelfCycled -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Set.empty))
+        TriggerCondition.SelfCycled -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Nothing))
         -- CR 702.94a's cause, so the event is one this condition genuinely
         -- admits; an Ordinary reveal would pin nothing.
         TriggerCondition.SelfRevealedForMiracle -> one (GameEvent.Revealed (Revealed.MkRevealed S.alice departed (RevealCause.ForMiracle (Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})) S.emptyCharacteristics))
@@ -1971,19 +1971,19 @@ representativeEvents cond =
         -- discard and a cycle are each an event it genuinely admits, and an arm
         -- that read the cause would pin nothing for one of them.
         TriggerCondition.SelfDiscarded ->
-          noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Set.empty))
-            NonEmpty.:| [noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Set.empty))]
+          noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Nothing))
+            NonEmpty.:| [noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Nothing))]
         -- CR 702.35a's own discard: the madness set NON-EMPTY, which is the
         -- only event this condition admits -- the cause is irrelevant to it and
         -- the flag is not, so a False event would pin nothing.
-        TriggerCondition.SelfExiledForMadness -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary (Set.singleton MadnessCost.OwnManaCost)))
-        TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Set.empty))
+        TriggerCondition.SelfExiledForMadness -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary (Just MadnessCost.OwnManaCost)))
+        TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Nothing))
         -- The same event, which binds this batch reading's one card as its amount.
-        TriggerCondition.PlayerDiscardsCards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Set.empty))
+        TriggerCondition.PlayerDiscardsCards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Nothing))
         -- The CYCLING cause, which is the only one this condition admits -- an
         -- Ordinary discard is an event it rejects, and eventBindings is consulted
         -- only for a match, so it would pin nothing.
-        TriggerCondition.PlayerCycles _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Set.empty))
+        TriggerCondition.PlayerCycles _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Nothing))
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
         -- eventBindings being consulted only for a match.

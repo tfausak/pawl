@@ -71,6 +71,7 @@ import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Suspend as Suspend
@@ -1590,7 +1591,7 @@ balothAnswer p = case p of
   Prompt.ChooseAction {} -> S.castAnswer p
   _ -> S.attackTo S.bob p
 
-suspendHaste :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+suspendHaste :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
   Spec.it s "CR 702.62a cast off its own suspend ability the Baloth attacks the turn it arrives; cast from hand that turn it cannot" $ do
     forest <- S.printingOf s registry "Forest"
@@ -1608,6 +1609,62 @@ suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
         S.countOnBattlefieldByName (S.printingName baloth) S.alice hardCast
       )
       (1, 1)
+  -- CR 702.62a's "until you lose control of the SPELL": Aethersnatch takes the
+  -- free cast on the stack, and the haste goes to nobody.
+  Spec.it s "CR 702.62a / 110.2b the Baloth bob Aethersnatched off the stack enters under him without haste" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    snatch <- S.printingOf s registry "Aethersnatch"
+    let played = runUntil snatchAnswer alicesPostcombat (snatchBoard island snatch [S.bob] (balothBoard forest baloth True))
+        arrived = balothsIn baloth played
+    Spec.assertEqWith
+      s
+      "CR 702.62a the caster lost control of the spell, so bob's Baloth has no haste"
+      (fmap (\oid -> (Projection.controllerOf oid played, Projection.hasKeyword Keyword.Haste oid played)) arrived)
+      [(Just S.bob, False)]
+  -- The duration ENDS once and for good (CR 611.2b): alice taking the spell back
+  -- before it resolves does not restart it. The one road to a stolen Baloth
+  -- arriving on its caster's own turn, where haste is an attack.
+  Spec.it s "CR 702.62a / 611.2b the Baloth alice snatched back from bob does not attack the turn it arrives" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    snatch <- S.printingOf s registry "Aethersnatch"
+    let played = runUntil snatchAnswer alicesPostcombat (snatchBoard island snatch [S.alice, S.bob] (balothBoard forest baloth True))
+    Spec.assertEqWith s "CR 702.62a alice lost control of the spell to bob, so her Baloth could not attack" (S.lifeOf S.bob played) (Just 20)
+    Spec.assertEqWith
+      s
+      "the control: the Baloth arrived under alice, who took the spell back"
+      (fmap (`Projection.controllerOf` played) (balothsIn baloth played))
+      [Just S.alice]
+
+-- balothBoard's exiled Baloth, with an Aethersnatch and the six Islands that
+-- pay for it in each listed player's hand and battlefield.
+snatchBoard :: Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId] -> GameState.GameState -> GameState.GameState
+snatchBoard island snatch thieves gs0 =
+  List.foldl' (\g pid -> snd (S.addHandCard snatch pid (S.landsFor island pid 6 g))) gs0 thieves
+
+-- balothAnswer, except that a target prompt takes the EARLIEST object offered.
+-- Aethersnatch is offered only while a spell is on the stack, so alice's (when
+-- she holds one) is cast first with the Baloth its one target, and bob's answers
+-- it; the Baloth spell was put on the stack before either Aethersnatch, so the
+-- lowest id is it.
+snatchAnswer :: Prompt.Prompt r -> r
+snatchAnswer p = case p of
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (Maybe.isJust . Recipient.objectOf) (List.sortOn Recipient.objectOf (Set.toList recipients)))) slots
+  _ -> balothAnswer p
+
+-- The postcombat main phase of alice's turn: the countdown's upkeep and her
+-- combat have both run.
+alicesPostcombat :: GameState.GameState -> Bool
+alicesPostcombat g = GameState.phase g == Phase.PostcombatMain && GameState.activePlayer g == S.alice
+
+-- Every Durkwood Baloth on the battlefield, whoever controls it: alice owns it,
+-- and Game.zoneMembers indexes by owner.
+balothsIn :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
+balothsIn baloth gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName baloth)) (Game.zoneMembers Zone.Battlefield S.alice gs)
 
 -- Delay (TSP 57) {1}{U} Instant, "Counter target spell. If the spell is
 -- countered this way, exile it with three time counters on it instead of
@@ -2080,6 +2137,106 @@ foretellGrant s registry = Spec.describe s "CR 702.143a Dream Devourer's grant" 
       Spec.assertBool s (not (S.castable S.alice exiledId (tapOne later))) "one Mountain does not, so the cast is not free"
     Spec.assertEqWith s "the control: the Devourer is off the battlefield" (S.creaturesInPlay S.alice later) 0
 
+-- Patriar's Humiliation (HBG, Arena) {W} Instant, "Target creature perpetually
+-- loses all abilities, then Patriar's Humiliation deals damage to it equal to
+-- the number of creatures you control", then Unsummon bouncing alice's `victim`
+-- to her hand, where its suspend or plot functions (CR 702.62a, 702.170a). The
+-- perpetual effect follows the card there (Duration.Perpetual).
+--
+-- The pair differs in what the Humiliation targets and in nothing else: the
+-- victim, or bob's Goblin Piker. Both boards spend the same Plains and Island,
+-- so the lands `base` holds are untapped on each.
+--
+-- Answers the bounced card, when it is the only card in alice's hand, and the
+-- board after the bounce.
+humiliatedBoard ::
+  GameState.GameState ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Bool ->
+  (Maybe ObjectId.ObjectId, GameState.GameState)
+humiliatedBoard base victim plains island piker humiliation unsummon onVictim =
+  let lands = S.landsFor island S.alice 1 (S.landsFor plains S.alice 1 base)
+      (victimId, g1) = S.addPermanent victim S.alice lands
+      (pikerId, g2) = S.addPermanent piker S.bob g1
+      (humiliationId, g3) = S.addHandCard humiliation S.alice g2
+      (unsummonId, g4) = S.addHandCard unsummon S.alice g3
+      atMain =
+        g4
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      castAt spell target g = S.runPure (aimAtObject target) g (S.cast S.alice spell >> Stack.resolveTop)
+      humiliated = castAt humiliationId (if onVictim then victimId else pikerId) atMain
+      bounced = castAt unsummonId victimId humiliated
+      inHand = case Game.zoneMembers Zone.Hand S.alice bounced of
+        [oid] -> Just oid
+        _ -> Nothing
+   in (inHand, bounced)
+
+-- Aims a spell at `oid`, PICKED OUT OF THE OFFERED SET rather than built,
+-- suspendAnswer's reason (CR 608.2b).
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (\r -> Recipient.objectOf r == Just oid) (Set.toList recipients))) slots
+  _ -> S.identityAnswer p
+
+perpetualLoss :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perpetualLoss s registry = Spec.describe s "CR 613.1f Patriar's Humiliation" $ do
+  -- One Forest for the Baloth's {G}.
+  Spec.it s "CR 613.1f a Durkwood Baloth that perpetually lost all abilities cannot be suspended" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humiliation <- S.printingOf s registry "Patriar's Humiliation"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let build = humiliatedBoard (S.landsInPlay forest 1) baloth plains island piker humiliation unsummon
+        (lostId, lost) = build True
+        (keptId, kept) = build False
+        offered mId gs = maybe False (\oid -> List.elem (Action.Type.Suspend oid) (Action.legalActions S.alice gs)) mId
+    Spec.assertBool s (not (offered lostId lost)) "CR 613.1f the humiliated Baloth back in hand offers no suspend"
+    Spec.assertBool s (offered keptId kept) "the control: with the Piker humiliated instead, the bounced Baloth may be suspended"
+    Spec.assertBool s (Maybe.isJust lostId) "the Baloth is the one card in alice's hand"
+  -- Four Islands for the Djinn's {3}{U}.
+  Spec.it s "CR 613.1f a Djinn of Fool's Fall that perpetually lost all abilities cannot be plotted" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humiliation <- S.printingOf s registry "Patriar's Humiliation"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let build = humiliatedBoard (S.landsInPlay island 4) djinn plains island piker humiliation unsummon
+        (lostId, lost) = build True
+        (keptId, kept) = build False
+        offered mId gs = maybe False (\oid -> List.elem (Action.Type.Plot oid djinnPlotCost) (Action.legalActions S.alice gs)) mId
+    Spec.assertBool s (not (offered lostId lost)) "CR 613.1f the humiliated Djinn back in hand offers no plot"
+    Spec.assertBool s (offered keptId kept) "the control: with the Piker humiliated instead, the bounced Djinn may be plotted"
+    Spec.assertBool s (Maybe.isJust lostId) "the Djinn is the one card in alice's hand"
+  -- CR 116.2e's discard, through Projection.specialActionsOf. No lands beyond
+  -- the two spells': the action costs nothing.
+  Spec.it s "CR 613.1f a Circling Vultures that perpetually lost all abilities cannot be discarded" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    vultures <- S.printingOf s registry "Circling Vultures"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humiliation <- S.printingOf s registry "Patriar's Humiliation"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let build = humiliatedBoard (Setup.emptyGame S.bothPlayers) vultures plains island piker humiliation unsummon
+        (lostId, lost) = build True
+        (keptId, kept) = build False
+        offered mId gs = maybe False (\oid -> List.elem (Action.Type.DiscardFromHand oid) (Action.legalActions S.alice gs)) mId
+    Spec.assertBool s (not (offered lostId lost)) "CR 613.1f the humiliated Vultures back in hand offer no discard"
+    Spec.assertBool s (offered keptId kept) "the control: with the Piker humiliated instead, the bounced Vultures may be discarded"
+    Spec.assertBool s (Maybe.isJust lostId) "the Vultures are the one card in alice's hand"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
@@ -2101,6 +2258,7 @@ spec s registry = do
   suspendingForX s registry
   whileExiled s registry
   delaying s registry
+  perpetualLoss s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and how
@@ -2375,7 +2533,7 @@ circlingVultures s registry = Spec.describe s "CR 116.2e Circling Vultures" $ do
       s
       "CR 701.9a the discard was logged, and CR 702.29c's cycling cause is not what caused it"
       (filter isDiscarded (S.eventsOf after))
-      (fmap (\oid -> GameEvent.Discarded (Discarded.MkDiscarded S.alice oid DiscardCause.Ordinary Set.empty)) graveyard)
+      (fmap (\oid -> GameEvent.Discarded (Discarded.MkDiscarded S.alice oid DiscardCause.Ordinary Nothing)) graveyard)
   -- CR 116.3: "if a player takes a special action, that player receives
   -- priority afterward." Both halves of the arm are pinned by the one sequence.
   -- Retaining priority puts alice's second prompt before bob's first; restarting

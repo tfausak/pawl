@@ -757,9 +757,6 @@ data Keyword
     -- control and cards in your graveyard, and returning this card to the
     -- battlefield transformed under its owner's control at sorcery speed. Minted
     -- by Pawl.Engine.Keyword.craft.
-    --
-    -- Not implemented: CR 702.167c's "the exiled cards used to craft it", which
-    -- needs the materials recorded for a later clause to read (#3931).
     Craft (Craft.Craft Keyword)
   | -- | 702.168a: disguise [cost] -- Morph's twin, casting the card as a 2\/2
     -- face-down creature with ward {2} for {3}; the Cost is what CR 702.168d
@@ -888,7 +885,7 @@ data Keyword
     -- discard of this card with an exile
     -- (Pawl.Engine.Keyword.handReplacementsOf); the triggered one then offers
     -- its owner the cast for [cost], or the graveyard
-    -- (Pawl.Engine.Keyword.exileTriggeredAbilitiesOf).
+    -- (Pawl.Engine.Keyword.madnessCast).
     Madness (MadnessCost.MadnessCost Keyword)
   | -- | 702.88a: a spell cast from its controller's hand is exiled as it
     -- resolves instead of going to the graveyard, and a delayed triggered

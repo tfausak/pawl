@@ -307,8 +307,8 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- fold knows; the copiable ones are gated outside it
               -- (abilityRemoval).
               PC.grantedPlayerAbilities = [],
-              -- The same for a granted cost reduction. Unproven: nothing in the
-              -- pool wipes the abilities of a card off the battlefield.
+              -- The same for a granted cost reduction. Unproven: no test wipes
+              -- a card carrying a granted one.
               PC.grantedCostReductions = [],
               -- The same for a granted static ability: only an EARLIER grant is
               -- gone. Unproven: no card in data/cards/ grants a static ability
@@ -779,8 +779,16 @@ ruleAbilitiesOf oid gs = maybe (copiableRuleAbilitiesOf oid gs) PC.ruleAbilities
 -- CR 116.2: ruleAbilitiesOf's shape for special actions. Pawl.ProjectionSpec's
 -- "CR 612.6 the Shapeshifter as Leonin Arbiter offers its {2}" proves the
 -- full-text read.
+--
+-- CR 613.1f: an object whose abilities a layer-6 wipe removed grants none, in
+-- any zone. The fold's flag is asked only when there is an action to take away,
+-- so an object granting none costs no projection. Pawl.SpecialActionSpec's "CR
+-- 613.1f a Circling Vultures that perpetually lost all abilities cannot be
+-- discarded" proves it.
 specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
-specialActionsOf oid gs = maybe (copiableSpecialActionsOf oid gs) PC.specialActions (fullTextOf oid gs)
+specialActionsOf oid gs = case maybe (copiableSpecialActionsOf oid gs) PC.specialActions (fullTextOf oid gs) of
+  [] -> []
+  actions -> if PC.lostAllAbilities (project oid gs) then [] else actions
 
 -- CR 612.1: the word swaps a reader outside the fold applies to what
 -- ruleAbilitiesOf, specialActionsOf or PlayerEffect.playerAbilitiesOf handed
@@ -4310,7 +4318,18 @@ projectDecidingFrom seedOf admits cands =
                   -- applies to has the same state on the running board as under the
                   -- bound, so scanning it could not change an answer, and paying for
                   -- every library card on every board would.
-                  reachable = Set.unions (GameState.battlefield gs : fmap (\c -> candidatesFor (gAffected c) gs) here)
+                  reachable = Set.unions (GameState.battlefield gs : definingReach : fmap (\c -> candidatesFor (gAffected c) gs) here)
+                  -- CR 604.3 / 613.4a: where this object's own CDA reads power,
+                  -- every object off the battlefield whose CDA defines one --
+                  -- Mastercraft Raptor totalling the power of a Tarmogoyf it was
+                  -- crafted from, which no other effect at this sublayer reaches.
+                  -- Empty on every other projection, which keeps the walk over
+                  -- every object off the hot path. Pawl.ActivateSpec's Tarmogoyf
+                  -- case is the proof.
+                  definingReach =
+                    if definingMovable
+                      then Set.filter (Maybe.isJust . PC.characteristicPT . (`copiableCharacteristics` gs)) (Set.difference (Map.keysSet (GameState.objects gs)) (GameState.battlefield gs))
+                      else Set.empty
                   otherBoards = Map.fromSet snapshot (Set.delete oid reachable)
                   -- CR 613.8b: an effect that depends on another waits for it, and
                   -- CR 613.7 timestamp order picks the next among those waiting on
@@ -4545,12 +4564,9 @@ projectDecidingFrom seedOf admits cands =
                     _ -> False
                   -- CR 613.4a's units, in a board-wide order so that every object's
                   -- projection breaks a timestamp tie the same way. `oid` is here
-                  -- as well as on the battlefield: CR 604.3 makes a CDA function in
-                  -- every zone.
-                  --
-                  -- Not implemented: the range is `reachable`, which at this
-                  -- sublayer is the battlefield alone, so a count cannot read a
-                  -- power a CDA defines on a card in another zone (#3109).
+                  -- as well as on the battlefield, and so is every other object
+                  -- carrying a P/T-defining ability (`definingReach`): CR 604.3
+                  -- makes a CDA function in every zone.
                   definingUnits = do
                     (o, (p, _)) <- Map.toAscList (Map.insert oid (seeded, decided) otherBoards)
                     obj <- Maybe.maybeToList (Game.lookupObject o gs)
