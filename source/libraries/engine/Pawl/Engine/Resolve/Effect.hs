@@ -4283,8 +4283,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- PlayerEffect.playersInScope against CR 109.5's "you" -- the resolving
   -- controller -- so this arm classifies the choice and never names a card. That
   -- fold is over Game.stillPlaying, so a seat that has left (CR 104.3a) is not
-  -- offered; CR 102.2 leaves "an opponent" nothing to decide at two seats, where
-  -- "a player" there has two candidates and must be asked. An answer naming
+  -- offered, and it is cut to the controller's range (CR 801.5a); CR 102.2
+  -- leaves "an opponent" nothing to decide at two seats, where "a player" there
+  -- has two candidates and must be asked. An answer naming
   -- somebody never offered falls back to the first candidate, since the
   -- instruction is mandatory. Nobody in scope binds nothing, so the following
   -- sentence names no player and does nothing (CR 101.3).
@@ -4297,7 +4298,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.ChoosePlayer choice -> do
     gs <- State.get
     let slot = ChoosePlayer.slot choice
-        candidates = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayer.scope choice))
+        candidates = filter (\pid -> Game.inRangeOf controller pid gs) (Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayer.scope choice)))
     chosenPlayer <- case candidates of
       [] -> pure Nothing
       [sole] -> pure (Just sole)
@@ -4320,9 +4321,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- WHICH players are offered is the payload's PlayerScope, read through the
   -- same PlayerEffect.playersInScope the deciding twin above reads, against CR
-  -- 109.5's "you" -- so the offer can hold the resolving controller
-  -- (PlayerScope.EachPlayer) and this arm still classifies rather than naming a
-  -- card. Nobody in scope binds nothing (CR 101.3); CR 102.2 leaves
+  -- 109.5's "you" and cut to their range (CR 801.10) -- so the offer can hold
+  -- the resolving controller (PlayerScope.EachPlayer) and this arm still
+  -- classifies rather than naming a card. Nobody in scope binds nothing (CR 101.3); CR 102.2 leaves
   -- PlayerScope.Opponents nothing to pick at two seats.
   --
   -- ONE prompt where the deciding twin picks between two: Prompt.RandomPlayer
@@ -4337,7 +4338,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.ChoosePlayerAtRandom choice -> do
     gs <- State.get
     let slot = ChoosePlayerAtRandom.slot choice
-        candidates = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayerAtRandom.scope choice))
+        candidates = filter (\pid -> Game.inRangeOf controller pid gs) (Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayerAtRandom.scope choice)))
     chosenPlayer <- case candidates of
       [] -> pure Nothing
       [sole] -> pure (Just sole)
