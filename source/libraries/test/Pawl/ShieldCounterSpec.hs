@@ -14,9 +14,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -494,20 +492,6 @@ hurrJackalSpec s registry = Spec.describe s "Hurr Jackal (CR 701.19c)" $ do
       Spec.assertBool s (Set.member victim (GameState.battlefield settled)) "the Piker regenerates when nothing forbade it"
       Spec.assertBool s (Set.member bystander (GameState.battlefield settled)) "and so does the Mammoth"
       Spec.assertEqWith s "nothing reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
-  Spec.it s "CR 514.2 the prohibition lasts exactly the turn, and the same shield saves the same creature next turn"
-    . withBoard
-    $ \_ (_, victim, _, activated) -> do
-      -- CR 514.2's own sweep, then the handoff into bob's turn. The shield is
-      -- RE-ARMED after both: Support.addRegenShield arms Expiry.AtCleanup, so
-      -- the one this turn put up is gone either way and a case that did not
-      -- re-arm would pass for the wrong reason.
-      let bobsTurn = S.runPure S.identityAnswer (Expiry.dropAtCleanup activated) Engine.handoffTurn
-          settled = S.settleSba (S.markDamage victim 1 (S.addRegenShield victim bobsTurn))
-      Spec.assertBool s (Set.member victim (GameState.battlefield settled)) "the same creature regenerates once the turn it was named in is over"
-      Spec.assertEqWith s "CR 701.19a removed its damage" (S.damageOf victim settled) (Just 0)
-      Spec.assertEqWith s "nothing reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
-      Spec.assertEqWith s "and the prohibition really is off the board" (GameState.unregeneratables bobsTurn) []
-      Spec.assertEqWith s "bob's turn really did begin" (GameState.activePlayer bobsTurn) S.bob
 
 -- Chatterfang, Squirrel General (Oracle text checked against Scryfall
 -- 2026-09-30): "If one or more tokens would be created under your control, those

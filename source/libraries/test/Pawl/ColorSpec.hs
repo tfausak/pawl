@@ -66,7 +66,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetSlot as TargetSlot
-import qualified Pawl.Types.Zone as Zone
 
 -- "target nonblack creature", the target slot Doom Blade and the CR 115.1a cases share.
 nonblackCreature :: TargetSlot.TargetSlot
@@ -328,26 +327,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (droneId, gs) = S.addPermanent slaughterDrone S.alice gs0
         legal = Target.legalRecipients Nothing S.noSource nonblackCreature gs
     Spec.assertBool s (Set.member (Recipient.ToCreature droneId) legal) "colourless is nonblack"
-
-  Spec.it s "CR 608.2b Doom Blade fizzles when its target becomes black in response" $ do
-    -- The fizzle is only reachable through a colour change, and Aphotic Wisps
-    -- is the one card in the pool that makes something BLACK.
-    swamp <- S.printingOf s registry "Swamp"
-    llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    doomBlade <- S.printingOf s registry "Doom Blade"
-    aphoticWisps <- S.printingOf s registry "Aphotic Wisps"
-    let base = S.landsInPlay swamp 3
-        (elvesId, board) = S.addPermanent llanowarElves S.bob base
-        (gs1, dbId) = S.handOne doomBlade board
-        (gs2, awId) = S.handOne aphoticWisps gs1
-        castDb = snd (Engine.runGamePure S.identityAnswer gs2 (S.cast S.alice dbId))
-        castAw = snd (Engine.runGamePure S.identityAnswer castDb (S.cast S.alice awId))
-        -- Aphotic Wisps is on top, so it resolves first and turns the green
-        -- Elves black; Doom Blade then re-checks its target (CR 608.2b).
-        after = snd (Engine.runGamePure S.identityAnswer castAw (Stack.resolveTop >> Stack.resolveTop))
-    Spec.assertEqWith s "the Elves are black" (Projection.colorsOf elvesId after) $ Set.singleton Color.Black
-    Spec.assertBool s (Set.member elvesId (GameState.battlefield after)) "the Elves survive"
-    Spec.assertEqWith s "both spells are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
 
   Spec.it s "CR 105.3 2008-05-01 a colour change overwrites ALL previous colours, even a multicoloured one" $ do
     -- Gatherer ruling on Crimson Wisps / Aphotic Wisps (WotC, 2008-05-01):

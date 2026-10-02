@@ -86,10 +86,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.DiscardCause as DiscardCause
-import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Facing as Facing
-import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -173,11 +170,6 @@ isPlay action = case action of
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
-isDiscarded :: GameEvent.GameEvent -> Bool
-isDiscarded event = case event of
-  GameEvent.Discarded {} -> True
-  _ -> False
-
 -- Take the named action the first time it is offered and pass ever after,
 -- recording which player each ChooseAction prompt went to. That record is what
 -- CR 116.3 is asserted on, since who is asked next is the only thing a game
@@ -208,45 +200,6 @@ arbiterBoard forest arbiter growth =
    in ( arbiterId,
         growthId,
         gs3
-          { GameState.activePlayer = S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.priority = Just S.alice
-          }
-      )
-
--- arbiterBoard with the Arbiter's text moved onto a COPY of it: alice's Unstable
--- Shapeshifter becomes a copy of the Leonin Arbiter as that Arbiter enters (CR
--- 707.4), and the printed Arbiter then leaves the battlefield.
---
--- The departure is what makes the board discriminating, the reason
--- Pawl.CopySpec's becameCopyBoard gives: while the printed Arbiter is still
--- there it grants CR 116.2d's permission itself, and a reader that consulted the
--- copier's own printed face cannot be told apart from one that consulted the
--- copied text. CR 707.2b is what makes the board after the departure legal.
--- CR 604.2 takes the printed Arbiter's prohibition with it, so the ban that
--- remains is the copy's alone.
---
--- Nine Forests, one Forest left in the library and a Rampant Growth in hand,
--- exactly as arbiterBoard has them. Returns the Shapeshifter and the Growth.
-copiedArbiterBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-copiedArbiterBoard forest shapeshifter arbiter growth =
-  let (shifterId, gs1) = S.addPermanent shapeshifter S.alice (S.landsInPlay forest 9)
-      (_, gs2) = S.addLibraryCard forest S.alice gs1
-      (growthId, gs3) = S.addHandCard growth S.alice gs2
-      -- addPermanent above arranges a board and fires nothing; the Arbiter is the
-      -- one permanent that ENTERS, which is what raises CR 707.4's trigger.
-      (arbiterId, entered) = S.entersWithTrigger arbiter S.alice gs3
-      stacked = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)
-      copied = snd (Engine.runGamePure S.identityAnswer stacked (Stack.resolveTop >> Engine.settleForPriority))
-      gone = S.runPure S.identityAnswer copied (Event.changeZone arbiterId Zone.Graveyard)
-   in ( shifterId,
-        growthId,
-        gone
           { GameState.activePlayer = S.alice,
             GameState.phase = Phase.PrecombatMain,
             GameState.priority = Just S.alice
@@ -520,65 +473,6 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
           (oid, g) -> (oid, g {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
     Spec.assertBool s (List.elem (Action.Type.Plot djinnId djinnPlotCost) (Action.legalActions S.alice gs)) "four Islands pay {3}{U}"
     Spec.assertBool s (List.notElem (Action.Type.Plot poorId djinnPlotCost) (Action.legalActions S.alice poor)) "three do not"
-  -- CR 702.170b: the action does not use the stack. The prompt log is what proves
-  -- it -- alice acts and is asked AGAIN before bob is asked anything, so no player
-  -- got a window to respond and nothing was put on the stack to respond to. CR
-  -- 116.3's retained priority is the same sequence read the other way, and is
-  -- asserted once for the whole family in the Vultures group above.
-  Spec.it s "CR 702.170b taking it exiles the card without using the stack" $ do
-    island <- S.printingOf s registry "Island"
-    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    let (djinnId, _, gs) = plotBoard island djinn traveler
-        (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId djinnPlotCost)) gs Engine.priorityLoop) [] of
-          ((_, g), log2) -> (log2, g)
-    Spec.assertEqWith
-      s
-      "alice acts, alice is asked again, and only then is bob asked"
-      asked
-      [S.alice, S.alice, S.bob]
-    Spec.assertEqWith
-      s
-      "the Djinn is in exile"
-      (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (soleExile after))
-      (Just (Just (S.printingName djinn)))
-    Spec.assertEqWith s "the Traveler is still in hand" (S.handSize S.alice after) 1
-    Spec.assertEqWith s "nothing but the four Islands is on the battlefield" (length (GameState.battlefield after)) 4
-    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
-    -- CR 702.170a's "it becomes a plotted card", which is the whole point of the
-    -- action: an arm that exiled the card and stamped nothing would pass every
-    -- assertion above.
-    Spec.assertEqWith
-      s
-      "the exiled card is plotted, stamped with this turn"
-      (soleExile after >>= \oid -> fmap Object.plotted (Game.lookupObject oid after))
-      (Just (Just (GameState.turnNumber after)))
-  -- CR 702.170d: "a plotted card's owner may cast it from exile without paying
-  -- its mana cost ... during ANY TURN AFTER the turn in which it became plotted."
-  -- Every board below is the state the plot left behind, with one thing moved:
-  -- the turn number, the caster, or the stamp.
-  Spec.it s "CR 702.170d the plotted card is castable only by its owner, and only later" $ do
-    island <- S.printingOf s registry "Island"
-    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    let (djinnId, _, gs) = plotBoard island djinn traveler
-        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId djinnPlotCost)) gs Engine.priorityLoop) [])
-        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
-        unplotted = later {GameState.objects = Map.map (\o -> o {Object.plotted = Nothing}) (GameState.objects later)}
-        -- CR 307.5's window belongs to whoever's turn it is, so bob's case has to
-        -- be asked on bob's turn or it fails for the timing rather than for the
-        -- ownership. `bobOwns` is that same board with the exiled card's owner
-        -- moved and nothing else, which is what makes the refusal above CR
-        -- 702.170d's rather than a coincidence.
-        bobsTurn = later {GameState.activePlayer = S.bob}
-        bobOwns oid = bobsTurn {GameState.objects = Map.adjust (\o -> o {Object.owner = S.bob}) oid (GameState.objects bobsTurn)}
-    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
-    Monad.forM_ (soleExile after) $ \exiledId -> do
-      Spec.assertBool s (not (S.castable S.alice exiledId after)) "not on the turn it became plotted"
-      Spec.assertBool s (S.castable S.alice exiledId later) "on the next turn it is castable -- with every Island still tapped, so the cast is free"
-      Spec.assertBool s (not (S.castable S.bob exiledId bobsTurn)) "and not by a player who does not own it"
-      Spec.assertBool s (S.castable S.bob exiledId (bobOwns exiledId)) "the control: bob's own turn and bob's own plotted card is castable, so the refusal above was the ownership"
-      Spec.assertBool s (not (S.castable S.alice exiledId unplotted)) "the control: the same card in the same exile, unplotted, is castable by nobody"
   -- The offer taken rather than merely asked about: the Djinn reaches the
   -- battlefield off a board with no untapped land on it, which is CR 702.170d's
   -- "without paying its mana cost" observed rather than inferred.
@@ -773,15 +667,6 @@ foretellBoard island raven traveler =
           }
       )
 
--- Tap one of alice's untapped permanents, and nothing else -- the one difference
--- between the two boards the cast's price is read off.
-tapOne :: GameState.GameState -> GameState.GameState
-tapOne gs =
-  let untapped oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
-   in case filter untapped (Game.zoneMembers Zone.Battlefield S.alice gs) of
-        oid : _ -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
-        [] -> gs
-
 -- Ethereal Valkyrie (KHC 3) {4}{W}{U} Creature -- Spirit Angel, "Flying /
 -- Whenever this creature enters or attacks, draw a card, then exile a card from
 -- your hand face down. It becomes foretold. Its foretell cost is its mana cost
@@ -840,10 +725,10 @@ valkyrieAnswers loreId prompt = case prompt of
   Prompt.ChooseCardInHand _ _ _ candidates | elem loreId candidates -> loreId
   _ -> S.identityAnswer prompt
 
--- Tap one of alice's untapped lands OF THAT PRINTING, and nothing else -- the one
--- difference between the boards each cast's price is read off. Named rather than
--- `tapOne` above, which takes the first untapped permanent: the Valkyrie herself
--- is untapped on these boards and tapping her moves no mana.
+-- Tap one of alice's untapped lands OF THAT PRINTING, and nothing else -- the
+-- one difference between the boards each cast's price is read off. Named rather
+-- than the first untapped permanent: the Valkyrie herself is untapped on these
+-- boards and tapping her moves no mana.
 tapOneNamed :: Printing.Printing -> GameState.GameState -> GameState.GameState
 tapOneNamed island gs =
   let untapped oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
@@ -1082,78 +967,6 @@ foretelling s registry = Spec.describe s "CR 116.2h Augury Raven" $ do
           (oid, g) -> (oid, g {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
     Spec.assertBool s (List.elem (Action.Type.Foretell ravenId) (Action.legalActions S.alice gs)) "two Islands pay {2}"
     Spec.assertBool s (List.notElem (Action.Type.Foretell poorId) (Action.legalActions S.alice poor)) "one does not"
-  -- CR 702.143b: the action does not use the stack. The prompt log proves it the
-  -- way the plot group's does -- alice acts and is asked again before bob is
-  -- asked anything. CR 116.3's retained priority is that same sequence read the
-  -- other way, and is asserted once for the whole family in the Vultures group.
-  Spec.it s "CR 702.143b taking it exiles the card face down without using the stack" $ do
-    island <- S.printingOf s registry "Island"
-    raven <- S.printingOf s registry "Augury Raven"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    let (ravenId, _, gs) = foretellBoard island raven traveler
-        (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [] of
-          ((_, g), log2) -> (log2, g)
-    Spec.assertEqWith
-      s
-      "alice acts, alice is asked again, and only then is bob asked"
-      asked
-      [S.alice, S.alice, S.bob]
-    Spec.assertEqWith
-      s
-      "the Raven is in exile"
-      (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (soleExile after))
-      (Just (Just (S.printingName raven)))
-    Spec.assertEqWith s "the Traveler is still in hand" (S.handSize S.alice after) 1
-    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
-    -- CR 116.2h's own words -- "and exile that card FACE DOWN", against CR
-    -- 406.3's face-up default.
-    Spec.assertEqWith
-      s
-      "the exiled card is face down"
-      (soleExile after >>= \oid -> fmap Object.exiledFaceDown (Game.lookupObject oid after))
-      (Just True)
-    -- CR 702.143a's foretold card, which is what the later cast is read off: an
-    -- arm that exiled the card and stamped nothing passes every assertion above.
-    Spec.assertEqWith
-      s
-      "the exiled card is foretold, stamped with this turn"
-      (soleExile after >>= \oid -> fmap Object.foretold (Game.lookupObject oid after))
-      (Just (Just (GameState.turnNumber after)))
-    -- CR 116.2h's {2}, observed rather than inferred: two of the four Islands
-    -- paid for it and two are still standing.
-    Spec.assertEqWith s "two Islands paid the {2}" (S.tappedCount S.alice after) 2
-  -- CR 702.143a: "they may cast that card AFTER THE CURRENT TURN HAS ENDED by
-  -- paying any foretell cost it has". Every board below is the state the special
-  -- action left behind, with one thing moved: the turn number, the caster, the
-  -- stamp, or one land.
-  Spec.it s "CR 702.143a the foretold card is castable only by its owner, only later, and only for the foretell cost" $ do
-    island <- S.printingOf s registry "Island"
-    raven <- S.printingOf s registry "Augury Raven"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    let (ravenId, _, gs) = foretellBoard island raven traveler
-        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [])
-        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
-        unforetold = later {GameState.objects = Map.map (\o -> o {Object.foretold = Nothing}) (GameState.objects later)}
-        -- CR 307.5's window belongs to whoever's turn it is, so bob's case is
-        -- asked on bob's turn or it fails for the timing rather than for the
-        -- ownership -- the plot group's argument unchanged. bob gets two Islands
-        -- of his own on the SAME board for the same reason one rule further on:
-        -- rule 702.143a's cast is not free, so a bob with no mana would be
-        -- refused for the price rather than for the ownership. Both of bob's
-        -- boards carry them, so the pair below still differs in the owner alone.
-        bobsTurn = S.landsFor island S.bob 2 (later {GameState.activePlayer = S.bob})
-        bobOwns oid = bobsTurn {GameState.objects = Map.adjust (\o -> o {Object.owner = S.bob}) oid (GameState.objects bobsTurn)}
-    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
-    Monad.forM_ (soleExile after) $ \exiledId -> do
-      Spec.assertBool s (not (S.castable S.alice exiledId after)) "not on the turn it was foretold"
-      Spec.assertBool s (S.castable S.alice exiledId later) "on the next turn it is castable, off the two Islands the {2} left standing"
-      Spec.assertBool s (not (S.castable S.bob exiledId bobsTurn)) "and not by a player who does not own it"
-      Spec.assertBool s (S.castable S.bob exiledId (bobOwns exiledId)) "the control: bob's own turn and bob's own foretold card is castable, so the refusal above was the ownership"
-      Spec.assertBool s (not (S.castable S.alice exiledId unforetold)) "the control: the same card in the same exile, not foretold, is castable by nobody"
-      -- The price, from both sides. Two Islands are enough, which the printed
-      -- {3}{U} would not be; ONE is not enough, which a cast charging nothing
-      -- would be. The pair differs in a single tapped land.
-      Spec.assertBool s (not (S.castable S.alice exiledId (tapOne later))) "one Island does not pay {1}{U}, so the cast is not free"
   -- The offer taken rather than merely asked about: the Raven reaches the
   -- battlefield and the last two Islands go down with it, which is CR 702.143a's
   -- "paying any foretell cost it has" observed.
@@ -1282,36 +1095,6 @@ suspending s registry = Spec.describe s "CR 116.2f Rift Bolt" $ do
     Spec.assertBool s (List.elem (Action.Type.Suspend boltId) actions) "the Bolt may be suspended"
     Spec.assertBool s (List.notElem (Action.Type.Suspend travelerId) actions) "the Doomed Traveler may not"
     Spec.assertBool s (List.notElem (Action.Type.Suspend boltId) (Action.legalActions S.alice opponentsTurn)) "and not on an opponent's turn, where the sorcery could not be cast"
-  -- The whole rule, driven: the action is taken, the counter ticks down on
-  -- alice's next upkeep, and the Bolt is cast that same upkeep for nothing.
-  Spec.it s "CR 702.62 the card is exiled with a time counter, ticks down at the next upkeep, and is cast free" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Rift Bolt"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    let (boltId, _, gs) = riftBoltBoard mountain bolt traveler
-        suspended = snd (Engine.runGamePure (suspendAnswer boltId) gs Engine.priorityLoop)
-        startTurn = GameState.turnNumber suspended
-        -- CR 702.62a's countdown runs at the OWNER's upkeep, which in a two-seat
-        -- game is two turns on: bob's, then alice's.
-        stop g = GameState.turnNumber g > startTurn + 1 && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
-        after = runUntil (suspendAnswer boltId) stop suspended
-    -- CR 702.62a: "exile it with N time counters on it", exactly one for
-    -- suspend 1, and CR 702.62b is what makes that the definition of suspended.
-    Spec.assertEqWith
-      s
-      "the Bolt is exiled with exactly one time counter"
-      (soleExileOf suspended >>= \oid -> fmap (Map.lookup CounterKind.Time . Object.counters) (Game.lookupObject oid suspended))
-      (Just (Just 1))
-    Spec.assertEqWith s "and the Mountain paid {R} for it" (S.tappedCount S.alice suspended) 1
-    -- CR 702.62a's second ability, then its third. bob's life is what the free
-    -- cast produced: 3 damage from a Bolt nothing on this board could pay
-    -- {2}{R} for.
-    Spec.assertEqWith s "bob has taken the Bolt's 3" (S.lifeOf S.bob after) (Just 17)
-    Spec.assertEqWith s "on alice's own next turn, not bob's" (GameState.turnNumber after) (startTurn + 2)
-    Spec.assertEqWith s "the time counter is gone with the card, which is in the graveyard (CR 608.2n)" (length (GameState.exile after)) 0
-    -- "For free" read off the board rather than inferred: the untap step gave
-    -- the Mountain back, and the cast left it untapped.
-    Spec.assertEqWith s "and no mana was spent -- the Mountain is still untapped" (S.tappedCount S.alice after) 0
   -- CR 702.62a's "if it's exiled" is CR 603.4's intervening "if": it immediately
   -- follows the trigger condition, so CR 608.2a re-checks it as the ability
   -- resolves. The pair is one board where the suspended card is still in exile
@@ -1638,24 +1421,6 @@ suspendForX x oid p = case p of
 
 suspendingForX :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
-  -- The whole of rule 107.3d in one run: the announcement is made as the special
-  -- action is taken, and both halves of "Suspend X--{X}{W}{W}" read it.
-  Spec.it s "CR 107.3d the announced X is both the time counters and the mana" $ do
-    plains <- S.printingOf s registry "Plains"
-    commander <- S.printingOf s registry "Benalish Commander"
-    let (commanderId, gs) = benalishBoard 6 plains commander
-        suspended = snd (Engine.runGamePure (suspendForX 3 commanderId) gs Engine.priorityLoop)
-    -- CR 702.62a's "exile it with N time counters on it", where N is rule
-    -- 107.3d's answer: three, not the one a fixed N would have written and not
-    -- the zero an unread announcement would have.
-    Spec.assertEqWith
-      s
-      "the Commander is exiled with exactly three time counters"
-      (soleExileOf suspended >>= \oid -> fmap (Map.lookup CounterKind.Time . Object.counters) (Game.lookupObject oid suspended))
-      (Just (Just 3))
-    -- The same announcement on the cost half (CR 107.3i): {3}{W}{W} is five of
-    -- the six Plains, and the sixth is still untapped.
-    Spec.assertEqWith s "and five of the six Plains paid {3}{W}{W} for it" (S.tappedCount S.alice suspended) 5
   -- CR 101.1 / 101.2: "X can't be 0" beats rule 107.3d's otherwise free choice, so the
   -- announcement is illegal and the special action does nothing. The pair is one
   -- board and one answer apart -- same hand, same six Plains, same action taken.
@@ -1826,43 +1591,8 @@ foretoldSpell s registry = Spec.describe s "CR 702.143c Poison the Cup" $ do
       Spec.assertEqWith s "the copy destroyed the Piker, so it resolved" (S.creaturesInPlay S.bob copied) 0
       Spec.assertEqWith s "and the stack is empty" (GameState.stack copied) []
 
--- Dream Devourer (KHM 90) {1}{B} Creature -- Demon Cleric 0/3, "Each nonland
--- card in your hand without foretell has foretell. Its foretell cost is equal to
--- its mana cost reduced by {2}. / Whenever you foretell a card, this creature
--- gets +2/+0 until end of turn." -- checked against Scryfall, 2026-09-25.
---
--- ONE DEVOURER EACH, alice's and bob's, so "you" is not collapsed onto "a
--- player": alice foretells, and only hers may grow.
-devourerBoard ::
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-devourerBoard island raven devourer =
-  let (ravenId, g1) = S.addHandCard raven S.alice (S.landsInPlay island 4)
-      (mineId, g2) = S.addPermanent devourer S.alice g1
-      (theirsId, g3) = S.addPermanent devourer S.bob g2
-   in ( ravenId,
-        mineId,
-        theirsId,
-        g3
-          { GameState.activePlayer = S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.priority = Just S.alice
-          }
-      )
-
-foretellTrigger :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foretellTrigger :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 foretellTrigger s registry = Spec.describe s "CR 702.143c Dream Devourer" $ do
-  Spec.it s "CR 702.143c foretelling a card triggers its controller's Devourer and no one else's" $ do
-    island <- S.printingOf s registry "Island"
-    raven <- S.printingOf s registry "Augury Raven"
-    devourer <- S.printingOf s registry "Dream Devourer"
-    let (ravenId, mineId, theirsId, gs) = devourerBoard island raven devourer
-        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [])
-    Spec.assertEqWith s "CR 702.143c alice's Devourer got +2/+0" (Projection.powerOf mineId after) (Just 2)
-    Spec.assertEqWith s "bob's did not: it watches its own controller" (Projection.powerOf theirsId after) (Just 0)
-    Spec.assertBool s (Maybe.isJust (soleExile after)) "and the Raven really was foretold"
   -- CR 702.143c: "foretelling a card" is the special action, and CR 702.143d's
   -- effect makes a card foretold without anyone foretelling it -- Ethereal
   -- Valkyrie's own ruling says the trigger does not fire. The Valkyrie's board
@@ -1905,7 +1635,7 @@ grantBoard mountain giant devourer controller =
           }
       )
 
-foretellGrant :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foretellGrant :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 foretellGrant s registry = Spec.describe s "CR 702.143a Dream Devourer's grant" $ do
   -- CR 613.1f: a layer-6 grant to a card in a hand, where CR 702.143a's ability
   -- functions. The pair differs only in who controls the Devourer: "your hand"
@@ -1918,21 +1648,6 @@ foretellGrant s registry = Spec.describe s "CR 702.143a Dream Devourer's grant" 
         (theirGiantId, _, theirs) = grantBoard mountain giant devourer S.bob
     Spec.assertBool s (List.elem (Action.Type.Foretell giantId) (Action.legalActions S.alice mine)) "CR 613.1f alice's Devourer lets her foretell the Giant"
     Spec.assertBool s (List.notElem (Action.Type.Foretell theirGiantId) (Action.legalActions S.alice theirs)) "bob's does not"
-  -- The ruling: the grant stops once the card leaves the hand, yet the card keeps
-  -- the cost it was given -- so the Devourer is gone before the cast.
-  Spec.it s "CR 702.143a the foretold card is cast for its own mana cost reduced by {2}, the Devourer gone" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    giant <- S.printingOf s registry "Hill Giant"
-    devourer <- S.printingOf s registry "Dream Devourer"
-    let (giantId, devourerId, gs) = grantBoard mountain giant devourer S.alice
-        foretold = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell giantId)) gs Engine.priorityLoop) [])
-        gone = S.runPure S.identityAnswer foretold (Event.changeZone devourerId Zone.Graveyard)
-        later = gone {GameState.turnNumber = GameState.turnNumber gone + 1}
-    Spec.assertBool s (Maybe.isJust (soleExile foretold)) "the Giant was foretold into exile, so the case below runs at all"
-    Monad.forM_ (soleExile later) $ \exiledId -> do
-      Spec.assertBool s (S.castable S.alice exiledId later) "CR 702.143a the two Mountains the {2} left pay {1}{R}"
-      Spec.assertBool s (not (S.castable S.alice exiledId (tapOne later))) "one Mountain does not, so the cast is not free"
-    Spec.assertEqWith s "the control: the Devourer is off the battlefield" (S.creaturesInPlay S.alice later) 0
 
 -- Patriar's Humiliation (HBG, Arena) {W} Instant, "Target creature perpetually
 -- loses all abilities, then Patriar's Humiliation deals damage to it equal to
@@ -2236,38 +1951,6 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     Spec.assertEqWith s "the search was offered this time" asked ["search", "shuffle"]
     Spec.assertBool s (not (PlayerEffect.prohibitsSearching S.alice S.alice S.alice afterIgnore)) "alice paid, so she is not prohibited"
     Spec.assertBool s (PlayerEffect.prohibitsSearching S.bob S.bob S.bob afterIgnore) "bob did not, so he still is"
-  -- CR 707.2 / 707.2a: the permission is derived from the copied object's rules
-  -- text, so it is copied along with the prohibition it accompanies. What this
-  -- proves is that Pawl.Engine.Ignore.ignoreGrants and
-  -- Pawl.Engine.PlayerEffect.playerAbilitiesOf answer off the SAME copiable read
-  -- (Projection.specialActionsOf and Projection.copiableSnapshotOf under it):
-  -- a fork between them leaves the copy enforcing a ban nobody may pay to ignore.
-  --
-  -- The payment leg is FIRST: an implementation that offered the action without
-  -- wiring it to the copy's ban passes an offer-only assertion.
-  Spec.it s "CR 707.2a a copy of the Arbiter carries the offer with the ban" $ do
-    forest <- S.printingOf s registry "Forest"
-    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
-    arbiter <- S.printingOf s registry "Leonin Arbiter"
-    growth <- S.printingOf s registry "Rampant Growth"
-    let (shifterId, growthId, gs) = copiedArbiterBoard forest shapeshifter arbiter growth
-        afterIgnore = snd (State.evalState (Engine.runGame (takeOnce (Action.Type.Ignore shifterId searchBan)) gs Engine.priorityLoop) False)
-        (paid, askedAfterPaying) = growAndResolve growthId afterIgnore
-        (unpaid, askedWithout) = growAndResolve growthId gs
-    Spec.assertEqWith s "CR 116.2d paying the copy's {2} lets the search happen: the Forest left the library" (S.countByName (S.printingName forest) S.alice paid) 0
-    Spec.assertEqWith s "and is the tenth on the battlefield" (S.countOnBattlefieldByName (S.printingName forest) S.alice paid) 10
-    Spec.assertEqWith s "the search was offered this time" askedAfterPaying ["search", "shuffle"]
-    -- The paired control, differing in exactly the payment: the copy's ban is
-    -- real, so the same board without it searches nothing. BEFORE the offer
-    -- below, which is a proxy -- CR 116.2d's WHO conjunct withdraws the offer
-    -- when the ban goes, so the offer would absorb a mutation aimed at the ban.
-    Spec.assertEqWith s "CR 707.2a the unpaid copy still bans the search" askedWithout ["shuffle"]
-    Spec.assertEqWith s "so that Forest is still in the library" (S.countByName (S.printingName forest) S.alice unpaid) 1
-    Spec.assertBool s (List.elem (Action.Type.Ignore shifterId searchBan) (Action.legalActions S.alice gs)) "and the offer is the copy's own"
-    -- The fixture's own preconditions, after the behaviour so neither can absorb
-    -- a mutation aimed at it.
-    Spec.assertEqWith s "the Shapeshifter is the Arbiter by name (CR 707.2)" (Projection.namesOf shifterId gs) (Set.singleton (S.printingName arbiter))
-    Spec.assertEqWith s "and no printed Arbiter is left on the battlefield to answer for it" (S.countOnBattlefieldByName (S.printingName arbiter) S.alice gs) 0
   -- CR 514.2: "until end of turn" ends at cleanup, which is the one caller of
   -- Expiry.dropAtCleanup. Asserted by casting the SAME spell on the swept state
   -- and watching it stop searching again.
@@ -2281,7 +1964,7 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     Spec.assertEqWith s "the Forest is still in the library" (S.countByName (S.printingName forest) S.alice after) 1
     Spec.assertEqWith s "and the search was not offered again" asked ["shuffle"]
 
-circlingVultures :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+circlingVultures :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 circlingVultures s registry = Spec.describe s "CR 116.2e Circling Vultures" $ do
   -- CR 116.2e's last sentence: "a player can take such an action any time they
   -- have priority". The card's own words are "any time you could cast an
@@ -2300,54 +1983,6 @@ circlingVultures s registry = Spec.describe s "CR 116.2e Circling Vultures" $ do
     Spec.assertBool s (List.notElem (Action.Type.DiscardFromHand travelerId) actions) "the Doomed Traveler may not"
     Spec.assertBool s (not (any isPlay actions)) "and no land play is offered in this window"
     Spec.assertBool s (any isPlay (Action.legalActions S.alice ownTurn)) "the control: the same Mountain is playable at sorcery speed"
-  -- CR 116.1 / CR 701.9a: the action does not use the stack, and the discard
-  -- goes through Pawl.Engine.Event.discard rather than a zone move -- so CR
-  -- 702.29d's "cycles or discards" trigger can see it, which a zone poke would
-  -- leave it blind to forever. An arm that stacked the card instead would put
-  -- it onto the battlefield rather than into the graveyard, which is what the
-  -- first two assertions rule out.
-  Spec.it s "CR 701.9a taking it discards the card without using the stack" $ do
-    vultures <- S.printingOf s registry "Circling Vultures"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (vulturesId, _, base) = board vultures traveler mountain bolt
-        gs = base {GameState.stack = []}
-        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.DiscardFromHand vulturesId)) gs Engine.priorityLoop) [])
-    -- CR 400.7 mints a new object on the move, so the graveyard card is named
-    -- rather than compared to the hand id, and the logged event is asserted
-    -- against that new id -- which is what ties the two together.
-    let graveyard = Game.zoneMembers Zone.Graveyard S.alice after
-    Spec.assertEqWith
-      s
-      "the Vultures are in alice's graveyard"
-      (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) graveyard)
-      [Just (S.printingName vultures)]
-    Spec.assertEqWith s "and nothing reached the battlefield" (length (GameState.battlefield after)) 0
-    Spec.assertEqWith s "the other two hand cards are untouched" (S.handSize S.alice after) 2
-    Spec.assertEqWith
-      s
-      "CR 701.9a the discard was logged, and CR 702.29c's cycling cause is not what caused it"
-      (filter isDiscarded (S.eventsOf after))
-      (fmap (\oid -> GameEvent.Discarded (Discarded.MkDiscarded S.alice oid DiscardCause.Ordinary Nothing)) graveyard)
-  -- CR 116.3: "if a player takes a special action, that player receives
-  -- priority afterward." Both halves of the arm are pinned by the one sequence.
-  -- Retaining priority puts alice's second prompt before bob's first; restarting
-  -- the pass count is what makes bob asked at all, since the standing pass plus
-  -- alice's would otherwise be a full round.
-  Spec.it s "CR 116.3 the player receives priority again afterward" $ do
-    vultures <- S.printingOf s registry "Circling Vultures"
-    traveler <- S.printingOf s registry "Doomed Traveler"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (vulturesId, _, base) = board vultures traveler mountain bolt
-        gs = base {GameState.stack = []}
-        asked = State.execState (Engine.runGame (takeThenPass (Action.Type.DiscardFromHand vulturesId)) gs Engine.priorityLoop) []
-    Spec.assertEqWith
-      s
-      "bob passes, alice acts, alice is asked again, and only then is bob asked"
-      asked
-      [S.bob, S.alice, S.alice, S.bob]
 
 -- Is this the offer to activate an ability of THAT permanent? `playing`'s shape
 -- one action over, and written out for its reason: the operation alone would

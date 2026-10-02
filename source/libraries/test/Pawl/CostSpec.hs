@@ -69,7 +69,6 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.DiscardCause as DiscardCause
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -117,7 +116,6 @@ import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Status as Status
-import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
@@ -1350,8 +1348,7 @@ jaradDrainSpec s registry =
       Spec.assertEqWith s "so the ability was on the stack with the Piker already gone" (length (GameState.stack activated)) 1
 
 -- Chooses this value of X; every other prompt takes the identity fallback, which
--- aims Hatred's one target slot at the only creature on the board. The liar
--- pattern ProjectionSpec's answerX4 uses.
+-- aims Hatred's one target slot at the only creature on the board.
 answerHatredXOf :: Natural.Natural -> Prompt.Prompt r -> r
 answerHatredXOf n p = case p of
   Prompt.ChooseX {} -> n
@@ -2371,11 +2368,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   crossCheckSpec s registry
   longtuskCubSpec s registry
   thrastaSpec s registry
-  ertaisScornSpec s registry
   avengeSpec s registry
   deemInferiorSpec s registry
   synchronizedEvictionSpec s registry
-  richlauSpec s registry
   humiliationSpec s registry
   targetCostSpec s registry
   frogmiteSpec s registry
@@ -2584,45 +2579,6 @@ omniscienceSpec s registry =
       Spec.assertBool s (not (any (S.isCastOf grindId) (Action.legalActions S.alice grindGs))) "CR 101.1 Mind Grind is not offered under the grant"
       Spec.assertBool s (any (S.isCastOf blazeId) (Action.legalActions S.alice blazeGs)) "and Blaze, whose X has no floor, is"
 
--- Three seats. alice holds Ertai's Scorn ({1}{U}{U}) over an Island and a Swamp;
--- bob holds one Fog over one Forest, carol two Fogs over two Forests. `bobFirst`
--- picks who casts the first Fog, which resolves; carol then casts a second, which
--- stays on the stack as the Scorn's target. Two opponent spells either way, so a
--- sum across opponents cannot tell the boards apart.
---
--- Island and Swamp pay {1}{U} and neither {1}{U}{U} nor a {U}{U} that took the
--- {U} off generically (CR 118.7c), so castability is the reduction and its type.
-ertaisScornBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
-ertaisScornBoard island swamp forest fog scorn bobFirst =
-  let lands = S.landsFor forest S.carol 2 (S.landsFor forest S.bob 1 (S.landsFor swamp S.alice 1 (S.landsFor island S.alice 1 S.threePlayerGame)))
-      (scornId, gs1) = S.addHandCard scorn S.alice lands
-      (bobFog, gs2) = S.addHandCard fog S.bob gs1
-      (carolFog1, gs3) = S.addHandCard fog S.carol gs2
-      (carolFog2, gs4) = S.addHandCard fog S.carol gs3
-      main = gs4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
-      castBy pid oid gs = S.runPure S.identityAnswer (gs {GameState.priority = Just pid}) (S.cast pid oid)
-      (firstCaster, firstFog) = if bobFirst then (S.bob, bobFog) else (S.carol, carolFog1)
-      resolved = S.runPure S.identityAnswer (castBy firstCaster firstFog main) Stack.resolveTop
-      second = castBy S.carol carolFog2 resolved
-   in (scornId, second {GameState.priority = Just S.alice})
-
--- CR 601.2f: "This spell costs {U} less to cast if an opponent cast two or more
--- spells this turn" asks each opponent's own tally, not their sum.
-ertaisScornSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-ertaisScornSpec s registry =
-  Spec.describe s "Ertai's Scorn" $ do
-    Spec.it s "CR 601.2f one opponent's two spells take {U} off; two opponents' one each do not" $ do
-      island <- S.printingOf s registry "Island"
-      swamp <- S.printingOf s registry "Swamp"
-      forest <- S.printingOf s registry "Forest"
-      fog <- S.printingOf s registry "Fog"
-      scorn <- S.printingOf s registry "Ertai's Scorn"
-      let board = ertaisScornBoard island swamp forest fog scorn
-          (carolsScorn, carols) = board False
-          (splitScorn, split) = board True
-      Spec.assertBool s (S.castable S.alice carolsScorn carols) "carol cast two, so the Scorn costs {1}{U} and is offered"
-      Spec.assertBool s (not (S.castable S.alice splitScorn split)) "bob and carol cast one each, so the Scorn keeps its {1}{U}{U} and is refused"
-
 -- CR 601.2f / 800.4i: Avenge ({4}{W}{W}) "costs {2} less to cast if a player
 -- attacked you during their last turn". Three seats; bob attacks carol on turn
 -- 2 and concedes on turn 3. carol's four Plains pay {2}{W}{W} and not
@@ -2709,66 +2665,6 @@ deemInferiorSpec s registry =
           (oneId, one) = board [(S.alice, 1), (S.bob, 2)]
       Spec.assertBool s (S.castable S.alice twoId two) "alice drew two, so it costs {1}{U} and is offered"
       Spec.assertBool s (not (S.castable S.alice oneId one)) "alice drew one and bob two, so it costs {2}{U} and is refused"
-
--- Richlau, Headmaster {1}{W}{U} Legendary Creature -- Human Advisor 2/4 (YBRO,
--- digital; data/cards/richlau-headmaster.json, Oracle text checked against
--- Scryfall 2026-09-27): "At the beginning of your end step, you may pay {1}.
--- When you do, target artifact card in your graveyard perpetually gains 'This
--- spell costs {1} less to cast.' If it's a creature or Vehicle card, it
--- perpetually gets +2/+2. Put it into your library second from the top."
---
--- alice has Richlau and one Island, Venser's Sliver ({5} Artifact Creature 3/3)
--- and Consulate Dreadnought ({1} Artifact -- Vehicle 7/11) in her graveyard, and
--- three cards in her library. She pays {1} and aims at `aim`; the two boards
--- differ only in which card that is. The Sliver then goes to her hand, she gets
--- four fresh Islands, and her main phase begins.
-richlauBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Bool -> Maybe (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
-richlauBoard island richlau sliver dreadnought library aimAtSliver =
-  let (_, g1) = S.addPermanent richlau S.alice (S.landsInPlay island 1)
-      (sliverId, g2) = S.addGraveyardCard sliver S.alice g1
-      (dreadnoughtId, g3) = S.addGraveyardCard dreadnought S.alice g2
-      g4 = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) g3 library
-      aim = if aimAtSliver then sliverId else dreadnoughtId
-      answer :: Prompt.Prompt r -> r
-      answer p = case p of
-        Prompt.ChooseToPay {} -> PaymentDecision.Pays
-        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((==) (Just aim) . Recipient.objectOf) offered) asked
-        _ -> S.identityAnswer p
-      endStep = Phase.Ending EndingStep.EndStep
-      begun = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (g4 {GameState.phase = endStep, GameState.activePlayer = S.alice})
-      atEnd = S.runPure answer (S.runPure answer begun Engine.settleForPriority) Engine.priorityLoop
-   in do
-        sliverNow <- List.find (\oid -> fmap S.nameOf (Game.cardOf oid atEnd) == Just (S.printingName sliver)) (Game.zoneMembers Zone.Library S.alice atEnd <> Game.zoneMembers Zone.Graveyard S.alice atEnd)
-        let inHand = S.runPure S.identityAnswer atEnd (Event.changeZone sliverNow Zone.Hand)
-        handId <- Maybe.listToMaybe (Game.zoneMembers Zone.Hand S.alice inHand)
-        pure (handId, atEnd, (S.landsFor island S.alice 4 inHand) {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
-
--- CR 613.1f / 601.2f: a cost reduction GRANTED to a card off the battlefield
--- reaches the cast, through the projection (Pawl.Engine.Cost.selfReductions).
-richlauSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-richlauSpec s registry =
-  Spec.describe s "Richlau, Headmaster" $ do
-    let fixture aimAtSliver = do
-          island <- S.printingOf s registry "Island"
-          richlau <- S.printingOf s registry "Richlau, Headmaster"
-          sliver <- S.printingOf s registry "Venser's Sliver"
-          dreadnought <- S.printingOf s registry "Consulate Dreadnought"
-          library <- traverse (S.printingOf s registry) ["Lightning Bolt", "Unsummon", "Griptide"]
-          pure (sliver, richlauBoard island richlau sliver dreadnought library aimAtSliver)
-        named = Just . CardName.MkCardName . Text.pack
-        libraryNames gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Library S.alice gs)
-    Spec.it s "CR 601.2f the perpetually discounted Sliver is cast off four Islands and enters a 5/5" $ do
-      (sliver, board) <- fixture True
-      case board of
-        Nothing -> Spec.assertFailure s "the Sliver should reach alice's hand"
-        Just (sliverId, atEnd, main) -> do
-          let cast = S.runPure S.identityAnswer main (S.cast S.alice sliverId)
-              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-              entered = filter (\oid -> fmap S.nameOf (Game.cardOf oid resolved) == Just (S.printingName sliver)) (Game.zoneMembers Zone.Battlefield S.alice resolved)
-          Spec.assertEqWith s "it entered a 5/5" (fmap (`S.powerToughnessOf` resolved) entered) [Just (5, 5)]
-          Spec.assertEqWith s "four Islands paid {4}, besides the one that paid Richlau's {1}" (S.tappedCount S.alice resolved) 5
-          Spec.assertBool s (S.castable S.alice sliverId main) "the Sliver was offered off four Islands"
-          Spec.assertEqWith s "CR 401.7 it went in second from the top" (libraryNames atEnd) (fmap named ["Griptide", "Venser's Sliver", "Unsummon", "Lightning Bolt"])
 
 -- CR 613.1f / 113.6d: Patriar's Humiliation's perpetual "loses all abilities"
 -- follows the card Unsummon returns to alice's hand
@@ -3545,15 +3441,6 @@ addLand land pid gs =
 firstOf :: [ObjectId.ObjectId] -> ObjectId.ObjectId
 firstOf = Maybe.fromMaybe S.noSource . Maybe.listToMaybe
 
--- Answer Prompt.ChooseReturns with one named permanent, FILTERED against the
--- offer rather than hand-built: an answer the engine did not offer is rejected
--- by Cost.payComponent, so filtering is what keeps the assertion about the
--- engine's own candidates.
-returning :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-returning wanted p = case p of
-  Prompt.ChooseReturns _ _ _ candidates _ -> Set.fromList (filter (== wanted) candidates)
-  _ -> S.identityAnswer p
-
 -- Answer Prompt.ChooseReturns with nothing at all, which is not a size-1 subset
 -- -- the reject-not-repair probe.
 returningNothing :: Prompt.Prompt r -> r
@@ -3598,20 +3485,6 @@ melokuSpec s registry = Spec.describe s "Meloku the Clouded Mirror" $ do
     Spec.assertBool s (not (Activatable.activatable S.alice payableId (theAbility meloku) unpayable)) "the same land under bob: not"
     Spec.assertBool s (Cost.canPayComponent Map.empty S.alice payableId component payable) "and the component itself is payable on the one board"
     Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice payableId component unpayable)) "and not on the other"
-  -- CR 400.3: the destination is the OWNER's hand, not the payer's. alice
-  -- controls bob's Island through a control effect, so "a land you control"
-  -- admits it and the return still lands in bob's hand.
-  Spec.it s "CR 400.3 a land its payer does not own goes back to its owner's hand" $ do
-    meloku <- S.printingOf s registry "Meloku the Clouded Mirror"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    island <- S.printingOf s registry "Island"
-    let (melokuId, landIds, gs0) = melokuBoard meloku elves [(island, S.bob)]
-        borrowed = firstOf landIds
-        gs = S.giveControl borrowed S.alice gs0
-        after = S.runPure (returning borrowed) gs (Activate.activateAbility S.alice melokuId (theAbility meloku))
-    Spec.assertEqWith s "the Island is in bob's hand" (handNames S.bob after) [S.printingName island]
-    Spec.assertEqWith s "and not in alice's" (handNames S.alice after) []
-    Spec.assertEqWith s "the ability is on the stack, its cost paid" (length (GameState.stack after)) 1
 
 -- alice with Everbark Shaman settled on the battlefield, `buried` in her own
 -- graveyard, and Maskwood Nexus beside the Shaman when `withNexus`. Priority in

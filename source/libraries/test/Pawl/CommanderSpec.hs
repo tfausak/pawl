@@ -915,12 +915,6 @@ orderingSpec s registry = Spec.describe s "Ordering" $ do
     (board, bounceId, _) <- interdicted s registry
     let after = bouncing S.identityAnswer bounceId board
     Spec.assertEqWith s "it is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
-  -- CR 616.1: the affected object's CONTROLLER picks the order, so bob, who took
-  -- the commander, may let the redirect go first although alice would accept.
-  Spec.it s "CR 616.1 the controller of a stolen commander orders the offer" $ do
-    (board, bounceId, commander) <- interdicted s registry
-    let after = bouncing (returningOnly commander) bounceId (S.giveControl commander S.bob board)
-    Spec.assertEqWith s "bob declined to put the offer first, so it is in exile" (length (Game.zoneMembers Zone.Exile S.alice after), length (inCommandZone after)) (1, 0)
 
 -- bounceBoard with Synthetic Hand Interdiction on the battlefield, and alice's
 -- commander's id there.

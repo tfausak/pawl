@@ -1,0 +1,148 @@
+{
+  "description": "CR 615.1 the shield covers the player it names and no other",
+  "note": "Three seats so one flier can hit a player other than the shielded one: carol's two Heavenly Blademasters (flying, double strike, 3) attack alice and bob, and alice activates Scarecrow in the declare attackers step. The source half is the same printed property on both (same card), so the pair differs in the recipient: bob takes 6, alice none.",
+  "board": {
+    "seats": [
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Heavenly Blademaster",
+            "label": "flier",
+            "ready": true
+          },
+          {
+            "card": "Heavenly Blademaster",
+            "label": "flier-2",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Scarecrow",
+            "label": "scarecrow",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "Plains",
+            "label": "p4"
+          },
+          {
+            "card": "Plains",
+            "label": "p5"
+          },
+          {
+            "card": "Plains",
+            "label": "p6"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "carol",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "Attack": [
+          "$flier",
+          "$flier-2"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "ChooseAttackTarget": "$alice"
+      },
+      "source": "$flier"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      },
+      "source": "$flier-2"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "carol",
+      "check": {
+        "Attackers": {
+          "attackers": {
+            "$flier": "$alice",
+            "$flier-2": "$bob"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$scarecrow",
+          "ability": 0,
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$p4",
+            "$p5",
+            "$p6"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "carol",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 14
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "carol",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    }
+  ]
+}

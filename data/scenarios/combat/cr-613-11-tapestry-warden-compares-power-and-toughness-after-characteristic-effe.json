@@ -1,0 +1,100 @@
+{
+  "description": "CR 613.11 Tapestry Warden compares power and toughness after characteristic effects",
+  "note": "Safehold Sentry's own {2}{W}, untap: +0/+2 until end of turn is the real card for the test's hand-built +0/+2 on Goblin Piker. Untapped after attacking, the 2/2 Sentry is a finished 2/4, so it assigns 4 beside the Warden's 4. Read before the effect, it would assign 2.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Tapestry Warden",
+            "label": "warden",
+            "ready": true
+          },
+          {
+            "card": "Safehold Sentry",
+            "label": "sentry",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-1",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$warden",
+          "$sentry"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$sentry",
+          "mana": [
+            "$plains-1",
+            "$plains-2",
+            "$plains-3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$sentry",
+          "power": 2,
+          "toughness": 4
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 12
+        }
+      }
+    }
+  ]
+}

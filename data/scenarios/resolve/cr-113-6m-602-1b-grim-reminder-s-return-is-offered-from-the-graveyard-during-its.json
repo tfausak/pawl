@@ -1,0 +1,114 @@
+{
+  "description": "CR 113.6m / 602.1b Grim Reminder's return is offered from the graveyard during its controller's upkeep only",
+  "note": "Grim Reminder is cast and resolved in alice's turn-1 main phase (the Fog and Boil casts are the companion test's board), which puts it in her graveyard. On her next turn her three Swamps are untapped: its {B}{B} return is offered at priority in her upkeep and not in her draw step (CR 602.1b's 'Activate only during your upkeep'; CR 113.6m lets it function from the graveyard).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp-1"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Grim Reminder",
+            "label": "reminder"
+          }
+        ],
+        "library": [
+          {
+            "card": "Swamp",
+            "label": "lib-swamp"
+          },
+          {
+            "card": "Boil",
+            "label": "lib-boil"
+          },
+          {
+            "card": "Fog",
+            "label": "lib-fog"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fog",
+            "label": "fog"
+          }
+        ],
+        "library": [
+          {
+            "card": "Forest"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boil",
+            "label": "boil"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": {"Cast": {"object": "$fog", "mana": ["$forest"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "do": {"Cast": {"object": "$boil", "mana": ["$mountain-1", "$mountain-2", "$mountain-3", "$mountain-4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$reminder", "mana": ["$swamp-1", "$swamp-2", "$swamp-3"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Answer": {"prompt": "Search", "with": ["$lib-fog"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Answer": {"prompt": "Shuffle", "with": ["$lib-swamp", "$lib-boil", "$lib-fog"]}}},
+    {"turn": 4, "step": "Upkeep", "player": "alice", "check": {"View": {"of": "Offered", "player": "alice", "is": ["Pass", "Activate Grim Reminder", "ActivateManaAbility $swamp-1", "ActivateManaAbility $swamp-2", "ActivateManaAbility $swamp-3"]}}},
+    {"turn": 4, "step": "DrawStep", "player": "alice", "check": {"View": {"of": "Offered", "player": "alice", "is": ["Pass", "ActivateManaAbility $swamp-1", "ActivateManaAbility $swamp-2", "ActivateManaAbility $swamp-3"]}}}
+  ]
+}

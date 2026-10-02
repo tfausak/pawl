@@ -1,0 +1,130 @@
+{
+  "description": "CR 609.7a the unbounded shield watches the source its controller chose and no other",
+  "note": "bob attacks alice with his Goblin Piker (alpha, 2) and Ridgetop Raptor (omega, 2 with double strike, so it strikes twice); alice sacrifices Auriok Replica during declare attackers and names omega. alice ends on 18: alpha's 2 lands, and omega's first-strike 2 AND its regular 2 are both prevented (CR 615.3: only the duration ends the shield). Naming alpha gives 16, a shield spent by omega's first strike gives 16, no shield 14.",
+  "board": {
+    "seats": [
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "alpha",
+            "ready": true
+          },
+          {
+            "card": "Ridgetop Raptor",
+            "label": "omega",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Auriok Replica",
+            "label": "replica",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$alpha",
+          "$omega"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$replica",
+          "ability": 0,
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "ability of $replica"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDamageSource",
+          "with": "$omega"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 18
+        }
+      }
+    }
+  ]
+}

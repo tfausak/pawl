@@ -1,0 +1,180 @@
+{
+  "description": "CR 601.2f one opponent's two spells take {U} off; two opponents' one each do not",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island",
+            "ready": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ertai's Scorn",
+            "label": "scorn"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "bforest",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fog",
+            "label": "bfog"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "cforest-1",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "cforest-2",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fog",
+            "label": "cfog-1"
+          },
+          {
+            "card": "Fog",
+            "label": "cfog-2"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "Upkeep",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$cfog-1",
+          "mana": [
+            "$cforest-1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$cfog-2",
+          "mana": [
+            "$cforest-2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$scorn",
+          "targets": [
+            "Fog#3"
+          ],
+          "mana": [
+            "$island",
+            "$swamp"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Ertai's Scorn",
+            "Fog#3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Graveyard",
+          "card": "Fog",
+          "count": 2
+        }
+      }
+    }
+  ]
+}

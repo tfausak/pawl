@@ -481,25 +481,6 @@ conditionalSilenceSpec s registry =
       Spec.assertEqWith s "still stored" (length (GameState.playerEffects swept)) 1
       Spec.assertEqWith s "and bob is still stopped" (conditionalSilenceCasts S.bob swept) []
 
-    -- THE NEGATIVE, on the same board with exactly one difference: the Swamp
-    -- changes hands (CR 613.1b), so alice no longer controls one and CR 611.2b's
-    -- period is over. The effect is DELETED, and Engine.settleForPriority is what
-    -- runs the sweep in a live game.
-    Spec.it s "CR 611.2b when the Swamp changes hands the effect is deleted" $ do
-      island <- S.printingOf s registry "Island"
-      swamp <- S.printingOf s registry "Swamp"
-      hush <- S.printingOf s registry "Synthetic Conditional Silence"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (hushId, swampId, bobsPiker, _, before) = conditionalSilenceBoard True island swamp hush mountain piker
-          resolved = conditionalSilenceAfter hushId before
-          stolen = S.giveControl swampId S.bob resolved
-          settled = S.runPure S.identityAnswer stolen Engine.settleForPriority
-      Spec.assertEqWith s "one stored before the Swamp moved" (length (GameState.playerEffects resolved)) 1
-      Spec.assertEqWith s "none after" (GameState.playerEffects settled) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId VariableChoice.Announced settled)) "bob is no longer prohibited"
-      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "and his Piker is offered again"
-
     -- CR 611.2b's first sentence: a duration that never STARTS means the effect
     -- does nothing at all. The board differs from the holding one by the Swamp
     -- alone -- the Island that pays for the spell is on both -- so this is the
@@ -609,7 +590,7 @@ hackedSilenceAfter hack hushId hackId before =
 -- The printed carrier already had this -- Edgewalker under a Magical Hack, above
 -- -- so what is new here is the STORED one: Synthetic Conditional Silence hacked
 -- while it sits on the stack.
-hackedSilenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hackedSilenceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hackedSilenceSpec s registry =
   Spec.describe s "Synthetic Conditional Silence" $ do
     -- THE CONTROL TWIN, differing from the case below in the Hack alone: it sits
@@ -627,26 +608,6 @@ hackedSilenceSpec s registry =
       Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.carol after)) "and carol hers"
       Spec.assertEqWith s "the Silence really did resolve" (length (GameState.stack after)) 0
       Spec.assertEqWith s "and nothing is stored" (GameState.playerEffects after) []
-
-    -- And the rewritten clause is still a CONDITION rather than an open-ended
-    -- one: hand alice's two Islands to bob (CR 613.1b) and CR 611.2b's period is
-    -- over, so the effect is deleted. Without this an arm that stored the effect
-    -- unconditionally would pass the case above.
-    Spec.it s "CR 611.2b the rewritten clause counts Islands, so losing them ends it" $ do
-      island <- S.printingOf s registry "Island"
-      hush <- S.printingOf s registry "Synthetic Conditional Silence"
-      magicalHack <- S.printingOf s registry "Magical Hack"
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      let (hushId, hackId, firstIsland, secondIsland, bobsPiker, _, before) = hackedSilenceBoard island hush magicalHack mountain piker
-          after = hackedSilenceAfter True hushId hackId before
-          stolen = S.giveControl secondIsland S.bob (S.giveControl firstIsland S.bob after)
-          settled = S.runPure S.identityAnswer stolen Engine.settleForPriority
-          kept = S.runPure S.identityAnswer after Engine.settleForPriority
-      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "bob may cast once the Islands are his"
-      Spec.assertEqWith s "and nothing is stored any more" (GameState.playerEffects settled) []
-      Spec.assertEqWith s "while a sweep that leaves them with alice changes nothing" (length (GameState.playerEffects kept)) 1
-      Spec.assertEqWith s "so bob is still stopped there" (conditionalSilenceCasts S.bob kept) []
 
 -- The one activated ability at index `n` of what the PROJECTION hands out for
 -- `oid` -- not Face.activatedAbilities, which is the printed list a text change

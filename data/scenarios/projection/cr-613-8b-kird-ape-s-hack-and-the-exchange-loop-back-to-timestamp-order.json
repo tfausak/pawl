@@ -1,0 +1,65 @@
+{
+  "description": "CR 613.8b Kird Ape's Hack and the exchange loop back to timestamp order",
+  "note": "The Haskell board's resolved Hack and pending exchange are reached by casting both. A Magical Hack (Forest to Island) on Kird Ape and Exchange of Words with Stalker Hag depend on each other, so CR 613.8b falls back to timestamp order: the Hack runs first, Kird Ape keeps the Hag's forestwalk, and the Hag's pump asks for alice's Island. The check before the exchange shows the hacked Ape pumped by that Island.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Kird Ape",
+            "label": "ape"
+          },
+          {
+            "card": "Stalker Hag",
+            "label": "hag"
+          },
+          {
+            "card": "Island",
+            "label": "island1"
+          },
+          {
+            "card": "Island",
+            "label": "island2"
+          },
+          {
+            "card": "Island",
+            "label": "island3"
+          },
+          {
+            "card": "Island",
+            "label": "island4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Magical Hack",
+            "label": "hack"
+          },
+          {
+            "card": "Exchange of Words",
+            "label": "exchange"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$hack", "targets": ["$ape"], "mana": ["$island1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack", "do": {"ChooseTypeSwap": {"from": {"type": "Forest"}, "to": {"type": "Island"}}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$ape", "power": 2, "toughness": 3}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$exchange", "mana": ["$island2", "$island3", "$island4"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Exchange of Words", "do": {"ChooseTargets": {"creatures": ["$ape", "$hag"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$ape", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Forest"}}}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$ape", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Island"}}}, "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$hag", "power": 4, "toughness": 4}}}
+  ]
+}

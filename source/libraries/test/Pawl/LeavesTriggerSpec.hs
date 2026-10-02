@@ -824,23 +824,6 @@ warpedDevotionSpec s registry =
           Spec.assertEqWith s "and alice, its controller, did not" (graveyardSize S.alice after) 0
           Spec.assertEqWith s "bob is left with one of his two, the token having ceased rather than joined them" (S.handSize S.bob after) 1
           Spec.assertBool s (not (Set.member pikerId (GameState.battlefield after))) "the token left the battlefield"
-        -- The whole card through a real spell: alice casts Unsummon at the Piker
-        -- bob both owns and controls, targeted by id.
-        Spec.it s "CR 603.2 whole card: Unsummon on bob's Piker makes bob discard" $ do
-          (pikerId, gs) <- board S.bob False False
-          unsummon <- S.printingOf s registry "Unsummon"
-          let (withSpell, spellId) = S.handOne unsummon gs
-              answer :: Prompt.Prompt r -> r
-              answer p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just pikerId) . Recipient.objectOf) . snd) sets
-                _ -> S.identityAnswer p
-              cast = S.runPure answer withSpell (S.cast S.alice spellId)
-              resolved = S.runPure answer cast Stack.resolveTop
-              settled = S.runPure answer resolved Engine.settleForPriority
-              after = S.runPure answer settled Stack.resolveTop
-          Spec.assertEqWith s "bob discarded" (graveyardSize S.bob after) 1
-          Spec.assertEqWith s "alice's graveyard holds Unsummon alone" (graveyardSize S.alice after) 1
-          Spec.assertEqWith s "the Piker left the battlefield" (Game.lookupObject pikerId settled) Nothing
         -- The bindings themselves, off the recorded event: the owner under
         -- thatPlayer, the departed id under thatDepartedPermanent, and no
         -- `became` -- CR 400.7e withholds it for a hand (CR 400.2).
@@ -3239,7 +3222,7 @@ skullclampSpec s registry =
 -- about whether the ability triggers at all, and the end-step board cannot make
 -- it: the armed move names the graveyard, an Amalgam standing on the battlefield
 -- is not in one, and the board after the end step looks the same either way.
-prizedAmalgamSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prizedAmalgamSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 prizedAmalgamSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       -- TriggerSpec's tokenSetSpec's step: the phase written and the CR 513.1
@@ -3280,20 +3263,6 @@ prizedAmalgamSpec s registry =
       -- placed, and resolves.
       throughEndStep gs = S.runPure S.identityAnswer (settle (beginEndStep gs)) Engine.priorityLoop
    in Spec.describe s "PrizedAmalgam" $ do
-        -- The proving leg. CR 113.6m's final sentence is the whole of why the
-        -- ability is read from the graveyard at all.
-        Spec.it s "CR 113.6m an ability whose delayed trigger returns it from the graveyard functions there" $ do
-          amalgam <- S.printingOf s registry "Prized Amalgam"
-          skeleton <- S.printingOf s registry "Reassembling Skeleton"
-          swamp <- S.printingOf s registry "Swamp"
-          raiseWith S.addGraveyardCard amalgam skeleton swamp $ \raised -> do
-            let after = throughEndStep (resolveTop raised)
-            Spec.assertEqWith s "CR 113.6m the Amalgam came back from the graveyard, tapped" (amalgamTapStates after) [Just TapState.Tapped]
-            -- The preconditions the assertion rests on, AFTER it so none of them
-            -- can absorb a mutation aimed at the sentence.
-            Spec.assertEqWith s "the Skeleton really entered from the graveyard" (length (onBattlefieldNamed skeletonName raised)) 1
-            Spec.assertEqWith s "the Amalgam's trigger was on the stack" (length (GameState.stack raised)) 1
-            Spec.assertEqWith s "and resolving it armed exactly one delayed ability" (Seq.length (GameState.delayedTriggers (resolveTop raised))) 1
         -- The "ONLY" in "functions only in that zone", and the leg that reddens
         -- if the reading is left additive. One difference from the leg above:
         -- the Amalgam starts on the battlefield.

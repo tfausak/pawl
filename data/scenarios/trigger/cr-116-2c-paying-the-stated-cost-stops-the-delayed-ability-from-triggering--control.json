@@ -1,0 +1,44 @@
+{
+  "description": "CR 116.2c paying the stated cost stops the delayed ability from triggering (control: unpaid)",
+  "note": "The control: the same Bounty left unpaid gains alice 3 at the end step.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "island-1"
+          },
+          {
+            "card": "Island",
+            "label": "island-2"
+          },
+          {
+            "card": "Island",
+            "label": "island-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Standing Bounty",
+            "label": "bounty"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$bounty", "mana": ["$island-1", "$island-2", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "alice", "life": 20}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"View": {"of": "Stack", "is": ["trigger of Synthetic Standing Bounty"]}}},
+    {"turn": 1, "step": "EndStep", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "EndStep", "player": "alice", "check": {"Life": {"player": "alice", "life": 23}}}
+  ]
+}

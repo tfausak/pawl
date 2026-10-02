@@ -1,0 +1,59 @@
+{
+  "description": "CR 101.2 a finished Saga that cannot be sacrificed is left where it stands",
+  "note": "bob's Summon: Choco/Mog is placed under alice's control with four lore counters and alice's History of Benalia with three, both finished and with no chapter ability triggered; it is alice's upkeep, so no lore counter is added before the first pass. Garland, Royal Kidnapper's 'creatures you control but don't own can't be sacrificed' stops CR 704.5s for the Choco/Mog, which stays, while Benalia is sacrificed on the same pass. The control of the stolen Saga is placed: the test is about the prohibition, not how control came.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Garland, Royal Kidnapper"
+          },
+          {
+            "card": "History of Benalia",
+            "label": "benalia",
+            "counters": [
+              {
+                "key": {
+                  "type": "Lore"
+                },
+                "value": 3
+              }
+            ]
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Summon: Choco/Mog",
+            "label": "choco",
+            "controller": "alice",
+            "counters": [
+              {
+                "key": {
+                  "type": "Lore"
+                },
+                "value": 4
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {"turn": 1, "step": "Upkeep", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Summon: Choco/Mog", "count": 1}}},
+    {"turn": 1, "step": "Upkeep", "player": "alice", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Summon: Choco/Mog", "count": 0}}},
+    {"turn": 1, "step": "Upkeep", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "History of Benalia", "count": 0}}},
+    {"turn": 1, "step": "Upkeep", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "History of Benalia", "count": 1}}}
+  ]
+}

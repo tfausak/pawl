@@ -1,0 +1,127 @@
+{
+  "description": "CR 609.7b the shield covering a player watches every source with the printed properties, and no other",
+  "note": "bob attacks alice with Heavenly Blademaster (flying, double strike, 3) and Goblin Piker (2); alice activates Scarecrow in the declare attackers step. The flier's first-strike 3 is prevented (20 after that step), its regular 3 too (CR 615.3), and the ground Piker's 2 lands: 18. No ChooseDamageSource is scheduled, so a CR 609.7a choice raised here would fail the run.",
+  "board": {
+    "seats": [
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Heavenly Blademaster",
+            "label": "flier",
+            "ready": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "ground",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Scarecrow",
+            "label": "scarecrow",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "label": "p3"
+          },
+          {
+            "card": "Plains",
+            "label": "p4"
+          },
+          {
+            "card": "Plains",
+            "label": "p5"
+          },
+          {
+            "card": "Plains",
+            "label": "p6"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$flier",
+          "$ground"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$scarecrow",
+          "ability": 0,
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$p4",
+            "$p5",
+            "$p6"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "ability of $scarecrow"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 18
+        }
+      }
+    }
+  ]
+}

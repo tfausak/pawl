@@ -1,0 +1,52 @@
+{
+  "description": "CR 701.9a taking it discards the card without using the stack",
+  "note": "bob's turn: alice discards Circling Vultures as a special action. The Vultures reach her graveyard and nothing of hers reaches the battlefield, and the other two hand cards stay. The Haskell test reads the event log for a discard with an ordinary cause; two observers of alice's stand in for it: Magmakin Artillerist's 'whenever you cycle or discard' fires (the only thing on the stack afterwards, so the discard itself used none) and deals bob 1, one card discarded, while Prickly Marmoset's 'whenever you cycle' does not, leaving it 2/3.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Magmakin Artillerist",
+            "label": "artillerist"
+          },
+          {
+            "card": "Prickly Marmoset",
+            "label": "marmoset"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Circling Vultures",
+            "label": "vultures"
+          },
+          {
+            "card": "Doomed Traveler",
+            "label": "traveler"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Take": {"action": "DiscardFromHand $vultures"}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Stack", "is": ["trigger of $artillerist"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Circling Vultures", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Circling Vultures", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Doomed Traveler", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Hand", "card": "Mountain", "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Life": {"player": "bob", "life": 19}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"PowerToughness": {"object": "$marmoset", "power": 2, "toughness": 3}}}
+  ]
+}

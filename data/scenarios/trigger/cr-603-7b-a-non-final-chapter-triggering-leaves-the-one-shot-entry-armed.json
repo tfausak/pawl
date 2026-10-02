@@ -1,0 +1,119 @@
+{
+  "description": "CR 603.7b a non-final chapter triggering leaves the one-shot entry armed",
+  "note": "alice casts Synthetic Epilogue Vigil in her upkeep with History of Benalia on one lore counter; the main-phase counter fires chapter II alone, which does not match the entry, and no Angel arrives. On her next turn chapter III fires the still-armed entry above it, and the Angel arrives. A second History of Benalia, cast then, reaches chapter III two turns of hers later and brings no second Angel: the entry was spent.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains-1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-3"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-4"
+          },
+          {
+            "card": "Plains",
+            "label": "plains-5"
+          },
+          {
+            "card": "History of Benalia",
+            "label": "benalia",
+            "counters": [
+              {
+                "key": {
+                  "type": "Lore"
+                },
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "hand": [
+          {
+            "card": "Synthetic Epilogue Vigil",
+            "label": "vigil"
+          },
+          {
+            "card": "History of Benalia",
+            "label": "benalia-2"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {"turn": 1, "step": "Upkeep", "player": "alice", "do": {"Cast": {"object": "$vigil", "mana": ["$plains-1", "$plains-2", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Stack", "is": ["trigger of $benalia"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Angel Token", "count": 0}}},
+    {"turn": 3, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": []}},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Stack", "is": ["trigger of Synthetic Epilogue Vigil", "trigger of $benalia"]}}},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Angel Token", "count": 1}}},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$benalia-2", "mana": ["$plains-3", "$plains-4", "$plains-5", null]}}},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 3, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 5, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": []}},
+    {"turn": 7, "step": "PrecombatMain", "player": "alice", "check": {"View": {"of": "Stack", "is": ["trigger of History of Benalia"]}}},
+    {"turn": 7, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": []}},
+    {"turn": 7, "step": "PostcombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Angel Token", "count": 1}}},
+    {"turn": 7, "step": "PostcombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "History of Benalia", "count": 2}}}
+  ]
+}

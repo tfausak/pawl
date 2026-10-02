@@ -1,0 +1,52 @@
+{
+  "description": "CR 613.8b an earlier text change waits for the later one it depends on",
+  "note": "Both Magical Hacks are cast on Bog Wraith in turn: Island to Forest, which finds no Island word, then Swamp to Island. The earlier depends on the later, so the later applies first and the Wraith walks Forests; timestamp order would leave islandwalk. The check after the first Hack shows it changed nothing on its own.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Bog Wraith",
+            "label": "wraith"
+          },
+          {
+            "card": "Island",
+            "label": "island1"
+          },
+          {
+            "card": "Island",
+            "label": "island2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Magical Hack",
+            "label": "hack1"
+          },
+          {
+            "card": "Magical Hack",
+            "label": "hack2"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$hack1", "targets": ["$wraith"], "mana": ["$island1", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack#2", "do": {"ChooseTypeSwap": {"from": {"type": "Island"}, "to": {"type": "Forest"}}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$wraith", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Swamp"}}}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$hack2", "targets": ["$wraith"], "mana": ["$island2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "source": "Magical Hack#2", "do": {"ChooseTypeSwap": {"from": {"type": "Swamp"}, "to": {"type": "Island"}}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$wraith", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Forest"}}}, "count": 1}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$wraith", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Island"}}}, "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Keywords": {"object": "$wraith", "keyword": {"type": "Landwalk", "value": {"type": "HasSubtype", "value": {"type": "Swamp"}}}, "count": 0}}}
+  ]
+}

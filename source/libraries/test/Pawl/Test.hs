@@ -1450,12 +1450,10 @@ spec s registry = do
   Pawl.CopySpec.faceDownCopySpec s registry
   Pawl.CopySpec.permanentCopySpec s registry
   Pawl.CopySpec.copyAbilityOnStackSpec s registry
-  Pawl.CopySpec.ivySpec s registry
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry
   Pawl.CopySpec.flamerushRiderSpec s registry
   Pawl.CopySpec.garthSpec s registry
-  Pawl.CopySpec.cipherSpec s registry
   Pawl.CopySpec.magarSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry

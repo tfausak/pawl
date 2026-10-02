@@ -23,7 +23,6 @@ import qualified Data.Text as Text
 import Pawl.DamageReplacementSpec (graveyardNames)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -42,14 +41,11 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Combat as Combat.Type
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -311,26 +307,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "the first attacker's damage was prevented" (S.damageOf victimA after) (Just 0)
     Spec.assertEqWith s "and so was the second's, independently" (S.damageOf victimB after) (Just 0)
     Spec.assertEqWith s "no damage event was recorded at all" (S.damageEventsOf after) []
-  Spec.it s "CR 701.19a Uses=Once: the first destruction is replaced, the second is not" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
-    let base = S.landsInPlay swamp 1
-        (skel, g1) = S.addPermanent drudgeSkeletons S.alice base
-        -- Activate {B}: regenerate this creature, and resolve it.
-        armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice skel (theAbility drudgeSkeletons) >> Stack.resolveTop)
-        -- CR 701.19a's "remove it from combat" half needs the creature
-        -- actually attacking. Driving a full combat phase to reach a legal
-        -- attack is disproportionate to what this asserts, so seed
-        -- GameState.combat's attacker map directly -- the same shortcut
-        -- Support.addRegenShield takes for the shield itself.
-        attacking = armed {GameState.combat = (GameState.combat armed) {Combat.Type.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
-        once = S.runPure S.identityAnswer attacking (Event.destroy Regenerability.Regenerable [skel])
-        twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [skel])
-    Spec.assertBool s (Map.null (Combat.Type.attackers (GameState.combat armed))) "combat started with no attackers"
-    Spec.assertBool s (Set.member skel (GameState.battlefield once)) "survived the first destruction"
-    Spec.assertEqWith s "the shield was spent" (GameState.replacements once) []
-    Spec.assertBool s (not (Map.member skel (Combat.Type.attackers (GameState.combat once)))) "removed from combat by the regeneration (CR 701.19a)"
-    Spec.assertBool s (not (Set.member skel (GameState.battlefield twice))) "the second destruction kills it"
   -- CR 701.19b's other form of regeneration: Mossbridge Troll's "If this
   -- creature would be destroyed, regenerate it." is a static ability (CR 604.1),
   -- so CR 604.2 keeps its replacement effect active for as long as the permanent
@@ -381,23 +357,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [skel])
     Spec.assertBool s (Set.member skel (GameState.battlefield after)) "it survived"
     Spec.assertEqWith s "and this time the shield was spent" (GameState.replacements after) []
-  -- The gameplay-level proof (design.md section 4): real cards, cast and
-  -- resolved. Uthden Troll rather than Drudge Skeletons because Terror
-  -- cannot target a black creature -- the Troll is red.
-  Spec.it s "CR 701.19c whole cards: Terror kills an Uthden Troll that just regenerated" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    swamp <- S.printingOf s registry "Swamp"
-    uthdenTroll <- S.printingOf s registry "Uthden Troll"
-    terror <- S.printingOf s registry "Terror"
-    let base = List.foldl' (\gs p -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
-        (troll, g1) = S.addPermanent uthdenTroll S.alice base
-        -- {R}: Regenerate this creature -- the shield is really activated.
-        armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
-        (withTerror, spell) = S.handOne terror armed
-        afterCast = S.runPure S.identityAnswer withTerror (S.cast S.alice spell)
-        resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
-    Spec.assertBool s (not (null (GameState.replacements armed))) "the shield really was created"
-    Spec.assertBool s (not (Set.member troll (GameState.battlefield resolved))) "and Terror killed the Troll through it"
   -- The twin of the whole-card test: the SAME creature and the SAME shield,
   -- destroyed by the CR 704.5g state-based action instead, which carries no
   -- such clause. Regeneration is exactly what it is for.
@@ -929,7 +888,7 @@ surgeBoard mountain splitter surge firebolt artifacts =
         splitters
       )
 
-voltaicSurgeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+voltaicSurgeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 voltaicSurgeSpec s registry =
   Spec.describe s "Synthetic Voltaic Surge (CR 614.1)" $ do
     let board artifacts = do
@@ -958,21 +917,6 @@ voltaicSurgeSpec s registry =
           Spec.assertEqWith s "setup: alice is down to two artifacts" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bonesplitter")) S.alice shrunk) 2
           Spec.assertEqWith s "and the row is still installed -- it stopped applying, it was not removed" (length (GameState.replacements after)) 1
         _ -> Spec.assertFailure s "fixture should hold two Firebolts and three artifacts"
-    -- The other direction, and the one a gate read at installation cannot reach
-    -- at all: the clause is FALSE as the spell resolves, so the old reading
-    -- installed nothing and no later board could turn it on.
-    Spec.it s "CR 614.1 a row installed while its clause was false applies once the clause turns true" $ do
-      (splitter, (gs, surgeId, bolts, _)) <- board 2
-      case bolts of
-        [first_, second] -> do
-          let armed = castAndResolve atBob gs surgeId
-              printed = castAndResolve atBob armed first_
-              grown = snd (S.addPermanent splitter S.alice printed)
-              after = castAndResolve atBob grown second
-          Spec.assertEqWith s "the first Firebolt lands at its printed 2" (S.lifeOf S.bob printed) (Just 18)
-          Spec.assertEqWith s "the third artifact turns the clause on, so the second is doubled" (S.lifeOf S.bob after) (Just 14)
-          Spec.assertEqWith s "setup: the row was installed though its clause was false" (length (GameState.replacements armed)) 1
-        _ -> Spec.assertFailure s "fixture should hold two Firebolts"
 
 -- How many battlefield permanents `pid` CONTROLS are printed with this name. NOT
 -- S.countOnBattlefieldByName, which counts by OWNER (Game.zoneMembers filters the
@@ -1050,16 +994,6 @@ replaceIfAskedOf who preferred p = case p of
         maybe 0 Int.toNaturalSaturating (List.findIndex ((== preferred) . ReplacementEntry.source) entries)
   _ -> S.identityAnswer p
 
--- Copy `wanted` if and only if the copy choice is offered to `who`, and decline
--- otherwise. The readout for WHICH player held Clone's own CR 109.5 "you" when
--- the copy choice was made: the copy lands (a 2/1) only when the engine asked
--- the named player, and the Clone stays a 0/0 when it asked anyone else.
-copyIfAskedOf :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-copyIfAskedOf who wanted p = case p of
-  Prompt.ChooseCopyTarget _ asked _ legal ->
-    if asked == who && List.elem wanted legal then Just wanted else Nothing
-  _ -> S.identityAnswer p
-
 -- CR 616.1b's bucket, through the one card in the pool that produces one.
 --
 -- Gather Specimens ({3}{U}{U}{U} instant, Shards of Alara): "If a creature would
@@ -1081,44 +1015,6 @@ copyIfAskedOf who wanted p = case p of
 gatherSpecimensSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gatherSpecimensSpec s registry =
   Spec.describe s "Gather Specimens (CR 616.1b)" $ do
-    -- CR 616.1b BEFORE CR 616.1c, and the two orders disagree about WHO IS ASKED
-    -- -- which is what makes this an assertion rather than a coincidence:
-    --
-    --   * CR 616.1b's order -- the control rewrite first, so the object is
-    --     alice's by the time Clone's own choice is offered, and ALICE picks
-    --     the copy target.
-    --   * the other order -- the copy first, while the object is still bob's,
-    --     so BOB picks.
-    --
-    -- CR 109.5 makes Clone's "you" the entering object's CONTROLLER, and CR
-    -- 614.12a fixes when that is read (before the permanent enters). For an
-    -- opponent's entering creature that controller is not the Gather Specimens
-    -- controller until CR 616.1b's rewrite has been applied -- which is the whole
-    -- point: the bucket ordering decides who the second question goes to.
-    Spec.it s "CR 616.1b before CR 616.1c: the NEW controller chooses the copy" $ do
-      island <- S.printingOf s registry "Island"
-      pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
-      clonePrinting <- S.printingOf s registry "Clone"
-      let (gs, gatherId, bobs, piker) = specimenBoard island pikerPrinting gatherSpecimens [clonePrinting]
-      case bobs of
-        cloneId : _ ->
-          let armed = S.runPure S.identityAnswer gs (S.cast S.alice gatherId >> Stack.resolveTop)
-              askedAlice = S.runPure (copyIfAskedOf S.alice piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
-              askedBob = S.runPure (copyIfAskedOf S.bob piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
-              asked = answersFor (copyIfAskedOf S.alice piker) armed (S.cast S.bob cloneId >> Stack.resolveTop)
-           in case (newestNamed (CardName.MkCardName $ Text.pack "Clone") askedAlice, newestNamed (CardName.MkCardName $ Text.pack "Clone") askedBob) of
-                (Just toAlice, Just toBob) -> do
-                  Spec.assertEqWith s "alice was offered the copy, and took it" (Projection.powerOf toAlice askedAlice) (Just 2)
-                  Spec.assertEqWith s "bob was never offered it, so the Clone is still a 0/0" (Projection.powerOf toBob askedBob) (Just 0)
-                  -- CR 616.1b's "one of them must be chosen" with one member:
-                  -- the control rewrite is alone in the highest non-empty
-                  -- bucket, so there is nothing to choose and the engine must
-                  -- not ask. Were both candidates in CR 616.1e's bucket, this
-                  -- is the race that would be prompted.
-                  Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
-                _ -> Spec.assertFailure s "a Clone did not reach the battlefield"
-        _ -> Spec.assertFailure s "fixture did not deal bob a card"
     -- CR 614.1d's filter is the card's own "a creature", and this is the leg that
     -- holds it to that word. Its other half -- "under an OPPONENT's control" --
     -- is held by the duelling-Gather-Specimens leg below, which needs a second
@@ -1184,45 +1080,6 @@ gatherSpecimensSpec s registry =
                   Spec.assertEqWith s "carol named bob's row, so alice's applies second and keeps it" (Projection.controllerOf afterBob namedBob) (Just S.alice)
                 _ -> Spec.assertFailure s "the creature did not reach the battlefield"
         _ -> Spec.assertFailure s "both Gather Specimens rows should be floating"
-    -- CR 800.4a's SECOND clause, at three seats: alice resolves a Gather
-    -- Specimens and then concedes. A floating control-on-entry row is an effect
-    -- whose whole content is giving its controller control of objects, so it is
-    -- one of the "effects which give that player control of any objects" that
-    -- end when she leaves -- and carol's creature, entering afterwards, stays
-    -- carol's.
-    --
-    -- Three seats are required twice over: Departure.continuesAfterDeparture is
-    -- `> 2`, so at two seats CR 104.2a ends the game and none of CR 800.4a runs,
-    -- and a creature entering under bob's control is not "an opponent's" from
-    -- bob's own side.
-    Spec.it s "CR 800.4a a control-on-entry row ends when its controller leaves the game" $ do
-      island <- S.printingOf s registry "Island"
-      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
-      narcomoeba <- S.printingOf s registry "Narcomoeba"
-      let (gs, aliceGather, _, moeba) = threeSeatSpecimenBoard island gatherSpecimens narcomoeba
-          armed = S.runPure S.identityAnswer gs (S.cast S.alice aliceGather >> Stack.resolveTop)
-          -- The one difference between the two runs.
-          gone = S.runPure S.identityAnswer armed (Departure.leaveGame Departure.Type.Conceded S.alice)
-          entry = S.cast S.carol moeba >> Stack.resolveTop
-          after = S.runPure S.identityAnswer gone entry
-          stayed = S.runPure S.identityAnswer armed entry
-          moebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
-      -- Both read boards taken BEFORE the departure filter runs, so neither can
-      -- absorb a mutation of it.
-      Spec.assertEqWith s "alice's row was floating before she left" (length (GameState.replacements armed)) 1
-      Spec.assertBool s (List.notElem S.alice (Game.stillPlaying gone)) "alice really has left"
-      case (newestNamed moebaName after, newestNamed moebaName stayed) of
-        (Just departed, Just present) -> do
-          Spec.assertEqWith s "carol's creature stays carol's (CR 800.4a)" (Projection.controllerOf departed after) (Just S.carol)
-          -- The discriminating twin, on the identical board with alice seated:
-          -- the fix ended the row, it did not disable the rewrite.
-          Spec.assertEqWith s "with alice seated the same creature is hers (CR 616.1b)" (Projection.controllerOf present stayed) (Just S.alice)
-          -- CR 110.2a's entry controller, written by the effect that put the
-          -- permanent there and left alone by an entry loop with no candidate:
-          -- carol, and so not the departed player CR 800.4c draws its line at.
-          Spec.assertEqWith s "the recorded entry controller is carol, not alice (CR 110.2a)" (fmap Object.enteredUnder (Game.lookupObject departed after)) (Just (Just S.carol))
-          Spec.assertEqWith s "the row itself is gone" (length (GameState.replacements gone)) 0
-        _ -> Spec.assertFailure s "the creature did not reach the battlefield"
     -- WHY CR 800.4a ends the row rather than Event's UnderSourceControl arm
     -- refusing to name a departed player. A guard inside that arm would leave
     -- alice's row a CR 616.1 candidate, and Replacement.readsApplier answers True
@@ -1544,23 +1401,6 @@ declineLastRiot responses =
         Response.ChoseRiot _ : rest -> Response.ChoseRiot OptionalDecision.Declines : rest
         r : rest -> r : flipFirst rest
    in reverse (flipFirst (reverse responses))
-
--- The board moved to alice's declare-attackers step, with bob defending. Stated
--- rather than played out, exactly as S.combatBoardOf states it: a direct-call
--- test never runs the turn-based action that would settle CR 506.2's defending
--- player.
---
--- Nothing else is touched, so a creature cast in the main phase is still as new
--- to the battlefield as CR 302.6 finds it.
-atDeclareAttackers :: GameState.GameState -> GameState.GameState
-atDeclareAttackers gs =
-  gs
-    { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
-    }
-
-attackersIn :: GameState.GameState -> [ObjectId.ObjectId]
-attackersIn gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
 
 -- How many of alice's graveyard cards have this printing's name. A ZONE count,
 -- not an id lookup: CR 400.7 mints a new object for the card that arrives, so

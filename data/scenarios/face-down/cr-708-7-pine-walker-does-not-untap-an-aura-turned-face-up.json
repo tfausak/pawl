@@ -1,0 +1,216 @@
+{
+  "description": "CR 708.7 Pine Walker does not untap an Aura turned face up",
+  "note": "Gift of Doom is placed face down (Morphed) and tapped beside a tapped Pine Walker, the three Swamps its {3} cast spent placed tapped; alice turns it up by sacrificing the Piker and attaches it to the Mammoth. No trigger reaches the stack and both stay tapped.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Swamp",
+            "label": "swamp-1",
+            "tapped": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2",
+            "tapped": true
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-3",
+            "tapped": true
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "fodder",
+            "ready": true
+          },
+          {
+            "card": "War Mammoth",
+            "label": "mammoth",
+            "ready": true
+          },
+          {
+            "card": "Pine Walker",
+            "label": "walker",
+            "ready": true,
+            "tapped": true
+          },
+          {
+            "card": "Gift of Doom",
+            "label": "gift",
+            "faceDown": {
+              "type": "Morphed"
+            },
+            "ready": true,
+            "tapped": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$gift",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "TurnFaceUp $gift Morph"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Take": {
+          "action": "TurnFaceUp $gift Morph"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseSacrifices",
+          "with": [
+            "$fodder"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseTurnUpAttachment",
+          "with": {
+            "type": "Exercises"
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseAttachment",
+          "with": "$mammoth"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Names": {
+          "object": "$gift",
+          "names": [
+            "Gift of Doom"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "$gift",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Types": {
+          "object": "$gift",
+          "types": [
+            "Enchantment"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "AttachedTo",
+          "object": "$gift",
+          "is": "$mammoth"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$gift",
+          "tapped": true
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "Tapped": {
+          "object": "$walker",
+          "tapped": true
+        }
+      }
+    }
+  ]
+}

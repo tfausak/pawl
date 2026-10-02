@@ -1533,7 +1533,6 @@ castAndResolveRecording answer gs oid =
 -- Pay the {G/U/P} with life, and answer the CR 616.1e race by SOURCE -- Doubling
 -- Season's row names the enchantment, compleated's names Tamiyo -- so the
 -- assertion does not rest on the engine's canonical candidate order.
--- Pawl.DamageReplacementSpec.raceIsSelf is the same idiom.
 racesCompleated :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 racesCompleated wantCompleated seasonId p = case p of
   Prompt.ChooseReplacement _ _ entries ->

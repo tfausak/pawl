@@ -56,7 +56,6 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
-import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
@@ -147,7 +146,6 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
@@ -243,35 +241,13 @@ graveyardTriggerSpec s registry =
   let namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       narcomoebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
-      merenName = CardName.MkCardName $ Text.pack "Meren of Clan Nel Toth"
-      experienceOf = S.playerCounterOf PlayerCounterKind.Experience
-      -- Exercises Corpse Churn's OPTIONAL clause, pinned by clause index rather
+   in -- Exercises Corpse Churn's OPTIONAL clause, pinned by clause index rather
       -- than answered blanket-yes: clause 1 is the "you may return", clause 0 the
       -- mandatory mill, and Narcomoeba's own printed "may" is a ChooseOptional too
       -- -- a blanket yes would conflate the two.
-      returnsIt :: Prompt.Prompt r -> r
-      returnsIt p = case p of
-        Prompt.ChooseOptional _ _ _ _ clause _
-          | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
-        _ -> S.identityAnswer p
       -- Corpse Churn resolved returning the card pinned by id, then any trigger
       -- placed and resolved.
-      churnReturning :: ObjectId.ObjectId -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
-      churnReturning chosen gs spellId =
-        let answer :: Prompt.Prompt r -> r
-            answer p = case p of
-              Prompt.ChooseCardInGraveyard _ _ _ offered _ -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== chosen) (NonEmpty.toList offered))
-              _ -> returnsIt p
-            cast = S.runPure answer gs (S.cast S.alice spellId)
-            placed = S.runPure answer (S.runPure answer cast Stack.resolveTop) Engine.settleForPriority
-         in if null (GameState.stack placed) then placed else S.runPure answer placed Stack.resolveTop
-      zombieTapStates gs =
-        [ Object.tapped obj
-        | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
-          fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Zombie Token"),
-          Just obj <- [Game.lookupObject oid gs]
-        ]
-   in Spec.describe s "GraveyardTrigger" $ do
+      Spec.describe s "GraveyardTrigger" $ do
         -- "from your library" doing real work, half one: the same card moved
         -- out of a HAND reaches the same graveyard and must not trigger.
         Spec.it s "CR 113.6k Narcomoeba put into the graveyard from the HAND does not trigger" $ do
@@ -300,84 +276,6 @@ graveyardTriggerSpec s registry =
               entered = S.runPure S.identityAnswer gs1 (Event.changeZone pikerCard Zone.Battlefield)
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
           Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (gathered entered)) []
-        -- Oglor, Devoted Assistant whole card. Her upkeep look puts the Goblin
-        -- Piker from the library into the graveyard, her second trigger grants
-        -- it "When this card leaves your graveyard, create a tapped 2/2 black
-        -- Zombie creature token" perpetually, and Corpse Churn returns it to
-        -- hand, so the granted ability sees its own departure (CR 603.10a). A
-        -- Hill Giant put into the graveyard from the battlefield first is the
-        -- origin control: "from your library or hand" does not admit it.
-        Spec.it s "CR 603.10a Oglor's perpetual grant fires as the milled card leaves the graveyard" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          churn <- S.printingOf s registry "Corpse Churn"
-          oglor <- S.printingOf s registry "Oglor, Devoted Assistant"
-          piker <- S.printingOf s registry "Goblin Piker"
-          giant <- S.printingOf s registry "Hill Giant"
-          let upkeep = Phase.Beginning BeginningStep.Upkeep
-              (_, g1) = S.addPermanent oglor S.alice (S.landsInPlay swamp 2)
-              (giantId, g2) = S.addPermanent giant S.alice g1
-              g3 = iterate (snd . S.addLibraryCard swamp S.alice) g2 !! 3
-              (pikerId, g4) = S.addLibraryCard piker S.alice g3
-              (_, g5) = S.addLibraryCard swamp S.alice g4
-              (g6, spellId) = S.handOne churn g5
-              lookedAt :: Prompt.Prompt r -> r
-              lookedAt p = case p of
-                Prompt.ChooseCardFromAmong _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== pikerId) (NonEmpty.toList offered))
-                _ -> S.identityAnswer p
-              drain gs =
-                let placed = S.runPure lookedAt gs Engine.settleForPriority
-                 in if null (GameState.stack placed) then placed else drain (S.runPure lookedAt placed Stack.resolveTop)
-              (buried, died) = S.runPureWith S.identityAnswer g6 (Event.changeZoneReturning giantId Zone.Graveyard)
-              giantCard = Maybe.fromMaybe giantId (Seq.lookup 0 buried)
-              upkept = drain (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) ((drain died) {GameState.phase = upkeep}))
-              ready = upkept {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-              pikerCard = Maybe.fromMaybe pikerId (List.find (\oid -> fmap Face.name (Game.faceOf oid ready) == Just (S.printingName piker)) (Game.zoneMembers Zone.Graveyard S.alice ready))
-              after = drain (churnReturning pikerCard ready spellId)
-          Spec.assertEqWith s "CR 603.10a alice has one tapped Zombie token" (zombieTapStates after) [TapState.Tapped]
-          Spec.assertBool s (Set.member (S.printingName piker) (namesIn Zone.Hand S.alice after)) "the Piker the upkeep look buried left the graveyard for the hand"
-          Spec.assertEqWith s "the Hill Giant, put there from the battlefield, gained no ability" (length (Projection.triggeredAbilitiesOf giantCard after)) 0
-        -- The FILTER on that source, which is CR 113.6k itself: a departed
-        -- graveyard card is offered only the abilities that function in a
-        -- graveyard. Come Back Wrong ("Destroy target creature. If a creature
-        -- card is put into a graveyard this way, return it to the battlefield
-        -- under your control.") aimed at Meren of Clan Nel Toth is the board that
-        -- observes it -- one resolution in which a permanent DIES and then LEAVES
-        -- its graveyard, with no CR 117.5 boundary between the two, so the
-        -- graveyard incarnation is reachable by nothing but `leftGraveyard`.
-        --
-        -- Meren's "whenever ANOTHER creature you control dies" functions only on
-        -- the battlefield (CR 113.6's default), and the death it would see is the
-        -- very move that buried her: CR 400.7 minted a fresh id for the graveyard
-        -- incarnation, so the printed "another" compares two different ids and
-        -- passes. Without the filter she takes an experience counter for her own
-        -- death. permanentDiesSpec below is where that same exclusion is proved
-        -- from the battlefield, where the two ids DO coincide.
-        Spec.it s "CR 113.6k a battlefield-only trigger on a card that arrived in a graveyard and left it is not offered" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
-          comeBackWrong <- S.printingOf s registry "Come Back Wrong"
-          let (merenId, board) = S.addPermanent meren S.alice (S.landsInPlay swamp 3)
-              (gs, spellId) = S.handOne comeBackWrong board
-              -- Pinned by FILTERING the offered set rather than building a
-              -- Recipient. Meren is the only creature, so this is the identity on
-              -- a set of one, and it cannot smuggle in a recipient CR 608.2b's
-              -- re-read would drop.
-              answer :: Prompt.Prompt r -> r
-              answer p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature merenId) . snd) sets
-                _ -> S.identityAnswer p
-              cast = S.runPure answer gs (S.cast S.alice spellId)
-              resolved = S.runPure answer cast Stack.resolveTop
-              settled = S.runPure answer resolved Engine.settleForPriority
-              after = S.runPure answer settled Stack.resolveTop
-          Spec.assertEqWith s "CR 113.6k alice takes no experience counter: her Meren did not see her own death from the graveyard" (experienceOf S.alice after) 0
-          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack settled)) 0
-          Spec.assertEqWith s "and the narrow scan of that batch offered nothing" (fmap PendingTrigger.source (gathered resolved)) []
-          -- The board really is the one the case needs: she died, and she is not
-          -- in the graveyard the CR 117.5 boundary would have scanned.
-          Spec.assertEqWith s "CR 400.7 the permanent that died is gone" (Game.lookupObject merenId resolved) Nothing
-          Spec.assertBool s (Set.member merenName (namesIn Zone.Battlefield S.alice resolved)) "a fresh Meren stands on the battlefield: she really did leave the graveyard"
-          Spec.assertBool s (not (Set.member merenName (namesIn Zone.Graveyard S.alice resolved))) "with nothing of hers left in it"
         -- Bloodghast's second line, a static ability reading "an opponent has 10
         -- or less life": the greatest negated opponent life total is at least -10.
         -- alice's own life is the control, since "an opponent" excludes her.

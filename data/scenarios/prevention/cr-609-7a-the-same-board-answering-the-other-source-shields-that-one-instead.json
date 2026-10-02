@@ -1,0 +1,119 @@
+{
+  "description": "CR 609.7a the same board answering the OTHER source shields that one instead",
+  "note": "bob attacks alice with his Goblin Piker (alpha, 2) and Hill Giant (omega, 3); alice sacrifices Auriok Replica during declare attackers and names alpha. alice ends on 17: alpha's 2 prevented and omega's 3 landing are the only reading giving 17 (naming omega gives 18, no shield 15, both shielded 20). An unscheduled second ChooseDamageSource would fail the run, so the one Answer is the one choice asked.",
+  "board": {
+    "seats": [
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "alpha",
+            "ready": true
+          },
+          {
+            "card": "Hill Giant",
+            "label": "omega",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Auriok Replica",
+            "label": "replica",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$alpha",
+          "$omega"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$replica",
+          "ability": 0,
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "ability of $replica"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDamageSource",
+          "with": "$alpha"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PostcombatMain",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 17
+        }
+      }
+    }
+  ]
+}

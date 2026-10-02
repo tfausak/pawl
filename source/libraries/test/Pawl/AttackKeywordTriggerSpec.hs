@@ -21,20 +21,15 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
-import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
-import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -508,76 +503,6 @@ trainingSpec s _ =
         "each watching CR 702.149a's declaration"
         (fmap TriggeredAbility.condition abilities)
         [expected, expected]
-
--- CR 702.149c's second trigger form: "when this creature trains" means "when a
--- resolving training ability puts one or more +1/+1 counters on this creature".
---
--- Savior of Ollenbock {1}{W}{W} Creature -- Human Soldier 1/2 is the only paper
--- printing, and the whole card is here: training, "whenever this creature trains,
--- exile up to one other target creature from the battlefield or creature card
--- from a graveyard", and "when this creature leaves the battlefield, put the
--- exiled cards onto the battlefield under their owners' control".
---
--- The exile clause is what makes the trigger OBSERVABLE at gameplay level: rule
--- 702.149c's marker is otherwise invisible, the counter it rides being an
--- ordinary +1/+1 counter. So every case below reads the exile rather than the
--- counter, and the counter assertions are there to prove the training half
--- happened at all.
---
--- The pair of boards differs in exactly one thing: the companion's POWER, moved
--- across rule 702.149a's threshold by a continuous effect rather than by swapping
--- the card, so seats, timing, stock and the declaration are identical.
---
--- The other-source case is Battlegrowth's counter, which is the discrimination
--- this whole unit exists for: a +1/+1 counter arriving from anything but a
--- resolving training ability trains nobody.
-saviorOfOllenbockSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-saviorOfOllenbockSpec s registry =
-  let board mine theirs = do
-        ours <- mapM (S.printingOf s registry) mine
-        yours <- mapM (S.printingOf s registry) theirs
-        pure (S.combatBoardOf ours yours)
-      -- CR 508.1's declaration narrowed to the named creatures, trainingSpec's.
-      plan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-      plan attackers p = case p of
-        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
-        _ -> S.aggressiveAnswer p
-      -- CR 601.2c's announcement for the trained creature's trigger: one target,
-      -- PINNED rather than searched. An answerer that picked a legal option would
-      -- find another one after a mutation and repair the assertion; this one hands
-      -- back the recipient the case names, tag and all -- ToCreature for the
-      -- battlefield half of the pool, ToObject for the graveyard half.
-      aimingAt :: Recipient.Recipient -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-      aimingAt recipient attackers p = case p of
-        Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
-        Prompt.ChooseTargets _ _ _ asked -> fmap (const (Set.singleton recipient)) asked
-        _ -> plan attackers p
-      atBlockers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
-      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
-      nameOf oid gs = fmap Face.name (Game.faceOf oid gs)
-      -- Exile is one shared zone (CR 400.1), so this is everything in it whoever
-      -- owns it. By NAME, because CR 400.7 mints the exiled card a fresh id.
-      exiledNames gs = List.sort (Maybe.mapMaybe (`nameOf` gs) (Set.toList (GameState.exile gs)))
-      -- Rule 702.149a's threshold crossed from below by a continuous effect: the
-      -- Piker's 2 power becomes 1, which is the Savior's own, and CR 702.149a's
-      -- "greater" is strict.
-      shrink oid = S.withEffect oid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal 0)))
-   in Spec.describe s "CR 702.149c a trigger on training" $ do
-        -- The one-difference control: the same board with the companion's power
-        -- one lower, so rule 702.149a's strict "greater" is not met, nothing
-        -- trains, and rule 702.149c's trigger never fires.
-        Spec.it s "CR 702.149a a companion whose power is only equal exiles nothing" $ do
-          (gs, mine, theirs) <- board ["Savior of Ollenbock", "Goblin Piker"] ["Hill Giant"]
-          case (mine, theirs) of
-            ([savior, piker], [giant]) -> do
-              let weakened = shrink piker gs
-                  after = atBlockers (aimingAt (Recipient.ToCreature giant) [savior, piker]) weakened
-              Spec.assertEqWith s "the companion really is a 1/1 now" (S.powerToughnessOf piker weakened) (Just (1, 1))
-              Spec.assertEqWith s "no counter was put" (countersOn savior after) Map.empty
-              Spec.assertEqWith s "and nothing was exiled" (exiledNames after) []
-              Spec.assertBool s (S.onBattlefield giant after) "the Giant is where it was"
-            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker, and bob a Giant"
 
 -- CR 702.147a's decayed: a combat restriction and a triggered ability that arms
 -- a CR 603.7 DELAYED one -- the first minted ability to arm anything, and so the
@@ -1175,10 +1100,9 @@ krasisSpec s registry =
 -- narrowing observable rather than incidental: the token's own CR 508.4 choice is
 -- elided because carol is its only candidate, and a narrowing that admitted every
 -- defending player would take bob instead.
-myriadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+myriadSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 myriadSpec s registry =
-  let patrolName = CardName.MkCardName (Text.pack "Wyrm's Crossing Patrol")
-      plan :: Prompt.Prompt r -> r
+  let plan :: Prompt.Prompt r -> r
       plan p = case p of
         Prompt.ChooseAttackTarget {} -> S.attackTo S.bob p
         -- Rule 702.116a's per-opponent "may", taken against every opponent.
@@ -1190,7 +1114,6 @@ myriadSpec s registry =
       picking wanted p = case p of
         Prompt.ChooseLoopMembers {} -> wanted
         _ -> plan p
-      attackedBy oid gs = Map.lookup oid (Combat.Type.attackers (GameState.combat gs))
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       -- threePlayerCombat's board with dave seated too.
       fourSeats = do
@@ -1206,42 +1129,6 @@ myriadSpec s registry =
                 }
         pure gs0
    in Spec.describe s "Myriad (CR 702.116)" $ do
-        -- THE PROJECTION TRIPWIRE. Nothing alice controls PRINTS myriad: her
-        -- creature is a Clone, and the keyword, the trigger and the token's
-        -- characteristics all come off CR 707.2's copiable values. A read of the
-        -- printed card anywhere on this road answers "Clone" and mints nothing.
-        --
-        -- The Patrol is BOB's, so the only myriad on the battlefield that attacks
-        -- is the copy's, and a second token would say the printed one triggered
-        -- too.
-        Spec.it s "CR 707.2 a Clone of the Patrol has myriad and mints a copy of the Patrol" $ do
-          patrol <- S.printingOf s registry "Wyrm's Crossing Patrol"
-          clone <- S.printingOf s registry "Clone"
-          let (gs0, _, theirs, _) = S.threePlayerCombat [] [patrol] []
-              (_, staged) = S.spellOnStack clone S.alice gs0
-              copying p = case p of
-                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
-                _ -> S.identityAnswer p
-              resolved = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-              -- CR 302.6: the Clone entered this turn. Settling it is the one
-              -- fixture step here that is not the cards' own doing.
-              alices = filter (\oid -> Projection.controllerOf oid resolved == Just S.alice) (Set.toList (GameState.battlefield resolved))
-              settle gs oid = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)}
-              ready = List.foldl' settle resolved alices
-              after = atBlockers plan ready
-          case (theirs, alices) of
-            ([bobsPatrol], [cloneId]) -> do
-              Spec.assertBool s (Projection.hasName patrolName cloneId after) "the Clone copied the Patrol"
-              Spec.assertEqWith
-                s
-                "CR 702.116a the Clone's own token attacks carol"
-                (fmap (`attackedBy` after) (S.tokensOf after))
-                [Just (AttackTarget.OfPlayer S.carol)]
-              case S.tokensOf after of
-                [token] -> Spec.assertBool s (Projection.hasName patrolName token after) "and it is a copy of the Patrol, not of the Clone's printed card"
-                other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
-              Spec.assertBool s (S.onBattlefield bobsPatrol after) "while bob's printed Patrol never attacked"
-            (_, other) -> Spec.assertFailure s ("expected alice to control exactly the Clone, got " <> show (length other))
         -- THE PAIR of the case above, picking nobody: rule 702.116a's "if one or
         -- more tokens are created this way" then arms nothing, which the clause
         -- counting the minted batch is what holds.
@@ -1258,7 +1145,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   mentorSpec s registry
   mentorsTriggerSpec s registry
   trainingSpec s registry
-  saviorOfOllenbockSpec s registry
   decayedSpec s registry
   myriadSpec s registry
   provokeSpec s registry

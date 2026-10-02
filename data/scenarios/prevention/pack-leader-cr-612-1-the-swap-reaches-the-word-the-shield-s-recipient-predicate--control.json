@@ -1,0 +1,122 @@
+{
+  "description": "CR 612.1 the swap reaches the word the shield's RECIPIENT predicate names",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Pack Leader",
+            "label": "leader",
+            "ready": true
+          },
+          {
+            "card": "Ainok Tracker",
+            "label": "dog",
+            "ready": true
+          },
+          {
+            "card": "Pouncing Cheetah",
+            "label": "cat",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i1"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Artificial Evolution",
+            "label": "evo"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Hill Giant",
+            "label": "giant",
+            "ready": true
+          },
+          {
+            "card": "Jedit Ojanen",
+            "label": "jedit",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$leader",
+          "$dog",
+          "$cat"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "trigger of $leader"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$giant": [
+            "$cat"
+          ],
+          "$jedit": [
+            "$dog"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Damage": {
+          "object": "$dog",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Pouncing Cheetah",
+          "count": 1
+        }
+      }
+    }
+  ],
+  "note": "The control leg: the same board without the Evolution."
+}

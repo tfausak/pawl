@@ -1,0 +1,185 @@
+{
+  "description": "CR 612.5 a Hack made before the exchange moves with Kird Ape's text",
+  "note": "alice controls Islands and no Forest. Her Magical Hack turns Kird Ape's Forest into Island (2/3 off her Islands), then Exchange of Words swaps its text box with her Goblin Piker's: the Piker carries the HACKED pump and is 3/3, the Ape a printed 1/1.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Kird Ape",
+            "label": "worded"
+          },
+          {
+            "card": "Goblin Piker",
+            "label": "piker"
+          },
+          {
+            "card": "Island",
+            "label": "island1"
+          },
+          {
+            "card": "Island",
+            "label": "island2"
+          },
+          {
+            "card": "Island",
+            "label": "island3"
+          },
+          {
+            "card": "Island",
+            "label": "island4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Magical Hack",
+            "label": "hack"
+          },
+          {
+            "card": "Exchange of Words",
+            "label": "exchange"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$hack",
+          "targets": [
+            "$worded"
+          ],
+          "mana": [
+            "$island1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTypeSwap": {
+          "from": {
+            "type": "Forest"
+          },
+          "to": {
+            "type": "Island"
+          }
+        }
+      },
+      "source": "Magical Hack"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$worded",
+          "power": 2,
+          "toughness": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$exchange",
+          "mana": [
+            "$island2",
+            "$island3",
+            "$island4"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "ChooseTargets": {
+          "creatures": [
+            "$worded",
+            "$piker"
+          ]
+        }
+      },
+      "source": "Exchange of Words"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$piker",
+          "power": 3,
+          "toughness": 3
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "PowerToughness": {
+          "object": "$worded",
+          "power": 1,
+          "toughness": 1
+        }
+      }
+    }
+  ]
+}

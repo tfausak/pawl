@@ -16,7 +16,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -46,7 +45,6 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -1641,8 +1639,6 @@ echoSpec s registry =
       ranUpkeep answer pid gs = Replay.record answer (atUpkeepOf pid gs) Engine.runStep
       afterUpkeep :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
       afterUpkeep answer pid gs = S.runPure answer (atUpkeepOf pid gs) Engine.runStep
-      afterStep :: (forall r. Prompt.Prompt r -> r) -> Phase.Phase -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-      afterStep answer step pid gs = S.runPure answer (atStepOf step pid gs) Engine.runStep
       jaguarBoard forests = do
         forest <- S.printingOf s registry "Forest"
         jaguar <- S.printingOf s registry "Pouncing Jaguar"
@@ -1675,34 +1671,6 @@ echoSpec s registry =
           Spec.assertBool s (S.onBattlefield oid bobs) "and left the Jaguar untouched"
           Spec.assertEqWith s "CR 702.30a alice's own upkeep still asks, so bob's did not turn her clock" (S.tappedCount S.alice alices) 1
           Spec.assertEqWith s "the transcripts agreeing: nothing offered on bob's upkeep, one offer on alice's" (length (payResponses bobLog), length (payResponses aliceLog)) (0, 1)
-        -- CR 702.30a asks whether the permanent came under your control since
-        -- your last upkeep, NOT whether this is the first time you ever
-        -- controlled it. alice's window has already closed when bob borrows the
-        -- Jaguar for a turn, and CR 514.2 ending the Act of Treason gives it back
-        -- to her -- which is a fresh coming-under-her-control and opens hers
-        -- again. CR 400.7 is not involved: the permanent never left the
-        -- battlefield, so this is the same incarnation with the same clock.
-        --
-        -- The settle after the Act of Treason resolves is a REAL precondition and
-        -- not tidiness: Engine.sampleControl sees control move by diffing two
-        -- samples, so a theft and a hand-back that both fell between one sample
-        -- and the next would be invisible to it. A game gives bob priority there;
-        -- this script has to say so.
-        Spec.it s "CR 702.30a control coming back re-opens the window it closed" $ do
-          (oid, gs0) <- jaguarBoard 4
-          mountain <- S.printingOf s registry "Mountain"
-          treason <- S.printingOf s registry "Act of Treason"
-          let elapsed = afterUpkeep (paysFor S.alice) S.alice (afterUpkeep (paysFor S.alice) S.alice gs0)
-              (held, staged) = S.addHandCard treason S.bob (S.landsFor mountain S.bob 3 elapsed)
-              stolen = S.runPure (paysFor S.bob) (atStepOf S.precombatMain S.bob staged) (S.cast S.bob held >> Stack.resolveTop >> Engine.settleForPriority)
-              reverted = afterStep (paysFor S.bob) (Phase.Ending EndingStep.Cleanup) S.bob stolen
-              ((_, back), backLog) = ranUpkeep (paysFor S.alice) S.alice reverted
-          Spec.assertEqWith s "alice's two upkeeps spent one Forest and shut her window" (S.tappedCount S.alice elapsed) 1
-          Spec.assertEqWith s "the Jaguar really was bob's" (Projection.View.controllerOf oid stolen) (Just S.bob)
-          Spec.assertEqWith s "CR 514.2 and alice's again once bob's turn ended" (Projection.View.controllerOf oid reverted) (Just S.alice)
-          Spec.assertEqWith s "CR 702.30a a second Forest of alice's paid echo, so her window re-opened" (S.tappedCount S.alice back) 2
-          Spec.assertBool s (S.onBattlefield oid back) "and the Jaguar survived that upkeep too"
-          Spec.assertEqWith s "she being offered it once" (length (payResponses backLog)) 1
         -- The copy tripwire. A Clone of the Jaguar HAS echo -- CR 707.2 copies the
         -- printed keyword -- and CR 702.30a's clock starts for the copy as it
         -- enters. An implementation reading the PRINTED card (Game.faceOf) rather
@@ -2582,29 +2550,6 @@ backupSpec s registry =
               Spec.assertEqWith s "where its power was 3" (Projection.powerOf arborId pumped) (Just 3)
               Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf arborId pumped)) "and Blood Moon really had made it a Mountain"
             _ -> Spec.assertFailure s "fixture should give alice a Dryad Arbor"
-        -- THE RULE HALF, at gameplay level, as a pair differing only in rule
-        -- 702.165a's target. Backed up, the Piker (now 3/2) can't be blocked by
-        -- the 2/2 Evangel but can by the 3/3 Mammoth; aimed at the Kavu itself,
-        -- the Piker gains nothing and the Evangel may block it.
-        Spec.it s "CR 702.165a the backed-up creature can't be blocked by a creature with power 2 or less" $ do
-          piker <- S.printingOf s registry "Goblin Piker"
-          evangel <- S.printingOf s registry "Cabal Evangel"
-          mammoth <- S.printingOf s registry "War Mammoth"
-          kavu <- S.printingOf s registry "Chomping Kavu"
-          case S.combatBoardOf [piker] [evangel, mammoth] of
-            (gs0, [pikerId], [evangelId, mammothId]) -> do
-              let (card, staged) = S.addHandCard kavu S.alice gs0
-                  backed = entersTargeting pikerId card staged
-                  -- RE-FOUND after the entry, for the Archpriest pair's CR 400.7
-                  -- reason.
-                  placed = S.runPure S.identityAnswer staged (Event.changeZone card Zone.Battlefield)
-                  kavuId = Maybe.fromMaybe card (Maybe.listToMaybe (reverse (Game.zoneMembers Zone.Battlefield S.alice placed)))
-                  selfBacked = S.runPure (targeting kavuId) placed (Engine.settleForPriority >> Stack.resolveTop)
-              Spec.assertBool s (not (mayBlock evangelId pikerId backed)) "CR 702.165a the backed-up Piker can't be blocked by the 2/2"
-              Spec.assertBool s (mayBlock mammothId pikerId backed) "but can by the 3/3"
-              Spec.assertBool s (mayBlock evangelId pikerId selfBacked) "and aimed at the Kavu itself, the 2/2 may block the Piker"
-              Spec.assertEqWith s "the self-aimed trigger put its counter on the Kavu" (plusOnes kavuId selfBacked) 1
-            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel and a Mammoth"
         -- CR 613.1f in CR 613.7 timestamp order, the static half's pair over a
         -- rule ability: a Turn to Frog before the grant leaves the Piker barring
         -- the Evangel, one after takes the restriction away. Either way the
@@ -2627,42 +2572,6 @@ backupSpec s registry =
               Spec.assertEqWith s "the Frog really resolved first, leaving a 1/1 with the counter" (Projection.powerOf pikerId frogFirst) (Just 2)
               Spec.assertEqWith s "and last" (Projection.powerOf pikerId frogLast) (Just 2)
             _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel"
-        -- CR 613.1f's NAMED removal, later than the grant: Glittering Lion
-        -- ({2}{W} 2/2, "{3}: Until end of turn, this creature loses 'Prevent
-        -- all damage that would be dealt to this creature.'") loses its shield
-        -- and nothing else, so the restriction backup granted it stays. The
-        -- pair is the same activation on a Lion no Kavu backed up, which the
-        -- 2/2 may block.
-        Spec.it s "CR 613.1f Glittering Lion losing its shield keeps the restriction backup granted it" $ do
-          lion <- S.printingOf s registry "Glittering Lion"
-          evangel <- S.printingOf s registry "Cabal Evangel"
-          kavu <- S.printingOf s registry "Chomping Kavu"
-          plains <- S.printingOf s registry "Plains"
-          case (S.combatBoardOf [lion] [evangel], Face.activatedAbilities (S.combinedFace lion)) of
-            ((gs0, [lionId], [evangelId]), shieldOff : _) -> do
-              let (card, staged) = S.addHandCard kavu S.alice (S.landsFor plains S.alice 3 gs0)
-                  unshield g = S.runPure S.identityAnswer g {GameState.priority = Just S.alice} (Activate.activateAbility S.alice lionId shieldOff >> Stack.resolveTop)
-                  backed = unshield (entersTargeting lionId card staged)
-                  bare = unshield staged
-              Spec.assertBool s (not (mayBlock evangelId lionId backed)) "CR 613.1f the unshielded Lion still can't be blocked by the 2/2"
-              Spec.assertBool s (mayBlock evangelId lionId bare) "where an unbacked unshielded Lion can be"
-              Spec.assertBool s (null (PC.replacementEffects (Projection.project lionId backed))) "and the Lion really lost its shield"
-            _ -> Spec.assertFailure s "fixture should give alice a Lion and bob an Evangel"
-        -- The same named removal over a granted STATIC ability, the gate
-        -- Pawl.Engine.Projection.gather applies: Streetwise Negotiator's backup
-        -- survives the Lion losing its shield.
-        Spec.it s "CR 613.1f Glittering Lion losing its shield keeps the static ability backup granted it" $ do
-          lion <- S.printingOf s registry "Glittering Lion"
-          negotiator <- S.printingOf s registry "Streetwise Negotiator"
-          plains <- S.printingOf s registry "Plains"
-          case (S.combatBoardOf [lion] [], Face.activatedAbilities (S.combinedFace lion)) of
-            ((gs0, [lionId], _), shieldOff : _) -> do
-              let (card, staged) = S.addHandCard negotiator S.alice (S.landsFor plains S.alice 3 gs0)
-                  backed = entersTargeting lionId card staged
-                  unshielded = S.runPure S.identityAnswer backed {GameState.priority = Just S.alice} (Activate.activateAbility S.alice lionId shieldOff >> Stack.resolveTop)
-              Spec.assertBool s (PC.assignsCombatDamageWithToughness (Projection.project lionId unshielded)) "CR 613.1f the unshielded Lion still assigns damage by toughness"
-              Spec.assertBool s (null (PC.replacementEffects (Projection.project lionId unshielded))) "and the Lion really lost its shield"
-            _ -> Spec.assertFailure s "fixture should give alice a Lion"
         -- CR 305.7's last clause over a rule ability: Blood Moon strips the
         -- Dryad Arbor's rules text but not the restriction backup granted it.
         Spec.it s "CR 305.7 a Blood Moon'd Dryad Arbor keeps the restriction backup granted it" $ do

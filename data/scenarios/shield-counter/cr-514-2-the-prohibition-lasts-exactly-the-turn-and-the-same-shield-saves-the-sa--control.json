@@ -1,0 +1,62 @@
+{
+  "description": "CR 514.2 the prohibition lasts exactly the turn, and the same shield saves the same creature next turn (control: named the same turn)",
+  "note": "The control: the Jackal names the Troll in bob's own turn, after his regeneration resolves, so the prohibition is in force when the Bolt's damage is lethal and the Troll dies.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Hurr Jackal",
+            "label": "jackal",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "a-mountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Uthden Troll",
+            "label": "troll"
+          },
+          {
+            "card": "Mountain",
+            "label": "b-mountain"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "DeclareAttackers", "player": "alice", "do": {"Attack": []}},
+    {"turn": 2, "step": "Upkeep", "player": "bob", "do": {"Activate": {"object": "$troll", "mana": ["$b-mountain"]}}},
+    {"turn": 2, "step": "Upkeep", "player": "alice", "do": {"Activate": {"object": "$jackal", "targets": ["$troll"], "mana": [null]}}},
+    {"turn": 2, "step": "Upkeep", "player": "alice", "do": "Pass"},
+    {"turn": 2, "step": "Upkeep", "player": "alice", "do": "Pass"},
+    {"turn": 2, "step": "Upkeep", "player": "alice", "do": {"Cast": {"object": "$bolt", "targets": ["$troll"], "mana": ["$a-mountain"]}}},
+    {"turn": 2, "step": "DrawStep", "player": "bob", "check": {"Count": {"player": "bob", "zone": "Graveyard", "card": "Uthden Troll", "count": 1}}}
+  ]
+}

@@ -17,18 +17,15 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Stack as Stack
 import Pawl.PreventionSpec (atLife, attackNoBlock, bobAttacks, inMainPhase, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -268,23 +265,6 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
         after = S.runPure S.identityAnswer unarmed (Event.drawCard S.alice)
     Spec.assertEqWith s "she gained nothing" (S.lifeOf S.alice after) (Just 20)
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "CR 704.5b and the failed draw is on the books"
-  -- CR 109.5's "you": the pattern is ControllerRelation.Yours, so bob's draw is
-  -- not alice's, and the row is still there afterwards.
-  --
-  -- BOB's life is what discriminates, not alice's: the rewrite gains the life to
-  -- the player the EVENT named, so a row that wrongly matched his draw would gain
-  -- HIM the 5 and leave alice at 20 either way.
-  Spec.it s "CR 109.5 the row watches its controller's draws and nobody else's" $ do
-    plains <- S.printingOf s registry "Plains"
-    wordsOfWorship <- S.printingOf s registry "Words of Worship"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (armed, _) = wordsBoard plains wordsOfWorship piker True
-        stocked = snd (S.addLibraryCard piker S.bob armed)
-        after = S.runPure S.identityAnswer stocked (Event.drawCard S.bob)
-    Spec.assertEqWith s "CR 109.5 bob's draw is not alice's, so the rewrite never ran" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "CR 121.1 and bob drew his card" (S.handSize S.bob after) 1
-    Spec.assertEqWith s "alice gained nothing either" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertEqWith s "CR 614.3 the row is unspent" (length (GameState.replacements after)) 1
 
   -- CR 614.3 / 608.2: the row is an effect of a resolution that has ENDED, so its
   -- CR 109.5 "you" was fixed when the ability resolved. Destroying the
@@ -309,22 +289,6 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     Spec.assertBool s (not (Set.member enchantment (GameState.battlefield gone))) "setup: the enchantment really left the battlefield"
     Spec.assertEqWith s "CR 614.3 the row still applied, so alice is at 25" (S.lifeOf S.alice after) (Just 25)
     Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
-  -- The same field one reading over: a CONTROL CHANGE. Confiscate ({4}{U}{U}
-  -- Aura, "Enchant permanent / You control enchanted permanent") hands bob the
-  -- enchantment, and the row stays alice's -- a live reading would answer bob and
-  -- stop matching her draw.
-  Spec.it s "CR 109.5 the row stays with the player who activated it, not the enchantment" $ do
-    plains <- S.printingOf s registry "Plains"
-    wordsOfWorship <- S.printingOf s registry "Words of Worship"
-    confiscate <- S.printingOf s registry "Confiscate"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (armed, enchantment) = wordsBoard plains wordsOfWorship piker True
-        (aura, g1) = S.addPermanent confiscate S.bob armed
-        stolen = S.attachTo aura (Recipient.ToObject enchantment) g1
-        after = S.runPure S.identityAnswer stolen (Event.drawCard S.alice)
-    Spec.assertEqWith s "setup: bob really controls the enchantment now" (Projection.controllerOf enchantment stolen) (Just S.bob)
-    Spec.assertEqWith s "CR 109.5 the row is still alice's, so she is at 25" (S.lifeOf S.alice after) (Just 25)
-    Spec.assertEqWith s "CR 614.6 and her draw still never happened" (S.handSize S.alice after) 0
 
 -- alice with a Plains, a Words of Worship and two library cards, with the
 -- ability activated and resolved when `arm` is True and untouched when it is
@@ -462,7 +426,7 @@ collectorBoard island piker collector recall collecting =
 -- THREE SEATS wherever the clause's CR 109.5 "you" is the question, because a
 -- two-player board cannot tell "the row's controller" from "the player the event
 -- names" when one seat holds both roles.
-boonReflectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boonReflectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 614.1a)" $ do
   -- CR 120.3f: lifelink's gain is a life gain event like any other, so the row
   -- reaches it -- which is the half of this unit that no Effect.GainLife road can
@@ -495,22 +459,6 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     Spec.assertEqWith s "and the Bond drains the SETTLED 6, so alice takes 3 + 6" (S.lifeOf S.alice doubled) (Just 11)
     Spec.assertEqWith s "the same board without the row gains bob the printed 3" (S.lifeOf S.bob control) (Just 23)
     Spec.assertEqWith s "and drains alice 3, so she takes 3 + 3" (S.lifeOf S.alice control) (Just 14)
-  -- CR 614.11's substituted gain, the fourth road into the funnel: Words of
-  -- Worship's "the next time you would draw a card this turn, you gain 5 life
-  -- instead" gains life through a REPLACEMENT rather than through an effect, and
-  -- rule 119.10 knows no difference -- a source caused alice to gain life.
-  --
-  -- The board is the Words of Worship group's armed one with a row added, so the
-  -- two differ in exactly one thing, and the draw is still cancelled either way.
-  Spec.it s "CR 614.11 the life a draw replacement substitutes is a gain the row resizes" $ do
-    plains <- S.printingOf s registry "Plains"
-    wordsOfWorship <- S.printingOf s registry "Words of Worship"
-    boon <- S.printingOf s registry "Boon Reflection"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (armed, _) = wordsBoard plains wordsOfWorship piker True
-        after = S.runPure S.identityAnswer (snd (S.addPermanent boon S.alice armed)) (Event.drawCard S.alice)
-    Spec.assertEqWith s "CR 614.1a the substituted 5 becomes 10, so alice is at 30" (S.lifeOf S.alice after) (Just 30)
-    Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
 
 ashiokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 614.6)" $ do
@@ -590,43 +538,6 @@ deflectionCombat :: ObjectId.ObjectId -> ObjectId.ObjectId -> [Recipient.Recipie
 deflectionCombat blocker attacker wanted p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers {} -> Map.singleton blocker (Set.singleton attacker)
-  Prompt.AllocateDamage _ _ events share ->
-    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
-  _ -> S.identityAnswer p
-
--- Cast Molten Disaster UNKICKED for `x`, spending a contested shield on the
--- batch's hits in `wanted` order. The kicker answer is PINNED rather than
--- deferred: kicking it turns on a static ability that grants split second (CR
--- 702.61a), and the case below is about the damage sentence alone.
---
--- The order is stated by RECIPIENT, deflectionCombat's shape, so the assertions
--- do not depend on the order the instruction's own sweep gathered the batch in.
-castDisaster :: Natural.Natural -> [Recipient.Recipient] -> Prompt.Prompt r -> r
-castDisaster x wanted p = case p of
-  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
-  Prompt.ChooseX {} -> x
-  Prompt.AllocateDamage _ _ events share ->
-    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
-  _ -> S.identityAnswer p
-
--- Aim CR 115.4's "any target" at `victim` and spend a contested prevention
--- shield on the batch's hits in `wanted` order. The target is FILTERED out of
--- the offered set rather than built, castDeflection's shape, and the order is
--- stated by RECIPIENT, castDisaster's.
-aimCreatureAndOrder :: ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
-aimCreatureAndOrder victim wanted p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets
-  Prompt.AllocateDamage _ _ events share ->
-    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
-  _ -> S.identityAnswer p
-
--- Win Winter Sky's CR 705.2 call, then spend a contested shield in `wanted`
--- order. The flip is pinned rather than deferred: the losing branch draws cards
--- instead of dealing damage, and the case below is about the damage sentence.
-winTheFlipAndOrder :: [Recipient.Recipient] -> Prompt.Prompt r -> r
-winTheFlipAndOrder wanted p = case p of
-  Prompt.FlipCoin -> CoinFace.Heads
-  Prompt.CallCoin {} -> CoinFace.Heads
   Prompt.AllocateDamage _ _ events share ->
     S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
   _ -> S.identityAnswer p

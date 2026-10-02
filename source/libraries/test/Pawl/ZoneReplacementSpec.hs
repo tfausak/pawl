@@ -10,26 +10,18 @@ module Pawl.ZoneReplacementSpec where
 
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
-import qualified Data.Set as Set
-import qualified Data.Text as Text
-import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
-import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.DiscardCause as DiscardCause
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Zone as Zone
 
@@ -51,14 +43,6 @@ import qualified Pawl.Types.Zone as Zone
 reversingShuffle :: Prompt.Prompt r -> r
 reversingShuffle p = case p of
   Prompt.Shuffle ids -> reverse ids
-  _ -> S.identityAnswer p
-
--- CR 601.2c aimed at one object, by FILTERING the set the engine offers rather
--- than by building a recipient of its own -- a hand-built one is a different
--- recipient and CR 608.2b drops it silently.
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
   _ -> S.identityAnswer p
 
 -- Which objects a CR 701.20a reveal has shown, in the order the log holds them.
@@ -189,44 +173,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "CR 701.20a the Nexus was shown, under the id it had in the zone it left" (revealed (discarding nexusId)) [nexusId]
     Spec.assertEqWith s "the control: discarding a card with no such row shows nobody anything" (revealed (discarding pikerId)) []
     Spec.assertEqWith s "and the control card really was discarded" (length (Game.zoneMembers Zone.Graveyard S.alice (discarding pikerId))) 1
-  -- CR 613.1f / 611.2c: Can't Stay Away's "It gains 'If this creature would
-  -- die, exile it instead.'" is a quoted replacement ability a RESOLUTION
-  -- grants, stored and read off the receiver's projection. Llanowar Elves is
-  -- returned; a second Elves already on the battlefield is the control, and a
-  -- Clone of the returned one is the CR 707.2 tripwire -- a grant is not a
-  -- copiable value, so the copy dies normally.
-  Spec.it s "CR 613.1f Can't Stay Away's quoted replacement exiles the returned creature and nothing else" $ do
-    plains <- S.printingOf s registry "Plains"
-    swamp <- S.printingOf s registry "Swamp"
-    elves <- S.printingOf s registry "Llanowar Elves"
-    spell <- S.printingOf s registry "Can't Stay Away"
-    clone <- S.printingOf s registry "Clone"
-    let lands = S.landsFor swamp S.alice 1 (S.landsFor plains S.alice 1 (Setup.emptyGame S.bothPlayers))
-        (buried, g1) = S.addGraveyardCard elves S.alice lands
-        (control, g2) = S.addPermanent elves S.alice g1
-        (_, g3) = S.addLibraryCard plains S.alice g2
-        (gs, spellId) = S.handOne spell g3
-        cast = S.runPure (aimedAt buried) gs (S.cast S.alice spellId)
-        resolved = S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
-        arrived = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield gs))
-        destroyed oid g = S.runPure S.identityAnswer g (Event.destroy Regenerability.Regenerable [oid] >> Engine.settleForPriority)
-        named name zone g = length (filter (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid g) == Just name) (Game.zoneMembers zone S.alice g))
-        elvesIn = named "Llanowar Elves"
-    case arrived of
-      [returned] -> do
-        let copying :: Prompt.Prompt r -> r
-            copying p = case p of
-              Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== returned) legal
-              _ -> S.identityAnswer p
-            (_, staged) = S.spellOnStack clone S.alice resolved
-            copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-            copies = Set.toList (Set.difference (GameState.battlefield copied) (GameState.battlefield resolved))
-        Spec.assertEqWith s "the returned Elves were exiled as they were destroyed" (elvesIn Zone.Exile (destroyed returned resolved)) 1
-        Spec.assertEqWith s "the control Elves, never returned, went to the graveyard" (elvesIn Zone.Exile (destroyed control resolved), elvesIn Zone.Graveyard (destroyed control resolved)) (0, 1)
-        case copies of
-          [copy] -> Spec.assertEqWith s "CR 707.2 a Clone of the returned Elves copies no grant, so it dies into the graveyard" (named "Clone" Zone.Exile (destroyed copy copied), named "Clone" Zone.Graveyard (destroyed copy copied)) (0, 1)
-          _ -> Spec.assertFailure s ("expected one Clone to arrive, got " <> show copies)
-      _ -> Spec.assertFailure s ("expected one returned creature, got " <> show arrived)
   -- CR 613.1f in a GRAVEYARD: Yixlid Jailer ({1}{B} Creature -- Zombie Wizard
   -- 2/1, "Cards in graveyards lose all abilities." -- checked against
   -- api.scryfall.com 2026-09-29) takes Darkblast's dredge 3 away, so CR 702.52a

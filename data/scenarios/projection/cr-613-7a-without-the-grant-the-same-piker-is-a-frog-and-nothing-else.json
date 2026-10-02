@@ -1,0 +1,26 @@
+{
+  "description": "CR 613.7a without the grant the same Piker is a Frog and nothing else",
+  "note": "The Haskell board's Turn to Frog is reached by casting it; the Aura the paired test adds is left off, so nothing grants changeling.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ],
+        "hand": [{ "card": "Turn to Frog", "label": "frog" }]
+      },
+      { "name": "bob" }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$frog", "targets": ["$piker"], "mana": ["$island-1", "$island-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Subtypes": { "object": "$piker", "subtypes": ["Frog"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Keywords": { "object": "$piker", "keyword": { "type": "Changeling" }, "count": 0 } } }
+  ]
+}

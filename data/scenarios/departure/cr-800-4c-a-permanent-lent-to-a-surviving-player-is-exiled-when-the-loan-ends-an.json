@@ -1,0 +1,437 @@
+{
+  "description": "CR 800.4c a permanent lent to a surviving player is exiled when the loan ends and its default controller has left",
+  "note": "Alice steals bob's Towershell with Control Magic (turn 1), attacks with it once it is no longer sick (turn 4), and its own trigger exiles it, burying the Aura; it returns under alice's control by CR 110.2a on turn 7. Carol's Ray of Command lends it to her; alice concedes; carol's loan ends in the cleanup step and the Towershell goes to exile, not back to alice. Turns run three later than the Haskell test's because Control Magic is cast rather than placed.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "a0",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "a1",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "a2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "a3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Control Magic",
+            "label": "control-magic"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Meandering Towershell",
+            "label": "towershell",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i0",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i1",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i2",
+            "ready": true
+          },
+          {
+            "card": "Island",
+            "label": "i3",
+            "ready": true
+          }
+        ],
+        "hand": [
+          {
+            "card": "Ray of Command",
+            "label": "ray"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$control-magic",
+          "targets": [
+            "$towershell"
+          ],
+          "mana": [
+            "$a0",
+            "$a1",
+            "$a2",
+            "$a3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$towershell"
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      }
+    },
+    {
+      "turn": 7,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "ChooseAttackTarget": "$bob"
+      }
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "Meandering Towershell",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Control Magic",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": {
+        "Cast": {
+          "object": "$ray",
+          "targets": [
+            "Meandering Towershell"
+          ],
+          "mana": [
+            "$i0",
+            "$i1",
+            "$i2",
+            "$i3"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "do": "Pass"
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": [
+            "Ray of Command"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 7,
+      "step": "DeclareBlockers",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "Meandering Towershell",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 7,
+      "step": "EndOfCombat",
+      "player": "alice",
+      "do": "Concede"
+    },
+    {
+      "turn": 7,
+      "step": "EndOfCombat",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Controller",
+          "object": "Meandering Towershell",
+          "is": "carol"
+        }
+      }
+    },
+    {
+      "turn": 7,
+      "step": "EndOfCombat",
+      "player": "carol",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 7,
+      "step": "EndOfCombat",
+      "player": "carol",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Battlefield",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 8,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Exile",
+          "card": "Meandering Towershell",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 8,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "bob",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 8,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "carol",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 8,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Meandering Towershell",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 8,
+      "step": "Upkeep",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Result",
+          "is": null
+        }
+      }
+    }
+  ]
+}

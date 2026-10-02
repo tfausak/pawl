@@ -401,29 +401,6 @@ activateSole oid gs = case Activatable.abilitiesFor oid gs of
 
 zoneChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
-  Spec.it s "CR 701.19a Murder is replaced by regeneration" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    piker <- S.printingOf s registry "Goblin Piker"
-    murder <- S.printingOf s registry "Murder"
-    let base = S.landsInPlay swamp 3
-        (victim, withFoe) = S.addPermanent piker S.bob base
-        shielded = S.addRegenShield victim withFoe
-        (gs, spellId) = S.handOne murder shielded
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
-    Spec.assertEqWith s "the shielded creature survived Murder" (S.creaturesInPlay S.bob after) 1
-  Spec.it s "CR 701.19a regeneration does not save a bounced creature" $ do
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    unsummon <- S.printingOf s registry "Unsummon"
-    let base = S.landsInPlay island 1
-        (victim, withFoe) = S.addPermanent piker S.bob base
-        shielded = S.addRegenShield victim withFoe
-        (gs, spellId) = S.handOne unsummon shielded
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "the creature left the battlefield (bounce is not a destruction)" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "it is in bob's hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 1
   -- CR 121.2c: "If more than one player is instructed to draw cards, the
   -- active player performs all of their draws first, then each other player
   -- in turn order does the same." The seat order the players map answers in
@@ -843,7 +820,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
 -- bottom to the OWNER, Oust states the depth, and Unexpectedly Absent reads it
 -- off X. Every board aims at a creature bob OWNS and alice CONTROLS, so the
 -- owner and the controller are different seats.
-libraryDepthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+libraryDepthSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 libraryDepthSpec s registry = Spec.describe s "LibraryDepth" $ do
   let -- bob's Goblin Piker under alice's control, bob's library seeded with
       -- the given names (the LAST is the top), and the spell in alice's hand
@@ -884,31 +861,6 @@ libraryDepthSpec s registry = Spec.describe s "LibraryDepth" $ do
     let (after, asked) = castAt pikerId 0 LibraryPosition.Top gs spellId
     Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Goblin Piker", "Unsummon", "Lightning Bolt"])
     Spec.assertEqWith s "the owner was asked, offered one card above the upper option" asked [(S.bob, 1)]
-  Spec.it s "CR 401.7 Temporal Cleansing: the owner picks the bottom instead" $ do
-    (gs, spellId, pikerId, _) <- depthBoard "Temporal Cleansing" ["Lightning Bolt", "Unsummon", "Griptide"]
-    let (after, _) = castAt pikerId 0 LibraryPosition.Bottom gs spellId
-    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Unsummon", "Lightning Bolt", "Goblin Piker"])
-  Spec.it s "CR 401.7 Oust: second from the top, and its CONTROLLER gains 3 life" $ do
-    (gs, spellId, pikerId, _) <- depthBoard "Oust" ["Lightning Bolt", "Unsummon", "Griptide"]
-    let (after, asked) = castAt pikerId 0 LibraryPosition.Bottom gs spellId
-    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Goblin Piker", "Unsummon", "Lightning Bolt"])
-    Spec.assertEqWith s "a stated depth asks nobody" asked []
-    Spec.assertEqWith s "alice, its controller, gains 3" (S.lifeOf S.alice after) (Just 23)
-    Spec.assertEqWith s "bob, its owner, does not" (S.lifeOf S.bob after) (Just 20)
-  -- The rule's own case: "fewer than N cards" puts it on the bottom, which with
-  -- one card is also directly beneath the top card (Oust's ruling).
-  Spec.it s "CR 401.7 Oust into a one-card library puts the creature on the bottom" $ do
-    (gs, spellId, pikerId, _) <- depthBoard "Oust" ["Lightning Bolt"]
-    let (after, _) = castAt pikerId 0 LibraryPosition.Top gs spellId
-    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Lightning Bolt", "Goblin Piker"])
-  Spec.it s "CR 401.7 Unexpectedly Absent with X = 2 puts it just beneath the top two cards" $ do
-    (gs, spellId, pikerId, _) <- depthBoard "Unexpectedly Absent" ["Lightning Bolt", "Unsummon", "Griptide"]
-    let (after, _) = castAt pikerId 2 LibraryPosition.Top gs spellId
-    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Unsummon", "Goblin Piker", "Lightning Bolt"])
-  Spec.it s "CR 401.7 Unexpectedly Absent with X = 0 puts it on top" $ do
-    (gs, spellId, pikerId, _) <- depthBoard "Unexpectedly Absent" ["Lightning Bolt", "Unsummon", "Griptide"]
-    let (after, _) = castAt pikerId 0 LibraryPosition.Bottom gs spellId
-    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Goblin Piker", "Griptide", "Unsummon", "Lightning Bolt"])
 
 -- Every question Aetherspouts raises: which object each owner was asked to place
 -- (CR 401.2), and which batch each owner was asked to arrange (CR 401.4).
@@ -2117,16 +2069,9 @@ elkinLairSpec s registry =
 -- return it to its owner's hand. Activate only as a sorcery."
 --
 -- Bob's Goblin Piker is there so Psychic Theft's choice has a card to pass over.
-castTheCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+castTheCardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 castTheCardSpec s registry =
   let -- Alice's end step begun, its triggers put on the stack, none resolved.
-      alicesEndStep :: GameState.GameState -> GameState.GameState
-      alicesEndStep gs =
-        let step = Phase.Ending EndingStep.EndStep
-         in S.runPure atBobAnswer (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan step S.alice)) gs {GameState.phase = step}) Engine.settleForPriority
-      -- Two Mountains, so a Mountain spent on Psychic Theft's {1} still leaves
-      -- the {R} the Lightning Bolt asks for.
-      theftBoard theft island mountain = theftBoardWith theft [island, island, mountain, mountain]
       theftBoardWith theft alicesLands bolt piker =
         let lands = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) (Setup.emptyGame S.bothPlayers) alicesLands
             withBobs = List.foldl' (\g q -> snd (S.addHandCard q S.bob g)) lands [piker, bolt]
@@ -2134,19 +2079,6 @@ castTheCardSpec s registry =
             cast = S.runPure atBobAnswer gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice} (S.cast S.alice theftId)
          in S.runPure atBobAnswer cast Stack.resolveTop
    in Spec.describe s "CastTheCard" $ do
-        Spec.it s "CR 603.4 Psychic Theft's card, once alice casts it, triggers nothing at her end step" $ do
-          ps <- traverse (S.printingOf s registry) ["Psychic Theft", "Island", "Mountain", "Lightning Bolt", "Goblin Piker"]
-          case ps of
-            [theft, island, mountain, bolt, piker] -> do
-              let exiled = theftBoard theft island mountain bolt piker
-              case Game.zoneMembers Zone.Exile S.bob exiled of
-                [boltId] -> do
-                  let cast = S.runPure atBobAnswer exiled (S.cast S.alice boltId)
-                      resolved = S.runPure atBobAnswer cast Stack.resolveTop
-                  Spec.assertEqWith s "nothing triggered at alice's end step" (length (GameState.stack (alicesEndStep resolved))) 0
-                  Spec.assertEqWith s "alice's Lightning Bolt hit bob" (S.lifeOf S.bob resolved) (Just 17)
-                _ -> Spec.assertFailure s "Psychic Theft should exile exactly one card"
-            _ -> Spec.assertFailure s "five printings"
         -- CR 724.1e: Time Stop skips alice's end step, so the delayed trigger
         -- waits for bob's. "Haven't cast" has no "this turn", so the play alice
         -- made on the turn before still answers it.

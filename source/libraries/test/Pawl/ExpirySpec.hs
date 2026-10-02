@@ -811,16 +811,6 @@ garlandSpec s registry = Spec.describe s "GarlandRoyalKidnapper" $ do
     Spec.assertEqWith s "control goes back to bob" (Projection.controllerOf bobs crowned) (Just S.bob)
     -- CR 611.2b's one continuous period: the effect is deleted, not masked.
     Spec.assertEqWith s "and the stored effect is gone" (filter (S.continuousEffectAffects bobs) (GameState.continuousEffects crowned)) []
-  -- The same ending with the crown going to Garland's OWN controller, which is
-  -- the reading that would survive if the condition had been baked to CR 109.5's
-  -- "you" instead of to the slot.
-  Spec.it s "CR 611.2b it ends when the crown moves to the ability's controller" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
-    let (bobs, _, entering) = garlandBoard piker garland
-        stolen = S.runPure garlandPlan (monarchSettle entering) Engine.priorityLoop
-        crowned = monarchSettle (S.withMonarch S.alice stolen)
-    Spec.assertEqWith s "control goes back to bob" (Projection.controllerOf bobs crowned) (Just S.bob)
 
 hagUpkeep :: Phase.Phase
 hagUpkeep = Phase.Beginning BeginningStep.Upkeep

@@ -5,9 +5,9 @@
 -- against a stubbed ViewOf so the evaluator is tested apart from the projection
 -- that supplies it (Pawl.PowerToughnessSpec covers the wiring). Two exceptions,
 -- each of which says so where it sits: the Aggregation.Greatest case that folds
--- a PROJECTED power, since a stub has no power to read; and the Aetherflux
--- Reservoir group at the foot of the module, which is gameplay level because
--- what it proves is that a count folds what Pawl.Engine.Cast actually recorded.
+-- a PROJECTED power, since a stub has no power to read; and the groups at the
+-- foot of the module, which are gameplay level because what they prove is that
+-- a count folds what the engine actually recorded.
 module Pawl.CountSpec where
 
 import qualified Data.List as List
@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -35,7 +34,6 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
@@ -49,7 +47,6 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -371,131 +368,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         viewOf = S.stubView [(a1, Set.singleton CardType.Land, Set.singleton Subtype.Swamp, Just S.alice)]
     Spec.assertEqWith s "undeterminable" (S.countOf viewOf (Filter.contextFor Teams.none (Just S.alice) Nothing) gs count) Nothing
 
-  aetherfluxReservoirSpec s registry
   approachSpec s registry
   tobiasSpec s registry
   charnelTallySpec s registry
-  roothaSpec s registry
   tyranidInvasionSpec s registry
   oreskosExplorerSpec s registry
-  flunkSpec s registry
   keeningStoneSpec s registry
   priceOfKnowledgeSpec s registry
   ebonyOwlNetsukeSpec s registry
-  strandcatcherSpec s registry
   leftBattlefieldSpec s registry
   ownershipLedgerSpec s registry
-
--- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
--- turn", the first count whose scope is a shape of event that is NOT a zone
--- change. GAMEPLAY LEVEL, unlike the rest of this module -- the whole point is
--- that the count sees what Pawl.Engine.Cast recorded, so a stubbed ViewOf would
--- prove nothing about the wiring, and the trigger, the log and the fold have to
--- meet.
---
--- Aetherflux Reservoir, {4} Artifact: "Whenever you cast a spell, you gain 1 life
--- for each spell you've cast this turn." Its second ability (Pay 50 life: this
--- artifact deals 50 damage to any target) is on the card and deliberately never
--- activated here -- S.identityAnswer takes no action at all -- so a stray
--- activation would show up as a 50-point swing rather than hiding.
---
--- WHY THE COUNT IS CUMULATIVE AND NOT FLAT. 1 + 2 + 3 = 6, and so does a flat
--- 2-per-cast; the RUNNING TOTAL after each cast is what tells the two apart, so
--- every case below asserts after every cast rather than at the end.
---
--- THE TRIGGERING SPELL COUNTS ITSELF. CR 601.2i records the cast and fires the
--- trigger in that order -- the spell "becomes cast", THEN abilities that trigger
--- on a cast trigger -- so the event is already in the log before the ability is
--- even put on the stack, let alone resolved. The first cast gaining 1 rather
--- than 0 is the assertion that proves it.
---
--- Fog, {G} Instant, is the spell cast: one mana, no targets, and its CR 615
--- combat-damage prevention has nothing to act on outside combat, so nothing but
--- the life total moves. THREE seats, so "an opponent cast it" and "bob cast it"
--- are different sentences (Pawl.TriggerSpec's Young Pyromancer group makes the
--- same argument).
-aetherfluxReservoirSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-aetherfluxReservoirSpec s registry =
-  let -- alice has the Reservoir and six Forests, bob two Forests, carol nothing.
-      -- Six covers the four Fogs the turn-boundary case casts, none of which
-      -- untaps: no untap step runs between them.
-      board forest reservoir =
-        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent forest pid g2)) g [1 .. (n :: Int)]
-            withLands = addLands S.bob 2 (addLands S.alice 6 S.threePlayerGame)
-            (_, withReservoir) = S.addPermanent reservoir S.alice withLands
-         in withReservoir
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-      -- One Fog into `caster`'s hand, cast, and the stack run down -- which
-      -- resolves both the Reservoir trigger and the Fog itself.
-      castFog fog caster gs =
-        let (oid, gs1) = S.addHandCard fog caster gs
-            cast = S.runPure S.identityAnswer gs1 (S.cast caster oid)
-         in S.runPure S.identityAnswer cast Engine.priorityLoop
-      lifeChange base gs pid = do
-        before <- S.lifeOf pid base
-        after <- S.lifeOf pid gs
-        pure (after - before)
-   in Spec.describe s "Aetherflux Reservoir" $ do
-        Spec.it s "CR 608.2i three casts in one turn gain 1, then 2, then 3" $ do
-          forest <- S.printingOf s registry "Forest"
-          reservoir <- S.printingOf s registry "Aetherflux Reservoir"
-          fog <- S.printingOf s registry "Fog"
-          let base = board forest reservoir
-              one = castFog fog S.alice base
-              two = castFog fog S.alice one
-              three = castFog fog S.alice two
-              gained = lifeChange base
-          Spec.assertEqWith s "the first cast counts ITSELF, so 1" (gained one S.alice) (Just 1)
-          Spec.assertEqWith s "the second sees two casts, so 3 in total" (gained two S.alice) (Just 3)
-          Spec.assertEqWith s "the third sees three casts, so 6 in total" (gained three S.alice) (Just 6)
-        -- The "you" half of BOTH filters -- the trigger's and the count's --
-        -- and they need separating, because each is invisible where the other
-        -- is being read. alice casts FIRST so that a Reservoir that wrongly
-        -- triggered on bob's cast would have something to count: with an empty
-        -- log the wrong trigger gains 0 and hides.
-        --
-        --   after alice's cast   1  (the trigger's filter says nothing yet)
-        --   after bob's cast     1  -- a trigger that ignored "you cast" makes it 2
-        --   after alice's second 3  -- a count that ignored "you've cast" makes it 4
-        --
-        -- carol is the third seat: she is neither the caster nor the ability's
-        -- controller, so "an opponent cast it" and "bob cast it" are different
-        -- sentences here.
-        Spec.it s "CR 601.2a a spell an OPPONENT cast neither triggers nor counts" $ do
-          forest <- S.printingOf s registry "Forest"
-          reservoir <- S.printingOf s registry "Aetherflux Reservoir"
-          fog <- S.printingOf s registry "Fog"
-          let base = board forest reservoir
-              byAlice = castFog fog S.alice base
-              thenByBob = castFog fog S.bob byAlice
-              thenByAliceAgain = castFog fog S.alice thenByBob
-              gained = lifeChange base
-          Spec.assertEqWith s "alice's own cast gains 1" (gained byAlice S.alice) (Just 1)
-          Spec.assertEqWith s "bob's cast fires nothing, so alice is still at 1" (gained thenByBob S.alice) (Just 1)
-          Spec.assertEqWith s "and gains bob nothing" (gained thenByBob S.bob) (Just 0)
-          Spec.assertEqWith s "and gains carol nothing" (gained thenByBob S.carol) (Just 0)
-          Spec.assertEqWith s "alice's second counts only her own two, so 3 in total" (gained thenByAliceAgain S.alice) (Just 3)
-        -- "This turn", moved on its own. Without this a lifetime tally passes
-        -- every assertion above.
-        Spec.it s "CR 608.2i the count is THIS turn's: it resets at the handoff" $ do
-          forest <- S.printingOf s registry "Forest"
-          reservoir <- S.printingOf s registry "Aetherflux Reservoir"
-          fog <- S.printingOf s registry "Fog"
-          let base = board forest reservoir
-              three = castFog fog S.alice (castFog fog S.alice (castFog fog S.alice base))
-              -- The turn passes to bob. alice keeps her Forests -- no untap step
-              -- runs -- and casts an instant on his turn, so the only thing that
-              -- changed is which turn it is.
-              handed = S.runPure S.identityAnswer three Engine.handoffTurn
-              onBobsTurn = handed {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-              fourth = castFog fog S.alice onBobsTurn
-              gained = lifeChange base
-          Spec.assertEqWith s "six over alice's own turn" (gained three S.alice) (Just 6)
-          Spec.assertEqWith s "the handoff itself gains nothing" (gained handed S.alice) (Just 6)
-          Spec.assertEqWith s "and the next turn's first cast gains 1, not 4" (gained fourth S.alice) (Just 7)
 
 -- CR 608.2i's look-back over a whole GAME rather than a turn
 -- (EventShape.SpellCastThisGame). Approach of the Second Sun, {6}{W} Sorcery: "If
@@ -550,10 +432,9 @@ approachSpec s registry =
           Spec.assertEqWith s "and alice gained a second 7" (S.lifeOf S.alice after) (Just 34)
 
 -- CR 608.2i read over CR 608.2h's record of a ZONE CHANGE: "for each nontoken
--- creature you controlled that died this turn". GAMEPLAY LEVEL for the
--- Aetherflux group's reason -- what it proves is that the count reads what the
--- move funnel filed as each permanent ceased, so a stubbed ViewOf would prove
--- nothing about the wiring.
+-- creature you controlled that died this turn". GAMEPLAY LEVEL, because what it
+-- proves is that the count reads what the move funnel filed as each permanent
+-- ceased, so a stubbed ViewOf would prove nothing about the wiring.
 --
 -- Tobias, Doomed Conqueror, {2}{W}{U} Legendary Creature -- Human Soldier 3/2
 -- with Flash: "When Tobias dies, for each nontoken creature you controlled that
@@ -643,7 +524,7 @@ tobiasSpec s registry =
 -- snapshot. CR 122.2 destroyed them as it left the battlefield and CR 613.4c had
 -- already consumed them into the projected power the snapshot records, so the
 -- only surviving record is CR 608.2h's, which Count.snapshotView's Moved arm
--- reads. GAMEPLAY LEVEL for the Aetherflux group's reason.
+-- reads. GAMEPLAY LEVEL, since a stub has no CR 608.2h record to read.
 --
 -- Synthetic. Scryfall on 2026-08-27 finds no printing that counts the counters
 -- on things that died: o:"died this turn" o:"counters on" returns eight cards,
@@ -718,111 +599,14 @@ charnelTallySpec s registry =
 isDeath :: ZoneChange.ZoneChange -> Bool
 isDeath zc = ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard
 
--- CR 608.2i's look-back with a GREATEST over it: a fold whose per-member
--- quantity is read off an event's CR 608.2h snapshot rather than off a live
--- object, over the SpellCast shape where the group above takes the Moved one.
--- GAMEPLAY LEVEL for the Aetherflux group's reason.
---
--- Rootha, Mastering the Moment, {2}{U}{R} Legendary Creature -- Orc Sorcerer 3/4:
--- "At the beginning of combat on your turn, if you've cast an instant or sorcery
--- spell this turn, create an X/X blue and red Elemental creature token with
--- flying and haste, where X is the greatest mana value among instant and sorcery
--- spells you've cast this turn."
---
--- alice casts Fog ({G}, 1) and Trumpet Blast ({2}{R}, 3), both instants or
--- sorceries and both targetless; Panglacial Wurm ({5}{G}{G}, 7), a CREATURE
--- spell; and bob casts Aetherspouts ({3}{U}{U}, 5). Six readings of the fold,
--- six different numbers: greatest 3, least 1, count 2, sum 4, card-type-blind 7,
--- controller-blind 5.
---
--- THREE seats, so "you cast it" and "bob cast it" are different sentences.
-roothaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-roothaSpec s registry =
-  let board rootha forest mountain island =
-        let addLands printing pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
-            withLands = addLands island S.bob 8 (addLands mountain S.alice 6 (addLands forest S.alice 10 S.threePlayerGame))
-            (_, withRootha) = S.addPermanent rootha S.alice withLands
-         in withRootha
-              { GameState.phase = Phase.PrecombatMain,
-                GameState.activePlayer = S.alice,
-                GameState.priority = Just S.alice
-              }
-      -- One spell into `caster`'s hand, cast, and the stack run down.
-      castOne printing caster gs =
-        let (oid, gs1) = S.addHandCard printing caster gs
-            cast = S.runPure S.identityAnswer gs1 (S.cast caster oid)
-         in S.runPure S.identityAnswer cast Engine.priorityLoop
-      -- Rule 507's beginning of combat step, staged and then RUN: Engine.runStep
-      -- is what writes the CR 603.2b StepBegan record the trigger matches, and
-      -- the priority loop resolves what it put on the stack.
-      intoBeginningOfCombat gs =
-        S.runPure
-          S.identityAnswer
-          gs
-            { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
-              GameState.priority = Just S.alice
-            }
-          Engine.runStep
-      throughBeginningOfCombat gs = S.runPure S.identityAnswer (intoBeginningOfCombat gs) Engine.priorityLoop
-      spellsCast rootha forest mountain island fog blast wurm spouts =
-        let base = board rootha forest mountain island
-            withFog = castOne fog S.alice base
-            withBlast = castOne blast S.alice withFog
-            withWurm = castOne wurm S.alice withBlast
-         in castOne spouts S.bob withWurm
-   in Spec.describe s "Rootha, Mastering the Moment" $ do
-        Spec.it s "CR 202.3 X is the GREATEST mana value among the instants and sorceries ALICE cast" $ do
-          rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
-          forest <- S.printingOf s registry "Forest"
-          mountain <- S.printingOf s registry "Mountain"
-          island <- S.printingOf s registry "Island"
-          fog <- S.printingOf s registry "Fog"
-          blast <- S.printingOf s registry "Trumpet Blast"
-          wurm <- S.printingOf s registry "Panglacial Wurm"
-          spouts <- S.printingOf s registry "Aetherspouts"
-          let cast = spellsCast rootha forest mountain island fog blast wurm spouts
-              after = throughBeginningOfCombat cast
-          -- The four casts are what everything below folds, so a board where one
-          -- went unpaid would otherwise report a smaller maximum and look right.
-          Spec.assertEqWith s "four spells were cast" (length (filter isSpellCast (S.eventsOf cast))) 4
-          Spec.assertEqWith s "no token before combat" (S.tokensOf cast) []
-          Spec.assertEqWith s "CR 603.4 the intervening if holds, so the ability triggers" (length (filter isAbilityTriggered (S.eventsOf after))) 1
-          Spec.assertEqWith s "exactly one token" (length (S.tokensOf after)) 1
-          mapM_ (\oid -> Spec.assertEqWith s "3/3, not 1, 2, 4, 5 or 7" (S.powerToughnessOf oid after) (Just (3, 3))) (S.tokensOf after)
-          mapM_ (\oid -> Spec.assertEqWith s "blue and red" (Projection.colorsOf oid after) (Set.fromList [Color.Blue, Color.Red])) (S.tokensOf after)
-        -- CR 111.3: the creating ability defines the token's characteristics, and
-        -- it defines them as it resolves. GameState.events is cleared at the
-        -- handoff, so a token that kept the fold in its power box would have no
-        -- power at all on the next turn.
-        Spec.it s "CR 111.3 the 3/3 is fixed at creation: it survives the turn handoff that clears the log" $ do
-          rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
-          forest <- S.printingOf s registry "Forest"
-          mountain <- S.printingOf s registry "Mountain"
-          island <- S.printingOf s registry "Island"
-          fog <- S.printingOf s registry "Fog"
-          blast <- S.printingOf s registry "Trumpet Blast"
-          wurm <- S.printingOf s registry "Panglacial Wurm"
-          spouts <- S.printingOf s registry "Aetherspouts"
-          let after = throughBeginningOfCombat (spellsCast rootha forest mountain island fog blast wurm spouts)
-              handed = S.runPure S.identityAnswer after Engine.handoffTurn
-          Spec.assertEqWith s "the log is empty on the next turn" (S.eventsOf handed) []
-          Spec.assertEqWith s "one token still" (length (S.tokensOf handed)) 1
-          mapM_ (\oid -> Spec.assertEqWith s "still 3/3" (S.powerToughnessOf oid (S.settleSba handed)) (Just (3, 3))) (S.tokensOf handed)
-
 isAbilityTriggered :: GameEvent.GameEvent -> Bool
 isAbilityTriggered event = case event of
   GameEvent.AbilityTriggered {} -> True
   _ -> False
 
-isSpellCast :: GameEvent.GameEvent -> Bool
-isSpellCast event = case event of
-  GameEvent.SpellCast {} -> True
-  _ -> False
-
 -- CR 102.1 read as a NUMBER: the first count whose scope folds players rather
--- than objects. GAMEPLAY LEVEL, for the reason the Aetherflux Reservoir group
--- above is: what it proves is that a printed card reaches the fold and that the
--- fold reaches the seats the engine actually has.
+-- than objects. GAMEPLAY LEVEL, because what it proves is that a printed card
+-- reaches the fold and that the fold reaches the seats the engine actually has.
 --
 -- Tyranid Invasion, {3}{G} Sorcery: "Create a number of 3/3 green Tyranid
 -- Warrior creature tokens with trample equal to the number of opponents you
@@ -953,87 +737,14 @@ findsWhatItCan p = case p of
   Prompt.Search _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
 
--- Fill every target slot with the candidate naming `oid`. The offered set is
--- FILTERED rather than answered with a hand-built recipient, so CR 608.2b's
--- re-read at resolution still finds the target (Pawl.DamageSpec's `aimedAt` is
--- the same answerer).
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
-  _ -> S.identityAnswer p
-
--- CR 613.1b / CR 400.1: a count whose SCOPE names the controller of a bound
--- object. Layer 2 is what decides who controls a permanent, so
--- Count.playersFor reads the reference off the injected view rather than off
--- the resolution's bindings; the hand it then indexes is CR 400.1's per-player
--- zone, so "that player's hand" is a read no filter has to narrow. GAMEPLAY
--- LEVEL for the Aetherflux group's reason -- what is on trial is that the
--- reference resolves against the projection the resolution supplies, which a
--- stubbed ViewOf would not show.
---
--- Flunk, {1}{B} Instant: "Target creature gets -X/-X until end of turn, where X
--- is 7 minus the number of cards in that creature's controller's hand." Nothing
--- else on the card, so the target's box is the only thing a case can be reading.
---
--- THREE SEATS with THREE DIFFERENT hand sizes, because "that creature's
--- controller", "you" and "each player" are three sentences a two-seat board or
--- an equal hand collapses onto one. At resolution alice holds nothing (Flunk
--- left her hand), bob three and carol one, so the 0/8 Wall of Stone reads:
---
---   bob, its controller     X = 7 - 3 = 4   a -4/4
---   alice, the caster       X = 7 - 0 = 7   a -7/1
---   carol                   X = 7 - 1 = 6   a -6/2
---   every player at once    X = 7 - 4 = 3   a -3/5
---   unanswered              nothing stored, a 0/8
---
--- Wall of Stone rather than a smaller creature so that EVERY one of those
--- readings leaves a positive toughness: a target CR 704.5f put away would
--- collapse three of the five onto the same absent answer. Its Defender and its
--- 0 power are read by nothing here.
---
--- alice keeps a Piker of her own on the battlefield, so the target slot offers
--- two creatures and the answerer has to pick one rather than the offer
--- collapsing onto the only candidate.
-flunkSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-flunkSpec s registry =
-  let handOf printing pid n g = List.foldl' (\g2 _ -> snd (S.addHandCard printing pid g2)) g [1 .. (n :: Int)]
-      castAt flunkId target gs =
-        let started = S.runPure (aimedAt target) gs (S.cast S.alice flunkId)
-         in S.runPure (aimedAt target) started Engine.priorityLoop
-      -- alice: three Swamps and a Piker; bob: the Wall. The hands are the
-      -- caller's, since which seat holds how many is what each case varies.
-      board swamp piker wall =
-        let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
-            (wallId, withWall) = S.addPermanent wall S.bob lands
-            (_, withPiker) = S.addPermanent piker S.alice withWall
-         in (wallId, withPiker)
-   in Spec.describe s "Flunk" $ do
-        -- The OWNER/CONTROLLER discriminator, and the reason the arm reads a
-        -- view at all: bob still OWNS the Wall and holds three cards, while
-        -- carol CONTROLS it and holds one. Reading the owner gives the case
-        -- above's -4/4. The board differs from that one's in the control effect
-        -- alone.
-        Spec.it s "CR 613.1b a Wall STOLEN from bob counts carol's hand, who controls it" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          flunk <- S.printingOf s registry "Flunk"
-          piker <- S.printingOf s registry "Goblin Piker"
-          wall <- S.printingOf s registry "Wall of Stone"
-          let (wallId, base) = board swamp piker wall
-              (withFlunk, flunkId) = S.handOne flunk base
-              staged = S.giveControl wallId S.carol (handOf piker S.carol 1 (handOf piker S.bob 3 withFlunk))
-              after = castAt flunkId wallId staged
-          Spec.assertEqWith s "a -6/2: 7 minus carol's one card" (S.powerToughnessOf wallId after) (Just (-6, 2))
-          Spec.assertEqWith s "carol controls the Wall she does not own" (Projection.controllerOf wallId after) (Just S.carol)
-          Spec.assertEqWith s "its owner bob still holds three" (S.handSize S.bob after) 3
-
 -- CR 113.7 / CR 608.2c: a count whose SCOPE names the player an ABILITY's slot
--- bound. Pawl.Engine.Resolve.Slots.effectContext frames the resolution on the ability's
--- SOURCE, while its target is stamped on the ability object on the stack, so
--- Count.playersFor reading the source's own bindings found nothing and the count
--- came back unanswered -- a mill of nothing. A SPELL cannot show it: its source
--- and its stack object are one object. GAMEPLAY LEVEL for the Flunk group's
--- reason -- what is on trial is which object the resolution's slots are read off,
--- which a hand-built context would decide for the engine.
+-- bound. Pawl.Engine.Resolve.Slots.effectContext frames the resolution on the
+-- ability's SOURCE, while its target is stamped on the ability object on the
+-- stack, so Count.playersFor reading the source's own bindings found nothing
+-- and the count came back unanswered -- a mill of nothing. A SPELL cannot show
+-- it: its source and its stack object are one object. GAMEPLAY LEVEL, because
+-- what is on trial is which object the resolution's slots are read off, which a
+-- hand-built context would decide for the engine.
 --
 -- Keening Stone, {6} Artifact: "{5}, {T}: Target player mills X cards, where X is
 -- the number of cards in that player's graveyard." Nothing else on the card, so
@@ -1097,8 +808,7 @@ keeningStoneSpec s registry =
 
 -- CR 601.2c: fill every target slot with the candidate naming `pid`. The offered
 -- set is FILTERED rather than answered with a hand-built recipient, so CR 608.2b's
--- re-read at resolution still finds the target (`aimedAt` above is the same
--- answerer one recipient kind over).
+-- re-read at resolution still finds the target.
 aimedAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimedAtPlayer pid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
@@ -1204,85 +914,6 @@ ebonyOwlNetsukeSpec s registry =
           Spec.assertEqWith s "bob took 4: his own nine cards cleared the threshold, though alice's three do not" (lives after) (Just 20, Just 16, Just 20)
           Spec.assertEqWith s "bob still holds the nine the count read" (S.handSize S.bob after) 9
           Spec.assertEqWith s "and alice the three that would have answered the other way" (S.handSize S.alice after) 3
-
--- CR 608.2i with an ORIGIN on the fold: a card count that reads where the cards
--- came from as well as where they arrived. GAMEPLAY LEVEL for the
--- Aetherflux Reservoir group's reason -- what it proves is that the fold reads
--- the zone changes Pawl.Engine.Event actually recorded.
---
--- Dimir Strandcatcher, {2}{U/B}{U/B} Creature -- Faerie Rogue 3/3: "Flying.
--- Whenever you attack, surveil X, where X is the number of opponents being
--- attacked. At the beginning of each end step, if three or more cards were put
--- into your graveyard from anywhere other than the battlefield this turn, draw
--- a card."
---
--- THREE boards, each putting exactly three cards into a graveyard this turn, so
--- the arrival total is the same on all three and only the reading of the clause
--- differs: three of alice's own spells; two spells beside her own creature's
--- death; two of her spells beside bob's. A fold reading the destination alone
--- draws on all three, and one reading the origin but not CR 400.3's owner draws
--- on the last two.
---
--- Every library is stocked (CR 104.3c) -- the draw this group reads has to come
--- from somewhere, and the priority loop would otherwise deck alice before the
--- assertion.
-strandcatcherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-strandcatcherSpec s registry =
-  let endStep = Phase.Ending EndingStep.EndStep
-      library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
-      -- The end step entered the way the trigger reads it: its
-      -- TriggerCondition.StepBegins matches the EVENT, so the fixture records one
-      -- beside setting the phase (priceOfKnowledgeSpec's upkeepOf).
-      endStepOf gs =
-        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep, GameState.activePlayer = S.alice})
-            settled = S.runPure S.identityAnswer began Engine.settleForPriority
-         in S.runPure S.identityAnswer settled Engine.priorityLoop
-      -- CR 608.2: cast and resolved, so the card reaches its owner's graveyard
-      -- from the STACK rather than being left there as a spell.
-      castAndResolve pid oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast pid oid)) Stack.resolveTop
-      -- The only route to a death here, so the battlefield arrival is the
-      -- engine's own (CR 704.5g) rather than a fixture write.
-      kill oid gs = S.runPure S.identityAnswer (S.markDamage oid 9 gs) Engine.priorityLoop
-      graveyard pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
-      board = do
-        strandcatcher <- S.printingOf s registry "Dimir Strandcatcher"
-        forest <- S.printingOf s registry "Forest"
-        fog <- S.printingOf s registry "Fog"
-        piker <- S.printingOf s registry "Goblin Piker"
-        let lands = S.landsFor forest S.bob 1 (S.landsFor forest S.alice 3 (Setup.emptyGame S.bothPlayers))
-            (_, withCatcher) = S.addPermanent strandcatcher S.alice lands
-            stocked = library piker S.bob 5 (library piker S.alice 5 withCatcher)
-        pure (fog, piker, stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
-   in Spec.describe s "Dimir Strandcatcher" $ do
-        Spec.it s "CR 608.2i three of alice's own spells reach her graveyard from the stack, so she draws" $ do
-          (fog, _, gs0) <- board
-          let (f1, g1) = S.addHandCard fog S.alice gs0
-              (f2, g2) = S.addHandCard fog S.alice g1
-              (f3, g3) = S.addHandCard fog S.alice g2
-              after = endStepOf (castAndResolve S.alice f3 (castAndResolve S.alice f2 (castAndResolve S.alice f1 g3)))
-          Spec.assertEqWith s "alice drew a card: her hand held nothing after the three casts" (S.handSize S.alice after) 1
-          Spec.assertEqWith s "and the three Fogs really are in her graveyard" (graveyard S.alice after) 3
-        -- The ORIGIN leg, differing from the board above in ONE thing: the third
-        -- card reaches the same graveyard from the BATTLEFIELD, which the clause
-        -- excludes.
-        Spec.it s "CR 608.2i a creature that died is not a card put there from anywhere other than the battlefield" $ do
-          (fog, piker, gs0) <- board
-          let (p1, g1) = S.addPermanent piker S.alice gs0
-              (f1, g2) = S.addHandCard fog S.alice g1
-              (f2, g3) = S.addHandCard fog S.alice g2
-              after = endStepOf (kill p1 (castAndResolve S.alice f2 (castAndResolve S.alice f1 g3)))
-          Spec.assertEqWith s "alice drew nothing: only two of the three arrivals qualify" (S.handSize S.alice after) 0
-          Spec.assertEqWith s "and three cards did reach her graveyard, so a destination-only fold would have drawn" (graveyard S.alice after) 3
-        -- The OWNER leg, differing from the first board in ONE thing: the third
-        -- spell is bob's, so CR 400.3 puts its card in HIS graveyard.
-        Spec.it s "CR 400.3 a card put into bob's graveyard is not put into yours" $ do
-          (fog, _, gs0) <- board
-          let (f1, g1) = S.addHandCard fog S.alice gs0
-              (f2, g2) = S.addHandCard fog S.alice g1
-              (f3, g3) = S.addHandCard fog S.bob g2
-              after = endStepOf (castAndResolve S.bob f3 (castAndResolve S.alice f2 (castAndResolve S.alice f1 g3)))
-          Spec.assertEqWith s "alice drew nothing: bob's Fog is in bob's graveyard" (S.handSize S.alice after) 0
-          Spec.assertEqWith s "two cards in hers and one in his, three arrivals in all" (graveyard S.alice after, graveyard S.bob after) (2, 1)
 
 -- CR 108.3's owner over CR 608.2i's cast log, which is not CR 405.4's
 -- controller.

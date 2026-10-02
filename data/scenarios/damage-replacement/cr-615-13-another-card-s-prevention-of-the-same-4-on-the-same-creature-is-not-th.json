@@ -1,0 +1,141 @@
+{
+  "description": "CR 615.13 another card's prevention of the same 4, on the same creature, is not 'this way'",
+  "note": "Alice casts Mending Hands on her Phyrexian Vindicator in bob's beginning of combat; bob attacks with Barkhide Mauler (4/4) and the Vindicator blocks. Its 4 has two applicable preventions and alice picks between them (CR 616.1): naming Mending Hands' (index 1) triggers nothing and bob stays on 20; the --control file names the Vindicator's own (index 0), whose trigger she aims at bob for the same 4. The Mauler's combat damage stands in for the test's hand-built 4 from bob's Goblin Piker.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Phyrexian Vindicator",
+            "label": "vindicator",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "plains"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mending Hands",
+            "label": "hands"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Barkhide Mauler",
+            "label": "mauler",
+            "ready": true
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$hands",
+          "targets": [
+            "$vindicator"
+          ],
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "bob",
+      "do": {
+        "Attack": [
+          "$mauler"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": {
+        "Block": {
+          "$vindicator": [
+            "$mauler"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseReplacement",
+          "with": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "bob",
+      "check": {
+        "View": {
+          "of": "Stack",
+          "is": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 20
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "EndOfCombat",
+      "player": "bob",
+      "check": {
+        "Damage": {
+          "object": "$vindicator",
+          "damage": 0
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "description": "CR 800.4a a control-on-entry row ends when its controller leaves the game",
+  "note": "alice resolves Gather Specimens in carol's upkeep and then concedes; three seats keep the game going (CR 104.2a). CR 800.4a ends her control-on-entry row, so carol's Narcomoeba, cast afterwards, enters under carol's control. The control file is the same board with alice seated, where the same creature is alice's: the row was live before she left.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "a-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "a-island-2"
+          },
+          {
+            "card": "Island",
+            "label": "a-island-3"
+          },
+          {
+            "card": "Island",
+            "label": "a-island-4"
+          },
+          {
+            "card": "Island",
+            "label": "a-island-5"
+          },
+          {
+            "card": "Island",
+            "label": "a-island-6"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Gather Specimens",
+            "label": "a-gather"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "b-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "b-island-2"
+          },
+          {
+            "card": "Island",
+            "label": "b-island-3"
+          },
+          {
+            "card": "Island",
+            "label": "b-island-4"
+          },
+          {
+            "card": "Island",
+            "label": "b-island-5"
+          },
+          {
+            "card": "Island",
+            "label": "b-island-6"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "c-island-1"
+          },
+          {
+            "card": "Island",
+            "label": "c-island-2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Narcomoeba",
+            "label": "moeba"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          }
+        ]
+      }
+    ],
+    "active": "carol",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    {"turn": 1, "step": "Upkeep", "player": "alice", "do": {"Cast": {"object": "$a-gather", "mana": ["$a-island-1", "$a-island-2", "$a-island-3", "$a-island-4", "$a-island-5", "$a-island-6"]}}},
+    {"turn": 1, "step": "Upkeep", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "Upkeep", "player": "alice", "do": "Concede"},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "check": {"View": {"of": "Result", "is": null}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Island", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "do": {"Cast": {"object": "$moeba", "mana": ["$c-island-1", "$c-island-2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "carol", "check": {"View": {"of": "Controller", "object": "Narcomoeba", "is": "carol"}}}
+  ]
+}

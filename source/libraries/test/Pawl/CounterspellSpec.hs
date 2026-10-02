@@ -369,7 +369,7 @@ lithophageUpkeep hacked lithophage mountain island seat magicalHack =
 -- difference is which land died. The graveyard COUNT cannot tell the two
 -- readings apart -- one land either way -- so the load-bearing assertions are
 -- the two land NAMES, and they come first.
-lithophageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lithophageSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 lithophageSpec s registry =
   let mountainName = CardName.MkCardName (Text.pack "Mountain")
       islandName = CardName.MkCardName (Text.pack "Island")
@@ -391,19 +391,6 @@ lithophageSpec s registry =
           Spec.assertEqWith s "the Mountain is gone" (S.countOnBattlefieldByName mountainName S.alice after) 0
           Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
           Spec.assertBool s (elem (Just mountainName) (namesIn Zone.Graveyard S.alice after)) "the Mountain was sacrificed, so it is IN alice's graveyard"
-          Spec.assertBool s (S.onBattlefield lithoId onStack) "the Lithophage is on the battlefield before its upkeep trigger resolves"
-          Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
-          Spec.assertBool s (S.onBattlefield lithoId after) "paying kept the Lithophage on the battlefield"
-          Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
-        -- The swap. alice's board did not move -- the same Mountain and the same
-        -- Island -- but the gate printed on the Lithophage now offers "sacrifice
-        -- an Island", so the Island is what dies and the Mountain is not even
-        -- eligible.
-        Spec.it s "CR 612.1 whole card: hacking Lithophage moves which land its CR 118.12 gate demands" $ do
-          (lithoId, onStack, after, transcript) <- run True
-          Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
-          Spec.assertEqWith s "the Mountain survives" (S.countOnBattlefieldByName mountainName S.alice after) 1
-          Spec.assertBool s (elem (Just islandName) (namesIn Zone.Graveyard S.alice after)) "the Island was sacrificed, so it is IN alice's graveyard"
           Spec.assertBool s (S.onBattlefield lithoId onStack) "the Lithophage is on the battlefield before its upkeep trigger resolves"
           Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
           Spec.assertBool s (S.onBattlefield lithoId after) "paying kept the Lithophage on the battlefield"
@@ -1492,21 +1479,6 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "one token" (length tokens) 1
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Faerie Rogue" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Faerie, Subtype.Rogue])) tokens
     mapM_ (\oid -> Spec.assertEqWith s "named Faerie Rogue Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Faerie Rogue Token")))) tokens
-
-  Spec.it s "CR 612.2a whole card: an evolved Bitterblossom's trigger mints an Elf Rogue Token" $ do
-    (tokens, after) <- bitterblossomChain s registry (Just (Subtype.Faerie, Subtype.Elf))
-    Spec.assertEqWith s "one token" (length tokens) 1
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Rogue" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Elf, Subtype.Rogue])) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Elf Rogue Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Rogue Token")))) tokens
-
-  -- The SECOND word of the same CR 111.4 name, so a rewrite that only reached the
-  -- first would show here. Rogue -> Assassin, both creature types, both whole
-  -- words of "Faerie Rogue Token".
-  Spec.it s "CR 612.2a an evolved Bitterblossom's second name word moves too" $ do
-    (tokens, after) <- bitterblossomChain s registry (Just (Subtype.Rogue, Subtype.Assassin))
-    Spec.assertEqWith s "one token" (length tokens) 1
-    mapM_ (\oid -> Spec.assertEqWith s "named Faerie Assassin Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Faerie Assassin Token")))) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Faerie Assassin" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Faerie, Subtype.Assassin])) tokens
 
   -- CR 612.2's limit on the same rule: a text-changing effect changes only words
   -- "used in the correct way". Synthetic Ursine Rite ({1}{G} Sorcery, "Create a

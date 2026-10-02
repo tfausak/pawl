@@ -32,7 +32,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
 import Pawl.PreventionSpec (answersFor, castAndResolve, counterBoard, countersOn, newestNamed, nextTurn, raceAnswer, theAbility, wasAskedToReplace)
 import qualified Pawl.Registry as Registry
-import Pawl.ReplacementSpec (atDeclareAttackers, attackersIn, controlledNamed, declineLastRiot, riotAsks, riotBoard, riotChoosing, wasAskedForRiot)
+import Pawl.ReplacementSpec (controlledNamed, declineLastRiot, riotAsks, riotBoard, riotChoosing, wasAskedForRiot)
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
@@ -71,22 +71,6 @@ import qualified Pawl.Types.Zone as Zone
 
 riotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
-  -- THE PAIR THAT MAKES THE HASTE REAL. CR 302.6 keeps a creature that entered
-  -- this turn from attacking, and CR 702.10b is the exception riot buys.
-  Spec.it s "CR 702.10b the goblin that took haste attacks the turn it entered" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    forest <- S.printingOf s registry "Forest"
-    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
-    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
-        answer = riotChoosing OptionalDecision.Declines
-    case held of
-      goblinCard : _ ->
-        let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
-            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.manaPerformer S.alice)
-         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
-              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
-              Just goblin -> Spec.assertEqWith s "attacks" (attackersIn after) [goblin]
-      _ -> Spec.assertFailure s "fixture did not deal a card"
   -- THE CHOICE IS THE ANSWERER'S. Both outcomes above are reachable only through
   -- a prompt, and the prompt is never elided: CR 702.136a's two halves are
   -- distinguishable on every board.

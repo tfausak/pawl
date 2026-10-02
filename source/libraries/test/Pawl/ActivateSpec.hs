@@ -157,9 +157,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
-  professorHojoFirstActivationSpec s registry
   kiliTheResourcefulSpec s registry
-  unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
   goldenEggSpec s registry
   presenceOfGondSpec s registry
@@ -409,47 +407,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
       (filter (S.continuousEffectAffects myrId) (GameState.continuousEffects resolved))
       []
 
-  -- The stolen-creature case the OLD (deleted) Resolve.hs comment named --
-  -- the POSITIVE mirror of the test above, on the same Aladdin: control of
-  -- the source moves to bob FIRST, bob then activates, and the effect must
-  -- arm and store under bob, the ability's frozen (and only) controller
-  -- (CR 113.8). Object.owner is stamped with bob at activation time, so there
-  -- is no later re-read to get wrong.
-  --
-  -- ASYMMETRIC on purpose, and this half is the weaker one: bob is both the
-  -- activator and the later controller, so a regression to a live re-read of
-  -- the source's controller passes HERE and fails only the test above. The
-  -- pair is what covers CR 113.8, not either case alone -- do not "fix" this
-  -- one into a second copy of the first.
-  Spec.it s "CR 113.8 a stolen creature's ability, activated by the new controller, resolves under them" $ do
-    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-    mountain <- S.printingOf s registry "Mountain"
-    aladdin <- S.printingOf s registry "Aladdin"
-    -- bob pays for it, so the Mountains are HIS. S.giveControl also settles
-    -- the stolen Aladdin under bob, which CR 302.6 requires before he can
-    -- pay its {T} (#198 -- a thief does not inherit the previous
-    -- controller's settle).
-    let addMountains g = List.foldl' (\acc _ -> snd (S.addPermanent mountain S.bob acc)) g [1 .. (3 :: Int)]
-        base = addMountains (Setup.emptyGame S.bothPlayers)
-        (myrId, g0) = S.addPermanent darksteelMyr S.alice base
-        (srcId, g1) = S.addPermanent aladdin S.alice g0
-        ability = theAbility aladdin
-        -- Control of the SOURCE CREATURE moves to bob BEFORE activation.
-        taken = S.giveControl srcId S.bob g1
-        g2 = taken {GameState.priority = Just S.bob}
-        activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.bob srcId ability))
-        resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
-        stored = filter (S.continuousEffectAffects myrId) (GameState.continuousEffects resolved)
-    Spec.assertEqWith s "bob controls the stolen Aladdin" (Projection.controllerOf srcId activated) (Just S.bob)
-    Spec.assertEqWith s "one thing on the stack" (length (GameState.stack activated)) 1
-    Spec.assertEqWith s "stack empty after resolution" (GameState.stack resolved) []
-    Spec.assertEqWith
-      s
-      "control of the artifact changed to bob, the new controller who activated it"
-      (Projection.controllerOf myrId resolved)
-      (Just S.bob)
-    Spec.assertEqWith s "exactly one stored effect names the artifact" (length stored) 1
-
   lastKnownSpec s registry
 
 -- Answers every target slot with `who`, so a damage test reads a player's life
@@ -483,19 +440,6 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
     Spec.assertBool s (not (Set.member srcId (GameState.battlefield activated))) "the cost really sacrificed it"
     Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId activated)) "and the id it left behind names nothing"
     Spec.assertEqWith s "bob took the Fire-Eater's 2" (S.lifeOf S.bob resolved) (Just 18)
-
-  Spec.it s "CR 608.2h the value is LAST KNOWN, not printed: a pumped Fire-Eater deals 5" $ do
-    -- The discriminator between reading last known information and reading
-    -- the printed card. Both answer 2 for a vanilla Fire-Eater; only last
-    -- known information answers 5 for one that was pumped before it left.
-    ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
-    let (srcId, g0) = S.addPermanent ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
-        pumped = S.withEffect srcId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3))) g0
-        g1 = pumped {GameState.priority = Just S.alice}
-        activated = snd (Engine.runGamePure (aimAt S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility ghituFireEater)))
-        resolved = snd (Engine.runGamePure (aimAt S.bob) activated Stack.resolveTop)
-    Spec.assertEqWith s "it was a 5/5 while it was on the battlefield" (Projection.powerOf srcId g1) (Just 5)
-    Spec.assertEqWith s "bob took 5, not the printed 2" (S.lifeOf S.bob resolved) (Just 15)
 
   Spec.it s "CR 608.2h leaving a zone files last known information under the OLD id" $ do
     -- The substrate, on its own. CR 400.7 mints a fresh id for the graveyard
@@ -3023,63 +2967,6 @@ outlastSpec s registry = Spec.describe s "Outlast" $ do
     Spec.assertEqWith s "no ability in a hand" (Activatable.abilitiesFor oid gs) []
     Spec.assertEqWith s "and no activation offered" (activationsOf oid (Action.legalActions S.alice gs)) []
 
--- Professor Hojo's first line, checked against Scryfall on 2026-09-28: "The
--- first activated ability you activate during your turn that targets a creature
--- you control costs {2} less to activate." CR 601.2f / 602.2b apply the
--- reduction; "first" is card text counted over GameState.activationsThisTurn.
---
--- WHY TWO TOWERS OF THE MAGISTRATE. "{1}, {T}: Target creature gains protection
--- from artifacts until end of turn" is instant speed, so the opponent's-turn leg
--- can be built; it can aim at bob's creature, so a non-matching activation can
--- come first; and its cost is generic, so the Mountains that pay it can never be
--- tapped for a colour the cost does not want. A reduced activation taps its Tower
--- alone and a full-price one taps a Mountain besides, so every reading below is a
--- distinct tapped count. Two, because {T} spends each once.
-professorHojoFirstActivationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-professorHojoFirstActivationSpec s registry = Spec.describe s "ProfessorHojoFirstActivation" $ do
-  let board withHojo = do
-        hojo <- S.printingOf s registry "Professor Hojo"
-        tower <- S.printingOf s registry "Tower of the Magistrate"
-        mammoth <- S.printingOf s registry "War Mammoth"
-        mountain <- S.printingOf s registry "Mountain"
-        -- Mountains FIRST, so the head of every mana-source prompt is a Mountain
-        -- and never the other Tower's {C}.
-        let (towerA, g0) = S.addPermanent tower S.alice (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
-            (towerB, g1) = S.addPermanent tower S.alice g0
-            (alicesMammoth, g2) = S.addPermanent mammoth S.alice g1
-            (bobsMammoth, g3) = S.addPermanent mammoth S.bob g2
-            g4 = if withHojo then snd (S.addPermanent hojo S.alice g3) else g3
-            ready = g4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-        pure (towerA, towerB, alicesMammoth, bobsMammoth, ready, hojo)
-      -- The Tower's targeting ability, told from its {C} ability by its mana cost.
-      targeting ability = case ActivatedAbility.cost ability of
-        Cost.Type.MkCost (Just (ManaCost.MkManaCost (_ : _))) _ -> True
-        _ -> False
-      -- Activate a Tower at one creature and resolve it, off whatever board.
-      activateAt towerId victim gs = case filter targeting (Projection.abilitiesOf towerId gs) of
-        [ability] -> S.runPure (aimAtOffered victim) (S.runPure (aimAtOffered victim) gs (Activate.activateAbility S.alice towerId ability)) Stack.resolveTop
-        _ -> gs
-  -- "The first activated ability you activate": a history of the turn, not a
-  -- budget of the Hojo's. An activation made before the Hojo arrived is still
-  -- the turn's first (Tezzeret, Betrayer of Flesh's ruling on the same wording).
-  Spec.it s "CR 601.2f a matching activation before the Hojo arrived was the first" $ do
-    (towerA, towerB, alicesMammoth, _, gs, hojo) <- board False
-    let before = activateAt towerA alicesMammoth gs
-        withHojo = snd (S.addPermanent hojo S.alice before)
-        after = activateAt towerB alicesMammoth withHojo
-    Spec.assertEqWith s "the activation with no Hojo pays the printed {1}" (S.tappedCount S.alice before) 2
-    Spec.assertEqWith s "and the one after the Hojo arrived is not the first, so pays it too" (S.tappedCount S.alice after) 4
-  -- "Each turn": GameState.activationsThisTurn is cleared at the handoff, so
-  -- alice's next turn has a first activation again.
-  Spec.it s "CR 601.2f the next turn has a first activation again" $ do
-    (towerA, towerB, alicesMammoth, _, gs, _) <- board True
-    let spent = activateAt towerB alicesMammoth (activateAt towerA alicesMammoth gs)
-        nextTurn = (nextTurnOfAlice spent) {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-        again = activateAt towerA alicesMammoth nextTurn
-    Spec.assertEqWith s "setup: both activations were made last turn" (S.tappedCount S.alice spent) 3
-    Spec.assertEqWith s "setup: the untap step untapped everything" (S.tappedCount S.alice nextTurn) 0
-    Spec.assertEqWith s "and the first activation of the new turn pays nothing" (S.tappedCount S.alice again) 1
-
 -- Answers CR 601.2b's ChooseCost with `pick` and aims every target at `victim`.
 payingAt :: ([Cost.Type.Cost Keyword.Keyword] -> Cost.Type.Cost Keyword.Keyword) -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 payingAt pick victim p = case p of
@@ -3312,160 +3199,6 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
     Spec.assertEqWith s "two of bob's three Mountains paid it" (S.tappedCount S.bob after) 2
     Spec.assertEqWith s "and alice tapped nothing" (S.tappedCount S.alice after) 0
 
--- The SECOND printed ability of a land that animates itself -- Mutavault's {1} and
--- Mishra's Foundry's {2}. `theAbility` takes the first, which on both is the mana
--- ability CR 605.3b keeps off the stack -- and one with no mana in its cost, so
--- nothing could be measured on it.
-animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
-animationAbility p = case drop 1 (Face.activatedAbilities (S.combinedFace p)) of
-  ab : _ -> ab
-  [] -> theAbility p
-
--- alice's board: Mutavault, `lands` Mountains and Heartstone, plus Blossoming
--- Tortoise when one is passed. The positive and the negative differ in that Maybe
--- and in nothing else -- same seats, same lands, same permanents, same priority --
--- which is what makes a tapped count attributable to the second reduction.
-mutavaultBoard ::
-  Printing.Printing ->
-  Int ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Maybe Printing.Printing ->
-  (ObjectId.ObjectId, GameState.GameState)
-mutavaultBoard mountain lands mutavault heartstone mTortoise =
-  let base = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
-      (srcId, g1) = S.addPermanent mutavault S.alice base
-      g2 = snd (S.addPermanent heartstone S.alice g1)
-      g3 = maybe g2 (\tortoise -> snd (S.addPermanent tortoise S.alice g2)) mTortoise
-   in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
-
--- alice's board: Mishra's Foundry, `lands` Mountains, Heartstone and Blossoming
--- Tortoise. ONE board rather than mutavaultBoard's pair, because what the order
--- case below varies is the ANSWER to a prompt raised on this board -- a second
--- board would put a difference beside the one the assertion is about.
-foundryBoard ::
-  Printing.Printing ->
-  Int ->
-  Printing.Printing ->
-  Printing.Printing ->
-  Printing.Printing ->
-  (ObjectId.ObjectId, GameState.GameState)
-foundryBoard mountain lands foundry heartstone tortoise =
-  let base = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
-      (srcId, g1) = S.addPermanent foundry S.alice base
-      g2 = snd (S.addPermanent heartstone S.alice g1)
-      g3 = snd (S.addPermanent tortoise S.alice g2)
-   in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
-
--- Answers CR 601.2f's Prompt.ChooseReducedCost with `total_` whenever it is on
--- offer, and defers everything else to S.identityAnswer -- Pawl.PlayerEffectSpec's
--- takesHalf shape, for its reason. Naming the TOTAL rather than an index is what
--- makes the case below discriminating: an engine that stopped offering the
--- costlier order would fall through to the default, and the two answers would
--- stop disagreeing.
-takesTotal :: ManaCost.ManaCost -> Prompt.Prompt r -> r
-takesTotal total_ p = case p of
-  Prompt.ChooseReducedCost _ _ _ offers -> if elem total_ offers then total_ else S.identityAnswer p
-  _ -> S.identityAnswer p
-
--- CR 601.2f's floor read PER REDUCING EFFECT rather than as a clamp on the pooled
--- result (#1243). The two readings agree on every board with one reduction, and on
--- every board whose reductions all state the same floor, so what tells them apart
--- is a FLOORED reduction beside an UNFLOORED one on one cost.
---
--- Heartstone {3} Artifact -- "Activated abilities of creatures cost {1} less to
--- activate. This effect can't reduce the mana in that cost to less than one mana"
--- -- is the floored half. Blossoming Tortoise {2}{G}{G} Creature -- Turtle 3/3 --
--- "Activated abilities of lands you control cost {1} less to activate" is the
--- unfloored half; it states no such sentence, so nothing forbids it taking the
--- mana Heartstone's floor left behind. Mutavault's "{1}: This land becomes a 2/2
--- creature with all creature types until end of turn. It's still a land" is the
--- cost both reduce, and the animation is what puts one permanent inside both
--- criteria at once. All three Oracle texts checked against api.scryfall.com.
---
--- The NUMBERS are why the board is honest: the printed {1} is at most what either
--- reduction takes, so the two orders CR 601.2f leaves the player agree -- the
--- Tortoise alone empties the cost, and Heartstone applied to an empty cost adds
--- nothing back (its own ruling) -- and the assertion is not reading pawl's choice
--- of order. A pooled clamp answers {1} on the same board, which is a different
--- number of lands.
-unflooredActivationCostReductionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-unflooredActivationCostReductionSpec s registry = Spec.describe s "UnflooredActivationCostReduction" $ do
-  Spec.it s "CR 601.2f an unfloored reduction takes the mana a floored one may not" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    mutavault <- S.printingOf s registry "Mutavault"
-    heartstone <- S.printingOf s registry "Heartstone"
-    tortoise <- S.printingOf s registry "Blossoming Tortoise"
-    let animate = animationAbility mutavault
-        (withId, withBoard) = mutavaultBoard mountain 2 mutavault heartstone (Just tortoise)
-        (withoutId, withoutBoard) = mutavaultBoard mountain 2 mutavault heartstone Nothing
-        activate srcId gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId animate)
-        animated srcId gs = S.runPure S.identityAnswer (activate srcId gs) Stack.resolveTop
-        withAnimated = animated withId withBoard
-        withoutAnimated = animated withoutId withoutBoard
-    Spec.assertEqWith s "Mutavault prints two abilities, and the animation is the second" (length (Face.activatedAbilities (S.combinedFace mutavault))) 2
-    -- The first activation, made while Mutavault is still no creature: only the
-    -- Tortoise's criterion names it, so the board WITHOUT her pays the printed
-    -- {1}. That is also what proves the two boards are the same board otherwise.
-    Spec.assertEqWith s "the Tortoise alone pays the first activation" (S.tappedCount S.alice withAnimated) 0
-    Spec.assertEqWith s "where the printed {1} costs a land" (S.tappedCount S.alice withoutAnimated) 1
-    -- The animation resolved, so Mutavault is now a land AND a creature -- inside
-    -- both criteria at once. The Tortoise's third sentence is what tells the two
-    -- apart: "Land creatures you control get +1/+1".
-    Spec.assertEqWith s "an animated Mutavault under the Tortoise" (S.powerToughnessOf withId withAnimated) (Just (3, 3))
-    Spec.assertEqWith s "and 2/2 without her" (S.powerToughnessOf withoutId withoutAnimated) (Just (2, 2))
-    let withSecond = activate withId withAnimated
-        withoutSecond = activate withoutId withoutAnimated
-    -- THE ASSERTION. Heartstone may not take the last mana; the Tortoise may, and
-    -- does. A clamp on the pooled reduction leaves {1} here and taps a Mountain.
-    Spec.assertEqWith s "the second activation costs nothing at all" (S.tappedCount S.alice withSecond) 0
-    Spec.assertEqWith s "and is on the stack, so it was not merely refused" (length (GameState.stack withSecond)) 1
-    -- The floor, on the same pair: Heartstone alone leaves the {1} it may not
-    -- reduce, and one more land pays it. Not a refusal -- the ability reaches the
-    -- stack on this board too, so the difference is the mana and nothing else.
-    Spec.assertEqWith s "Heartstone's own floor leaves a mana to pay" (S.tappedCount S.alice withoutSecond) 2
-    Spec.assertEqWith s "which is paid, not refused" (length (GameState.stack withoutSecond)) 1
-
-  -- CR 601.2f's OTHER sentence, on the same two reducers: "If multiple cost
-  -- reductions apply, the player may apply them in any order." Two ANSWERS on one
-  -- board rather than two boards, since what is varied is the choice itself.
-  --
-  -- Mishra's Foundry {2} rather than Mutavault {1}, because the printed number is
-  -- what makes the orders disagree: Heartstone may not take the last mana of a {2},
-  -- so Heartstone-then-Tortoise reaches {0} while Tortoise-then-Heartstone stops at
-  -- {1}. Mutavault's {1} is emptied by either order -- the case above -- which is
-  -- why that board cannot see this and this one is not asserting through it.
-  --
-  -- "{T}: Add {C}. / {2}: This land becomes a 2/2 Assembly-Worker artifact creature
-  -- until end of turn. It's still a land. / {1}, {T}: Target attacking
-  -- Assembly-Worker gets +2/+2 until end of turn", checked against
-  -- api.scryfall.com.
-  Spec.it s "CR 601.2f the payer picks which reduction applies first" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    foundry <- S.printingOf s registry "Mishra's Foundry"
-    heartstone <- S.printingOf s registry "Heartstone"
-    tortoise <- S.printingOf s registry "Blossoming Tortoise"
-    let animate = animationAbility foundry
-        (srcId, board) = foundryBoard mountain 3 foundry heartstone tortoise
-        activation = Activate.activateAbility S.alice srcId animate
-        -- The FIRST activation, made while the Foundry is a land and no creature:
-        -- only the Tortoise's criterion names it, so one reduction applies, there is
-        -- one order, and the printed {2} costs {1}. Resolved, so the activation the
-        -- case is about is made by a permanent inside both criteria at once.
-        animated = S.runPure S.identityAnswer (S.runPure S.identityAnswer board activation) Stack.resolveTop
-        costlier = ManaCost.MkManaCost [ManaSymbol.Generic 1]
-        chosen = S.runPure (takesTotal costlier) animated activation
-        cheapest = S.runPure S.identityAnswer animated activation
-    Spec.assertEqWith s "Mishra's Foundry prints three abilities, and the animation is the second" (length (Face.activatedAbilities (S.combinedFace foundry))) 3
-    Spec.assertEqWith s "the Tortoise alone pays one of the printed {2}" (S.tappedCount S.alice animated) 1
-    Spec.assertEqWith s "and the animation resolved, so the Foundry is a land creature under the Tortoise" (S.powerToughnessOf srcId animated) (Just (3, 3))
-    -- THE ASSERTION. Tortoise first leaves the {1} Heartstone's own floor then
-    -- forbids it to take, and the payer is the one who says so -- a second Mountain
-    -- pays it. Nothing but the answer differs between these two lines.
-    Spec.assertEqWith s "the order the payer chose costs a second Mountain" (S.tappedCount S.alice chosen) 2
-    Spec.assertEqWith s "where the order pawl offers first taps nothing more" (S.tappedCount S.alice cheapest) 1
-    Spec.assertEqWith s "and both reached the stack, so neither was refused" (fmap (length . GameState.stack) [chosen, cheapest]) [1, 1]
-
 -- alice's board: Saltfield Recluse, `lands` Plains, and a Goblin Piker under bob
 -- to aim the Recluse's ability at -- plus Brutal Suppression under BOB when one
 -- is passed. The positive and the negative differ in that Maybe and in nothing
@@ -3686,12 +3419,6 @@ presenceOfGondSpec s registry = Spec.describe s "Presence of Gond" $ do
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Elf, Subtype.Warrior])) tokens
     mapM_ (\oid -> Spec.assertEqWith s "named Elf Warrior Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Warrior Token")))) tokens
 
-  Spec.it s "CR 612.2a an evolved Presence of Gond's granted ability mints a Goblin Warrior Token" $ do
-    (tokens, after) <- gondEvolvedChain s registry (Just (Subtype.Elf, Subtype.Goblin))
-    Spec.assertEqWith s "one token" (length tokens) 1
-    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Goblin Warrior" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Goblin, Subtype.Warrior])) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Goblin Warrior Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Warrior Token")))) tokens
-
 -- alice's Aura, bob's settled Prodigal Sorcerer, carol as the third seat. The
 -- two boards this builds differ in exactly one thing: whether the Aura is
 -- attached (CR 303.4m is what the Aura's HasAttached IsSource conjunct reads).
@@ -3848,34 +3575,6 @@ retractionHelixSpec s registry = Spec.describe s "Retraction Helix" $ do
     -- CR 611.2c froze the effect onto the one creature the spell targeted, so
     -- the other creature on the board is untouched.
     Spec.assertEqWith s "and the creature the spell did not target gains nothing" (Projection.abilitiesOf (helixPiker board) granted) []
-
-  -- The gameplay-level proof. bob activates the ability his creature was GIVEN
-  -- and aims it at carol's Goblin Piker: the Piker ends up in CAROL's hand (CR
-  -- 400.3's owner, not the activating player's), bob's Sorcerer paid the {T},
-  -- and carol's Island -- which the quoted "nonland permanent" excludes -- is
-  -- untouched.
-  Spec.it s "CR 400.3 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand" $ do
-    board <- helixBoard s registry
-    let granted = helixCast board
-    -- Falls back to the PRINTED ability rather than failing when the grant is
-    -- missing, so a board that never granted anything is answered by the bounce
-    -- assertion below rather than by a structural one ahead of it.
-    let ability = Maybe.fromMaybe (theAbility (helixSorcererPrinting board)) (grantedAbility (helixSorcererPrinting board) (helixSorcerer board) granted)
-        resolved =
-          S.runPure (aimAtObject (helixPiker board)) granted $ do
-            Activate.activateAbility S.bob (helixSorcerer board) ability
-            Stack.resolveTop
-    -- CR 400.7: the move makes a NEW object, so the Piker is named rather
-    -- than tracked by id -- which is also what makes the OWNER claim below
-    -- readable off the board.
-    Spec.assertEqWith s "the Piker is in carol's hand" (fmap (`S.soleFaceName` resolved) (Game.zoneMembers Zone.Hand S.carol resolved)) [S.printingName (helixPikerPrinting board)]
-    Spec.assertEqWith s "and the activating player's hand is empty" (length (Game.zoneMembers Zone.Hand S.bob resolved)) 0
-    Spec.assertEqWith s "it left the battlefield" (S.countOnBattlefieldByName (S.printingName (helixPikerPrinting board)) S.carol resolved) 0
-    Spec.assertEqWith s "carol's Island stayed on the battlefield" (fmap Object.zone (Game.lookupObject (helixCarolIsland board) resolved)) (Just Zone.Battlefield)
-    Spec.assertEqWith s "the receiving creature paid the {T}" (fmap Object.tapped (Game.lookupObject (helixSorcerer board) resolved)) (Just TapState.Tapped)
-    Spec.assertBool s (any (\a -> case a of A.Activate _ ab -> ab == ability; _ -> False) (activationsOf (helixSorcerer board) (Action.legalActions S.bob granted))) "the granted ability is offered to its controller"
-    Spec.assertEqWith s "and not to the spell's controller" (activationsOf (helixSorcerer board) (Action.legalActions S.alice granted)) []
-    Spec.assertBool s (ability /= theAbility (helixSorcererPrinting board)) "and what was activated is the granted ability, not the printed one"
 
 -- Aims every announced target slot at one object, filtering the OFFERED set so a
 -- recipient the engine did not offer can never stand in for one it did.

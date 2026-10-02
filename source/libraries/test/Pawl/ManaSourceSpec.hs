@@ -30,7 +30,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import Pawl.ManaSpec (alicePermanents, atLife, castFrom, isActivationOf, optionOfTypes, paysColors, poolSize, poolTypes, poolUnits, prefersSource, recordingManaSources, tapEverything, theAbility)
+import Pawl.ManaSpec (alicePermanents, atLife, castFrom, isActivationOf, optionOfTypes, paysColors, poolSize, poolUnits, prefersSource, recordingManaSources, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -472,23 +472,6 @@ chromaticSpec s registry = Spec.describe s "Chromatic Sphere and Chromatic Star"
     Spec.assertBool s (any (isActivateOf sphereId) sphereActions) "the Sphere is menued as an ordinary activation"
     Spec.assertBool s (not (any (isActivateOf starId) starActions)) "which a mana ability never is"
 
-  -- End to end. tapEverything takes ONLY mana activations, so what it reaches is
-  -- exactly CR 605.3a's window: the Star is sacrificed to its own cost and its
-  -- death trigger draws, while the Sphere is never touched at all and its draw
-  -- never happens.
-  Spec.it s "CR 605.3a the mana window reaches the Star and never the Sphere" $ do
-    star <- S.printingOf s registry "Chromatic Star"
-    sphere <- S.printingOf s registry "Chromatic Sphere"
-    forest <- S.printingOf s registry "Forest"
-    let (_, starBoard) = chromaticBoard star forest
-        (_, sphereBoard) = chromaticBoard sphere forest
-        starAfter = S.runPure tapEverything starBoard Engine.priorityLoop
-        sphereAfter = S.runPure tapEverything sphereBoard Engine.priorityLoop
-    Spec.assertEqWith s "the Star paid its own sacrifice" (length (Game.zoneMembers Zone.Graveyard S.alice starAfter)) 1
-    Spec.assertEqWith s "the Sphere was never activated" (length (Game.zoneMembers Zone.Graveyard S.alice sphereAfter)) 0
-    Spec.assertEqWith s "the Star's death trigger drew one card" (length (Game.zoneMembers Zone.Hand S.alice starAfter)) 1
-    Spec.assertEqWith s "and nothing drew on the Sphere's board" (length (Game.zoneMembers Zone.Hand S.alice sphereAfter)) 0
-
 -- alice, active, in her precombat main phase: one of the two artifacts, a Forest
 -- to pay the {1} activation cost with, and a stocked library so a draw has a card
 -- to take and CR 104.3c decides nothing first. Identical for both artifacts, so
@@ -570,22 +553,6 @@ millikinSpec s registry = Spec.describe s "Millikin" $ do
     Spec.assertBool s (notElem (Action.Type.ActivateManaAbility millikinId) actions) "Millikin is not"
     Spec.assertBool s (any (isActivateOf millikinId) actions) "Millikin is menued as an ordinary activation"
     Spec.assertBool s (not (any (isActivateOf solRingId) actions)) "which a mana ability never is"
-
-  -- End to end, and the gameplay-level proof (design.md section 4).
-  -- tapEverything takes ONLY mana activations, so what it reaches is exactly CR
-  -- 605.3a's window: the Sol Ring is tapped for {C}{C} and Millikin is never
-  -- touched, so no card is milled and it stays untapped. Under the other reading
-  -- of rule 605.1a the window takes Millikin too, and the graveyard says so.
-  Spec.it s "CR 605.3a the mana window reaches the Sol Ring and never Millikin" $ do
-    millikin <- S.printingOf s registry "Millikin"
-    solRing <- S.printingOf s registry "Sol Ring"
-    let (millikinId, solRingId, board) = millikinBoard millikin solRing
-        after = S.runPure tapEverything board Engine.priorityLoop
-    Spec.assertEqWith s "CR 701.17a nothing was milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
-    Spec.assertEqWith s "and Millikin's library is whole" (length (Game.zoneMembers Zone.Library S.alice after)) 3
-    Spec.assertEqWith s "Millikin is untapped, never having paid its cost" (fmap Object.tapped (Game.lookupObject millikinId after)) (Just TapState.Untapped)
-    Spec.assertEqWith s "the Sol Ring did pay its own" (fmap Object.tapped (Game.lookupObject solRingId after)) (Just TapState.Tapped)
-    Spec.assertEqWith s "so the window ran and floated {C}{C}" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless]
 
 -- alice, active, in her precombat main phase, with Millikin and a Sol Ring on
 -- the battlefield -- both settled and untapped -- and three cards in her library

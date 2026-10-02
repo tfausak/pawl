@@ -1,0 +1,165 @@
+{
+  "description": "CR 615.7 alice redirects 1 from each of two simultaneous hits, and both creatures live (control: the 2 spent down the batch)",
+  "note": "Bob casts Fire Magic for its 2-to-each-creature tier; alice answers with Harm's Way aimed at bob, naming the Fire Magic spell as the source, and when it resolves she divides the 2 a point to each Cabal Evangel: both live with 1 marked and bob takes 2. Fire Magic stands in for the test's hand-built batch of two 2s from bob's Goblin Piker (Pyroclasm's shape). The --control file spends the 2 down the batch: the first Evangel keeps nothing and the second dies, with bob on 18 either way.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Cabal Evangel",
+            "label": "first"
+          },
+          {
+            "card": "Cabal Evangel",
+            "label": "second"
+          },
+          {
+            "card": "Plains",
+            "label": "plains"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Harm's Way",
+            "label": "harms-way"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-2"
+          },
+          {
+            "card": "Mountain",
+            "label": "mountain-3"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Fire Magic",
+            "label": "fire"
+          }
+        ]
+      }
+    ],
+    "active": "bob",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$fire",
+          "mana": [
+            "$mountain",
+            "$mountain-2",
+            "$mountain-3"
+          ],
+          "modes": [
+            1
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$harms-way",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$plains"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseDamageSource",
+          "with": "Fire Magic"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "AllocateDamage",
+          "with": [
+            2,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 18
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Damage": {
+          "object": "$first",
+          "damage": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Graveyard",
+          "card": "Cabal Evangel",
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "bob",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Cabal Evangel",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

@@ -22,11 +22,9 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
@@ -44,7 +42,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Scenario.Prompt as Scenario.Prompt
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -1155,38 +1152,6 @@ delayedSpec s registry =
           Spec.assertEqWith s "it fired" (length firedOnce) 1
           Spec.assertEqWith s "and stayed armed" (Seq.length survivors) 1
           Spec.assertEqWith s "so the next end step fires it again" (length firedAgain) 1
-        -- Synthetic Deferred Rally {W} Instant: "At the beginning of the next
-        -- end step, if you control a creature, you gain 2 life." A LABELED
-        -- CRUTCH: every printed delayed ability with an intervening "if" asks
-        -- whether a named card was cast, played or is still in some zone, and
-        -- neither Quantity nor Filter can name a card. CR 603.4 and
-        -- CR 603.7b meeting on one ability: the first end step's event matches,
-        -- but the intervening "if" is false, so the ability does not TRIGGER --
-        -- and CR 603.7b bounds how many times it triggers, not how many events
-        -- it watches, so nothing was spent and it is still waiting for the next
-        -- end step.
-        --
-        -- The STORE is where the difference shows, and the two assertions on it
-        -- are the discriminating pair: still armed after the false occurrence,
-        -- spent after the true one. The life total alone would not discriminate
-        -- in the first half -- an entry that wrongly triggered at the first end
-        -- step still gains nothing, because Pawl.Engine.Stack's CR 608.2a
-        -- re-check removes it from the stack for the same false condition, so
-        -- the one shot would be spent invisibly.
-        Spec.it s "CR 603.4 a false intervening \"if\" leaves the delayed ability armed for the next end step" $ do
-          rally <- S.printingOf s registry "Synthetic Deferred Rally"
-          plains <- S.printingOf s registry "Plains"
-          piker <- S.printingOf s registry "Goblin Piker"
-          let (gs0, oid) = S.handOne rally (S.landsInPlay plains 1)
-              armed = resolveAll (snd (Engine.runGamePure S.identityAnswer gs0 (S.cast S.alice oid)))
-              firstEnd = resolveAll (settle (beginEndStep armed))
-              withCreature = snd (S.addPermanent piker S.alice firstEnd)
-              secondEnd = resolveAll (settle (beginEndStep withCreature))
-          Spec.assertEqWith s "the resolution armed it" (Seq.length (GameState.delayedTriggers armed)) 1
-          Spec.assertEqWith s "no life gained while the condition is false" (S.lifeOf S.alice firstEnd) (Just 20)
-          Spec.assertEqWith s "and the entry is still armed" (Seq.length (GameState.delayedTriggers firstEnd)) 1
-          Spec.assertEqWith s "the next end step fires it" (S.lifeOf S.alice secondEnd) (Just 22)
-          Spec.assertEqWith s "and that spends it" (Seq.length (GameState.delayedTriggers secondEnd)) 0
         -- CR 514.2: "all 'until end of turn' and 'this turn' effects end"
         -- during the cleanup step -- which is what ends the stated duration,
         -- and the reason an armed entry cannot outlive the turn that made it.
@@ -1200,19 +1165,6 @@ delayedSpec s registry =
           -- CR 603.7b's one shot is spent by FIRING, not by time, so an entry
           -- on no duration at all must survive every sweep.
           Spec.assertEqWith s "and a one-shot entry stays" (Seq.length (swept Nothing)) 1
-        -- CR 603.7c: the ability still triggers and is still consumed even when
-        -- the object it remembers is gone.
-        Spec.it s "CR 603.7c with the token already gone the ability does nothing and is consumed" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          let armed = castWave tidalWave island
-              killed = case walls armed of
-                wall : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [wall]))
-                [] -> armed
-              after = resolveAll (settle (beginEndStep killed))
-          Spec.assertEqWith s "no Wall" (walls after) []
-          Spec.assertEqWith s "the store is still emptied" (Seq.length (GameState.delayedTriggers after)) 0
-          Spec.assertEqWith s "nothing stuck on the stack" (GameState.stack after) []
         -- IMPORTANT-1 (fix pass 1): Engine.placeOne merges a delayed ability's
         -- OWN placement-time bindings (its chosen modes/targets, chosen just now)
         -- with the environment CAPTURED when the ability was armed, under
@@ -1287,51 +1239,6 @@ delayedSpec s registry =
           Spec.assertEqWith s "with bob still in the game the SAME ability IS placed -- the filter is what did it" (length (GameState.stack control)) 1
           Spec.assertEqWith s "nothing reached the stack, so placePendingTriggers honestly reports it placed nothing" placedAny False
           Spec.assertEqWith s "with bob still in the game, something genuinely got placed" controlAny True
-        -- CR 116.2c's OTHER use, beside ending a continuous effect: the special
-        -- action is taken "usually to end a continuous effect or to stop a
-        -- delayed triggered ability from triggering". Synthetic Standing Bounty
-        -- {1}{U} Instant: "At the beginning of each end step, you gain 3 life.
-        -- You may pay {1} to end this effect." Synthetic because no printing
-        -- arms a delayed ability under a pay-to-end duration -- Scryfall
-        -- o:/doesn't trigger/ o:/you may pay/, 2026-09-02, no hit, and
-        -- o:/counter that ability/ o:/pay/ returns only Strict Proctor, whose
-        -- payment is a cost inside the trigger rather than CR 116.2c's action.
-        --
-        -- What it drives is CR 603.7b's stated duration being a pay-to-end one:
-        -- Duration.UntilPaid arms to Expiry.WhenPaid on the armed ENTRY,
-        -- Expiry.sourcedExpiries makes it findable, and the payment deletes the
-        -- entry itself rather than a continuous effect. A duration is also what
-        -- makes the offer reachable at all -- CR 603.7b's default is no stated
-        -- duration, which stores no expiry for CR 116.2c to name -- so the entry
-        -- stays armed through a firing and the pair below is read at the FIRST
-        -- end step, before that difference could show.
-        --
-        -- A PAIR of boards differing in exactly one thing -- whether alice took
-        -- the action -- both cut from the same board, so the unpaid leg is not
-        -- passing for want of mana. Three Islands: two for the {1}{U}, one left
-        -- for the {1}.
-        Spec.it s "CR 116.2c paying the stated cost stops the delayed ability from triggering" $ do
-          bounty <- S.printingOf s registry "Synthetic Standing Bounty"
-          island <- S.printingOf s registry "Island"
-          let (gs0, bountyId) = S.handOne bounty (S.landsInPlay island 3)
-              armed = resolveAll (S.runPure S.identityAnswer gs0 (S.cast S.alice bountyId))
-              ready = armed {GameState.priority = Just S.alice}
-          case fmap DelayedTrigger.source (Seq.lookup 0 (GameState.delayedTriggers ready)) of
-            Nothing -> Spec.assertFailure s "the spell should have armed one delayed ability"
-            Just source -> do
-              let paid = S.settleSba (S.runPure S.identityAnswer ready (EndEffect.endEffect S.alice source))
-                  atEndStep gs = resolveAll (settle (beginEndStep gs))
-              -- THE gameplay-level pair, ahead of every proxy below.
-              Spec.assertEqWith s "CR 116.2c: the paid board gains no life at the end step" (S.lifeOf S.alice (atEndStep paid)) (Just 20)
-              Spec.assertEqWith s "while the unpaid board gains 3" (S.lifeOf S.alice (atEndStep ready)) (Just 23)
-              -- Anti-vacuity: the two legs start from one life total, so the
-              -- reads above are the end step's doing.
-              Spec.assertEqWith s "both legs started at 20" (S.lifeOf S.alice ready) (Just 20)
-              -- The offer, which no printed permission grants: it rides the
-              -- armed entry's stored duration.
-              Spec.assertBool s (List.elem (Action.Type.EndEffect source) (Action.legalActions S.alice ready)) "CR 116.2c: alice is offered the payment while the entry is armed"
-              Spec.assertEqWith s "the resolution armed one entry" (Seq.length (GameState.delayedTriggers ready)) 1
-              Spec.assertEqWith s "and the payment deleted it" (Seq.length (GameState.delayedTriggers paid)) 0
 
 -- Thatcher Revolt {2}{R} Sorcery: "Create three 1/1 red Human creature tokens
 -- with haste. Sacrifice those tokens at the beginning of the next end step."
@@ -2478,69 +2385,6 @@ chronicleWardenSpec s registry =
           -- lore counter on, so chapter III really was the final chapter.
           Spec.assertEqWith s "the turn-based action put the third lore counter on" (S.counterOf CounterKind.Lore sagaId advanced) 3
 
--- CR 603.3b's second class armed as a CR 603.7 DELAYED ability. Synthetic
--- Epilogue Vigil, {1}{W} Instant, "When the final chapter ability of a Saga you
--- control next triggers, create a 4/4 white Angel creature token with flying
--- and vigilance." SYNTHETIC: MTGJSON's oracle text (2026-09-29) and Scryfall
--- `o:/next time .*abilit.* triggers?/` and `o:/whenever .*abilit.* triggers?
--- this turn/`, 2026-09-29, have no delayed ability watching an ability
--- trigger; Historian's Boon is the object-borne twin.
---
--- THE PAIR differs in one thing, how many lore counters History of Benalia
--- stands on when CR 714.3c's turn-based action adds one. At two, chapter III
--- (the final one, CR 714.2d) triggers and the entry fires in CR 603.3b's same
--- batch. At one, chapter II triggers instead: its record reaches the entry and
--- does not match, so CR 603.7b's one shot is NOT spent, and the next lore
--- counter fires it. A second Saga's chapter III after the first firing is what
--- shows the one shot WAS spent.
-delayedSecondClassSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-delayedSecondClassSpec s registry =
-  let angelToken = CardName.MkCardName (Text.pack "Angel Token")
-      atMain gs =
-        gs
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      -- alice casts the Vigil off two Plains with the Saga on `lore` counters;
-      -- (the Saga's id, the board with the entry armed).
-      armed lore = do
-        plains <- S.printingOf s registry "Plains"
-        benalia <- S.printingOf s registry "History of Benalia"
-        vigil <- S.printingOf s registry "Synthetic Epilogue Vigil"
-        let (sagaId, base) = S.addPermanent benalia S.alice (S.landsFor plains S.alice 2 (Setup.emptyGame S.bothPlayers))
-            (vigilId, withVigil) = S.addHandCard vigil S.alice (S.addCounter CounterKind.Lore lore sagaId base)
-            cast = S.runPure S.identityAnswer (atMain withVigil) (S.cast S.alice vigilId >> Engine.priorityLoop)
-        pure (sagaId, cast)
-      -- One more lore counter by CR 714.3c, and everything that triggers resolved.
-      chapter gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer (atMain gs) (Engine.runTurnBasedActions Phase.PrecombatMain)) Engine.priorityLoop
-   in Spec.describe s "CR 603.7 a delayed ability watching an ability trigger" $ do
-        Spec.it s "CR 603.3b the Vigil's entry fires off chapter III triggering" $ do
-          (sagaId, gs) <- armed 2
-          let after = chapter gs
-              settled = S.runPure S.identityAnswer (S.runPure S.identityAnswer (atMain gs) (Engine.runTurnBasedActions Phase.PrecombatMain)) Engine.settleForPriority
-          Spec.assertEqWith s "alice gets the Vigil's Angel" (S.countOnBattlefieldByName angelToken S.alice after) 1
-          -- CR 603.7b's one shot, read at gameplay level: a second Saga's final
-          -- chapter later fires nothing more.
-          benalia <- S.printingOf s registry "History of Benalia"
-          let (againId, withAgain) = S.addPermanent benalia S.alice after
-              staged = S.addCounter CounterKind.Lore 2 againId withAgain
-          Spec.assertEqWith s "CR 603.7b a second final chapter brings no second Angel" (S.countOnBattlefieldByName angelToken S.alice (chapter staged)) 1
-          Spec.assertEqWith s "the second Saga did reach chapter III" (S.counterOf CounterKind.Lore againId (S.runPure S.identityAnswer (atMain staged) (Engine.runTurnBasedActions Phase.PrecombatMain))) 3
-          Spec.assertEqWith s "CR 603.7b and the one shot is spent" (Seq.length (GameState.delayedTriggers after)) 0
-          -- Second class, so placed in the second pass above chapter III.
-          Spec.assertEqWith s "chapter III sits under the Vigil's trigger" (chaptersOnStackFrom sagaId settled) [3]
-          Spec.assertEqWith s "two triggers on the stack" (length (GameState.stack settled)) 2
-          Spec.assertEqWith s "the entry was armed before the lore counter" (Seq.length (GameState.delayedTriggers gs)) 1
-        Spec.it s "CR 603.7b a non-final chapter triggering leaves the one-shot entry armed" $ do
-          (_, gs) <- armed 1
-          let second = chapter gs
-              third = chapter second
-          Spec.assertEqWith s "chapter II's triggering fires nothing" (S.countOnBattlefieldByName angelToken S.alice second) 0
-          Spec.assertEqWith s "chapter III's triggering then fires it" (S.countOnBattlefieldByName angelToken S.alice third) 1
-          Spec.assertEqWith s "the store still held the entry between" (Seq.length (GameState.delayedTriggers second)) 1
-          Spec.assertEqWith s "and spends it" (Seq.length (GameState.delayedTriggers third)) 0
-
 -- CR 608.2h read by CR 603.3b's second class: the Saga whose final chapter fired
 -- is already in the graveyard when CR 117.5 gathers the watcher's trigger.
 --
@@ -2772,7 +2616,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   secondPlacementPassSpec s registry
   matchedClausePassSpec s registry
   chronicleWardenSpec s registry
-  delayedSecondClassSpec s registry
   sagaDiesBeforeScanSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry

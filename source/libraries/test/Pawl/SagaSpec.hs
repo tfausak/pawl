@@ -231,19 +231,6 @@ sacrificeSpec s registry = Spec.describe s "The final chapter" $ do
     Spec.assertEqWith s "and one card is in exile" (Set.size (GameState.exile after)) 1
     Spec.assertBool s (not (S.onBattlefield reliquaryId after)) "the Reliquary was sacrificed"
     Spec.assertBool s (not (S.onBattlefield benaliaId after)) "and so was History of Benalia"
-  -- CR 101.2 subtracted from CR 704.5s, reachable now that the pool holds a Saga
-  -- that is also a creature: Garland, Royal Kidnapper's "creatures you control but
-  -- don't own get +2/+2 and can't be sacrificed" reaches bob's Summon: Choco/Mog
-  -- once alice controls it. Pawl.Engine.Sba's `told` subtracts it rather than
-  -- reporting a sacrifice it can never perform, which is what keeps CR 704.3's
-  -- "repeat until no state-based action is performed" terminating.
-  --
-  -- The PAIR differs in one thing: alice's own History of Benalia is finished on
-  -- the same pass and nobody prohibits its sacrifice.
-  Spec.it s "CR 101.2 a finished Saga that cannot be sacrificed is left where it stands" $ do
-    (chocoId, benaliaId, after) <- prohibitedSagaBoard s registry True
-    Spec.assertBool s (S.onBattlefield chocoId after) "CR 101.2 stops the sacrifice, so the finished Saga stays"
-    Spec.assertBool s (not (S.onBattlefield benaliaId after)) "while the Saga nobody protects is sacrificed on the same pass"
   Spec.it s "CR 704.5s and without the prohibition that same Saga is sacrificed" $ do
     (chocoId, benaliaId, after) <- prohibitedSagaBoard s registry False
     Spec.assertBool s (not (S.onBattlefield chocoId after)) "CR 704.5s takes the finished Saga"

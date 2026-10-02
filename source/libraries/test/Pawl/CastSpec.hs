@@ -68,7 +68,6 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -79,7 +78,6 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -2259,36 +2257,16 @@ fugitiveDoctorAnswer p = case p of
   -- The Clue is worth spending: without the sacrifice the pay gate's IfPaid
   -- branch never runs and no second flashback is granted.
   Prompt.ChooseToPay {} -> PaymentDecision.Pays
-  -- Both boards below leave exactly ONE instant-or-sorcery card in alice's
+  -- The board below leaves exactly ONE instant-or-sorcery card in alice's
   -- graveyard, so taking every legal recipient takes exactly that card and the
   -- slot's count is satisfied.
   Prompt.ChooseTargets _ _ _ sets -> fmap snd sets
   _ -> S.aggressiveAnswer p
 
--- alice attacks with The Fugitive Doctor, sacrifices the Clue its own enters
--- trigger made, and grants the graveyard Firebolt a second flashback. The board
--- returned sits in the postcombat main phase, where a sorcery may be cast.
-fugitiveDoctorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
-fugitiveDoctorBoard s registry = do
-  mountain <- S.printingOf s registry "Mountain"
-  forest <- S.printingOf s registry "Forest"
-  firebolt <- S.printingOf s registry "Firebolt"
-  doctor <- S.printingOf s registry "The Fugitive Doctor"
-  let (combat, _, _) = S.combatBoardOf [] []
-      lands = S.landsFor forest S.alice 3 (S.landsFor mountain S.alice 7 combat)
-      (inGraveyard, buried) = S.addGraveyardCard firebolt S.alice lands
-      -- entersWithTrigger rather than addPermanent: the Clue this ability's
-      -- pay gate spends is the Doctor's OWN CR 701.16a investigate, so the
-      -- fixture makes it the way the card does.
-      (_, entered) = S.entersWithTrigger doctor S.alice buried
-      withClue = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-  pure (S.runCombat fugitiveDoctorAnswer withClue, inGraveyard)
-
--- fugitiveDoctorBoard's discriminating twin. One thing differs: alice's
--- graveyard is EMPTY, and the card the reflexive ability will target is in her
--- hand instead -- same lands, same Doctor, same Clue from the same CR 701.16a
--- investigate, same seats. So nothing below can turn on mana, timing or stock;
--- only on WHEN the card reaches the graveyard.
+-- alice's graveyard is EMPTY, and the card the reflexive ability will target is
+-- in her hand: ten lands, the Doctor, and a Clue from CR 701.16a's investigate.
+-- So nothing below can turn on mana, timing or stock; only on WHEN the card
+-- reaches the graveyard.
 --
 -- Lightning Bolt rather than Firebolt for two reasons: it is an INSTANT, so it
 -- can be cast in response to the attack trigger, and it prints no flashback of
@@ -2324,7 +2302,7 @@ respondingDoctorAnswer inHand p = case p of
         fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> fugitiveDoctorAnswer p
 
-fugitiveDoctorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fugitiveDoctorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
   -- CR 603.12 routes the reflexive ability through CR 603.7, so it goes on the
   -- stack in its own right (CR 603.3) and announces its own target there (CR
@@ -2360,38 +2338,6 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
     -- CR 603.12a's second sentence, and CR 603.7b: one arming, one firing. A
     -- second would have wanted a second target and found none.
     Spec.assertEqWith s "and the reflexive ability fired once, leaving the delayed store empty" (length (GameState.delayedTriggers after)) 0
-  Spec.it s "CR 702.34a/601.2b two flashback abilities offer two costs, and either one exiles the card" $ do
-    firebolt <- S.printingOf s registry "Firebolt"
-    (board, inGraveyard) <- fugitiveDoctorBoard s registry
-    let granted = ManaCost.MkManaCost [ManaSymbol.Generic 2, theRed, ManaSymbol.OfType (ManaType.Colored Color.Green)]
-        printed = ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed]
-        -- graveRecitalSpec's announcement, answered by naming a cost: the two
-        -- flashback costs share no reading, so no answer here is an index.
-        paying :: ManaCost.ManaCost -> Prompt.Prompt r -> r
-        paying wanted p = case p of
-          Prompt.ChooseCost _ _ _ candidates ->
-            Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just wanted) . Cost.Type.mana) candidates)
-          -- Firebolt's own "any target", aimed at alice so that its 2 damage
-          -- reports which cast resolved rather than which permanent died.
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
-          _ -> S.identityAnswer p
-        resolveWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
-        resolveWith answer = S.runPure answer (S.runPure answer board (S.cast S.alice inGraveyard)) Stack.resolveTop
-        boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName firebolt)) (Game.zoneMembers zone S.alice gs))
-    Spec.assertEqWith s "the fixture reached the postcombat main phase" (GameState.phase board) Phase.PostcombatMain
-    Spec.assertEqWith
-      s
-      "CR 601.2b: both flashback costs are on offer, the granted one first by Ord"
-      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard board))
-      [Just granted, Just printed]
-    -- CR 702.34a's SECOND static ability, asked of the cost a first-only read
-    -- never returns: paying the PRINTED {4}{R} must exile the card too.
-    Spec.assertEqWith s "the printed cost's cast dealt its 2" (S.lifeOf S.alice (resolveWith (paying printed))) (Just 18)
-    Spec.assertEqWith s "and exiled the card (CR 702.34a)" (boltsIn Zone.Exile (resolveWith (paying printed))) 1
-    Spec.assertEqWith s "not put it into the graveyard" (boltsIn Zone.Graveyard (resolveWith (paying printed))) 0
-    Spec.assertEqWith s "the granted cost's cast dealt its 2 as well" (S.lifeOf S.alice (resolveWith (paying granted))) (Just 18)
-    Spec.assertEqWith s "and exiled the card too" (boltsIn Zone.Exile (resolveWith (paying granted))) 1
-    Spec.assertEqWith s "not put it into the graveyard either" (boltsIn Zone.Graveyard (resolveWith (paying granted))) 0
 
 -- Lier, Disciple of the Drowned {3}{U}{U} (data/cards/lier-disciple-of-the-drowned.json):
 -- "Spells can't be countered. Each instant and sorcery card in your graveyard
@@ -3160,28 +3106,8 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
 -- cost. With a Hill Giant that is no Goblin the cast is asked in bob's turn and
 -- then in alice's own; with a Piker beside it, an answerer asking for the
 -- printed cost in bob's turn still gets the offering, the only one on offer.
-offeringSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+offeringSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 offeringSpec s registry = Spec.describe s "Offering" $ do
-  let onBobsTurn gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
-  Spec.it s "CR 702.48a in bob's turn alice casts the Patron by sacrificing a Goblin, reduced by its mana cost" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    island <- S.printingOf s registry "Island"
-    piker <- S.printingOf s registry "Goblin Piker"
-    clone <- S.printingOf s registry "Clone"
-    patron <- S.printingOf s registry "Patron of the Akki"
-    let (pikerId, gs1) = S.addPermanent piker S.bob (S.landsInPlay island 4)
-        (cloneId, gs2) = S.addHandCard clone S.alice gs1
-        cloned = castResolved (aimedAt pikerId) cloneId (aliceOnTurn gs2)
-        (_, gs3) = S.addPermanent mountain S.alice (S.landsFor plains S.alice 3 cloned)
-        (spellId, gs4) = S.addHandCard patron S.alice gs3
-        board = onBobsTurn gs4
-        after = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
-    Spec.assertEqWith
-      s
-      "CR 702.48c a Mountain and three Plains paid {4}{R}{R} less the copied {1}{R}: the Patron resolved, the Clone was sacrificed, and the gate offered the cast"
-      (length (namedOnBattlefield "Patron of the Akki" after), length (namedInGraveyard "Clone" after), S.castable S.alice spellId board)
-      (1, 1, True)
   -- CR 118.9d: offering is an ADDITIONAL cost, so a free cast still offers it.
   -- Apex Devastator {8}{G}{G} cascades into the Patron (mana value 6 < 10), and
   -- alice controls a Goblin Piker. Two answerers differing only in the cost they
@@ -3762,54 +3688,6 @@ prowlCost = [ManaSymbol.Generic 1, theBlack]
 
 theBlack :: ManaSymbol.ManaSymbol
 theBlack = ManaSymbol.OfType (ManaType.Colored Color.Black)
-
--- CR 702.174a-e on Scrapshooter {1}{G}{G} 4/4 Creature -- Raccoon Archer, "Gift a
--- card / Reach / When this creature enters, if the gift was promised, destroy
--- target artifact or enchantment an opponent controls." (Oracle text checked on
--- Scryfall, 2026-09-18.)
---
--- THREE SEATS, which rule 702.174a needs: "you may choose an opponent" is not a
--- choice at two, and the seat promised has to be tellable from the other one.
--- carol is promised and bob is not, and bob is the seat whose Bonesplitter the
--- printed trigger destroys -- so no assertion here can be answered by naming the
--- same player twice.
-giftSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-giftSpec s registry = Spec.describe s "Gift" $ do
-  -- CR 608.2h: the case above's board, the 4/4 given -5/-5 and buried by CR
-  -- 704.5f while both its enters triggers wait. The chosen player is read off
-  -- the last known information, so carol still draws.
-  Spec.it s "CR 608.2h a Scrapshooter killed in response still has the promised opponent draw" $ do
-    (shooterId, board) <- scrapshooterBoard s registry
-    let answer :: Prompt.Prompt r -> r
-        answer = promising S.carol
-        onStack = S.runPure answer (S.runPure answer board (S.cast S.alice shooterId)) (Stack.resolveTop >> Engine.settleForPriority)
-        minusFive = Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5)))
-        dead = S.runPure answer (foldr (`S.withEffect` minusFive) onStack (namedOnBattlefield "Scrapshooter" onStack)) Engine.settleForPriority
-        after = S.runPure answer dead (Monad.replicateM_ (2 :: Int) (Stack.resolveTop >> Engine.settleForPriority))
-    Spec.assertEqWith s "CR 608.2h the promised carol drew a card and bob did not" (S.handSize S.carol after, S.handSize S.bob after) (1, 0)
-    Spec.assertEqWith s "and both triggers were on the stack as the 4/4 died" (length (GameState.stack dead), namedOnBattlefield "Scrapshooter" dead) (2, [])
-    Spec.assertEqWith s "and both resolved" (length (GameState.stack after)) 0
-
--- alice on turn with three Forests and Scrapshooter in hand, bob with a
--- Bonesplitter, and two cards in each opponent's library so that rule 702.174e's
--- draw is a draw rather than CR 104.3c.
-scrapshooterBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
-scrapshooterBoard s registry = do
-  forest <- S.printingOf s registry "Forest"
-  shooter <- S.printingOf s registry "Scrapshooter"
-  splitter <- S.printingOf s registry "Bonesplitter"
-  let (shooterId, gs1) = S.addHandCard shooter S.alice (S.landsFor forest S.alice 3 S.threePlayerGame)
-      (_, gs2) = S.addPermanent splitter S.bob gs1
-      stock pid gs = snd (S.addLibraryCard forest pid (snd (S.addLibraryCard forest pid gs)))
-  pure (shooterId, aliceOnTurn (stock S.carol (stock S.bob gs2)))
-
--- CR 702.174a paid, promising `who`. The seat is found in the offer rather than
--- built, so an engine that offered the wrong set cannot be repaired here.
-promising :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-promising who p = case p of
-  Prompt.ChooseKicker _ _ _ (Keyword.Gift _) _ -> KickerDecision.MkKickerDecision 1
-  Prompt.ChooseOpponent _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (who ==) (NonEmpty.toList offered))
-  _ -> S.identityAnswer p
 
 -- Mardu Scout's printed {R}{R} and its dash {1}{R}; Riveteers Requisitioner's
 -- printed {1}{R} and its blitz {2}{R}.
@@ -4598,7 +4476,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   warpSpec s registry
   surgeSpec s registry
   prowlSpec s registry
-  giftSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

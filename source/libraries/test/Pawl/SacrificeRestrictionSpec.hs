@@ -38,7 +38,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Engine as Engine
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Engine.Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -68,7 +67,6 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.Zone as Zone
 
 -- "a creature", the criterion Village Rites' additional cost and Diabolic Edict's
 -- effect both carry.
@@ -136,33 +134,6 @@ ownerSpec s registry = Spec.describe s "Owner" $ do
 -- answers, which is the CR 118.3 payability count and every sacrifice prompt.
 offerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 offerSpec s registry = Spec.describe s "Offer" $ do
-  -- Village Rites is {B} "As an additional cost to cast this spell, sacrifice a
-  -- creature. Draw two cards." On the stolen-Garland board alice's own Piker is
-  -- the ONLY legal victim, so CR 601.2h's choice is forced and the payment is
-  -- made with no prompt -- which makes this an assertion about WHICH creature
-  -- died rather than about an interpreter's answer.
-  Spec.it s "CR 101.2 whole cards: Village Rites eats the Piker alice owns, never the two she stole" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
-    piker <- S.printingOf s registry "Goblin Piker"
-    villageRites <- S.printingOf s registry "Village Rites"
-    let (stolenGarland, g0) = S.addPermanent garland S.bob (S.landsInPlay swamp 1)
-        (stolenPiker, g1) = S.addPermanent piker S.bob g0
-        g2 = S.giveControl stolenPiker S.alice (S.giveControl stolenGarland S.alice g1)
-        (hers, g3) = S.addPermanent piker S.alice g2
-        -- Stocked, so the draw has something to draw and CR 104.3c does not
-        -- deck alice before the assertion runs.
-        (_, g4) = S.addLibraryCard swamp S.alice g3
-        (_, g5) = S.addLibraryCard swamp S.alice g4
-        (gs, spell) = S.handOne villageRites g5
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
-        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "one creature alice owns is the whole offer" (offered gs) [hers]
-    Spec.assertBool s (S.castable S.alice spell gs) "the additional cost is payable"
-    Spec.assertBool s (not (S.onBattlefield hers resolved)) "alice's own Piker paid the cost"
-    Spec.assertBool s (S.onBattlefield stolenPiker resolved) "the stolen Piker is still there"
-    Spec.assertBool s (S.onBattlefield stolenGarland resolved) "and so is the stolen Garland"
-    Spec.assertEqWith s "the spell resolved and drew two" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 2
   -- CR 118.3's "fully", the half that would otherwise ship broken: a candidate
   -- list filtered only at the prompt still COUNTS the prohibited permanent when
   -- deciding payability, and the spell would announce as castable and then fail.

@@ -1,0 +1,110 @@
+{
+  "description": "CR 615.7 the shielded PLAYER chooses which of two simultaneous damages the shield prevents",
+  "note": "A real combat stands in for the hand-built batch: alice's Jedit Ojanen (5) and lifelinking Cubwarden (3) attack bob, whom her Mending Hands shields for 4, so bob is asked (AllocateDamage, Jedit's event first) how the shield is divided. Spending it all on the 5 lets 1 and the Cubwarden's 3 through: bob 16, and the Cubwarden's damage HAPPENED, so alice gains 3. The --control file spends 1 and 3: bob is still 16, but the Cubwarden's event never happens and alice gains nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Jedit Ojanen",
+            "label": "big",
+            "ready": true
+          },
+          {
+            "card": "Cubwarden",
+            "label": "small",
+            "ready": true
+          },
+          {
+            "card": "Plains",
+            "label": "p1"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mending Hands",
+            "label": "mh"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "turn": 1,
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$mh",
+          "mana": [
+            "$p1"
+          ],
+          "targets": [
+            "$bob"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$big",
+          "$small"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "bob",
+      "do": {
+        "Answer": {
+          "prompt": "AllocateDamage",
+          "with": [
+            4,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 16
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "CombatDamage",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 23
+        }
+      }
+    }
+  ]
+}

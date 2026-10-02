@@ -1,0 +1,295 @@
+{
+  "description": "CR 601.3 Mandate of Peace is castable only during a combat phase",
+  "note": "Three moments on one game: alice's precombat main phase (not offered, and a refused Cast with two Plains open), her declare blockers step after the Mandate-board moves (offered), and bob's beginning of combat step on turn 2 (offered).",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "attacker",
+            "ready": true
+          },
+          {
+            "card": "Jade Statue",
+            "label": "jade"
+          },
+          {
+            "card": "Plains",
+            "label": "plains1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains3"
+          },
+          {
+            "card": "Plains",
+            "label": "plains4"
+          },
+          {
+            "card": "Mountain",
+            "label": "amountain"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Mandate of Peace",
+            "label": "mandate"
+          },
+          {
+            "card": "Burst Lightning",
+            "label": "hers"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Goblin Piker",
+            "label": "blocker",
+            "ready": true
+          },
+          {
+            "card": "Mountain",
+            "label": "bmountain1"
+          },
+          {
+            "card": "Mountain",
+            "label": "bmountain2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Burst Lightning",
+            "label": "his"
+          },
+          {
+            "card": "Burst Lightning",
+            "label": "stacked"
+          }
+        ],
+        "library": [
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          },
+          {
+            "card": "Mountain"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $hers",
+            "ActivateManaAbility $plains1",
+            "ActivateManaAbility $plains2",
+            "ActivateManaAbility $plains3",
+            "ActivateManaAbility $plains4",
+            "ActivateManaAbility $amountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$mandate",
+          "mana": [
+            "$plains3",
+            "$plains4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareAttackers",
+      "player": "alice",
+      "do": {
+        "Attack": [
+          "$attacker"
+        ]
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Block": {
+          "$blocker": [
+            "$attacker"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$jade",
+          "mana": [
+            "$plains1",
+            "$plains2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "bob",
+      "do": {
+        "Cast": {
+          "object": "$stacked",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$bmountain1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "DeclareBlockers",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $mandate",
+            "Cast $hers",
+            "Activate $jade",
+            "ActivateManaAbility $plains3",
+            "ActivateManaAbility $plains4",
+            "ActivateManaAbility $amountain"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Offered",
+          "player": "alice",
+          "is": [
+            "Pass",
+            "Cast $mandate",
+            "Cast $hers",
+            "Activate $jade",
+            "ActivateManaAbility $plains3",
+            "ActivateManaAbility $plains4",
+            "ActivateManaAbility $amountain"
+          ]
+        }
+      }
+    }
+  ]
+}

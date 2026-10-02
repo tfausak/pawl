@@ -44,7 +44,6 @@ import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -81,7 +80,6 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -92,7 +90,6 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
-import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
@@ -1126,7 +1123,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   enchantmentAlterationSpec s registry
   miracleWorkerSpec s registry
   enchantPlayerSpec s registry
-  chosenLandTypeSpec s registry
   replenishSpec s registry
   attachRestrictionSpec s registry
   couldEnchantSpec s registry
@@ -1140,63 +1136,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   groupAttachSpec s registry
   groupAttachCardsSpec s registry
   auraSwapSpec s registry
-
--- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
--- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
--- its CR 614.1c as-enters basic land type. aimRecipient below answers only the
--- first, and the entry choice is the whole point of this card.
-mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
-mirageOn landId subtype p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject landId))) sets
-  Prompt.ChooseBasicLandType {} -> subtype
-  _ -> S.identityAnswer p
-
--- CR 614.1c's as-enters choice, whose value is a SUBTYPE rather than a colour,
--- and CR 305.7's set reading it back off the Aura. Convincing Mirage is the
--- pool's only producer of the second; Pillar of Origins makes the other kind of
--- subtype choice (Pawl.ManaSourceSpec). It enchants a non-creature OBJECT, which
--- Song of the Dryads and Consecrate Land also do -- where the two Curses
--- (enchantPlayerSpec below) enchant players, CR 702.5d's other shape, reaching
--- the battlefield through Affected.AttachedPlayerControls rather than
--- Affected.Attached.
-chosenLandTypeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
-  -- The gameplay-level proof design.md section 4 asks for: cast the Aura, answer
-  -- its as-enters prompt for real, let it resolve, and see the enchanted land
-  -- tap for the CHOSEN colour.
-  --
-  -- Run TWICE with different answers on one board. Once would only prove the
-  -- choice was made; a modification that ignored Object.chosenSubtype and
-  -- conjured a fixed type would still pass a single half. Two halves that
-  -- disagree can only be told apart by reading the choice.
-  Spec.it s "CR 614.1c whole card: Convincing Mirage makes a Mountain the chosen basic land type" $ do
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    convincingMirage <- S.printingOf s registry "Convincing Mirage"
-    -- The Islands pay {1}{U}; the Mountain is the host, and is added last so it
-    -- is never the head of a mana-source candidate list.
-    let base0 = S.landsInPlay island 4
-        (landId, base1) = S.addPermanent mountain S.alice base0
-        (withAura, auraSpell) = S.handOne convincingMirage base1
-        run pick =
-          let cast = snd (Engine.runGamePure (mirageOn landId pick) withAura (S.cast S.alice auraSpell))
-           in snd (Engine.runGamePure (mirageOn landId pick) cast Stack.resolveTop)
-        asIsland = run Subtype.Island
-        asSwamp = run Subtype.Swamp
-    Spec.assertEqWith s "before: a plain Mountain" (Projection.subtypesOf landId withAura) (Set.singleton Subtype.Mountain)
-    Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf landId withAura) "and it taps for red"
-    -- CR 303.4: the Aura entered attached to what its enchant slot named, so it
-    -- really did resolve -- without this a failed cast would look like a failed
-    -- type change.
-    Spec.assertBool s (not (null (attachedTo landId asIsland))) "the Aura entered attached to the land"
-    -- CR 305.7: "the land no longer has its old land type". CR 305.6: a land
-    -- with a basic land type has the intrinsic "{T}: Add [mana symbol]".
-    Spec.assertEqWith s "choosing Island: only an Island" (Projection.subtypesOf landId asIsland) (Set.singleton Subtype.Island)
-    Spec.assertBool s (ManaType.Colored Color.Blue `elem` Mana.manaTypesOf landId asIsland) "so it taps for blue"
-    Spec.assertBool s (ManaType.Colored Color.Red `notElem` Mana.manaTypesOf landId asIsland) "and no longer for red"
-    -- The same board, the other answer.
-    Spec.assertEqWith s "choosing Swamp: only a Swamp" (Projection.subtypesOf landId asSwamp) (Set.singleton Subtype.Swamp)
-    Spec.assertBool s (ManaType.Colored Color.Black `elem` Mana.manaTypesOf landId asSwamp) "so it taps for black"
 
 -- Answers every target slot with one fixed recipient, deferring everything else
 -- to S.identityAnswer. aimAt above does the same for a Pool.Permanents slot
@@ -1506,7 +1445,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
 -- Four distinct power/toughness pairs, so no numeric coincidence can hide a
 -- wrong host: 2/4 under the Aura is 4/5, 3/3 is 5/4, 4/4 is 6/5, and the Piker
 -- stays 2/1.
-simicGuildmageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+simicGuildmageSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 simicGuildmageSpec s registry =
   let -- The destination choice by INDEX into what was offered, never by naming
       -- an object: an answerer that searched for a legal option would find the
@@ -1522,41 +1461,6 @@ simicGuildmageSpec s registry =
         [_, ability] -> Just ability
         _ -> Nothing
    in Spec.describe s "Simic Guildmage" $ do
-        -- The PROJECTION read, and the reason it is a second board: bob's
-        -- creatures here are OWNED by alice and controlled by bob through a CR
-        -- 613.1b layer-2 effect, so an owner read of the host's controller would
-        -- offer alice's side instead. The seats and the four creatures are the
-        -- board above's; only who OWNS bob's three differs.
-        Spec.it s "CR 613.1b the host's controller is the projected one, not its owner" $ do
-          island <- S.printingOf s registry "Island"
-          guildmage <- S.printingOf s registry "Simic Guildmage"
-          piker <- S.printingOf s registry "Goblin Piker"
-          brigade <- S.printingOf s registry "Foriysian Brigade"
-          giant <- S.printingOf s registry "Hill Giant"
-          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
-          unholy <- S.printingOf s registry "Unholy Strength"
-          let base = S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers)
-              (mage, g1) = S.addPermanent guildmage S.alice base
-              (decoy, g2) = S.addPermanent piker S.alice g1
-              (host, g3) = S.addPermanent brigade S.alice g2
-              (firstDest, g4) = S.addPermanent giant S.alice g3
-              (secondDest, g5) = S.addPermanent berserkers S.alice g4
-              (aura, g6) = S.addPermanent unholy S.alice g5
-              granted = S.giveControl secondDest S.bob (S.giveControl firstDest S.bob (S.giveControl host S.bob g6))
-              gs = (S.attach aura host granted) {GameState.priority = Just S.alice}
-          case secondAbility guildmage of
-            Nothing -> Spec.assertFailure s "Simic Guildmage should print two activated abilities"
-            Just ability -> do
-              let answer :: Prompt.Prompt r -> r
-                  answer = pickBy NonEmpty.head aura
-                  activated = S.runPure answer gs (Activate.activateAbility S.alice mage ability)
-                  after = S.runPure answer activated Stack.resolveTop
-              Spec.assertEqWith s "bob controls the host although alice owns it" (Projection.controllerOf host gs) (Just S.bob)
-              Spec.assertEqWith s "the Aura moved to a permanent bob controls" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature firstDest)))
-              Spec.assertEqWith s "the Hill Giant is 5/4" (S.powerToughnessOf firstDest after) (Just (5, 4))
-              Spec.assertEqWith s "alice's remaining creature is untouched" (S.powerToughnessOf decoy after) (Just (2, 1))
-              Spec.assertEqWith s "and the Guildmage is a plain 2/2" (S.powerToughnessOf mage after) (Just (2, 2))
-              Spec.assertBool s (secondDest /= firstDest) "the two destinations are distinct objects"
         -- CR 613.8b's loop clause through two Confiscates. Alice's enchants bob's
         -- Forest; bob's enchants alice's, so bob controls it and the Forest.
         -- The Guildmage then moves alice's onto bob's -- bob controls both hosts,
@@ -2255,69 +2159,8 @@ sovereignsAnswer attacker other p = case p of
 -- it", where the host is fixed for the whole evaluation and the Aura varies per
 -- candidate. Filter.CanHostSubject is the same rule with the two roles swapped,
 -- and auraGraftSpec above is its case.
-couldEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+couldEnchantSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
-  -- THE PROVING CASE for #2027, CR 608.2h. The board above with ONE act added:
-  -- the Mage is shrunk to death while its own ETB trigger is on the stack, so the
-  -- ability resolves (CR 113.7a) with its source already gone. Both halves of the
-  -- card that only that board can reach are here -- the search still finds the
-  -- Aura, because "could enchant it" is asked of the Mage as it MOST RECENTLY
-  -- existed, and the found card is revealed to the hand rather than attached to
-  -- nothing.
-  --
-  -- A PAIR of boards differing in exactly one thing: this fixture is the case
-  -- above's, line for line, plus the S.withEffect that kills the Mage. So the
-  -- destination the Aura reaches is the only thing the two runs disagree about,
-  -- and neither reading can be produced by the other board.
-  Spec.it s "CR 608.2h whole card: an Auratouched Mage killed in response still finds the Aura and reveals it to hand" $ do
-    plains <- S.printingOf s registry "Plains"
-    mage <- S.printingOf s registry "Auratouched Mage"
-    strength <- S.printingOf s registry "Unholy Strength"
-    consecrate <- S.printingOf s registry "Consecrate Land"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let base0 = S.landsInPlay plains 6
-        (pikerId, base1) = S.addPermanent piker S.alice base0
-        (_, base2) = S.addLibraryCard piker S.alice base1
-        (_, base3) = S.addLibraryCard strength S.alice base2
-        (_, base4) = S.addLibraryCard consecrate S.alice base3
-        (gs, spell) = S.handOne mage base4
-        mageName = S.nameOf (Printing.card mage)
-        strengthName = S.nameOf (Printing.card strength)
-        consecrateName = S.nameOf (Printing.card consecrate)
-        -- CopySpec's Radstag shape: -5/-5 takes the printed 3/3 to -2/-2 and CR
-        -- 704.5f buries it at the next settle, with the trigger left on the stack.
-        shrink oid = S.withEffect oid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5))))
-        run = do
-          -- Cast the Mage, resolve it, and settle so that CR 603.3b puts its
-          -- "when this creature enters" onto the stack -- and stop there.
-          (_, triggered) <- Engine.runGame (mageAnswer pikerId) gs (do S.cast S.alice spell; Stack.resolveTop; Engine.settleForPriority)
-          let shrunk = Maybe.maybe triggered (\mageId -> shrink mageId triggered) (battlefieldNamed mageName triggered)
-          (_, buried) <- Engine.runGame (mageAnswer pikerId) shrunk Engine.settleForPriority
-          (_, resolved) <- Engine.runGame (mageAnswer pikerId) buried Engine.priorityLoop
-          pure (triggered, buried, resolved)
-        ((onStack, dead, after), searches) = State.runState run []
-        -- Read off `gs`, the PRE-run board, for the case above's reason.
-        named = fmap (Maybe.mapMaybe (fmap Face.name . flip Game.faceOf gs))
-    -- THE gameplay-level assertion, and FIRST: the card the searcher may now cast
-    -- is in their hand. Under the live-board reading the search offers nothing at
-    -- all and this is empty; under a fix that found the card but left it with
-    -- nowhere to go it is empty too. Hand-scoped rather than S.countByName, which
-    -- sums the hand with the library and so cannot tell the two zones apart.
-    Spec.assertEqWith s "CR 608.2h: the Aura the dead Mage could have hosted is in alice's hand" (filter (== strengthName) (handNames S.alice after)) [strengthName]
-    -- The preconditions the assertion above rests on, and the act that separates
-    -- this board from the case above's.
-    Spec.assertBool s (not (null (GameState.stack onStack))) "the Mage's own trigger really was on the stack"
-    Spec.assertEqWith s "and the Mage was gone before it resolved" (battlefieldNamed mageName dead) Nothing
-    -- CR 303.4i is not what happened: there is no host, so nothing was attached
-    -- and no Aura reached the battlefield.
-    Spec.assertEqWith s "the Aura did not enter the battlefield" (S.countOnBattlefieldByName strengthName S.alice after) 0
-    -- CR 701.3a still asked, of the Mage as it most recently existed: Consecrate
-    -- Land's "enchant land" admits no creature, live or last known, and it sits at
-    -- the HEAD of the library so a fallback that stopped asking would hand it back
-    -- first.
-    Spec.assertEqWith s "the search offered exactly the Aura that could have enchanted the Mage" (named searches) [[strengthName]]
-    Spec.assertEqWith s "and the rejected Aura never reached alice's hand" (filter (== consecrateName) (handNames S.alice after)) []
-
   -- THE PROVING CASE for #2028: the object CR 701.3a's question is about is the
   -- one the resolution BOUND, not the searching ability's source. Sovereigns of
   -- Lost Alara's trigger says "an Aura card that could enchant THAT CREATURE" of

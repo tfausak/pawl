@@ -1074,26 +1074,8 @@ floatsEverything p = case p of
 -- what makes the pool VISIBLE on a board: its layer-7c pump counts the unspent
 -- green mana its controller has, so three Forests tapped for nothing at all read
 -- off the creature as 4/4.
-priorityWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+priorityWindowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" $ do
-  Spec.it s "CR 605.3a a player with priority may fill their pool with nothing to pay for" $ do
-    forest <- S.printingOf s registry "Forest"
-    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
-    let (omnathId, board) = priorityWindowBoard omnath forest
-        after = S.runPure tapEverything board Engine.priorityLoop
-        -- The paired control: the same board, the same loop, and the one
-        -- difference is that alice declines the action. Every assertion below
-        -- reads the other way on it, so none of them can be passing on
-        -- something the fixture would have done anyway.
-        passed = S.runPure S.identityAnswer board Engine.priorityLoop
-    Spec.assertEqWith s "three green floating, and nothing asked for them" (poolSize S.alice after) 3
-    Spec.assertEqWith s "all three Forests are tapped" (S.tappedCount S.alice after) 3
-    Spec.assertEqWith s "CR 605.3b nothing went on the stack" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "CR 613.4c Omnath counts all three" (Projection.powerOf omnathId after) (Just 4)
-    Spec.assertEqWith s "and its toughness with them" (Projection.toughnessOf omnathId after) (Just 4)
-    Spec.assertEqWith s "the control: passing floats nothing" (poolSize S.alice passed) 0
-    Spec.assertEqWith s "and leaves Omnath its printed 1/1" (Projection.powerOf omnathId passed) (Just 1)
-
   -- The offer itself, and its one gate. Mana.manaSources is what
   -- Action.legalActions filters on, so a source already tapped for the turn
   -- drops off the menu -- which is also what stops the loop above from being
@@ -1109,38 +1091,6 @@ priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" 
     Spec.assertEqWith s "one per Forest, and none for the Omnath" (length (offers board)) 3
     Spec.assertEqWith s "tapping one takes it off the menu" (length (offers tappedOne)) 2
 
-  -- CR 118.3 reaches this window too: the options are gated by whether the
-  -- ability's own activation cost can be paid (CR 602.2b), the same predicate
-  -- the payment window is gated by. Phyrexian Tower is the pool's one permanent
-  -- pairing a mana ability whose cost can fail -- "{T}, Sacrifice a creature:
-  -- Add {B}{B}" -- with an always-payable "{T}: Add {C}", so the permanent is on
-  -- the menu either way and what changes is what taking it can yield.
-  -- Transmogrant Altar's cost can fail too and has no such sibling, which is
-  -- why transmograntAltarSpec asserts the whole permanent off the menu.
-  Spec.it s "CR 118.3 what the activation may yield is gated by its own cost" $ do
-    tower <- S.printingOf s registry "Phyrexian Tower"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let alone = towerBoard tower Nothing
-        withPiker = towerBoard tower (Just piker)
-        run gs = S.runPure tapEverythingForBlack gs Engine.priorityLoop
-    Spec.assertEqWith s "with a creature to give, the priority window floats {B}{B}" (poolTypes S.alice (run withPiker)) [ManaType.Colored Color.Black, ManaType.Colored Color.Black]
-    Spec.assertEqWith s "CR 601.2h and the creature paid for it" (S.creaturesInPlay S.alice (run withPiker)) 0
-    Spec.assertEqWith s "with none, the same window can only take the {C}" (poolTypes S.alice (run alone)) [ManaType.Colorless]
-
-  -- CR 117.3c: "if a player has priority when they ... activate an ability ...
-  -- that player receives priority afterward." Who is asked next is the only
-  -- thing a game observes about who holds it, so the sequence is the assertion --
-  -- SpecialActionSpec's shape for CR 116.3, and both halves of the arm ride on
-  -- it. It is BOB's turn, so his pass is already standing when alice taps:
-  -- retaining priority puts her second prompt before his second, and restarting
-  -- CR 117.4's pass count is what makes him asked a second time at all.
-  Spec.it s "CR 117.3c the activator receives priority again afterward" $ do
-    forest <- S.printingOf s registry "Forest"
-    let (_, withForest) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
-        board = withForest {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
-        asked = State.execState (Engine.runGame tapOnceThenPass board Engine.priorityLoop) []
-    Spec.assertEqWith s "bob passes, alice taps, alice is asked again, and only then is bob asked again" asked [S.bob, S.alice, S.alice, S.bob]
-
 -- alice, active, in her precombat main phase with an empty hand and an empty
 -- stack: one Omnath and three Forests, so the only mana that can ever reach her
 -- pool is mana she activated a mana ability for while holding priority.
@@ -1149,16 +1099,6 @@ priorityWindowBoard omnath forest =
   let (omnathId, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
       board = foldr (\_ gs -> snd (S.addPermanent forest S.alice gs)) g1 [1 :: Int, 2, 3]
    in (omnathId, board {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
-
--- alice, active, in her precombat main phase: one Phyrexian Tower, and a
--- creature to sacrifice or not.
-towerBoard :: Printing.Printing -> Maybe Printing.Printing -> GameState.GameState
-towerBoard tower victim =
-  let g1 = snd (S.addPermanent tower S.alice (Setup.emptyGame S.bothPlayers))
-      g2 = case victim of
-        Nothing -> g1
-        Just printing -> snd (S.addPermanent printing S.alice g1)
-   in g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
 
 -- CR 605.3a's two windows, gated by the "activate only ..." rider CR 602.5 makes
 -- a prohibition. Synthetic Ember Spring is the producer -- "{T}: Add {R}.
@@ -1190,20 +1130,8 @@ towerBoard tower victim =
 -- Pawl.Engine.ActivationRestriction.needsEmptyStack about that arm rather than
 -- reading the stack of the wrong moment, and grinningIgnusSpec below is where
 -- both roads are proved.
-riderWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+riderWindowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 riderWindowSpec s registry = Spec.describe s "CR 605.3a a printed rider gates both windows" $ do
-  Spec.it s "CR 500.1 the priority window offers the source only inside the rider's step" $ do
-    spring <- S.printingOf s registry "Synthetic Ember Spring"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (inUpkeep, _) = springBoard spring bolt
-        inMain = inUpkeep {GameState.phase = Phase.PrecombatMain}
-        floated gs = poolTypes S.alice (S.runPure tapEverything gs Engine.priorityLoop)
-        offers gs = filter isManaActivation (Action.legalActions S.alice gs)
-    Spec.assertEqWith s "in her upkeep the rider admits it and {R} floats" (floated inUpkeep) [ManaType.Colored Color.Red]
-    Spec.assertEqWith s "in her main phase the same board floats nothing" (floated inMain) []
-    Spec.assertEqWith s "the menu it was taken from carries the one offer" (length (offers inUpkeep)) 1
-    Spec.assertEqWith s "and carries none outside the window" (length (offers inMain)) 0
-
   -- CR 605.3a's other window: the same rider asked while a payment is in flight,
   -- reached through Cast.castSpell rather than through the action menu, so
   -- neither assertion here can be passing on the offer above.
@@ -1256,25 +1184,8 @@ springBoard spring bolt =
 -- shape two colorless mana pay -- turned up none, Lightning Bolt's {R} being
 -- the shape every instant in the corpus has. Any generic-only instant added
 -- later would serve as the door instead.
-laviniaTurnRiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+laviniaTurnRiderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 laviniaTurnRiderSpec s registry = Spec.describe s "CR 102.1 a rider naming a turn and no phase" $ do
-  Spec.it s "CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers" $ do
-    lavinia <- S.printingOf s registry "Lavinia, Foil to Conspiracy"
-    wretch <- S.printingOf s registry "Withered Wretch"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let boardOn active = snd (laviniaBoard lavinia wretch piker active)
-        floated active = poolTypes S.alice (S.runPure tapEverything (boardOn active) Engine.priorityLoop)
-        offers active = length (filter isManaActivation (Action.legalActions S.alice (boardOn active)))
-        colorless = [ManaType.Colorless, ManaType.Colorless]
-    -- The gameplay-level assertion, and the whole point of three seats: the mana
-    -- exists on BOTH opponents' turns and on neither reading of "an opponent" is
-    -- alice's own turn one.
-    Spec.assertEqWith s "CR 102.2 on bob's turn the rider admits it and {C}{C} floats" (floated S.bob) colorless
-    Spec.assertEqWith s "CR 806.1 on carol's turn too, so this is not an enumeration of one opponent" (floated S.carol) colorless
-    Spec.assertEqWith s "CR 109.5 on her own turn the same board floats nothing" (floated S.alice) []
-    -- The menu those activations were taken from, as a supporting check.
-    Spec.assertEqWith s "the offer follows the pool at all three seats" (fmap offers [S.bob, S.carol, S.alice]) [1, 1, 0]
-
   -- CR 605.3a's other window, reached through Activate.activateAbility rather
   -- than the action menu, so neither assertion here can be passing on the offer
   -- above. Only Lavinia can pay the Wretch's {1}, so the payment is her rider's
@@ -1393,23 +1304,6 @@ tapEverything p = case p of
     h : _ -> h
     [] -> Action.Type.Pass
   _ -> S.identityAnswer p
-
--- tapEverything's actions with prefersDoubleBlack's colour answer, so the one
--- thing separating the two Phyrexian Tower boards is whether {B}{B} was on offer.
-tapEverythingForBlack :: Prompt.Prompt r -> r
-tapEverythingForBlack p = case p of
-  Prompt.ChooseAction {} -> tapEverything p
-  _ -> prefersDoubleBlack p
-
--- tapEverything again, recording which player each priority prompt went to:
--- the record CR 117.3c is asserted on. Its board holds one source, so the
--- activation happens once and every later prompt passes.
-tapOnceThenPass :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
-tapOnceThenPass p = case p of
-  Prompt.ChooseAction _ pid _ -> do
-    State.modify' (<> [pid])
-    pure (tapEverything p)
-  _ -> pure (S.identityAnswer p)
 
 -- CR 605.3b: one activation of one mana ability, adding TWO mana. Sol Ring ({1}
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
@@ -2715,36 +2609,6 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
            in S.castable S.alice oid board
     Spec.assertBool s (not (holding alone)) "CR 605.3c the {R} it would add is not there to pay the {R} it costs"
     Spec.assertBool s (holding withLand) "and a Mountain is what makes the same {1} castable"
-
-  -- CR 601.2a against CR 307.5, which is the one rider whose window CLOSES
-  -- between the gate and the payment: CR 601.2a puts the spell on the stack
-  -- BEFORE CR 601.2f-h totals and pays the cost, so no cast's payment ever has
-  -- the empty stack CR 307.5 requires. A gate counting the Ignus's {C}{C}{R}
-  -- therefore offered a cast whose own payment could not reach that mana, and CR
-  -- 601.2 then rewound it (#2005).
-  --
-  -- The BOARD is ignusBoard plus a Boggart Brute in hand: {2}{R} against a
-  -- Mountain and an Ignus, whose three mana are exactly the Mountain's one and
-  -- the Ignus's net two -- so nothing pays the Brute without the Ignus, and the
-  -- Mountain alone is not the reason either way.
-  --
-  -- The two boards are ONE ACTIVATION apart and nothing else -- same phase, same
-  -- Brute, same Mountain. Floating the mana first, with the stack still empty, is
-  -- what the rules leave the player (CR 605.3a's priority window, which
-  -- Action.legalActions goes on offering), and the same Brute is castable there.
-  -- So the refusal is about the window and not about the {2}{R}.
-  Spec.it s "CR 601.2a no cast is offered off the sorcery-speed source, the proposal itself closing CR 307.5's window" $ do
-    ignus <- S.printingOf s registry "Grinning Ignus"
-    mountain <- S.printingOf s registry "Mountain"
-    brute <- S.printingOf s registry "Boggart Brute"
-    let (ignusId, board) = ignusBoard ignus mountain
-        (held, bruteId) = S.handOne brute board
-        floated = snd (State.evalState (Engine.runGame (takesIgnusOnce ignusId) held Engine.priorityLoop) (0 :: Int))
-        offers gs = filter (S.isCastOf bruteId) (Action.legalActions S.alice gs)
-    Spec.assertEqWith s "CR 601.2a the Ignus is no supply for a cast, whose payment the proposal has already put a spell on the stack for" (length (offers held)) 0
-    Spec.assertEqWith s "CR 605.3a the same Brute off the same board is castable once that mana is floated with the stack still empty" (length (offers floated)) 1
-    Spec.assertEqWith s "and the float is the Ignus's own {C}{C}{R}" (poolTypes S.alice floated) [ManaType.Colorless, ManaType.Colorless, ManaType.Colored Color.Red]
-    Spec.assertEqWith s "CR 307.1 both boards are the same sorcery-speed window, so the phase decides neither" (GameState.phase floated) Phase.PrecombatMain
 
   -- CR 602.2a is CR 601.2a's rule for an ACTIVATION -- the ability goes on the
   -- stack, and only then does CR 602.2b send the cost through CR 601.2f-h -- so

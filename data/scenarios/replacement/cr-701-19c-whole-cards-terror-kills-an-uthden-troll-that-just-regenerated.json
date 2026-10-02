@@ -1,0 +1,48 @@
+{
+  "description": "CR 701.19c whole cards: Terror kills an Uthden Troll that just regenerated",
+  "note": "The Troll's {R} regeneration is activated and resolved, then Terror, whose destruction forbids regeneration (CR 701.19c), kills it through the shield. The control casts Doom Blade instead after the same activation and the Troll survives, which is the Haskell test's check that the shield really was created.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "mountain"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-1"
+          },
+          {
+            "card": "Swamp",
+            "label": "swamp-2"
+          },
+          {
+            "card": "Uthden Troll",
+            "label": "troll"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Terror",
+            "label": "spell"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Activate": {"object": "$troll", "mana": ["$mountain", null]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": {"Cast": {"object": "$spell", "targets": ["$troll"], "mana": ["$swamp-1", "$swamp-2"]}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass"},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Battlefield", "card": "Uthden Troll", "count": 0}}},
+    {"turn": 1, "step": "PrecombatMain", "player": "alice", "check": {"Count": {"player": "alice", "zone": "Graveyard", "card": "Uthden Troll", "count": 1}}}
+  ]
+}

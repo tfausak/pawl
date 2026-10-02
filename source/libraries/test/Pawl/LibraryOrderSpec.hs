@@ -868,9 +868,8 @@ fatesealSpec s registry = Spec.describe s "Fateseal" $ do
 -- put the revealed card into their graveyard."
 --
 -- Merfolk Branchwalker {1}{G} Creature -- Merfolk Scout 2/1, "When this creature
--- enters, it explores", cast off two Forests and run to a stable board -- the
--- gameplay-level route Pawl.MassEffectSpec's baneOfProgressSpec takes, so CR 603.6a's enters trigger
--- is placed by the engine rather than by the fixture.
+-- enters, it explores", cast off two Forests and run to a stable board, so CR
+-- 603.6a's enters trigger is placed by the engine rather than by the fixture.
 --
 -- The library is STACKED so the branch is chosen rather than drawn: the top card
 -- is this helper's argument and a Bird Maiden always sits beneath it. Every case

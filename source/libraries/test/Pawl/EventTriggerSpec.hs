@@ -9,7 +9,6 @@ module Pawl.EventTriggerSpec where
 import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -1148,65 +1147,13 @@ kambalSpec s registry =
 -- BOTH the counter and the projected power are asserted, because CR 122.1a is
 -- what makes the counter mean anything: a counter that landed but never reached
 -- the CR 613.4c layer would leave the count right and the creature a 2/1.
-brinebornCutthroatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brinebornCutthroatSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 brinebornCutthroatSpec s registry =
   let -- alice bears the Cutthroat and three Forests, one per Fog: no untap step
-      -- runs between the casts below, so the lands are not reused. bob and carol
-      -- get nothing at all -- they are turns here, not casters.
-      board forest cutthroat =
-        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent forest pid g2)) g [1 .. (n :: Int)]
-            withLands = addLands S.alice 3 S.threePlayerGame
-            (cutthroatId, withCutthroat) = S.addPermanent cutthroat S.alice withLands
-         in ( cutthroatId,
-              withCutthroat
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.priority = Just S.alice
-                }
-            )
-      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
       -- alice keeps priority throughout: CR 117.1a lets her cast an instant on
       -- anybody's turn, which is the whole premise of the card.
       onTurnOf pid gs = gs {GameState.activePlayer = pid, GameState.priority = Just S.alice}
-      countersOn = S.counterOf CounterKind.PlusOnePlusOne
    in Spec.describe s "SpellCast during an opponent's turn" $ do
-        -- THE case, in one run so the counts accumulate: the same caster and the
-        -- same spell three times over, one turn apart each.
-        Spec.it s "CR 601.2i Brineborn Cutthroat counts only the casts on another player's turn" $ do
-          forest <- S.printingOf s registry "Forest"
-          fog <- S.printingOf s registry "Fog"
-          cutthroat <- S.printingOf s registry "Brineborn Cutthroat"
-          let (cutthroatId, base) = board forest cutthroat
-              (fog1, g1) = S.addHandCard fog S.alice base
-              (fog2, g2) = S.addHandCard fog S.alice g1
-              (fog3, g3) = S.addHandCard fog S.alice g2
-              afterAlice = castAndResolve S.alice fog1 (onTurnOf S.alice g3)
-              afterBob = castAndResolve S.alice fog2 (onTurnOf S.bob afterAlice)
-              afterCarol = castAndResolve S.alice fog3 (onTurnOf S.carol afterBob)
-              graveyardOf gs = length (Game.zoneMembers Zone.Graveyard S.alice gs)
-          Spec.assertEqWith s "no counter before anything is cast" (countersOn cutthroatId g3) 0
-          -- Positive control: all three casts really happened and really
-          -- resolved, so any silence below is the scope's answer rather than a
-          -- fixture that ran out of mana on the second Fog.
-          Spec.assertEqWith s "each Fog resolved into alice's graveyard in turn" (graveyardOf afterAlice, graveyardOf afterBob, graveyardOf afterCarol) (1, 2, 3)
-          -- ONE TUPLE over the three turns rather than three assertions, so a
-          -- scope read the wrong way round shows its whole trajectory at once:
-          -- alice's own turn is the seat that must NOT count, bob's is the first
-          -- that must, and carol's is the seat that is neither the caster nor the
-          -- one other player -- which is what "an opponent's" has to mean (CR
-          -- 102.2, CR 806.1).
-          Spec.assertEqWith
-            s
-            "only bob's and carol's turns put a counter on"
-            (countersOn cutthroatId afterAlice, countersOn cutthroatId afterBob, countersOn cutthroatId afterCarol)
-            (0, 1, 2)
-          -- And the same three states read through the CR 613.4c layer, so a
-          -- counter that landed without reaching the projected P/T is caught.
-          Spec.assertEqWith
-            s
-            "CR 122.1a moves the printed 2/1 with them"
-            (S.powerToughnessOf cutthroatId afterAlice, S.powerToughnessOf cutthroatId afterBob, S.powerToughnessOf cutthroatId afterCarol)
-            (Just (2, 1), Just (3, 2), Just (4, 3))
         -- CR 702.8a's flash, which the trigger above does not touch: casting an
         -- INSTANT on an opponent's turn is CR 117.1a and says nothing about the
         -- Cutthroat's own keyword. Goblin Piker is the control -- an ordinary
@@ -1422,76 +1369,6 @@ blightChroniclerBoard s registry withSolemnity withOwnWatcher = do
           (g6 {GameState.phase = endStep, GameState.activePlayer = S.alice})
   pure (gnarlbarkId, S.runPure S.identityAnswer begun Engine.settleForPriority)
 
--- CR 701.66b's earthbend as a TRIGGER EVENT, and rule 701.67c's waterbend
--- beside it. The one printing that watches either act, Avatar Aang, reads only
--- its own controller's ("whenever YOU waterbend, earthbend, ..."; Scryfall
--- oracle:earthbend, oracle:waterbend, oracle:airbend and oracle:firebend, every
--- card_faces entry read, 2026-09-19), and data/scenarios/event-trigger holds
--- its case. The watchers here read EVERY player's, which no printing does, so
--- they are made up -- data/cards/synthetic-stonelistener-adept.json and
--- data/cards/synthetic-tidecaller-scribe.json, both "Whenever a player
--- [bend]s, put a +1/+1 counter on this creature". One trigger condition over
--- one event, and the counter is an effect the engine already had.
---
--- Each watcher sits under BOB while alice bends, so every case reads
--- PlayerRelation.AnyPlayer across a seat rather than a self-scoped trigger.
---
--- The bender is Earthbending Lesson ({3}{G} Sorcery -- Lesson, whose whole text
--- is "Earthbend 4") and Geyser Leaper ({4}{U} 4/3, "Flying / Waterbend {4}: Draw
--- a card, then discard a card"); Pawl.EarthbendSpec and Pawl.CostSpec are where
--- what those two do is proved.
-bendTriggerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-bendTriggerSpec s registry =
-  let placeTriggers gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-      settle gs = S.runPure S.identityAnswer (placeTriggers gs) Stack.resolveTop
-      plus = S.counterOf CounterKind.PlusOnePlusOne
-   in Spec.describe s "Bend triggers" $ do
-        -- THE MOMENT, which is the whole of rule 701.66b: the ability triggers
-        -- when rule 701.66a's DELAYED triggered ability is created, not when
-        -- that delayed ability later returns the land. The two readings are
-        -- separated by reading the Adept twice on one board -- once while the
-        -- Lesson has only just resolved, and again after the earthbent land has
-        -- died and come back. A "when it returns" implementation answers 0 then
-        -- 1 where rule 701.66b answers 1 then 1.
-        Spec.it s "CR 701.66b the Adept fires as rule 701.66a's delayed ability is created, not when it returns the land" $ do
-          forest <- S.printingOf s registry "Forest"
-          lesson <- S.printingOf s registry "Earthbending Lesson"
-          adept <- S.printingOf s registry "Synthetic Stonelistener Adept"
-          let (adeptId, g1) = S.addPermanent adept S.bob (S.landsInPlay forest 5)
-              (g2, spell) = S.handOne lesson g1
-              target = lastLand g2
-              answer :: Prompt.Prompt r -> r
-              answer = aimedAt target
-              cast = S.runPure answer g2 (S.cast S.alice spell)
-              earthbent = settle (S.runPure answer cast Stack.resolveTop)
-              returned = settle (settle (S.settleSba (S.markDamage target 4 earthbent)))
-          Spec.assertEqWith s "CR 701.66b the earthbend put a +1/+1 counter on bob's Adept" (plus adeptId earthbent) 1
-          Spec.assertEqWith s "CR 701.66b and rule 701.66a's delayed ability returning the land puts no second one" (plus adeptId returned) 1
-          -- The proxies, after the behaviour: rule 701.66a really ran, and the
-          -- delayed ability really resolved, so neither reading above is of a
-          -- board that never moved.
-          Spec.assertEqWith s "CR 701.66a the earthbend itself put four +1/+1 counters on the land" (plus target earthbent) 4
-          Spec.assertBool s (not (S.onBattlefield target returned)) "CR 400.7 the earthbent land itself is gone"
-          Spec.assertEqWith s "CR 701.66a and the card it was came back, so alice controls five lands again" (length (Game.zoneMembers Zone.Battlefield S.alice returned)) 5
-
--- alice's last battlefield permanent in ObjectId order. Her battlefield holds
--- nothing but Forests on this board, so this is one of them; rule 701.66a's
--- "target land you control" asks nothing about whether paying for the Lesson
--- tapped it.
-lastLand :: GameState.GameState -> ObjectId.ObjectId
-lastLand gs = case List.sortOn Ord.Down (Game.zoneMembers Zone.Battlefield S.alice gs) of
-  oid : _ -> oid
-  [] -> S.noSource
-
--- Aim a target slot at this permanent, PINNED rather than searched: an answerer
--- that took whatever was legal would find another Forest after a mutation and
--- keep the case green. FILTERED out of the offered set rather than built from
--- the id, since CR 608.2b re-reads the recipient the pool offered.
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just victim) . Recipient.objectOf) offered) sets
-  _ -> S.castAnswer p
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cyclesTriggerSpec s registry
@@ -1510,4 +1387,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   brinebornCutthroatSpec s registry
   oreskosSunGuideSpec s registry
   blightChroniclerSpec s registry
-  bendTriggerSpec s registry
