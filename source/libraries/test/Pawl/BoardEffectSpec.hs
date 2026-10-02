@@ -2884,7 +2884,7 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
 -- Five tapped lands, three alice's Islands and two bob's Mountains -- the
 -- printed "lands" is not "lands you control" -- so more are eligible than the
 -- ceiling admits, and the choice is put to a player however many it names.
-teferiUntapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+teferiUntapSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 teferiUntapSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
@@ -2933,20 +2933,6 @@ teferiUntapSpec s registry =
               Spec.assertEqWith s "the +1 armed one delayed ability" (length (GameState.delayedTriggers armed)) 1
               Spec.assertEqWith s "alice's first Island and bob's first Mountain untapped, the other three did not" (fmap (tapped after) lands) [False, True, True, False, True]
               Spec.assertEqWith s "asked once, offered every land, at most two" asked [(lands, Just 2)]
-            Nothing -> Spec.assertFailure s "Teferi prints a +1"
-        -- An answer naming all five: the ceiling holds anyway (#222's posture).
-        Spec.it s "CR 608.2d an answer naming more than two untaps only two" $ do
-          result <- run id
-          case result of
-            Just (lands, _, after, _) -> Spec.assertEqWith s "two of the five lands untapped" (length (filter (not . tapped after) lands)) 2
-            Nothing -> Spec.assertFailure s "Teferi prints a +1"
-        -- "Up to": none is an answer too.
-        Spec.it s "CR 608.2d naming none untaps nothing" $ do
-          result <- run (const [])
-          case result of
-            Just (lands, _, after, asked) -> do
-              Spec.assertEqWith s "all five lands still tapped" (fmap (tapped after) lands) [True, True, True, True, True]
-              Spec.assertEqWith s "the player was asked" (length asked) 1
             Nothing -> Spec.assertFailure s "Teferi prints a +1"
 
 -- Archfiend of Depravity {3}{B}{B} Creature -- Demon 5/4: "Flying / At the

@@ -1,6 +1,6 @@
 {
   "description": "CR 118.3 an answer naming a kind the creature lacks pays nothing",
-  "note": "The Answer takes two +1/+1 counters off the Piker, which carries one +1/+1 and one vigilance counter; the payment fails whole and nothing moves. CR 733.2's ReverseManaAbilities is answered Declines: Exercises, as the Haskell answerer gives, crashes pawl scenario with an arithmetic underflow, and no assertion depends on it.",
+  "note": "The Answer takes two +1/+1 counters off the Piker, which carries one +1/+1 and one vigilance counter; the payment fails whole and nothing moves.",
   "board": {
     "seats": [
       {
@@ -121,7 +121,7 @@
         "Answer": {
           "prompt": "ReverseManaAbilities",
           "with": {
-            "type": "Declines"
+            "type": "Exercises"
           }
         }
       }

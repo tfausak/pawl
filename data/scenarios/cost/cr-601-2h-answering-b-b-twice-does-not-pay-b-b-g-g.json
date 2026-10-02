@@ -1,6 +1,6 @@
 {
   "description": "CR 601.2h answering {B}{B} twice does not pay {B}{B}{G}{G}",
-  "note": "The cast is offered; the Bloom's two activations are answered {B}{B} each, which the engine does not repair into {G}{G}, so the cast is refused and Jarad never resolves. CR 733.2's ReverseManaAbilities is answered Declines: Exercises crashes pawl scenario with an arithmetic underflow, and no assertion reads the pool.",
+  "note": "The cast is offered; the Bloom's two activations are answered {B}{B} each, which the engine does not repair into {G}{G}, so the cast is refused and Jarad never resolves.",
   "board": {
     "seats": [
       {
@@ -69,7 +69,7 @@
         "Answer": {
           "prompt": "ReverseManaAbilities",
           "with": {
-            "type": "Declines"
+            "type": "Exercises"
           }
         }
       }

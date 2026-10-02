@@ -509,22 +509,6 @@ bloodthirstSpec s registry =
           case vampireIn after of
             Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
             Just vamp -> Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
-        -- CR 608.2i: the window is THIS turn. Without this a lifetime tally passes
-        -- every case above. The turn goes all the way round to alice again, so the
-        -- only difference from the positive case is which turn it is.
-        Spec.it s "CR 608.2i the damage is THIS turn's: the handoff clears it" $ do
-          swamp <- S.printingOf s registry "Swamp"
-          vampire <- S.printingOf s registry "Bloodrage Vampire"
-          sentry <- S.printingOf s registry "Ogre Sentry"
-          let (gs0, held, bobsSentry) = bloodthirstBoard swamp vampire sentry
-              damaged = hit bobsSentry (Recipient.ToPlayer S.bob) 4 gs0
-              handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
-              roundAgain = readyForAlice (handoff (handoff (handoff damaged)))
-              after = enters roundAgain held
-          Spec.assertEqWith s "the turn came back to alice" (GameState.activePlayer roundAgain) S.alice
-          case vampireIn after of
-            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
-            Just vamp -> Spec.assertEqWith s "no counters a turn cycle later" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
         -- CR 702.54c: "if an object has multiple instances of bloodthirst, each
         -- applies separately." Asserted at the mint rather than at gameplay level,
         -- because nothing in the pool prints or grants a second instance -- the

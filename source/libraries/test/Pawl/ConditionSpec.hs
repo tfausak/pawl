@@ -706,20 +706,6 @@ ashlingSpec s registry = Spec.describe s "Ashling the Pilgrim (CR 608.2n)" $ do
         Spec.assertEqWith s "nobody was dealt anything" (S.lifeOf S.bob after) (Just 20)
         Spec.assertEqWith s "and the Blind-Spot Giant is untouched" (S.countOnBattlefieldByName giantName S.bob after) 1
         Spec.assertEqWith s "the counters are still on Ashling" (S.counterOf CounterKind.PlusOnePlusOne ashlingId after) 2
-  -- CR 608.2i's extent: GameState.events is cleared at the turn handoff, so the
-  -- tally is of THIS turn. Two resolutions, the handoff, then a third -- which a
-  -- game-long count would make the third time and a counters-on-Ashling reading
-  -- would too, Ashling carrying three of them by then.
-  Spec.it s "CR 608.2i the turn handoff resets the tally" $ do
-    (ashlingId, board) <- setUp
-    case Maybe.listToMaybe (Projection.abilitiesOf ashlingId board) of
-      Nothing -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability"
-      Just pump -> do
-        let twice = List.foldl' (\gs _ -> activateAshling ashlingId pump gs) board [1 .. (2 :: Int)]
-            after = activateAshling ashlingId pump (Engine.beginTurnOf S.bob twice)
-        Spec.assertEqWith s "CR 608.2i the resolution on bob's turn is the first of it, so nothing was dealt" (S.lifeOf S.bob after) (Just 20)
-        Spec.assertEqWith s "and the Blind-Spot Giant is untouched" (S.countOnBattlefieldByName giantName S.bob after) 1
-        Spec.assertEqWith s "Ashling carries all three counters, which is what a count of them rather than of resolutions would have read" (S.counterOf CounterKind.PlusOnePlusOne ashlingId after) 3
 
 -- One activation of Ashling's ability by alice, resolved and settled. alice is
 -- given priority because a board does not imply a window (S.priorityGame's

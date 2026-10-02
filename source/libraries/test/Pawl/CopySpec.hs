@@ -117,12 +117,10 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.ManaSymbolSpec as ManaSymbolSpec
@@ -3071,45 +3069,6 @@ magarSpec s registry = Spec.describe s "MagarOfTheMagicStrings" $ do
         Spec.assertEqWith s "and her hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
         Spec.assertEqWith s "CR 510.1b the Clone alone dealt bob 3" (S.lifeOf S.bob after) (Just 17)
       other -> Spec.assertFailure s ("expected one Clone to enter, got " <> show (length other))
-
-  -- The listed "exile it instead", on the permanent and on a Clone of it.
-  Spec.it s "CR 614.1a the face-down permanent and a Clone of it are exiled instead of dying" $ do
-    (downId, board) <- magarBoard s registry
-    clone <- S.printingOf s registry "Clone"
-    let resolved = cloneOnto clone downId board
-        entered = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield board))
-        killed = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable (downId : entered))
-        names zone = List.sort (fmap (\oid -> S.soleFaceName oid killed) (Game.zoneMembers zone S.alice killed))
-    Spec.assertEqWith s "both are in exile, Divination and Clone" (names Zone.Exile) (List.sort [CardName.MkCardName (Text.pack "Clone"), CardName.MkCardName (Text.pack "Divination")])
-    Spec.assertEqWith s "and alice's graveyard holds only the Lightning Bolt" (names Zone.Graveyard) [CardName.MkCardName (Text.pack "Lightning Bolt")]
-
-  -- The ruling's "turn a face-down instant or sorcery card face up" case, the
-  -- shape CR 701.40g gives a manifested one. Break Open's effect, driven through
-  -- its funnel.
-  Spec.it s "CR 708.2 the rulings: an effect turning the face-down Divination face up leaves it face down" $ do
-    (downId, board) <- magarBoard s registry
-    let after = S.runPure S.identityAnswer board (FaceDown.turnFaceUpByEffect downId)
-    Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject downId board)) "before: it is face down"
-    Spec.assertEqWith s "the ruling: it is still face down" (fmap (Facing.isFaceDown . Object.facing) (Game.lookupObject downId after)) (Just True)
-
-  -- The ruling's blink case: exiled, the card is an instant card, and CR 400.4a
-  -- keeps it there when Flicker of Fate tries to return it.
-  Spec.it s "CR 400.4a Flicker of Fate exiles the face-down Divination and it stays in exile" $ do
-    (downId, board) <- magarBoard s registry
-    flicker <- S.printingOf s registry "Flicker of Fate"
-    let (flickerId, inHand) = S.addHandCard flicker S.alice board
-        funded = inHand {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [floating Color.White, floating Color.White]), GameState.priority = Just S.alice}
-        after = S.runPure (targetingCard downId) funded (S.cast S.alice flickerId >> Stack.resolveTop)
-        names zone = fmap (\oid -> S.soleFaceName oid after) (Game.zoneMembers zone S.alice after)
-    Spec.assertEqWith s "CR 400.4a Divination is in exile" (names Zone.Exile) [CardName.MkCardName (Text.pack "Divination")]
-    Spec.assertEqWith s "and alice controls only Magar" (length (filter (\oid -> Projection.controllerOf oid after == Just S.alice) (Set.toList (GameState.battlefield after)))) 1
-
-  -- CR 712.14b asks about a card entering FACE UP: CR 708.3 has turned this
-  -- one over first, and CR 712.15 gives a face-down double-faced card the listed
-  -- characteristics.
-  Spec.it s "CR 712.15 Magar puts a modal double-faced card with a sorcery front onto the battlefield face down" $ do
-    (downId, board) <- magarBoardAt s registry "Sea Gate Restoration"
-    Spec.assertEqWith s "a face-down 3/3 entered" (fmap (Facing.isFaceDown . Object.facing) (Game.lookupObject downId board), Projection.powerOf downId board) (Just True, Just 3)
 
 -- alice's settled Magar in combat's declare attackers step, bob defending, and
 -- Magar's ability activated at Divination and resolved. Answers the face-down

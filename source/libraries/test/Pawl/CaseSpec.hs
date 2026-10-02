@@ -49,7 +49,6 @@ module Pawl.CaseSpec where
 import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -66,7 +65,6 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
@@ -74,19 +72,15 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
-import qualified Pawl.Types.ZoneChange as ZoneChange
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Case" $ do
@@ -351,28 +345,8 @@ enteredOne before after =
 -- Case of the Gorgon's Kiss, MKM 79: its entry trigger and CR 702.169b's static
 -- reading of "Solved --" as a type-changing effect. Its to-solve count is proven
 -- against a melded permanent in Pawl.MeldSpec.
-gorgonsKissSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gorgonsKissSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 gorgonsKissSpec s registry = Spec.describe s "Case of the Gorgon's Kiss" $ do
-  -- Prodigal Sorcerer pings one of two Hill Giants, so the damaged one is the
-  -- only creature the trigger's slot admits.
-  Spec.it s "CR 120.1 the entry trigger destroys the creature that was dealt damage this turn" $ do
-    gorgonsKiss <- S.printingOf s registry "Case of the Gorgon's Kiss"
-    island <- S.printingOf s registry "Island"
-    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    case Face.activatedAbilities (S.combinedFace sorcerer) of
-      ping : _ -> do
-        let (sorcererId, gs1) = S.addPermanent sorcerer S.alice (S.landsInPlay island 1)
-            (hurtId, gs2) = S.addPermanent hillGiant S.bob gs1
-            (wholeId, gs3) = S.addPermanent hillGiant S.bob gs2
-            ready = gs3 {GameState.priority = Just S.alice}
-            pinged = S.settleSba (S.runPure (aimedAt hurtId) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop))
-            (caseId, withCase) = S.addPermanent gorgonsKiss S.alice pinged
-            entered = Event.recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange caseId caseId Zone.Stack Zone.Battlefield) (Projection.project caseId withCase))) withCase
-            after = S.runPure (aimedAt wholeId) entered (Engine.settleForPriority >> Engine.priorityLoop)
-        Spec.assertBool s (not (Set.member hurtId (GameState.battlefield after))) "the damaged Giant was destroyed"
-        Spec.assertBool s (Set.member wholeId (GameState.battlefield after)) "and its undamaged twin, though aimed at, is not a legal target"
-      [] -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability"
   -- CR 719.3a's three creature cards, then CR 702.169b's "as long as this Case
   -- is solved": a 4/4 Gorgon creature with deathtouch and lifelink, still an
   -- enchantment. Two cards leave it the enchantment it was.
@@ -392,9 +366,3 @@ gorgonsKissSpec s registry = Spec.describe s "Case of the Gorgon's Kiss" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch solvedId solved) "with deathtouch"
     Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink solvedId solved) "and lifelink"
     Spec.assertEqWith s "CR 719.3a two creature cards leave it unsolved and no creature" (Projection.cardTypesOf unsolvedId unsolved) (Set.fromList [CardType.Enchantment])
-
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt oid p = case p of
-  Prompt.AnnounceTargets _ _ _ slots -> fmap (const 1) slots
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
-  _ -> S.identityAnswer p

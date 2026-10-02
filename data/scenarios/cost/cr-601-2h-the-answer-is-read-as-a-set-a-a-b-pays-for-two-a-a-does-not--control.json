@@ -1,6 +1,6 @@
 {
   "description": "CR 601.2h the answer is read as a set: [a,a,b] pays for two, [a,a] does not",
-  "note": "Control: [a,a] names one distinct card for a count of two, so nothing is discarded and the cast is reversed. CR 733.2's ReverseManaAbilities is answered Declines: Exercises crashes pawl scenario with an arithmetic underflow, and no assertion reads the Mountains.",
+  "note": "Control: [a,a] names one distinct card for a count of two, so nothing is discarded and the cast is reversed.",
   "board": {
     "seats": [
       {
@@ -64,7 +64,7 @@
         "Answer": {
           "prompt": "ReverseManaAbilities",
           "with": {
-            "type": "Declines"
+            "type": "Exercises"
           }
         }
       }

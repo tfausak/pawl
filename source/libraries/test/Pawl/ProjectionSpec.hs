@@ -61,7 +61,6 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
-import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -4182,10 +4181,6 @@ shapeshifterBoard shapeshifter sorcerer sentry =
           }
    in (shifterId, b2 {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [blue, blue]), GameState.priority = Just S.alice})
 
--- The one activated ability of `oid` whose cost does (or does not) tap it.
-tapAbilityOf :: Bool -> ObjectId.ObjectId -> GameState.GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
-tapAbilityOf taps oid gs = filter (\a -> (CostComponent.TapThis `elem` Cost.Type.components (ActivatedAbility.cost a)) == taps) (Activatable.abilitiesFor oid gs)
-
 -- alice's Volrath's Shapeshifter, with `top` the only card in her graveyard.
 fullTextBoard :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 fullTextBoard shapeshifter top gs0 =
@@ -4195,34 +4190,6 @@ fullTextBoard shapeshifter top gs0 =
 
 fullTextSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fullTextSpec s registry = Spec.describe s "HasFullText" $ do
-  -- CR 612.6 whole card: Volrath's Shapeshifter ({1}{U}{U} 0/1, "As long as the
-  -- top card of your graveyard is a creature card, this creature has the full
-  -- text of that card and has the text '{2}: Discard a card.'", checked against
-  -- Scryfall 2026-09-27). With Prodigal Sorcerer on top it is a blue 1/1
-  -- Prodigal Sorcerer whose ping deals the damage; discarding Ogre Sentry through
-  -- the extra text makes it a red 3/3 Ogre Sentry with defender, with no trigger
-  -- and no priority pass in between (CR 613.5).
-  Spec.it s "CR 612.6 the Shapeshifter has the full text of the top card of its controller's graveyard" $ do
-    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
-    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    sentry <- S.printingOf s registry "Ogre Sentry"
-    let (shifterId, board) = shapeshifterBoard shapeshifter sorcerer sentry
-    Spec.assertEqWith s "CR 612.6 it is named Prodigal Sorcerer" (Projection.namesOf shifterId board) (Set.singleton (CardName.MkCardName (Text.pack "Prodigal Sorcerer")))
-    Spec.assertEqWith s "and is a blue 1/1" (S.powerToughnessOf shifterId board, Projection.colorsOf shifterId board) (Just (1, 1), Set.singleton Color.Blue)
-    -- Each activation falls back to the unchanged board when the ability is
-    -- missing, so the gameplay assertion below it is what reddens.
-    let pinged = case tapAbilityOf True shifterId board of
-          ping : _ -> S.runPure (pingFrom shifterId) board (Activate.activateAbility S.alice shifterId ping >> Stack.resolveTop)
-          [] -> board
-        discarded = case tapAbilityOf False shifterId board of
-          discard : _ -> S.runPure S.identityAnswer board (Activate.activateAbility S.alice shifterId discard >> Stack.resolveTop)
-          [] -> board
-    Spec.assertEqWith s "CR 612.6 the Sorcerer's ping, activated from the Shapeshifter, deals bob 1" (S.lifeOf S.bob pinged) (fmap (subtract 1) (S.lifeOf S.bob board))
-    Spec.assertEqWith s "the extra text discards the Ogre Sentry" (S.handSize S.alice discarded) 0
-    Spec.assertEqWith s "CR 613.5 and the Shapeshifter is at once a 3/3 Ogre Sentry" (Projection.namesOf shifterId discarded, S.powerToughnessOf shifterId discarded) (Set.singleton (CardName.MkCardName (Text.pack "Ogre Sentry")), Just (3, 3))
-    Spec.assertEqWith s "red, with defender" (Projection.colorsOf shifterId discarded, Projection.hasKeyword Keyword.Defender shifterId discarded) (Set.singleton Color.Red, True)
-    Spec.assertEqWith s "with no ping and one discard ability" (length (tapAbilityOf True shifterId discarded), length (tapAbilityOf False shifterId discarded)) (0, 1)
-
   -- CR 612.6's gate is the CARD on top, not a non-empty graveyard: with a
   -- non-creature card on top the Shapeshifter is its printed 0/1, though a
   -- creature card sits beneath it.

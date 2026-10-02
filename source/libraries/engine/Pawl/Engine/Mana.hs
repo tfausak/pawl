@@ -563,8 +563,8 @@ manaOptionsOfGiven pcs oid gs =
       -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit
       -- AFTER the type is picked: an addition of two AnyColor offers five options
       -- here, not twenty-five. Loot, the Pathfinder's "{G}, {T}: Add three mana
-      -- of any one color" is the printing that proves it -- Pawl.ManaSpec's Loot
-      -- group reads three units of one colour off one activation -- and Stadium
+      -- of any one color" is the printing that proves it -- data/scenarios/mana
+      -- reads three units of one colour off one activation -- and Stadium
       -- Vendors says the same sentence as a triggered ability that resolves off
       -- the stack (Resolve's arm).
       --

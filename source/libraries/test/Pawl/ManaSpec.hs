@@ -3621,23 +3621,6 @@ drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
     Spec.assertEqWith s "the fixture: the three crossed to alice" (poolTypes S.alice charged) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
     Spec.assertEqWith s "CR 119.3 bob pays 3 life for the three he lost, and nobody else pays" (lives charged) [Just 20, Just 17, Just 20]
     Spec.assertEqWith s "CR 103.4 and with no Yurlok the same move costs nobody anything" (lives uncharged) [Just 20, Just 20, Just 20]
-  -- CR 106.13's parenthetical: "note that these may be the same player".
-  Spec.it s "CR 106.13 a self-targeted transfer nets the mana once" $ do
-    drainPower <- S.printingOf s registry "Drain Power"
-    island <- S.printingOf s registry "Island"
-    forest <- S.printingOf s registry "Forest"
-    let base = Mana.addMana S.alice [unitOf (ManaType.Colored Color.White)] (S.landsFor forest S.alice 1 (S.landsFor island S.alice 2 S.threePlayerGame))
-        (gs, spellId) = S.handOne drainPower base
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-        after = S.runPure S.identityAnswer cast Stack.resolveTop
-    -- The fixture: the two Islands paid for the spell, leaving the {W} that was
-    -- already floating and the untapped Forest.
-    Spec.assertEqWith s "the spell left alice's hand" (S.handSize S.alice cast) 0
-    Spec.assertEqWith s "her floating {W} survived the payment" (poolTypes S.alice cast) [ManaType.Colored Color.White]
-    -- ONCE: the Forest's {G} joins the {W} and the transfer onto herself empties
-    -- the pool before it adds, so neither unit is doubled. The tapped Islands
-    -- offer nothing, which is CR 609.3's "as much as possible".
-    Spec.assertEqWith s "CR 106.13 the pool is what it held, not twice that" (poolTypes S.alice after) [ManaType.Colored Color.White, ManaType.Colored Color.Green]
   -- CR 605.3a: WHICH ORDER bob activates his two lands in is his, and it is
   -- observable -- Mystic Gate's "{W/U}, {T}: Add {W}{W}, {W}{U}, or {U}{U}" is
   -- paid for out of the mana the Plains put in his pool, which is there only if
@@ -3901,7 +3884,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   omnathSpec s registry
   priorityWindowSpec s registry
   riderWindowSpec s registry
-  lootSpec s registry
   translatorSpec s registry
   cabalCoffersSpec s registry
   laviniaTurnRiderSpec s registry
@@ -4257,95 +4239,11 @@ untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.
 -- takes a turn, alice takes the next one, whatever she floated is gone and
 -- everything she controls untaps (CR 502.3) -- the same permanent, untapped and
 -- with an empty pool, on a later turn. CR 602.5b's per-GAME memory is on the
--- object and no rule clears it at a handoff, which is what lootSpec reads;
--- Engine.beginTurnOf clears its per-TURN twin, which is what translatorSpec
--- reads.
+-- object and no rule clears it at a handoff, which is what data/scenarios/mana
+-- reads for Loot, the Pathfinder; Engine.beginTurnOf clears its per-TURN twin,
+-- which is what translatorSpec reads.
 nextTurnOfAlice :: GameState.GameState -> GameState.GameState
 nextTurnOfAlice gs = untapStep (Mana.emptiedManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
-
--- alice with Loot, one Forest and two Lightning Bolts in hand, in her precombat
--- main phase and going nowhere.
-lootBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-lootBoard loot forest bolt =
-  let (_, gs1) = S.addPermanent loot S.alice (S.landsInPlay forest 1)
-      (firstBolt, gs2) = S.addHandCard bolt S.alice gs1
-      (secondBolt, gs3) = S.addHandCard bolt S.alice gs2
-   in ( firstBolt,
-        secondBolt,
-        gs3
-          { GameState.activePlayer = S.alice,
-            GameState.phase = Phase.PrecombatMain,
-            GameState.priority = Just S.alice,
-            GameState.remaining = Seq.empty
-          }
-      )
-
--- Pins the two choices the option order would otherwise decide. CR 105.4 offers
--- Loot's "any one color" as five yields and only the red one pays for a Bolt;
--- CR 115.1's target is FILTERED out of the offered set rather than built, so the
--- recipient the spell carries is the engine's own (CR 608.2b re-reads it).
-lootAnswer :: Prompt.Prompt r -> r
-lootAnswer p = case p of
-  Prompt.ChooseManaYield _ _ _ options ->
-    Maybe.fromMaybe
-      (NonEmpty.head options)
-      (List.find (elem (ManaType.Colored Color.Red) . fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList options))
-  Prompt.ChooseTargets _ _ _ slots -> fmap (\(_, recipients) -> Set.filter ((==) (Just S.bob) . Recipient.playerOf) recipients) slots
-  _ -> S.identityAnswer p
-
--- CR 602.5b's counted rider printed on a MANA ability, which CR 605.3b keeps off
--- the stack entirely: Loot, the Pathfinder (Aetherdrift) prints "Exhaust -- {G},
--- {T}: Add three mana of any one color." beside two other exhaust abilities, and
--- CR 702.177a rewrites each into "[Cost]: [Effect]. Activate only once." Oracle
--- text checked against Scryfall 2026-09-06.
---
--- pawl's transcription carries the keyword on each ability
--- (Pawl.Types.ActivatedAbility.keyword), Greenbelt Guardian's arrangement, so
--- Boom Scholar's "exhaust abilities of other permanents you control" reaches
--- these three -- including the mana one, whose stamp Cost.manaActivationAdjustmentsGiven
--- threads.
---
--- The card file states no rider: the keyword adds rule 702.177a's
--- (Keyword.printedRiders), and Mana.manaRoutesOfGiven reads it through
--- Keyword.restrictionsOf, so the refusal below is the keyword's.
---
--- ONE Forest and two Lightning Bolts. The Forest pays no {R}, so Loot's route is
--- the only way to pay for either Bolt, and the Forest is what Loot's own {G}
--- spends -- so both windows CR 605.3a gives a mana ability run through
--- Cost.manaActivationsGiven and neither through Pawl.Engine.Activate, which
--- refuses a mana ability outright (CR 605.3b).
---
--- THE PAIR is the two boards below: the same permanents, the same handoff, the
--- same untap, differing only in whether the first Bolt was paid for. Without it
--- the second Bolt is cast; with it the route is withheld, which is the rider and
--- nothing else -- everything is untapped at both moments.
-lootSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-lootSpec s registry = Spec.describe s "Loot, the Pathfinder" $ do
-  Spec.it s "CR 605.3a / 602.5b the exhaust mana ability pays for one spell and is withheld the next turn" $ do
-    loot <- S.printingOf s registry "Loot, the Pathfinder"
-    forest <- S.printingOf s registry "Forest"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let (firstBolt, secondBolt, board) = lootBoard loot forest bolt
-        castOf oid gs = snd (Engine.runGamePure lootAnswer gs (do S.cast S.alice oid; Stack.resolveTop))
-        afterFirst = castOf firstBolt board
-        spent = nextTurnOfAlice afterFirst
-        unspent = nextTurnOfAlice board
-        inHand oid gs = elem oid (Game.zoneMembers Zone.Hand S.alice gs)
-    Spec.assertEqWith s "CR 605.3a the route is offered, so the first Bolt is paid for and resolves" (S.lifeOf S.bob afterFirst) (Just 17)
-    Spec.assertEqWith s "CR 602.5b the second Bolt cannot be paid for once the exhaust ability is spent" (S.lifeOf S.bob (castOf secondBolt spent)) (Just 17)
-    Spec.assertEqWith s "and the same Bolt IS paid for on the board that never spent it" (S.lifeOf S.bob (castOf secondBolt unspent)) (Just 17)
-    Spec.assertBool s (inHand secondBolt (castOf secondBolt spent)) "so the refused Bolt is still in her hand"
-    Spec.assertBool s (not (inHand secondBolt (castOf secondBolt unspent))) "and the paid-for one is not"
-    -- The offer, asked of the same two boards: CR 118.3's cast gate reads the
-    -- same capacity the payment does, so the two cannot disagree about the route.
-    Spec.assertEqWith s "CR 118.3 the cast gate agrees at both moments" (fmap (S.castable S.alice secondBolt) [spent, unspent]) [False, True]
-    -- CR 605.3a's OTHER window, which reaches the same capacity through
-    -- Mana.manaSourcesGiven rather than through a payment: the Forest is a source
-    -- on both boards and Loot only on the one that has not spent its route.
-    Spec.assertEqWith s "CR 605.3a the priority window drops the source whose only route is spent" (fmap (length . filter isManaActivation . Action.legalActions S.alice) [spent, unspent]) [1, 2]
-    -- Neither refusal is a tapped permanent: the handoff and the untap step ran
-    -- on both boards, so everything alice controls is untapped at both moments.
-    Spec.assertEqWith s "nothing of alice's is tapped on either board" (fmap (S.tappedCount S.alice) [spent, unspent]) [0, 0]
 
 -- CR 602.5b's rider timed PER TURN and printed on a MANA ability, which CR 605.3b
 -- keeps off the stack entirely: Kozilek's Translator (Oath of the Gatewatch)

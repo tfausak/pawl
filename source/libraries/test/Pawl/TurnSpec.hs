@@ -910,7 +910,7 @@ tapStateOf oid = fmap Object.tapped . Game.lookupObject oid
 -- created after this one and taken BEFORE it, and the printed card skips the
 -- untap step of the turn IT made, not of whichever turn comes next. Two cards
 -- already in the pool reach that divergence.
-turnScopedSkipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnScopedSkipSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
   let boardOf = do
         island <- S.printingOf s registry "Island"
@@ -920,30 +920,6 @@ turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
         pure (savorBoard island savor warp piker)
       tapped = Just TapState.Tapped
       untapped = Just TapState.Untapped
-  Spec.it s "CR 500.11 whole card: Savor the Moment's extra turn skips its untap step" $ do
-    (gs, savor, _, piker) <- boardOf
-    let resolved = castAndResolve savor gs
-        atExtra = runTurns 1 resolved
-        -- CR 500.11: "to skip a step, phase, or turn is to proceed past
-        -- it as though it didn't exist", and CR 614.1b replaces it with
-        -- nothing -- so CR 502.3's turn-based action never happens.
-        afterExtra = runTurns 1 atExtra
-    Spec.assertEqWith
-      s
-      "one turn was created, alice's, carrying the untap skip"
-      (fmap (\e -> (ExtraTurn.taker e, ExtraTurn.skipped e)) (GameState.extraTurns resolved))
-      [(S.alice, Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))]
-    Spec.assertEqWith s "the extra turn is alice's" (GameState.activePlayer atExtra) S.alice
-    Spec.assertEqWith s "and it untapped nothing" (tapStateOf piker afterExtra) tapped
-    -- The skip named ONE turn (CR 500.11's "skip a step ... of that
-    -- turn", as Savor the Moment prints it) and is gone with it -- NOT CR
-    -- 614.10a's "next", which is the reading these cases exist to rule
-    -- out. bob's turn untaps BOB's permanents (CR 502.3 is about the
-    -- ACTIVE player's), so it is alice's own next turn that has to put
-    -- this right.
-    Spec.assertEqWith s "the turn after it is bob's" (GameState.activePlayer afterExtra) S.bob
-    Spec.assertEqWith s "which is not alice's untap step" (tapStateOf piker (runTurns 1 afterExtra)) tapped
-    Spec.assertEqWith s "alice's next ordinary turn untaps it" (tapStateOf piker (runTurns 2 afterExtra)) untapped
   -- THE PROVING CASE. Savor the Moment creates extra turn A; Time Warp,
   -- cast after it in the same turn, creates extra turn B. CR 500.7: "the
   -- most recently created turn will be taken first", so B is taken first

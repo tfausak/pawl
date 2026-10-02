@@ -1,0 +1,162 @@
+{
+  "description": "CR 106.13 a self-targeted transfer nets the mana once",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "manaPool": "W",
+        "battlefield": [
+          {
+            "card": "Island",
+            "label": "i1"
+          },
+          {
+            "card": "Island",
+            "label": "i2"
+          },
+          {
+            "card": "Forest",
+            "label": "forest"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Drain Power",
+            "label": "drain"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$drain",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$i1",
+            "$i2",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Drain Power",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ManaPool",
+          "player": "alice",
+          "is": [
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "White"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "OrderManaActivations",
+          "with": [
+            0
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ManaPool",
+          "player": "alice",
+          "is": [
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "White"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            },
+            {
+              "manaType": {
+                "type": "Colored",
+                "value": {
+                  "type": "Green"
+                }
+              },
+              "tags": [],
+              "retention": {
+                "type": "Ordinary"
+              },
+              "restriction": null,
+              "rider": null,
+              "sourceChosenSubtype": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

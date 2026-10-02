@@ -1,0 +1,215 @@
+{
+  "description": "CR 702.16d whole card: a land that gains protection from artifacts sheds its Fortification",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Forest",
+            "label": "forest",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-2",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-3",
+            "ready": true
+          },
+          {
+            "card": "Forest",
+            "label": "forest-4",
+            "ready": true
+          },
+          {
+            "card": "Dryad Arbor",
+            "label": "arbor",
+            "ready": true
+          },
+          {
+            "card": "Tower of the Magistrate",
+            "label": "tower",
+            "ready": true
+          },
+          {
+            "card": "Darksteel Garrison",
+            "label": "garrison",
+            "ready": true
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$garrison",
+          "ability": 0,
+          "targets": [
+            "$arbor"
+          ],
+          "mana": [
+            "$forest",
+            "$forest-2",
+            "$forest-3",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "AttachedTo",
+          "object": "$garrison",
+          "is": "$arbor"
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$arbor",
+          "keyword": {
+            "type": "Indestructible"
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$arbor",
+          "keyword": {
+            "type": "Protection",
+            "value": {
+              "quality": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Artifact"
+                }
+              },
+              "spares": null
+            }
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$tower",
+          "ability": 1,
+          "targets": [
+            "$arbor"
+          ],
+          "mana": [
+            "$forest-4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$arbor",
+          "keyword": {
+            "type": "Protection",
+            "value": {
+              "quality": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Artifact"
+                }
+              },
+              "spares": null
+            }
+          },
+          "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "AttachedTo",
+          "object": "$garrison",
+          "is": null
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Keywords": {
+          "object": "$arbor",
+          "keyword": {
+            "type": "Indestructible"
+          },
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Darksteel Garrison",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "description": "CR 702.137a after bob lost life the Skewer is cast for {R}; with nobody hurt and with only alice hurt, its {2}{R} is unpayable",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m2"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Skewer the Critics",
+            "label": "skewer"
+          },
+          {
+            "card": "Lightning Bolt",
+            "label": "bolt"
+          }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$bolt",
+          "targets": [
+            "$alice"
+          ],
+          "mana": [
+            "$m1",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 17
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "refuse": {
+        "Cast": {
+          "object": "$skewer",
+          "targets": [
+            "$bob"
+          ],
+          "mana": [
+            "$m2"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Hand",
+          "card": "Skewer the Critics",
+          "count": 1
+        }
+      }
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "bob",
+        "life": 20
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 17
+      }
+    }
+  ],
+  "note": "Control board: only alice has lost life (CR 102.3, she is not her own opponent), so the Skewer is refused with one Mountain left."
+}

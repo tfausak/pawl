@@ -1,0 +1,169 @@
+{
+  "description": "CR 109.5 'you cast': an opponent's cast is not counted toward the ordinal (control: no cast by bob)",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "m-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "m-2"
+          },
+          {
+            "card": "Mountain",
+            "label": "m-3"
+          },
+          {
+            "card": "Mountain",
+            "label": "m-4"
+          },
+          {
+            "card": "Mountain",
+            "label": "m-5"
+          },
+          {
+            "card": "Mountain",
+            "label": "m-6"
+          },
+          {
+            "card": "Mountain",
+            "label": "m-7"
+          },
+          {
+            "card": "Mountain",
+            "label": "m-8"
+          },
+          {
+            "card": "Clarion Spirit",
+            "label": "clarion"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boil",
+            "label": "first"
+          },
+          {
+            "card": "Boil",
+            "label": "second"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Mountain",
+            "label": "b-1"
+          },
+          {
+            "card": "Mountain",
+            "label": "b-2"
+          },
+          {
+            "card": "Mountain",
+            "label": "b-3"
+          },
+          {
+            "card": "Mountain",
+            "label": "b-4"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Boil",
+            "label": "bobs-boil"
+          }
+        ]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$first",
+          "mana": [
+            "$m-1",
+            "$m-2",
+            "$m-3",
+            "$m-4",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Spirit Token",
+          "count": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$second",
+          "mana": [
+            "$m-5",
+            "$m-6",
+            "$m-7",
+            "$m-8"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Count": {
+          "player": "alice",
+          "zone": "Battlefield",
+          "card": "Spirit Token",
+          "count": 1
+        }
+      }
+    }
+  ]
+}

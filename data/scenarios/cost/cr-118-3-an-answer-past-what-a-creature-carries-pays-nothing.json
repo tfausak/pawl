@@ -1,6 +1,6 @@
 {
   "description": "CR 118.3 an answer past what a creature carries pays nothing",
-  "note": "The Answer asks the Giant for three +1/+1 counters where it carries two; the payment fails whole, so the activation does not stand: no counter moves, and nothing reaches the stack. Answering two pays and the checks fail. CR 733.2's ReverseManaAbilities is answered Declines (the Forests' mana is kept): answering Exercises, as the Haskell answerer does, crashes pawl scenario with an arithmetic underflow, and neither the counters nor the stack depend on it.",
+  "note": "The Answer asks the Giant for three +1/+1 counters where it carries two; the payment fails whole, so the activation does not stand: no counter moves, and nothing reaches the stack. Answering two pays and the checks fail.",
   "board": {
     "seats": [
       {
@@ -98,7 +98,7 @@
         "Answer": {
           "prompt": "ReverseManaAbilities",
           "with": {
-            "type": "Declines"
+            "type": "Exercises"
           }
         }
       }

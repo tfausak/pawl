@@ -2756,15 +2756,6 @@ windowAttackRestrictionSpec s registry = Spec.describe s "WindowAttackRestrictio
     Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(giant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob alicesTurn))) "the window is open, so the Giant may not attack"
     Spec.assertBool s (not (Combat.canAttack S.alice giant (declaringAt S.bob alicesTurn))) "and it is off CR 508.1a's candidate list"
     Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(openGiant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob openAlices)) "the pair: with nothing stored the same Giant attacks"
-  Spec.it s "CR 514.2 the window closes at the end of the turn it named" $ do
-    (giant, _, blocked) <- wallBoard s registry "Wall of Dust"
-    let afterwards = handoffUntapping (handoffUntapping (handoffUntapping blocked))
-        later = handoffUntapping afterwards
-    Spec.assertEqWith s "alice is active again on turn 5" (GameState.activePlayer later, GameState.turnNumber later) (S.alice, 5)
-    Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(giant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob later)) "the Giant attacks on the turn after the one the window named"
-    -- Ordered BEHIND the declaration above so a sweep that kept the row reddens
-    -- the gameplay assertion rather than being absorbed by a list length.
-    Spec.assertEqWith s "with nothing left stored once that turn's cleanup has run" (GameState.attackProhibitions afterwards) []
 
 -- Turn 1 played through its whole combat phase: alice attacks with a Hill Giant
 -- and bob blocks with `blocker`, whose only job on the Wall of Stone leg is to

@@ -60,7 +60,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -510,7 +509,7 @@ aetherfluxReservoirSpec s registry =
 -- win. Three seats, so bob's Approach is an opponent's and not "the other
 -- player's". Future Sight sits under alice on every board, so the library-cast
 -- case differs from the winning one only in where the second copy is.
-approachSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+approachSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 approachSpec s registry =
   let -- alice: fourteen Plains (two casts, no untap step between them), eight
       -- Plains in her library, Future Sight. bob: seven Plains. alice's main
@@ -537,30 +536,6 @@ approachSpec s registry =
         approach <- S.printingOf s registry "Approach of the Second Sun"
         pure (plains, sight, approach)
    in Spec.describe s "Approach of the Second Sun" $ do
-        Spec.it s "CR 104.2b the second, cast from hand on a LATER turn, wins" $ do
-          (plains, sight, approach) <- printings
-          let (first, g1) = S.addHandCard approach S.alice (board plains sight)
-              (second, g2) = S.addHandCard approach S.alice g1
-              turnOne = castAndResolve S.alice first g2
-              turnFour = nextTurn (nextTurn (nextTurn turnOne))
-              after = castAndResolve S.alice second turnFour
-          Spec.assertEqWith s "alice won" (GameState.result after) (Just (Result.Won S.alice))
-          Spec.assertEqWith s "the first cast is three turns back" (GameState.turnNumber after - GameState.turnNumber turnOne) 3
-          Spec.assertEqWith s "on her own turn" (GameState.activePlayer turnFour) S.alice
-          Spec.assertEqWith s "and alice gained no second 7" (S.lifeOf S.alice after) (Just 27)
-
-        Spec.it s "CR 601.2a an OPPONENT's earlier Approach is not one you've cast" $ do
-          (plains, sight, approach) <- printings
-          let (his, g1) = S.addHandCard approach S.bob (board plains sight)
-              (hers, g2) = S.addHandCard approach S.alice g1
-              bobsTurn = castAndResolve S.bob his (nextTurn g2)
-              aliceTurn = nextTurn (nextTurn bobsTurn)
-              after = castAndResolve S.alice hers aliceTurn
-          Spec.assertEqWith s "bob's went into his library and gained him 7" (S.lifeOf S.bob bobsTurn) (Just 27)
-          Spec.assertEqWith s "nobody has won" (GameState.result after) Nothing
-          Spec.assertEqWith s "alice's went seventh from the top instead" (approachesIn S.alice after) [7 :: Int]
-          Spec.assertEqWith s "and gained her 7" (S.lifeOf S.alice after) (Just 27)
-
         Spec.it s "CR 601.2a the second, cast from the LIBRARY, does not win" $ do
           (plains, sight, approach) <- printings
           let (first, g1) = S.addHandCard approach S.alice (board plains sight)

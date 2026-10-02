@@ -459,11 +459,6 @@ fatigueSpec s registry = Spec.describe s "Fatigue" $ do
     Spec.assertEqWith s "and drew" (libraryOf S.alice after) 4
     Spec.assertEqWith s "bob's skip is still armed, waiting for his own turn" (armed after) 1
 
--- The turn's schedule after the precombat main phase, so a board positioned in
--- that phase still runs its own combat.
-afterPrecombatMain :: Seq.Seq Phase.Phase
-afterPrecombatMain = S.phasesAfter Phase.PrecombatMain
-
 -- Run whole steps until `done` holds of the board, the game ends, or the bound
 -- runs out. The bound is three turns' worth of steps, so a skip that dropped
 -- more of the schedule than it should still terminates and fails an assertion
@@ -476,41 +471,10 @@ runUntil done answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 40 gs0
 
--- Run whole steps until the board reaches its postcombat main phase. Top-level
--- rather than a `where` binding because the answer is rank-2 and GHC will not
--- infer it -- the same reason castEach above is.
-atPostcombatMain :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-atPostcombatMain = runUntil ((== Phase.PostcombatMain) . GameState.phase)
-
 -- Run whole steps until the turn hands off, leaving the board at the first step
 -- of the next turn.
 nextTurn :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 nextTurn answer gs = runUntil ((/= GameState.turnNumber gs) . GameState.turnNumber) answer gs
-
--- Attacks with everything, blocks with nothing, and aims every target slot at
--- `victim`. Blocks are declined so an attack's damage lands on the defending
--- PLAYER -- the observable a skipped combat phase removes. Never casts, which
--- is what makes it the control.
-skirmishAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-skirmishAnswer victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer victim))) sets
-  Prompt.DeclareAttackers _ _ ids -> ids
-  Prompt.DeclareBlockers {} -> Map.empty
-  _ -> S.identityAnswer p
-
--- skirmishAnswer, plus casting whatever is castable. alice's hand holds exactly
--- Stonehorn Dignitary and both libraries hold only lands, so this casts that one
--- card and nothing else.
-castingSkirmishAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-castingSkirmishAnswer victim p = case p of
-  Prompt.ChooseAction _ _ actions ->
-    let isCast a = case a of
-          Action.Cast {} -> True
-          _ -> False
-     in case filter isCast actions of
-          h : _ -> h
-          [] -> Action.Pass
-  _ -> skirmishAnswer victim p
 
 -- Cast whatever is offered, and otherwise pass. Read by the CR 614.1d case
 -- below, where the one castable card in the game is the {B} creature whose
@@ -604,118 +568,6 @@ namedOut name gs =
 -- bare subtraction from the life total would not satisfy.
 lostLife :: PlayerId.PlayerId -> Natural.Natural -> GameState.GameState -> Bool
 lostLife pid n gs = GameEvent.LifeLost (LifeChange.MkLifeChange pid n) `elem` S.eventsOf gs
-
--- Stonehorn Dignitary {3}{W} Creature -- Rhino Soldier 1/4: "When this creature
--- enters, target opponent skips their next combat phase." (oracle checked on
--- Scryfall)
---
--- The pool's first skip of a phase that HAS steps. CR 500.1: "The beginning,
--- combat, and ending phases are further broken down into steps, which proceed in
--- order" -- so what this card names is not one entry of the turn's schedule, the
--- way Eon Hub's upkeep step and Fatigue's draw step are, but the whole of CR
--- 506.1's five.
---
--- CR 500.11: "to skip a step, phase, or turn is to proceed past it as though it
--- didn't exist" -- past the PHASE, so no step of it begins and the turn carries
--- on at the postcombat main phase, which is what CR 500.1's order puts next.
---
--- Everything Fatigue proved about a skip's LIFETIME rides along unchanged: the
--- skip is created by an effect, scoped to the player its resolution named, and
--- consumed by one occurrence (CR 614.10a).
-stonehornSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
-  let -- alice in her precombat main phase on turn 2, holding Stonehorn Dignitary
-      -- with four untapped Plains (exactly {3}{W}); bob has one Settled Goblin
-      -- Piker, whose attack is what the skip must prevent. Both libraries hold
-      -- five lands, so the draw steps this fixture runs through never reach CR
-      -- 704.5b, and neither player can cast anything off the top.
-      --
-      -- Turn 2, so CR 103.8a's first-turn draw skip is out of the way.
-      board plains stonehorn piker =
-        let (_, gs1) = S.addPermanent piker S.bob (S.landsInPlay plains 4)
-            stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard plains pid h)) g [1 .. (5 :: Int)]
-            (gs2, held) = S.handOne stonehorn (stock (stock gs1 S.alice) S.bob)
-         in ( gs2
-                { GameState.remaining = afterPrecombatMain,
-                  GameState.turnNumber = 2
-                },
-              held
-            )
-      -- CR 603.2b: the steps of `pid`'s turn that actually BEGAN. A skipped step
-      -- never appears, which is CR 614.6's "if an event is replaced, it never
-      -- happens" -- and is why this is read at the postcombat main phase rather
-      -- than after the turn, since Engine.handoffTurn clears the log.
-      stepsBegunBy pid gs =
-        Maybe.mapMaybe
-          ( \event -> case event of
-              GameEvent.StepBegan (StepBegan.MkStepBegan ph who) | who == pid -> Just ph
-              _ -> Nothing
-          )
-          (S.eventsOf gs)
-      combatStepsOf pid gs = filter (\ph -> case ph of Phase.Combat _ -> True; _ -> False) (stepsBegunBy pid gs)
-      armed gs = length (GameState.replacements gs)
-  -- The control: the same board with the creature never cast. bob's combat
-  -- phase runs all five of CR 506.1's steps and his Piker takes two off
-  -- alice, which is what every case below is measured against.
-  Spec.it s "CR 506.1 without a skip bob's combat phase runs and his Piker connects" $ do
-    plains <- S.printingOf s registry "Plains"
-    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _) = board plains stonehorn piker
-        bobsTurn = nextTurn (skirmishAnswer S.bob) gs
-        mid = atPostcombatMain (skirmishAnswer S.bob) bobsTurn
-    Spec.assertEqWith s "all five combat steps began" (length (combatStepsOf S.bob mid)) 5
-    Spec.assertEqWith s "and the Piker's two damage landed" (S.lifeOf S.alice mid) (Just 18)
-  -- THE PROVING CASE. CR 500.11 / 614.1b: the whole combat phase is
-  -- replaced with nothing, so NO step of it begins -- not merely the
-  -- beginning of combat step the boundary question is asked at. A
-  -- pattern that named one step would leave the other four running, and
-  -- bob's Piker would still be declared.
-  Spec.it s "CR 500.11 the named opponent's whole combat phase is skipped, every step of it" $ do
-    plains <- S.printingOf s registry "Plains"
-    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _) = board plains stonehorn piker
-        bobsTurn = nextTurn (castingSkirmishAnswer S.bob) gs
-        mid = atPostcombatMain (castingSkirmishAnswer S.bob) bobsTurn
-    Spec.assertEqWith s "no combat step began at all" (combatStepsOf S.bob mid) []
-    Spec.assertEqWith s "so the Piker never attacked" (S.attackerDeclarationsOf mid) []
-    Spec.assertEqWith s "and alice took nothing" (S.lifeOf S.alice mid) (Just 20)
-    -- CR 500.1 fixes the order of the five phases, so the postcombat
-    -- main phase is what follows combat; CR 500.11's "proceed past it"
-    -- is past the PHASE and no further.
-    Spec.assertEqWith s "the turn proceeded to the postcombat main phase" (GameState.phase mid) Phase.PostcombatMain
-    Spec.assertEqWith s "and the skip was used up (CR 614.3)" (armed mid) 0
-  -- CR 614.10a: "anything scheduled for the 'next' occurrence of something
-  -- waits for the first occurrence that isn't skipped" -- ONE occurrence,
-  -- so bob's following combat phase is his own again.
-  Spec.it s "CR 614.10a one Stonehorn skips one combat phase, and the next one happens" $ do
-    plains <- S.printingOf s registry "Plains"
-    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let answer = castingSkirmishAnswer S.bob
-        (gs, _) = board plains stonehorn piker
-        bobsTurn = nextTurn answer gs
-        alicesTurn = nextTurn answer bobsTurn
-        bobsSecondTurn = nextTurn answer alicesTurn
-        mid = atPostcombatMain answer bobsSecondTurn
-    Spec.assertEqWith s "bob is active again" (GameState.activePlayer bobsSecondTurn) S.bob
-    Spec.assertEqWith s "all five combat steps began this time" (length (combatStepsOf S.bob mid)) 5
-    Spec.assertEqWith s "and the Piker connected" (S.lifeOf S.alice mid) (Just 18)
-  -- The "whose" dimension, read the discriminating way round. The skip is
-  -- installed during ALICE's precombat main phase, one phase before her
-  -- own combat phase -- so a whole-phase skip that ignored
-  -- PhasePattern.whosePhase would eat alice's combat immediately, and
-  -- spend itself doing it.
-  Spec.it s "CR 614.1b a Stonehorn aimed at bob leaves alice's own combat phase alone" $ do
-    plains <- S.printingOf s registry "Plains"
-    stonehorn <- S.printingOf s registry "Stonehorn Dignitary"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let answer = castingSkirmishAnswer S.bob
-        (gs, _) = board plains stonehorn piker
-        mid = atPostcombatMain answer gs
-    Spec.assertBool s (not (null (combatStepsOf S.alice mid))) "alice's combat phase began"
-    Spec.assertEqWith s "bob's skip is still armed, waiting for his own turn" (armed mid) 1
 
 -- CR 615.7's prevention shield, whose plainest producer in data/cards/ is Mending
 -- Hands ({W} Instant: "Prevent the next 4 damage that would be dealt to any
@@ -2572,7 +2424,7 @@ preventAllRows gs =
    in length (filter (isPreventAll . ActiveReplacement.effect) (GameState.replacements gs))
 
 -- Attacks with everything and blocks with NOTHING, so an attack's damage reaches
--- the defending player. skirmishAnswer's combat half without its targeting half.
+-- the defending player.
 attackNoBlock :: Prompt.Prompt r -> r
 attackNoBlock p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
@@ -2895,7 +2747,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   stepSkipSpec s registry
   fatigueSpec s registry
-  stonehornSpec s registry
   mendingHandsSpec s registry
   healingGraceSpec s registry
   auriokReplicaSpec s registry

@@ -4769,7 +4769,7 @@ nextTurnOfAlice gs =
     (Mana.emptiedManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
     (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
-printedActivationOnlyOnceEachTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationOnlyOnceEachTurnSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedActivationOnlyOnceEachTurnSpec s registry = Spec.describe s "PrintedActivationOnlyOnceEachTurn" $ do
   -- CR 602.5b's grain: the restriction is about the ABILITY, not the permanent.
   -- The same board, once the untap ability is spent -- the {G} regenerate ability
@@ -4782,21 +4782,6 @@ printedActivationOnlyOnceEachTurnSpec s registry = Spec.describe s "PrintedActiv
         offered = activationsOf swarmId (Action.legalActions S.alice after)
     Spec.assertEqWith s "the once-each-turn ability is not offered again this turn" (filter isOnlyOnceEachTurn offered) []
     Spec.assertEqWith s "but the Swarm's regenerate ability still is" (length (filter (not . isOnlyOnceEachTurn) offered)) 1
-
-  -- The two counted riders differing in exactly one thing, the period: the same
-  -- handoff, the same untap step, the same empty pools. CR 602.5b's per-turn
-  -- clause is back and CR 702.177a's per-game one (Greenbelt Guardian, spent on
-  -- guardianBoard above) is not.
-  Spec.it s "CR 602.5b the per-turn rider resets at the handoff and the per-game one does not" $ do
-    swarm <- S.printingOf s registry "Locust Swarm"
-    forest <- S.printingOf s registry "Forest"
-    guardian <- S.printingOf s registry "Greenbelt Guardian"
-    let (swarmId, board) = locustBoard swarm forest
-        next = nextTurnOfAlice (S.runPure onlyOnceEachTurnAnswer board Engine.priorityLoop)
-        (guardianId, guarded) = guardianBoard guardian forest
-        guardedNext = nextTurnOfAlice (S.runPure onlyOnceAnswer guarded Engine.priorityLoop)
-    Spec.assertEqWith s "the once-each-turn ability is offered again on alice's next turn" (length (filter isOnlyOnceEachTurn (activationsOf swarmId (Action.legalActions S.alice next)))) 1
-    Spec.assertEqWith s "and the once-per-game ability is still refused after the same handoff" (filter isOnlyOnce (activationsOf guardianId (Action.legalActions S.alice guardedNext))) []
 
 -- CR 702.167: craft, the one keyword whose ability exiles out of two zones at
 -- once --- "[Cost], Exile this permanent, Exile [materials] from among

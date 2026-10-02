@@ -535,33 +535,6 @@ fortificationSpec s registry = Spec.describe s "Fortification" $ do
           (ActivatedAbility.cost ability)
           (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])
       abilities -> Spec.assertFailure s ("expected exactly one fortify ability, got " <> show (length abilities))
-  -- CR 702.16d: "A permanent with protection can't be equipped by Equipment that
-  -- have the stated quality or fortified by Fortifications that have the stated
-  -- quality. Such Equipment or Fortifications become unattached from that
-  -- permanent as a state-based action, but remain on the battlefield."
-  --
-  -- Two boards differing in exactly one thing -- whether Tower of the
-  -- Magistrate's ability resolved -- so the detach cannot be about the fortify,
-  -- the Arbor's card types, or the state-based pass itself.
-  Spec.it s "CR 702.16d whole card: a land that gains protection from artifacts sheds its Fortification" $ do
-    (arborId, towerId, garrisonId, gs) <- fortifyBoard s registry
-    case (Projection.abilitiesOf garrisonId gs, Projection.abilitiesOf towerId gs) of
-      ([fortifyAbility], [_, protect]) -> do
-        let fortified =
-              let activated = S.runPure (aimAtOffered arborId) gs (Activate.activateAbility S.alice garrisonId fortifyAbility)
-               in S.runPure (aimAtOffered arborId) activated Stack.resolveTop
-            protected =
-              let activated = S.runPure (aimAtOffered arborId) fortified (Activate.activateAbility S.alice towerId protect)
-               in S.runPure (aimAtOffered arborId) activated Stack.resolveTop
-            after = S.settleSba protected
-            control = S.settleSba fortified
-        Spec.assertEqWith s "CR 702.16d the Garrison becomes unattached from the protected land" (fmap Object.attachedTo (Game.lookupObject garrisonId after)) (Just Nothing)
-        Spec.assertEqWith s "where the same board without the protection keeps it attached" (fmap Object.attachedTo (Game.lookupObject garrisonId control)) (Just (Just (Recipient.ToObject arborId)))
-        Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible arborId after)) "and the land loses the indestructible the Fortification was granting"
-        Spec.assertBool s (Set.member garrisonId (GameState.battlefield after)) "CR 704.5n it remains on the battlefield"
-        Spec.assertBool s (Projection.hasKeyword protectionFromArtifacts arborId protected) "the land really did gain protection from artifacts"
-        Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible arborId control) "and on the control board it kept the indestructible"
-      abilities -> Spec.assertFailure s ("expected one fortify ability and two Tower abilities, got " <> show (fmap length abilities))
   -- CR 702.16b, and NOT rule 702.16d's first sentence, which is why the
   -- state-based case above is the one that proves this unit: a Fortification is
   -- the source of its own fortify ability, so a land already protected from

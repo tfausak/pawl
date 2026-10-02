@@ -2462,28 +2462,6 @@ graftedWargearSpec s registry =
               -- The precondition: without the equip there is nothing to fall off,
               -- and the protection alone would leave the same board.
               Spec.assertBool s (S.onBattlefield pikerId onPiker) "the Piker was alive and equipped before the protection"
-    -- CR 701.3d's third road and CR 603.10c's own case: the EQUIPMENT leaves the
-    -- battlefield. Bane of Progress destroys every artifact on entry, so the
-    -- Wargear is in a graveyard by the time the CR 117.5 boundary gathers its
-    -- trigger, and only the look-back offers it.
-    Spec.it s "CR 603.10c whole card: destroying the Wargear still sacrifices the creature it was on" $ do
-      forest <- S.printingOf s registry "Forest"
-      piker <- S.printingOf s registry "Goblin Piker"
-      wargear <- S.printingOf s registry "Grafted Wargear"
-      bane <- S.printingOf s registry "Bane of Progress"
-      let (pikerId, base1) = S.addPermanent piker S.alice (S.landsFor forest S.alice 6 (Setup.emptyGame S.bothPlayers))
-          (gearId, base2) = S.addPermanent wargear S.alice base1
-          ready = base2 {GameState.priority = Just S.alice}
-      case equipAbilityOf gearId ready of
-        Nothing -> Spec.assertFailure s "Grafted Wargear should offer rule 702.6a's minted equip ability"
-        Just equip -> do
-          let onPiker = settleTriggers (aimAtOffered pikerId) (S.runPure (aimAtOffered pikerId) ready (Activate.activateAbility S.alice gearId equip >> Stack.resolveTop))
-              (armed, baneSpell) = S.handOne bane onPiker
-              cast = S.runPure S.identityAnswer (armed {GameState.priority = Just S.alice}) (S.cast S.alice baneSpell >> Stack.resolveTop)
-              after = settleTriggers S.identityAnswer cast
-          Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.3d the creature the destroyed Wargear was on was sacrificed"
-          Spec.assertBool s (not (S.onBattlefield gearId after)) "the Wargear itself is gone, which is what made this the look-back leg"
-          Spec.assertBool s (S.onBattlefield pikerId onPiker) "and the Piker was alive and equipped before Bane of Progress"
 
 -- CR 613.1f layer 6, the TRIGGERED half of the grant: Sixth Sense ({G}
 -- Enchantment -- Aura, "Enchant creature / Enchanted creature has 'Whenever this

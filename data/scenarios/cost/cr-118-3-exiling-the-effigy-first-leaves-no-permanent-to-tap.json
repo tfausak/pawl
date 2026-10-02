@@ -1,6 +1,6 @@
 {
   "description": "CR 118.3 exiling the Effigy first leaves no permanent to tap",
-  "note": "costOrder [1,0] pays the Effigy's own exile before its {T}, leaving nothing to tap, so the activation is reversed; the [0,1] order stands. CR 733.2's ReverseManaAbilities is answered Declines (the Plains stay tapped, their mana kept): Exercises crashes pawl scenario with an arithmetic underflow, and no assertion reads the lands.",
+  "note": "costOrder [1,0] pays the Effigy's own exile before its {T}, leaving nothing to tap, so the activation is reversed; the [0,1] order stands.",
   "board": {
     "seats": [
       {
@@ -60,7 +60,7 @@
         "Answer": {
           "prompt": "ReverseManaAbilities",
           "with": {
-            "type": "Declines"
+            "type": "Exercises"
           }
         }
       }

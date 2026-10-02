@@ -54,7 +54,6 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -1642,28 +1641,6 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
     Spec.assertEqWith s "and neither did alice" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "the cost sacrificed Denethor into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "and the ability left the stack" (GameState.stack after) []
-
-  -- CR 725.3: "Only one player can be the monarch at a time. As a player becomes
-  -- the monarch, the current monarch ceases to be the monarch." The unseating is
-  -- observable only through CR 725.2's inherent end-step draw, which belongs to
-  -- whoever holds the crown -- so alice, who held it, must stop drawing and bob,
-  -- who took it, must start.
-  Spec.it s "CR 725.3 the unseated monarch stops drawing at end step, and the new one starts" $ do
-    (ability, srcId, gs0) <- denethorBoard s registry
-    piker <- S.printingOf s registry "Goblin Piker"
-    let answers = Map.fromList [(denethorCrownSlot, Set.singleton (Recipient.ToPlayer S.bob)), (denethorDamageSlot, Set.singleton (Recipient.ToPlayer S.carol))]
-        act = do Activate.activateAbility S.alice srcId ability; Stack.resolveTop
-        ((_, after), _) = State.runState (Engine.runGame (answerSlots answers) gs0 act) []
-        -- CR 104.3c: a seat asked to draw from an empty library loses instead, so
-        -- both candidates get a card. That also makes "drew nothing" mean the
-        -- trigger did not fire rather than that there was nothing to take.
-        stocked = snd (S.addLibraryCard piker S.bob (snd (S.addLibraryCard piker S.alice after)))
-        endStep = Phase.Ending EndingStep.EndStep
-        endStepOf pid gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep pid)) (gs {GameState.phase = endStep, GameState.activePlayer = pid})
-        run gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-    Spec.assertEqWith s "bob really has the crown" (GameState.monarch after) (Just S.bob)
-    Spec.assertEqWith s "CR 725.2 bob, the new monarch, draws on his own end step" (length (Game.zoneMembers Zone.Hand S.bob (run (endStepOf S.bob stocked)))) 1
-    Spec.assertEqWith s "CR 725.3 alice, unseated, draws nothing on hers" (length (Game.zoneMembers Zone.Hand S.alice (run (endStepOf S.alice stocked)))) 0
 
   -- The classification half, asserted directly. slotsOf is the READ side of the
   -- D4 dataflow lint and has no runtime consumer: Resolve.resolveModes re-derives

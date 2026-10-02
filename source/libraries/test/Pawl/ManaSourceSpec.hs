@@ -38,7 +38,6 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
@@ -786,49 +785,6 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
     Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.carol hers)) "carol casts a second Shizuko off her own upkeep's mana"
     Spec.assertBool s (not (any (S.isCastOf otherOid) (Action.legalActions S.carol his))) "and cannot when the mana went to alice"
 
-  -- CR 500.5 / 106.4, driven through Engine.runStep so the WHOLE upkeep step
-  -- runs
-  -- -- CR 603.2b's event, the trigger, the priority round and the step's own
-  -- end-of-step mana emptying -- rather than by calling Mana.emptiedManaPools.
-  --
-  -- carol's pool is seeded with one ORDINARY green before the step, so the pool
-  -- the sweep sees holds four units identical but for their retention. The two
-  -- casts read that difference at gameplay level on one board: Shizuko is
-  -- {1}{G}{G} and Giant Spider is {3}{G}, so three green pays the first and not
-  -- the second. Keeping nothing fails the first assertion; keeping all four --
-  -- which is what a player-axis retention would do -- fails the second.
-  Spec.it s "CR 500.5 the three retained green survive the upkeep step's end and the ordinary fourth does not" $ do
-    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
-    giantSpider <- S.printingOf s registry "Giant Spider"
-    let seeded = Mana.addMana S.carol [plainGreen] (shizukoStep shizuko S.carol (Phase.Beginning BeginningStep.Upkeep))
-        after = carolMain (S.runPure S.identityAnswer seeded Engine.runStep)
-        (shizukoId, withShizuko) = S.addHandCard shizuko S.carol after
-        (spiderId, withSpider) = S.addHandCard giantSpider S.carol after
-    Spec.assertBool s (any (S.isCastOf shizukoId) (Action.legalActions S.carol withShizuko)) "carol casts a {1}{G}{G} spell in a later phase, off mana the step's end did not take"
-    Spec.assertBool s (not (any (S.isCastOf spiderId) (Action.legalActions S.carol withSpider))) "but not a {3}{G} one, because the ordinary fourth green WAS taken"
-    Spec.assertEqWith s "exactly the three the trigger added" (poolOf S.carol after) [retainedGreen, retainedGreen, retainedGreen]
-
-  -- CR 514.2 ends the retention, and CR 500.5 then takes the mana. A pair of
-  -- boards differing in EXACTLY one thing -- which step Engine.runStep runs --
-  -- both starting from the same resolved upkeep trigger.
-  --
-  -- The end step is the last one the retention outlives: its end runs CR 500.5's
-  -- sweep with the retention still standing. The cleanup step's turn-based
-  -- actions run CR 514.2 at that step's START (Mana.endManaRetention), so the
-  -- same sweep at that step's END finds ordinary mana and takes it. Swapping the
-  -- two moments in Engine.hs is what this pair refuses.
-  Spec.it s "CR 514.2 the retention outlives the end step and not the cleanup step" $ do
-    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
-    let floated = shizukoUpkeep shizuko S.carol
-        ran phase = carolMain (S.runPure S.identityAnswer (atStep phase floated) Engine.runStep)
-        afterEnd = ran (Phase.Ending EndingStep.EndStep)
-        afterCleanup = ran (Phase.Ending EndingStep.Cleanup)
-        (endId, castableAfterEnd) = S.addHandCard shizuko S.carol afterEnd
-        (cleanupId, castableAfterCleanup) = S.addHandCard shizuko S.carol afterCleanup
-    Spec.assertBool s (any (S.isCastOf endId) (Action.legalActions S.carol castableAfterEnd)) "carol still has the mana once the end step has ended"
-    Spec.assertBool s (not (any (S.isCastOf cleanupId) (Action.legalActions S.carol castableAfterCleanup))) "and no longer does once the cleanup step has ended"
-    Spec.assertEqWith s "the pools say the same thing" (poolOf S.carol afterEnd, poolOf S.carol afterCleanup) ([retainedGreen, retainedGreen, retainedGreen], [])
-
 -- One Shizuko on the battlefield under ALICE's control, with @upkeep@'s upkeep
 -- beginning (CR 500.1: a step belongs to exactly one turn, so the event names one
 -- seat and GameState.activePlayer agrees with it), that trigger placed and
@@ -843,28 +799,6 @@ shizukoUpkeep shizuko upkeep =
           board {GameState.activePlayer = upkeep, GameState.phase = Phase.Beginning BeginningStep.Upkeep}
       placed = snd (Engine.runGamePure S.identityAnswer began Engine.placePendingTriggers)
    in snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop)
-
--- @shizukoUpkeep@'s twin for a runStep-driven case: the same board with NOTHING
--- yet done to it, since Engine.runStep records CR 603.2b's event, places the
--- trigger and runs the priority round that resolves it. The schedule loses its
--- head for Pawl.ActivateSpec's augurUpkeep reason -- Setup.emptyGame's
--- `remaining` still begins with the upkeep step, so a runStep-driven board would
--- otherwise advance back into the step it just ran.
-shizukoStep :: Printing.Printing -> PlayerId.PlayerId -> Phase.Phase -> GameState.GameState
-shizukoStep shizuko active phase =
-  let (_, board) = S.addPermanent shizuko S.alice S.threePlayerGame
-   in board
-        { GameState.activePlayer = active,
-          GameState.phase = phase,
-          GameState.priority = Just active,
-          GameState.remaining = Seq.drop 1 (GameState.remaining board)
-        }
-
--- An already-floated board moved to another step of the SAME turn, so the pair
--- above differs in one field and nothing else. The active player keeps priority,
--- which is what makes Engine.runStep grant a priority round rather than settle.
-atStep :: Phase.Phase -> GameState.GameState -> GameState.GameState
-atStep phase gs = gs {GameState.phase = phase, GameState.priority = Just (GameState.activePlayer gs)}
 
 -- CR 307.1 / 117.1a: carol active with priority in her own precombat main phase,
 -- which is what a sorcery-speed cast of hers needs. Applied to BOTH boards of the
@@ -1075,38 +1009,8 @@ retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
 --
 -- Nothing is omitted from the card, so pawl's Geosurge is neither stricter nor
 -- weaker than printed.
-geosurgeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+geosurgeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 geosurgeSpec s registry = Spec.describe s "Geosurge" $ do
-  -- The other half: the mana the restriction ADMITS is spent like any other, so
-  -- the cast it allows really is paid out of these units and not out of some
-  -- other supply. Six restricted red are left, not seven and not zero.
-  Spec.it s "CR 106.4 the artifact cast spends one of the seven and leaves six" $ do
-    geosurge <- S.printingOf s registry "Geosurge"
-    mountain <- S.printingOf s registry "Mountain"
-    solRing <- S.printingOf s registry "Sol Ring"
-    let after = snd (geosurgeBoards geosurge mountain)
-        (ringId, withRing) = S.addHandCard solRing S.alice after
-        paid = S.runPure S.identityAnswer withRing (S.cast S.alice ringId)
-    Spec.assertEqWith s "Sol Ring is on the stack" (length (GameState.stack paid)) 1
-    Spec.assertEqWith s "six restricted red are left" (poolOf S.alice paid) (replicate 6 restrictedRed)
-
-  -- CR 106.4's other half, and the one that keeps the restriction from being a
-  -- way to LOSE mana: a cost the seven cannot pay is paid out of something else,
-  -- and the seven are still in the pool afterwards. One Mountain added AFTER
-  -- Geosurge resolved is the only difference from the board above, so the {R}
-  -- Lightning Bolt now has a legal payment that does not touch the restricted
-  -- mana -- and pawl must both offer that cast and pay it the way the rule says.
-  Spec.it s "CR 106.4 an instant paid from a Mountain leaves all seven restricted red floating" $ do
-    geosurge <- S.printingOf s registry "Geosurge"
-    mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let spare = S.landsFor mountain S.alice 1 (snd (geosurgeBoards geosurge mountain))
-        (boltId, withBolt) = S.addHandCard bolt S.alice spare
-        after = S.runPure S.identityAnswer withBolt (S.cast S.alice boltId)
-    Spec.assertBool s (S.castable S.alice boltId withBolt) "the spare Mountain makes the instant castable"
-    Spec.assertEqWith s "Lightning Bolt is on the stack" (length (GameState.stack after)) 1
-    Spec.assertEqWith s "and the seven restricted red are untouched" (poolOf S.alice after) (replicate 7 restrictedRed)
-
   -- CR 106.6 asked of a payment that is NO cast. Chromatic Star ("{1}, {T},
   -- Sacrifice this artifact: Add one mana of any color") is a mana ability whose
   -- own cost holds mana, and paying it is an activation cost (CR 602.2b) -- so
@@ -1139,20 +1043,6 @@ geosurgeBoards geosurge mountain =
   let (before, geoId) = S.handOne geosurge (S.landsInPlay mountain 4)
       cast_ = S.runPure S.identityAnswer before (S.cast S.alice geoId)
    in (before, S.runPure S.identityAnswer cast_ Stack.resolveTop)
-
--- One of Geosurge's seven: red, from a source that is not snow, lost as the
--- phase ends, and spendable only on an artifact or creature spell.
-restrictedRed :: ManaUnit.ManaUnit
-restrictedRed =
-  ManaUnit.MkManaUnit
-    { ManaUnit.manaType = ManaType.Colored Color.Red,
-      ManaUnit.tags = Set.empty,
-      ManaUnit.retention = ManaRetention.Ordinary,
-      ManaUnit.restriction =
-        Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])),
-      ManaUnit.rider = Nothing,
-      ManaUnit.sourceChosenSubtype = Nothing
-    }
 
 -- CR 106.6 on the OTHER road: a mana ability's restricted mana, added inline at
 -- payment (CR 605.3b) rather than by a spell resolving off the stack. Mishra's
@@ -1235,9 +1125,9 @@ lastingSpringSpec s registry = Spec.describe s "Synthetic Lasting Spring" $ do
     Spec.assertEqWith s "the pools say the same thing" (poolOf S.alice (ran spring), poolOf S.alice (ran powder)) ([retainedColorless], [])
 
 -- `printing`'s one mana ability activated inline during alice's upkeep. The
--- schedule loses its head for shizukoStep's reason: Setup.emptyGame's
--- `remaining` still begins with the upkeep step, so a runStep-driven board would
--- otherwise advance back into the step it just ran.
+-- schedule loses its head because Setup.emptyGame's `remaining` still begins
+-- with the upkeep step, so a runStep-driven board would otherwise advance back
+-- into the step it just ran.
 tappedAtUpkeep :: Printing.Printing -> GameState.GameState
 tappedAtUpkeep printing =
   let (oid, board) = S.addPermanent printing S.alice (Setup.emptyGame S.bothPlayers)

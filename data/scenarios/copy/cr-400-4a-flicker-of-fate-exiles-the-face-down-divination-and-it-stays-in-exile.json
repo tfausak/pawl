@@ -1,0 +1,173 @@
+{
+  "description": "CR 400.4a Flicker of Fate exiles the face-down Divination and it stays in exile",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "manaPool": "BRRWW",
+        "battlefield": [
+          {
+            "card": "Magar of the Magic Strings",
+            "label": "magar",
+            "ready": true
+          }
+        ],
+        "graveyard": [
+          {
+            "card": "Divination"
+          },
+          {
+            "card": "Lightning Bolt"
+          }
+        ],
+        "library": [
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          },
+          {
+            "card": "Island"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Flicker of Fate",
+            "label": "flicker"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          {
+            "card": "Hill Giant"
+          },
+          {
+            "card": "Hill Giant"
+          },
+          {
+            "card": "Hill Giant"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Activate": {
+          "object": "$magar",
+          "ability": 0,
+          "targets": [
+            "Divination"
+          ],
+          "mana": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Answer": {
+          "prompt": "ChooseManaToSpend",
+          "with": {
+            "manaType": {
+              "type": "Colored",
+              "value": {
+                "type": "Red"
+              }
+            },
+            "tags": [],
+            "retention": {
+              "type": "Ordinary"
+            },
+            "restriction": null,
+            "rider": null,
+            "sourceChosenSubtype": null
+          }
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Battlefield",
+          "is": [
+            "$magar",
+            "Divination"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$flicker",
+          "targets": [
+            "Divination"
+          ],
+          "mana": []
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Exile",
+          "is": [
+            "Divination"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Zone",
+          "player": "alice",
+          "zone": "Battlefield",
+          "is": [
+            "$magar"
+          ]
+        }
+      }
+    }
+  ]
+}

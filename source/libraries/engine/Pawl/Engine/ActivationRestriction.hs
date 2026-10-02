@@ -182,9 +182,9 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- CR 605.3a's mana window asks this too, off the ability
   -- Pawl.Engine.Mana.manaRoutesOfGiven carries onto the route -- Loot, the
   -- Pathfinder's "{G}, {T}: Add three mana of any one color", which
-  -- Pawl.ManaSpec's Loot group proves. Nothing is CR 305.6's intrinsic route
-  -- alone, which prints no rider, so the answer below is unreachable rather than
-  -- a claim about one.
+  -- data/scenarios/mana's Loot boards prove. Nothing is CR 305.6's intrinsic
+  -- route alone, which prints no rider, so the answer below is unreachable rather
+  -- than a claim about one.
   ActivationRestriction.OnlyOnce -> case ability of
     Nothing -> False
     Just this -> case Game.lookupObject srcId gs of

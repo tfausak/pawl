@@ -1,0 +1,292 @@
+{
+  "description": "CR 104.2b the second, cast from hand on a LATER turn, wins",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p1"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p2"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p3"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p4"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p5"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p6"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p7"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p8"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p9"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p10"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p11"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p12"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p13"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "p14"
+          },
+          {
+            "card": "Future Sight",
+            "ready": true
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Approach of the Second Sun",
+            "label": "first"
+          },
+          {
+            "card": "Approach of the Second Sun",
+            "label": "second"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b1"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b2"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b3"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b4"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b5"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b6"
+          },
+          {
+            "card": "Plains",
+            "ready": true,
+            "label": "b7"
+          }
+        ],
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      },
+      {
+        "name": "carol",
+        "library": [
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          },
+          {
+            "card": "Plains"
+          }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$first",
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$p4",
+            "$p5",
+            "$p6",
+            "$p7",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "alice",
+          "life": 27
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "Result",
+          "is": null
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "View": {
+          "of": "ActivePlayer",
+          "is": "alice"
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$second",
+          "mana": [
+            "$p1",
+            "$p2",
+            "$p3",
+            "$p4",
+            "$p5",
+            "$p6",
+            "$p7",
+            null
+          ]
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "View": {
+        "of": "Result",
+        "is": {
+          "won": "alice"
+        }
+      }
+    },
+    {
+      "Life": {
+        "player": "alice",
+        "life": 27
+      }
+    }
+  ]
+}

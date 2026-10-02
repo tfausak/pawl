@@ -140,7 +140,9 @@ data Rehearsal = MkRehearsal
     staged :: Staged.Staged,
     pending :: Maybe (When.When, Move.Move, Choices.Choices),
     refusing :: Maybe (When.When, Move.Move, Text.Text),
-    reversing :: Maybe (When.When, Move.Move, PlayerId.PlayerId, GameState.GameState)
+    reversing :: Maybe (When.When, Move.Move, PlayerId.PlayerId, GameState.GameState),
+    -- | CR 108.1: the Oracle card reference, as far as the timeline names it.
+    reference :: Map.Map CardName.CardName Card.Card
   }
 
 type Run = State.StateT Rehearsal (Either Failure.ScenarioFailure)
@@ -152,12 +154,23 @@ type Run = State.StateT Rehearsal (Either Failure.ScenarioFailure)
 run :: (Monad m) => Registry.Registry m -> Scenario.Scenario -> m (Either Failure.ScenarioFailure GameState.GameState)
 run registry scenario = do
   staging <- stage registry (Scenario.board scenario)
+  let names = Set.toList (foldMap (namesIn . Either.fromRight ReplyType.Null . Codec.Reply.fromValue . Codec.encode Codec.Timed.codec) (Scenario.timeline scenario))
+  found <- mapM (\name -> fmap (fmap ((,) name)) (Registry.fetchCard registry name)) names
   pure $ do
     board <- staging
-    (final, rehearsal) <- State.runStateT (playOut stepBudget (Staged.state board)) (rehearsalOf (Scenario.timeline scenario) board)
+    (final, rehearsal) <- State.runStateT (playOut stepBudget (Staged.state board)) ((rehearsalOf (Scenario.timeline scenario) board) {reference = Map.fromList (Maybe.catMaybes found)})
     settle rehearsal final
     State.evalStateT (mapM_ (expect Nothing final) (Scenario.final scenario)) rehearsal
     pure final
+
+-- | Every string a timeline entry holds, read as a card name: the names a
+-- CR 201.4 answer can choose, for Prompt.LookUpCard.
+namesIn :: ReplyType.Reply -> Set.Set CardName.CardName
+namesIn reply = case reply of
+  ReplyType.Text t -> Set.singleton (CardName.MkCardName t)
+  ReplyType.Array xs -> foldMap namesIn xs
+  ReplyType.Object kvs -> foldMap (namesIn . snd) kvs
+  _ -> Set.empty
 
 -- | How many steps a data scenario may run: a bound, so a scenario whose moment
 -- never comes fails rather than hangs.
@@ -191,7 +204,8 @@ rehearsalOf timeline board =
           staged = board,
           pending = Nothing,
           refusing = Nothing,
-          reversing = Nothing
+          reversing = Nothing,
+          reference = Map.empty
         }
 
 -- | What a finished run still owes: choices its last action never used, and
@@ -476,6 +490,8 @@ answerDedicated decider asked =
       unscheduled offers = failWith (Failure.MkUnscheduledPrompt (GameState.turnNumber gs) (GameState.phase gs) decider kind offers)
    in case prompt of
         Prompt.Type.ChooseAction who _ actions -> answerActionPrompt gs (Decider.unwrap who) actions
+        -- CR 108.1: the interpreter's question, answered from the reference.
+        Prompt.Type.LookUpCard name -> State.gets (Map.lookup name . reference)
         -- CR 723.6: keyed on the conceding player, whom no one decides for.
         Prompt.Type.Concede pid -> do
           key <- whenOf gs pid

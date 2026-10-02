@@ -30,7 +30,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- needs it to record the one it just spent. Nothing for CR 305.6's intrinsic
 -- route, which is printed on no card and so is no ability's. Loot, the
 -- Pathfinder's "{G}, {T}: Add three mana of any one color" is the printing, and
--- Pawl.ManaSpec's Loot group is what proves it.
+-- data/scenarios/mana's Loot boards are what prove it.
 --
 -- The cost and the yield both, because either alone loses a distinction the player is entitled
 -- to make. The yield alone cannot separate an Urborg'd Mana Confluence's free

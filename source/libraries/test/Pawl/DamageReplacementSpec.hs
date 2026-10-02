@@ -989,7 +989,7 @@ proteanHydraSpec s registry = Spec.describe s "Protean Hydra (CR 107.3m, CR 615.
 -- Numbers distinct: the Firebolt is 2, the counters are 2 because CR 615.5's
 -- "that many" says so, and Jared's 3/3 becomes 5/5. A "one counter per event"
 -- reading would answer 1 and an unrun rider 0.
-jaredCarthalionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaredCarthalionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (CR 604.2)" $ do
   -- alice holds `n` Firebolts over one Mountain apiece, bob's Jared is on the
   -- battlefield, and carol is the third seat. Jared is placed rather than cast,
@@ -1030,22 +1030,6 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
     Spec.assertEqWith s "carol is the monarch, so the same 2 is marked in full" (S.damageOf jared heldByCarol) (Just 2)
     Spec.assertEqWith s "and no counter is put on" (countersOn CounterKind.PlusOnePlusOne jared heldByCarol) 0
     Spec.assertEqWith s "so Jared is still a 3/3" (S.powerToughnessOf jared heldByCarol) (Just (3, 3))
-  -- CR 604.1's "simply true", which is what makes the clause a live read rather
-  -- than a latch: the crown changes hands with no trigger and no resolution in
-  -- between, and the SAME permanent's ability stops applying. A gate snapshotted
-  -- when the ability was gathered -- or when the permanent entered -- would
-  -- prevent the second Firebolt too.
-  Spec.it s "CR 604.1 the clause is re-asked, so losing the crown turns the ability off" $ do
-    (jared, bolts, g) <- board 2
-    case bolts of
-      [first, second] -> do
-        let shielded = castAndResolve (aimCreature jared) (S.withMonarch S.bob g) first
-            dethroned = castAndResolve (aimCreature jared) (S.withMonarch S.carol shielded) second
-        Spec.assertEqWith s "the first Firebolt is prevented while bob wears the crown" (S.damageOf jared shielded) (Just 0)
-        Spec.assertEqWith s "leaving two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne jared shielded) 2
-        Spec.assertEqWith s "the second lands in full once carol has it" (S.damageOf jared dethroned) (Just 2)
-        Spec.assertEqWith s "and adds no third counter" (countersOn CounterKind.PlusOnePlusOne jared dethroned) 2
-      _ -> Spec.assertFailure s "fixture should hold two Firebolts"
 
 -- CR 613.1f's NAMED removal aimed at a printed PREVENTION ability, whose producer
 -- is Glittering Lion ({2}{W} Creature -- Cat 2/2, Prophecy): "Prevent all damage

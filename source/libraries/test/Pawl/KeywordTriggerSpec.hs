@@ -1351,42 +1351,11 @@ rippleSpec s registry =
 -- the storm trigger. Two copies is right. A count of alice's spells alone, or a
 -- single copy whatever the count, makes one; a this-turn tally read at
 -- resolution makes three. Each leaves bob at a different life total.
-stormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-stormSpec s registry = Spec.describe s "Storm" $ do
+stormSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+stormSpec s _ = Spec.describe s "Storm" $ do
   Spec.it s "CR 702.40a storm is minted for a spell on the stack and nowhere else" $ do
     Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Storm 1)) [Keyword.storm]
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Storm 1)) []
-
-  -- THE PROVING TEST.
-  Spec.it s "CR 702.40a Grapeshot copies itself once per spell cast before it, and not for one cast in response" $ do
-    grapeshot <- S.printingOf s registry "Grapeshot"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    mountain <- S.printingOf s registry "Mountain"
-    let lands = S.landsFor mountain S.bob 1 (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
-        (firstBolt, g1) = S.addHandCard bolt S.alice lands
-        (bobBolt, g2) = S.addHandCard bolt S.bob g1
-        (responseBolt, g3) = S.addHandCard bolt S.alice g2
-        (grapeshotId, g4) = S.addHandCard grapeshot S.alice g3
-        board =
-          g4
-            { GameState.activePlayer = S.alice,
-              GameState.phase = Phase.PrecombatMain
-            }
-        -- Every target prompt answered with that player: each cast's, and CR
-        -- 707.10c's offer to re-target a copy.
-        step pid gs action = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer pid)) gs (action >> Engine.settleForPriority))
-        castAndResolve caster pid gs oid = step pid (step pid gs {GameState.priority = Just caster} (S.cast caster oid)) Stack.resolveTop
-        -- The two spells cast before Grapeshot: alice's Bolt at bob, bob's at alice.
-        before = castAndResolve S.bob S.alice (castAndResolve S.alice S.bob board firstBolt) bobBolt
-        -- Grapeshot at bob, its storm trigger on the stack above it, and alice's
-        -- second Bolt at bob in response to the trigger.
-        responded = step S.bob (step S.bob before {GameState.priority = Just S.alice} (S.cast S.alice grapeshotId)) (S.cast S.alice responseBolt)
-        -- The Bolt, the trigger, the copies, then Grapeshot: resolved down to an
-        -- empty stack, however many copies there were.
-        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step S.bob gs Stack.resolveTop)
-        after = resolveAll responded
-    Spec.assertEqWith s "bob took two Bolts' 6, Grapeshot's 1 and TWO copies' 2" (S.lifeOf S.bob after) (Just 11)
-    Spec.assertEqWith s "alice took bob's Bolt" (S.lifeOf S.alice after) (Just 17)
 
 -- CR 702.56a's replicate: "As an additional cost to cast this spell, you may pay
 -- [cost] any number of times" and "When you cast this spell, if a replicate cost

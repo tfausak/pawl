@@ -1,6 +1,6 @@
 {
   "description": "CR 601.2h a division short of the count pays nothing",
-  "note": "Two counters are owed and the Answer names one off the Piker; the payment fails whole, so no counter moves and nothing reaches the stack, and the consumed Answer is the one ask. CR 733.2's ReverseManaAbilities is answered Declines (the Island's mana is kept): Exercises, as the Haskell answerer gives, crashes pawl scenario with an arithmetic underflow, and no assertion depends on it.",
+  "note": "Two counters are owed and the Answer names one off the Piker; the payment fails whole, so no counter moves and nothing reaches the stack, and the consumed Answer is the one ask.",
   "board": {
     "seats": [
       {
@@ -86,7 +86,7 @@
         "Answer": {
           "prompt": "ReverseManaAbilities",
           "with": {
-            "type": "Declines"
+            "type": "Exercises"
           }
         }
       }
