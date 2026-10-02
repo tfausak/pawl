@@ -57,7 +57,6 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - `board:protector`: a battle's protector
 - `move:LookUpCard`: the `LookUpCard` prompt
 - `board:command`: the command zone
-- `move:ReverseManaAbilities`: the `ReverseManaAbilities` prompt
 - `move:ChooseCardName`: the `ChooseCardName` prompt
 - `move:ChooseTapsForTotalPower`: the `ChooseTapsForTotalPower` prompt
 - `board:objects-ids`
@@ -287,7 +286,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 602.1a an opponent's activation destroys Aether Storm and the life comes out of the opponent | `check:on-battlefield`
 - CR 602.2 an X past the energy on hand is a no-op | `move:out-of-range-answer`
 - CR 602.2 an ability with no timing rider is still offered during combat | `check:helper-isActivate` `check:offered-actions` `check:priority` `check:step`
-- CR 602.2 the gate offers an equip only a target-aware reduction can pay for | `move:ReverseManaAbilities`
+- CR 602.2 the gate offers an equip only a target-aware reduction can pay for | `ready`
 - CR 602.2a cycling from hand reveals the Mauler as the ability is announced | `check:events` `check:helper-revealed` `check:stack`
 - CR 602.2b an activation cost with no black symbol sacrifices nothing | `check:helper-theAbility` `check:stack`
 - CR 602.2b an activation cost with one black symbol costs a Swamp | `move:ChooseSacrifices`
@@ -764,7 +763,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2f a spell with no black symbol sacrifices nothing | `check:stack`
 - CR 601.2f a spell with one black symbol costs a Swamp to cast | `move:ChooseSacrifices`
 - CR 601.2f two black symbols cost two Swamps | `move:ChooseSacrifices`
-- CR 601.2h a caster without the life to pay has the cast rewound, and the same caster aims the Bolt elsewhere | `move:ReverseManaAbilities`
+- CR 601.2h a caster without the life to pay has the cast rewound, and the same caster aims the Bolt elsewhere | `ready`
 - CR 601.3 alice casts the Bolt she picked out of the Shell's pile | `board:exile-linked` `check:tapped-count` `move:ChooseOfferedCastSpell` `move:OfferedCast`
 - CR 601.3 castable once bob has been attacked in the declare attackers step | `check:offered-actions`
 - CR 601.3 not castable in the declare blockers step, though bob was attacked | `check:combat` `check:offered-actions` `check:other-Combat.Type.attacked` `check:step`
@@ -791,7 +790,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 400.7j Crabomination offers a spell from its own three exiled cards alone | `move:ChooseOfferedCastSpell` `move:OfferedCast` `move:RandomObject`
 - CR 500.5 no mana floats at the end of a game | `move:ChooseDiscard` `move:DeclareMulligan` `move:Shuffle`
 - CR 601 casting puts a NEW object on the stack and taps two lands | `check:hand-size` `check:helper-handSize` `check:other-Game.objectCount` `check:stack` `check:tapped-count`
-- CR 601.2 a mis-coloured mana answer unwinds the whole cast | `move:ReverseManaAbilities`
+- CR 601.2 a mis-coloured mana answer unwinds the whole cast | `ready`
 - CR 601.2 the same cast with the right colour succeeds | `check:stack` `check:tapped-count` `check:zone-contents`
 - CR 601.2a the same board casting the same card from the GRAVEYARD does not trigger | `check:helper-runHarness`
 - CR 601.2a the spell is already on the stack when CR 601.2c announces its targets | `check:stack`
@@ -821,7 +820,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.113b/601.2c/700.2a the printed cast is offered though no land exists to target | `check:offered-actions` `check:other-GameState.extraTurns` `check:other-Mana.yieldUnits` `check:other-ManaUnit.manaType`
 - CR 702.117a after alice's own Bolt the Salvo is cast for {1}{R}; after nobody's and after bob's, its {4}{R} is unpayable | `check:offered-actions` `move:expect-rejected`
 - CR 702.119a the emerge cost is reduced by the sacrificed creature's mana value | `check:helper-namedInGraveyard` `check:helper-namedOnBattlefield`
-- CR 702.119c an Ashnod's Altar that eats the chosen creature reverses the cast | `move:ChooseCost:unmatchable` `move:ChooseSacrifices` `move:ReverseManaAbilities`
+- CR 702.119c an Ashnod's Altar that eats the chosen creature reverses the cast | `move:ChooseCost:unmatchable` `move:ChooseSacrifices`
 - CR 702.133a cast from the graveyard for {1}{R}{R} plus a discard, then exiled | `move:ChooseDiscard`
 - CR 702.137a after bob lost life the Skewer is cast for {R}; with nobody hurt and with only alice hurt, its {2}{R} is unpayable | `board:mana-pool`
 - CR 702.138a a creature card escapes from the graveyard for {4}{G} plus three exiles | `move:ChooseExilesFromGraveyard`
@@ -842,7 +841,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.175a paying offspring TWICE rejects the cast; once, one token | `move:ChooseKicker`
 - CR 702.176a cast for impending, the Overlord is not a creature until alice's fourth end step removes its last time counter | `move:ChooseMovedCounters`
 - CR 702.180a the harmonize cost is reduced by the tapped creature's power, and the spell is exiled from the stack | `check:helper-handSize` `check:helper-namedInGraveyard` `check:helper-tapStateOf` `check:offered-actions` `check:zone-contents`
-- CR 702.180b tapping the chosen creature for mana reverses the cast | `move:ChooseCost:unmatchable` `move:ReverseManaAbilities`
+- CR 702.180b tapping the chosen creature for mana reverses the cast | `move:ChooseCost:unmatchable`
 - CR 702.185c a spell warped this turn makes Insatiable Skittermaw's end step trigger; the same Colossus cast for {9} does not | `move:OrderTriggers-departed-source`
 - CR 702.188a with a tapped Piker the Spider-Man is cast for {W} and the Piker goes home; untapped, no cast is offered | `check:helper-namedOnBattlefield` `check:helper-webSlingingCost` `check:offered-actions` `check:on-battlefield` `check:zone-contents`
 - CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer | `check:offered-actions`
@@ -951,7 +950,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 109.5 a Ghostly Prison its own controller is attacking WITH taxes nothing | `check:combat` `check:helper-allUntapped`
 - CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block | `move:ChooseTaps`
 - CR 506.7b the window opens at the declaration and runs to the end of the combat phase | `check:offered-actions` `check:other-Turn.afterBlockersDeclared` `check:step`
-- CR 508.1 the rewound declaration is made again: two Pikers under a Ghostly Prison become one | `move:ReverseManaAbilities`
+- CR 508.1 the rewound declaration is made again: two Pikers under a Ghostly Prison become one | `ready`
 - CR 508.1 the same board WITHOUT the Prison pays nothing | `check:combat` `check:helper-allUntapped`
 - CR 508.1 the same board with an untaxed attacker sacrifices nothing | `check:combat` `check:helper-stillThere`
 - CR 508.1d / 611.2a / 611.2c whole cards: bob's creatures attack alice on his next turn, and only then | `board:attackrequirements` `board:hand-order` `board:mana-pool` `board:turn-number`
@@ -959,7 +958,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 508.1g / 701.43d exerting an attacker fires its linked trigger | `move:ChooseExert`
 - CR 508.1h a cost to attack that is not mana: an Exalted Dragon sacrifices a land | `move:ChooseSacrifices`
 - CR 508.1h two taxed attackers at 3 life: neither {W/P} may take the life route | `check:combat`
-- CR 508.1j partial payments are not allowed: three Forests do not buy two attacks | `move:ReverseManaAbilities`
+- CR 508.1j partial payments are not allowed: three Forests do not buy two attacks | `ready`
 - CR 508.1j partial payments are not allowed: two Dragons and one land sacrifice nothing | `check:combat` `check:helper-allUntapped` `check:helper-stillThere`
 - CR 508.1j the payer orders the two taxing permanents: Hollow Warrior before Exalted Dragon | `move:OrderCombatTolls`
 - CR 508.1j the way the attacker's controller announced is the way the toll is paid | `move:AnnouncePhyrexianPayment`
@@ -989,9 +988,9 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 702.154a a summoning-sick creature is not offered, and enlists nothing | `move:ChooseEnlist`
 - CR 702.154a a vigilant co-attacker is untapped and still cannot be enlisted | `move:ChooseEnlist`
 - CR 702.154a enlisting a 3-power creature gives the attacker +3/+0, and the tapped creature is not attacking | `move:ChooseEnlist`
-- CR 733.1 a blocker's toll: the Forests stay tapped and their mana floats | `move:ChooseManaSource` `move:ReverseManaAbilities` `check:helper-floating`
-- CR 733.1 the exert goes back with the declaration and the Drum's tap stands | `move:ChooseExert` `move:ReverseManaAbilities`
-- CR 733.2 the kept mana pays the smaller declaration | `move:ReverseManaAbilities`
+- CR 733.1 a blocker's toll: the Forests stay tapped and their mana floats | `move:ChooseManaSource` `check:helper-floating`
+- CR 733.1 the exert goes back with the declaration and the Drum's tap stands | `move:ChooseExert`
+- CR 733.2 the kept mana pays the smaller declaration | `ready`
 
 ### `CombatEffectSpec`
 
@@ -1182,24 +1181,24 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 ### `CostSpec`
 
 - CR 101.1 an announced waterbend X of 0 is refused, and 1 is not | `move:ChooseTaps`
-- CR 101.4b the helper is asked on the board the caster's answer left | `move:ChooseAssistAmount` `move:ChooseAssistant` `move:ReverseManaAbilities`
+- CR 101.4b the helper is asked on the board the caster's answer left | `move:ChooseAssistAmount` `move:ChooseAssistant`
 - CR 107.3a an announced waterbend X is paid by tapping that many permanents | `move:ChooseTaps`
 - CR 107.3a/601.2h the announced X is divided among creatures and the target gets -X/-X | `move:ChooseCounterRemovalAmong`
-- CR 107.5 tapping the source for mana loses its own {T} | `move:ReverseManaAbilities`
+- CR 107.5 tapping the source for mana loses its own {T} | `ready`
 - CR 107.6 paying from the Plains instead untaps the Sentry itself | `check:stack`
 - CR 107.6 whole card: a TAPPED Sentry untaps to pay {Q} and gets +0/+2 | `check:tapped-count`
 - CR 118.1 / 613.4c the cost removes the +1/+1 counter, so the 3/3 becomes a 2/2 that cannot pay again | `check:helper-counterRemovalsOf` `check:helper-isActivateOf` `check:offered-actions` `check:other-Event.removeCounters`
 - CR 118.1 the payer chooses which land the cost returns | `move:ChooseReturns`
 - CR 118.12 Izoni makes its Spiders only when alice collects evidence | `move:ChooseCollectEvidence`
-- CR 118.3 an answer naming a kind the creature lacks pays nothing | `move:ChooseMixedCounterRemoval` `move:ReverseManaAbilities`
-- CR 118.3 an answer past what a creature carries pays nothing | `move:ChooseCounterRemovalAtLeast` `move:ReverseManaAbilities`
+- CR 118.3 an answer naming a kind the creature lacks pays nothing | `move:ChooseMixedCounterRemoval`
+- CR 118.3 an answer past what a creature carries pays nothing | `move:ChooseCounterRemovalAtLeast`
 - CR 118.3 counters exactly covering the count are one division, so nothing is asked | `check:stack`
-- CR 118.3 exiling the Effigy first leaves no permanent to tap | `move:ReverseManaAbilities`
+- CR 118.3 exiling the Effigy first leaves no permanent to tap | `ready`
 - CR 118.3 no untapped creature means no payment | `check:helper-isTapped` `check:helper-pooledFrom` `check:other-Cost.canPayComponent`
-- CR 118.3 the Altar eats the Executioner before its own exile is paid | `move:ReverseManaAbilities`
-- CR 118.3 the Altar eats the Ignus before its own return is paid | `move:ReverseManaAbilities`
-- CR 118.3 the Altar eats the Replica before its own sacrifice is paid | `move:ReverseManaAbilities`
-- CR 118.3 the Altar eats the Sentry before its own {Q} is paid | `move:ReverseManaAbilities`
+- CR 118.3 the Altar eats the Executioner before its own exile is paid | `ready`
+- CR 118.3 the Altar eats the Ignus before its own return is paid | `ready`
+- CR 118.3 the Altar eats the Replica before its own sacrifice is paid | `ready`
+- CR 118.3 the Altar eats the Sentry before its own {Q} is paid | `ready`
 - CR 118.3 the ChooseX bound is the counters the creatures carry between them | `move:ChooseCounterRemovalAmong`
 - CR 118.3 two activations take {B}{B} then {G}{G} and pay {B}{B}{G}{G} | `move:ChooseCardInHand`
 - CR 118.6 paying an unpayable cost changes nothing | `check:tapped-count`
@@ -1247,14 +1246,14 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 601.2h Gush's two returned Islands draw once for Synthetic Return Ledger | `check:hand-size` `check:stack` `check:zone-contents`
 - CR 601.2h Phyrexian Tribute's two sacrifices grow Vengeful Townsfolk once | `move:ChooseSacrifices`
 - CR 601.2h a creature sacrificed to pay a cast's additional cost is still readable when the spell resolves | `check:offered-actions` `check:stack`
-- CR 601.2h a division short of the count pays nothing | `move:ChooseCounterRemovalAmong` `move:ReverseManaAbilities`
-- CR 601.2h an answer of the wrong size pays nothing at all | `move:ChooseReturns` `move:ReverseManaAbilities`
-- CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid | `move:ChooseDiscard` `move:ReverseManaAbilities`
-- CR 601.2h answering {B}{B} twice does not pay {B}{B}{G}{G} | `move:ChooseCardInHand` `move:ReverseManaAbilities`
+- CR 601.2h a division short of the count pays nothing | `move:ChooseCounterRemovalAmong`
+- CR 601.2h an answer of the wrong size pays nothing at all | `move:ChooseReturns`
+- CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid | `move:ChooseDiscard`
+- CR 601.2h answering {B}{B} twice does not pay {B}{B}{G}{G} | `move:ChooseCardInHand`
 - CR 601.2h delving three cards fires Rakshasa Vizier once, for three counters | `check:stack`
 - CR 601.2h one candidate still asks how many | `move:ChooseCounterRemovalAtLeast`
 - CR 601.2h tapping first pays the same cost in full | `check:on-battlefield` `check:stack`
-- CR 601.2h the answer is read as a set: [a,a,b] pays for two, [a,a] does not | `move:ChooseDiscard` `move:ReverseManaAbilities`
+- CR 601.2h the answer is read as a set: [a,a,b] pays for two, [a,a] does not | `move:ChooseDiscard`
 - CR 601.2h the card the cost exiled is the card the ability returns | `check:on-battlefield` `check:zone-contents`
 - CR 601.2h the payer chooses how many counters come off, and the token is that big | `move:ChooseCounterRemovalAtLeast`
 - CR 601.2h the payer chooses which card pays | `move:ChooseCardInHand`
@@ -1294,24 +1293,24 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 701.67b a waterbend cost's taps pay for its own generic mana and not for the tax on top of it | `move:ChooseTaps`
 - CR 702.125a two opponents take {2} off, and the total is what pays | `check:helper-namesIn` `check:offered-actions` `check:tapped-count`
 - CR 702.126a improvise pays {3} of a Foundry Assembler's {5} by tapping three artifacts | `check:tapped-count`
-- CR 702.132a a caster who chooses nobody pays the whole cost alone | `move:ChooseAssistant` `move:ReverseManaAbilities`
+- CR 702.132a a caster who chooses nobody pays the whole cost alone | `move:ChooseAssistant`
 - CR 702.132a alice, with one Forest, casts the Binox bob pays seven of | `move:ChooseAssistAmount` `move:ChooseAssistant`
 - CR 702.132a the player alice chose pays seven of the Binox's generic mana | `move:ChooseAssistAmount` `move:ChooseAssistant`
-- CR 702.132a the same cast unwinds when alice names nobody | `move:ChooseAssistant` `move:ReverseManaAbilities`
+- CR 702.132a the same cast unwinds when alice names nobody | `move:ChooseAssistant`
 - CR 702.41a two artifacts take {2} off, and the total is what pays | `check:helper-namesIn` `check:offered-actions` `check:tapped-count`
 - CR 702.51a convoke pays a Siege Wurm's whole cost by tapping seven creatures | `move:ChooseTaps`
 - CR 702.51c the entry trigger grows the creatures that convoked the Loxodon, and nothing else | `move:ChooseTaps`
 - CR 702.66a delve pays seven of a Treasure Cruise's eight mana by exiling seven cards | `move:ChooseExilesFromGraveyard`
 - CR 704.5a paying the last 2 life is legal and loses the game | `check:other-GameState.players` `check:other-Player.status`
 - CR 733.1 a caster who keeps the mana ability has the spell back in hand and the mana floating | `board:mana-pool`
-- CR 733.1 a nested window's mana abilities are the payer's to keep | `move:ReverseManaAbilities`
-- CR 733.1 a refused assisted cast asks the helper too, and each keeps only their own | `move:ChooseAssistAmount` `move:ChooseAssistant` `move:ReverseManaAbilities`
-- CR 733.1 an activator who keeps the mana abilities keeps both lands tapped and both mana floating | `move:ReverseManaAbilities`
-- CR 733.1 reversing an unpayable activation does not undo the mana ability's own shuffle | `move:ChooseDiscard` `move:ReverseManaAbilities` `move:Shuffle`
-- CR 733.1 reversing the payment does not undo the Tomb's own shuffle | `move:ReverseManaAbilities` `move:Shuffle` `board:library-order` `check:mana-pool`
-- CR 733.1 the payer may keep the mana ability they activated while making the illegal play | `move:ReverseManaAbilities` `check:mana-pool`
-- CR 733.1 the payer who reverses it gets the mana, the tap and the damage back | `move:ReverseManaAbilities` `check:mana-pool`
-- CR 733.1 what a nested window kept is offered again when the outer payment fails | `move:ReverseManaAbilities`
+- CR 733.1 a nested window's mana abilities are the payer's to keep | `ready`
+- CR 733.1 a refused assisted cast asks the helper too, and each keeps only their own | `move:ChooseAssistAmount` `move:ChooseAssistant`
+- CR 733.1 an activator who keeps the mana abilities keeps both lands tapped and both mana floating | `ready`
+- CR 733.1 reversing an unpayable activation does not undo the mana ability's own shuffle | `move:ChooseDiscard` `move:Shuffle`
+- CR 733.1 reversing the payment does not undo the Tomb's own shuffle | `move:Shuffle` `board:library-order` `check:mana-pool`
+- CR 733.1 the payer may keep the mana ability they activated while making the illegal play | `check:mana-pool`
+- CR 733.1 the payer who reverses it gets the mana, the tap and the damage back | `check:mana-pool`
+- CR 733.1 what a nested window kept is offered again when the outer payment fails | `ready`
 - the choice is the player's: a different three leaves a different Elf untapped | `move:ChooseTaps`
 - the choice is the player's: the other answer returns the other land | `move:ChooseReturns`
 - the payer chooses which three of the four Elves are tapped | `move:ChooseTaps`
@@ -2271,7 +2270,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 605.3a a mana ability whose cost holds mana may be activated inside the window | `move:action-ActivateManaAbility`
 - CR 605.3a a player with priority may fill their pool with nothing to pay for | `move:action-ActivateManaAbility`
 - CR 605.3a a tapped, sick Blood Pet pays for Typhoid Rats | `check:helper-countOf` `check:other-Cost.manaActivations` `check:other-Mana.canPay`
-- CR 605.3a the Goblin is cast off a red activation and a green one | `move:ChooseRiot` `move:ChooseSacrifices` `move:ReverseManaAbilities`
+- CR 605.3a the Goblin is cast off a red activation and a green one | `move:ChooseRiot` `move:ChooseSacrifices`
 - CR 605.3a the order the batch is activated in is the targeted player's | `move:OrderManaActivations` `check:mana-pool` `move:ChooseManaYield`
 - CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers | `move:action-ActivateManaAbility`
 - CR 605.3b Typhoid Rats is cast off a lone Birds of Paradise that taps for black | `check:creature-count` `check:stack` `check:tapped-count`
@@ -2284,7 +2283,7 @@ single spec-local helper, and the `other-*` tail, are left out: grep for them.
 - CR 614.1c Hickory Woodlot enters tapped with two depletion counters | `move:ChooseReplacement`
 - Typhoid Rats is cast off one Swamp and resolves onto the battlefield | `check:creature-count` `check:stack` `check:tapped-count`
 - War Mammoth is cast off four Forests and resolves onto the battlefield | `check:creature-count` `check:stack` `check:tapped-count`
-- the color is the player's: a Birds tapped for green does not pay {B} | `move:ReverseManaAbilities`
+- the color is the player's: a Birds tapped for green does not pay {B} | `ready`
 
 ### `ManaSymbolSpec`
 

@@ -497,6 +497,13 @@ answerTopPrompt decider asked =
           onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
             Move.ChooseOptional decision -> Just (pure decision)
             _ -> Nothing
+        -- CR 733.1's "may also reverse", answered by a ChooseOptional naming no
+        -- source: Exercises reverses the mana abilities, Declines keeps them.
+        Prompt.Type.ReverseManaAbilities who _ _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          onEntry unscheduled key kind [] (takeUnqualified key kind) $ \verb -> case verb of
+            Move.ChooseOptional decision -> Just (pure decision)
+            _ -> Nothing
         -- CR 118.12a: keyed like ChooseOptional, by the object offering the cost.
         -- Paying leaves the move's choices pending for the payment's own prompts.
         Prompt.Type.ChooseToPay who _ offering _ _ _ -> do
