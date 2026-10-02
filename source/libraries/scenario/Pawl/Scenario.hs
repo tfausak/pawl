@@ -1161,6 +1161,23 @@ resolveObject ref gs = case ref of
     _ -> case List.genericDrop (occurrence - 1) (namedObjects name gs) of
       oid : _ -> pure oid
       [] -> failWith (Failure.MkUnknownObject ref False)
+  Reference.TriggerOf source -> onStack source $ \obj -> case Object.source obj of
+    Source.OfTrigger trigger -> Just (TriggeredAbilitySource.source trigger)
+    _ -> Nothing
+  Reference.AbilityOf source -> onStack source $ \obj -> case Object.source obj of
+    Source.OfAbility ability -> Just (ActivatedAbilitySource.source ability)
+    _ -> Nothing
+  where
+    -- The source may have left the game since (CR 113.7a), so a label is read
+    -- off the board without asking that its object still exist.
+    onStack source sourceOf = do
+      labels <- State.gets (Staged.objects . staged)
+      wanted <- case source of
+        Reference.Labelled label | Just oid <- Map.lookup label labels -> pure oid
+        _ -> resolveObject source gs
+      case [oid | oid <- GameState.stack gs, Just from <- [Game.lookupObject oid gs >>= sourceOf], from == wanted] of
+        oid : _ -> pure oid
+        [] -> failWith (Failure.MkUnknownObject ref False)
 
 -- | A seat (Left) or an object (Right), for a reference that may name either.
 resolveEither :: Reference.Reference -> GameState.GameState -> Run (Either PlayerId.PlayerId ObjectId.ObjectId)

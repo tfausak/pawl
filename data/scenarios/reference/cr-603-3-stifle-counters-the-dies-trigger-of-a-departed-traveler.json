@@ -1,0 +1,29 @@
+{
+  "description": "CR 603.3 / 701.6a alice's Stifle counters the dies trigger of bob's Doomed Traveler, named by its source after the Traveler has left the battlefield, so no Spirit is made",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [ { "card": "Mountain", "label": "mountain" }, { "card": "Island", "label": "island" } ],
+        "hand": [ { "card": "Lightning Bolt", "label": "bolt" }, { "card": "Stifle", "label": "stifle" } ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [ { "card": "Doomed Traveler", "label": "traveler", "ready": true } ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$bolt", "targets": ["$traveler"], "mana": ["$mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "View": { "of": "Stack", "is": ["trigger of $traveler"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$stifle", "targets": ["trigger of $traveler"], "mana": ["$island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" }
+  ],
+  "final": [
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Spirit Token", "count": 0 } },
+    { "Count": { "player": "bob", "zone": "Graveyard", "card": "Doomed Traveler", "count": 1 } }
+  ]
+}

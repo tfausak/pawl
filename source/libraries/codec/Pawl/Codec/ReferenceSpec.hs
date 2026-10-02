@@ -18,6 +18,10 @@ spec s = Spec.describe s "Pawl.Codec.Reference" $ do
     Common.assertCodec s Reference.codec (Reference.Type.Printed (CardName.Type.MkCardName (Text.pack "Grizzly Bears")) 1) " \"Grizzly Bears\" "
   Spec.it s "a later one carries its occurrence after #" $
     Common.assertCodec s Reference.codec (Reference.Type.Printed (CardName.Type.MkCardName (Text.pack "Grizzly Bears")) 2) " \"Grizzly Bears#2\" "
+  Spec.it s "an ability on the stack is named by its kind and source" $
+    Common.assertCodec s Reference.codec (Reference.Type.TriggerOf (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear")))) " \"trigger of $bear\" "
+  Spec.it s "an activated one names a printed source too" $
+    Common.assertCodec s Reference.codec (Reference.Type.AbilityOf (Reference.Type.Printed (CardName.Type.MkCardName (Text.pack "Grizzly Bears")) 2)) " \"ability of Grizzly Bears#2\" "
   Spec.it s "an explicit first occurrence reads as the bare name" $
     Common.assertFromJson s (Codec.decode Reference.codec) " \"Grizzly Bears#1\" " (Reference.Type.Printed (CardName.Type.MkCardName (Text.pack "Grizzly Bears")) 1)
   Spec.it s "rejects a bare @, an empty string and a non-number occurrence" $

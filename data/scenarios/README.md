@@ -31,7 +31,9 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
 - **References.** `"$name"` is a seat or a labelled card; the sigil is not `@`,
   so a label quoted in a PR or issue mentions no GitHub user. `"Goblin Piker"`
   is the first live object with that name, `"Goblin Piker#2"` the second, in
-  creation order across every zone.
+  creation order across every zone. `"trigger of $x"` and `"ability of $x"`
+  name the topmost triggered or activated ability on the stack from that
+  source, which may have left the game (CR 113.7a).
 - **Timeline.** Each entry is keyed by `turn`, `step` and the `player` who
   decides, and carries `do` (a move) or `check`. Entries sharing a key are
   taken in order. An unscheduled priority prompt passes; any other
