@@ -1191,6 +1191,44 @@ costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
       (take 2 (snd (rerollPrompts [3, 6, 2] [OptionalDecision.Declines, OptionalDecision.Exercises] spell withBoth)))
       [3, 3]
 
+  Spec.it s "CR 706.2b the player who rolled picks which modifier applies" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    clam <- S.printingOf s registry "Clam-I-Am"
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (clammer, clammed) = S.addPermanent clam S.alice board
+        (walled, both) = S.addPermanent wall S.bob clammed
+        (pickedWall, pickers) = pickRun walled spell both
+        (pickedClam, _) = pickRun clammer spell both
+    -- THE GAMEPLAY ASSERTION: alice's Clam-I-Am and bob's Wall of Fortune
+    -- both offer to reroll alice's natural 3, and every offer put is taken.
+    -- Alice picks the Wall, so bob is asked first and his Wall pays. An engine
+    -- that put the offers in timestamp order asks alice's Clam first, and the
+    -- Wall stays untapped.
+    Spec.assertBool s (Game.isTapped walled pickedWall) "CR 706.2b: alice picks bob's Wall, so it is the modifier applied"
+    -- The paired run, one answer different: picking her own Clam rerolls the 3
+    -- into a 6, which the Wall is then declined over.
+    Spec.assertBool s (not (Game.isTapped walled pickedClam)) "and picking her own Clam leaves the Wall untapped"
+    Spec.assertEqWith s "CR 706.2b: the pick is put to the roller, once" pickers [S.alice]
+
+-- The Endeavor cast under rerollAnswer, one reroll accepted, except that
+-- the roller's CR 706.2b pick takes the modifier `wanted` states, pinned by
+-- index. Answers the board and every seat the pick was put to.
+pickRun :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [PlayerId.PlayerId])
+pickRun wanted spell board =
+  let answering :: Prompt.Prompt r -> State.State ([PlayerId.PlayerId], ([Natural.Natural], [OptionalDecision.OptionalDecision])) r
+      answering p = case p of
+        Prompt.ChooseRollModifier _ pid candidates -> do
+          (seen, scripted) <- State.get
+          State.put (pid : seen, scripted)
+          pure (List.genericLength (NonEmpty.takeWhile (/= Just wanted) candidates))
+        _ -> do
+          (seen, scripted) <- State.get
+          let (answer, next) = State.runState (rerollAnswer 1 p) scripted
+          State.put (seen, next)
+          pure answer
+      ((_, after), (seen, _)) = State.runState (Engine.runGame answering board (S.cast S.alice spell >> Stack.resolveTop)) ([], ([3, 6, 2], [OptionalDecision.Exercises]))
+   in (after, reverse seen)
+
 -- The same cast under an answerer that records WHICH player each reroll offer
 -- was put to. rerollPrompts' shape, and separate from it because the seat is a
 -- different question from the natural result: the Clam group reads the number
