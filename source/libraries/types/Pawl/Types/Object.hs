@@ -655,7 +655,8 @@ data Object = MkObject
     -- snow of one of the spell's own colours?" as reads rather than fields --
     -- Pawl.Engine.Filter.View.manaSpentTagColors is where the two are taken.
     --
-    -- Written by Pawl.Engine.Cost.payMana, and only once the payment has
+    -- Written by Pawl.Engine.Cost.recordPayment, for the caster's payment and
+    -- CR 702.132a's assisting player's alike, and only once the payment has
     -- settled: an unpaid cost is unwound to a state older than this write, even
     -- where CR 733.1 lets the payer keep what the mana window did, so a rejected
     -- cast records nothing. An ACTIVATION's units land on the ability object and
