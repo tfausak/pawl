@@ -1,0 +1,50 @@
+{
+  "description": "CR 707.2/118.9 a duplicate of a Clone offers the alternative cost of what the Clone copies",
+  "note": "CR 707.2 makes rules text a copiable value, so the duplicate Sinister Reflections conjures of alice's Clone of bob's Asmoranomardicadaistinaculdacar carries Asmor's \"you may pay {B/R}\" and Asmor's missing mana cost (CR 118.6): only the alternative cost (CR 118.9) can cast it, and the Swamp alone pays it. The Cookbook's discard, made while Reflections is on the stack so the Piker is the only card in hand, meets its condition. The Clone's own enters trigger is resolved before anything else, since a trigger left on the stack closes CR 302.1's window and the cast goes unoffered for that reason alone. The cast waits for the postcombat main phase and bob then concedes (CR 104.3a), because the duplicate resolving would put alice to CR 704.5j's choice beside her Clone, and bob controls the original so that choice never arises earlier.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "The Underworld Cookbook", "label": "cookbook" },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Island", "ready": true },
+          { "card": "Swamp", "ready": true }
+        ],
+        "hand": [
+          { "card": "Clone", "label": "clone" },
+          { "card": "Sinister Reflections", "label": "reflections" },
+          { "card": "Goblin Piker", "label": "piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Asmoranomardicadaistinaculdacar", "label": "asmor" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$clone", "mana": ["Island", "Island#2", "Island#3", "Island#4", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseCopyTarget": "$asmor" } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Declines" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$reflections", "targets": ["Clone"], "mana": ["Island#5", "Island#6", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "$cookbook", "mana": [null], "costOrder": [0, 1] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Goblin Piker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Names": { "object": "Clone#2", "names": ["Asmoranomardicadaistinaculdacar"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "do": { "Cast": { "object": "Clone#2", "mana": ["Swamp"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Stack", "card": "Clone", "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "bob", "do": "Concede" }
+  ]
+}

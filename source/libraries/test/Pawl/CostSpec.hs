@@ -7818,6 +7818,32 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     -- CR 104.4b: the stamp bob's question wrote survives the final restore,
     -- which for two reversals goes back to a state from before the cast.
     Spec.assertEqWith s "CR 104.4b the last question's stamp stands" (fmap GameState.lastChoice seenNeither) [GameState.lastChoice neither]
+  -- CR 106.6a on the HELPER's mana: bob sacrifices Generator Servant ({T},
+  -- Sacrifice: "Add {C}{C}. If any of that mana is spent on a creature spell, it
+  -- gains haste until end of turn.") in his assist window and pays seven with its
+  -- two and five Plains. The control is the same board with two Plains in the
+  -- Servant's place, so the only difference is where two of bob's seven came from.
+  Spec.it s "CR 106.6a the Binox bob's Generator Servant helped pay for attacks the turn it arrives" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    servant <- S.printingOf s registry "Generator Servant"
+    let fought (spell, forestId, sources, gs) =
+          let board = gs {GameState.remaining = S.phasesAfter Phase.PrecombatMain}
+              answer :: Prompt.Prompt r -> r
+              answer = assisting (Just S.bob) 7 forestId sources
+              resolved = S.runPure answer (S.runPure answer board (S.cast S.alice spell)) Stack.resolveTop
+           in (resolved, S.runPure S.aggressiveAnswer resolved (Monad.replicateM_ 6 Engine.runStep))
+        withServant =
+          let (spell, forestId, plainsIds, gs) = assistBoard 0 5 forest mountain plains binox
+              (servantId, gs') = S.addPermanent servant S.bob gs
+           in fought (spell, forestId, servantId : plainsIds, gs')
+        withPlains = fought (assistBoard 0 7 forest mountain plains binox)
+        spentOn gs = sum (fmap (\oid -> maybe 0 (length . Mana.Type.unwrap . Object.manaSpent) (Game.lookupObject oid gs)) (Game.zoneMembers Zone.Battlefield S.alice gs))
+    Spec.assertEqWith s "CR 106.6a bob takes 7 trample from the Binox his Servant's mana helped pay for" (S.lifeOf S.bob (snd withServant)) (Just 13)
+    Spec.assertEqWith s "and none from the one his seven Plains paid for" (S.lifeOf S.bob (snd withPlains)) (Just 20)
+    Spec.assertEqWith s "CR 400.7d the Binox's record holds alice's {G} and bob's seven" (spentOn (fst withServant)) 8
 
 -- Answer CR 702.132a's two prompts with `helper` and `amount`, and each mana
 -- window with the lands that window's player is meant to tap -- alice the one

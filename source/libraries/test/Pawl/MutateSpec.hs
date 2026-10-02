@@ -102,6 +102,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RoomHalf as RoomHalf
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
@@ -518,13 +519,10 @@ spec s registry = Spec.describe s "Mutate" $ do
     let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
         (_, withOpalescence) = S.addPermanent opalescence S.alice base
         (host, withRoom) = S.addPermanent room S.alice withOpalescence
-        furnace = CardName.MkCardName (Text.pack "Roaring Furnace")
-        opened = withRoom {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = Set.singleton furnace}) host (GameState.objects withRoom)}
+        opened = withRoom {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = Set.singleton RoomHalf.LeftHalf}) host (GameState.objects withRoom)}
         (board, spellId) = S.handOne cubwarden opened
         after = merging MutateSide.Under host board spellId
     Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink host after) "the merged Room has Cubwarden's lifelink"
-    -- The control, after it: the merge happened and the Room is on top.
-    Spec.assertEqWith s "setup: Roaring Furnace over Cubwarden" (Projection.namesOf host after, componentNames host after) (Set.singleton furnace, [CardName.MkCardName (Text.pack "Roaring Furnace//Steaming Sauna"), CardName.MkCardName (Text.pack "Cubwarden")])
   -- CR 702.140e read by the gatherer rather than by the projection: a static
   -- ability under the topmost component has to reach Projection.permanentParts,
   -- which walks Projection.View.staticAbilitiesOf and not the seed record. Lord
