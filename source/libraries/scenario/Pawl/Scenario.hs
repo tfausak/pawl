@@ -744,6 +744,72 @@ withinOffer prompt chosen = case prompt of
   Prompt.Type.ChooseSacrifices _ _ _ objects _ _ -> all (`elem` objects) chosen
   Prompt.Type.ChooseAnyNumberToSacrifice _ _ _ objects -> all (`elem` objects) chosen
   Prompt.Type.ChooseOfferedCastSpell _ _ offers -> chosen `elem` offers
+  Prompt.Type.RandomFirstPlayer players -> chosen `elem` players
+  Prompt.Type.RandomObject objects -> chosen `elem` objects
+  Prompt.Type.ChooseDieResult _ _ _ results -> chosen `elem` results
+  Prompt.Type.ChooseCoinResult _ _ faces -> chosen `elem` faces
+  Prompt.Type.ChooseDiscard _ _ cards _ -> all (`elem` cards) chosen
+  Prompt.Type.ChooseScry _ _ cards -> all (`elem` cards) (uncurry (<>) chosen)
+  Prompt.Type.ChooseSurveil _ _ cards -> all (`elem` cards) (uncurry (<>) chosen)
+  Prompt.Type.ChooseFateseal _ _ _ cards -> all (`elem` cards) (uncurry (<>) chosen)
+  Prompt.Type.ChooseDefender _ _ players -> chosen `elem` players
+  Prompt.Type.ChooseRingBearer _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseBolster _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseAmass _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseBlight _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseBehold _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseVote _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseVoteWord _ _ _ slots -> chosen `elem` slots
+  Prompt.Type.ChooseMovedCounter _ _ _ _ kinds -> chosen `elem` kinds
+  Prompt.Type.ChooseMovedCounterOrNone _ _ _ _ kinds -> all (`elem` kinds) chosen
+  Prompt.Type.ChooseDamageSource _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseCardInHand _ _ _ cards -> chosen `elem` cards
+  Prompt.Type.ChooseCardsFromAmong _ _ _ cards _ -> all (`elem` cards) chosen
+  Prompt.Type.ChooseDungeon _ _ dungeons -> chosen `elem` dungeons
+  Prompt.Type.ChooseCompanion _ _ companions -> all (`elem` companions) chosen
+  Prompt.Type.ChooseRoom _ _ _ rooms -> chosen `elem` rooms
+  Prompt.Type.ChooseHalf _ _ _ names -> chosen `elem` names
+  Prompt.Type.ChooseLegend _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseAttackTarget _ _ _ targets -> chosen `elem` targets
+  Prompt.Type.ChooseEnlist _ _ _ objects -> all (`elem` objects) chosen
+  Prompt.Type.ChooseEncode _ _ _ objects -> all (`elem` objects) chosen
+  Prompt.Type.ChooseSearchZones _ _ places -> all (`Set.member` places) chosen
+  Prompt.Type.ChooseX _ _ _ least greatest -> least <= chosen && chosen <= greatest
+  Prompt.Type.ChooseLearn _ _ _ modes -> all (`elem` modes) chosen
+  Prompt.Type.ChooseSplice _ _ _ offers -> all (`elem` fmap fst offers) chosen
+  Prompt.Type.ChooseAssistant _ _ _ players -> all (`elem` players) chosen
+  Prompt.Type.ChooseRevealOnEntry _ _ _ cards -> all (`elem` cards) chosen
+  Prompt.Type.ChooseManaType _ _ _ types -> chosen `elem` types
+  Prompt.Type.ChooseProtector _ _ _ players -> chosen `elem` players
+  Prompt.Type.ChooseActivePlayer _ _ players -> chosen `elem` players
+  Prompt.Type.ChooseExilesFromGraveyard _ _ _ cards _ -> all (`elem` cards) chosen
+  Prompt.Type.ChooseMaterials _ _ _ objects _ _ -> all (`elem` objects) chosen
+  Prompt.Type.ChooseCollectEvidence _ _ _ cards _ -> all (`elem` cards) chosen
+  Prompt.Type.ChooseAnyNumberToReveal _ _ _ cards -> all (`elem` cards) chosen
+  Prompt.Type.ChooseAnyNumberOfPermanents _ _ _ objects _ -> all (`elem` objects) chosen
+  Prompt.Type.ChooseAnyNumberToDiscard _ _ _ cards _ -> all (`elem` cards) chosen
+  Prompt.Type.ChoosePermanent _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseTapsForTotalPower _ _ _ objects _ -> all (`elem` objects) chosen
+  Prompt.Type.ChooseTaps _ _ _ objects _ -> all (`elem` objects) chosen
+  Prompt.Type.ChooseReturns _ _ _ objects _ -> all (`elem` objects) chosen
+  Prompt.Type.ChooseCounterRemoval _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChooseCounterRemovalAmong _ _ _ _ bearers -> all (`Map.member` bearers) (Map.keys chosen)
+  Prompt.Type.ChooseCounterRemovalAtLeast _ _ _ _ bearers -> all (`Map.member` bearers) (Map.keys chosen)
+  Prompt.Type.ChooseCounterRemovalUpTo _ _ _ _ bearers -> all (`Map.member` bearers) (Map.keys chosen)
+  Prompt.Type.ChooseAttachment _ _ _ objects -> chosen `elem` objects
+  Prompt.Type.ChoosePlayPermission _ _ _ permissions -> chosen `elem` permissions
+  Prompt.Type.ChooseClause _ _ _ _ clauses _ -> chosen `elem` clauses
+  Prompt.Type.ChooseModes _ _ _ modes _ -> all (`Set.member` modes) chosen
+  Prompt.Type.ChooseManaToSpend _ _ units -> chosen `elem` units
+  Prompt.Type.AnnouncePhyrexianPayment _ _ _ _ payments -> chosen `elem` payments
+  Prompt.Type.AnnounceHybridPayment _ _ _ _ payments -> chosen `elem` payments
+  Prompt.Type.AnnounceHybridHalf _ _ _ _ types -> chosen `elem` types
+  Prompt.Type.ChooseReductionHalf _ _ _ _ symbols -> chosen `elem` symbols
+  Prompt.Type.ChooseReducedCost _ _ _ costs -> chosen `elem` costs
+  Prompt.Type.Bottom _ _ cards _ -> all (`elem` cards) chosen
+  Prompt.Type.MulliganAction _ _ actions -> all (`elem` actions) chosen
+  Prompt.Type.OpeningHandAction _ _ actions -> all (`elem` actions) chosen
+  Prompt.Type.ChooseCost _ _ _ costs -> chosen `elem` costs
   _ -> True
 
 -- | A priority prompt: first the checks at the head of this moment, in timeline
