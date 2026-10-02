@@ -90,27 +90,32 @@
           "condition": {
             "type": "PermanentDealsCombatDamageToPlayer",
             "value": {
-              "type": "And",
-              "value": [
-                {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "HasDesignation",
+                    "value": {
+                      "type": "Renowned"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
                   }
-                },
-                {
-                  "type": "HasDesignation",
-                  "value": {
-                    "type": "Renowned"
-                  }
-                },
-                {
-                  "type": "ControlledBy",
-                  "value": {
-                    "type": "You"
-                  }
-                }
-              ]
+                ]
+              },
+              "recipient": {
+                "type": "AnyPlayer"
+              }
             }
           },
           "modal": {

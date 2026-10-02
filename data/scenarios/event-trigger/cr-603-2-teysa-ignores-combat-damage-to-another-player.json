@@ -1,0 +1,26 @@
+{
+  "description": "CR 603.2 Teysa, Envoy of Ghosts ignores combat damage dealt to another player",
+  "note": "Three seats, so the damaged player and Teysa's controller differ: alice's Llanowar Elves hit carol while bob controls Teysa. \"To you\" is bob, so nothing triggers; a Teysa that admitted any damaged player would destroy the Elves. Teysa destroys the creature that hit bob is the same board with the attack aimed at bob.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Llanowar Elves", "label": "elves", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Teysa, Envoy of Ghosts", "label": "teysa", "ready": true }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$elves"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$elves", "do": { "ChooseAttackTarget": "$carol" } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Llanowar Elves", "count": 1 } } }
+  ]
+}

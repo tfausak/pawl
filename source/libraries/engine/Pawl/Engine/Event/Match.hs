@@ -88,6 +88,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
@@ -1302,9 +1303,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- The same event read by a BYSTANDER (CR 510.1b / 510.2): a permanent the Filter
-  -- admits dealt combat damage to a player. The Filter reads the event's DAMAGER,
-  -- the bearer contributing only CR 109.5's "you" and the Filter.Context's source
-  -- -- which is what would make Filter.IsSource the self-scoped reading.
+  -- admits dealt combat damage to a player the relation admits, read like
+  -- SelfDealsCombatDamageToPlayer's: Teysa, Envoy of Ghosts' "to you", which
+  -- data/scenarios/event-trigger's "Teysa ignores combat damage dealt to another
+  -- player" proves. The Filter reads the event's DAMAGER, the bearer
+  -- contributing only CR 109.5's "you" and the Filter.Context's source -- which
+  -- is what would make Filter.IsSource the self-scoped reading.
   --
   -- The damager off `board` (Event.Binding.postEventView), not the live view:
   -- CR 603.10's first sentence wants it as it existed immediately after the
@@ -1313,14 +1317,14 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- "The Raven's Warning sees Venser's Sliver fly as it hit" proves it. The
   -- DamageKind test is a fence rather than a tested branch: no card in the pool
   -- makes a Wolf or Werewolf deal NONCOMBAT damage while a Tovolar watches.
-  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> case event of
+  TriggerCondition.PermanentDealsCombatDamageToPlayer p -> case event of
     GameEvent.DamageDealt ev ->
       DamageEvent.kind ev == DamageKind.Combat
-        && isPlayerRecipient (DamageEvent.target ev)
+        && maybe False (PlayerRelation.holds (Game.teams gs) (PermanentDealsCombatDamageToPlayer.recipient p) you) (Recipient.playerOf (DamageEvent.target ev))
         && ( let damager = DamageEvent.source ev
               in case postEventView board gs damager of
                    Nothing -> False
-                   Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view f
+                   Just view -> Filter.matches (SourceContext.sourceContext gs (Just you) bearer) view (PermanentDealsCombatDamageToPlayer.filter p)
            )
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
@@ -5562,19 +5566,23 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- Chief Mechanic's "whenever ONE OR MORE artifact creatures you control deal
   -- combat damage to a player"), delegated for PermanentsDie's reason: which
   -- damage events this condition admits is the singular arm's answer, filter,
-  -- kind and recipient alike, and firing once for the CR 510.2 step is
-  -- `batchScoped` below plus eventTriggers' dedup, never this arm.
-  --
-  -- Plus the damaged player, which the singular arm leaves unasked: Norn's
-  -- Decree's "deal combat damage to YOU", read like
-  -- SelfDealsCombatDamageToPlayer's relation.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer p -> case event of
-    GameEvent.DamageDealt ev ->
-      maybe False (PlayerRelation.holds (Game.teams gs) (PermanentsDealCombatDamageToPlayer.recipient p) you) (Recipient.playerOf (DamageEvent.target ev))
-        && matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentsDealCombatDamageToPlayer.filter p)) event
-    -- A wildcard where the singular arm is exhaustive: that arm already answers
-    -- False for every other event, and this one only narrows it.
-    _ -> False
+  -- kind and recipient alike (Norn's Decree's "deal combat damage to YOU"),
+  -- and firing once for the CR 510.2 step is `batchScoped` below plus
+  -- eventTriggers' dedup, never this arm.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer p ->
+    matchesTriggerGiven
+      bindings
+      board
+      gs
+      bearer
+      you
+      ( TriggerCondition.PermanentDealsCombatDamageToPlayer
+          PermanentDealsCombatDamageToPlayer.MkPermanentDealsCombatDamageToPlayer
+            { PermanentDealsCombatDamageToPlayer.filter = PermanentsDealCombatDamageToPlayer.filter p,
+              PermanentDealsCombatDamageToPlayer.recipient = PermanentsDealCombatDamageToPlayer.recipient p
+            }
+      )
+      event
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
   -- ZoneChange.departed for that arm's reason (CR 603.10a).
@@ -13413,17 +13421,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
-
--- Whether a damage recipient is a player (CR 120.1): a total discriminator over
--- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
-isPlayerRecipient :: Recipient.Recipient -> Bool
-isPlayerRecipient r = case r of
-  Recipient.ToPlayer _ -> True
-  Recipient.ToCreature _ -> False
-  Recipient.ToPlaneswalker _ -> False
-  Recipient.ToBattle _ -> False
-  Recipient.ToObject _ -> False
-  Recipient.ToPile _ -> False
 
 -- CR 106.12a's second half: did an activation that produced @produced@ produce
 -- the mana this condition specified? The narrowing half of the

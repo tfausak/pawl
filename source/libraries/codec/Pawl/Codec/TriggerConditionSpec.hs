@@ -30,6 +30,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
@@ -145,14 +146,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfIsDealtDamage
       " {\"type\":\"SelfIsDealtDamage\"} "
-  -- The same event read by a bystander, carrying Tovolar's "you control": the
-  -- Filter is the whole payload, so it has to survive both directions.
-  Spec.it s "PermanentDealsCombatDamageToPlayer round-trips with its Filter" $
+  -- The same event read by a bystander, carrying Tovolar's "you control" and
+  -- Teysa's "to you": two relations, so a crossed codec would not round-trip.
+  Spec.it s "PermanentDealsCombatDamageToPlayer round-trips with its Filter and recipient" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.ControlledBy PlayerRelation.You))
-      " {\"type\":\"PermanentDealsCombatDamageToPlayer\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
+      (TriggerCondition.PermanentDealsCombatDamageToPlayer (PermanentDealsCombatDamageToPlayer.MkPermanentDealsCombatDamageToPlayer (Filter.ControlledBy PlayerRelation.Opponent) PlayerRelation.You))
+      " {\"type\":\"PermanentDealsCombatDamageToPlayer\",\"value\":{\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"Opponent\"}},\"recipient\":{\"type\":\"You\"}}} "
   -- CR 603.2c's batch reading of that same form, carrying the same Filter -- so a
   -- separate tag is the only thing that keeps Pia Nalaar's once-per-step card and
   -- Tovolar's once-per-damager card apart on the wire.

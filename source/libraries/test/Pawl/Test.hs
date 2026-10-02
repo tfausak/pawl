@@ -424,6 +424,7 @@ import qualified Pawl.Codec.PendingDamageEffectSpec
 import qualified Pawl.Codec.PendingEntryEffectSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PermanentCandidateSpec
+import qualified Pawl.Codec.PermanentDealsCombatDamageToPlayerSpec
 import qualified Pawl.Codec.PermanentSacrificedSpec
 import qualified Pawl.Codec.PermanentTappedForManaSpec
 import qualified Pawl.Codec.PermanentWasSacrificedSpec
@@ -1230,6 +1231,7 @@ spec s registry = do
   Pawl.Codec.PermanentTappedForManaSpec.spec s
   Pawl.Codec.PermanentWasSacrificedSpec.spec s
   Pawl.Codec.PermanentsBecomeTargetedSpec.spec s
+  Pawl.Codec.PermanentDealsCombatDamageToPlayerSpec.spec s
   Pawl.Codec.PermanentsDealCombatDamageToPlayerSpec.spec s
   Pawl.Codec.PermissionLimitSpec.spec s
   Pawl.Codec.PermissionPoolSpec.spec s

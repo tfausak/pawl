@@ -255,6 +255,7 @@ import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
@@ -4272,7 +4273,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries one -- Tovolar's "a Wolf or Werewolf you
   -- control", which the card lint must sweep.
-  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> unframed [f]
+  TriggerCondition.PermanentDealsCombatDamageToPlayer p -> unframed [PermanentDealsCombatDamageToPlayer.filter p]
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- swept the same way for PermanentsDie's reason: answering [] here would exempt
   -- Pia Nalaar's "artifact creatures you control" from every corpus filter lint.

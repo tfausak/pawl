@@ -156,6 +156,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentDealsCombatDamageToPlayer as PermanentDealsCombatDamageToPlayer
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
@@ -1808,7 +1809,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfDealsDamageToPlayer _ -> condition
   TriggerCondition.SelfDealsDamageToCreature -> condition
   TriggerCondition.SelfIsDealtDamage -> condition
-  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.rewrite pairs f)
+  TriggerCondition.PermanentDealsCombatDamageToPlayer p -> TriggerCondition.PermanentDealsCombatDamageToPlayer p {PermanentDealsCombatDamageToPlayer.filter = Filter.rewrite pairs (PermanentDealsCombatDamageToPlayer.filter p)}
   TriggerCondition.PermanentsDealCombatDamageToPlayer p -> TriggerCondition.PermanentsDealCombatDamageToPlayer p {PermanentsDealCombatDamageToPlayer.filter = Filter.rewrite pairs (PermanentsDealCombatDamageToPlayer.filter p)}
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
   TriggerCondition.CreaturesDealtCombatDamageToInitiative -> condition

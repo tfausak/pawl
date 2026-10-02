@@ -44,32 +44,37 @@
           "condition": {
             "type": "PermanentDealsCombatDamageToPlayer",
             "value": {
-              "type": "And",
-              "value": [
-                {
-                  "type": "Or",
-                  "value": [
-                    {
-                      "type": "HasSubtype",
-                      "value": {
-                        "type": "Wolf"
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "Or",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Wolf"
+                        }
+                      },
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Werewolf"
+                        }
                       }
-                    },
-                    {
-                      "type": "HasSubtype",
-                      "value": {
-                        "type": "Werewolf"
-                      }
+                    ]
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
                     }
-                  ]
-                },
-                {
-                  "type": "ControlledBy",
-                  "value": {
-                    "type": "You"
                   }
-                }
-              ]
+                ]
+              },
+              "recipient": {
+                "type": "AnyPlayer"
+              }
             }
           },
           "modal": {
@@ -393,32 +398,37 @@
           "condition": {
             "type": "PermanentDealsCombatDamageToPlayer",
             "value": {
-              "type": "And",
-              "value": [
-                {
-                  "type": "Or",
-                  "value": [
-                    {
-                      "type": "HasSubtype",
-                      "value": {
-                        "type": "Wolf"
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "Or",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Wolf"
+                        }
+                      },
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Werewolf"
+                        }
                       }
-                    },
-                    {
-                      "type": "HasSubtype",
-                      "value": {
-                        "type": "Werewolf"
-                      }
+                    ]
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
                     }
-                  ]
-                },
-                {
-                  "type": "ControlledBy",
-                  "value": {
-                    "type": "You"
                   }
-                }
-              ]
+                ]
+              },
+              "recipient": {
+                "type": "AnyPlayer"
+              }
             }
           },
           "modal": {

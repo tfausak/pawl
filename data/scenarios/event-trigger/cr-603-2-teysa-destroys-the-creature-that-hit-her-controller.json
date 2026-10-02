@@ -1,0 +1,28 @@
+{
+  "description": "CR 603.2 Teysa, Envoy of Ghosts destroys the creature that dealt combat damage to her controller",
+  "note": "The board of Teysa ignores combat damage dealt to another player, with the Elves' attack aimed at bob, who controls Teysa: \"that creature\" is destroyed and bob gets the Spirit.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Llanowar Elves", "label": "elves", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Teysa, Envoy of Ghosts", "label": "teysa", "ready": true }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["$elves"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "$elves", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Llanowar Elves", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Spirit Token", "count": 1 } } }
+  ]
+}

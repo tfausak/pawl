@@ -31,21 +31,26 @@
           "condition": {
             "type": "PermanentDealsCombatDamageToPlayer",
             "value": {
-              "type": "And",
-              "value": [
-                {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
                   }
-                },
-                {
-                  "type": "ControlledBy",
-                  "value": {
-                    "type": "You"
-                  }
-                }
-              ]
+                ]
+              },
+              "recipient": {
+                "type": "AnyPlayer"
+              }
             }
           },
           "modal": {
