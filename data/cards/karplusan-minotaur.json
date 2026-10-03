@@ -128,7 +128,10 @@
                 "targetSlots": {
                   "opponentsTarget": {
                     "chooser": {
-                      "type": "Opponent"
+                      "type": "Relative",
+                      "value": {
+                        "type": "Opponent"
+                      }
                     },
                     "pool": {
                       "type": "AnyTarget"

@@ -9,6 +9,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
+import qualified Pawl.Types.TargetChooser as TargetChooser
 import qualified Pawl.Types.TargetCount as TargetCount
 
 -- | What a target slot may hold: a closed Pool of candidate recipients (CR 115),
@@ -85,17 +86,17 @@ data TargetSlot = MkTargetSlot
     -- X on a spell (Stir the Grave's "mana value X or less", proved by that
     -- module's "CR 601.2c whole card: the bound is the X the caster announced").
     amount :: Maybe Quantity.Quantity,
-    -- | CR 115.1 / 601.2c: WHO announces this slot's targets, as a relation to
-    -- the ability's controller -- Cuombajj Witches' "1 damage to any target of an
-    -- opponent's choice". Nothing is the rule's default, the controller, which is
+    -- | CR 115.1 / 601.2c: WHO announces this slot's targets -- Cuombajj
+    -- Witches' "1 damage to any target of an opponent's choice", Curse of
+    -- Inertia's "that attacking player may tap or untap target permanent of
+    -- their choice". Nothing is the rule's default, the controller, which is
     -- every other slot in the corpus.
     --
-    -- A RELATION and not a player, because a card prints one: rule 601.2c's
-    -- announcement happens before anything is bound, so a slot cannot name the
-    -- seat by id and there is nothing else to name it by. Resolving it to a seat
-    -- is Pawl.Engine.Target.chooserOf's, and where the relation admits more than
-    -- one seat the CONTROLLER picks which -- CR 801.5a's example is the rule text
-    -- that says so, "choosing Rob as the opponent who picks the other target".
+    -- Never a seat by id: CR 601.2c's announcement precedes every binding the
+    -- announcement itself makes, so a slot names its chooser by relation to the
+    -- controller or through a binding the announcement already holds -- CR
+    -- 603.2's trigger-event bindings, there before CR 603.3d's announcement.
+    -- Resolving it to a seat is Pawl.Engine.Target.chooserOf's.
     --
     -- ON THE SLOT rather than on the ability, because Cuombajj Witches prints
     -- both readings in one activation: its first target is the controller's and
@@ -104,7 +105,7 @@ data TargetSlot = MkTargetSlot
     -- Whose choice it is does NOT move CR 109.5's "you". Legality is still judged
     -- from the ability's controller -- hexproof asks who controls the ability (CR
     -- 702.11b), not who points it -- so only the prompt's seat changes.
-    chooser :: Maybe PlayerRelation.PlayerRelation,
+    chooser :: Maybe TargetChooser.TargetChooser,
     -- | CR 601.2c: "for each opponent, ... target ... that player controls" --
     -- the slot announced once per player, each copy with its own "that player"
     -- (Pawl.Engine.Target.announcedSlots). Nothing is one ordinary slot.
@@ -143,8 +144,8 @@ withAmount q slot = slot {amount = Just q}
 -- the ability's controller. Separate from the four builders above so that the
 -- slots the controller chooses, which is almost every slot, stay spelled as they
 -- were.
-chosenBy :: PlayerRelation.PlayerRelation -> TargetSlot -> TargetSlot
-chosenBy relation slot = slot {chooser = Just relation}
+chosenBy :: TargetChooser.TargetChooser -> TargetSlot -> TargetSlot
+chosenBy who slot = slot {chooser = Just who}
 
 -- CR 601.2c's "for each opponent": the same slot announced once per player the
 -- relation names, `thatPlayer` naming that player for the slot's own Filter and pool.

@@ -578,6 +578,7 @@ import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TappedForManaSpec
 import qualified Pawl.Codec.TappedIsSpec
+import qualified Pawl.Codec.TargetChooserSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TeamIdSpec
@@ -1406,6 +1407,7 @@ spec s registry = do
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TappedForManaSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
+  Pawl.Codec.TargetChooserSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
   Pawl.Codec.TeamIdSpec.spec s
   Pawl.Codec.RangeOfInfluenceSpec.spec s
