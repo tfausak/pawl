@@ -2511,10 +2511,12 @@ enchantedObjectLeaves condition = case condition of
 -- each, so `functionsIn` reads the same either way. They are here so the rule is
 -- stated once, not because a test can redden them.
 --
--- Not implemented: a self condition spelled as a bystander constructor narrowed
--- by Filter.IsSource (PermanentSacrificed {You, IsSource}, Biolume Egg's shape)
--- -- the `_` answers False for it, and the ability is pinned to its own
--- graveyard (#3177).
+-- A self condition spelled as a bystander constructor narrowed by
+-- Filter.IsSource (Biolume Egg's PermanentSacrificed {You, IsSource}) answers
+-- False through the `_`, so `selfNamingSlots` leaves `became` out and the
+-- graveyard its payload names pins nothing: the battlefield default, which is
+-- CR 113.6m's answer once the exemption reads CR 701.21a's graveyard.
+-- Pawl.LeavesTriggerSpec's `biolumeEggSpec` proves the Egg returns.
 --
 -- The AnyOf arm serves `selfNamingSlots`; `zonesFunctionedIn` asks each
 -- disjunct on its own.
