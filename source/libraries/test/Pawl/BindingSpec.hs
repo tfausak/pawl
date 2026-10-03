@@ -59,6 +59,7 @@ sampleSnapshot =
       PC.alternativeCosts = [],
       PC.costReductions = [],
       PC.grantedCostReductions = [],
+      PC.grantedAlternativeCosts = [],
       PC.halves = Nothing,
       PC.exceptions = [],
       PC.mergedDonors = [],

@@ -985,11 +985,8 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- Mine Security ({1}{R} Creature -- Kavu Soldier 3/1, trample, "When this
   -- creature enters, conjure a card named Flametongue Kavu into the top eight
   -- cards of your library at random."). Randomness names the fifth place, which
-  -- neither end nor the top of the eight is.
-  --
-  -- Not implemented: the printed rider "It perpetually gains 'You may pay {0}
-  -- rather than pay this spell's mana cost.'", a perpetual effect over a card in
-  -- a library (#3291).
+  -- neither end nor the top of the eight is. Its perpetual {0} rider is proven
+  -- by the scenario cr-118-9-the-kavu-mine-security-conjured-is-cast-for-0.
   Spec.it s "a conjure into the top eight at random puts the card where randomness named" $ do
     security <- S.printingOf s registry "Mine Security"
     island <- S.printingOf s registry "Island"

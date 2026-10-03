@@ -450,12 +450,21 @@ candidateCostsGiven permitted pid name oid gs =
               -- abilities has no alternative cost" and "CR 113.6d under Yixlid
               -- Jailer a Fireblast cast from the graveyard still sacrifices two
               -- Mountains" prove both.
-              alternatives = case Face.alternativeCosts face of
-                [] -> []
-                printedAlternatives ->
-                  if PC.lostAllAbilities spell
-                    then []
-                    else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
+              --
+              -- A GRANTED alternative cost (Mine Security's perpetual "You may
+              -- pay {0} rather than pay this spell's mana cost") is read off
+              -- `spell` too, CR 113.6d's standing; the projection has already
+              -- applied any wipe to it. The scenario
+              -- cr-118-9-the-kavu-mine-security-conjured-is-cast-for-0 proves it.
+              alternatives =
+                ( case Face.alternativeCosts face of
+                    [] -> []
+                    printedAlternatives ->
+                      if PC.lostAllAbilities spell
+                        then []
+                        else fmap (withAdditional . AlternativeCost.cost) (filter available printedAlternatives)
+                )
+                  <> fmap (withAdditional . AlternativeCost.cost) (filter available (PC.grantedAlternativeCosts spell))
               -- CR 702.103a: bestow, offered from EVERY zone the printed cost is
               -- -- "a static ability that functions in any zone from which you
               -- could play the card it's on" -- so it joins `ordinary` below
