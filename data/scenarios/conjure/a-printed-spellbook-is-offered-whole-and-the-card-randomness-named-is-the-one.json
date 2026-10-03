@@ -1,6 +1,6 @@
 {
   "description": "a printed spellbook is offered whole, and the card randomness named is the one conjured",
-  "note": "Tome of the Infinite's pick: refused answers naming Hill Giant and Counterspell, cards outside its spellbook, are refused already, while a refused answer naming any of the spellbook's ten stands. Swords to Plowshares, the book's last card, is taken and is the card in alice's hand. The offer's order is not witnessed. Its perpetual grant is then what lets alice's one untapped Mountain pay the Swords' {W}, and bob's Hill Giant is exiled. Not implemented: bob's life gain, which reads the Giant's power after it has left (#4653).",
+  "note": "Tome of the Infinite's pick: refused answers naming Hill Giant and Counterspell, cards outside its spellbook, are refused already, while a refused answer naming any of the spellbook's ten stands. Swords to Plowshares, the book's last card, is taken and is the card in alice's hand. The offer's order is not witnessed. Its perpetual grant is then what lets alice's one untapped Mountain pay the Swords' {W}, bob's Hill Giant is exiled, and bob gains its power, 3, off its last known information (CR 608.2h).",
   "board": {
     "active": "alice",
     "step": "PrecombatMain",
@@ -149,6 +149,17 @@
           "zone": "Exile",
           "card": "Hill Giant",
           "count": 1
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "check": {
+        "Life": {
+          "player": "bob",
+          "life": 23
         }
       }
     }
