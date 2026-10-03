@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
@@ -79,7 +80,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.completedDungeons = 10,
           Player.completedDungeonNames = Set.fromList [CardName.MkCardName (Text.pack "Tomb of Annihilation"), CardName.MkCardName (Text.pack "Undercity")],
           Player.startingDeck = Map.singleton (PrintingId.MkPrintingId 14) 15,
-          Player.companion = Just (PrintingId.MkPrintingId 16),
+          Player.companion = Just (OutsideCard.InPool (PrintingId.MkPrintingId 16)),
           Player.companionTaken = True,
           Player.graveyardOrder = GraveyardOrder.Matters
         }
@@ -90,7 +91,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           <> ",\"designations\":[{\"type\":\"CitysBlessing\"},{\"type\":\"EnduringStory\"}]"
           <> ",\"commander\":[5,17],\"commanderCasts\":{\"5\":6,\"17\":19}"
           <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]"
-          <> ",\"startingDeck\":{\"14\":15},\"companion\":16,\"companionTaken\":true"
+          <> ",\"startingDeck\":{\"14\":15},\"companion\":{\"type\":\"InPool\",\"value\":16},\"companionTaken\":true"
           <> ",\"graveyardOrder\":{\"type\":\"Matters\"}} "
       )
   Spec.it s "has a schema" $

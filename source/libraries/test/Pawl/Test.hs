@@ -409,6 +409,7 @@ import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalDecisionSpec
 import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.OrElseSpec
+import qualified Pawl.Codec.OutsideCardSpec
 import qualified Pawl.Codec.OutsideDestinationSpec
 import qualified Pawl.Codec.OutsideObjectSpec
 import qualified Pawl.Codec.OwnedZoneSpec
@@ -1217,6 +1218,7 @@ spec s registry = do
   Pawl.Codec.OrElseSpec.spec s
   Pawl.Codec.IfTakenSpec.spec s
   Pawl.Codec.OutsideDestinationSpec.spec s
+  Pawl.Codec.OutsideCardSpec.spec s
   Pawl.Codec.OutsideObjectSpec.spec s
   Pawl.Codec.PaidExpirySpec.spec s
   Pawl.Codec.PairingSpec.spec s
