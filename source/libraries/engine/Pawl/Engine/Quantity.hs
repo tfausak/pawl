@@ -418,6 +418,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.LifeTotal ref -> case playersOf ref of
           Just [pid] -> fmap Player.life (Map.lookup pid (GameState.players gs))
           _ -> Nothing
+        -- CR 103.4 / 119.1: LifeTotal's arm over the figure setup recorded.
+        Quantity.StartingLifeTotal ref -> case playersOf ref of
+          Just [pid] -> fmap Player.startingLife (Map.lookup pid (GameState.players gs))
+          _ -> Nothing
         -- CR 702.179e / 702.179f: a player's speed. LifeTotal's arm in every respect
         -- above -- read live, resolved through the same playersOf, and Nothing
         -- for a reference naming anything but exactly one player.
@@ -1268,6 +1272,7 @@ objectSlots quantity = case quantity of
   -- Resolve.Slots.quantitySlots folds it, so the read is not lost.
   Quantity.ManaCount _ -> Set.empty
   Quantity.LifeTotal _ -> Set.empty
+  Quantity.StartingLifeTotal _ -> Set.empty
   Quantity.Speed _ -> Set.empty
   Quantity.IsMonarch _ -> Set.empty
   Quantity.HasPlayerDesignation {} -> Set.empty
@@ -1533,9 +1538,9 @@ readsX quantity = case quantity of
   -- strictly smaller subterm.
   Quantity.Count c -> QuantitySlot.anyCount readsX c
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
-  -- The nine references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
-  -- HasPlayerDesignation's, IsStartingPlayer's, IsActivePlayer's, PlayerCounters',
-  -- Devotion's) are PlayerRefs, whose InSlot names a TARGET slot rather than an
+  -- The ten references below (ManaCount's, LifeTotal's, StartingLifeTotal's,
+  -- Speed's, IsMonarch's, HasPlayerDesignation's, IsStartingPlayer's,
+  -- IsActivePlayer's, PlayerCounters', Devotion's) are PlayerRefs, whose InSlot names a TARGET slot rather than an
   -- amount one, and X is only ever an amount.
   Quantity.Literal _ -> False
   Quantity.ManaValue -> False
@@ -1545,6 +1550,7 @@ readsX quantity = case quantity of
   Quantity.Star -> False
   Quantity.ManaCount _ -> False
   Quantity.LifeTotal _ -> False
+  Quantity.StartingLifeTotal _ -> False
   Quantity.Speed _ -> False
   Quantity.IsMonarch _ -> False
   Quantity.HasPlayerDesignation {} -> False

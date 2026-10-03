@@ -283,7 +283,16 @@ stage registry board =
                         }
                   }
           placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
-          pure (fmap designateDefenders (placed >>= attachAll (placementsOf board)))
+          pure (fmap (designateDefenders . settleStartingLife) (placed >>= attachAll (placementsOf board)))
+
+-- | CR 103.4 / 119.1: each seat's starting life total, as setup would have
+-- recorded it from the board's settings, seat count and command zone.
+settleStartingLife :: Staged.Staged -> Staged.Staged
+settleStartingLife board =
+  let gs = Staged.state board
+      seats = length (GameState.turnOrder gs)
+      record pid p = p {Player.startingLife = Setup.startingLifeOf (GameState.settings gs) seats pid (Player.commander p) (Setup.lifeModifierOf pid gs)}
+   in board {Staged.state = gs {GameState.players = Map.mapWithKey record (GameState.players gs)}}
 
 -- | One unrestricted unit of a type, as a board floats it (CR 106.4).
 plainUnit :: ManaType.ManaType -> ManaUnit.ManaUnit
