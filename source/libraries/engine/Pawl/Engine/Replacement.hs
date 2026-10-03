@@ -896,7 +896,8 @@ matchesPrinted viewOf gs event candidate =
         (ReplacementEffect.LifeGainR (LifeGainR.MkLifeGainR whose rewrite), ProposedEvent.WouldGainLife pid n) ->
           matchesPlayer gs src whose pid
             && resizes rewrite n
-        -- CR 121.6 / 614.11: whose card draws the row watches (CR 109.5's "you").
+        -- CR 121.6 / 614.11: whose card draws the row watches (CR 109.5's "you",
+        -- or Plagiarize's target player, baked by CR 601.2c's resolution).
         -- The whole of the pattern, there being nothing else about a draw to
         -- narrow by. The `stocked` conjunct beside it is rule 702.52a's own
         -- condition and NOT a general applicability test: rule 614.11's first
@@ -905,8 +906,8 @@ matchesPrinted viewOf gs event candidate =
         -- dredge.
         --
         -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the
-        -- src-derived arms below it: both producers install a FLOATING row from an
-        -- activated ability, so the "you" was baked when the ability resolved and
+        -- src-derived arms below it: every producer but dredge installs a FLOATING
+        -- row from a resolution, so the "you" was baked when it resolved and
         -- survives the source leaving the battlefield or changing hands -- which
         -- Ring of Ma'rûf's own cost makes it do. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
@@ -1030,6 +1031,7 @@ stocked gs rewrite pid = case rewrite of
   DrawRewrite.Dredge n -> Natural.length (Game.zoneMembers Zone.Library pid gs) >= n
   DrawRewrite.GainLife _ -> True
   DrawRewrite.FromOutsideTheGame _ -> True
+  DrawRewrite.YouDraw -> True
 
 breaches :: GameState -> Maybe PlayerId -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
 breaches gs you rewrite pid n = case rewrite of
@@ -1376,6 +1378,10 @@ relationHolds gs src you rel theirs =
         ControllerRelation.Yours -> both (==) you theirs
         ControllerRelation.Opponents -> both (Game.areOpponents gs) you theirs
         ControllerRelation.EnchantedPlayers -> both (==) (Projection.enchantedPlayerOf src gs) theirs
+        -- An InSlot the install never baked names nobody: a printed row has no
+        -- resolution whose slots it could read.
+        ControllerRelation.InSlot _ -> False
+        ControllerRelation.Among players -> maybe False (`Set.member` players) theirs
 
 -- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against
 -- the controller of the effect's SOURCE?
@@ -2221,6 +2227,10 @@ readsApplier re = case re of
   -- CANDIDATE rather than the effect, which is `readsSource`'s question and not
   -- this one.
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> False
+  -- CR 109.5: "you draw a card" -- the drawer is the row's own controller, so
+  -- two rows alike in `effect` and unlike in `you` hand the draw to different
+  -- seats. DrawCountRewrite.EachDrawOne's answer, and for its reason.
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ DrawRewrite.YouDraw) -> True
   -- CR 121.2a: "you and that player each draw a card" -- the "you" is the row's
   -- own controller, so two rows alike in `effect` and unlike in `you` hand the
   -- extra card to different seats. LifeLossRewrite.ExileFromTopOfYourLibrary's
@@ -2284,6 +2294,7 @@ readsSource :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effe
 readsSource effect = case effect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> True
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ DrawRewrite.YouDraw) -> False
   -- Not implemented: the wish filter IS scanned under a Filter.Context naming
   -- this candidate's source, so a filter that named it would make two such rows
   -- differ; the one printing's is `And []` (#3215).

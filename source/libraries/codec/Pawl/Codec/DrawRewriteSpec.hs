@@ -40,4 +40,11 @@ spec s = Spec.describe s "Pawl.Codec.DrawRewrite" $ do
       DrawRewrite.codec
       (DrawRewrite.Dredge 3)
       " {\"type\":\"Dredge\",\"value\":3} "
+  -- CR 614.10: Plagiarize.
+  Spec.it s "YouDraw" $
+    Common.assertCodec
+      s
+      DrawRewrite.codec
+      DrawRewrite.YouDraw
+      " {\"type\":\"YouDraw\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DrawRewrite.codec

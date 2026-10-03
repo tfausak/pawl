@@ -6,6 +6,7 @@
 module Pawl.Engine.Resolve.Slots where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.Functor.Const as Functor
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -59,6 +60,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
@@ -67,6 +69,7 @@ import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
@@ -76,6 +79,7 @@ import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
+import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamagePart as DamagePart
@@ -86,9 +90,11 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionR as DestructionR
+import qualified Pawl.Types.DieRollR as DieRollR
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
+import qualified Pawl.Types.DrawCountR as DrawCountR
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
@@ -135,12 +141,16 @@ import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LifeGainR as LifeGainR
 import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
+import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
+import qualified Pawl.Types.MillCountR as MillCountR
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -170,6 +180,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
+import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -194,6 +205,7 @@ import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
+import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
@@ -218,6 +230,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.VillainousChoiceR as VillainousChoiceR
 import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
@@ -1727,6 +1740,7 @@ drawRewriteReads rewrite = case rewrite of
   -- CR 702.52a's dredge carries a bare count: no Filter, and the N is the
   -- keyword's own rather than a Quantity a slot could name.
   DrawRewrite.Dredge _ -> ([], [])
+  DrawRewrite.YouDraw -> ([], [])
 
 -- replacementRowReads as a slot map. Arity One for every FILTER read, a
 -- Filter.IsBound being a membership test rather than a target slot; the QUANTITY
@@ -1737,7 +1751,68 @@ drawRewriteReads rewrite = case rewrite of
 replacementRowSlots :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
 replacementRowSlots re =
   let (filters, quantities) = replacementRowReads re
-   in joinSlots (fmap filterSlotsOf filters <> fmap quantitySlots quantities <> fmap slotsOf (replacementRowEffects re))
+   in joinSlots (fmap filterSlotsOf filters <> fmap quantitySlots quantities <> fmap slotsOf (replacementRowEffects re) <> fmap relationSlots (relationsOf re))
+
+-- The slot a ControllerRelation.InSlot names, at arity Many: the install bakes
+-- every player the slot holds (Pawl.Engine.Resolve.Effect's Effect.Replace arm).
+relationSlots :: ControllerRelation.ControllerRelation -> Map.Map SlotName SlotArity
+relationSlots rel = case rel of
+  ControllerRelation.InSlot slot -> Map.singleton slot SlotArity.Many
+  ControllerRelation.Yours -> Map.empty
+  ControllerRelation.Anyones -> Map.empty
+  ControllerRelation.Opponents -> Map.empty
+  ControllerRelation.EnchantedPlayers -> Map.empty
+  ControllerRelation.Among _ -> Map.empty
+
+-- Every ControllerRelation one row's pattern carries.
+relationsOf :: ReplacementEffect.ReplacementEffect card ability effect -> [ControllerRelation.ControllerRelation]
+relationsOf = Functor.getConst . overRelations (Functor.Const . pure)
+
+-- CR 614.1: every ControllerRelation one row's pattern carries, as a traversal,
+-- so the read above and the install's bake cannot disagree about where they sit.
+--
+-- No wildcard, replacementRowReads' discipline: an arm whose pattern comes to
+-- carry a relation must answer here, or an InSlot in it is never baked and admits
+-- nobody.
+overRelations :: (Applicative f) => (ControllerRelation.ControllerRelation -> f ControllerRelation.ControllerRelation) -> ReplacementEffect.ReplacementEffect card ability effect -> f (ReplacementEffect.ReplacementEffect card ability effect)
+overRelations f re = case re of
+  ReplacementEffect.ZoneChangeR r ->
+    let pat = ZoneChangeR.matching r
+     in (\w -> ReplacementEffect.ZoneChangeR r {ZoneChangeR.matching = pat {ZoneChangePattern.whoseObject = w}}) <$> f (ZoneChangePattern.whoseObject pat)
+  ReplacementEffect.CounterR r ->
+    let pat = CounterR.matching r
+     in (\subject whose onWho -> ReplacementEffect.CounterR r {CounterR.matching = pat {CounterPattern.subject = subject, CounterPattern.whose = whose, CounterPattern.onWho = onWho}})
+          <$> overSubject (CounterPattern.subject pat)
+          <*> f (CounterPattern.whose pat)
+          <*> traverse f (CounterPattern.onWho pat)
+  ReplacementEffect.TokenR r ->
+    let pat = TokenR.matching r
+     in (\w -> ReplacementEffect.TokenR r {TokenR.matching = pat {TokenPattern.whose = w}}) <$> f (TokenPattern.whose pat)
+  ReplacementEffect.LifeLossR r ->
+    let pat = LifeLossR.matching r
+     in (\w -> ReplacementEffect.LifeLossR r {LifeLossR.matching = pat {LifeLossPattern.whose = w}}) <$> f (LifeLossPattern.whose pat)
+  ReplacementEffect.LifeGainR r -> (\w -> ReplacementEffect.LifeGainR r {LifeGainR.whose = w}) <$> f (LifeGainR.whose r)
+  ReplacementEffect.DrawR r -> (\w -> ReplacementEffect.DrawR r {DrawR.whose = w}) <$> f (DrawR.whose r)
+  ReplacementEffect.DrawCountR r -> (\w -> ReplacementEffect.DrawCountR r {DrawCountR.whose = w}) <$> f (DrawCountR.whose r)
+  ReplacementEffect.MillCountR r -> (\w -> ReplacementEffect.MillCountR r {MillCountR.whose = w}) <$> f (MillCountR.whose r)
+  ReplacementEffect.CoinFlipR r -> (\w -> ReplacementEffect.CoinFlipR r {CoinFlipR.whose = w}) <$> f (CoinFlipR.whose r)
+  ReplacementEffect.DieRollR r -> (\w -> ReplacementEffect.DieRollR r {DieRollR.whose = w}) <$> f (DieRollR.whose r)
+  ReplacementEffect.ProliferateR r -> (\w -> ReplacementEffect.ProliferateR r {ProliferateR.whose = w}) <$> f (ProliferateR.whose r)
+  ReplacementEffect.ScryR r -> (\w -> ReplacementEffect.ScryR r {ScryR.whose = w}) <$> f (ScryR.whose r)
+  ReplacementEffect.VillainousChoiceR r -> (\w -> ReplacementEffect.VillainousChoiceR r {VillainousChoiceR.whose = w}) <$> f (VillainousChoiceR.whose r)
+  -- CR 109.5's relation rides EntryR's Filter (Filter.ControlledBy) and DamageR's
+  -- PlayerRelation; the other four name no player at all.
+  ReplacementEffect.EntryR _ -> pure re
+  ReplacementEffect.DamageR _ -> pure re
+  ReplacementEffect.DestructionR _ -> pure re
+  ReplacementEffect.TurnUpR _ -> pure re
+  ReplacementEffect.UntapR _ -> pure re
+  ReplacementEffect.PhaseR _ -> pure re
+  where
+    overSubject subject = case subject of
+      CounterSubject.ByPlayer rel -> CounterSubject.ByPlayer <$> f rel
+      CounterSubject.ByEffect -> pure subject
+      CounterSubject.ByAnything -> pure subject
 
 -- The card-authored EFFECT PROGRAMS one waiting row carries: CR 614.1c's "as
 -- [this permanent] enters, [do something]", CR 614.1a's "instead [do something]"

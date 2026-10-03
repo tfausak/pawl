@@ -4,15 +4,16 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 
 -- | CR 614.1a / 614.11: how a replacement rewrites a would-draw-a-card event.
--- Under either arm the draw does not happen at all (CR 614.6), so no card leaves
--- the library and CR 121.4's draw-from-an-empty-library is never attempted.
+-- Under every arm the affected player's draw does not happen (CR 614.6), so no
+-- card leaves their library and CR 121.4's draw-from-an-empty-library is never
+-- attempted. YouDraw alone leaves a draw standing, by another seat.
 --
 -- A type rather than a payload-free Pawl.Types.ReplacementEffect arm, for
 -- Pawl.Types.UntapRewrite's reason: a replacement effect is classified by the
 -- event class it intercepts AND the rewrite shape it applies.
 --
--- A shape per rewrite rather than a general list of effects: the two printings
--- replace a draw with two different things, and an arm naming which one keeps
+-- A shape per rewrite rather than a general list of effects: the printings
+-- replace a draw with different things, and an arm naming which one keeps
 -- Pawl.Engine.Replacement.readsApplier and Pawl.Engine.Resolve.Slots.replacementRowReads
 -- able to classify a row without running it.
 data DrawRewrite
@@ -48,4 +49,7 @@ data DrawRewrite
     -- is also rule 702.52b: a row that cannot mill N is not offered at all, so
     -- CR 616.1's choice never sees it.
     Dredge Natural.Natural
+  | -- | CR 614.10 / 614.6: Plagiarize's "that player skips that draw and you draw
+    -- a card" -- the draw stands, made by the row's controller instead.
+    YouDraw
   deriving (Eq, Ord, Show)
