@@ -115,18 +115,18 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Warrior"
+            "type": "Equipment"
           },
           {
-            "type": "Equipment"
+            "type": "Warrior"
           }
         ],
         "types": [
           {
-            "type": "Kindred"
+            "type": "Artifact"
           },
           {
-            "type": "Artifact"
+            "type": "Kindred"
           }
         ]
       }
