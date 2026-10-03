@@ -4849,14 +4849,16 @@ damagePatternFilters pattern_ = DamagePattern.whatSource pattern_ : Maybe.maybeT
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
+  -- BOTH Filters, ReduceActivationCost's reason below: `perTarget` asks about
+  -- the spell's targets through the same context.
+  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _ targets) -> f : Maybe.maybeToList targets
   -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
   -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
   -- below does. The whichKind beside it is not returned, for the reason that
   -- arm's grantedBy is not: CR 605.1a's classification is no more a Filter than
   -- a rule-702 family is.
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _ _) -> [f]
-  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
+  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _ targets) -> f : Maybe.maybeToList targets
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
   -- and whichKind beside it are not returned: neither a KeywordFamily nor CR

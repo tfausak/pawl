@@ -66,6 +66,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -2397,6 +2398,80 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
     Spec.assertEqWith s "the Dragon entering beside a Piker already out dealt nothing" (S.lifeOf S.bob itself) (Just 20)
     Spec.assertEqWith s "though it did enter" (S.countOnBattlefieldByName (S.printingName terror) S.alice itself) 1
 
+-- Hinata, Dawn-Crowned (NEO 218) {1}{U}{R}{W} Legendary Creature -- Kirin Spirit
+-- 4/4, Oracle text checked against Scryfall: "Flying, trample / Spells you cast
+-- cost {1} less to cast for each target. / Spells your opponents cast cost {1}
+-- more to cast for each target."
+--
+-- CR 601.2c fixes the targets before CR 601.2f totals the cost, and the count is
+-- of distinct objects and players, not instances of the word (CR 601.2c's "the
+-- chosen objects and/or players each become a target"; Hinata's ruling). alice
+-- controls Hinata; bob controls two Goblin Pikers. Twisted Fealty ({2}{R}, "Gain
+-- control of target creature ... Create a Young Hero Role token attached to up
+-- to one target creature") has two target words that may name one creature.
+hinataBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hinataBoard mountain hinata piker fealty mountains =
+  let (_, g1) = S.addPermanent hinata S.alice (S.landsFor mountain S.alice mountains (Setup.emptyGame S.bothPlayers))
+      (first, g2) = S.addPermanent piker S.bob g1
+      (second, g3) = S.addPermanent piker S.bob g2
+      (fealtyId, g4) = S.addHandCard fealty S.alice g3
+   in (first, second, fealtyId, aliceOnTurn g4)
+
+-- Twisted Fealty's "target" slot at `stolen` and its "creature" slot at `roled`,
+-- each filtered from the offered set rather than built, and the "up to one"
+-- slot announced as taking one.
+fealtyAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+fealtyAnswer stolen roled prompt = case prompt of
+  Prompt.AnnounceTargets _ _ _ slots -> fmap (const 1) slots
+  Prompt.ChooseTargets _ _ _ sets ->
+    let wanted slot = if slot == SlotName.MkSlotName (Text.pack "creature") then roled else stolen
+     in Map.mapWithKey (\slot (_, legal) -> Set.filter ((== Just (wanted slot)) . Recipient.objectOf) legal) sets
+  _ -> S.identityAnswer prompt
+
+hinataSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hinataSpec s registry = Spec.describe s "Hinata, Dawn-Crowned" $ do
+  -- The reduction, as a pair differing in the aim alone: both words at one
+  -- Piker is one target, so {1} comes off; one Piker each is two, so {2} does.
+  -- Counting instances (Filter.View's targetCount) would answer two both times.
+  -- The one-Mountain board is the castability gate's: only an aiming at both
+  -- Pikers makes Twisted Fealty payable there, so the gate has to search them.
+  Spec.it s "CR 601.2c / 601.2f alice's spell costs {1} less per distinct target, and the gate finds the aiming that pays" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fealty <- S.printingOf s registry "Twisted Fealty"
+    let (first, second, fealtyId, board) = hinataBoard mountain hinata piker fealty 2
+        once = S.runPure (fealtyAnswer first first) board (S.cast S.alice fealtyId)
+        twice = S.runPure (fealtyAnswer first second) board (S.cast S.alice fealtyId)
+        (_, _, shortId, short) = hinataBoard mountain hinata piker fealty 1
+    Spec.assertEqWith s "CR 601.2c one Piker named by both words is one target: {1}{R}, two Mountains" (S.tappedCount S.alice once) 2
+    Spec.assertEqWith s "two Pikers are two targets: {R}, one Mountain" (S.tappedCount S.alice twice) 1
+    Spec.assertBool s (S.castable S.alice shortId short) "CR 601.2 on one Mountain the cast is offered, since aiming at both Pikers pays it"
+    Spec.assertEqWith s "and both casts were made" (length (GameState.stack once), length (GameState.stack twice)) (1, 1)
+  -- The increase, and a PLAYER target counts: bob's Lightning Bolt at alice
+  -- costs {1}{R}. The same Bolt with Hinata under bob costs his own {R}, which
+  -- is "your opponents" (CR 109.5).
+  Spec.it s "CR 601.2f an opponent's spell costs {1} more for its target, a player among them" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let boardWith owner =
+          let (_, g1) = S.addPermanent hinata owner (S.landsFor mountain S.bob 3 (Setup.emptyGame S.bothPlayers))
+           in S.addHandCard bolt S.bob g1
+        (boltId, taxed) = boardWith S.alice
+        (ownId, own) = boardWith S.bob
+        atAlice = S.runPure (aimAtPlayer S.alice) taxed (S.cast S.bob boltId)
+        ownAtAlice = S.runPure (aimAtPlayer S.alice) own (S.cast S.bob ownId)
+    Spec.assertEqWith s "CR 601.2f bob's Bolt at alice cost {1}{R}" (S.tappedCount S.bob atAlice) 2
+    Spec.assertEqWith s "CR 109.5 with Hinata his own, the same Bolt cost {R}" (S.tappedCount S.bob ownAtAlice) 1
+    Spec.assertEqWith s "and both are on the stack" (length (GameState.stack atAlice), length (GameState.stack ownAtAlice)) (1, 1)
+
 -- Shell of the Last Kappa (CHK 269) {3} Legendary Artifact, Oracle text checked
 -- against Scryfall: "{3}, {T}: Exile target instant or sorcery spell that
 -- targets you. (The spell has no effect.) / {3}, {T}, Sacrifice Shell of the
@@ -2590,6 +2665,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   grafdiggersCageCastSpec s registry
   avenInterrupterSpec s registry
   terrorOfThePeaksSpec s registry
+  hinataSpec s registry
   shellOfTheLastKappaSpec s registry
   shellSecondAbilitySpec s registry
   senTripletsSpec s registry

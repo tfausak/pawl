@@ -1077,6 +1077,24 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
     Spec.assertEqWith s "and neither symbol was a choice" (phyrexianAnnouncements asked) []
     Spec.assertEqWith s "Dismember resolved rather than evaporating" (length (GameState.stack resolved)) 0
 
+  -- The REDUCTION the other way round, and one that reads CR 601.2c's target:
+  -- Hinata, Dawn-Crowned takes {1} off Dismember for its one target, so two
+  -- Swamps pay {B/P}{B/P} with mana twice. CR 601.2b's announcement comes before
+  -- the target, and measured with no target the first symbol's mana route
+  -- strands the second, which the engine would then force to life.
+  Spec.it s "CR 601.2f Dismember under Hinata offers both mana routes, priced with its target" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hinata <- S.printingOf s registry "Hinata, Dawn-Crowned"
+    dismember <- S.printingOf s registry "Dismember"
+    let (_, withPiker) = S.addPermanent piker S.alice (S.landsInPlay swamp 2)
+        (_, withHinata) = S.addPermanent hinata S.alice withPiker
+        (gs, dismemberId) = S.handOne dismember withHinata
+        (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
+    Spec.assertEqWith s "CR 601.2f no life paid: both Swamps paid both symbols" (S.lifeOf S.alice resolved) (Just 20)
+    Spec.assertEqWith s "both symbols were asked" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysMana, PhyrexianPayment.PaysMana]
+    Spec.assertEqWith s "and both Swamps tapped" (S.tappedCount S.alice resolved) 2
+
 -- Dismember ({1}{B/P}{B/P}) -- the first card in the pool with more than one
 -- Phyrexian mana symbol, and so the first to exercise CR 601.2b's "for each of
 -- those symbols" at all. Everything Mutagenic Growth proves about ONE symbol it

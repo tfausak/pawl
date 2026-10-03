@@ -27,8 +27,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- expressible and no printing writes it; the field is a classification either
 -- way, so admitting the other side costs nothing and asserts nothing.
 --
--- There is no `whichTargets` beside them, because no producer narrows an
--- increase by what the ability targets.
+-- Not implemented: a `whichTargets` beside them, narrowing the increase by what
+-- the ability targets, as ReduceActivationCost's does (#4667).
 data IncreaseActivationCost = MkIncreaseActivationCost
   { whichAbilities :: Filter.Filter Keyword.Keyword,
     whichKind :: Maybe AbilityKind.AbilityKind,

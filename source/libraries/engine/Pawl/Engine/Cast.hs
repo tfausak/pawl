@@ -350,8 +350,9 @@ flashOn oid face gs =
 --     hand size cannot enter a cost or a filter.
 --   * a cost adjustment carries a LITERAL amount. PlayerEffect.IncreaseSpellCost
 --     and ReduceSpellCost hold a Natural or a ManaCost, never a Quantity, so no
---     adjustment can count anything -- which is the only route a zone read could
---     take into Cost.total.
+--     adjustment can count anything but the spell's own targets (`perTarget`),
+--     which the first point keeps out of hidden zones -- and a count is the only
+--     route a zone read could take into Cost.total.
 --
 -- The one object whose stack membership the move does change is the spell itself,
 -- and CR 115.5 takes that one back out of every stack pool
@@ -462,8 +463,9 @@ payableCost extra spending pid oid gs = payableCostAt (maybe 0 Face.minimumX (Ga
 -- CR 601.2c's targets do not exist at any moment this gate is asked -- every
 -- caller sits at CR 601.3 or inside CR 601.2b -- and a cost whose criterion NAMES one cannot be measured without them
 -- (Cost.readsBoundSlot), nor can a spell whose own cost sentence reads them
--- (Cost.selfReadsTargets, Bury in Books' "if it targets an attacking
--- creature"). Such a cost is asked of every announcement still open
+-- (Cost.readsTargets, Bury in Books' "if it targets an attacking
+-- creature"), nor one another object's change counts them for (Hinata,
+-- Dawn-Crowned). Such a cost is asked of every announcement still open
 -- instead -- CR 601.2 makes a casting legal when the player can comply with
 -- every step, so the gate's question is whether SOME aiming complies, exactly
 -- as Activatable.aimingSomewhere asks it. Whole aimings rather than one
@@ -502,11 +504,12 @@ payableCostAtGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId]
 payableCostAtGiven pcs sources x extra spending pid oid gs cost =
   let substituted = Cost.substituteX x cost
       assisted = Cost.assistable (PaymentSubject.Casting oid) pid oid gs
-      ask slots =
-        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems slots)) pid oid gs)
+      ask aiming =
+        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems aiming)) pid oid gs)
             totalled = Cost.plusComponents adjustments substituted
+            slots = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) aiming
          in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
-   in if Cost.readsBoundSlot substituted || Cost.selfReadsTargets pid oid gs
+   in if Cost.readsBoundSlot substituted || Cost.readsTargets pid oid gs
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
 
@@ -536,7 +539,7 @@ payableCostAtGiven pcs sources x extra spending pid oid gs cost =
 -- slot, neither of which takes this
 -- road. A card printing an X-bounded target slot beside a slot-reading
 -- additional cost is what would make the two values differ.
-castAimable :: PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set ObjectId)]
+castAimable :: PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)]
 castAimable pid oid gs = case Game.faceOf oid gs of
   Nothing -> []
   Just face ->
@@ -547,9 +550,8 @@ castAimable pid oid gs = case Game.faceOf oid gs of
         -- CR 601.2c's per-player copies, as castProposed offers them. A REGRESSION
         -- FENCE: no card pairs a per-player slot with a target-reading cost.
         slotsOf mi = Target.announcedSlots pid oid gs (Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal))
-        objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
         setsOf slots = Target.legalSets (Just pid) True Map.empty oid slots gs
-     in fmap (fmap objectsOf . setsOf . slotsOf) (Set.toList (Target.fillableModes (Just pid) Map.empty oid enchant modal gs))
+     in fmap (setsOf . slotsOf) (Set.toList (Target.fillableModes (Just pid) Map.empty oid enchant modal gs))
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -3197,16 +3199,24 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- Phyrexian symbol (Scryfall keyword:assist, 2026-09-23), so
                   -- no announcement here has a choice it could change.
                   --
-                  -- No targets yet, so a spell's own sentence reading them
-                  -- (Cost.selfReadsTargets) is not in this total, and the routes
-                  -- are offered as if it did not apply. A fence, not a proof:
-                  -- no printing states such a sentence beside a hybrid or
-                  -- Phyrexian symbol (MTGJSON 2026-08-23, "costs .* (less|more)
-                  -- to cast if it targets").
-                  let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments Set.empty pid sid announcedBoard)
+                  -- No targets yet, so an adjustment reading them
+                  -- (Cost.readsTargets) is totalled under every aiming CR
+                  -- 601.2c could still make, payableCostAtGiven's search, and a
+                  -- route is offered when SOME aiming pays it: measured with no
+                  -- targets, Hinata, Dawn-Crowned's reduction would hide a mana
+                  -- route the payer is entitled to. Pawl.ManaSymbolSpec's "CR
+                  -- 601.2f Dismember under Hinata offers both mana routes" proves
+                  -- it.
+                  let gatheredFor targets = Cost.plusReductions chosenReductions (Cost.spellAdjustments targets pid sid announcedBoard)
+                      gathered = gatheredFor Set.empty
+                      aimedGathers
+                        | Cost.readsTargets pid sid announcedBoard =
+                            gathered : fmap (gatheredFor . Set.unions . Map.elems) (Target.aimings (Target.legalSets (Just pid) False (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots announcedBoard))
+                        | otherwise = [gathered]
+                      routeTotals mana = concatMap (`Cost.totalManas` mana) aimedGathers
                   let totalledCost = Cost.plusComponents gathered announcedAtX
                       assistedTotal = Cost.assistable (PaymentSubject.Casting sid) pid sid announcedBoard
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid announcedBoard) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid announcedBoard) (fmap assistedTotal . routeTotals)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.paidCosts`'s
@@ -3334,10 +3344,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- Reap cases are the proof (Baral pays the sacrifice, and
                       -- the Reap still costs {B}).
                       pricedGs <- State.get
-                      -- CR 601.2c's targets are fixed by now, so the spell's own
-                      -- sentence reading them (Bury in Books) is asked here.
-                      let announced = Set.fromList (Maybe.mapMaybe Recipient.objectOf (Set.toList (Set.unions (Map.elems chosen))))
-                      adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.plusReductions chosenReductions (Cost.spellAdjustments announced pid sid pricedGs))
+                      -- CR 601.2c's targets are fixed by now, so an adjustment
+                      -- reading them (Bury in Books, Hinata) is asked here.
+                      adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.plusReductions chosenReductions (Cost.spellAdjustments (Set.unions (Map.elems chosen)) pid sid pricedGs))
                       -- CR 601.2f's "plus all additional costs", gathered NOW
                       -- that the targets are fixed, where `gathered` at CR
                       -- 601.2b above could not see them: a component read off
