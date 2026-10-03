@@ -1397,12 +1397,12 @@ choicesUpTo n attackers =
 -- what makes the answer total. blockCeilingGiven is the half legalBlockDeclaration
 -- reaches, so the two share one grant walk and one whole-board projection.
 --
--- The enumeration ranges over the creatures that block FREELY, which is CR
--- 509.1c's cost clause: a player is never required to pay to block, so `best` is
--- drawn from the untaxed creatures while `requirements` stays every instance in
--- force. attackCeilingGiven applies the same clause in the same place, and the
--- placement is the whole of the rule -- a taxed creature is still a CANDIDATE and
--- still a legal blocker, it is only never one the defending player must reach for.
+-- The enumeration ranges over the blocks made FREELY, which is CR 509.1c's cost
+-- clause: a player is never required to pay to block, so `best` is drawn from
+-- the untaxed (blocker, attacker) pairs while `requirements` stays every instance
+-- in force. attackCeilingGiven applies the same clause in the same place, and the
+-- placement is the whole of the rule -- a taxed block is still legal, it is only
+-- never one the defending player must reach for.
 blockCeiling :: PlayerId -> GameState -> (Requirement.Instances (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
 blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
@@ -1412,14 +1412,15 @@ blockCeilingGiven grants pcs pid gs =
       able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
       arity = blockArityGiven candidates gs
       requirements = BlockRequirement.instances able candidates attackers gs
-      -- CR 509.1c's cost clause is a filter on the CREATURE, never on its
-      -- requirements: a creature is excused wholly or not at all, and what it
-      -- would have blocked never enters the question.
-      freely blocker = BlockCost.blocksFreely blocker gs
+      -- CR 509.1c's cost clause is a filter on the PAIRS the search may
+      -- declare, never on the requirements: a block that costs something is
+      -- never one the defending player must make, while the same creature's
+      -- free blocks stay required (Hipparion).
+      freely blocker attacker = able blocker attacker && BlockCost.blocksFreely blocker attacker gs
    in ( requirements,
         if Requirement.vacuous requirements
           then Map.empty
-          else bestBlockDeclaration requirements limit arity pcs able (filter freely candidates) attackers gs
+          else bestBlockDeclaration requirements limit arity pcs freely candidates attackers gs
       )
 
 -- CR 509.1: is this declaration one the defending player may make? Both checks

@@ -1,7 +1,7 @@
 -- Covers Pawl.Codec.BlockCost. Pawl.Codec.PerCreature, the one codec it
 -- dispatches to that Pawl.Codec.Affected does not, is round-tripped through
 -- Pawl.Codec.AttackCostSpec as well: one share type serves both combat costs, so
--- what is proved here is this object's own two keys.
+-- what is proved here is this object's own three keys.
 module Pawl.Codec.BlockCostSpec where
 
 import qualified Pawl.Codec.BlockCost as BlockCost
@@ -10,6 +10,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PerCreature as PerCreature
@@ -25,6 +26,18 @@ spec s = Spec.describe s "Pawl.Codec.BlockCost" $ do
       ( BlockCost.MkBlockCost
           Affected.Attached
           (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))
+          Nothing
       )
       " {\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}},\"subject\":{\"type\":\"Attached\"}} "
+  -- Hipparion: only blocks of attackers with power 3 or greater cost {1}.
+  Spec.it s "MkBlockCost with attackers" $
+    Common.assertCodec
+      s
+      BlockCost.codec
+      ( BlockCost.MkBlockCost
+          (Affected.Matching Filter.IsSource)
+          (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []))
+          (Just (Filter.PowerAtLeast 3))
+      )
+      " {\"attackers\":{\"type\":\"PowerAtLeast\",\"value\":3},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockCost.codec

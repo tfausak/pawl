@@ -2058,7 +2058,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         ending = base {Face.spell = spellOf [Effect.AffectPlayers (AffectPlayers.MkAffectPlayers (Duration.UntilPaid sacrificeCost) (AffectedPlayers.Scoped PlayerScope.You) PlayerEffect.CantCastSpells)]}
         -- CR 508.1h and CR 509.1d: a declaration announces no target.
         attacking = base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (PerCreature.Fixed sacrificeCost) AttackCostScope.Controller]}
-        blocking = base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (PerCreature.Fixed sacrificeCost)]}
+        blocking = base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (PerCreature.Fixed sacrificeCost) Nothing]}
     -- Ordered FIRST: the positions an announcement pays are accepted, which is
     -- what #2924 changed -- Pawl.Engine.Cost.pay reads CR 601.2c's targets off
     -- the stack object, so the atom is answered there.
@@ -2796,7 +2796,10 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 509.1d's cost to block",
-              base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching buried) (PerCreature.Fixed (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))]}
+              base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching buried) (PerCreature.Fixed (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])) Nothing]}
+            ),
+            ( "CR 509.1b's block-cost attacker filter",
+              base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching Filter.Type.IsSource) (PerCreature.Fixed (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])) (Just buried)]}
             ),
             ( "CR 509.1d's counted share",
               base
@@ -2808,6 +2811,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                                 (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
                             )
                         )
+                        Nothing
                     ]
                 }
             ),
