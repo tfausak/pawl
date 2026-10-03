@@ -1334,6 +1334,8 @@ rewriteGrantedAbility pairs granted = case granted of
         { AlternativeCost.condition = fmap (rewriteCondition pairs) (AlternativeCost.condition a),
           AlternativeCost.cost = Filter.rewriteCost pairs (AlternativeCost.cost a)
         }
+  -- Mana types and filters carry no land type word.
+  GrantedAbility.SelfSpendManaAsThough clause -> GrantedAbility.SelfSpendManaAsThough clause
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR

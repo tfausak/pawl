@@ -2222,7 +2222,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed comm
       -- sources (or the other way round) would make this disagree with `spend`
       -- about what is payable, and the symptom is an action the engine offers and
       -- then cannot pay.
-      clauses = PlayerEffect.spendManaAsThough pid gs
+      clauses = PlayerEffect.spendManaAsThoughFor pid subject gs
       pooled = fmap (rewriteSupply clauses . supplyOf admitting) (unitsOf (Game.poolOf pid gs))
       suppliesPer = fmap (\oid -> manaSuppliesGiven capacity pcs pid oid gs) sources
       -- WHICH groups are worth taking fewer times: the ones whose claims meet
