@@ -1,0 +1,36 @@
+{
+  "description": "CR 106.6 / 118.12a Hydraulic Helper's mana pays the cost Cutpurse asks as it resolves",
+  "note": "Rishadan Cutpurse's trigger makes bob sacrifice a permanent unless he pays {1}. A payment made as an ability resolves is no cast, so mana barred only from nonartifact spells pays it, and bob keeps both permanents.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island-1" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" }
+        ],
+        "hand": [{ "card": "Rishadan Cutpurse", "label": "cutpurse" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Hydraulic Helper", "label": "helper", "ready": true },
+          { "card": "Goblin Piker" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$cutpurse", "mana": ["$island-1", "$island-2", "$island-3"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "ChooseToPay": { "decision": { "type": "Pays" }, "mana": ["$helper"] } }, "source": "Rishadan Cutpurse" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ],
+  "final": [
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Hydraulic Helper", "count": 1 } },
+    { "Tapped": { "object": "$helper", "tapped": true } }
+  ]
+}
