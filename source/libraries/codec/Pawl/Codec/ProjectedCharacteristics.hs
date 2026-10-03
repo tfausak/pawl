@@ -84,6 +84,7 @@ codec = Fields.object $ do
   alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) PC.alternativeCosts
   costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) PC.costReductions
   grantedCostReductions <- Fields.defaulted "grantedCostReductions" [] (Common.list CostReduction.codec) PC.grantedCostReductions
+  grantedAlternativeCosts <- Fields.defaulted "grantedAlternativeCosts" [] (Common.list AlternativeCost.codec) PC.grantedAlternativeCosts
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   exceptions <- Fields.defaulted "exceptions" [] (Common.list (CopyException.codec (GrantedAbility.codec Card.codec))) PC.exceptions
   mergedDonors <- Fields.defaulted "mergedDonors" [] (Common.list codec) PC.mergedDonors
@@ -130,6 +131,7 @@ codec = Fields.object $ do
         PC.alternativeCosts = alternativeCosts,
         PC.costReductions = costReductions,
         PC.grantedCostReductions = grantedCostReductions,
+        PC.grantedAlternativeCosts = grantedAlternativeCosts,
         PC.halves = halves,
         PC.exceptions = exceptions,
         PC.mergedDonors = mergedDonors,

@@ -56,6 +56,40 @@
                                 "value": "opponent"
                               }
                             }
+                          },
+                          "slot": "revealed"
+                        }
+                      },
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "Perpetual"
+                          },
+                          "modification": {
+                            "type": "GainAbility",
+                            "value": {
+                              "type": "SelfCostReduction",
+                              "value": {
+                                "amount": [
+                                  {
+                                    "type": "Generic",
+                                    "value": 1
+                                  }
+                                ],
+                                "direction": {
+                                  "type": "More"
+                                },
+                                "perEach": {
+                                  "type": "Literal",
+                                  "value": 1
+                                }
+                              }
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "revealed"
                           }
                         }
                       }

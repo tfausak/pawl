@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.GraveyardOrder as GraveyardOrder
+import qualified Pawl.Codec.OutsideCard as OutsideCard
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Codec.PrintingId as PrintingId
@@ -47,7 +48,7 @@ codec = Fields.object $ do
   completedDungeons <- Fields.defaulted "completedDungeons" 0 Common.natural Player.completedDungeons
   completedDungeonNames <- Fields.defaulted "completedDungeonNames" Set.empty (Common.set CardName.codec) Player.completedDungeonNames
   startingDeck <- Fields.defaulted "startingDeck" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.startingDeck
-  companion <- Fields.defaulted "companion" Nothing (Common.maybe PrintingId.codec) Player.companion
+  companion <- Fields.defaulted "companion" Nothing (Common.maybe OutsideCard.codec) Player.companion
   companionTaken <- Fields.defaulted "companionTaken" False Common.boolean Player.companionTaken
   graveyardOrder <- Fields.defaulted "graveyardOrder" GraveyardOrder.Type.Indifferent GraveyardOrder.codec Player.graveyardOrder
   pure

@@ -1271,8 +1271,8 @@ combatReplaySpec s =
         -- and which, is a decision, so it has to survive a transcript like any
         -- other.
         Spec.it s "ChooseCompanion round-trips through the transcript" $ do
-          let a = PrintingId.MkPrintingId 7
-              b = PrintingId.MkPrintingId 9
+          let a = OutsideCard.InPool (PrintingId.MkPrintingId 7)
+              b = OutsideCard.InAnotherGame (ObjectId.MkObjectId 9)
               p = Prompt.ChooseCompanion decider S.alice (a NonEmpty.:| [b])
           Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p (Just b))) (Just (Just b))
           Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p (Just a))) (Just (Just a))
@@ -1280,10 +1280,10 @@ combatReplaySpec s =
           -- and has to survive too, which is what the Maybe carries.
           Spec.assertEqWith s "declining round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
           -- Discriminating: fails if the prompt reuses Response.ChoseDungeon
-          -- rather than getting its own constructor. Both name a PrintingId chosen
-          -- from outside the game, so nothing but a distinct constructor keeps a
+          -- rather than getting its own constructor. Both name a card chosen from
+          -- outside the game, so nothing but a distinct constructor keeps a
           -- transcript of one from replaying as the other.
-          Spec.assertEqWith s "a dungeon choice does not decode as this one" (Replay.decode p (Response.ChoseDungeon a)) Nothing
+          Spec.assertEqWith s "a dungeon choice does not decode as this one" (Replay.decode p (Response.ChoseDungeon (PrintingId.MkPrintingId 7))) Nothing
           -- CR 103.2b again: with nothing recorded, nobody reveals -- an absent
           -- transcript must not make a choice for a player.
           Spec.assertEqWith s "a short transcript reveals nothing" (Replay.defaultAnswer p) Nothing

@@ -1,6 +1,7 @@
 module Pawl.Types.GrantedAbility where
 
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
@@ -47,4 +48,8 @@ data GrantedAbility card
   | -- | CR 113.3d / 601.2f: a static ability reducing its own object's cost to
     -- cast, Richlau, Headmaster's "This spell costs {1} less to cast".
     SelfCostReduction CostReduction.CostReduction
+  | -- | CR 113.6d / 118.9: an alternative cost its own object may be cast for,
+    -- Mine Security's perpetual "You may pay {0} rather than pay this spell's
+    -- mana cost".
+    SelfAlternativeCost AlternativeCost.AlternativeCost
   deriving (Eq, Ord, Show)

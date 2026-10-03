@@ -140,6 +140,30 @@
                               "type": "AtRandomInTop",
                               "value": 8
                             }
+                          },
+                          "slot": "conjured"
+                        }
+                      },
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "Perpetual"
+                          },
+                          "modification": {
+                            "type": "GainAbility",
+                            "value": {
+                              "type": "SelfAlternativeCost",
+                              "value": {
+                                "cost": {
+                                  "mana": []
+                                }
+                              }
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "conjured"
                           }
                         }
                       }

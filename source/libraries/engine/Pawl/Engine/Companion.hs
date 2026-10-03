@@ -7,7 +7,7 @@
 -- written to its shape -- a gate, an offer, and a performer that pays before it
 -- moves anything. What is different is the ZONE the card comes from: outside the
 -- game is not one (CR 400.11), so no object stands for the companion and
--- Pawl.Engine.Event.bringIn is the door rather than a zone change.
+-- Pawl.Engine.Event.bringChosen is the door rather than a zone change.
 --
 -- THE INVARIANT: rule 702 is part of the rulebook, so reading Keyword.Companion
 -- here is the same closed-half act as reading a Phase. This module never asks
@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
@@ -42,7 +43,9 @@ import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
+import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
@@ -115,16 +118,31 @@ fulfilled predicate pid gs =
 -- 103.2b runs AFTER rule 103.2a has set the sideboard aside; Pawl.Engine.Setup.createDeck
 -- is what interns it into the pool this reads.
 --
--- Not implemented: in a subgame, CR 729.4's main-game objects
--- (GameState.outsideObjects) are outside the game too, and none is offered
--- (#4645).
-revealable :: PlayerId -> GameState -> [PrintingId]
+-- In a subgame, CR 729.4's main-game objects (GameState.outsideObjects) are
+-- outside the game too, so each one this player owns is offered on the same
+-- terms -- Pawl.Engine.Event.eligible's two sources. A FACE-DOWN one is not:
+-- CR 708.2 leaves it no abilities, so it has no companion ability to reveal.
+revealable :: PlayerId -> GameState -> [OutsideCard.OutsideCard]
 revealable pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
       admits printingId = case conditionOf printingId gs of
         Nothing -> False
         Just predicate -> fulfilled predicate pid gs
-   in fmap fst (filter (\(printingId, n) -> n > 0 && admits printingId) (Map.toAscList pool))
+      fromPool = fmap (OutsideCard.InPool . fst) (filter (\(printingId, n) -> n > 0 && admits printingId) (Map.toAscList pool))
+      admitsOuter entry =
+        OutsideObject.owner entry == pid
+          && not (Facing.isFaceDown (OutsideObject.facing entry))
+          && admits (OutsideObject.printing entry)
+      fromOuter = fmap (OutsideCard.InAnotherGame . fst) (filter (admitsOuter . snd) (Map.toAscList (GameState.outsideObjects gs)))
+   in fromPool <> fromOuter
+
+-- CR 116.2g: is this card still outside the game, where the special action has
+-- to find it?
+stillOutside :: PlayerId -> OutsideCard.OutsideCard -> GameState -> Bool
+stillOutside pid card gs = case card of
+  OutsideCard.InPool printingId ->
+    Map.findWithDefault 0 printingId (maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))) > 0
+  OutsideCard.InAnotherGame outerId -> Map.member outerId (GameState.outsideObjects gs)
 
 -- CR 103.2b: put the reveal to this player, and record what they revealed.
 --
@@ -148,8 +166,8 @@ reveal pid = do
       answer <- Game.choose (Prompt.ChooseCompanion (Decide.deciderFor pid gs0) pid offered)
       let chosen = case answer of
             Nothing -> Nothing
-            Just printingId ->
-              if List.elem printingId (NonEmpty.toList offered) then Just printingId else Nothing
+            Just card ->
+              if List.elem card (NonEmpty.toList offered) then Just card else Nothing
       State.modify' $ \gs ->
         gs
           { GameState.players =
@@ -165,7 +183,8 @@ reveal pid = do
 --
 -- A FIFTH that rule 116.2g leaves implicit: the card is still outside the game.
 -- It fails where something else brought the revealed card in first -- a wish
--- whose filter admits it (CR 400.11b) spends the same pool entry.
+-- whose filter admits it (CR 400.11b) spends the same pool entry or outside
+-- object.
 --
 -- The payability check is Cost.canPay and NOT Cost.total's CR 601.2f
 -- adjustments, Pawl.Engine.Foretell.canForetell's reason: that rule totals the
@@ -179,9 +198,9 @@ canTake pid gs = case Map.lookup pid (GameState.players gs) of
   Nothing -> False
   Just player -> case Player.companion player of
     Nothing -> False
-    Just printingId ->
+    Just card ->
       not (Player.companionTaken player)
-        && Map.findWithDefault 0 printingId (Player.outsideTheGame player) > 0
+        && stillOutside pid card gs
         && Turn.sorcerySpeedWindow pid gs
         && Cost.canPay PaymentSubject.ForNeither pid (GameState.nextObjectId gs) actionCost gs
 
@@ -199,11 +218,12 @@ canTake pid gs = case Map.lookup pid (GameState.players gs) of
 -- activated to pay this cost may mint an object, and the peeked id is exactly the
 -- one such an object would be given.
 --
--- Event.bringIn and not a zone change, its own haddock's reason: no object stood
--- for the card, so the card is MINTED into the hand. That call spends the pool
--- entry, which is CR 702.139c -- the card "remains in the game until the game
--- ends", so a second action could not find it again even if the flag below did
--- not stop one.
+-- Event.bringChosen and not a zone change, Event.bringIn's reason: no object
+-- stood for the card, so the card is MINTED into the hand. That call spends the
+-- pool entry, or for a main-game object records CR 729.4a's crossing, which is
+-- CR 702.139c -- the card "remains in the game until the game ends", so a
+-- second action could not find it again even if the flag below did not stop
+-- one.
 take :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> Game ()
 take perform pid = do
   before <- State.get
@@ -211,7 +231,7 @@ take perform pid = do
     then pure ()
     else case Map.lookup pid (GameState.players before) >>= Player.companion of
       Nothing -> pure ()
-      Just printingId -> do
+      Just card -> do
         -- CR 118.13c, Pawl.Engine.Foretell.foretell's announcement and for its
         -- reasons. CR 116.2g fixes this cost at {3}, so no symbol here is ever
         -- payable in multiple ways and no prompt is ever raised.
@@ -232,7 +252,7 @@ take perform pid = do
             -- CR 702.139a names the hand, which is the whole of what the
             -- destination says here: this is the rulebook's own action, not a
             -- card's sentence.
-            State.modify' (snd . Event.bringIn OutsideDestination.Hand pid printingId)
+            _ <- Event.bringChosen OutsideDestination.Hand False pid [card]
             State.modify' $ \gs ->
               gs
                 { GameState.players =

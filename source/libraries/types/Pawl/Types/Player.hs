@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.GraveyardOrder as GraveyardOrder
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -250,16 +251,17 @@ data Player = MkPlayer
     -- as their companion, or Nothing for the players who revealed none -- which is
     -- every player in a game whose decks brought no companion.
     --
-    -- A PRINTING and not an ObjectId, for Player.commander's reason turned inside
-    -- out: CR 103.2b leaves the revealed card OUTSIDE the game, where CR 400.11
-    -- gives it no object at all until CR 116.2g brings it in.
+    -- An OutsideCard and not an ObjectId of this game: CR 103.2b leaves the
+    -- revealed card OUTSIDE the game, where CR 400.11 gives it no object until
+    -- CR 116.2g brings it in. That is a sideboard printing, or in a subgame a
+    -- main-game object (CR 729.4).
     --
     -- ONE, which is CR 103.2b's own cap: "a player may reveal no more than one card
     -- this way".
     --
     -- NOT taken out of Player.outsideTheGame when it is chosen: CR 103.2b's last
     -- sentence keeps the revealed card out there, and CR 116.2g is what spends it.
-    companion :: Maybe PrintingId.PrintingId,
+    companion :: Maybe OutsideCard.OutsideCard,
     -- | CR 116.2g: has this player already taken the companion special action this
     -- game? "Only if they haven't done so yet this game" is this flag, and
     -- Pawl.Engine.Companion.take is its sole writer.

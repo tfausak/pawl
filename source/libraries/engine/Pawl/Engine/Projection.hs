@@ -300,6 +300,10 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           -- it off the projection of the card being cast.
           GrantedAbility.SelfCostReduction r ->
             pc {PC.grantedCostReductions = PC.grantedCostReductions pc <> [r]}
+          -- CR 118.9: recorded for Pawl.Engine.Cost.costsFor, which reads it
+          -- off the projection of the card being cast.
+          GrantedAbility.SelfAlternativeCost a ->
+            pc {PC.grantedAlternativeCosts = PC.grantedAlternativeCosts pc <> [a]}
         -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
         -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
         -- above as the ability resolves, so nothing with this modification is ever
@@ -343,6 +347,9 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- The same for a granted cost reduction. Unproven: no test wipes
               -- a card carrying a granted one.
               PC.grantedCostReductions = [],
+              -- The same for a granted alternative cost. Unproven: no test
+              -- wipes a card carrying a granted one.
+              PC.grantedAlternativeCosts = [],
               -- The same for a granted static ability: only an EARLIER grant is
               -- gone. Unproven: no card in data/cards/ grants a static ability
               -- to a permanent an ability wipe reaches.
@@ -5541,6 +5548,8 @@ grantedStaticWrites p g = case g of
   GrantedAbility.Player _ -> False
   -- CR 601.2f: nor does a reduction of its own cost.
   GrantedAbility.SelfCostReduction _ -> False
+  -- CR 118.9: nor does an alternative cost.
+  GrantedAbility.SelfAlternativeCost _ -> False
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands

@@ -6,7 +6,8 @@ import qualified Pawl.Types.Keyword as Keyword
 
 -- | CR 118.9: one alternative cost a face PRINTS, which its controller may pay
 -- rather than the spell's mana cost -- and, when the card states one, the
--- condition rule 604.2 gates that permission on.
+-- condition rule 604.2 gates that permission on. An effect may grant one too
+-- (Pawl.Types.GrantedAbility.SelfAlternativeCost, Mine Security).
 --
 -- A Cost plus a Condition rather than a bare Cost, because the two printings part
 -- exactly there: Fireblast's alternative is offered on every board, while
