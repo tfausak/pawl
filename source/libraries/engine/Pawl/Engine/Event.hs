@@ -8603,6 +8603,11 @@ drawCard pid = Monad.void (drawCardReturning pid)
 -- empty library (CR 104.3c is then the whole of what happened), or a move a
 -- replacement effect cancelled -- so a caller binding the answer binds nothing
 -- rather than binding a card that is not there.
+--
+-- Nothing too for a draw a replacement handed to another player (CR 121.6c):
+-- the card is drawn, but as a result of the replacement, so the instruction's
+-- "reveal it" does not reach it. A rewrite keeping the drawer is Plagiarize
+-- aimed at its own controller, which its ruling calls no useful effect.
 drawCardReturning :: PlayerId -> Game (Maybe ObjectId)
 drawCardReturning pid = do
   outcome <- applyReplacements (ProposedEvent.WouldDraw pid)
@@ -8611,7 +8616,9 @@ drawCardReturning pid = do
     -- already done its own work; nothing is left to do here and nothing is
     -- recorded.
     Nothing -> pure Nothing
-    Just drawer -> performDraw drawer
+    Just drawer -> do
+      drawn <- performDraw drawer
+      pure (if drawer == pid then drawn else Nothing)
 
 -- The draw itself, once CR 616.1's loop has left it standing. Split out so that
 -- rule 614.11's ordering is visible: the proposal above runs BEFORE the library
