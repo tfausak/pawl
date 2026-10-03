@@ -128,9 +128,10 @@ overSlots f quantity =
         -- 202.3 computed bound, and what slotsAreExhaustive reads so the CR 603.3b
         -- elision cannot rest on a gap.
         Quantity.ManaCount _ -> pure quantity
-        -- The same position a third time: this arm's PlayerRef.InSlot names a TARGET
-        -- slot, not an amount one.
+        -- The same position a third time: these arms' PlayerRef.InSlot names a
+        -- TARGET slot, not an amount one.
         Quantity.LifeTotal _ -> pure quantity
+        Quantity.StartingLifeTotal _ -> pure quantity
         -- And a fourth: LifeTotal's sibling carries a PlayerRef in the same position.
         Quantity.Speed _ -> pure quantity
         -- And a fifth, CR 725.1's designation -- a PlayerRef and nothing else.
@@ -324,6 +325,7 @@ nestedRefs quantity = case quantity of
   Quantity.Count c -> Set.union (scopeRefs (Count.Type.scope c)) (foldCount nestedRefs c)
   Quantity.ManaCount c -> Set.singleton (Left (ManaCount.Type.player c))
   Quantity.LifeTotal ref -> Set.singleton (Left ref)
+  Quantity.StartingLifeTotal ref -> Set.singleton (Left ref)
   Quantity.Speed ref -> Set.singleton (Left ref)
   Quantity.IsMonarch ref -> Set.singleton (Left ref)
   Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally ref _) -> Set.singleton (Left ref)
@@ -441,6 +443,7 @@ nestedCounts quantity = case quantity of
   -- Every remaining arm is a leaf reading a scalar off a player, an object or the
   -- game, so none of them holds a Count:
   Quantity.LifeTotal _ -> []
+  Quantity.StartingLifeTotal _ -> []
   Quantity.Speed _ -> []
   Quantity.IsMonarch _ -> []
   Quantity.HasPlayerDesignation {} -> []
@@ -614,6 +617,7 @@ mapPlayerRefs f intoCount quantity =
   let recur = mapPlayerRefs f intoCount
    in case quantity of
         Quantity.LifeTotal ref -> Quantity.LifeTotal (f ref)
+        Quantity.StartingLifeTotal ref -> Quantity.StartingLifeTotal (f ref)
         Quantity.Speed ref -> Quantity.Speed (f ref)
         Quantity.IsMonarch ref -> Quantity.IsMonarch (f ref)
         Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally ref mark) -> Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally (f ref) mark)

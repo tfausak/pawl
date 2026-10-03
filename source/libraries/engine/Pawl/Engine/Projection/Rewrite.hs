@@ -2097,6 +2097,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity
+  Quantity.Type.StartingLifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
   Quantity.Type.HasPlayerDesignation {} -> quantity

@@ -1,0 +1,104 @@
+{
+  "description": "CR 603.4 Resolute Archangel leaves a life total above the starting one",
+  "note": "The same two-player Brawl board with alice on 27, above her starting 25: the intervening if fails, so her life total is not lowered to 25.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 27,
+        "battlefield": [
+          {
+            "card": "Plains",
+            "label": "plains 1"
+          },
+          {
+            "card": "Plains",
+            "label": "plains 2"
+          },
+          {
+            "card": "Plains",
+            "label": "plains 3"
+          },
+          {
+            "card": "Plains",
+            "label": "plains 4"
+          },
+          {
+            "card": "Plains",
+            "label": "plains 5"
+          },
+          {
+            "card": "Plains",
+            "label": "plains 6"
+          },
+          {
+            "card": "Plains",
+            "label": "plains 7"
+          }
+        ],
+        "hand": [
+          {
+            "card": "Resolute Archangel",
+            "label": "archangel"
+          }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 11
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain",
+    "brawl": true
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "$archangel",
+          "mana": [
+            "$plains 1",
+            "$plains 2",
+            "$plains 3",
+            "$plains 4",
+            "$plains 5",
+            "$plains 6",
+            "$plains 7"
+          ]
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": "Pass"
+    }
+  ],
+  "final": [
+    {
+      "Life": {
+        "player": "alice",
+        "life": 27
+      }
+    },
+    {
+      "Count": {
+        "player": "alice",
+        "zone": "Battlefield",
+        "card": "Resolute Archangel",
+        "count": 1
+      }
+    }
+  ]
+}

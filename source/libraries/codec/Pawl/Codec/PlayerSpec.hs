@@ -22,7 +22,9 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
   -- Commander game (CR 903.3), with no speed at all (CR 702.179b) and no
   -- counters. `speed` is null here and a number below, which CR 702.179b and CR
   -- 704.5aa make two different players -- no speed at all, against a speed that
-  -- has a value. Every other field is 'Fields.defaulted' and sits at its
+  -- has a value. `startingLife` is required beside `life`, since no default
+  -- answers for every variant (CR 119.1a-e). Every other field is
+  -- 'Fields.defaulted' and sits at its
   -- default, so this literal is where the OMISSION is pinned: a field switched
   -- back to 'Fields.required' reappears in it.
   Spec.it s "a player at the start of an ordinary game" $
@@ -31,6 +33,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
       Player.codec
       Player.MkPlayer
         { Player.life = 20,
+          Player.startingLife = 20,
           Player.status = Status.Playing,
           Player.counters = Map.empty,
           Player.ringTemptations = 0,
@@ -48,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.companionTaken = False,
           Player.graveyardOrder = GraveyardOrder.Indifferent
         }
-      " {\"life\":20,\"speed\":null} "
+      " {\"life\":20,\"startingLife\":20,\"speed\":null} "
   -- Every axis away from the case above. `life` is NEGATIVE, which CR 104.3b
   -- reaches through a state-based action rather than clamping at zero, so the
   -- field is an Integer and a Natural encoder would reject this state.
@@ -63,6 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
       Player.codec
       Player.MkPlayer
         { Player.life = -1,
+          Player.startingLife = 40,
           Player.status = Status.Departed Departure.Conceded,
           Player.counters =
             Map.fromList
@@ -84,7 +88,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.companionTaken = True,
           Player.graveyardOrder = GraveyardOrder.Matters
         }
-      ( " {\"life\":-1,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
+      ( " {\"life\":-1,\"startingLife\":40,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":2}"
           <> ",{\"key\":{\"type\":\"Poison\"},\"value\":0}]"
           <> ",\"ringTemptations\":3,\"speed\":4"

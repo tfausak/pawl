@@ -3977,6 +3977,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.Count count -> concatMap quantityKindFilters (countQuantities count)
   Quantity.Type.ManaCount _ -> []
   Quantity.Type.LifeTotal _ -> []
+  Quantity.Type.StartingLifeTotal _ -> []
   Quantity.Type.Speed _ -> []
   Quantity.Type.IsMonarch _ -> []
   Quantity.Type.HasPlayerDesignation {} -> []
