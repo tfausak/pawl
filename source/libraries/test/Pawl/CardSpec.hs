@@ -5192,6 +5192,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> outsideTheGameFramed [FromOutsideTheGame.filter payload]
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> []
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> []
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ DrawRewrite.YouDraw) -> []
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []

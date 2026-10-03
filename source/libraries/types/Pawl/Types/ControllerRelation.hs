@@ -1,5 +1,9 @@
 module Pawl.Types.ControllerRelation where
 
+import qualified Data.Set as Set
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.SlotName as SlotName
+
 -- | CR 614.1 / 109.5: whose object a replacement's pattern admits, relative to the
 -- controller of the effect's SOURCE (that is what "you" means on a permanent's
 -- static ability). Hardened Scales says "a creature you control" (Yours); Rest in
@@ -19,4 +23,12 @@ data ControllerRelation
   | -- | CR 303.4b: the player the source enchants -- Wheel of Sun and Moon's
     -- "enchanted player's graveyard".
     EnchantedPlayers
-  deriving (Bounded, Enum, Eq, Ord, Show)
+  | -- | CR 601.2c / 608.2b: the players a slot of the INSTALLING resolution names
+    -- -- Plagiarize's "if target player would draw". Pawl.Engine.Resolve.Effect
+    -- bakes it into Among as the row is installed; unbaked, it admits nobody.
+    InSlot SlotName.SlotName
+  | -- | The players an InSlot named when its row was installed. Runtime-only: a
+    -- card cannot name a PlayerId, and Pawl.EffectLintSpec keeps the pool from
+    -- authoring one.
+    Among (Set.Set PlayerId.PlayerId)
+  deriving (Eq, Ord, Show)
