@@ -1,6 +1,7 @@
 module Pawl.Codec.Filter where
 
 import qualified Data.Typeable as Typeable
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
@@ -19,6 +20,7 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Filter as Filter
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
@@ -75,9 +77,7 @@ codec keywordCodec =
       Arm.nullary "OwnedByRecipient" Filter.OwnedByRecipient,
       Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer (\x -> case x of Filter.IsPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsControllerOfBound" SlotName.codec Filter.IsControllerOfBound (\x -> case x of Filter.IsControllerOfBound y -> Just y; _ -> Nothing),
-      -- Recursive like Not below, and for the atom's own reason rather than the
-      -- combinator's: the payload describes the permanents being counted.
-      Arm.payload "ControlsMoreThanYou" (codec keywordCodec) Filter.ControlsMoreThanYou (\x -> case x of Filter.ControlsMoreThanYou y -> Just y; _ -> Nothing),
+      Arm.payload "ControlsMoreThanYou" (controlsMoreThanYou keywordCodec) (uncurry Filter.ControlsMoreThanYou) (\x -> case x of Filter.ControlsMoreThanYou n y -> Just (n, y); _ -> Nothing),
       -- Natural rather than Common.integer above, so a negative literal is
       -- rejected at decode instead of decoding into a vacuously true filter: a
       -- zone holds no negative number of cards.
@@ -167,6 +167,16 @@ codec keywordCodec =
       Arm.payload "Or" (Common.list (codec keywordCodec)) Filter.Or (\x -> case x of Filter.Or y -> Just y; _ -> Nothing),
       Arm.payload "Not" (codec keywordCodec) Filter.Not (\x -> case x of Filter.Not y -> Just y; _ -> Nothing)
     ]
+
+-- | CR 110.2's comparison keyed by name: the margin, and the filter
+-- describing the permanents being counted -- recursive like Not, and for the
+-- atom's own reason rather than the combinator's.
+controlsMoreThanYou :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (Natural.Natural, Filter.Filter keyword)
+controlsMoreThanYou keywordCodec =
+  Fields.object $
+    (,)
+      <$> Fields.required "margin" Common.natural fst
+      <*> Fields.required "filter" (codec keywordCodec) snd
 
 tagOf :: Filter.Filter keyword -> String
 tagOf x = case x of
