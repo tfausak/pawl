@@ -5,8 +5,9 @@ import qualified Pawl.Types.GameState as GameState
 
 -- | CR 732.3: a game state as Pawl.Engine.Fragmented.digest leaves it for
 -- comparison. Ordered by a few cheap fields before the whole record, so two
--- states that differ in who holds priority or what is on the stack -- most
--- pairs a loop compares -- never walk every object.
+-- states that differ in who holds priority, what is on the stack, what is on
+-- the battlefield or in a mana pool -- most pairs a loop compares -- never
+-- walk every object.
 newtype StateDigest = MkStateDigest
   { unwrap :: GameState.GameState
   }
@@ -20,9 +21,14 @@ instance Ord StateDigest where
     compare (cheap a) (cheap b) <> compare a b
     where
       cheap gs =
-        ( GameState.priority gs,
-          GameState.passed gs,
-          GameState.stack gs,
-          GameState.phase gs,
-          Map.size (GameState.objects gs)
+        ( ( GameState.priority gs,
+            GameState.passed gs,
+            GameState.stack gs,
+            GameState.phase gs
+          ),
+          ( Map.size (GameState.objects gs),
+            GameState.battlefield gs,
+            GameState.manaPool gs,
+            fmap length (GameState.hand gs)
+          )
         )

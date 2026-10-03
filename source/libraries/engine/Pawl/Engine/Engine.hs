@@ -1356,7 +1356,9 @@ priorityLoop = do
                                 -- offered a choice, so a Pass-only grant pays
                                 -- nothing for it. Narrowed to Pass alone, the
                                 -- menu goes the way any Pass-only menu does.
-                                refused = if offersAChoice then Fragmented.forbidden gs p trail else Set.empty
+                                here = Fragmented.digest gs
+                                settled = if offersAChoice then Fragmented.settle here trail else trail
+                                refused = if offersAChoice then Fragmented.forbidden here gs p settled else Set.empty
                                 menu = if Set.null refused then actions else filter (`Set.notMember` refused) actions
                                 narrowedChoice = case menu of
                                   _ : _ : _ -> True
@@ -1373,7 +1375,7 @@ priorityLoop = do
                             -- making all of it advisory. Rejecting to Pass keeps
                             -- the loop total and cannot wedge the game.
                             let chosen = if List.elem answered menu then answered else Action.Type.Pass
-                                trail' = if offersAChoice then Fragmented.record gs p chosen trail else trail
+                                trail' = if offersAChoice then Fragmented.record here p chosen settled else trail
                             case chosen of
                               -- CR 117.4 / 805.5b: every team has passed in
                               -- succession once every still-playing player has,

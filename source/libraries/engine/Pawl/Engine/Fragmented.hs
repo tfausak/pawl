@@ -186,9 +186,9 @@ historyReaders =
     ["onlyFirst", "Just"]
   ]
 
--- | CR 732.3: the actions `pid`, asked at `gs`, may not take, so a
--- fragmented loop does not continue. Empty unless `gs` repeats a state this
--- loop has seen and `pid` is the player the rule names.
+-- | CR 732.3: the actions `pid`, asked at `gs` (digested as `here`), may not
+-- take, so a fragmented loop does not continue. Empty unless `here` repeats a
+-- state this loop has seen and `pid` is the player the rule names.
 --
 -- "Involved in the loop" is the players who took a non-Pass action since the
 -- state FIRST occurred: a shorter loop nested inside a longer one through the
@@ -197,30 +197,26 @@ historyReaders =
 -- occurrence, not only the last, so A, B, A, B through one state is refused
 -- too. Pass never is (CR 732.5). Pawl.FragmentedSpec's control case is the
 -- board where the nesting happens.
-forbidden :: GameState -> PlayerId -> LoopTrail -> Set.Set Action
-forbidden gs pid unsettled =
-  let here = digest gs
-      loopTrail = settle here unsettled
-   in case Map.findWithDefault [] here (LoopTrail.seen loopTrail) of
-        [] -> Set.empty
-        occurrences ->
-          let choices = LoopTrail.choices loopTrail
-              acted (_, action) = action /= Action.Pass
-              involved = Set.fromList (fmap fst (filter acted (Foldable.toList (Seq.drop (minimum occurrences) choices))))
-              named = List.find (`Set.member` involved) (Game.turnOrderFrom (GameState.activePlayer gs) gs)
-              taken = Set.fromList [action | (who, action) <- Maybe.mapMaybe (`Seq.lookup` choices) occurrences, who == pid, action /= Action.Pass]
-           in if named == Just pid && not (Set.null taken) && not (readsHistory gs) then taken else Set.empty
+forbidden :: StateDigest -> GameState -> PlayerId -> LoopTrail -> Set.Set Action
+forbidden here gs pid loopTrail =
+  case Map.findWithDefault [] here (LoopTrail.seen loopTrail) of
+    [] -> Set.empty
+    occurrences ->
+      let choices = LoopTrail.choices loopTrail
+          acted (_, action) = action /= Action.Pass
+          involved = Set.fromList (fmap fst (filter acted (Foldable.toList (Seq.drop (minimum occurrences) choices))))
+          named = List.find (`Set.member` involved) (Game.turnOrderFrom (GameState.activePlayer gs) gs)
+          taken = Set.fromList [action | (who, action) <- Maybe.mapMaybe (`Seq.lookup` choices) occurrences, who == pid, action /= Action.Pass]
+       in if named == Just pid && not (Set.null taken) && not (readsHistory gs) then taken else Set.empty
 
--- | Note that `pid`, asked at `gs`, chose `action`. Held as pending until the
--- next prompt, since an action CR 733.1 reversed leaves the game in the state
--- it was taken in and never happened.
-record :: GameState -> PlayerId -> Action -> LoopTrail -> LoopTrail
-record gs pid action unsettled =
-  let here = digest gs
-   in (settle here unsettled) {LoopTrail.pending = Just (here, pid, action)}
+-- | Note that `pid`, asked at `here`, chose `action`. Held as pending until
+-- the next prompt, since an action CR 733.1 reversed leaves the game in the
+-- state it was taken in and never happened.
+record :: StateDigest -> PlayerId -> Action -> LoopTrail -> LoopTrail
+record here pid action loopTrail = loopTrail {LoopTrail.pending = Just (here, pid, action)}
 
--- Commit the pending choice, unless the game is still in the state it was
--- made in.
+-- | Commit the pending choice, unless the game is still in the state it was
+-- made in. Both functions above take a trail settled against `here`.
 settle :: StateDigest -> LoopTrail -> LoopTrail
 settle here loopTrail = case LoopTrail.pending loopTrail of
   Nothing -> loopTrail
