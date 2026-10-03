@@ -3976,7 +3976,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
     Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentIn) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentIn exactly) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -4212,16 +4212,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- name", "that have mana value 9"). A card that said "search
                   -- your library and graveyard for any number of cards" would
                   -- refute both.
-                  let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
+                  --
+                  -- Search.exactly takes all three away (CR 101.1): Burning-Rune
+                  -- Demon's "exactly two" is completed like CR 701.23d's
+                  -- quantity, as far as the zone allows (CR 609.3).
+                  let mayDecline zone = not exactly && (upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_))
                       -- Search.differentIn: "with different names" (CR
                       -- 201.2b), "with different powers", "don't share a mana
                       -- value". Filtered, not trusted: a card sharing a value
-                      -- with one kept ahead of it is dropped. The completion
-                      -- below is not held to it, which no card reaches: every
-                      -- card in data/cards/ printing one says "up to".
+                      -- with one kept ahead of it is dropped, and the
+                      -- completion below skips one too.
                       picked = List.genericTake capHere . differing differentIn gs . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
-                      filler = filter (\oid -> List.notElem oid picked) forced
+                      filler = List.drop (length picked) . differing differentIn gs . (picked <>) $ filter (\oid -> List.notElem oid picked) forced
                       -- CR 701.23j: the searcher "MAY choose" a card out there,
                       -- so nothing forces a find outside the game, and what the
                       -- zones' find left of the one count is its ceiling. Asked

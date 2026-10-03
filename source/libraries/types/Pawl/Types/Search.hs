@@ -126,6 +126,11 @@ data Search = MkSearch
     --
     -- Not implemented: a find outside the game (CR 701.23j) is not held to it
     -- (#4295).
-    differentIn :: Set.Set DifferentIn.DifferentIn
+    differentIn :: Set.Set DifferentIn.DifferentIn,
+    -- | Whether the printed count says "exactly" -- Burning-Rune Demon's
+    -- "exactly two cards ... that have different names" -- which takes away CR
+    -- 701.23b's permission to find fewer (CR 101.1). A library short of such
+    -- cards still gives as many as it can (CR 609.3). Never set beside `upTo`.
+    exactly :: Bool
   }
   deriving (Eq, Ord, Show)
