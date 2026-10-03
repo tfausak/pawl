@@ -1,0 +1,33 @@
+{
+  "description": "CR 603.3d / 608.2d Curse of Inertia: the attacking player untaps their own tapped attacker",
+  "note": "The tap scenario's board, carol now targeting the Goblin Piker that attacking tapped. A tapped permanent leaves only the untap branch (CR 608.2d), so the may carol takes untaps it. An engine running both clauses, or only the tap, leaves the Piker tapped.",
+  "board": {
+    "active": "carol",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Curse of Inertia", "label": "curse", "attached": "bob" },
+          { "card": "Island", "label": "island" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Forest", "label": "forest" }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "do": { "Attack": ["$attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$attacker", "do": { "ChooseAttackTarget": "$bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$curse", "do": { "ChooseTargets": { "target": ["$attacker"] } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "source": "$curse", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "check": { "Tapped": { "object": "$attacker", "tapped": false } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "carol", "check": { "Attackers": { "attackers": { "$attacker": "$bob" } } } }
+  ]
+}
