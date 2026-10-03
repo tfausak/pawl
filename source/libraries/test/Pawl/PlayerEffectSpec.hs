@@ -88,9 +88,9 @@
 -- Scout's Warning is CR 601.1a's PLAY-scoped sibling of Vedalken Orrery's
 -- CastAsThoughItHadFlash, and the one producer whose criterion a LAND card can
 -- match: Dryad Arbor is a creature land, so its play (never a cast, CR 305.1)
--- is what Pawl.Engine.Action.landTimingOk has to reach. It also carries the
--- pool's only Expiry.WhenUsed grant -- CR 611.2a's "or until you play a
--- matching card, whichever comes first" -- so Mountain beside it is the
+-- is what Pawl.Engine.Action.landTimingOk has to reach. Its grant is also
+-- Expiry.WhenUsed -- CR 611.2a's "or until you play a matching card,
+-- whichever comes first" -- so Mountain beside it is the
 -- Filter's own negative and Goblin Piker proves the same grant widens a CAST.
 --
 -- Angelic Arbiter is the condition asked PER AFFECTED PLAYER: "each opponent
