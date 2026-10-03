@@ -48,7 +48,11 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -62,6 +66,7 @@ spec s registry = Spec.describe s "Companion" $ do
   startingDeck s registry
   revealing s registry
   newGames s registry
+  mainGameCompanion s registry
   specialAction s registry
 
 -- CR 103.2b: reveal the first companion offered rather than declining, which is
@@ -106,7 +111,7 @@ decks s registry = do
   let shared = [(mountain, 20), (birds, 4), (bolt, 4)]
   pure (zirda, deckOf zirda shared, deckOf zirda ((traveler, 4) : shared))
 
-companionOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe PrintingId.PrintingId
+companionOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe OutsideCard.OutsideCard
 companionOf pid gs = Map.lookup pid (GameState.players gs) >>= Player.companion
 
 startingDeckOf :: PlayerId.PlayerId -> GameState.GameState -> Map.Map PrintingId.PrintingId Natural.Natural
@@ -155,7 +160,7 @@ revealing s registry = Spec.describe s "CR 103.2b the reveal" $ do
     (zirda, aliceDeck, bobDeck) <- decks s registry
     let gs = setup revealingAnswer aliceDeck bobDeck
         idOf printing = Map.lookup printing (GameState.printingIds gs)
-    Spec.assertEqWith s "CR 702.139a: alice's every permanent card has an activated ability" (companionOf S.alice gs) (idOf zirda)
+    Spec.assertEqWith s "CR 702.139a: alice's every permanent card has an activated ability" (companionOf S.alice gs) (fmap OutsideCard.InPool (idOf zirda))
     Spec.assertEqWith s "CR 702.139a: bob's Doomed Traveler has none, so he may not reveal" (companionOf S.bob gs) Nothing
     Spec.assertEqWith s "CR 103.2b: the revealed card stays outside the game" (fmap (\i -> Map.findWithDefault 0 i (maybe Map.empty Player.outsideTheGame (Map.lookup S.alice (GameState.players gs)))) (idOf zirda)) (Just 1)
 
@@ -191,7 +196,7 @@ newGames s registry = Spec.describe s "CR 727.1 / 729.2 a new game" $ do
         unchanged = restart revealed
         idOf gs printing = Map.lookup printing (GameState.printingIds gs)
     Spec.assertEqWith s "CR 103.2b: the new deck holds the Traveler, so Zirda is not her companion" (companionOf S.alice changed) Nothing
-    Spec.assertEqWith s "CR 103.2b: and without it she reveals Zirda again" (companionOf S.alice unchanged) (idOf unchanged zirda)
+    Spec.assertEqWith s "CR 103.2b: and without it she reveals Zirda again" (companionOf S.alice unchanged) (fmap OutsideCard.InPool (idOf unchanged zirda))
     Spec.assertEqWith s "CR 103.2a: the Traveler is in the new starting deck" (idOf changed traveler >>= \i -> Map.lookup i (startingDeckOf S.alice changed)) (Just 1)
     Spec.assertEqWith s "CR 103.2a: which is all twenty-nine of her cards" (sum (Map.elems (startingDeckOf S.alice changed))) 29
 
@@ -212,7 +217,7 @@ newGames s registry = Spec.describe s "CR 727.1 / 729.2 a new game" $ do
     (zirda, aliceDeck, _) <- decks s registry
     let declined = setup S.identityAnswer aliceDeck aliceDeck
         restarted = S.runPure revealingAnswer declined (Setup.restartGame S.performer Set.empty S.alice)
-    Spec.assertEqWith s "CR 103.2b: she reveals Zirda in the new game" (companionOf S.alice restarted) (Map.lookup zirda (GameState.printingIds restarted))
+    Spec.assertEqWith s "CR 103.2b: she reveals Zirda in the new game" (companionOf S.alice restarted) (fmap OutsideCard.InPool (Map.lookup zirda (GameState.printingIds restarted)))
     Spec.assertEqWith s "having revealed nothing in the first" (companionOf S.alice declined) Nothing
 
   -- CR 729.2: the subgame's deck is the main-game LIBRARY and nothing else, so a
@@ -228,8 +233,37 @@ newGames s registry = Spec.describe s "CR 727.1 / 729.2 a new game" $ do
         idOf gs printing = Map.lookup printing (GameState.printingIds gs)
         hidden = subOf inLibrary
     Spec.assertEqWith s "CR 103.2b: a Traveler in her main-game library bars Zirda in the subgame" (companionOf S.alice hidden) Nothing
-    Spec.assertEqWith s "CR 729.2: one in her main-game hand does not" (companionOf S.alice (subOf inHand)) (idOf inHand zirda)
-    Spec.assertEqWith s "CR 729.1b: the main game still has Zirda as her companion afterwards" (companionOf S.alice (Setup.funnelBack hidden inLibrary)) (idOf inLibrary zirda)
+    Spec.assertEqWith s "CR 729.2: one in her main-game hand does not" (companionOf S.alice (subOf inHand)) (fmap OutsideCard.InPool (idOf inHand zirda))
+    Spec.assertEqWith s "CR 729.1b: the main game still has Zirda as her companion afterwards" (companionOf S.alice (Setup.funnelBack hidden inLibrary)) (fmap OutsideCard.InPool (idOf inLibrary zirda))
+
+-- CR 729.4: inside a subgame every main-game object is outside the game, so a
+-- companion card alice owns in her main-game HAND is one CR 103.2b lets her
+-- reveal. Her sideboard is empty, so that object is the only candidate there is.
+-- CR 116.2g's {3} then brings that very object in, which CR 729.4a takes out of
+-- the main game once the subgame ends.
+--
+-- A FACE-DOWN main-game Zirda beside it is the control: CR 708.2 leaves it no
+-- companion ability, so it is never offered.
+mainGameCompanion :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+mainGameCompanion s registry = Spec.describe s "CR 729.4 a subgame's companion" $ do
+  Spec.it s "CR 729.4 a main-game companion card may be revealed and taken in a subgame" $ do
+    zirda <- S.printingOf s registry "Zirda, the Dawnwaker"
+    mountain <- S.printingOf s registry "Mountain"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    let built = setup S.identityAnswer (Deck.fromCards (Map.fromList [(mountain, 20), (birds, 4)])) (Deck.fromCards (Map.fromList [(mountain, 24)]))
+        -- The face-down one FIRST, so it has the lower id and would head the
+        -- offer if it were offered at all.
+        (faceDown, onField) = S.addPermanent zirda S.alice built
+        (zirdaInHand, parent) = S.addHandCard zirda S.alice onField
+        hidden = parent {GameState.objects = Map.adjust (\o -> o {Object.facing = Facing.faceDown FaceDownReason.Manifested}) faceDown (GameState.objects parent)}
+        sub = S.runPure revealingAnswer (Setup.subgameStateFrom S.alice hidden) (Setup.startGameFromCards S.performer Set.empty)
+        withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) sub [1 :: Int, 2, 3]
+        ready = withLands {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        taken = S.runPure S.identityAnswer ready (Companion.take S.manaPerformer S.alice)
+        zirdasInHand gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack "Zirda, the Dawnwaker"))) (Game.zoneMembers Zone.Hand S.alice gs)
+    Spec.assertEqWith s "CR 103.2b / 729.4: she reveals the Zirda in her main-game hand, not the face-down one" (companionOf S.alice sub) (Just (OutsideCard.InAnotherGame zirdaInHand))
+    Spec.assertEqWith s "CR 116.2g: paying {3} puts it into her subgame hand" (length (zirdasInHand taken)) 1
+    Spec.assertBool s (List.notElem zirdaInHand (Game.zoneMembers Zone.Hand S.alice (Setup.applyCrossings taken hidden))) "CR 729.4a: and the main game has lost it"
 
 -- alice with `lands` Mountains untapped in her precombat main phase holding
 -- priority, TWO Zirdas outside the game, and `chosen` saying whether CR 103.2b's
@@ -250,7 +284,7 @@ actionBoard mountain zirda chosen lands =
       stock p =
         p
           { Player.outsideTheGame = Map.singleton zirdaId 2,
-            Player.companion = if chosen then Just zirdaId else Nothing
+            Player.companion = if chosen then Just (OutsideCard.InPool zirdaId) else Nothing
           }
    in ( zirdaId,
         gs1
