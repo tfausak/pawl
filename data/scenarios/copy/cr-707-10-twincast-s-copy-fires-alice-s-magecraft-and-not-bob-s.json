@@ -1,13 +1,12 @@
 {
-  "description": "CR 707.10 Twincast's copy fires alice's magecraft, not prowess, and not bob's",
-  "note": "Bob casts the Bolt and alice Twincasts it. Alice drawing two Islands is magecraft firing on her cast AND on her copy; one would be the cast alone. Swiftspear at 2/3 rather than 3/4 is CR 707.10's copy not being cast, so plain prowess fires once. Bob drawing one Mountain is the copy being alice's, not the copied spell's controller's.",
+  "description": "CR 707.10 Twincast's copy fires alice's magecraft and not bob's",
+  "note": "Bob casts the Bolt and alice Twincasts it. Bob drawing one Mountain, not two, is the copy being alice's rather than the copied spell's controller's. Alice drawing two Islands is magecraft firing on her cast AND on her copy; one would be the cast alone. The prowess twin is the copy not being cast.",
   "board": {
     "seats": [
       {
         "name": "alice",
         "battlefield": [
           { "card": "Archmage Emeritus", "label": "alice-archmage" },
-          { "card": "Monastery Swiftspear", "label": "swiftspear" },
           { "card": "Island", "label": "island-1" },
           { "card": "Island", "label": "island-2" }
         ],
@@ -31,13 +30,11 @@
     "step": "PrecombatMain"
   },
   "timeline": [
-    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bolt", "targets": ["$carol"], "mana": ["$mountain", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": { "Cast": { "object": "$bolt", "targets": ["$carol"], "mana": ["$mountain"] } } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "$twincast", "targets": ["Lightning Bolt"], "mana": ["$island-1", "$island-2"] } } },
-    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTriggers": ["$swiftspear", "$alice-archmage"] } },
     { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseTargets": { "target": ["$carol"] } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 2 } } },
-    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "PowerToughness": { "object": "$swiftspear", "power": 2, "toughness": 3 } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Mountain", "count": 1 } } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Hand", "card": "Island", "count": 2 } } },
     { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Life": { "player": "carol", "life": 14 } } }
   ]
 }

@@ -1226,6 +1226,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
+    GameEvent.SpellCopied _ -> False
     GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.TookInitiative _ -> False
