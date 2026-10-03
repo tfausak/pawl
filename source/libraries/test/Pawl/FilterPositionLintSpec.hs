@@ -231,6 +231,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.ToughnessGreaterThanPower -> 0
   Filter.Type.PowerLessThanSource -> 0
   Filter.Type.PowerGreaterThanSource -> 0
+  Filter.Type.PowerAtLeastSourceToughness -> 0
   Filter.Type.PowerIsAmountInSlot _ -> 0
   Filter.Type.PowerAtLeastAmountInSlot _ -> 0
   Filter.Type.ControlledByDefendingPlayer -> 0
@@ -2397,14 +2398,15 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (ManaRestrictionFramed, [bound]),
         (TriggerConditionFramed, [bound])
       ]
-  -- The two source-power comparisons are answerable only where the CONTEXT
-  -- supplies a source power: Filter.Context.sourcePower is filled by
+  -- The source-power comparisons are answerable only where the CONTEXT
+  -- supplies a source power (or, for PowerAtLeastSourceToughness, a source
+  -- toughness, filled by the same callers): Filter.Context.sourcePower is filled by
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by
   -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's condition and by
   -- Pawl.Engine.CombatRestriction's two CR 509.1b pairwise walks, and is Nothing
   -- everywhere else -- so either atom in a card's affected set, Count filter or
   -- search filter would be a silent False. Outside a face's own pairwise
-  -- position (Spitfire Handler's), only Pawl.Engine.Keyword's mentor and
+  -- position (Spitfire Handler's, Ironclaw Curse's), only Pawl.Engine.Keyword's mentor and
   -- training and Pawl.Engine.Ring's emblem write them, and this is what keeps
   -- that true.
   Spec.it s "CR 702.134a / CR 702.149a no card writes a source-power comparison" $ do
@@ -2416,7 +2418,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           _ -> []
         atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerLessThanSource" c
         greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerGreaterThanSource" c
-        offenders = filter (anyFace (\c -> atoms c /= 0 || greater c /= 0) . Printing.card) ps
+        toughness c = jsonAtoms (Text.pack "PowerAtLeastSourceToughness") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerAtLeastSourceToughness" c
+        offenders = filter (anyFace (\c -> atoms c /= 0 || greater c /= 0 || toughness c /= 0) . Printing.card) ps
     Spec.assertEqWith s "the atoms are the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sweep above would be on its own: the same counter
     -- over a hand-built face that DOES carry the atom -- buried under all three
@@ -2442,6 +2445,15 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
+    let buriedToughness = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerAtLeastSourceToughness]]
+        plantedToughness =
+          planted
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedToughness)))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "and so is the toughness comparison" (toughness plantedToughness) 1
   -- CR 702.85a's comparison is the pair above's one characteristic over, and
   -- narrower still: Filter.Context.sourceManaValue is filled by
   -- Pawl.Engine.Resolve.Slots.effectContext alone, so the atom is answerable only

@@ -317,6 +317,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
             Filter.perspective = perspective,
             Filter.source = Just source,
             Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
+            Filter.sourceToughness = Nothing,
             -- Nothing: CR 702.85a's comparison is written into a resolution's own
             -- references (Pawl.Engine.Resolve.Slots.effectContext fills it), never
             -- into a target slot, and Pawl.FilterPositionLintSpec is what keeps a

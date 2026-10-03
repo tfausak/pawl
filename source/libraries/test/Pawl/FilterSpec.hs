@@ -448,6 +448,21 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
     Spec.it s "is False for a player" $ do
       Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.PowerGreaterThanSource)) "player"
+
+  -- Ironclaw Curse's comparison: the candidate's power against the source's
+  -- TOUGHNESS, inclusively. The source's power is set apart from its toughness
+  -- so a reading of the wrong field disagrees.
+  Spec.describe s "PowerAtLeastSourceToughness" $ do
+    let sourced t = self {Filter.sourcePower = Just 9, Filter.sourceToughness = Just t}
+    Spec.it s "holds at and above the source's toughness and fails below it" $ do
+      Spec.assertBool s (Filter.matches (sourced 2) blackCreature Filter.Type.PowerAtLeastSourceToughness) "2 >= 2"
+      Spec.assertBool s (Filter.matches (sourced 1) blackCreature Filter.Type.PowerAtLeastSourceToughness) "2 >= 1"
+      Spec.assertBool s (not (Filter.matches (sourced 3) blackCreature Filter.Type.PowerAtLeastSourceToughness)) "2 is not >= 3"
+
+    Spec.it s "is False when either number is absent" $ do
+      let noPower = blackCreature {Filter.power = Nothing}
+      Spec.assertBool s (not (Filter.matches (sourced 1) noPower Filter.Type.PowerAtLeastSourceToughness)) "no candidate power"
+      Spec.assertBool s (not (Filter.matches (self {Filter.sourcePower = Just 0}) blackCreature Filter.Type.PowerAtLeastSourceToughness)) "no source toughness"
   -- CR 702.39a's "defending player controls", whose player comes from the
   -- Context rather than from the perspective. blackCreature is controlled by
   -- player 0 and OWNED by player 1, so a reading that consulted the wrong field
