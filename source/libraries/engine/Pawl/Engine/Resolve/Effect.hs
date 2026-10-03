@@ -4544,7 +4544,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           pure $ case RollDie.modifier rollDie of
             Nothing -> 0
             Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
-        rollers = filter (`elem` Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) before (RollDie.roller rollDie))) (Game.apnapOrder before)
+        -- CR 801.10's table: a roller is in the controller's range, still
+        -- playing, and in the instruction's scope.
+        rollers = filter (\pid -> Game.inRangeOf controller pid before && PlayerEffect.inScope pid controller before (RollDie.roller rollDie)) (Game.apnapOrder before)
     rolled <- Monad.forM rollers $ \roller -> do
       (results, throwers) <- throwDice roller sides named perDie
       used <- case RollDie.reading rollDie of
